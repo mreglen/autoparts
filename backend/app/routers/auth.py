@@ -1,0 +1,359 @@
+# app/routers/auth.py
+from fastapi import APIRouter, Depends, Form, HTTPException, status
+from sqlalchemy.orm import Session
+from app.models.organization import Organization
+from app.models.password_reset_token import PasswordResetToken
+from app.models.pending_user import PendingUser
+from app.models.user import User
+from app.schemas.auth import (
+    EmailOnly,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    RegisterStep1,
+    UserLogin,
+    VerifyCode,
+    Token
+)
+from app.core.security import get_password_hash
+from app.core.auth import authenticate_user, create_access_token, get_current_user
+from app.db.database import get_db
+from datetime import datetime, timedelta, timezone
+from app.core.config import Settings
+from app.schemas.user import UserResponse
+from app.utils.email import generate_verification_code, send_verification_email
+from app.utils.event_logger import log_event
+from app.utils.id_generator import random_id
+from app.utils.phone import normalize_to_storage_format  
+import logging
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/auth", tags=["Auth"])
+settings = Settings()
+
+
+def _validate_and_normalize_phone(phone: str) -> str:
+    """Вспомогательная функция: валидирует и нормализует телефон к формату +7 (XXX) XXX-XX-XX"""
+    normalized = normalize_to_storage_format(phone)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Неверный формат телефона")
+    return normalized
+
+
+@router.post("/register/start")
+def register_start(data: RegisterStep1, db: Session = Depends(get_db)):
+    if db.query(User).filter(User.email == data.email).first():
+        raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
+
+    existing_pending = db.query(PendingUser).filter(PendingUser.email == data.email).first()
+    if existing_pending:
+        db.delete(existing_pending)
+        db.commit()
+
+    if data.is_seller:
+        if not data.name_organization or not data.address_organization:
+            raise HTTPException(status_code=400, detail="Для продавца обязательны название и адрес организации")
+
+    try:
+        normalized_phone = _validate_and_normalize_phone(data.phone)
+
+        code = generate_verification_code()
+        pending = PendingUser(
+            last_name=data.last_name,
+            first_name=data.first_name,
+            patronymic=data.patronymic,
+            email=data.email,
+            phone=normalized_phone, 
+            is_buyer=data.is_buyer,
+            is_seller=data.is_seller,
+            name_organization=data.name_organization,
+            address_organization=data.address_organization,
+            hashed_password=get_password_hash(data.password),
+            verification_code=code,
+        )
+        db.add(pending)
+        db.commit()
+        db.refresh(pending)
+
+        log_event(
+            db,
+            event_type="registration_started",
+            email=pending.email,
+            details={
+                "is_buyer": pending.is_buyer,
+                "is_seller": pending.is_seller,
+                "phone": normalized_phone,
+                "name_organization": pending.name_organization,
+                "address_organization": pending.address_organization,
+            }
+        )
+
+        send_verification_email(data.email, code)
+        return {"msg": "Код подтверждения отправлен на ваш email"}
+
+    except Exception as e:
+        logger.exception("Ошибка при сохранении или отправке email")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@router.post("/register/confirm")
+def register_confirm(data: VerifyCode, db: Session = Depends(get_db)):
+    pending = db.query(PendingUser).filter(PendingUser.email == data.email).first()
+    if not pending:
+        raise HTTPException(status_code=400, detail="Нет данных для этого email")
+
+    now = datetime.now(timezone.utc)
+    if (now - pending.created_at).total_seconds() > settings.VERIFICATION_CODE_EXPIRE_SECONDS:
+        db.delete(pending)
+        db.commit()
+        raise HTTPException(status_code=400, detail="Код устарел")
+
+    if pending.verification_code != data.code:
+        raise HTTPException(status_code=400, detail="Неверный код")
+
+    organization_id = None
+
+    if pending.is_seller:
+        from app.utils.id_generator import random_id
+        org_id = random_id(10)
+        org = Organization(
+            id=org_id,
+            name=pending.name_organization,
+            address=pending.address_organization
+        )
+        db.add(org)
+        db.flush()
+        organization_id = org.id
+
+    user = User(
+        last_name=pending.last_name,
+        first_name=pending.first_name,
+        patronymic=pending.patronymic,
+        email=pending.email,
+        phone=pending.phone,  
+        is_buyer=pending.is_buyer,
+        is_seller=pending.is_seller,
+        organization_id=organization_id,
+        hashed_password=pending.hashed_password,
+        is_director=pending.is_seller,
+    )
+    db.add(user)
+    db.delete(pending)
+    db.commit()
+    db.refresh(user)
+    log_event(
+        db,
+        event_type="user_registered",
+        user_id=user.id,
+        email=user.email,
+        details={
+            "is_buyer": user.is_buyer,
+            "is_seller": user.is_seller,
+            "phone": user.phone,
+        }
+    )
+
+    access_token = create_access_token(data={"sub": user.email})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+
+@router.post("/login", response_model=Token)
+def login(
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    user = authenticate_user(db, username, password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Неверный email/телефон или пароль",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    log_event(db, event_type="user_logged_in", user_id=user.id, email=user.email)
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/profile", response_model=UserResponse)
+def get_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Получаем пользователя с данными организации
+    user_data = db.query(User).filter(User.id == current_user.id).first()
+
+    # Создаем объект ответа с названием организации
+    response_data = {
+        "id": user_data.id,
+        "last_name": user_data.last_name,
+        "first_name": user_data.first_name,
+        "patronymic": user_data.patronymic,
+        "email": user_data.email,
+        "phone": user_data.phone,
+        "is_buyer": user_data.is_buyer,
+        "is_seller": user_data.is_seller,
+        "is_admin": user_data.is_admin,
+        "is_director": user_data.is_director,
+        "organization_id": user_data.organization_id,
+        "organization_name": user_data.organization.name if user_data.organization_id and user_data.organization else None
+    }
+
+    return response_data
+
+@router.post("/register/send-code")
+def send_code(data: EmailOnly, db: Session = Depends(get_db)):
+    email = data.email.strip().lower()
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
+
+
+    existing = db.query(PendingUser).filter(PendingUser.email == email).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+
+    code = generate_verification_code()
+    pending = PendingUser(
+        email=email,
+        verification_code=code,
+        created_at=datetime.now(timezone.utc)
+    )
+    db.add(pending)
+    db.commit()
+    send_verification_email(email, code)
+    return {"msg": "Код отправлен"}
+
+
+@router.post("/register/verify-code")
+def verify_code(data: VerifyCode, db: Session = Depends(get_db)):
+    pending = db.query(PendingUser).filter(PendingUser.email == data.email).first()
+    if not pending:
+        raise HTTPException(status_code=400, detail="Нет данных для этого email")
+
+    if pending.verification_code != data.code:
+        raise HTTPException(status_code=400, detail="Неверный код")
+
+    pending.is_verified = True
+    db.commit()
+
+    return {"msg": "Код подтверждён"}
+
+
+@router.post("/register/complete")
+def complete_registration(data: RegisterStep1, db: Session = Depends(get_db)):
+    pending = db.query(PendingUser).filter(PendingUser.email == data.email).first()
+    if not pending or not pending.is_verified:
+        raise HTTPException(status_code=400, detail="Email не подтверждён")
+
+    if db.query(User).filter(User.email == data.email).first():
+        raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
+
+    if data.is_seller:
+        if not data.name_organization or not data.address_organization:
+            raise HTTPException(status_code=400, detail="Для продавца обязательны название и адрес организации")
+
+    try:
+        normalized_phone = _validate_and_normalize_phone(data.phone)
+
+        organization_id = None
+        if data.is_seller:
+            org_id = random_id(10)
+            org = Organization(
+                id=org_id,
+                name=data.name_organization,
+                address=data.address_organization
+            )
+            db.add(org)
+            db.flush()
+            organization_id = org.id
+
+        user = User(
+            last_name=data.last_name,
+            first_name=data.first_name,
+            patronymic=data.patronymic,
+            email=data.email,
+            phone=normalized_phone,  
+            is_buyer=data.is_buyer,
+            is_seller=data.is_seller,
+            organization_id=organization_id,
+            hashed_password=get_password_hash(data.password),
+            is_director=data.is_seller, 
+        )
+        db.add(user)
+        db.delete(pending)
+        db.commit()
+        db.refresh(user)
+        log_event(
+            db,
+            event_type="user_registered",
+            user_id=user.id,
+            email=user.email,
+            details={
+                "is_buyer": user.is_buyer,
+                "is_seller": user.is_seller,
+                "phone": user.phone,
+            }
+        )
+
+        access_token = create_access_token(data={"sub": user.email})
+        return {"access_token": access_token, "token_type": "bearer"}
+
+    except Exception as e:
+        logger.exception("Ошибка при создании пользователя")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
+
+@router.post("/logout")
+def logout():
+    return {"msg": "Выход выполнен"}
+
+
+@router.post("/password/send-code")
+def send_password_reset_code(data: PasswordResetRequest, db: Session = Depends(get_db)):
+    email = data.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Пользователь с таким email не найден")
+
+    db.query(PasswordResetToken).filter(PasswordResetToken.email == email).delete()
+    db.commit()
+
+    token = generate_verification_code()
+    reset_token = PasswordResetToken(token=token, email=email)
+    db.add(reset_token)
+    db.commit()
+    send_verification_email(email, token)
+    return {"msg": "Код подтверждения отправлен на ваш email"}
+
+
+@router.post("/password/verify")
+def verify_password_reset(data: PasswordResetConfirm, db: Session = Depends(get_db)):
+    email = data.email.strip().lower()
+    code = data.code.strip()
+
+    token_record = db.query(PasswordResetToken).filter(
+        PasswordResetToken.email == email,
+        PasswordResetToken.token == code
+    ).first()
+
+    if not token_record:
+        raise HTTPException(status_code=400, detail="Неверный код или email")
+
+    now = datetime.now(timezone.utc)
+    if (now - token_record.created_at).total_seconds() > settings.VERIFICATION_CODE_EXPIRE_SECONDS:
+        db.delete(token_record)
+        db.commit()
+        raise HTTPException(status_code=400, detail="Код устарел")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Пользователь не найден")
+
+    user.hashed_password = get_password_hash(data.new_password)
+    db.delete(token_record)
+    db.commit()
+    return {"msg": "Пароль успешно изменён"}

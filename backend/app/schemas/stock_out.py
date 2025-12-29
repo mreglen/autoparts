@@ -1,0 +1,34 @@
+from typing import Optional
+from pydantic import BaseModel
+from datetime import date
+from .product import Product
+from .storage_location import StorageLocation
+from .user import User  
+
+class StockOutBase(BaseModel):
+    quantity: int
+    sale_price: float
+    movement_date: date
+    reason: Optional[str] = None
+
+class StockOutCreate(StockOutBase):
+    organization_id: str
+    storage_location_id: int
+    product_id: int
+    acquired_product_id: Optional[int] = None
+    user_id: int
+
+class StockOut(StockOutBase):
+    id: int
+    organization_id: str
+    storage_location_id: int
+    product_id: int
+    acquired_product_id: Optional[int] = None
+    user_id: int
+
+    product: Optional[Product] = None
+    storage_location: Optional[StorageLocation] = None
+    user: Optional[User] = None
+
+    class Config:
+        from_attributes = True
