@@ -13,7 +13,7 @@ app.include_router(api_router)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.add_middleware(
-    CORSMiddleware,
+    CORSMiddleware, 
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",

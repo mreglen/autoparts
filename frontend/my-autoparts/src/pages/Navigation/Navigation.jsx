@@ -26,11 +26,17 @@ export default function Navigation() {
     const cart = useSelector(selectCart);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [closeTimeout, setCloseTimeout] = useState(null);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const handleLogout = () => {
         dispatch(logout());
         setIsProfileOpen(false);
+        setIsMobileMenuOpen(false);
         navigate('/', { replace: true });
+    };
+
+    const closeMobileMenu = () => {
+        setIsMobileMenuOpen(false);
     };
 
     const handleMouseEnter = () => {
@@ -56,6 +62,18 @@ export default function Navigation() {
             }
         };
     }, [closeTimeout]);
+
+    // Закрытие мобильного меню при клике вне его
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (isMobileMenuOpen && !event.target.closest('header')) {
+                setIsMobileMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isMobileMenuOpen]);
 
     const fullName = `${user?.last_name || ''} ${user?.first_name || ''} ${user?.patronymic || ''}`.trim();
     // Для директоров показываем ФИО, для остальных - название организации или ФИО
@@ -84,17 +102,18 @@ export default function Navigation() {
         <header className="bg-white shadow-md">
             <div className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-7">
                 {/* Верхняя строка: локация + навигация */}
-                <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-2">
                         <img
                             src="/img/location_on_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg"
                             alt="Локация"
                             className="filter invert w-5 h-5"
                         />
-                        <p className="text-lg">г. Екатеринбург</p>
+                        <p className="text-sm sm:text-lg">г. Екатеринбург</p>
                     </div>
 
-                    <nav className="flex flex-wrap justify-center gap-4 mt-4 md:mt-0">
+                    {/* Десктопное меню */}
+                    <nav className="hidden md:flex flex-wrap justify-center gap-4">
                         {/* Всегда видимые пункты */}
                         <NavLink
                             to="/autoparts"
@@ -155,12 +174,33 @@ export default function Navigation() {
                             </NavLink>
                         ))}
 
-                        
+
                     </nav>
+
+                    {/* Мобильное бургер-меню */}
+                    <div className="md:hidden">
+                        <button
+                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            className="p-2 rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                        >
+                            <svg
+                                className="h-6 w-6"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                {isMobileMenuOpen ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                ) : (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                )}
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Основная часть */}
-                <div className="flex flex-col md:flex-row justify-between items-center gap-6 pb-4">
+                <div className="flex flex-col lg:flex-row justify-between items-center gap-4 lg:gap-6 pb-4">
                     {/* Логотип + каталог */}
                     <div className="flex items-center gap-6">
                         <NavLink to="/" className="flex items-center gap-3">
@@ -184,7 +224,7 @@ export default function Navigation() {
                     <Search />
 
                     {/* Профиль / Вход */}
-                    <div className="flex items-center gap-6 relative">
+                    <div className="flex items-center gap-3 sm:gap-6 relative">
                         {token ? (
                             <div
                                 className="relative"
@@ -192,7 +232,7 @@ export default function Navigation() {
                                 onMouseLeave={handleMouseLeave}
                             >
                                 <button
-                                    className="text-sm font-bold text-gray-700 hover:text-indigo-600 whitespace-nowrap"
+                                    className="text-xs sm:text-sm font-bold text-gray-700 hover:text-indigo-600 whitespace-nowrap"
                                 >
                                     {displayName}
                                 </button>
@@ -228,24 +268,24 @@ export default function Navigation() {
                                 )}
                             </div>
                         ) : (
-                            <NavLink to="/auth" className="flex flex-col items-center justify-center text-center text-sm text-gray-700 hover:text-indigo-600">
-                                <img src="/img/log-in 1.svg" alt="Войти" className="w-6 h-6" />
+                            <NavLink to="/auth" className="flex flex-col items-center justify-center text-center text-xs sm:text-sm text-gray-700 hover:text-indigo-600">
+                                <img src="/img/log-in 1.svg" alt="Войти" className="w-5 h-5 sm:w-6 sm:h-6" />
                                 <p className="font-bold">Войти</p>
                             </NavLink>
                         )}
 
-                        <NavLink to="/cart" className="flex flex-col items-center justify-center text-center text-sm text-gray-700 hover:text-indigo-600">
+                        <NavLink to="/cart" className="flex flex-col items-center justify-center text-center text-xs sm:text-sm text-gray-700 hover:text-indigo-600">
                             <div className="relative">
-                                <img src="/img/shopping-cart 1.svg" alt="Корзина" className="w-6 h-6" />
+                                <img src="/img/shopping-cart 1.svg" alt="Корзина" className="w-5 h-5 sm:w-6 sm:h-6" />
                                 {cartData.itemCount > 0 && (
-                                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
                                         {cartData.itemCount}
                                     </span>
                                 )}
                             </div>
                             <p className="font-bold">Корзина</p>
                             {cartData.itemCount > 0 && (
-                                <p className="text-xs text-indigo-600 font-medium">
+                                <p className="text-xs text-indigo-600 font-medium hidden sm:block">
                                     {formatPrice(cartData.totalPrice)}
                                 </p>
                             )}
@@ -253,6 +293,140 @@ export default function Navigation() {
                     </div>
                 </div>
             </div>
+
+            {/* Мобильное меню */}
+            {isMobileMenuOpen && (
+                <div className="md:hidden bg-white border-t border-gray-200">
+                    <div className="px-3 py-4 space-y-1">
+                        {/* Основные пункты меню */}
+                        <NavLink
+                            to="/autoparts"
+                            onClick={closeMobileMenu}
+                            className={({ isActive }) =>
+                                `block px-3 py-2 text-base font-medium rounded-md ${
+                                    isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
+                                }`
+                            }
+                        >
+                            Автозапчасти
+                        </NavLink>
+                        <NavLink
+                            to="/autoservice"
+                            onClick={closeMobileMenu}
+                            className={({ isActive }) =>
+                                `block px-3 py-2 text-base font-medium rounded-md ${
+                                    isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
+                                }`
+                            }
+                        >
+                            Сервис
+                        </NavLink>
+
+                        {/* Пункт Покупки для всех авторизованных пользователей */}
+                        {token && (
+                            <NavLink
+                                to="/purchases"
+                                onClick={closeMobileMenu}
+                                className={({ isActive }) =>
+                                    `block px-3 py-2 text-base font-medium rounded-md ${
+                                        isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
+                                    }`
+                                }
+                            >
+                                Покупки
+                            </NavLink>
+                        )}
+
+                        {/* Пункт Продажи только для админов */}
+                        {token && user?.is_admin && (
+                            <NavLink
+                                to="/sales"
+                                onClick={closeMobileMenu}
+                                className={({ isActive }) =>
+                                    `block px-3 py-2 text-base font-medium rounded-md ${
+                                        isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
+                                    }`
+                                }
+                            >
+                                Продажи
+                            </NavLink>
+                        )}
+
+                        {/* Пункты только для продавцов */}
+                        {token && user?.is_seller && sellerMenuItems.map((item) => (
+                            <NavLink
+                                key={item.path}
+                                to={item.path}
+                                onClick={closeMobileMenu}
+                                className={({ isActive }) =>
+                                    `block px-3 py-2 text-base font-medium rounded-md ${
+                                        isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
+                                    }`
+                                }
+                            >
+                                {item.name}
+                            </NavLink>
+                        ))}
+
+                        {/* Дополнительные пункты для всех авторизованных */}
+                        {token && (
+                            <>
+                                <div className="border-t border-gray-200 my-2"></div>
+                                <NavLink
+                                    to="/orders"
+                                    onClick={closeMobileMenu}
+                                    className={({ isActive }) =>
+                                        `block px-3 py-2 text-base font-medium rounded-md ${
+                                            isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
+                                        }`
+                                    }
+                                >
+                                    Заказы
+                                </NavLink>
+                                <NavLink
+                                    to="/storage"
+                                    onClick={closeMobileMenu}
+                                    className={({ isActive }) =>
+                                        `block px-3 py-2 text-base font-medium rounded-md ${
+                                            isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
+                                        }`
+                                    }
+                                >
+                                    Склад
+                                </NavLink>
+                                <NavLink
+                                    to="/profile"
+                                    onClick={closeMobileMenu}
+                                    className={({ isActive }) =>
+                                        `block px-3 py-2 text-base font-medium rounded-md ${
+                                            isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
+                                        }`
+                                    }
+                                >
+                                    Профиль
+                                </NavLink>
+                                <button
+                                    onClick={handleLogout}
+                                    className="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-md"
+                                >
+                                    Выход
+                                </button>
+                            </>
+                        )}
+
+                        {/* Кнопка входа для неавторизованных */}
+                        {!token && (
+                            <NavLink
+                                to="/auth"
+                                onClick={closeMobileMenu}
+                                className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-md"
+                            >
+                                Войти
+                            </NavLink>
+                        )}
+                    </div>
+                </div>
+            )}
         </header>
     );
 }

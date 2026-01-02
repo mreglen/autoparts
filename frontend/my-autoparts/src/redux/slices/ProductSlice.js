@@ -345,10 +345,40 @@ const productSlice = createSlice({
             .addCase(fetchProduct.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
+            })
+            .addCase(fetchPublicProducts.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(fetchPublicProducts.fulfilled, (state, action) => {
+                state.loading = false;
+                state.items = action.payload;
+            })
+            .addCase(fetchPublicProducts.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
             });
     },
 });
 
+
+export const fetchPublicProducts = createAsyncThunk(
+    'products/fetchPublicProducts',
+    async (_, { rejectWithValue }) => {
+        try {
+            // Запрос без авторизации к публичному endpoint поиска
+            const response = await axios.get(`${API_BASE}/search-products/search`, {
+                params: { q: '' }, // Пустой запрос для получения всех продуктов
+            });
+
+            return response.data || [];
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки продуктов'
+            );
+        }
+    }
+);
 
 export const { clearProductError, resetProducts, updateProductQuantity } = productSlice.actions;
 export { fetchAllProducts };

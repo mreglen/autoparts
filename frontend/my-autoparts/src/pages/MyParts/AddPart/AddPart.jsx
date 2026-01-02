@@ -199,7 +199,7 @@ const AddPart = () => {
           <input
             type="file"
             multiple
-            accept="image/*"
+            accept="image/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2"
             onChange={handlePhotoAdd}
             className="mt-1"
           />
