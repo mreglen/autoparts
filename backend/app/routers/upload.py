@@ -12,7 +12,10 @@ router = APIRouter(prefix="/upload", tags=["Upload"])
 
 @router.post("/photo")
 async def upload_photo(file: UploadFile = File(...)):
+    print(f"Upload attempt: filename={file.filename}, content_type={file.content_type}")
+
     if not file.content_type or not file.content_type.startswith("image/"):
+        print(f"Rejected: invalid content type {file.content_type}")
         raise HTTPException(400, "Разрешены только изображения")
 
     # Получаем расширение файла
@@ -44,9 +47,17 @@ async def upload_photo(file: UploadFile = File(...)):
     filename = f"{uuid.uuid4().hex}{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
 
+    print(f"Saving file to: {filepath}")
+    print(f"Upload dir exists: {os.path.exists(UPLOAD_DIR)}")
+
+    # Создаем директорию, если не существует
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+
     # Сохраняем файл
     with open(filepath, "wb") as f:
-        f.write(await file.read())
+        content = await file.read()
+        f.write(content)
+        print(f"File saved successfully, size: {len(content)} bytes")
 
     # Возвращаем относительный URL
     return {"url": f"/uploads/{filename}"}
