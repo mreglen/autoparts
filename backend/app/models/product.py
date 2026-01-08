@@ -49,7 +49,7 @@ class ProductPhoto(Base):
     @property
     def full_url(self):
         # Если photo_url уже содержит полный URL со старым IP, исправляем его
-        if self.photo_url.startswith('http://192.168.0.100'):
+        if self.photo_url.startswith('http://127.0.0.1'):
             filename = self.photo_url.split('/')[-1]
             return f"{settings.BASE_URL.rstrip('/')}/uploads/{filename}"
         # Если photo_url уже содержит полный URL с правильным IP, используем как есть

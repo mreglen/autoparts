@@ -1,14 +1,30 @@
 # app/routers/upload.py
 import os
 import uuid
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, Response
 from fastapi.responses import FileResponse
+
+# Максимальный размер файла в байтах (50MB)
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
 UPLOAD_DIR = "uploads"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 router = APIRouter(prefix="/upload", tags=["Upload"])
+
+@router.options("/photo")
+async def options_upload_photo():
+    """Handle OPTIONS request for photo upload"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "86400",
+        }
+    )
 
 @router.post("/photo")
 async def upload_photo(file: UploadFile = File(...)):
@@ -17,6 +33,19 @@ async def upload_photo(file: UploadFile = File(...)):
     if not file.content_type or not file.content_type.startswith("image/"):
         print(f"Rejected: invalid content type {file.content_type}")
         raise HTTPException(400, "Разрешены только изображения")
+
+    # Проверяем размер файла перед загрузкой
+    file_content = await file.read()
+    file_size = len(file_content)
+
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            413,
+            f"Файл слишком большой. Размер: {file_size/1024/1024:.1f}MB. Максимальный размер: {MAX_FILE_SIZE/1024/1024}MB"
+        )
+
+    # Возвращаем указатель файла в начало для повторного чтения
+    await file.seek(0)
 
     # Получаем расширение файла
     ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
@@ -53,11 +82,10 @@ async def upload_photo(file: UploadFile = File(...)):
     # Создаем директорию, если не существует
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    # Сохраняем файл
+    # Сохраняем файл (используем уже прочитанный контент)
     with open(filepath, "wb") as f:
-        content = await file.read()
-        f.write(content)
-        print(f"File saved successfully, size: {len(content)} bytes")
+        f.write(file_content)
+        print(f"File saved successfully, size: {file_size} bytes")
 
     # Возвращаем относительный URL
     return {"url": f"/uploads/{filename}"}
