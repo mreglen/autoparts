@@ -1,22 +1,14 @@
 // src/redux/slices/StockOutSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-
-const API_BASE = process.env.REACT_APP_API_URL;
-
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import { apiAxios } from '../../utils/apiClient';
 
 export const createStockOut = createAsyncThunk(
   'stockOut/createStockOut',
   async (stockOutData, { rejectWithValue }) => {
     try {
-      const response = await axios.post(
-        `${API_BASE}/stock-outs/`,
-        stockOutData,
-        { headers: getAuthHeaders() }
+      const response = await apiAxios.post(
+        `/stock-outs/`,
+        stockOutData
       );
       return response.data;
     } catch (error) {
@@ -31,9 +23,8 @@ export const fetchStockOuts = createAsyncThunk(
   'stockOut/fetchStockOuts',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(
-        `${API_BASE}/stock-outs/`,
-        { headers: getAuthHeaders() }
+      const response = await apiAxios.get(
+        `/stock-outs/`
       );
       return response.data;
     } catch (error) {

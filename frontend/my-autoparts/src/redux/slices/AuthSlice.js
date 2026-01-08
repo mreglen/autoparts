@@ -1,26 +1,16 @@
 // src/redux/slices/AuthSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-
-const API_BASE = process.env.REACT_APP_API_URL;
-console.log(API_BASE)
-
-const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
 
 // --- Async Thunks ---
 export const sendVerificationCode = createAsyncThunk(
     'auth/sendVerificationCode',
     async (email, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/auth/register/send-code`, {
+            await apiRequest('/auth/register/send-code', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email }),
             });
-            const result = await res.json();
-            if (!res.ok) throw result;
             return { email };
         } catch (err) {
             return rejectWithValue(err);
@@ -32,13 +22,10 @@ export const verifyEmailCode = createAsyncThunk(
     'auth/verifyEmailCode',
     async ({ email, code }, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/auth/register/verify-code`, {
+            const result = await apiRequest('/auth/register/verify-code', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, code }),
             });
-            const result = await res.json();
-            if (!res.ok) throw result;
             return result;
         } catch (err) {
             return rejectWithValue(err);
@@ -50,13 +37,10 @@ export const completeRegistration = createAsyncThunk(
     'auth/completeRegistration',
     async (formData, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/auth/register/complete`, {
+            const result = await apiRequest('/auth/register/complete', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData),
             });
-            const result = await res.json();
-            if (!res.ok) throw result;
             localStorage.setItem('token', result.access_token);
             return result;
         } catch (err) {
@@ -74,14 +58,9 @@ export const login = createAsyncThunk(
             formData.append('username', login);      // ← именно 'username', а не 'login'
             formData.append('password', password);
 
-            const res = await fetch(`${API_BASE}/auth/login`, {
+            const result = await apiRequestFormData('/auth/login', formData, {
                 method: 'POST',
-                // НЕ указываем Content-Type — браузер установит его автоматически с boundary
-                body: formData,
             });
-
-            const result = await res.json();
-            if (!res.ok) throw result;
 
             localStorage.setItem('token', result.access_token);
             return result;
@@ -97,12 +76,8 @@ export const fetchProfile = createAsyncThunk(
         const token = localStorage.getItem('token');
         if (!token) return rejectWithValue('Токен отсутствует');
         try {
-            const res = await fetch(`${API_BASE}/auth/profile`, { headers: getAuthHeaders() });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw err;
-            }
-            return await res.json();
+            const result = await apiRequest('/auth/profile');
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Не удалось загрузить профиль');
         }
@@ -117,13 +92,10 @@ export const requestPasswordReset = createAsyncThunk(
     'auth/requestPasswordReset',
     async (email, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/auth/password/send-code`, {
+            const result = await apiRequest('/auth/password/send-code', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email }),
             });
-            const result = await res.json();
-            if (!res.ok) throw result;
             return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Не удалось отправить код');
@@ -135,13 +107,10 @@ export const confirmPasswordReset = createAsyncThunk(
     'auth/confirmPasswordReset',
     async ({ email, code, new_password }, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/auth   /password/verify`, {
+            const result = await apiRequest('/auth/password/verify', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, code, new_password }),
             });
-            const result = await res.json();
-            if (!res.ok) throw result;
             return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Неверный код или ошибка сервера');

@@ -33,7 +33,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8000",
         "http://vm2512296768.vds.ru",
         "https://vm2512296768.vds.ru",
         "http://195.24.65.251",

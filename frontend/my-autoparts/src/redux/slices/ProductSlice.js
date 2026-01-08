@@ -1,14 +1,8 @@
 // src/store/slices/ProductSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-
-const API_BASE = process.env.REACT_APP_API_URL;
+import { apiAxios, apiRequestFormData } from '../../utils/apiClient';
 
 
-const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-};
 
 // НОВЫЙ thunk: загрузка фото
 export const uploadPhotos = createAsyncThunk(
@@ -18,16 +12,8 @@ export const uploadPhotos = createAsyncThunk(
             const uploadPromises = Array.from(files).map(file => {
                 const formData = new FormData();
                 formData.append('file', file);
-                return axios.post(
-                    `${API_BASE}/upload/photo`,
-                    formData,
-                    {
-                        headers: {
-                            ...getAuthHeaders(),
-                            'Content-Type': 'multipart/form-data',
-                        },
-                    }
-                ).then(res => res.data.url);
+                return apiRequestFormData('/upload/photo', formData)
+                    .then(res => res.url);
             });
             const urls = await Promise.all(uploadPromises);
             return urls;
@@ -44,10 +30,9 @@ export const createProduct = createAsyncThunk(
     'products/createProduct',
     async (productData, { rejectWithValue }) => {
         try {
-            const response = await axios.post(
-                `${API_BASE}/products/`,
+            const response = await apiAxios.post(
+                '/products/',
                 productData,
-                { headers: getAuthHeaders() }
             );
             return response.data;
         } catch (error) {
@@ -62,10 +47,9 @@ export const updateProduct = createAsyncThunk(
     'products/updateProduct',
     async ({ id, productData }, { rejectWithValue }) => {
         try {
-            const response = await axios.put(
-                `${API_BASE}/products/${id}`,
+            const response = await apiAxios.put(
+                `/products/${id}`,
                 productData,
-                { headers: getAuthHeaders() }
             );
             return response.data;
         } catch (error) {
@@ -80,9 +64,8 @@ export const fetchProducts = createAsyncThunk(
     'products/fetchProducts',
     async (_, { rejectWithValue }) => {
         try {
-            const response = await axios.get(
-                `${API_BASE}/products/`,
-                { headers: getAuthHeaders() }
+            const response = await apiAxios.get(
+                '/products/',
             );
             return response.data;
         } catch (error) {
@@ -97,9 +80,8 @@ export const fetchProduct = createAsyncThunk(
     'products/fetchProduct',
     async (productId, { rejectWithValue }) => {
         try {
-            const response = await axios.get(
-                `${API_BASE}/products/${productId}`,
-                { headers: getAuthHeaders() }
+            const response = await apiAxios.get(
+                `/products/${productId}`,
             );
             return response.data;
         } catch (error) {
@@ -114,9 +96,8 @@ export const fetchVehicles = createAsyncThunk(
     'vehicles/fetchVehicles',
     async (_, { rejectWithValue }) => {
         try {
-            const response = await axios.get(
-                `${API_BASE}/vehicles/`,
-                { headers: getAuthHeaders() }
+            const response = await apiAxios.get(
+                '/vehicles/',
             );
             return response.data;
         } catch (error) {
@@ -131,10 +112,9 @@ export const createVehicle = createAsyncThunk(
     'vehicles/createVehicle',
     async (vehicleData, { rejectWithValue }) => {
         try {
-            const response = await axios.post(
-                `${API_BASE}/vehicles/`,
+            const response = await apiAxios.post(
+                '/vehicles/',
                 vehicleData,
-                { headers: getAuthHeaders() }
             );
             return response.data;
         } catch (error) {
@@ -151,9 +131,8 @@ const fetchAllProducts = createAsyncThunk(
     async (_, { rejectWithValue }) => {
         try {
             console.log('fetchAllProducts: Making API call');
-            const response = await axios.get(`${API_BASE}/search-products/search`, {
+            const response = await apiAxios.get(`/search-products/search`, {
                 params: { q: '' }, // Пустой запрос для получения всех продуктов
-                headers: getAuthHeaders(),
             });
 
             console.log('fetchAllProducts: Response received', response.data);
@@ -172,11 +151,10 @@ export const searchAllProducts = createAsyncThunk(
     async (query, { rejectWithValue }) => {
         try {
             const [directRes, analogRes] = await Promise.all([
-                axios.get(`${API_BASE}/search-products/search`, {
+                apiAxios.get(`/search-products/search`, {
                     params: { q: query },
-                    headers: getAuthHeaders(),
                 }),
-                axios.get(`${API_BASE}/search-products/search-with-analogs`, {
+                apiAxios.get(`/search-products/search-with-analogs`, {
                     params: { q: query },
                 }),
             ]);
@@ -367,7 +345,7 @@ export const fetchPublicProducts = createAsyncThunk(
     async (_, { rejectWithValue }) => {
         try {
             // Запрос без авторизации к публичному endpoint поиска
-            const response = await axios.get(`${API_BASE}/search-products/search`, {
+            const response = await apiAxios.get(`/search-products/search`, {
                 params: { q: '' }, // Пустой запрос для получения всех продуктов
             });
 

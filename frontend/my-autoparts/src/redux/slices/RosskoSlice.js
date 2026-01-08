@@ -1,16 +1,14 @@
 // src/features/rossko/rosskoSlice.js
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-
-const API_BASE = process.env.REACT_APP_API_URL;
+import { apiAxios } from '../../utils/apiClient';
 
 // Асинхронный thunk для выполнения поиска
 export const fetchSearchResults = createAsyncThunk(
   'rossko/fetchSearchResults',
   async ({ text, delivery_id = "000000001", address_id = 176458 }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_BASE}/rossko/GetSearch`, {
+      const response = await apiAxios.post(`/rossko/GetSearch`, {
         text,
         delivery_id,
         address_id
@@ -104,7 +102,7 @@ export const fetchRosskoOrders = createAsyncThunk(
   'rossko/fetchRosskoOrders',
   async (params = {}, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_BASE}/rossko/GetOrders`, params);
+      const response = await apiAxios.post(`/rossko/GetOrders`, params);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.detail || error.message || 'Ошибка получения заказов');
@@ -117,7 +115,7 @@ export const createRosskoCheckout = createAsyncThunk(
   'rossko/createRosskoCheckout',
   async (checkoutData, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_BASE}/rossko/GetCheckout`, checkoutData);
+      const response = await apiAxios.post(`/rossko/GetCheckout`, checkoutData);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.detail || error.message || 'Ошибка оформления заказа');
@@ -131,7 +129,7 @@ export const fetchDatabaseOrders = createAsyncThunk(
   async (params = {}, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE}/orders/`, {
+      const response = await apiAxios.get(`/orders/`, {
         params,
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });

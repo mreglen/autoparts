@@ -1,23 +1,15 @@
 // src/store/slices/CartSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-
-const API_BASE = process.env.REACT_APP_API_URL;
-
-const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import { apiAxios } from '../../utils/apiClient';
 
 // Async thunk: добавление новых запчастей в корзину
 export const addNewPartsToCart = createAsyncThunk(
     'cart/addNewPartsToCart',
     async (cartItem, { rejectWithValue, dispatch }) => {
         try {
-            const response = await axios.post(
-                `${API_BASE}/cart/new-parts`,
+            const response = await apiAxios.post(
+                `/cart/new-parts`,
                 cartItem,
-                { headers: getAuthHeaders() }
             );
             // Перезагружаем корзину после успешного добавления
             dispatch(fetchCart());
@@ -35,9 +27,8 @@ export const fetchCart = createAsyncThunk(
     'cart/fetchCart',
     async (_, { rejectWithValue }) => {
         try {
-            const response = await axios.get(
-                `${API_BASE}/cart/`,
-                { headers: getAuthHeaders() }
+            const response = await apiAxios.get(
+                `/cart/`,
             );
             return response.data;
         } catch (error) {
@@ -53,9 +44,8 @@ export const removeFromCart = createAsyncThunk(
     'cart/removeFromCart',
     async (itemId, { rejectWithValue, dispatch }) => {
         try {
-            await axios.delete(
-                `${API_BASE}/cart/new-parts/${itemId}`,
-                { headers: getAuthHeaders() }
+            await apiAxios.delete(
+                `/cart/new-parts/${itemId}`,
             );
             // Перезагружаем корзину после успешного удаления
             dispatch(fetchCart());
@@ -73,12 +63,9 @@ export const updateCartItemQuantity = createAsyncThunk(
     'cart/updateCartItemQuantity',
     async ({ itemId, quantity }, { rejectWithValue, dispatch }) => {
         try {
-            const response = await axios.put(
-                `${API_BASE}/cart/new-parts/${itemId}/quantity`,
-                { quantity },
-                {
-                    headers: getAuthHeaders()
-                }
+            const response = await apiAxios.put(
+                `/cart/new-parts/${itemId}/quantity`,
+                { quantity }
             );
             // Перезагружаем корзину после успешного обновления
             dispatch(fetchCart());

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { clearCart } from '../../redux/slices/CartSlice';
-import axios from 'axios';
+import { apiAxios } from '../../utils/apiClient';
 
 export default function OrderRegistration() {
   const navigate = useNavigate();
@@ -59,8 +59,8 @@ export default function OrderRegistration() {
     const fetchAdminOrgAddress = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(
-          `${process.env.REACT_APP_API_URL}/cart/admin-org-address`,
+        const response = await apiAxios.get(
+          '/cart/admin-org-address',
           {
             headers: token ? { Authorization: `Bearer ${token}` } : {}
           }
@@ -146,8 +146,8 @@ export default function OrderRegistration() {
         total_amount: calculateTotal()
       };
 
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/orders/`,
+      const response = await apiAxios.post(
+        '/orders/',
         orderData,
         {
           headers: token ? { Authorization: `Bearer ${token}` } : {}

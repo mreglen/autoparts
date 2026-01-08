@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { apiAxios } from '../../utils/apiClient';
 
 export default function PurchasesTab() {
   const [orders, setOrders] = useState([]);
@@ -17,12 +17,7 @@ export default function PurchasesTab() {
       const token = localStorage.getItem('token');
 
       // Получаем заказы пользователя
-      const ordersResponse = await axios.get(
-        `${process.env.REACT_APP_API_URL}/orders/my/`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        }
-      );
+      const ordersResponse = await apiAxios.get('/orders/my/');
 
       setOrders(ordersResponse.data);
     } catch (error) {

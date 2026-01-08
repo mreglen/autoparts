@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { apiAxios } from '../../utils/apiClient';
 
 export default function OrdersTab() {
   const [orders, setOrders] = useState([]);
@@ -19,12 +19,7 @@ export default function OrdersTab() {
       const token = localStorage.getItem('token');
 
       // Получаем заказы
-      const ordersResponse = await axios.get(
-        `${process.env.REACT_APP_API_URL}/orders/`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        }
-      );
+      const ordersResponse = await apiAxios.get('/orders/');
 
       setOrders(ordersResponse.data);
     } catch (error) {
@@ -38,8 +33,8 @@ export default function OrdersTab() {
   const updateOrderStatus = async (orderId, statusCode) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.put(
-        `${process.env.REACT_APP_API_URL}/orders/${orderId}/status`,
+      await apiAxios.put(
+        `/orders/${orderId}/status`,
         { status_code: statusCode },
         {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
@@ -62,8 +57,8 @@ export default function OrdersTab() {
   const updateItemStatus = async (itemId, statusCode) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.put(
-        `${process.env.REACT_APP_API_URL}/orders/items/${itemId}/status`,
+      await apiAxios.put(
+        `/orders/items/${itemId}/status`,
         { status_code: statusCode },
         {
           headers: token ? { Authorization: `Bearer ${token}` } : {}

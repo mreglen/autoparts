@@ -1,26 +1,14 @@
 // src/redux/slices/OrganizationSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-
-const API_BASE = process.env.REACT_APP_API_URL;
-
-const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import { apiRequest } from '../../utils/apiClient';
 
 // Загрузка организации
 export const fetchOrganization = createAsyncThunk(
     'organization/fetchOrganization',
     async (orgId, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/organizations/${orgId}`, {
-                headers: { ...getAuthHeaders() },
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw err;
-            }
-            return await res.json();
+            const result = await apiRequest(`/organizations/${orgId}`);
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка загрузки организации');
         }
@@ -32,16 +20,11 @@ export const updateOrganization = createAsyncThunk(
     'organization/updateOrganization',
     async ({ id, ...updateData }, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/organizations/${id}`, {
+            const result = await apiRequest(`/organizations/${id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders(),
-                },
                 body: JSON.stringify(updateData),
             });
-            if (!res.ok) throw await res.json().catch(() => ({}));
-            return await res.json();
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка обновления организации');
         }
@@ -53,14 +36,8 @@ export const fetchStorageLocations = createAsyncThunk(
     'organization/fetchStorageLocations',
     async (orgId, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/storage-locations?organization_id=${orgId}`, {
-                headers: { ...getAuthHeaders() },
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw err;
-            }
-            return await res.json();
+            const result = await apiRequest(`/storage-locations?organization_id=${orgId}`);
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка загрузки складов');
         }
@@ -72,16 +49,11 @@ export const createStorageLocation = createAsyncThunk(
     'organization/createStorageLocation',
     async (newLoc, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/storage-locations/`, {
+            const result = await apiRequest(`/storage-locations/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders(),
-                },
                 body: JSON.stringify(newLoc),
             });
-            if (!res.ok) throw await res.json().catch(() => ({}));
-            return await res.json();
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка создания склада');
         }
@@ -93,16 +65,11 @@ export const updateStorageLocation = createAsyncThunk(
     'organization/updateStorageLocation',
     async ({ id, ...updateData }, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/storage-locations/${id}`, {
+            const result = await apiRequest(`/storage-locations/${id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders(),
-                },
                 body: JSON.stringify(updateData),
             });
-            if (!res.ok) throw await res.json().catch(() => ({}));
-            return await res.json();
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка обновления склада');
         }
@@ -114,11 +81,9 @@ export const deleteStorageLocation = createAsyncThunk(
     'organization/deleteStorageLocation',
     async (id, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/storage-locations/${id}`, {
+            await apiRequest(`/storage-locations/${id}`, {
                 method: 'DELETE',
-                headers: { ...getAuthHeaders() },
             });
-            if (!res.ok) throw await res.json().catch(() => ({}));
             return id;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка удаления склада');
@@ -131,11 +96,8 @@ export const fetchEmployees = createAsyncThunk(
     'organization/fetchEmployees',
     async (orgId, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/organizations/${orgId}/employees`, {
-                headers: getAuthHeaders(),
-            });
-            if (!res.ok) throw await res.json().catch(() => ({}));
-            return await res.json();
+            const result = await apiRequest(`/organizations/${orgId}/employees`);
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка загрузки сотрудников');
         }
@@ -147,13 +109,11 @@ export const addEmployee = createAsyncThunk(
     'organization/addEmployee',
     async ({ orgId, employeeData }, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/organizations/${orgId}/employees`, {
+            const result = await apiRequest(`/organizations/${orgId}/employees`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
                 body: JSON.stringify(employeeData),
             });
-            if (!res.ok) throw await res.json().catch(() => ({}));
-            return await res.json();
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка добавления сотрудника');
         }
@@ -164,11 +124,9 @@ export const deleteEmployee = createAsyncThunk(
     'organization/deleteEmployee',
     async ({ orgId, userId }, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/organizations/${orgId}/employees/${userId}`, {
+            await apiRequest(`/organizations/${orgId}/employees/${userId}`, {
                 method: 'DELETE',
-                headers: getAuthHeaders(),
             });
-            if (!res.ok) throw await res.json().catch(() => ({}));
             return userId;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка удаления сотрудника');
@@ -181,16 +139,11 @@ export const updateEmployee = createAsyncThunk(
     'organization/updateEmployee',
     async ({ orgId, userId, updateData }, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/organizations/${orgId}/employees/${userId}`, {
+            const result = await apiRequest(`/organizations/${orgId}/employees/${userId}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders(),
-                },
                 body: JSON.stringify(updateData),
             });
-            if (!res.ok) throw await res.json().catch(() => ({}));
-            return await res.json();
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка обновления сотрудника');
         }

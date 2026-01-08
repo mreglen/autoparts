@@ -1,29 +1,16 @@
 // src/redux/slices/UserSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-
-const API_BASE = process.env.REACT_APP_API_URL;
-
-
-const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import { apiRequest } from '../../utils/apiClient';
 
 // Async Thunk для обновления профиля
 export const updateProfile = createAsyncThunk(
     'user/updateProfile',
     async (userData, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/users/me`, {
+            const result = await apiRequest('/users/me', {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders(),
-                },
                 body: JSON.stringify(userData),
             });
-            const result = await res.json();
-            if (!res.ok) throw result;
             return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Не удалось обновить профиль');

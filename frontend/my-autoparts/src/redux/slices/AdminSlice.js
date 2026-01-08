@@ -1,26 +1,13 @@
 // src/redux/slices/AdminSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-
-const API_BASE = process.env.REACT_APP_API_URL;
-
-
-const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import { apiRequest } from '../../utils/apiClient';
 
 export const fetchAllUsers = createAsyncThunk(
     'admin/fetchAllUsers',
     async (_, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/admin/users`, {
-                headers: getAuthHeaders(),
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw err;
-            }
-            return await res.json();
+            const result = await apiRequest(`/admin/users`);
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Не удалось загрузить пользователей');
         }
@@ -31,14 +18,8 @@ export const fetchAllEvents = createAsyncThunk(
     'admin/fetchAllEvents',
     async (_, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/admin/events`, {
-                headers: getAuthHeaders(),
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw err;
-            }
-            return await res.json();
+            const result = await apiRequest(`/admin/events`);
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Не удалось загрузить журнал событий');
         }
@@ -50,14 +31,8 @@ export const fetchAllOrganizations = createAsyncThunk(
     'admin/fetchAllOrganizations',
     async (_, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/admin/organizations`, {
-                headers: getAuthHeaders(),
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw err;
-            }
-            return await res.json();
+            const result = await apiRequest(`/admin/organizations`);
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Не удалось загрузить организации');
         }
@@ -69,16 +44,11 @@ export const updateOrganizationAdmin = createAsyncThunk(
     'admin/updateOrganization',
     async ({ id, ...updateData }, { rejectWithValue }) => {
         try {
-            const res = await fetch(`${API_BASE}/admin/organizations/${id}`, {
+            const result = await apiRequest(`/admin/organizations/${id}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders(),
-                },
                 body: JSON.stringify(updateData),
             });
-            if (!res.ok) throw await res.json().catch(() => ({}));
-            return await res.json();
+            return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Не удалось обновить организацию');
         }
