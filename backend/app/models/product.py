@@ -48,14 +48,15 @@ class ProductPhoto(Base):
 
     @property
     def full_url(self):
-        # Если photo_url уже содержит полный URL со старым IP, исправляем его
-        if self.photo_url.startswith('http://127.0.0.1'):
-            filename = self.photo_url.split('/')[-1]
-            return f"{settings.BASE_URL.rstrip('/')}/uploads/{filename}"
-        # Если photo_url уже содержит полный URL с правильным IP, используем как есть
-        elif self.photo_url.startswith('http://'):
+        # Если photo_url уже содержит полный URL, используем как есть
+        if self.photo_url.startswith('http://') or self.photo_url.startswith('https://'):
             return self.photo_url
         # Если photo_url относительный, формируем полный URL
         else:
-            filename = self.photo_url.split('/')[-1]
-            return f"{settings.BASE_URL.rstrip('/')}/uploads/{filename}"
+            # Для localhost используем http://localhost:8000
+            base_url = "http://localhost:8000"
+            if self.photo_url.startswith('/uploads/'):
+                return f"{base_url}{self.photo_url}"
+            else:
+                filename = self.photo_url.split('/')[-1]
+                return f"{base_url}/uploads/{filename}"

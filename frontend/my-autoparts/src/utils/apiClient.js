@@ -1,8 +1,11 @@
 // Centralized API client for consistent API calls
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://195.24.65.251/api';
-const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'http://195.24.65.251';
+// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://195.24.65.251/api';
+// const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'http://195.24.65.251';
+
+const API_BASE = 'http://127.0.0.1:8000/api';
+const BACKEND_BASE = 'http://127.0.0.1:8000';
 
 // Helper function to get auth headers
 export const getAuthHeaders = () => {
@@ -14,12 +17,16 @@ export const getAuthHeaders = () => {
 export const normalizeImageUrl = (imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
 
-    // If URL is already relative or from current backend, return as is
-    if (imageUrl.startsWith('/uploads/') ||
-        imageUrl.startsWith(BACKEND_BASE) ||
+    // If URL is already from current backend, return as is
+    if (imageUrl.startsWith(BACKEND_BASE) ||
         imageUrl.startsWith('blob:') ||
         imageUrl.startsWith('data:')) {
         return imageUrl;
+    }
+
+    // If URL starts with /uploads/, convert to full backend URL
+    if (imageUrl.startsWith('/uploads/')) {
+        return BACKEND_BASE + imageUrl;
     }
 
     // If URL contains /uploads/, replace the domain with current backend
@@ -57,7 +64,9 @@ export const apiRequest = async (endpoint, options = {}) => {
 // For FormData requests (like file uploads)
 export const apiRequestFormData = async (endpoint, formData, options = {}) => {
     const url = `${API_BASE}${endpoint}`;
+
     const defaultOptions = {
+        method: 'POST', // Explicitly set POST method for uploads
         headers: {
             ...getAuthHeaders(),
             ...options.headers

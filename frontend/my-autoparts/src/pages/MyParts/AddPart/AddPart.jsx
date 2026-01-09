@@ -75,12 +75,25 @@ const AddPart = () => {
     }
 
     let photoUrls = [];
+
     if (photos.length > 0) {
-      const uploadAction = await dispatch(uploadPhotos(photos));
-      if (uploadPhotos.rejected.match(uploadAction)) {
+      try {
+        const uploadAction = await dispatch(uploadPhotos(photos));
+
+        if (uploadPhotos.rejected.match(uploadAction)) {
+          alert(`Ошибка загрузки фото: ${uploadAction.payload}`);
+          return;
+        }
+        photoUrls = uploadAction.payload;
+        if (!photoUrls || !Array.isArray(photoUrls)) {
+          alert('Ошибка: неправильный формат URL фото');
+          return;
+        }
+      } catch (error) {
+        console.error('Unexpected error during photo upload:', error);
+        alert(`Неожиданная ошибка при загрузке фото: ${error.message}`);
         return;
       }
-      photoUrls = uploadAction.payload;
     }
 
     const productData = {
@@ -94,7 +107,7 @@ const AddPart = () => {
       is_new: formData.condition === 'новый',
       storage_location_id: parseInt(formData.storage_location_id, 10),
       vehicle_ids: selectedVehicle ? [selectedVehicle.id] : [],
-      photos: photoUrls.length > 0 ? photoUrls : undefined,
+      photos: photoUrls.length > 0 ? photoUrls : null,
     };
 
     try {

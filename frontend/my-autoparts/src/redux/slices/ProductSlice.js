@@ -9,17 +9,22 @@ export const uploadPhotos = createAsyncThunk(
     'products/uploadPhotos',
     async (files, { rejectWithValue }) => {
         try {
-            const uploadPromises = Array.from(files).map(file => {
-                const formData = new FormData();
-                formData.append('file', file);
-                return apiRequestFormData('/upload/photo', formData)
-                    .then(res => res.url);
+            const uploadPromises = Array.from(files).map(async file => {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const res = await apiRequestFormData('/upload/photo', formData);
+                    return res.url;
+                } catch (error) {
+                    console.error('Failed to upload file:', file.name, error);
+                    throw error;
+                }
             });
             const urls = await Promise.all(uploadPromises);
             return urls;
         } catch (error) {
             return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка загрузки фото'
+                error.response?.data?.detail || error.message || 'Ошибка загрузки фото'
             );
         }
     }

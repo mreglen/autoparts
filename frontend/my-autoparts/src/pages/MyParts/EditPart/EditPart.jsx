@@ -60,10 +60,11 @@ const EditPart = () => {
 
   const [photos, setPhotos] = useState([]);
   const [existingPhotos, setExistingPhotos] = useState([]);
+  const [productLoaded, setProductLoaded] = useState(false);
 
   // Загрузка данных продукта при получении
   useEffect(() => {
-    if (currentProduct) {
+    if (currentProduct && !productLoaded) {
       setFormData({
         article: currentProduct.article || '',
         internal_code: currentProduct.internal_code || '',
@@ -76,14 +77,29 @@ const EditPart = () => {
         storage_location_id: currentProduct.storage_location_id?.toString() || '',
       });
 
-      setExistingPhotos(currentProduct.photos || []);
+      // Извлекаем URL из объектов ProductPhoto или оставляем строки как есть
+      const photoUrls = (currentProduct.photos || []).map(photo => {
+        if (typeof photo === 'string') return photo;
+        if (photo.photo_url) return photo.photo_url;
+        return null;
+      }).filter(url => url !== null);
+
+      setExistingPhotos(photoUrls);
+      setProductLoaded(true);
 
       // Установка выбранного автомобиля
       if (currentProduct.compatible_vehicles && currentProduct.compatible_vehicles.length > 0) {
         setSelectedVehicle(currentProduct.compatible_vehicles[0]);
       }
     }
-  }, [currentProduct]);
+  }, [currentProduct, productLoaded]);
+
+  // Сброс состояния при изменении ID продукта
+  useEffect(() => {
+    setProductLoaded(false);
+    setExistingPhotos([]);
+    setPhotos([]);
+  }, [id]);
 
   const handlePhotoAdd = (e) => {
     const files = Array.from(e.target.files);
@@ -127,7 +143,14 @@ const EditPart = () => {
 
     // Комбинируем существующие и новые фото
     const allPhotoUrls = [
-      ...existingPhotos.filter(photo => photo && (photo.photo_url || typeof photo === 'string')).map(photo => photo.photo_url || photo),
+      ...existingPhotos.filter(photo => photo).map(photo => {
+        // Если photo - строка, возвращаем как есть
+        if (typeof photo === 'string') return photo;
+        // Если photo - объект с photo_url, возвращаем photo_url
+        if (photo.photo_url) return photo.photo_url;
+        // Иначе пропускаем
+        return null;
+      }).filter(url => url !== null),
       ...photoUrls
     ];
 

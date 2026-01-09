@@ -46,6 +46,8 @@ const PhotoGallery = ({ photos = [], onImageClick }) => {
     photoUrl = normalizeImageUrl(currentPhoto);
   } else if (currentPhoto?.full_url) {
     photoUrl = normalizeImageUrl(currentPhoto.full_url);
+  } else if (currentPhoto?.photo_url) {
+    photoUrl = normalizeImageUrl(currentPhoto.photo_url);
   } else if (currentPhoto instanceof File) {
     photoUrl = objectUrls.get(currentPhotoIndex) || '';
   } else {
@@ -102,6 +104,8 @@ const PhotoGallery = ({ photos = [], onImageClick }) => {
               thumbUrl = normalizeImageUrl(photo);
             } else if (photo?.full_url) {
               thumbUrl = normalizeImageUrl(photo.full_url);
+            } else if (photo?.photo_url) {
+              thumbUrl = normalizeImageUrl(photo.photo_url);
             } else if (photo instanceof File) {
               thumbUrl = objectUrls.get(index) || '';
             } else {

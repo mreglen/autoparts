@@ -28,10 +28,14 @@ async def options_upload_photo():
 
 @router.post("/photo")
 async def upload_photo(file: UploadFile = File(...)):
-    print(f"Upload attempt: filename={file.filename}, content_type={file.content_type}")
+    print(f"=== PHOTO UPLOAD REQUEST ===")
+    print(f"Filename: {file.filename}")
+    print(f"Content-Type: {file.content_type}")
+    print(f"Headers: {dict(file.headers) if hasattr(file, 'headers') else 'No headers'}")
 
     if not file.content_type or not file.content_type.startswith("image/"):
         print(f"Rejected: invalid content type {file.content_type}")
+        print("=== END PHOTO UPLOAD (REJECTED) ===")
         raise HTTPException(400, "Разрешены только изображения")
 
     # Проверяем размер файла перед загрузкой
@@ -88,7 +92,10 @@ async def upload_photo(file: UploadFile = File(...)):
         print(f"File saved successfully, size: {file_size} bytes")
 
     # Возвращаем относительный URL
-    return {"url": f"/uploads/{filename}"}
+    result = {"url": f"/uploads/{filename}"}
+    print(f"Upload successful: {result}")
+    print("=== END PHOTO UPLOAD ===")
+    return result
 
 
 @router.get("/uploads/{filename}")
