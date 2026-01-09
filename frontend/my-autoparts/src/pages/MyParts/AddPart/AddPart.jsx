@@ -229,9 +229,9 @@ const AddPart = () => {
                 <button
                   type="button"
                   onClick={() => handlePhotoRemove(idx)}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow"
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
                 >
-                  ×
+                  <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
                 </button>
               </div>
             ))}

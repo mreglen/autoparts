@@ -91,9 +91,9 @@ const ImageModal = ({ isOpen, onClose, imageUrl, alt = 'Изображение' 
       {/* Кнопка закрытия */}
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 z-60 text-white text-4xl hover:text-gray-300 transition-colors"
+        className="absolute top-4 right-4 z-60 text-white hover:text-gray-300 transition-colors"
       >
-        ×
+        <img src="/img/close_md.svg" alt="Закрыть" className="w-6 h-6" />
       </button>
 
       {/* Кнопки управления зумом */}

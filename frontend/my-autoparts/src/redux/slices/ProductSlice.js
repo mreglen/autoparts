@@ -97,6 +97,36 @@ export const fetchProduct = createAsyncThunk(
     }
 );
 
+export const deleteProductPhoto = createAsyncThunk(
+    'products/deleteProductPhoto',
+    async ({ productId, photoId }, { rejectWithValue }) => {
+        try {
+            await apiAxios.delete(`/products/${productId}/photos/${photoId}`);
+            return { productId, photoId };
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка удаления фото'
+            );
+        }
+    }
+);
+
+export const deleteProductPhotos = createAsyncThunk(
+    'products/deleteProductPhotos',
+    async ({ productId, photoIds }, { rejectWithValue }) => {
+        try {
+            await apiAxios.delete(`/products/${productId}/photos`, {
+                data: { photo_ids: photoIds }
+            });
+            return { productId, photoIds };
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка удаления фото'
+            );
+        }
+    }
+);
+
 export const fetchVehicles = createAsyncThunk(
     'vehicles/fetchVehicles',
     async (_, { rejectWithValue }) => {
@@ -326,6 +356,38 @@ const productSlice = createSlice({
                 state.currentProduct = action.payload;
             })
             .addCase(fetchProduct.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            .addCase(deleteProductPhoto.pending, (state) => {
+                state.loading = true;
+            })
+            .addCase(deleteProductPhoto.fulfilled, (state, action) => {
+                state.loading = false;
+                // Удаляем фото из currentProduct, если оно загружено
+                if (state.currentProduct && state.currentProduct.id === action.payload.productId) {
+                    state.currentProduct.photos = state.currentProduct.photos.filter(
+                        photo => photo.id !== action.payload.photoId
+                    );
+                }
+            })
+            .addCase(deleteProductPhoto.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            .addCase(deleteProductPhotos.pending, (state) => {
+                state.loading = true;
+            })
+            .addCase(deleteProductPhotos.fulfilled, (state, action) => {
+                state.loading = false;
+                // Удаляем фото из currentProduct, если оно загружено
+                if (state.currentProduct && state.currentProduct.id === action.payload.productId) {
+                    state.currentProduct.photos = state.currentProduct.photos.filter(
+                        photo => !action.payload.photoIds.includes(photo.id)
+                    );
+                }
+            })
+            .addCase(deleteProductPhotos.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })

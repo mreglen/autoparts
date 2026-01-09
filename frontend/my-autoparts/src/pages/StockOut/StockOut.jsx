@@ -7,7 +7,7 @@ import { fetchStockOuts } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { Navigate } from 'react-router-dom';
 
-const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpanded }) => (
+const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpanded, onImageClick }) => (
   <React.Fragment>
     <tr
       className="cursor-pointer hover:bg-gray-50"
@@ -36,7 +36,7 @@ const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpanded }) =>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Фото */}
             <div>
-              <PhotoGallery photos={item.product?.photos || []}/>
+              <PhotoGallery photos={item.product?.photos || []} onImageClick={onImageClick}/>
             </div>
 
             {/* Информация */}
@@ -215,6 +215,7 @@ const StockOutList = () => {
                   getStorageAddress={getStorageAddress}
                   onToggleExpand={() => toggleExpand(item.id)}
                   isExpanded={expandedDocId === item.id}
+                  onImageClick={handleImageClick}
                 />
               ))}
             </tbody>

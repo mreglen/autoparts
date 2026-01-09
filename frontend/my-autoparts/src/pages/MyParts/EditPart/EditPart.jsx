@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { updateProduct, uploadPhotos, clearProductError, resetProducts, fetchProduct } from '../../../redux/slices/ProductSlice';
+import { updateProduct, uploadPhotos, clearProductError, resetProducts, fetchProduct, deleteProductPhotos } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import VehicleModal from '../AddPart/VehicleModal';
 import PhotoGallery from '../../../components/PhotoGallery/PhotoGallery';
@@ -61,6 +61,7 @@ const EditPart = () => {
   const [photos, setPhotos] = useState([]);
   const [existingPhotos, setExistingPhotos] = useState([]);
   const [productLoaded, setProductLoaded] = useState(false);
+  const [selectedPhotosForRemoval, setSelectedPhotosForRemoval] = useState([]);
 
   // Загрузка данных продукта при получении
   useEffect(() => {
@@ -77,14 +78,12 @@ const EditPart = () => {
         storage_location_id: currentProduct.storage_location_id?.toString() || '',
       });
 
-      // Извлекаем URL из объектов ProductPhoto или оставляем строки как есть
-      const photoUrls = (currentProduct.photos || []).map(photo => {
-        if (typeof photo === 'string') return photo;
-        if (photo.photo_url) return photo.photo_url;
-        return null;
-      }).filter(url => url !== null);
+      // Сохраняем полные объекты ProductPhoto для доступа к ID
+      const photos = (currentProduct.photos || []).filter(photo =>
+        photo && (photo.photo_url || typeof photo === 'string')
+      );
 
-      setExistingPhotos(photoUrls);
+      setExistingPhotos(photos);
       setProductLoaded(true);
 
       // Установка выбранного автомобиля
@@ -99,6 +98,7 @@ const EditPart = () => {
     setProductLoaded(false);
     setExistingPhotos([]);
     setPhotos([]);
+    setSelectedPhotosForRemoval([]);
   }, [id]);
 
   const handlePhotoAdd = (e) => {
@@ -110,8 +110,56 @@ const EditPart = () => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleExistingPhotoRemove = (index) => {
-    setExistingPhotos((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveSelectedPhotos = async () => {
+    if (selectedPhotosForRemoval.length === 0) {
+      return;
+    }
+
+    try {
+      await dispatch(deleteProductPhotos({
+        productId: parseInt(id, 10),
+        photoIds: selectedPhotosForRemoval
+      }));
+
+      // Локально обновляем состояние
+      setExistingPhotos((prev) => prev.filter((photo) => {
+        if (typeof photo === 'object' && photo.id) {
+          return !selectedPhotosForRemoval.includes(photo.id);
+        }
+        return true; // Для строковых URL оставляем как есть
+      }));
+
+      setSelectedPhotosForRemoval([]);
+    } catch (error) {
+      console.error('Ошибка при удалении фото:', error);
+    }
+  };
+
+  const handlePhotoSelectionToggle = (photoId) => {
+    setSelectedPhotosForRemoval((prev) =>
+      prev.includes(photoId)
+        ? prev.filter((id) => id !== photoId)
+        : [...prev, photoId]
+    );
+  };
+
+  const handleDeleteSinglePhoto = async (photoId) => {
+    try {
+      await dispatch(deleteProductPhotos({
+        productId: parseInt(id, 10),
+        photoIds: [photoId]
+      }));
+
+      // Локально обновляем состояние
+      setExistingPhotos((prev) => prev.filter((photo) => {
+        if (typeof photo === 'object' && photo.id) {
+          return photo.id !== photoId;
+        }
+        return true;
+      }));
+    } catch (error) {
+      console.error('Ошибка при удалении фото:', error);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -143,14 +191,17 @@ const EditPart = () => {
 
     // Комбинируем существующие и новые фото
     const allPhotoUrls = [
-      ...existingPhotos.filter(photo => photo).map(photo => {
-        // Если photo - строка, возвращаем как есть
-        if (typeof photo === 'string') return photo;
-        // Если photo - объект с photo_url, возвращаем photo_url
-        if (photo.photo_url) return photo.photo_url;
-        // Иначе пропускаем
-        return null;
-      }).filter(url => url !== null),
+      ...existingPhotos
+        .filter(photo => photo) // Фильтруем null/undefined
+        .map(photo => {
+          // Если photo - строка, возвращаем как есть
+          if (typeof photo === 'string') return photo;
+          // Если photo - объект с photo_url, возвращаем photo_url
+          if (photo.photo_url) return photo.photo_url;
+          // Иначе пропускаем
+          return null;
+        })
+        .filter(url => url !== null),
       ...photoUrls
     ];
 
@@ -173,6 +224,9 @@ const EditPart = () => {
       if (updateProduct.rejected.match(result)) {
         return;
       }
+
+      // Очищаем выбранные фото после успешного сохранения
+      setSelectedPhotosForRemoval([]);
 
       navigate('/my-parts');
     } catch (err) {
@@ -267,19 +321,24 @@ const EditPart = () => {
           {existingPhotos.length > 0 && (
             <div className="mt-2 mb-4">
               <p className="text-sm text-gray-600 mb-2">Существующие фотографии:</p>
-              <PhotoGallery photos={existingPhotos || []} onImageClick={handleImageClick} />
-              <div className="mt-2 flex flex-wrap gap-2">
-                {existingPhotos.map((photo, idx) => (
+              <PhotoGallery
+                photos={existingPhotos || []}
+                onImageClick={handleImageClick}
+                selectedPhotos={selectedPhotosForRemoval}
+                onPhotoSelect={handlePhotoSelectionToggle}
+                onDeletePhoto={existingPhotos.length === 1 ? handleDeleteSinglePhoto : null}
+              />
+              {selectedPhotosForRemoval.length > 0 && (
+                <div className="mt-2">
                   <button
-                    key={`remove-${idx}`}
                     type="button"
-                    onClick={() => handleExistingPhotoRemove(idx)}
-                    className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                    onClick={handleRemoveSelectedPhotos}
+                    className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors"
                   >
-                    Удалить фото {idx + 1}
+                    Удалить выбранные ({selectedPhotosForRemoval.length})
                   </button>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -300,14 +359,14 @@ const EditPart = () => {
                     <img
                       src={URL.createObjectURL(file)}
                       alt={`new-${idx}`}
-                      className="w-16 h-16 object-cover rounded border"
+                      className="w-16 h-16 object-contain rounded border"
                     />
                     <button
                       type="button"
                       onClick={() => handlePhotoRemove(idx)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow"
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
                     >
-                      ×
+                      <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
                     </button>
                   </div>
                 ))}

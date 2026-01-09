@@ -8,7 +8,7 @@ import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
 
-const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand, isExpanded }) => (
+const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand, isExpanded, onImageClick }) => (
   <React.Fragment>
     <tr
       className="cursor-pointer hover:bg-gray-50"
@@ -49,7 +49,7 @@ const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand,
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Фото */}
             <div>
-              <PhotoGallery photos={part.photos || []} />
+              <PhotoGallery photos={part.photos || []} onImageClick={onImageClick} />
             </div>
 
             {/* Описание и авто */}
@@ -294,6 +294,7 @@ function MyParts() {
                   onWriteoff={(p) => handleOpenModal(p, 'writeoff')}
                   onToggleExpand={() => toggleExpand(part.id)}
                   isExpanded={expandedPartId === part.id}
+                  onImageClick={handleImageClick}
                 />
               ))}
             </tbody>

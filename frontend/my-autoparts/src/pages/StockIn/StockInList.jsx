@@ -6,7 +6,7 @@ import { fetchStockIns } from '../../redux/slices/StockInSlice';
 import { Link } from 'react-router-dom';
 import VehicleModal from '../MyParts/AddPart/VehicleModal';
 
-const StockInRow = ({ doc, onToggleExpand, isExpanded }) => (
+const StockInRow = ({ doc, onToggleExpand, isExpanded, onImageClick }) => (
   <React.Fragment>
     <tr
       className="cursor-pointer hover:bg-gray-50"
@@ -29,7 +29,7 @@ const StockInRow = ({ doc, onToggleExpand, isExpanded }) => (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Фото */}
             <div>
-              <PhotoGallery photos={doc.product?.photos || []} />
+              <PhotoGallery photos={doc.product?.photos || []} onImageClick={onImageClick} />
             </div>
 
             {/* Информация */}
@@ -214,6 +214,7 @@ const StockInList = () => {
                   doc={doc}
                   onToggleExpand={() => toggleExpand(doc.id)}
                   isExpanded={expandedDocId === doc.id}
+                  onImageClick={handleImageClick}
                 />
               ))}
             </tbody>

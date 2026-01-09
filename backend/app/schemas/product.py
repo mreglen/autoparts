@@ -64,4 +64,7 @@ class Vehicle(VehicleBase):
 class ProductCreate(ProductBase):
     internal_code: str  # Делаем обязательным
     vehicle_ids: Optional[List[int]] = None
-    photos: Optional[List[str]] = None  
+    photos: Optional[List[str]] = None
+
+class DeletePhotosRequest(BaseModel):
+    photo_ids: List[int]  
