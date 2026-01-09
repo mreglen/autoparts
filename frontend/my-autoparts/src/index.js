@@ -1,17 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Provider } from 'react-redux';
+import { store } from './redux/store';
 import './index.css';
 import App from './App';
-import reportWebVitals from './reportWebVitals';
-import 'swiper/css';
-import 'swiper/css/navigation';
-import 'swiper/css/pagination';
-import 'swiper/css/scrollbar';
-import 'swiper/css/effect-fade';
-
-
-import { store } from './redux/store';
-import { Provider } from 'react-redux';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -22,4 +14,6 @@ root.render(
   </React.StrictMode>
 );
 
-reportWebVitals();
+// Optional: Web vitals reporting
+// import reportWebVitals from './reportWebVitals';
+// reportWebVitals();

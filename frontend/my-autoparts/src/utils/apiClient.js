@@ -1,12 +1,35 @@
 // Centralized API client for consistent API calls
 import axios from 'axios';
 
-const API_BASE = '/api';
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000/api';
+const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'http://127.0.0.1:8000';
 
 // Helper function to get auth headers
 export const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+// Helper function to normalize image URLs
+export const normalizeImageUrl = (imageUrl) => {
+    if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
+
+    // If URL is already relative or from current backend, return as is
+    if (imageUrl.startsWith('/uploads/') ||
+        imageUrl.startsWith(BACKEND_BASE) ||
+        imageUrl.startsWith('blob:') ||
+        imageUrl.startsWith('data:')) {
+        return imageUrl;
+    }
+
+    // If URL contains /uploads/, replace the domain with current backend
+    if (imageUrl.includes('/uploads/')) {
+        const uploadsIndex = imageUrl.indexOf('/uploads/');
+        return BACKEND_BASE + imageUrl.substring(uploadsIndex);
+    }
+
+    // For other absolute URLs, return as is
+    return imageUrl;
 };
 
 // Generic fetch wrapper for API calls

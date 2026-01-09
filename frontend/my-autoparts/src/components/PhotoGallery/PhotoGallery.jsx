@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { normalizeImageUrl } from '../../utils/apiClient';
 
 const PhotoGallery = ({ photos = [], onImageClick }) => {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
@@ -42,9 +43,9 @@ const PhotoGallery = ({ photos = [], onImageClick }) => {
   let photoUrl;
 
   if (typeof currentPhoto === 'string') {
-    photoUrl = currentPhoto;
+    photoUrl = normalizeImageUrl(currentPhoto);
   } else if (currentPhoto?.full_url) {
-    photoUrl = currentPhoto.full_url;
+    photoUrl = normalizeImageUrl(currentPhoto.full_url);
   } else if (currentPhoto instanceof File) {
     photoUrl = objectUrls.get(currentPhotoIndex) || '';
   } else {
@@ -98,9 +99,9 @@ const PhotoGallery = ({ photos = [], onImageClick }) => {
             let thumbUrl;
 
             if (typeof photo === 'string') {
-              thumbUrl = photo;
+              thumbUrl = normalizeImageUrl(photo);
             } else if (photo?.full_url) {
-              thumbUrl = photo.full_url;
+              thumbUrl = normalizeImageUrl(photo.full_url);
             } else if (photo instanceof File) {
               thumbUrl = objectUrls.get(index) || '';
             } else {
