@@ -183,22 +183,28 @@ const fetchAllProducts = createAsyncThunk(
 
 export const searchAllProducts = createAsyncThunk(
     'products/searchAllProducts',
-    async (query, { rejectWithValue }) => {
-        try {
-            const [directRes, analogRes] = await Promise.all([
-                apiAxios.get(`/search-products/search`, {
-                    params: { q: query },
-                }),
-                apiAxios.get(`/search-products/search-with-analogs`, {
-                    params: { q: query },
-                }),
-            ]);
+    async (query, { rejectWithValue, getState }) => {
+        const trimmedQuery = query.trim();
 
-            const direct = directRes.data || [];
-            const analog = analogRes.data || [];
+        // Проверяем кэш
+        const state = getState();
+        const cacheEntry = state.products.searchCache[trimmedQuery];
+
+        // Если данные в кэше свежие (менее 5 минут), используем их
+        if (cacheEntry && (Date.now() - cacheEntry.timestamp) < 5 * 60 * 1000) {
+            return cacheEntry.data;
+        }
+
+        try {
+            // Используем новый комбинированный endpoint
+            const response = await apiAxios.get(`/search-products/search-combined`, {
+                params: { q: trimmedQuery },
+            });
+
+            const { direct = [], analogs = [] } = response.data;
 
             // Убираем дубликаты по `id`
-            const merged = [...direct, ...analog];
+            const merged = [...direct, ...analogs];
             const unique = merged.reduce((acc, item) => {
                 if (!acc.find(p => p.id === item.id)) acc.push(item);
                 return acc;
@@ -213,6 +219,37 @@ export const searchAllProducts = createAsyncThunk(
     }
 );
 
+export const searchUsedParts = createAsyncThunk(
+    'products/searchUsedParts',
+    async (query, { rejectWithValue, getState }) => {
+        const trimmedQuery = query.trim();
+
+        // Проверяем кэш с оптимизированным временем
+        const state = getState();
+        const cacheEntry = state.products.usedPartsCache?.[trimmedQuery];
+
+        // Агрессивное кэширование: популярные запросы кэшируются дольше
+        const isPopularQuery = trimmedQuery.length <= 10 && !trimmedQuery.includes(' '); // Короткие запросы без пробелов
+        const cacheTime = isPopularQuery ? 30 * 60 * 1000 : 10 * 60 * 1000; // 30 мин для популярных, 10 мин для остальных
+
+        if (cacheEntry && (Date.now() - cacheEntry.timestamp) < cacheTime) {
+            return cacheEntry.data;
+        }
+
+        try {
+            const response = await apiAxios.get(`/search-products/search-used-parts`, {
+                params: { q: trimmedQuery },
+            });
+
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка поиска б/у запчастей'
+            );
+        }
+    }
+);
+
 const productSlice = createSlice({
     name: 'products',
     initialState: {
@@ -222,6 +259,9 @@ const productSlice = createSlice({
         loading: false,
         vehiclesLoading: false,
         error: null,
+        searchCache: {}, // Кэш результатов поиска: {query: {data, timestamp}}
+        usedPartsData: null, // Данные поиска б/у запчастей: {available_parts, analog_parts, rossko_data}
+        usedPartsCache: {}, // Кэш результатов поиска б/у запчастей: {query: {data, timestamp}}
     },
     reducers: {
         clearProductError: (state) => {
@@ -231,6 +271,9 @@ const productSlice = createSlice({
             state.items = [];
             state.loading = false;
             state.error = null;
+        },
+        clearSearchCache: (state) => {
+            state.searchCache = {};
         },
         updateProductQuantity: (state, action) => {
             const { productId, newQuantity } = action.payload;
@@ -254,6 +297,37 @@ const productSlice = createSlice({
             .addCase(searchAllProducts.fulfilled, (state, action) => {
                 state.loading = false;
                 state.items = action.payload;
+
+                // Сохраняем в кэш (получаем query из аргументов thunk)
+                const query = action.meta.arg; // thunk получает query как первый аргумент
+                if (query && query.trim()) {
+                    state.searchCache[query.trim()] = {
+                        data: action.payload,
+                        timestamp: Date.now()
+                    };
+                }
+            })
+            .addCase(searchUsedParts.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(searchUsedParts.fulfilled, (state, action) => {
+                state.loading = false;
+                state.usedPartsData = action.payload;
+
+                // Сохраняем в кэш
+                const query = action.meta.arg; // thunk получает query как первый аргумент
+                if (query && query.trim()) {
+                    state.usedPartsCache[query.trim()] = {
+                        data: action.payload,
+                        timestamp: Date.now()
+                    };
+                }
+            })
+            .addCase(searchUsedParts.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+                state.usedPartsData = null;
             })
             .addCase(searchAllProducts.rejected, (state, action) => {
                 state.loading = false;
@@ -425,7 +499,7 @@ export const fetchPublicProducts = createAsyncThunk(
     }
 );
 
-export const { clearProductError, resetProducts, updateProductQuantity } = productSlice.actions;
+export const { clearProductError, resetProducts, updateProductQuantity, clearSearchCache } = productSlice.actions;
 export { fetchAllProducts };
 export const selectMyParts = (state) => state.products.items;
 export const selectMyPartsStatus = (state) => state.products.loading ? 'loading' : 'idle';

@@ -3,13 +3,24 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiAxios } from '../../utils/apiClient';
 
-// Асинхронный thunk для выполнения поиска
+// Асинхронный thunk для выполнения поиска с кэшированием
 export const fetchSearchResults = createAsyncThunk(
   'rossko/fetchSearchResults',
-  async ({ text, delivery_id = "000000001", address_id = 176458 }, { rejectWithValue }) => {
+  async ({ text, delivery_id = "000000001", address_id = 176458 }, { rejectWithValue, getState }) => {
+    const trimmedText = text.trim();
+
+    // Проверяем кэш
+    const state = getState();
+    const cacheEntry = state.rossko.searchCache[trimmedText];
+
+    // Если данные в кэше свежие (менее 5 минут), используем их
+    if (cacheEntry && (Date.now() - cacheEntry.timestamp) < 5 * 60 * 1000) {
+      return cacheEntry.data;
+    }
+
     try {
       const response = await apiAxios.post(`/rossko/GetSearch`, {
-        text,
+        text: trimmedText,
         delivery_id,
         address_id
       });
@@ -27,6 +38,7 @@ const RosskoSlice = createSlice({
     status: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
     error: null,
     searchQuery: '', // Сохраняем последний запрос
+    searchCache: {}, // Кэш результатов поиска: {query: {data, timestamp}}
     orders: null,
     ordersStatus: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
     ordersError: null,
@@ -41,6 +53,9 @@ const RosskoSlice = createSlice({
       state.error = null;
       state.searchQuery = '';
     },
+    clearSearchCache: (state) => {
+      state.searchCache = {};
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -52,6 +67,15 @@ const RosskoSlice = createSlice({
         state.status = 'succeeded';
         state.items = action.payload;
         state.searchQuery = action.payload?.text || '';
+
+        // Сохраняем в кэш
+        const query = action.payload?.text || '';
+        if (query) {
+          state.searchCache[query] = {
+            data: action.payload,
+            timestamp: Date.now()
+          };
+        }
       })
       .addCase(fetchSearchResults.rejected, (state, action) => {
         state.status = 'failed';
@@ -93,7 +117,7 @@ const RosskoSlice = createSlice({
   },
 });
 
-export const { clearSearch } = RosskoSlice.actions;
+export const { clearSearch, clearSearchCache } = RosskoSlice.actions;
 
 export default RosskoSlice.reducer;
 

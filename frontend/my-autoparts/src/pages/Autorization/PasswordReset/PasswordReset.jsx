@@ -17,6 +17,8 @@ export default function PasswordReset() {
         password_repeat: '',
     });
     const [success, setSuccess] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showPasswordRepeat, setShowPasswordRepeat] = useState(false);
 
     const handleEmailSubmit = (e) => {
         e.preventDefault();
@@ -117,25 +119,53 @@ export default function PasswordReset() {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Новый пароль</label>
-                                    <input
-                                        type="password"
-                                        name="password"
-                                        value={formData.password}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                                        required
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            type={showPassword ? 'text' : 'password'}
+                                            name="password"
+                                            value={formData.password}
+                                            onChange={handleChange}
+                                            className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                                            aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                                        >
+                                            {showPassword ? (
+                                                <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                                            ) : (
+                                                <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Повторите пароль</label>
-                                    <input
-                                        type="password"
-                                        name="password_repeat"
-                                        value={formData.password_repeat}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                                        required
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            type={showPasswordRepeat ? 'text' : 'password'}
+                                            name="password_repeat"
+                                            value={formData.password_repeat}
+                                            onChange={handleChange}
+                                            className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPasswordRepeat(!showPasswordRepeat)}
+                                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                                            aria-label={showPasswordRepeat ? "Скрыть пароль" : "Показать пароль"}
+                                        >
+                                            {showPasswordRepeat ? (
+                                                <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                                            ) : (
+                                                <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
                                 {(hasPasswordMismatch || hasShortPassword) && (
                                     <p className="text-sm text-red-600">

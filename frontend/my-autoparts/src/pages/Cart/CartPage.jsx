@@ -375,9 +375,7 @@ export default function CartPage() {
       ) : cartItems.length === 0 ? (
         <div className="text-center py-16">
           <div className="bg-gray-100 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m0 0l2-2m-2 2l-2-2m2-2v6m0 0l2-2m-2 2l-2-2" />
-            </svg>
+            <img src="/img/cart.svg" alt="Корзина пуста" className="h-12 w-12 text-gray-400 filter brightness-0 saturate-100 invert-61 sepia-0 saturate-0 hue-rotate-0deg brightness-90 contrast-89" />
           </div>
           <h2 className="text-2xl font-medium text-gray-900 mb-2">Корзина пуста</h2>
           <p className="text-gray-500 mb-6">Добавьте товары в корзину, чтобы оформить заказ</p>
@@ -546,18 +544,14 @@ export default function CartPage() {
                             }}
                             className="inline-flex items-center px-3 py-1 border border-red-300 text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-red-500"
                           >
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
+                            <img src="/img/trash_full.svg" alt="" className="w-3 h-3 mr-1 filter brightness-0 saturate-100 invert-16 sepia-84 saturate-7456 hue-rotate-0deg brightness-97 contrast-105" />
                             Удалить выбранное
                           </button>
                           <button
                             onClick={() => handleCheckoutSelected(seller)}
                             className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                           >
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m0 0l2-2m-2 2l-2-2m2-2v6m0 0l2-2m-2 2l-2-2" />
-                            </svg>
+                            <img src="/img/cart.svg" alt="" className="w-3 h-3 mr-1 filter brightness-0" />
                             Оформить выбранное
                           </button>
                         </>
@@ -576,9 +570,7 @@ export default function CartPage() {
                         }}
                         className="inline-flex items-center px-3 py-1 border border-red-300 text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-red-500"
                       >
-                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                        <img src="/img/trash_full.svg" alt="" className="w-3 h-3 mr-1 filter brightness-0 saturate-100 invert-16 sepia-84 saturate-7456 hue-rotate-0deg brightness-97 contrast-105" />
                         Удалить все
                       </button>
                       <button

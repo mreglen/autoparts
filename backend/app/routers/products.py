@@ -93,6 +93,19 @@ def update_product(
     if not db_product:
         raise HTTPException(status_code=404, detail="Продукт не найден или недоступен")
 
+    # Проверяем уникальность internal_code (если он изменился)
+    if product.internal_code != db_product.internal_code:
+        existing_product = db.query(ProductModel).filter(
+            ProductModel.internal_code == product.internal_code,
+            ProductModel.organization_id == current_user.organization_id,
+            ProductModel.id != product_id  # Исключаем текущий продукт
+        ).first()
+        if existing_product:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Внутренний код '{product.internal_code}' уже используется другим продуктом"
+            )
+
     # Обновляем основные поля
     for key, value in product.dict(exclude={"vehicle_ids", "photos"}).items():
         setattr(db_product, key, value)
@@ -272,7 +285,10 @@ def get_products(
             selectinload(ProductModel.compatible_vehicles),
             selectinload(ProductModel.creator)
         )
-        .filter(ProductModel.organization_id == current_user.organization_id)
+        .filter(
+            ProductModel.organization_id == current_user.organization_id,
+            ProductModel.quantity > 0
+        )
         .all()
     )
     return products

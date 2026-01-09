@@ -19,7 +19,7 @@ const EditPart = () => {
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [selectedImage, setSelectedImage] = useState({ url: '', alt: '' });
+  const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
 
   useEffect(() => {
     if (user?.organization_id) {
@@ -167,8 +167,8 @@ const EditPart = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleImageClick = (imageUrl, alt) => {
-    setSelectedImage({ url: imageUrl, alt });
+  const handleImageClick = (photos, initialIndex) => {
+    setSelectedImages({ photos, initialIndex });
     setImageModalOpen(true);
   };
 
@@ -507,8 +507,9 @@ const EditPart = () => {
       <ImageModal
         isOpen={imageModalOpen}
         onClose={() => setImageModalOpen(false)}
-        imageUrl={selectedImage.url}
-        alt={selectedImage.alt}
+        photos={selectedImages.photos}
+        initialIndex={selectedImages.initialIndex}
+        alt="Фото товара"
       />
 
       <VehicleModal

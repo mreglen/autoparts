@@ -7,9 +7,9 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
-    article = Column(String(30))
-    name = Column(String(255))
-    brand = Column(String(100)) 
+    article = Column(String(30), index=True)  # Индекс для поиска по артикулу
+    name = Column(String(255), index=True)   # Индекс для поиска по названию
+    brand = Column(String(100), index=True)  # Индекс для поиска по бренду 
     internal_code = Column(String(100), unique=True, nullable=False, index=True)
     description = Column(Text) 
     is_new = Column(Boolean, default=True)

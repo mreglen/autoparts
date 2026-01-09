@@ -27,8 +27,8 @@ def authenticate_user(db: Session, login: str, password: str):
     login = login.strip()
 
     if '@' in login and '.' in login:
-        # Это email — ищем напрямую
-        user = db.query(User).filter(User.email == login).first()
+        # Это email — ищем без учета регистра
+        user = db.query(User).filter(User.email.ilike(login)).first()
     else:
         # Это телефон — нормализуем к формату хранения
         normalized = normalize_to_storage_format(login)

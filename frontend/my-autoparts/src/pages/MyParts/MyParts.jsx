@@ -1,19 +1,50 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
-import PhotoGallery from '../../components/PhotoGallery/PhotoGallery';
+import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import ImageModal from '../../components/ImageModal/ImageModal';
 import { fetchProducts, updateProductQuantity } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
 
-const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand, isExpanded, onImageClick }) => (
+const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect }) => {
+  const [showActions, setShowActions] = useState(false);
+
+  // Закрываем dropdown при клике вне
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.actions-dropdown')) {
+        setShowActions(false);
+      }
+    };
+
+    if (showActions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showActions]);
+
+  return (
   <React.Fragment>
     <tr
       className="cursor-pointer hover:bg-gray-50"
       onClick={onToggleExpand}
     >
+      <td className="px-2 sm:px-6 py-4 whitespace-nowrap">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+        />
+      </td>
       <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{part.brand || '—'}</td>
       <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{part.article || '—'}</td>
       <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{part.internal_code || '—'}</td>
@@ -28,16 +59,45 @@ const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand,
         {part.price != null ? `${part.price.toFixed(2)} ₽` : '—'}
       </td>
       <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        <div className="flex flex-col sm:flex-row gap-1">
-          <button onClick={(e) => { e.stopPropagation(); onSale(part); }} className="text-indigo-600 hover:text-indigo-900 text-xs sm:text-sm">
-            Продать
+        <div className="relative actions-dropdown">
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
+            className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
+          >
+            Действия
+            <img
+              src="/img/arrow_sm.svg"
+              alt=""
+              className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${showActions ? 'rotate-90' : ''}`}
+              style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
+            />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onWriteoff(part); }} className="text-red-600 hover:text-red-900 text-xs sm:text-sm">
-            Списать
-          </button>
-          <Link to={`/my-parts/edit/${part.id}`} onClick={(e) => e.stopPropagation()} className="text-green-600 hover:text-green-900 text-xs sm:text-sm">
-            Редактировать
-          </Link>
+
+          {showActions && (
+            <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
+              <div className="py-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onSale(part); setShowActions(false); }}
+                  className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                >
+                  Продать
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onWriteoff(part); setShowActions(false); }}
+                  className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                >
+                  Списать
+                </button>
+                <Link
+                  to={`/my-parts/edit/${part.id}`}
+                  onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
+                  className="block w-full px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                >
+                  Редактировать
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </td>
     </tr>
@@ -45,11 +105,11 @@ const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand,
     {/* Раскрывающаяся карточка */}
     {isExpanded && (
       <tr className="bg-gray-50">
-        <td colSpan="8" className="px-6 py-4 border-t">
+        <td colSpan="9" className="px-6 py-4 border-t">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Фото */}
             <div>
-              <PhotoGallery photos={part.photos || []} onImageClick={onImageClick} />
+              <PhotoThumbnail photos={part.photos || []} onImageClick={onImageClick} />
             </div>
 
             {/* Описание и авто */}
@@ -132,7 +192,8 @@ const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand,
       </tr>
     )}
   </React.Fragment>
-);
+  );
+};
 
 function MyParts() {
   const navigate = useNavigate();
@@ -146,15 +207,17 @@ function MyParts() {
   const [operationType, setOperationType] = useState(null);
   const [expandedPartId, setExpandedPartId] = useState(null);
   const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [selectedImage, setSelectedImage] = useState({ url: '', alt: '' });
+  const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
+  const [selectedParts, setSelectedParts] = useState(new Set());
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
   const [formData, setFormData] = useState({
     quantity: '',
     price: '',
     reason: '',
   });
 
-  const handleImageClick = (imageUrl, alt) => {
-    setSelectedImage({ url: imageUrl, alt });
+  const handleImageClick = (photos, initialIndex) => {
+    setSelectedImages({ photos, initialIndex });
     setImageModalOpen(true);
   };
 
@@ -166,6 +229,45 @@ function MyParts() {
 
   const toggleExpand = (id) => {
     setExpandedPartId(expandedPartId === id ? null : id);
+  };
+
+  const handlePartSelect = (partId) => {
+    setSelectedParts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(partId)) {
+        newSet.delete(partId);
+      } else {
+        newSet.add(partId);
+      }
+      return newSet;
+    });
+  };
+
+  // Функция для переключения мобильного меню действий
+  const toggleMobileActions = (partId) => {
+    setMobileActionsOpen(mobileActionsOpen === partId ? null : partId);
+  };
+
+  // Закрытие мобильного меню действий при клике вне
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.mobile-actions-dropdown')) {
+        setMobileActionsOpen(null);
+      }
+    };
+
+    if (mobileActionsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [mobileActionsOpen]);
+
+  const handleBulkAction = () => {
+    // Заглушка для будущих действий
+    console.log(`Выбрано ${selectedParts.size} запчастей для массовых действий`);
   };
 
   const handleConfirm = async () => {
@@ -238,6 +340,10 @@ function MyParts() {
 
   const displayParts = products;
 
+  // Расчет общей суммы и количества
+  const totalValue = displayParts.reduce((sum, part) => sum + (part.price * part.quantity), 0);
+  const totalQuantity = displayParts.reduce((sum, part) => sum + part.quantity, 0);
+
   const getStorageAddress = (locationId) => {
     if (!locationId) return '—';
     const loc = storageLocations.find(l => l.id === locationId);
@@ -247,59 +353,368 @@ function MyParts() {
 
 
   return (
-    <div className="mt-5">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Мои запчасти</h1>
+    <div className="mt-4 sm:mt-5 px-4 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+        <h1 className="text-2xl sm:text-2xl font-bold text-gray-800">Мои запчасти</h1>
+        <div className="text-left sm:text-right">
+          <div className="text-xl sm:text-2xl font-bold text-gray-700">
+            {totalValue.toLocaleString('ru-RU')} ₽
+          </div>
+          <div className="text-sm text-gray-500">Общая стоимость</div>
+          <div className="text-lg font-semibold text-gray-700 mt-1">
+            {totalQuantity.toLocaleString('ru-RU')} шт.
+          </div>
+          <div className="text-sm text-gray-500">Общее количество</div>
+        </div>
+      </div>
 
-      <button
-        onClick={() => navigate('/my-parts/add')}
-        className="mb-6 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition"
-      >
-        Добавить запчасть
-      </button>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start mb-6 gap-4">
+        <button
+          onClick={() => navigate('/my-parts/add')}
+          className="px-6 py-3 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base font-medium min-h-[48px] sm:min-h-0"
+        >
+          Добавить запчасть
+        </button>
+      </div>
 
-      <div className="font-medium text-base mb-4">
+      <div className="font-medium text-lg sm:text-base mb-4 px-0">
         <h2 className="border-b-4 border-blue-500 pb-2 inline-block">В наличии</h2>
       </div>
 
       {loading ? (
-        <div className="mt-8 text-center py-6 text-gray-600">Загрузка запчастей...</div>
+        <div className="mt-8 text-center py-16 px-6">
+          <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+            <svg className="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
+          <h2 className="text-xl font-medium text-gray-900 mb-2">Загрузка запчастей...</h2>
+          <p className="text-gray-600 text-base">Пожалуйста, подождите</p>
+        </div>
       ) : error ? (
-        <div className="mt-8 text-center py-6 text-red-600">Ошибка: {error}</div>
+        <div className="mt-8 text-center py-16 px-6">
+          <div className="bg-red-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-medium text-gray-900 mb-2">Ошибка загрузки запчастей</h2>
+          <p className="text-gray-500 mb-6 text-base">{error}</p>
+          <button
+            onClick={() => dispatch(fetchProducts())}
+            className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
+          >
+            Попробовать снова
+          </button>
+        </div>
       ) : displayParts.length === 0 ? (
-        <div className="mt-12 text-center text-gray-500">
-          У вас пока нет добавленных запчастей.
+        <div className="mt-12 text-center py-16 px-6">
+          <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+            <svg className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Запчастей нет</h2>
+          <p className="text-gray-600 text-base mb-6">У вас пока нет добавленных запчастей</p>
+          <button
+            onClick={() => navigate('/my-parts/add')}
+            className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
+          >
+            Добавить первую запчасть
+          </button>
         </div>
       ) : (
-        <div className="w-full">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бренд</th>
-                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Номер</th>
-                <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Внутр. код</th>
-                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Наименование</th>
-                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Состояние</th>
-                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Остаток</th>
-                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена, ₽</th>
-                <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {displayParts.map((part) => (
-                <CardPart
-                  key={part.id}
-                  part={part}
-                  getStorageAddress={getStorageAddress}
-                  onSale={(p) => handleOpenModal(p, 'sale')}
-                  onWriteoff={(p) => handleOpenModal(p, 'writeoff')}
-                  onToggleExpand={() => toggleExpand(part.id)}
-                  isExpanded={expandedPartId === part.id}
-                  onImageClick={handleImageClick}
+        <>
+          {/* Десктопная версия - таблица */}
+          <div className="hidden md:block w-full">
+            {selectedParts.size > 0 && (
+              <div className="mb-3 flex items-center justify-between py-2 border-b border-gray-200">
+                <span className="text-sm text-gray-500">
+                  Выбрано: {selectedParts.size}
+                </span>
+                <button
+                  onClick={handleBulkAction}
+                  className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
+                >
+                  Действия
+                  <img
+                    src="/img/arrow_sm.svg"
+                    alt=""
+                    className={`w-3 h-3 transition-transform duration-200 filter brightness-0 saturate-100 invert-61 sepia-0 saturate-0 hue-rotate-0deg brightness-90 contrast-89`}
+                  />
+                </button>
+              </div>
+            )}
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <input
+                      type="checkbox"
+                      checked={displayParts.length > 0 && selectedParts.size === displayParts.length}
+                      onChange={() => {
+                        if (selectedParts.size === displayParts.length) {
+                          setSelectedParts(new Set());
+                        } else {
+                          setSelectedParts(new Set(displayParts.map(part => part.id)));
+                        }
+                      }}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                  </th>
+                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бренд</th>
+                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Номер</th>
+                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Внутр. код</th>
+                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Наименование</th>
+                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Состояние</th>
+                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Остаток</th>
+                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена, ₽</th>
+                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {displayParts.map((part) => (
+                  <CardPart
+                    key={part.id}
+                    part={part}
+                    getStorageAddress={getStorageAddress}
+                    onSale={(p) => handleOpenModal(p, 'sale')}
+                    onWriteoff={(p) => handleOpenModal(p, 'writeoff')}
+                    onToggleExpand={() => toggleExpand(part.id)}
+                    isExpanded={expandedPartId === part.id}
+                    onImageClick={handleImageClick}
+                    isSelected={selectedParts.has(part.id)}
+                    onSelect={() => handlePartSelect(part.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Мобильная версия - карточки */}
+          <div className="md:hidden space-y-4">
+            {/* Панель массовых действий для мобильных */}
+            {selectedParts.size > 0 && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-medium text-gray-900">
+                    Выбрано: {selectedParts.size}
+                  </span>
+                  <button
+                    onClick={handleBulkAction}
+                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[44px]"
+                  >
+                    Действия
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Чекбокс "Выбрать все" для мобильных */}
+            {displayParts.length > 1 && (
+              <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3 mb-4">
+                <span className="text-sm font-medium text-gray-700">Выбрать все</span>
+                <input
+                  type="checkbox"
+                  checked={displayParts.length > 0 && selectedParts.size === displayParts.length}
+                  onChange={() => {
+                    if (selectedParts.size === displayParts.length) {
+                      setSelectedParts(new Set());
+                    } else {
+                      setSelectedParts(new Set(displayParts.map(part => part.id)));
+                    }
+                  }}
+                  className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                 />
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </div>
+            )}
+
+            {displayParts.map((part) => (
+              <div key={part.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                {/* Заголовок и чекбокс */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1 pr-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-base font-semibold text-gray-900">{part.brand || '—'}</span>
+                      <span className="text-sm text-gray-400">•</span>
+                      <span className="text-sm text-gray-500 font-mono">{part.article || '—'}</span>
+                    </div>
+                    <h3 className="text-base font-medium text-gray-800 mb-2 leading-tight">{part.name || '—'}</h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {part.is_new ? 'Новый' : 'Б/у'}
+                      </span>
+                      {part.internal_code && (
+                        <span className="text-xs text-gray-500 font-mono">{part.internal_code}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedParts.has(part.id)}
+                      onChange={() => handlePartSelect(part.id)}
+                      className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-gray-900 mb-1">
+                        {part.price != null ? `${part.price.toFixed(2)} ₽` : '—'}
+                      </div>
+                      <div className="text-sm text-gray-600">{part.quantity || 0} шт.</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Кнопка действий */}
+                <div className="mb-4">
+                  <div className="relative mobile-actions-dropdown">
+                    <button
+                      onClick={() => toggleMobileActions(part.id)}
+                      className="w-full text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded-lg px-4 py-3 bg-transparent hover:bg-gray-50 transition-colors min-h-[44px] flex items-center justify-center gap-2"
+                    >
+                      Действия
+                      <img
+                        src="/img/arrow_sm.svg"
+                        alt=""
+                        className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${mobileActionsOpen === part.id ? 'rotate-90' : ''}`}
+                        style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
+                      />
+                    </button>
+
+                    {mobileActionsOpen === part.id && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 mobile-actions-dropdown w-48 mx-auto">
+                        <div className="py-1">
+                          <button
+                            onClick={() => {
+                              handleOpenModal(part, 'sale');
+                              setMobileActionsOpen(null);
+                            }}
+                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50"
+                          >
+                            Продать
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleOpenModal(part, 'writeoff');
+                              setMobileActionsOpen(null);
+                            }}
+                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50"
+                          >
+                            Списать
+                          </button>
+                          <Link
+                            to={`/my-parts/edit/${part.id}`}
+                            onClick={() => setMobileActionsOpen(null)}
+                            className="block w-full px-3 py-2 text-sm text-black hover:bg-gray-50"
+                          >
+                            Редактировать
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Кнопка показа деталей */}
+                <div className="pt-3 border-t border-gray-100">
+                  <button
+                    onClick={() => toggleExpand(part.id)}
+                    className="w-full text-indigo-600 text-sm font-medium hover:text-indigo-800 transition-colors py-2"
+                  >
+                    {expandedPartId === part.id ? 'Скрыть детали' : 'Показать детали'}
+                  </button>
+                </div>
+
+                {/* Детали запчасти - мобильная версия */}
+                {expandedPartId === part.id && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="grid grid-cols-1 gap-4">
+                      {/* Фото */}
+                      <div>
+                        <PhotoThumbnail photos={part.photos || []} onImageClick={handleImageClick} />
+                      </div>
+
+                      {/* Описание и информация */}
+                      <div className="space-y-4">
+                        {/* Описание */}
+                        <div>
+                          <span className="text-sm text-gray-500 block mb-1">Описание</span>
+                          <div className="text-base text-gray-900">{part.description || '—'}</div>
+                        </div>
+
+                        {/* Дополнительная информация */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-sm text-gray-500 block mb-1">Склад</span>
+                            <div className="text-base font-medium text-gray-900">
+                              {part.storage_location_id ? getStorageAddress(part.storage_location_id) : '—'}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-sm text-gray-500 block mb-1">Ответственный</span>
+                            <div className="text-base font-medium text-gray-900">
+                              {part.creator_name || '—'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Автомобиль(и) */}
+                        {part.compatible_vehicles && part.compatible_vehicles.length > 0 && (
+                          <div>
+                            <span className="text-sm text-gray-500 block mb-2">Автомобиль</span>
+                            <div className="space-y-3">
+                              {part.compatible_vehicles.map((vehicle) => (
+                                <div
+                                  key={vehicle.id}
+                                  className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded border text-sm"
+                                >
+                                  <div>
+                                    <span className="text-gray-500">Марка:</span>
+                                    <div className="font-medium">{vehicle.brand}</div>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Модель:</span>
+                                    <div className="font-medium">{vehicle.model}</div>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Поколение:</span>
+                                    <div className="font-medium">{vehicle.generation || '—'}</div>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">Двигатель:</span>
+                                    <div className="font-medium">{vehicle.engine || '—'}</div>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500">КПП:</span>
+                                    <div className="font-medium">{vehicle.transmission || '—'}</div>
+                                  </div>
+                                  {vehicle.vin && (
+                                    <div className="col-span-2">
+                                      <span className="text-gray-500">VIN:</span>
+                                      <div className="font-medium">{vehicle.vin}</div>
+                                    </div>
+                                  )}
+                                  {vehicle.mileage && (
+                                    <div className="col-span-2">
+                                      <span className="text-gray-500">Пробег:</span>
+                                      <div className="font-medium">{vehicle.mileage.toLocaleString()} км</div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <StockOutModal
@@ -317,8 +732,9 @@ function MyParts() {
       <ImageModal
         isOpen={imageModalOpen}
         onClose={() => setImageModalOpen(false)}
-        imageUrl={selectedImage.url}
-        alt={selectedImage.alt}
+        photos={selectedImages.photos}
+        initialIndex={selectedImages.initialIndex}
+        alt="Фото товара"
       />
     </div>
   );

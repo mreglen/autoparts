@@ -276,7 +276,7 @@ export default function Navigation() {
 
                         <NavLink to="/cart" className="flex flex-col items-center justify-center text-center text-xs sm:text-sm text-gray-700 hover:text-indigo-600">
                             <div className="relative">
-                                <img src="/img/shopping-cart 1.svg" alt="Корзина" className="w-5 h-5 sm:w-6 sm:h-6" />
+                                <img src="/img/cart.svg" alt="Корзина" className="w-5 h-5 sm:w-6 sm:h-6 filter brightness-0" />
                                 {cartData.itemCount > 0 && (
                                     <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center font-bold">
                                         {cartData.itemCount}
@@ -297,13 +297,13 @@ export default function Navigation() {
             {/* Мобильное меню */}
             {isMobileMenuOpen && (
                 <div className="md:hidden bg-white border-t border-gray-200">
-                    <div className="px-3 py-4 space-y-1">
+                    <div className="px-4 py-6 space-y-2">
                         {/* Основные пункты меню */}
                         <NavLink
                             to="/autoparts"
                             onClick={closeMobileMenu}
                             className={({ isActive }) =>
-                                `block px-3 py-2 text-base font-medium rounded-md ${
+                                `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
                                     isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
                                 }`
                             }
@@ -314,7 +314,7 @@ export default function Navigation() {
                             to="/autoservice"
                             onClick={closeMobileMenu}
                             className={({ isActive }) =>
-                                `block px-3 py-2 text-base font-medium rounded-md ${
+                                `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
                                     isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
                                 }`
                             }
@@ -328,7 +328,7 @@ export default function Navigation() {
                                 to="/purchases"
                                 onClick={closeMobileMenu}
                                 className={({ isActive }) =>
-                                    `block px-3 py-2 text-base font-medium rounded-md ${
+                                    `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
                                         isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
                                     }`
                                 }
@@ -343,7 +343,7 @@ export default function Navigation() {
                                 to="/sales"
                                 onClick={closeMobileMenu}
                                 className={({ isActive }) =>
-                                    `block px-3 py-2 text-base font-medium rounded-md ${
+                                    `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
                                         isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
                                     }`
                                 }
@@ -359,7 +359,7 @@ export default function Navigation() {
                                 to={item.path}
                                 onClick={closeMobileMenu}
                                 className={({ isActive }) =>
-                                    `block px-3 py-2 text-base font-medium rounded-md ${
+                                    `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
                                         isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
                                     }`
                                 }
@@ -371,12 +371,12 @@ export default function Navigation() {
                         {/* Дополнительные пункты для всех авторизованных */}
                         {token && (
                             <>
-                                <div className="border-t border-gray-200 my-2"></div>
+                                <div className="border-t border-gray-200 my-4"></div>
                                 <NavLink
                                     to="/orders"
                                     onClick={closeMobileMenu}
                                     className={({ isActive }) =>
-                                        `block px-3 py-2 text-base font-medium rounded-md ${
+                                        `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
                                             isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
                                         }`
                                     }
@@ -387,7 +387,7 @@ export default function Navigation() {
                                     to="/storage"
                                     onClick={closeMobileMenu}
                                     className={({ isActive }) =>
-                                        `block px-3 py-2 text-base font-medium rounded-md ${
+                                        `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
                                             isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
                                         }`
                                     }
@@ -398,7 +398,7 @@ export default function Navigation() {
                                     to="/profile"
                                     onClick={closeMobileMenu}
                                     className={({ isActive }) =>
-                                        `block px-3 py-2 text-base font-medium rounded-md ${
+                                        `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
                                             isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
                                         }`
                                     }
@@ -407,7 +407,7 @@ export default function Navigation() {
                                 </NavLink>
                                 <button
                                     onClick={handleLogout}
-                                    className="block w-full text-left px-3 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-md"
+                                    className="block w-full text-left px-4 py-4 text-lg font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-lg min-h-[48px] flex items-center"
                                 >
                                     Выход
                                 </button>
@@ -419,7 +419,7 @@ export default function Navigation() {
                             <NavLink
                                 to="/auth"
                                 onClick={closeMobileMenu}
-                                className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-md"
+                                className="block px-4 py-4 text-lg font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-lg min-h-[48px] flex items-center"
                             >
                                 Войти
                             </NavLink>

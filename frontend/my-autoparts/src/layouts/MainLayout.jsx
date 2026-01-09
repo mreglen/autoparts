@@ -6,7 +6,7 @@ export default function MainLayout() {
     return (
         <div className="min-h-screen bg-gray-50">
             <Navigation />
-            <main className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-7 py-8">
+            <main className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-7 py-6 sm:py-8">
                 <Outlet />
             </main>
         </div>
