@@ -48,7 +48,6 @@ const EditPart = () => {
 
   const [formData, setFormData] = useState({
     article: '',
-    internal_code: '',
     name: '',
     brand: '',
     description: '',
@@ -68,7 +67,6 @@ const EditPart = () => {
     if (currentProduct && !productLoaded) {
       setFormData({
         article: currentProduct.article || '',
-        internal_code: currentProduct.internal_code || '',
         name: currentProduct.name || '',
         brand: currentProduct.brand || '',
         description: currentProduct.description || '',
@@ -207,7 +205,6 @@ const EditPart = () => {
 
     const productData = {
       article: formData.article,
-      internal_code: formData.internal_code,
       name: formData.name,
       brand: formData.brand,
       description: formData.description || null,
@@ -264,17 +261,18 @@ const EditPart = () => {
           />
         </div>
 
-        {/* Внутренний код */}
-        <div>
-          <label className="block text-sm font-medium">Внутренний код *</label>
-          <input
-            name="internal_code"
-            value={formData.internal_code}
-            onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
-          />
-        </div>
+        {/* Внутренний код (только для чтения) */}
+        {currentProduct?.internal_code && (
+          <div>
+            <label className="block text-sm font-medium">Внутренний код</label>
+            <input
+              value={currentProduct.internal_code}
+              readOnly
+              className="mt-1 block w-full px-3 py-2 border rounded-md bg-gray-50 text-gray-600"
+            />
+          </div>
+        )}
+
 
         {/* Наименование */}
         <div>

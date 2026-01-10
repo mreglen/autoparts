@@ -28,9 +28,31 @@ def create_product(
             detail="Только продавцы могут добавлять товары"
         )
 
+    # Подготавливаем данные продукта
+    product_data = product.dict(exclude={"vehicle_ids", "photos"})
+
+    # Автоматическая генерация internal_code, если не предоставлен
+    if not product_data.get("internal_code"):
+        # Находим все существующие internal_code для организации
+        existing_codes_result = db.query(ProductModel.internal_code).filter(
+            ProductModel.organization_id == current_user.organization_id
+        ).all()
+
+        # Извлекаем существующие коды как строки
+        existing_codes = [code_tuple[0] for code_tuple in existing_codes_result]
+
+        # Начинаем с 1 и находим следующий свободный код в формате 00001
+        next_code = 1
+        while True:
+            candidate_code = f"{next_code:05d}"  # Формат 00001, 00002, etc.
+            if candidate_code not in existing_codes:
+                product_data["internal_code"] = candidate_code
+                break
+            next_code += 1
+
     # Создаём продукт
     db_product = ProductModel(
-        **product.dict(exclude={"vehicle_ids", "photos"}),
+        **product_data,
         organization_id=current_user.organization_id,
         created_by=current_user.id
     )

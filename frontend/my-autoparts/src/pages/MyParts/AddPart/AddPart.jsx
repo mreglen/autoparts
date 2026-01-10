@@ -40,7 +40,6 @@ const AddPart = () => {
 
   const [formData, setFormData] = useState({
     article: '',
-    internal_code: '',
     name: '',
     brand: '',
     description: '',
@@ -98,7 +97,6 @@ const AddPart = () => {
 
     const productData = {
       article: formData.article,
-      internal_code: formData.internal_code,
       name: formData.name,
       brand: formData.brand,
       description: formData.description || null,
@@ -159,17 +157,6 @@ const AddPart = () => {
           />
         </div>
 
-        {/* Внутренний код */}
-        <div>
-          <label className="block text-sm font-medium">Внутренний код *</label>
-          <input
-            name="internal_code"
-            value={formData.internal_code}
-            onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
-          />
-        </div>
 
         {/* Наименование */}
         <div>

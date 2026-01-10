@@ -4,9 +4,9 @@ from pydantic import BaseModel
 class ProductBase(BaseModel):
     article: str
     name: str
-    brand: str 
+    brand: str
     price: float
-    internal_code: str
+    internal_code: Optional[str] = None
     description: Optional[str] = None
     quantity: int
     is_new: bool = True
@@ -62,7 +62,7 @@ class Vehicle(VehicleBase):
 
 
 class ProductCreate(ProductBase):
-    internal_code: str  # Делаем обязательным
+    internal_code: Optional[str] = None  # Теперь опционально, будет генерироваться автоматически
     vehicle_ids: Optional[List[int]] = None
     photos: Optional[List[str]] = None
 
