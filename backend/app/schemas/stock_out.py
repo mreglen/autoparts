@@ -32,3 +32,23 @@ class StockOut(StockOutBase):
 
     class Config:
         from_attributes = True
+
+
+class ReturnItem(BaseModel):
+    stockOutId: int
+    productId: int
+    quantity: int
+    returnPrice: float
+    reason: Optional[str] = None
+    storageLocationId: int
+
+    class Config:
+        allow_population_by_field_name = True
+        # Разрешаем дополнительные поля, которые могут прийти
+        extra = "ignore"
+        # Преобразовываем поля из snake_case в camelCase и наоборот
+        alias_generator = lambda x: x  # Сохраняем как есть
+
+
+class ReturnCreate(BaseModel):
+    items: list[ReturnItem]

@@ -30,6 +30,7 @@ function Map() {
                     allowFullScreen="true"
                     style={{ position: 'relative' }}
                     className="rounded-md"
+                    title="Карта расположения автосервиса"
                 />
             </div>
         </div>

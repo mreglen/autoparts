@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { clearCart } from '../../redux/slices/CartSlice';
@@ -48,11 +48,11 @@ export default function OrderRegistration() {
   ];
 
   // Адреса самовывоза для разных организаций
-  const pickupAddresses = {
+  const pickupAddresses = useMemo(() => ({
     'АвтоЗапчасти ООО': 'г. Москва, ул. Автозаводская, д. 23, склад №5',
     'ПрофиАвто Плюс': 'г. Санкт-Петербург, пр. Обуховской Обороны, д. 120, склад №3',
     'Организация': 'г. Москва, ул. Ленина, д. 15, офис 205'
-  };
+  }), []);
 
   // Получение адреса организации админа
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function OrderRegistration() {
     };
 
     fetchAdminOrgAddress();
-  }, [seller]);
+  }, [seller, pickupAddresses]);
 
   // Обновление адреса самовывоза при выборе типа доставки
   useEffect(() => {
@@ -82,7 +82,7 @@ export default function OrderRegistration() {
       // Для заказов от админа показываем адрес организации
       setPickupAddress(adminOrgAddress || pickupAddresses[seller] || 'Адрес самовывоза не указан');
     }
-  }, [deliveryType, seller, adminOrgAddress]);
+  }, [deliveryType, seller, adminOrgAddress, pickupAddresses]);
 
   // Проверка заполненности всех полей
   const isFormValid = () => {
@@ -100,9 +100,6 @@ export default function OrderRegistration() {
     }).format(price);
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('ru-RU');
-  };
 
   const calculateTotal = () => {
     return selectedItems.reduce((total, item) => total + (item.price * item.quantity), 0);

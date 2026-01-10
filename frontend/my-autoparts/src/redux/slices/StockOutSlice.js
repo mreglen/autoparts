@@ -35,6 +35,23 @@ export const fetchStockOuts = createAsyncThunk(
   }
 );
 
+export const createReturn = createAsyncThunk(
+  'stockOut/createReturn',
+  async (returnData, { rejectWithValue }) => {
+    try {
+      const response = await apiAxios.post(
+        `/stock-outs/returns`,
+        returnData
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.detail || 'Ошибка возврата запчастей'
+      );
+    }
+  }
+);
+
 const stockOutSlice = createSlice({
   name: 'stockOut',
   initialState: {
@@ -70,6 +87,19 @@ const stockOutSlice = createSlice({
         state.items = action.payload;
       })
       .addCase(fetchStockOuts.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(createReturn.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createReturn.fulfilled, (state, action) => {
+        state.loading = false;
+        // После успешного возврата обновляем список расходов
+        // В идеале здесь нужно обновить конкретные записи, но для простоты перезагрузим весь список
+      })
+      .addCase(createReturn.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
 import {
@@ -32,30 +32,16 @@ export default function RosskoOrdersTab() {
     type: null
   });
 
-  useEffect(() => {
-    if (activeTab === 'rossko_orders') {
-      fetchRosskoOrdersList();
-    } else if (activeTab === 'checkout_orders') {
-      fetchDatabaseOrdersList();
-    }
-  }, [filters, activeTab]);
-
-  // Проверка прав администратора (после всех хуков)
-  const user = useSelector((state) => state.auth.user);
-  if (!user || !user.is_admin) {
-    return <Navigate to="/" replace />;
-  }
-
-  const fetchRosskoOrdersList = () => {
+  const fetchRosskoOrdersList = useCallback(() => {
     // Убираем пустые значения из фильтров
     const cleanFilters = Object.fromEntries(
       Object.entries(filters).filter(([_, value]) => value !== null && value !== '')
     );
 
     dispatch(fetchRosskoOrders(cleanFilters));
-  };
+  }, [filters, dispatch]);
 
-  const fetchDatabaseOrdersList = () => {
+  const fetchDatabaseOrdersList = useCallback(() => {
     // Для заказов из базы данных используем параметры пагинации
     const params = {
       skip: 0,
@@ -63,7 +49,21 @@ export default function RosskoOrdersTab() {
     };
 
     dispatch(fetchDatabaseOrders(params));
-  };
+  }, [filters.limit, dispatch]);
+
+  useEffect(() => {
+    if (activeTab === 'rossko_orders') {
+      fetchRosskoOrdersList();
+    } else if (activeTab === 'checkout_orders') {
+      fetchDatabaseOrdersList();
+    }
+  }, [filters, activeTab, fetchRosskoOrdersList, fetchDatabaseOrdersList]);
+
+  // Проверка прав администратора (после всех хуков)
+  const user = useSelector((state) => state.auth.user);
+  if (!user || !user.is_admin) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({

@@ -1,5 +1,5 @@
 # app/routers/auth.py
-from fastapi import APIRouter, Depends, Form, HTTPException, status
+from fastapi import APIRouter, Depends, Form, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.models.organization import Organization
 from app.models.password_reset_token import PasswordResetToken
@@ -15,9 +15,11 @@ from app.schemas.auth import (
     Token
 )
 from app.core.security import get_password_hash
-from app.core.auth import authenticate_user, create_access_token, get_current_user
+from app.core.auth import authenticate_user, create_access_token, get_current_user, oauth2_scheme
+from app.models.user_session import UserSession
 from app.db.database import get_db
 from datetime import datetime, timedelta, timezone
+from jose import jwt
 from app.core.config import Settings
 from app.schemas.user import UserResponse
 from app.utils.email import generate_verification_code, send_verification_email
@@ -154,7 +156,16 @@ def register_confirm(data: VerifyCode, db: Session = Depends(get_db)):
         }
     )
 
-    access_token = create_access_token(data={"sub": user.email})
+    # Создаем токен с сессией
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=access_token_expires,
+        db=db,
+        user=user,
+        device_info="Registration",
+        ip_address=None
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -163,7 +174,10 @@ def register_confirm(data: VerifyCode, db: Session = Depends(get_db)):
 def login(
     username: str = Form(...),
     password: str = Form(...),
-    db: Session = Depends(get_db)
+    user_agent: str = Form(None, description="User agent браузера"),
+    device_info: str = Form(None, description="Информация об устройстве"),
+    db: Session = Depends(get_db),
+    request: Request = None
 ):
     user = authenticate_user(db, username, password)
     if not user:
@@ -172,11 +186,27 @@ def login(
             detail="Неверный email/телефон или пароль",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    log_event(db, event_type="user_logged_in", user_id=user.id, email=user.email)
+
+    # Получаем IP адрес
+    ip_address = request.client.host if request else None
+
+    # Информация об устройстве
+    if not device_info and user_agent:
+        device_info = user_agent[:255]  # Ограничиваем длину
+
+    log_event(db, event_type="user_logged_in", user_id=user.id, email=user.email, details={
+        "ip_address": ip_address,
+        "device_info": device_info
+    })
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email},
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
+        db=db,
+        user=user,
+        device_info=device_info,
+        ip_address=ip_address
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -243,7 +273,7 @@ def verify_code(data: VerifyCode, db: Session = Depends(get_db)):
 
 
 @router.post("/register/complete")
-def complete_registration(data: RegisterStep1, db: Session = Depends(get_db)):
+def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), request: Request = None):
     pending = db.query(PendingUser).filter(PendingUser.email == data.email).first()
     if not pending or not pending.is_verified:
         raise HTTPException(status_code=400, detail="Email не подтверждён")
@@ -298,7 +328,16 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db)):
             }
         )
 
-        access_token = create_access_token(data={"sub": user.email})
+        # Создаем токен с сессией
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email},
+            expires_delta=access_token_expires,
+            db=db,
+            user=user,
+            device_info="Registration Complete",
+            ip_address=request.client.host if request else None
+        )
         return {"access_token": access_token, "token_type": "bearer"}
 
     except Exception as e:
@@ -308,8 +347,34 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db)):
 
 
 @router.post("/logout")
-def logout():
-    return {"msg": "Выход выполнен"}
+def logout(
+    current_user: User = Depends(get_current_user),
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Декодируем токен, чтобы получить session_token
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        session_token = payload.get("session_token")
+
+        if session_token:
+            # Деактивируем сессию в базе данных
+            session = db.query(UserSession).filter(
+                UserSession.user_id == current_user.id,
+                UserSession.session_token == session_token
+            ).first()
+
+            if session:
+                session.is_active = False
+                db.commit()
+
+        log_event(db, event_type="user_logged_out", user_id=current_user.id, email=current_user.email)
+        return {"msg": "Выход выполнен"}
+
+    except Exception as e:
+        # Даже если что-то пошло не так, возвращаем успешный ответ
+        # чтобы не раскрывать детали внутренней работы
+        return {"msg": "Выход выполнен"}
 
 
 @router.post("/password/send-code")

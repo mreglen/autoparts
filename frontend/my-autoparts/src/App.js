@@ -16,7 +16,7 @@ import MyParts from './pages/MyParts/MyParts';
 import AddPart from './pages/MyParts/AddPart/AddPart';
 import EditPart from './pages/MyParts/EditPart/EditPart';
 import StockInList from './pages/StockIn/StockInList';
-import StockOutList from './pages/StockOut/StockOut';
+import { StockOutList } from './pages/StockOut';
 import CartPage from './pages/Cart/CartPage';
 import OrderRegistration from './pages/Cart/OrderRegistration';
 import SalesPage from './pages/Sales/SalesPage';

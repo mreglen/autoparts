@@ -8,7 +8,6 @@ import {
   updateCartItemQuantity,
   removeFromCart
 } from '../../redux/slices/CartSlice';
-import OrderRegistration from './OrderRegistration';
 
 export default function CartPage() {
   const dispatch = useDispatch();
@@ -230,31 +229,6 @@ export default function CartPage() {
     });
   };
 
-
-  const handleRemoveSelected = async () => {
-    // Удаляем выбранные товары по одному
-    const removePromises = Array.from(selectedItems).map(itemId =>
-      dispatch(removeFromCart(itemId)).unwrap()
-    );
-
-    try {
-      await Promise.all(removePromises);
-    setSelectedItems(new Set());
-    } catch (error) {
-      // При ошибке перезагрузим корзину
-      dispatch(fetchCart());
-    }
-  };
-
-  const getSelectedItemsCount = () => {
-    return selectedItems.size;
-  };
-
-  const getSelectedItemsTotal = () => {
-    return cartItems
-      .filter(item => selectedItems.has(item.id))
-      .reduce((total, item) => total + (item.price * item.quantity), 0);
-  };
 
   const calculateSellerTotal = (items) => {
     return items.reduce((total, item) => total + (item.price * item.quantity), 0);

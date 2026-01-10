@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import ImageModal from '../../components/ImageModal/ImageModal';
-import { fetchProducts, updateProductQuantity } from '../../redux/slices/ProductSlice';
+import { fetchProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
@@ -306,7 +306,7 @@ function MyParts() {
       await dispatch(createStockOut(stockOutData)).unwrap();
 
       const newQuantity = selectedPart.quantity - quantity;
-      dispatch(updateProductQuantity({ productId: selectedPart.id, newQuantity }));
+      dispatch(updateProductQuantityAPI({ productId: selectedPart.id, newQuantity }));
 
 
 
@@ -470,7 +470,7 @@ function MyParts() {
                   <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Состояние</th>
                   <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Остаток</th>
                   <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена, ₽</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">

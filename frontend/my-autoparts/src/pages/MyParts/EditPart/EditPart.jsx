@@ -212,6 +212,7 @@ const EditPart = () => {
       quantity: parseInt(formData.quantity, 10),
       is_new: formData.condition === 'новый',
       storage_location_id: parseInt(formData.storage_location_id, 10),
+      internal_code: currentProduct?.internal_code || null,
       vehicle_ids: selectedVehicle ? [selectedVehicle.id] : [],
       photos: allPhotoUrls.length > 0 ? allPhotoUrls : null,
     };

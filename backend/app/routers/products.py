@@ -4,7 +4,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.models.product import ProductPhoto, Product as ProductModel
 from app.models.product_vehicle import ProductVehicleAssociation
-from app.schemas.product import Product as ProductSchema, ProductCreate, Vehicle, DeletePhotosRequest
+from app.schemas.product import Product as ProductSchema, ProductCreate, ProductQuantityUpdate, Vehicle, DeletePhotosRequest
 from app.models.vehicle import Vehicle as VehicleModel
 from app.db.database import get_db
 from app.core.auth import get_current_user
@@ -129,7 +129,13 @@ def update_product(
             )
 
     # Обновляем основные поля
-    for key, value in product.dict(exclude={"vehicle_ids", "photos"}).items():
+    update_data = product.dict(exclude={"vehicle_ids", "photos"})
+
+    # Исключаем internal_code, если он пустой или null
+    if not update_data.get("internal_code"):
+        del update_data["internal_code"]
+
+    for key, value in update_data.items():
         setattr(db_product, key, value)
 
     # Обновляем фото: удаляем старые, добавляем новые
@@ -160,6 +166,27 @@ def update_product(
                     vehicle_id=vehicle.id
                 )
                 db.add(association)
+
+    db.commit()
+    db.refresh(db_product)
+    return db_product
+
+@router.patch("/{product_id}/quantity", response_model=ProductSchema)
+def update_product_quantity(
+    product_id: int,
+    quantity_update: ProductQuantityUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    db_product = db.query(ProductModel).filter(
+        ProductModel.id == product_id,
+        ProductModel.organization_id == current_user.organization_id
+    ).first()
+    if not db_product:
+        raise HTTPException(status_code=404, detail="Продукт не найден или недоступен")
+
+    # Обновляем только количество
+    db_product.quantity = quantity_update.quantity
 
     db.commit()
     db.refresh(db_product)

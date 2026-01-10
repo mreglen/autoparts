@@ -20,11 +20,13 @@ function Reviews() {
                         boxSizing: 'border-box'
                     }}
                     src="https://yandex.ru/maps-reviews-widget/213329928692?comments"
+                    title="Отзывы о автосервисе на Яндекс.Картах"
                 />
                 {/* Ссылка под виджетом */}
                 <a
                     href="https://yandex.ru/maps/org/svoy_garazh/213329928692/"
                     target="_blank"
+                    rel="noreferrer"
                     style={{
                         boxSizing: 'border-box',
                         textDecoration: 'none',

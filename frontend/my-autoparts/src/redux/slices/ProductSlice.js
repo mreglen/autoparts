@@ -41,9 +41,18 @@ export const createProduct = createAsyncThunk(
             );
             return response.data;
         } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка создания товара'
-            );
+            // Обработка детализированных ошибок FastAPI
+            let errorMessage = 'Ошибка создания товара';
+            if (error.response?.data?.detail) {
+                if (Array.isArray(error.response.data.detail)) {
+                    errorMessage = error.response.data.detail.map(err =>
+                        typeof err === 'string' ? err : err.msg || 'Ошибка валидации'
+                    ).join(', ');
+                } else if (typeof error.response.data.detail === 'string') {
+                    errorMessage = error.response.data.detail;
+                }
+            }
+            return rejectWithValue(errorMessage);
         }
     }
 );
@@ -58,9 +67,18 @@ export const updateProduct = createAsyncThunk(
             );
             return response.data;
         } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка обновления товара'
-            );
+            // Обработка детализированных ошибок FastAPI
+            let errorMessage = 'Ошибка обновления товара';
+            if (error.response?.data?.detail) {
+                if (Array.isArray(error.response.data.detail)) {
+                    errorMessage = error.response.data.detail.map(err =>
+                        typeof err === 'string' ? err : err.msg || 'Ошибка валидации'
+                    ).join(', ');
+                } else if (typeof error.response.data.detail === 'string') {
+                    errorMessage = error.response.data.detail;
+                }
+            }
+            return rejectWithValue(errorMessage);
         }
     }
 );
@@ -123,6 +141,32 @@ export const deleteProductPhotos = createAsyncThunk(
             return rejectWithValue(
                 error.response?.data?.detail || 'Ошибка удаления фото'
             );
+        }
+    }
+);
+
+export const updateProductQuantityAPI = createAsyncThunk(
+    'products/updateProductQuantityAPI',
+    async ({ productId, newQuantity }, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.patch(
+                `/products/${productId}/quantity`,
+                { quantity: newQuantity }
+            );
+            return response.data;
+        } catch (error) {
+            // Обработка детализированных ошибок FastAPI
+            let errorMessage = 'Ошибка обновления количества товара';
+            if (error.response?.data?.detail) {
+                if (Array.isArray(error.response.data.detail)) {
+                    errorMessage = error.response.data.detail.map(err =>
+                        typeof err === 'string' ? err : err.msg || 'Ошибка валидации'
+                    ).join(', ');
+                } else if (typeof error.response.data.detail === 'string') {
+                    errorMessage = error.response.data.detail;
+                }
+            }
+            return rejectWithValue(errorMessage);
         }
     }
 );
@@ -474,6 +518,24 @@ const productSlice = createSlice({
                 state.items = action.payload;
             })
             .addCase(fetchPublicProducts.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            .addCase(updateProductQuantityAPI.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(updateProductQuantityAPI.fulfilled, (state, action) => {
+                state.loading = false;
+                // Обновляем продукт в списке items
+                const index = state.items.findIndex(item => item.id === action.payload.id);
+                if (index !== -1) {
+                    state.items[index] = action.payload;
+                }
+                // Также обновляем currentProduct
+                state.currentProduct = action.payload;
+            })
+            .addCase(updateProductQuantityAPI.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             });

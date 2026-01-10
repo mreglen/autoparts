@@ -1,4 +1,5 @@
 from app.models.user import User
+from app.models.user_session import UserSession
 from app.models.organization import Organization
 from app.models.product import Product
 from app.models.acquired_product import AcquiredProduct

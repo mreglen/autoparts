@@ -38,20 +38,6 @@ const PhotoThumbnail = ({ photos = [], onImageClick }) => {
     return <div className="text-gray-500 italic">Нет фото</div>;
   }
 
-  const firstPhoto = photos[0];
-  let photoUrl;
-
-  if (typeof firstPhoto === 'string') {
-    photoUrl = normalizeImageUrl(firstPhoto);
-  } else if (firstPhoto?.full_url) {
-    photoUrl = normalizeImageUrl(firstPhoto.full_url);
-  } else if (firstPhoto?.photo_url) {
-    photoUrl = normalizeImageUrl(firstPhoto.photo_url);
-  } else if (firstPhoto instanceof File) {
-    photoUrl = objectUrls.get(0) || '';
-  } else {
-    photoUrl = '';
-  }
 
   return (
     <div className="flex flex-wrap gap-2">

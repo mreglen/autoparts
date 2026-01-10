@@ -66,5 +66,8 @@ class ProductCreate(ProductBase):
     vehicle_ids: Optional[List[int]] = None
     photos: Optional[List[str]] = None
 
+class ProductQuantityUpdate(BaseModel):
+    quantity: int
+
 class DeletePhotosRequest(BaseModel):
     photo_ids: List[int]  

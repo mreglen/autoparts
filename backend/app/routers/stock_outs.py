@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
+from datetime import date
 from app.core.auth import get_current_user
 from app.models.product import Product
 from app.models.stock_out import StockOut as StockOutModel
 from app.models.user import User
-from app.schemas.stock_out import StockOut as StockOutSchema, StockOutCreate
+from app.schemas.stock_out import StockOut as StockOutSchema, StockOutCreate, ReturnCreate
 from app.db.database import get_db
 
 router = APIRouter(prefix="/stock-outs", tags=["Stock Out"])
@@ -90,3 +91,68 @@ def get_stocks_outs(
         .all()
     )
     return stock_outs
+
+
+@router.post("/returns", status_code=200)
+def create_return(
+    return_data: ReturnCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Возврат запчастей: уменьшает количество в существующей записи расхода или удаляет запись полностью
+    """
+    if not current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Организация не указана")
+
+    processed_returns = []
+
+    for item in return_data.items:
+        # Находим запись расхода
+        stock_out = db.query(StockOutModel).filter(
+            StockOutModel.id == item.stockOutId,
+            StockOutModel.organization_id == current_user.organization_id
+        ).first()
+
+        if not stock_out:
+            raise HTTPException(status_code=404, detail=f"Запись расхода {item.stockOutId} не найдена")
+
+        # Проверяем, что количество возврата не превышает списанное
+        if item.quantity > stock_out.quantity:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Невозможно вернуть {item.quantity} шт. для записи {item.stockOutId}, доступно {stock_out.quantity} шт."
+            )
+
+        # Находим продукт
+        product = db.query(Product).filter(
+            Product.id == item.productId,
+            Product.organization_id == current_user.organization_id
+        ).first()
+
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Продукт {item.productId} не найден")
+
+        # Возвращаем количество в продукт
+        product.quantity += item.quantity
+
+        # Обновляем оригинальную запись stock_out (уменьшаем количество)
+        stock_out.quantity -= item.quantity
+
+        # Если количество стало 0 или меньше, удаляем запись stock_out
+        if stock_out.quantity <= 0:
+            db.delete(stock_out)
+
+        processed_returns.append({
+            "stock_out_id": item.stockOutId,
+            "product_id": item.productId,
+            "returned_quantity": item.quantity,
+            "return_price": item.returnPrice
+        })
+
+    db.commit()
+
+    return {
+        "message": f"Успешно возвращено {len(processed_returns)} позиций",
+        "returns": processed_returns
+    }

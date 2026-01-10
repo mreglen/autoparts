@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { normalizeImageUrl } from '../../utils/apiClient';
 
 const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'Изображение' }) => {
@@ -47,6 +47,18 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
     }
   }, [isOpen, initialIndex]);
 
+  const goToPrevious = useCallback(() => {
+    setCurrentIndex(prev => prev === 0 ? photos.length - 1 : prev - 1);
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
+  }, [photos.length]);
+
+  const goToNext = useCallback(() => {
+    setCurrentIndex(prev => prev === photos.length - 1 ? 0 : prev + 1);
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
+  }, [photos.length]);
+
   // Обработчик клавиатуры для закрытия и навигации
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -79,7 +91,7 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose, photos.length]);
+  }, [isOpen, onClose, photos.length, goToNext, goToPrevious]);
 
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev * 1.2, 3));
@@ -90,18 +102,6 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
   };
 
   const handleResetZoom = () => {
-    setZoom(1);
-    setPosition({ x: 0, y: 0 });
-  };
-
-  const goToPrevious = () => {
-    setCurrentIndex(prev => prev === 0 ? photos.length - 1 : prev - 1);
-    setZoom(1);
-    setPosition({ x: 0, y: 0 });
-  };
-
-  const goToNext = () => {
-    setCurrentIndex(prev => prev === photos.length - 1 ? 0 : prev + 1);
     setZoom(1);
     setPosition({ x: 0, y: 0 });
   };
