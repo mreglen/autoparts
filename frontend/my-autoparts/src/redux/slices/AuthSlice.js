@@ -35,13 +35,24 @@ export const verifyEmailCode = createAsyncThunk(
 
 export const completeRegistration = createAsyncThunk(
     'auth/completeRegistration',
-    async (formData, { rejectWithValue }) => {
+    async (formData, { rejectWithValue, dispatch }) => {
         try {
             const result = await apiRequest('/auth/register/complete', {
                 method: 'POST',
                 body: JSON.stringify(formData),
             });
             localStorage.setItem('token', result.access_token);
+
+            // Проверяем, нужно ли перенаправить пользователя после авторизации
+            const redirectPath = sessionStorage.getItem('redirectAfterAuth');
+            if (redirectPath) {
+                sessionStorage.removeItem('redirectAfterAuth');
+                // Небольшая задержка для завершения всех операций
+                setTimeout(() => {
+                    window.location.href = redirectPath;
+                }, 100);
+            }
+
             return result;
         } catch (err) {
             return rejectWithValue(err);
@@ -51,7 +62,7 @@ export const completeRegistration = createAsyncThunk(
 
 export const login = createAsyncThunk(
     'auth/login',
-    async ({ login, password }, { rejectWithValue }) => {
+    async ({ login, password }, { rejectWithValue, dispatch }) => {
         try {
             // Создаём объект FormData
             const formData = new FormData();
@@ -63,6 +74,17 @@ export const login = createAsyncThunk(
             });
 
             localStorage.setItem('token', result.access_token);
+
+            // Проверяем, нужно ли перенаправить пользователя после авторизации
+            const redirectPath = sessionStorage.getItem('redirectAfterAuth');
+            if (redirectPath) {
+                sessionStorage.removeItem('redirectAfterAuth');
+                // Небольшая задержка для завершения всех операций
+                setTimeout(() => {
+                    window.location.href = redirectPath;
+                }, 100);
+            }
+
             return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка входа');
@@ -311,5 +333,11 @@ export const {
     resetEmailVerificationError,
     setAddressError,
 } = authSlice.actions;
+
+// Селекторы
+export const selectToken = (state) => state.auth.token;
+export const selectUser = (state) => state.auth.user;
+export const selectAuthLoading = (state) => state.auth.loading;
+export const selectAuthError = (state) => state.auth.error;
 
 export default authSlice.reducer;

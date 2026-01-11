@@ -5,6 +5,7 @@ from app.models.product import Product as ProductModel
 from app.schemas.product import Product as ProductSchema
 from app.db.database import get_db
 from app.models.user import User
+from app.core.auth import get_current_user
 from app.routers.rossko_api.rossko_api import rossko_search, rossko_delivery_id, rossko_address_id
 from app.schemas.rossko import SearchRequest
 
@@ -489,3 +490,49 @@ async def search_used_parts(
         "rossko_data": rossko_response,
         "debug_info": debug_info
     }
+
+
+# Эндпоинт для поиска товаров организации с фильтрами
+@router.get("/search-organization-products")
+def search_organization_products(
+    q: str = "",
+    storage_location_id: int = None,
+    brand: str = "",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Поиск товаров организации с фильтрами:
+    - q: поиск по названию, артикулу, внутреннему коду, бренду
+    - storage_location_id: фильтр по складу
+    - brand: фильтр по бренду
+    """
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Пользователь не принадлежит ни к одной организации"
+        )
+
+    query = db.query(ProductModel).filter(ProductModel.organization_id == current_user.organization_id)
+
+    # Поиск по тексту
+    if q:
+        search_term = f"%{q.strip().lower()}%"
+        query = query.filter(
+            (ProductModel.article.ilike(search_term)) |
+            (ProductModel.name.ilike(search_term)) |
+            (ProductModel.internal_code.ilike(search_term)) |
+            (ProductModel.brand.ilike(search_term))
+        )
+
+    # Фильтр по складу
+    if storage_location_id:
+        query = query.filter(ProductModel.storage_location_id == storage_location_id)
+
+    # Фильтр по бренду
+    if brand:
+        brand_term = f"%{brand.strip().lower()}%"
+        query = query.filter(ProductModel.brand.ilike(brand_term))
+
+    products = query.all()
+    return products

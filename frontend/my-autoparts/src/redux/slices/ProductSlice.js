@@ -115,6 +115,28 @@ export const fetchProduct = createAsyncThunk(
     }
 );
 
+// Async thunk: поиск товаров организации с фильтрами
+export const searchOrganizationProducts = createAsyncThunk(
+    'products/searchOrganizationProducts',
+    async ({ q = '', storageLocationId = '', brand = '' }, { rejectWithValue }) => {
+        try {
+            const params = new URLSearchParams();
+            if (q) params.append('q', q);
+            if (storageLocationId) params.append('storage_location_id', storageLocationId);
+            if (brand) params.append('brand', brand);
+
+            const response = await apiAxios.get(
+                `/search-products/search-organization-products?${params.toString()}`,
+            );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка поиска товаров'
+            );
+        }
+    }
+);
+
 export const deleteProductPhoto = createAsyncThunk(
     'products/deleteProductPhoto',
     async ({ productId, photoId }, { rejectWithValue }) => {
@@ -303,6 +325,7 @@ const productSlice = createSlice({
         loading: false,
         vehiclesLoading: false,
         error: null,
+        searchResults: [], // Результаты поиска товаров организации
         searchCache: {}, // Кэш результатов поиска: {query: {data, timestamp}}
         usedPartsData: null, // Данные поиска б/у запчастей: {available_parts, analog_parts, rossko_data}
         usedPartsCache: {}, // Кэш результатов поиска б/у запчастей: {query: {data, timestamp}}
@@ -538,6 +561,18 @@ const productSlice = createSlice({
             .addCase(updateProductQuantityAPI.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
+            })
+            .addCase(searchOrganizationProducts.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(searchOrganizationProducts.fulfilled, (state, action) => {
+                state.loading = false;
+                state.searchResults = action.payload;
+            })
+            .addCase(searchOrganizationProducts.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
             });
     },
 });
@@ -564,6 +599,7 @@ export const fetchPublicProducts = createAsyncThunk(
 export const { clearProductError, resetProducts, updateProductQuantity, clearSearchCache } = productSlice.actions;
 export { fetchAllProducts };
 export const selectMyParts = (state) => state.products.items;
+export const selectSearchResults = (state) => state.products.searchResults;
 export const selectMyPartsStatus = (state) => state.products.loading ? 'loading' : 'idle';
 export const selectMyPartsError = (state) => state.products.error;
 export default productSlice.reducer;

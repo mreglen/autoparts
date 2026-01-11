@@ -21,6 +21,9 @@ import CartPage from './pages/Cart/CartPage';
 import OrderRegistration from './pages/Cart/OrderRegistration';
 import SalesPage from './pages/Sales/SalesPage';
 import PurchasesPage from './pages/Sales/PurchasesPage';
+import DashboardPage from './pages/Dashboard/DashboardPage';
+import EmployeesPage from './pages/Employees/EmployeesPage';
+import ClientsPage from './pages/Clients/ClientsPage';
 
 
 function App() {
@@ -44,8 +47,9 @@ function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Main />} />
           <Route path="/profile" element={<ProfilePage />} />
-
-
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/employees" element={<EmployeesPage />} />
+          <Route path="/clients" element={<ClientsPage />} />
 
           {/* Остальные маршруты */}
           <Route path="/autoparts" element={<AutoParts />} />

@@ -153,7 +153,8 @@ const cartSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
                 // При ошибке нужно перезагрузить корзину
-            });
+            })
+
     },
 });
 

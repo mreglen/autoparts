@@ -1,6 +1,7 @@
 import React, { useState, Fragment, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { addNewPartsToCart, selectCartLoading, selectCart, updateCartItemQuantity, removeFromCart } from '../../../redux/slices/CartSlice';
+import { selectToken } from '../../../redux/slices/AuthSlice';
 
 
 const formatDeliveryTime = (deliveryStart, deliveryEnd) => {
@@ -35,7 +36,14 @@ const formatDeliveryTime = (deliveryStart, deliveryEnd) => {
 function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onToggleExpand, sectionType = '', uniqueId }) {
     const dispatch = useDispatch();
     const cartLoading = useSelector(selectCartLoading);
+
+    // Определяем статус авторизации
+    const token = useSelector(selectToken);
+    const isAuthenticated = !!token;
+
+    // Выбираем соответствующие селекторы
     const cart = useSelector(selectCart);
+
     // Используем только переданные данные складов
     const partStockData = stocksData ? { stocks: stocksData } : null;
 
@@ -65,10 +73,11 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
 
     // Получаем количество товара в корзине
     const getCartQuantity = (stock) => {
-        if (!cart?.new_parts_items) return 0;
+        const cartItems = cart?.new_parts_items;
+        if (!cartItems) return 0;
 
         const stockId = stock.stock_id;
-        const cartItem = cart.new_parts_items.find(item =>
+        const cartItem = cartItems.find(item =>
             item.stock_id === stockId &&
             item.brand === brand &&
             item.partnumber === number

@@ -15,6 +15,7 @@ import {
 } from '../../redux/slices/ProductSlice';
 import { searchAllProducts, searchUsedParts, fetchAllProducts } from '../../redux/slices/ProductSlice';
 import { fetchCart } from '../../redux/slices/CartSlice';
+import { selectToken } from '../../redux/slices/AuthSlice';
 import CardPart from './CardPart/CardPart';
 import UsedPartsList from './UsedParts/UsedPartsList';
 
@@ -49,6 +50,10 @@ function AutoParts() {
   const status = useSelector(selectRosskoStatus);
   const error = useSelector(selectRosskoError);
   const searchQuery = useSelector(selectSearchQuery);
+
+  // Определяем статус авторизации для работы с корзиной
+  const token = useSelector(selectToken);
+  const isAuthenticated = !!token;
 
   // Состояние для переключения вкладок
   const [activeTab, setActiveTab] = useState('rossko');

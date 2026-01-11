@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import ImageModal from '../../components/ImageModal/ImageModal';
-import { fetchProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
+import { fetchProducts, updateProductQuantityAPI, searchOrganizationProducts, selectSearchResults } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
@@ -202,6 +202,7 @@ function MyParts() {
   const { items: products, loading, error } = useSelector((state) => state.products);
 
   const { storageLocations } = useSelector((state) => state.organization);
+  const searchResults = useSelector(selectSearchResults);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState(null);
   const [operationType, setOperationType] = useState(null);
@@ -215,6 +216,15 @@ function MyParts() {
     price: '',
     reason: '',
   });
+
+  // Состояние для поиска и фильтров
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAdvancedSearchOpen, setIsAdvancedSearchOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    storageLocation: '',
+    brand: '',
+  });
+  const [isSearching, setIsSearching] = useState(false);
 
   const handleImageClick = (photos, initialIndex) => {
     setSelectedImages({ photos, initialIndex });
@@ -333,16 +343,75 @@ function MyParts() {
     }
   }, [dispatch, user?.organization_id]);
 
+  // Получаем уникальные бренды для фильтра (из всех товаров)
+  const uniqueBrands = React.useMemo(() => {
+    if (!products) return [];
+    const brands = [...new Set(products.map(part => part.brand).filter(Boolean))];
+    return brands.sort();
+  }, [products]);
+
+  // Функция поиска товаров организации
+  const performSearch = React.useCallback(async () => {
+    setIsSearching(true);
+    try {
+      await dispatch(searchOrganizationProducts({
+        q: searchQuery,
+        storageLocationId: filters.storageLocation,
+        brand: filters.brand,
+      }));
+    } catch (error) {
+      console.error('Ошибка поиска:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [dispatch, searchQuery, filters]);
+
+  // Автоматический поиск при изменении фильтров
+  React.useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      performSearch();
+    }, 300); // Задержка 300мс для предотвращения слишком частых запросов
+
+    return () => clearTimeout(timeoutId);
+  }, [performSearch]);
+
+  // Начальный поиск при загрузке
+  React.useEffect(() => {
+    if (products.length > 0) {
+      performSearch();
+    }
+  }, [products, performSearch]); // Запускаем поиск когда товары загружены
+
   if (!user) return <Navigate to="/auth" replace />;
   if (!user.is_seller) return <Navigate to="/" replace />;
 
+  // Используем результаты поиска с бэкенда
+  const displayParts = searchResults;
 
-
-  const displayParts = products;
-
-  // Расчет общей суммы и количества
+  // Расчет общей суммы и количества (только отфильтрованных товаров)
   const totalValue = displayParts.reduce((sum, part) => sum + (part.price * part.quantity), 0);
   const totalQuantity = displayParts.reduce((sum, part) => sum + part.quantity, 0);
+
+  // Обработчики для поиска и фильтров
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const handleFilterChange = (filterName, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterName]: value
+    }));
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilters({
+      storageLocation: '',
+      brand: '',
+    });
+    // Поиск выполнится автоматически через useEffect
+  };
 
   const getStorageAddress = (locationId) => {
     if (!locationId) return '—';
@@ -366,6 +435,92 @@ function MyParts() {
           </div>
           <div className="text-sm text-gray-500">Общее количество</div>
         </div>
+      </div>
+
+      {/* Поиск и фильтры */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+        {/* Основной поиск */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-4">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              placeholder="Поиск по названию, номеру, коду или бренду..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+            {isSearching && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <svg className="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsAdvancedSearchOpen(!isAdvancedSearchOpen)}
+              className="px-4 py-2 text-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors whitespace-nowrap"
+            >
+              {isAdvancedSearchOpen ? 'Скрыть фильтры' : 'Расширенный поиск'}
+            </button>
+            {(searchQuery || filters.storageLocation || filters.brand) && (
+              <button
+                onClick={clearFilters}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
+              >
+                Очистить
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Расширенные фильтры */}
+        {isAdvancedSearchOpen && (
+          <div className="border-t border-gray-200 pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Фильтр по складу */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Склад
+                </label>
+                <select
+                  value={filters.storageLocation}
+                  onChange={(e) => handleFilterChange('storageLocation', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="">Все склады</option>
+                  {storageLocations.map((location) => (
+                    <option key={location.id} value={location.id.toString()}>
+                      {location.address || `Склад #${location.id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Фильтр по бренду */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Бренд
+                </label>
+                <input
+                  type="text"
+                  placeholder="Выберите или введите бренд..."
+                  value={filters.brand}
+                  onChange={(e) => handleFilterChange('brand', e.target.value)}
+                  list="brand-list"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+                <datalist id="brand-list">
+                  {uniqueBrands.map((brand) => (
+                    <option key={brand} value={brand} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start mb-6 gap-4">

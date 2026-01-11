@@ -5,6 +5,7 @@ import { useNavigate, NavLink } from 'react-router-dom';
 import { logout } from '../../redux/slices/AuthSlice';
 import { selectCart } from '../../redux/slices/CartSlice';
 import Search from './Search/Search';
+import SideMenu from '../../components/SideMenu/SideMenu';
 
 const menuItems = [
     { name: 'Заказы', path: '/orders' },
@@ -27,16 +28,22 @@ export default function Navigation() {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [closeTimeout, setCloseTimeout] = useState(null);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
 
     const handleLogout = () => {
         dispatch(logout());
         setIsProfileOpen(false);
         setIsMobileMenuOpen(false);
+        setIsSideMenuOpen(false);
         navigate('/', { replace: true });
     };
 
     const closeMobileMenu = () => {
         setIsMobileMenuOpen(false);
+    };
+
+    const closeSideMenu = () => {
+        setIsSideMenuOpen(false);
     };
 
     const handleMouseEnter = () => {
@@ -113,7 +120,7 @@ export default function Navigation() {
                     </div>
 
                     {/* Десктопное меню */}
-                    <nav className="hidden md:flex flex-wrap justify-center gap-4">
+                    <nav className="hidden md:flex flex-wrap justify-end gap-4">
                         {/* Всегда видимые пункты */}
                         <NavLink
                             to="/autoparts"
@@ -133,52 +140,30 @@ export default function Navigation() {
                         >
                             Сервис
                         </NavLink>
-
-                        {/* Пункт Покупки для всех авторизованных пользователей */}
-                        {token && (
-                            <NavLink
-                                to="/purchases"
-                                className={({ isActive }) =>
-                                    `text-lg transition-colors ease-in-out ${
-                                        isActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
-                                    }`}
-                            >
-                                Покупки
-                            </NavLink>
-                        )}
-
-                        {/* Пункт Продажи только для админов */}
-                        {token && user?.is_admin && (
-                            <NavLink
-                                to="/sales"
-                                className={({ isActive }) =>
-                                    `text-lg transition-colors ease-in-out ${
-                                        isActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
-                                    }`}
-                            >
-                                Продажи
-                            </NavLink>
-                        )}
-
-                        {/* Пункты только для продавцов */}
-                        {token && user?.is_seller && sellerMenuItems.map((item) => (
-                            <NavLink
-                                key={item.path}
-                                to={item.path}
-                                className={({ isActive }) =>
-                                    `text-lg transition-colors ease-in-out ${
-                                        isActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
-                                    }`}
-                            >
-                                {item.name}
-                            </NavLink>
-                        ))}
-
-
                     </nav>
 
-                    {/* Мобильное бургер-меню */}
-                    <div className="md:hidden">
+                    {/* Боковое меню для авторизованных пользователей */}
+                    {token && (
+                        <div className="block">
+                            <button
+                                onClick={() => setIsSideMenuOpen(!isSideMenuOpen)}
+                                className="p-2 rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                            >
+                                <svg
+                                    className="h-6 w-6"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Мобильное бургер-меню для неавторизованных */}
+                    {!token && (
+                        <div className="md:hidden">
                         <button
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                             className="p-2 rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
@@ -196,7 +181,8 @@ export default function Navigation() {
                                 )}
                             </svg>
                         </button>
-                    </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Основная часть */}
@@ -322,98 +308,6 @@ export default function Navigation() {
                             Сервис
                         </NavLink>
 
-                        {/* Пункт Покупки для всех авторизованных пользователей */}
-                        {token && (
-                            <NavLink
-                                to="/purchases"
-                                onClick={closeMobileMenu}
-                                className={({ isActive }) =>
-                                    `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
-                                        isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
-                                    }`
-                                }
-                            >
-                                Покупки
-                            </NavLink>
-                        )}
-
-                        {/* Пункт Продажи только для админов */}
-                        {token && user?.is_admin && (
-                            <NavLink
-                                to="/sales"
-                                onClick={closeMobileMenu}
-                                className={({ isActive }) =>
-                                    `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
-                                        isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
-                                    }`
-                                }
-                            >
-                                Продажи
-                            </NavLink>
-                        )}
-
-                        {/* Пункты только для продавцов */}
-                        {token && user?.is_seller && sellerMenuItems.map((item) => (
-                            <NavLink
-                                key={item.path}
-                                to={item.path}
-                                onClick={closeMobileMenu}
-                                className={({ isActive }) =>
-                                    `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
-                                        isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
-                                    }`
-                                }
-                            >
-                                {item.name}
-                            </NavLink>
-                        ))}
-
-                        {/* Дополнительные пункты для всех авторизованных */}
-                        {token && (
-                            <>
-                                <div className="border-t border-gray-200 my-4"></div>
-                                <NavLink
-                                    to="/orders"
-                                    onClick={closeMobileMenu}
-                                    className={({ isActive }) =>
-                                        `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
-                                            isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
-                                        }`
-                                    }
-                                >
-                                    Заказы
-                                </NavLink>
-                                <NavLink
-                                    to="/storage"
-                                    onClick={closeMobileMenu}
-                                    className={({ isActive }) =>
-                                        `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
-                                            isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
-                                        }`
-                                    }
-                                >
-                                    Склад
-                                </NavLink>
-                                <NavLink
-                                    to="/profile"
-                                    onClick={closeMobileMenu}
-                                    className={({ isActive }) =>
-                                        `block px-4 py-4 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
-                                            isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
-                                        }`
-                                    }
-                                >
-                                    Профиль
-                                </NavLink>
-                                <button
-                                    onClick={handleLogout}
-                                    className="block w-full text-left px-4 py-4 text-lg font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-lg min-h-[48px] flex items-center"
-                                >
-                                    Выход
-                                </button>
-                            </>
-                        )}
-
                         {/* Кнопка входа для неавторизованных */}
                         {!token && (
                             <NavLink
@@ -427,6 +321,9 @@ export default function Navigation() {
                     </div>
                 </div>
             )}
+
+            {/* Боковое меню */}
+            <SideMenu isOpen={isSideMenuOpen} onClose={closeSideMenu} />
         </header>
     );
 }

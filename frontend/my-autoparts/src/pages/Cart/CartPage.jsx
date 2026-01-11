@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   selectCart,
   selectCartLoading,
@@ -8,9 +9,17 @@ import {
   updateCartItemQuantity,
   removeFromCart
 } from '../../redux/slices/CartSlice';
+import { selectToken } from '../../redux/slices/AuthSlice';
 
 export default function CartPage() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  // Получаем токен для определения статуса авторизации
+  const token = useSelector(selectToken);
+  const isAuthenticated = !!token;
+
+  // Выбираем соответствующие селекторы
   const cart = useSelector(selectCart);
   const loading = useSelector(selectCartLoading);
   const error = useSelector(selectCartError);
@@ -18,14 +27,15 @@ export default function CartPage() {
   // Состояние для выбранных товаров
   const [selectedItems, setSelectedItems] = useState(new Set());
 
-
   // Состояние для режима доставки по продавцам (частями или единовременно)
   const [sellerDeliveryParts, setSellerDeliveryParts] = useState({});
 
   // Загрузка корзины при монтировании компонента
   useEffect(() => {
-    dispatch(fetchCart());
-  }, [dispatch]);
+    if (isAuthenticated) {
+      dispatch(fetchCart());
+    }
+  }, [dispatch, isAuthenticated]);
 
   // Группировка товаров по продавцам
   const groupedItems = React.useMemo(() => {
@@ -34,10 +44,11 @@ export default function CartPage() {
     const groups = {};
 
     // Группируем новые запчасти
-    if (cart.new_parts_items) {
+    const items = cart?.new_parts_items;
+    if (items) {
       // Сначала собираем все товары по продавцам для определения последней даты поставки
       const sellerItemsMap = {};
-      cart.new_parts_items.forEach(item => {
+      items.forEach(item => {
         const seller = item.seller || 'Новые запчасти';
         if (!sellerItemsMap[seller]) {
           sellerItemsMap[seller] = [];
@@ -92,7 +103,7 @@ export default function CartPage() {
     }
 
     // Группируем б/у запчасти (пока пусто)
-    if (cart.used_parts_items) {
+    if (cart?.used_parts_items) {
       cart.used_parts_items.forEach(item => {
         const seller = item.seller || 'Б/У запчасти';
         if (!groups[seller]) {
@@ -169,6 +180,15 @@ export default function CartPage() {
   };
 
   const handleCheckout = (seller) => {
+    // Проверяем авторизацию
+    if (!isAuthenticated) {
+      // Сохраняем текущий URL для возврата после авторизации
+      sessionStorage.setItem('redirectAfterAuth', window.location.pathname);
+      // Перенаправляем на страницу авторизации
+      navigate('/auth');
+      return;
+    }
+
     // Оформление заказа для всех товаров продавца
     const sellerItems = groupedItems[seller] || [];
 
@@ -185,6 +205,15 @@ export default function CartPage() {
   };
 
   const handleCheckoutSelected = (seller) => {
+    // Проверяем авторизацию
+    if (!isAuthenticated) {
+      // Сохраняем текущий URL для возврата после авторизации
+      sessionStorage.setItem('redirectAfterAuth', window.location.pathname);
+      // Перенаправляем на страницу авторизации
+      navigate('/auth');
+      return;
+    }
+
     // Оформление выбранных товаров продавца
     const selectedFromSeller = groupedItems[seller]?.filter(item => selectedItems.has(item.id)) || [];
 
@@ -425,6 +454,9 @@ export default function CartPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Цена
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Действия
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -491,6 +523,17 @@ export default function CartPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatPrice(item.price)}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => handleRemoveItem(item.id)}
+                            className="text-red-600 hover:text-red-900 p-1"
+                            title="Удалить товар"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -525,8 +568,19 @@ export default function CartPage() {
                             onClick={() => handleCheckoutSelected(seller)}
                             className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                           >
-                            <img src="/img/cart.svg" alt="" className="w-3 h-3 mr-1 filter brightness-0" />
-                            Оформить выбранное
+                            {isAuthenticated ? (
+                              <>
+                                <img src="/img/cart.svg" alt="" className="w-3 h-3 mr-1 filter brightness-0" />
+                                Оформить выбранное
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                                </svg>
+                                Авторизоваться
+                              </>
+                            )}
                           </button>
                         </>
                       )}
@@ -551,7 +605,21 @@ export default function CartPage() {
                         onClick={() => handleCheckout(seller)}
                         className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
-                        Оформить заказ
+                        {isAuthenticated ? (
+                          <>
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Оформить заказ
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                            </svg>
+                            Авторизоваться и оформить
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
