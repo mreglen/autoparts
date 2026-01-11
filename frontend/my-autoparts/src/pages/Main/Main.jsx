@@ -9,7 +9,7 @@ function Main() {
   return (
     <div className="home-page">
       {/* Hero Section */}
-      <section className="hero bg-gradient-to-r from-blue-900 to-blue-700 text-white py-16 px-4 md:px-8">
+      <section className="hero bg-gradient-to-r from-blue-900 to-blue-700 text-white py-16 px-4 md:px-6">
         <div className="container mx-auto flex flex-col md:flex-row items-center gap-8">
           <div className="md:w-1/2 text-center md:text-left">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Найдите любую автозапчасть</h1>
@@ -27,7 +27,7 @@ function Main() {
       </section>
 
       {/* Why Choose Us */}
-      <section className="py-16 px-4 md:px-8 bg-gray-50">
+      <section className="py-16 px-4 md:px-6 bg-gray-50">
         <div className="container mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">Почему выбирают нас?</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -51,7 +51,7 @@ function Main() {
       </section>
 
       {/* Categories */}
-      <section className="py-16 px-4 md:px-8">
+      <section className="py-16 px-4 md:px-6">
         <div className="container mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">Популярные категории</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -85,13 +85,13 @@ function Main() {
       </section>
 
       {/* Sell Your Parts */}
-      <section className="py-16 px-4 md:px-8 bg-blue-50">
+      <section className="py-16 px-4 md:px-6 bg-blue-50">
         <div className="container mx-auto text-center">
           <h2 className="text-3xl font-bold mb-4">У вас есть запчасти?</h2>
           <p className="text-lg mb-8">Разместите объявление — найдите покупателя за пару минут!</p>
           <Link
             to="/sell"
-            className="inline-block bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 transition"
+            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 transition"
           >
             Разместить объявление
           </Link>
@@ -99,7 +99,7 @@ function Main() {
       </section>
 
       {/* Latest Listings */}
-      <section className="py-16 px-4 md:px-8">
+      <section className="py-16 px-4 md:px-6">
         <div className="container mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">Новые объявления</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -128,20 +128,20 @@ function Main() {
       </section>
 
       {/* CTA Footer */}
-      <section className="py-16 px-4 md:px-8 bg-gray-800 text-white">
+      <section className="py-16 px-4 md:px-6 bg-gray-800 text-white">
         <div className="container mx-auto text-center">
           <h2 className="text-3xl font-bold mb-4">Готовы начать?</h2>
           <p className="text-xl mb-8">Ищите, покупайте, продавайте — всё в одном месте.</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               to="/autoparts"
-              className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 transition"
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 transition"
             >
               Начать поиск
             </Link>
             <Link
               to="/sell"
-              className="bg-green-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-green-700 transition"
+              className="bg-green-600 text-white px-6 py-3 rounded-lg text-lg font-medium hover:bg-green-700 transition"
             >
               Разместить запчасть
             </Link>

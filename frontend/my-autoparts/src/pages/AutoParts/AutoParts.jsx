@@ -19,7 +19,7 @@ import CardPart from './CardPart/CardPart';
 import UsedPartsList from './UsedParts/UsedPartsList';
 
 const EmptySearchState = ({ query }) => (
-  <div className="mt-12 sm:mt-16 flex flex-col items-center text-center max-w-2xl mx-auto px-6">
+  <div className="mt-12 sm:mt-16 flex flex-col items-center text-center max-w-2xl mx-auto px-4">
     <div className="bg-gray-100 p-6 rounded-full mb-8">
       <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 sm:h-12 sm:w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

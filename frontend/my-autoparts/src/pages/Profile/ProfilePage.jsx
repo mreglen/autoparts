@@ -17,7 +17,7 @@ export default function ProfilePage() {
 
     if (!user) {
         return (
-            <div className="max-w-2xl mx-auto px-3 sm:px-5 lg:px-7 py-12">
+            <div className="max-w-2xl mx-auto px-2 sm:px-3 lg:px-4 py-12">
                 <div className="bg-white border border-gray-200 rounded-xl shadow-lg p-8 text-center">
                     <div className="text-indigo-600 mb-3">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -59,8 +59,6 @@ export default function ProfilePage() {
         if (formData.first_name !== undefined) payload.first_name = formData.first_name;
         if (formData.patronymic !== undefined) payload.patronymic = formData.patronymic;
 
-
-
         await dispatch(updateProfile(payload));
         setIsEditing(false);
     };
@@ -73,11 +71,11 @@ export default function ProfilePage() {
     const fullName = `${formData.last_name || ''} ${formData.first_name || ''} ${formData.patronymic || ''}`.trim();
 
     return (
-        <div className="max-w-4xl mx-auto px-3 sm:px-5 lg:px-7 py-8">
-            {/* Сетка: 2 колонки — личная инфа + действия */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <>
+            {/* Личная информация и действия на одном уровне */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Личная информация */}
-                <div className="lg:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 p-6">
+                <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 w-full">
                     <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -184,15 +182,15 @@ export default function ProfilePage() {
                         </div>
                     ) : null}
                 </div>
+
                 {/* Блок действий */}
                 <ProfileActions onEditProfile={handleEdit} />
             </div>
-            {/* Организация и склады — на всю ширину */}
+
+            {/* Организация и склады */}
             {user.is_seller && user.organization_id && (
-                <div className="mt-6">
-                    <OrganizationCard orgId={user.organization_id} />
-                </div>
+                <OrganizationCard orgId={user.organization_id} />
             )}
-        </div>
+        </>
     );
 }

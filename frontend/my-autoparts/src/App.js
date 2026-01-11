@@ -7,6 +7,7 @@ import { fetchProfile } from './redux/slices/AuthSlice';
 // Pages
 import Authorization from './pages/Autorization/Authorization';
 import MainLayout from './layouts/MainLayout';
+import ProfileWithMenuLayout from './layouts/ProfileWithMenuLayout';
 import ProfilePage from './pages/Profile/ProfilePage';
 import PasswordReset from './pages/Autorization/PasswordReset/PasswordReset';
 import Home from './pages/Home/Home';
@@ -40,28 +41,27 @@ function App() {
         <Route path="/auth" element={<Authorization />} />
         <Route path="/auth/password-reset" element={<PasswordReset />} />
 
-        {/* Основной layout — доступен всегда */}
+        {/* Основной layout — страницы без бокового меню */}
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Main />} />
-          <Route path="/profile" element={<ProfilePage />} />
-
-
-
-          {/* Остальные маршруты */}
           <Route path="/autoparts" element={<AutoParts />} />
           <Route path="/autoservice" element={<Home />} />
-          <Route path="/my-parts" element={<MyParts />} />
-          <Route path="/my-parts/add" element={<AddPart />} />
-          <Route path="/my-parts/edit/:id" element={<EditPart />} />
-          <Route path="/stock-in" element={<StockInList />} />
-          <Route path="/stock-out" element={<StockOutList />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/order-reg" element={<OrderRegistration />} />
-          <Route path="/sales" element={<SalesPage />} />
-          <Route path="/purchases" element={<PurchasesPage />} />
+          <Route path="/my-parts/add" element={<AddPart />} />
+          <Route path="/my-parts/edit/:id" element={<EditPart />} />
 
           <Route path="*" element={<div>404</div>} />
+        </Route>
 
+        {/* Layout с боковым меню для страниц профиля */}
+        <Route path="/" element={<ProfileWithMenuLayout />}>
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/my-parts" element={<MyParts />} />
+          <Route path="/purchases" element={<PurchasesPage />} />
+          <Route path="/sales" element={<SalesPage />} />
+          <Route path="/stock-in" element={<StockInList />} />
+          <Route path="/stock-out" element={<StockOutList />} />
         </Route>
       </Routes>
     </BrowserRouter>
