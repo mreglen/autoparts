@@ -13,14 +13,17 @@ export default function ProfileWithMenuLayout() {
     // Определяем активную вкладку на основе текущего пути
     const getActiveTabFromPath = (path) => {
         const pathMap = {
+            '/dashboard': 'dashboard',
             '/profile': 'profile',
-            '/purchases': 'purchases',
-            '/sales': 'sales',
+            '/purchases/orders': 'purchases-orders',
+            '/purchases/returns': 'purchases-returns',
+            '/sales/orders': 'sales-orders',
+            '/sales/returns': 'sales-returns',
             '/my-parts': 'parts',
             '/stock-in': 'receipts',
             '/stock-out': 'expenses'
         };
-        return pathMap[path] || 'profile';
+        return pathMap[path] || (user?.is_seller ? 'dashboard' : 'profile');
     };
 
     const [activeTab, setActiveTab] = useState(getActiveTabFromPath(location.pathname));
@@ -34,21 +37,44 @@ export default function ProfileWithMenuLayout() {
     const getAvailableTabs = () => {
         const baseTabs = [
             { id: 'profile', label: 'Профиль' },
-            { id: 'purchases', label: 'Покупки' },
+            {
+                id: 'purchases',
+                label: 'Покупки',
+                submenu: [
+                    { id: 'purchases-orders', label: 'Заказы' },
+                    { id: 'purchases-returns', label: 'Возвраты' }
+                ]
+            }
         ];
 
-        // Для админов добавляем продажи
-        if (user?.is_admin) {
-            baseTabs.push({ id: 'sales', label: 'Продажи' });
+        // Для продавцов добавляем главную страницу в начало
+        if (user?.is_seller) {
+            baseTabs.unshift({ id: 'dashboard', label: 'Главная' });
         }
 
-        // Для продавцов добавляем их специфические вкладки
+        // Для продавцов добавляем продажи
         if (user?.is_seller) {
-            baseTabs.push(
-                { id: 'parts', label: 'Мои запчасти' },
-                { id: 'receipts', label: 'Поступление' },
-                { id: 'expenses', label: 'Расходы' }
-            );
+            baseTabs.push({
+                id: 'sales',
+                label: 'Продажи',
+                submenu: [
+                    { id: 'sales-orders', label: 'Заказы' },
+                    { id: 'sales-returns', label: 'Возвраты' }
+                ]
+            });
+        }
+
+        // Для продавцов добавляем вкладку склад с подменю
+        if (user?.is_seller) {
+            baseTabs.push({
+                id: 'warehouse',
+                label: 'Склад',
+                submenu: [
+                    { id: 'parts', label: 'Мои запчасти' },
+                    { id: 'receipts', label: 'Поступление' },
+                    { id: 'expenses', label: 'Расходы' }
+                ]
+            });
         }
 
         return baseTabs;
@@ -58,11 +84,15 @@ export default function ProfileWithMenuLayout() {
 
     const handleTabChange = (tabId) => {
         setActiveTab(tabId);
+
         // Маппинг id вкладок на пути
         const tabPathMap = {
+            'dashboard': '/dashboard',
             'profile': '/profile',
-            'purchases': '/purchases',
-            'sales': '/sales',
+            'purchases-orders': '/purchases/orders',
+            'purchases-returns': '/purchases/returns',
+            'sales-orders': '/sales/orders',
+            'sales-returns': '/sales/returns',
             'parts': '/my-parts',
             'receipts': '/stock-in',
             'expenses': '/stock-out'

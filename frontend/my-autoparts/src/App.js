@@ -20,8 +20,11 @@ import StockInList from './pages/StockIn/StockInList';
 import { StockOutList } from './pages/StockOut';
 import CartPage from './pages/Cart/CartPage';
 import OrderRegistration from './pages/Cart/OrderRegistration';
-import SalesPage from './pages/Sales/SalesPage';
-import PurchasesPage from './pages/Sales/PurchasesPage';
+import SalesOrdersPage from './pages/Sales/SalesOrdersPage';
+import SalesReturnsPage from './pages/Sales/SalesReturnsPage';
+import PurchasesOrdersPage from './pages/Sales/PurchasesOrdersPage';
+import PurchasesReturnsPage from './pages/Sales/PurchasesReturnsPage';
+import DashboardPage from './pages/Dashboard/DashboardPage';
 
 
 function App() {
@@ -56,10 +59,13 @@ function App() {
 
         {/* Layout с боковым меню для страниц профиля */}
         <Route path="/" element={<ProfileWithMenuLayout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-parts" element={<MyParts />} />
-          <Route path="/purchases" element={<PurchasesPage />} />
-          <Route path="/sales" element={<SalesPage />} />
+          <Route path="/purchases/orders" element={<PurchasesOrdersPage />} />
+          <Route path="/purchases/returns" element={<PurchasesReturnsPage />} />
+          <Route path="/sales/orders" element={<SalesOrdersPage />} />
+          <Route path="/sales/returns" element={<SalesReturnsPage />} />
           <Route path="/stock-in" element={<StockInList />} />
           <Route path="/stock-out" element={<StockOutList />} />
         </Route>

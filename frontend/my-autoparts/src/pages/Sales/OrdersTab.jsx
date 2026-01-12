@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 
 export default function OrdersTab() {
+  const { user } = useSelector((state) => state.auth);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,7 +23,28 @@ export default function OrdersTab() {
       // Получаем заказы
       const ordersResponse = await apiAxios.get('/orders/');
 
-      setOrders(ordersResponse.data);
+      let filteredOrders = ordersResponse.data;
+
+      // Фильтруем заказы по организации продавца
+      if (user?.organization_id) {
+        filteredOrders = filteredOrders.filter(order => {
+          // Заказы из новых автозапчастей фильтруем по организации (если есть такая информация)
+          if (order.new_parts_order) {
+            // Пока оставляем логику для админов, но можно добавить проверку организации
+            return user?.is_admin;
+          }
+          // Для обычных заказов проверяем связь с организацией
+          // Предполагаем, что заказы содержат organization_id или связь через товары
+          return order.organization_id === user.organization_id || !order.organization_id; // пока показываем без organization_id
+        });
+      }
+
+      // Фильтруем заказы: заказы из новых автозапчастей (new_parts_order) показываем только админам
+      if (!user?.is_admin) {
+        filteredOrders = filteredOrders.filter(order => !order.new_parts_order);
+      }
+
+      setOrders(filteredOrders);
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
       setError('Не удалось загрузить заказы');

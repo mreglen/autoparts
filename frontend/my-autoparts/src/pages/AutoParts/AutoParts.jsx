@@ -211,7 +211,6 @@ function AutoParts() {
                   </tbody>
                 </table>
               </div>
-
               {/* Мобильная версия - карточки */}
               <div className="md:hidden space-y-5">
                 {allParts.map((part, idx) => {

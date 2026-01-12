@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import OrdersTab from './OrdersTab';
 import ReturnsTab from './ReturnsTab';
-import RosskoOrdersTab from './RosskoOrdersTab';
 
 export default function SalesPage() {
   const navigate = useNavigate();
@@ -32,7 +31,6 @@ export default function SalesPage() {
   const tabs = [
     { id: 'orders', label: 'Заказы', component: OrdersTab },
     { id: 'returns', label: 'Возвраты', component: ReturnsTab },
-    { id: 'rossko', label: 'Росско', component: RosskoOrdersTab },
   ];
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component;

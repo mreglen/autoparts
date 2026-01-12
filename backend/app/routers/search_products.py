@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
+import re
 from app.models.product import Product as ProductModel
 from app.schemas.product import Product as ProductSchema
 from app.db.database import get_db
@@ -10,6 +11,62 @@ from app.schemas.rossko import SearchRequest
 
 router = APIRouter(prefix="/search-products", tags=["Search-Products"])
 
+
+def normalize_partnumber(pn):
+    """
+    Нормализует артикул для поиска:
+    - Убирает все разделители (пробелы, дефисы, точки, слэши)
+    - Приводит к верхнему регистру
+    - Оставляет только буквы и цифры
+    """
+    if not pn:
+        return ""
+    # Убираем все не буквенно-цифровые символы и приводим к верхнему регистру
+    normalized = re.sub(r'[^A-Za-z0-9]', '', pn).upper()
+    return normalized
+
+
+def get_partnumber_variants(pn):
+    """
+    Генерирует различные варианты артикула для поиска
+    """
+    if not pn:
+        return []
+
+    variants = set()
+
+    # Оригинальный артикул
+    variants.add(pn.upper())
+    variants.add(pn.lower())
+
+    # Нормализованный (без разделителей)
+    normalized = normalize_partnumber(pn)
+    variants.add(normalized)
+
+    # С пробелами между буквами и цифрами
+    spaced = re.sub(r'([A-Za-z]+)([0-9]+)', r'\1 \2', pn)
+    if spaced != pn:
+        variants.add(spaced.upper())
+
+    # С пробелами между группами цифр
+    spaced_groups = re.sub(r'([A-Za-z]+)([0-9]{2})([0-9]{3})', r'\1 \2 \3', pn)
+    if spaced_groups != pn:
+        variants.add(spaced_groups.upper())
+
+    # Без пробелов
+    no_spaces = pn.replace(" ", "")
+    variants.add(no_spaces.upper())
+
+    # С дефисами вместо пробелов
+    with_dashes = pn.replace(" ", "-")
+    variants.add(with_dashes.upper())
+
+    # С точками вместо пробелов
+    with_dots = pn.replace(" ", ".")
+    variants.add(with_dots.upper())
+
+    return list(variants)
+
 @router.get("/search", response_model=list[ProductSchema])
 def search_products(
     q: str,
@@ -18,11 +75,28 @@ def search_products(
     query = db.query(ProductModel)
 
     if q:
-        search_term = f"%{q.strip().lower()}%"
-        query = query.filter(
-            (ProductModel.article.ilike(search_term)) |
-            (ProductModel.name.ilike(search_term))
-        )
+        trimmed_q = q.strip()
+        search_term = f"%{trimmed_q.lower()}%"
+
+        # Обычный поиск
+        conditions = [
+            ProductModel.article.ilike(search_term),
+            ProductModel.name.ilike(search_term)
+        ]
+
+        # Поиск по нормализованным артикулам
+        normalized_q = normalize_partnumber(trimmed_q)
+        if normalized_q:
+            # Добавляем поиск по нормализованным артикулам
+            normalized_condition = func.replace(func.replace(func.replace(func.upper(ProductModel.article), '-', ''), ' ', ''), '.', '') == normalized_q
+            conditions.append(normalized_condition)
+
+            # И частичное совпадение
+            conditions.append(
+                func.replace(func.replace(func.replace(func.upper(ProductModel.article), '-', ''), ' ', ''), '.', '').ilike(f"%{normalized_q}%")
+            )
+
+        query = query.filter(or_(*conditions))
 
     products = query.filter(ProductModel.quantity > 0).all()
     print(f"Search API called with q='{q}', returning {len(products)} products")
@@ -292,37 +366,21 @@ async def search_used_parts(
         # Продолжаем без ROSSKO данных
 
     # === ШАГ 2: Прямой поиск в базе данных ===
-    # Генерируем все возможные варианты поиска артикулов
-    def generate_partnumber_variants(pn):
-        """Генерирует различные варианты артикула для поиска"""
-        variants = set()
-        if pn:
-            # Оригинальный
-            variants.add(pn.upper())
-            # Без пробелов
-            variants.add(pn.replace(" ", "").upper())
-            # С пробелами между буквами и цифрами (если применимо)
-            import re
-            # Разделяем на буквы и цифры: P85020 -> P 85020
-            spaced = re.sub(r'([A-Za-z]+)([0-9]+)', r'\1 \2', pn)
-            if spaced != pn:
-                variants.add(spaced.upper())
-            # Разделяем каждые несколько цифр: P85020 -> P 85 020
-            spaced_groups = re.sub(r'([A-Za-z]+)([0-9]{2})([0-9]{3})', r'\1 \2 \3', pn)
-            if spaced_groups != pn:
-                variants.add(spaced_groups.upper())
-        return variants
-
     all_search_terms = set()
     all_search_terms.add(trimmed_query.upper())  # Оригинальный запрос
     all_search_terms.add(normalized_query.upper())  # Без пробелов
 
     # Добавляем все варианты артикулов из ROSSKO
     for pn in rossko_partnumbers:
-        all_search_terms.update(generate_partnumber_variants(pn))
+        all_search_terms.update(get_partnumber_variants(pn))
 
     # Также добавляем варианты от оригинального запроса
-    all_search_terms.update(generate_partnumber_variants(trimmed_query))
+    all_search_terms.update(get_partnumber_variants(trimmed_query))
+
+    # Добавляем нормализованные версии для расширенного поиска
+    query_normalized = normalize_partnumber(trimmed_query)
+    if query_normalized:
+        all_search_terms.add(query_normalized)
 
     # 🔍 ПРОСТОЙ И НАДЕЖНЫЙ ПОИСК: Пошаговый подход с отладкой
     from sqlalchemy import or_, and_
@@ -345,6 +403,18 @@ async def search_used_parts(
         if term and len(term.strip()) > 0:
             article_conditions.append(ProductModel.article == term)
             article_conditions.append(ProductModel.article.ilike(f"%{term}%"))
+
+    # Добавляем поиск по нормализованным артикулам
+    if query_normalized:
+        # Создаем условие для поиска по нормализованным артикулам в базе
+        # Используем функцию замены для имитации нормализации в SQL
+        normalized_condition = func.replace(func.replace(func.replace(func.upper(ProductModel.article), '-', ''), ' ', ''), '.', '') == query_normalized
+        article_conditions.append(normalized_condition)
+
+        # Также ищем частичное совпадение нормализованных артикулов
+        article_conditions.append(
+            func.replace(func.replace(func.replace(func.upper(ProductModel.article), '-', ''), ' ', ''), '.', '').ilike(f"%{query_normalized}%")
+        )
 
     # СНАЧАЛА ИЩЕМ БЕЗ ФИЛЬТРОВ, чтобы увидеть все запчасти
     all_article_products = []
