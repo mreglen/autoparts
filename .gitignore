@@ -1,1 +1,46 @@
 node_modules/
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+ENV/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.log
+*.tmp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+
+# Logs and temporary files
+logs/
+tmp/
+cache/
+
+# Docker
+.dockerenv
+docker-compose.override.yml
+
+# PyInstaller
+build/
+dist/
+
+# MyPy cache
+.mypy_cache/
+
+# pytest cache
+.cache/
+
+# Coverage reports
+htmlcov/
+.tox/
