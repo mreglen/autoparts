@@ -6,13 +6,16 @@ import {
   selectMyParts,
   selectMyPartsStatus,
   selectMyPartsError,
-  searchUsedParts
+  searchUsedParts,
+  selectMyParts as selectMyPartsItems
 } from '../../../redux/slices/ProductSlice';
+import { selectSearchQuery } from '../../../redux/slices/RosskoSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
 
 // Селекторы для б/у запчастей
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 const selectUsedPartsLoading = (state) => state.products.loading;
+const selectAnalogsLoading = (state) => state.products.analogsLoading;
 
 
 
@@ -50,13 +53,16 @@ const UsedPartsList = () => {
   const dispatch = useDispatch();
 
   const usedPartsData = useSelector(selectUsedPartsData);
+  const myPartsItems = useSelector(selectMyPartsItems);
+  const searchQuery = useSelector(selectSearchQuery);
   const status = useSelector(selectUsedPartsLoading) ? 'loading' : 'idle';
+  const analogsLoading = useSelector(selectAnalogsLoading);
   const error = useSelector(selectMyPartsError);
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
-
-  // Получаем данные из usedPartsData
-  const availableParts = usedPartsData?.available_parts || [];
+  const availableParts = searchQuery
+    ? (usedPartsData?.available_parts || [])
+    : (myPartsItems || []);
   const analogParts = usedPartsData?.analog_parts || [];
 
   const [expandedPartId, setExpandedPartId] = useState(null);
@@ -143,8 +149,9 @@ const UsedPartsList = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Наименование</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Состояние</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Склад</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Остаток</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена, ₽</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">К заказу</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -183,7 +190,11 @@ const UsedPartsList = () => {
       )}
 
       {/* Аналоги */}
-      {hasAnalogParts && (
+      {analogsLoading ? (
+        <div className="mt-10 text-center py-5 bg-gray-50 rounded-lg">
+          <p className="text-gray-600 animate-pulse">Поиск аналогов...</p>
+        </div>
+      ) : hasAnalogParts && (
         <>
           <div className="font-medium text-lg sm:text-lg my-6 sm:my-10 px-4 sm:px-0">
             <h2 className="border-b-4 border-blue-500 pb-2 inline-block">Аналоги</h2>
@@ -200,8 +211,9 @@ const UsedPartsList = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Наименование</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Состояние</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Склад</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Остаток</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена, ₽</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">К заказу</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -266,22 +278,26 @@ const UsedPartRow = ({ part, organization, storageLocations, toggleExpand, expan
       </td>
       <td className="px-6 py-4 text-sm text-gray-500">{part.name || '—'}</td>
       <td className="px-6 py-4 whitespace-nowrap text-sm">
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-          Б/у
-        </span>
+        {part.is_new ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+            Новая
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+            Б/у
+          </span>
+        )}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getStorageAddress(part.storage_location_id)}</td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{part.quantity || 0} шт.</td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{part.price ? `${part.price} ₽` : '—'}</td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
         <div className="flex items-center space-x-2">
-          <input
-            type="number"
-            min="1"
-            defaultValue="1"
-            className="w-8 h-8 border border-gray-300 rounded-md text-center"
-          />
-          <button className="h-8 w-8 bg-red-500 text-white rounded-md flex items-center justify-center">
-            🛒
+
+          <button
+            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[38px]"
+          >
+            В корзину
           </button>
         </div>
       </td>
@@ -290,7 +306,7 @@ const UsedPartRow = ({ part, organization, storageLocations, toggleExpand, expan
     {/* Раскрывающаяся карточка */}
     {expandedPartId === part.id && (
       <tr className="bg-gray-50">
-        <td colSpan="8" className="px-6 py-4 border-t">
+        <td colSpan="9" className="px-6 py-4 border-t">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Фото */}
             <div>
@@ -394,9 +410,15 @@ const UsedPartCard = ({ part, organization, storageLocations, toggleExpand, expa
         </div>
         <h3 className="text-base font-medium text-gray-800 mb-3 leading-tight">{part.name || '—'}</h3>
         <div className="flex items-center gap-2 mb-3">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-            Б/у
-          </span>
+          {part.is_new ? (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+              Новая
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+              Б/у
+            </span>
+          )}
           {part.internal_code && (
             <span className="text-sm text-gray-500 font-mono">{part.internal_code}</span>
           )}
@@ -406,28 +428,25 @@ const UsedPartCard = ({ part, organization, storageLocations, toggleExpand, expa
         <div className="text-lg font-bold text-gray-900 mb-1">
           {part.price ? `${part.price} ₽` : '—'}
         </div>
-        <div className="text-sm text-gray-600">{getStorageAddress(part.storage_location_id)}</div>
+        <div className="text-sm text-gray-600">Остаток: {part.quantity || 0} шт.</div>
       </div>
     </div>
 
     <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-      <button
-        onClick={() => toggleExpand(part.id)}
-        className="text-indigo-600 text-sm font-medium hover:text-indigo-800 transition-colors px-2 py-1"
-      >
-        {expandedPartId === part.id ? 'Скрыть детали' : 'Показать детали'}
-      </button>
-      <div className="flex items-center space-x-3">
-        <input
-          type="number"
-          min="1"
-          defaultValue="1"
-          className="w-10 h-10 border border-gray-300 rounded-lg text-center text-sm font-medium"
-        />
-        <button className="w-10 h-10 bg-red-500 text-white rounded-lg flex items-center justify-center text-lg shadow hover:bg-red-600 transition-colors">
-          🛒
+      <div className="flex flex-col">
+        <div className="text-sm text-gray-600">{getStorageAddress(part.storage_location_id)}</div>
+        <button
+          onClick={() => toggleExpand(part.id)}
+          className="text-indigo-600 text-sm font-medium hover:text-indigo-800 transition-colors text-left mt-1"
+        >
+          {expandedPartId === part.id ? 'Скрыть детали' : 'Показать детали'}
         </button>
       </div>
+      <button
+        className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[38px]"
+      >
+        В корзину
+      </button>
     </div>
 
     {/* Раскрывающаяся карточка для мобильной версии */}

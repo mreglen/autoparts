@@ -28,7 +28,7 @@ export default function SalesReturnsPage() {
   return (
     <div className="mt-4 sm:mt-5 px-4 sm:px-0">
       <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Возвраты</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Возвраты покупателей</h1>
         <p className="mt-2 text-gray-600 text-base sm:text-base">Управление возвратами товаров</p>
       </div>
 
@@ -38,7 +38,7 @@ export default function SalesReturnsPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
           </svg>
         </div>
-        <h2 className="text-xl md:text-2xl font-medium text-gray-900 mb-2">Возвраты</h2>
+        <h2 className="text-xl md:text-2xl font-medium text-gray-900 mb-2">Возвраты покупателей</h2>
         <p className="text-gray-500 text-base">Функционал возвратов находится в разработке</p>
       </div>
     </div>

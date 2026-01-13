@@ -265,31 +265,61 @@ export const searchAllProducts = createAsyncThunk(
 
 export const searchUsedParts = createAsyncThunk(
     'products/searchUsedParts',
-    async (query, { rejectWithValue, getState }) => {
+    async (query, { rejectWithValue, getState, dispatch }) => {
         const trimmedQuery = query.trim();
 
-        // Проверяем кэш с оптимизированным временем
+        // Проверяем кэш
         const state = getState();
         const cacheEntry = state.products.usedPartsCache?.[trimmedQuery];
-
-        // Агрессивное кэширование: популярные запросы кэшируются дольше
-        const isPopularQuery = trimmedQuery.length <= 10 && !trimmedQuery.includes(' '); // Короткие запросы без пробелов
-        const cacheTime = isPopularQuery ? 30 * 60 * 1000 : 10 * 60 * 1000; // 30 мин для популярных, 10 мин для остальных
+        const cacheTime = 10 * 60 * 1000; // 10 мин
 
         if (cacheEntry && (Date.now() - cacheEntry.timestamp) < cacheTime) {
             return cacheEntry.data;
         }
 
         try {
-            const response = await apiAxios.get(`/search-products/search-used-parts`, {
-                params: { q: trimmedQuery },
+            // ШАГ 1: Быстрый поиск запчастей в наличии
+            const inStockResponse = await apiAxios.get(`/search-products/search-used-parts`, {
+                params: { q: trimmedQuery, only_in_stock: true },
             });
-
-            return response.data;
+            
+            const inStockData = inStockResponse.data;
+            
+            // Если мы получили данные в наличии, можем сразу обновить состояние через промежуточный экшен
+            // или просто вернуть их как часть итогового результата.
+            // Но чтобы "грузились ниже", нам нужно обновить состояние ДВАЖДЫ.
+            // Redux Toolkit не очень любит двойные fulfill в одном thunk, 
+            // поэтому мы можем использовать dispatch другого экшена или просто дождаться второго вызова.
+            
+            // Запускаем второй поиск (аналоги) асинхронно
+            // Мы возвращаем сначала данные из наличия, а аналоги подгрузим вторым запросом
+            
+            // Чтобы реализовать именно "подгрузку ниже", изменим логику:
+            // 1. Возвращаем inStockData
+            // 2. В extraReducers сохраняем его
+            // 3. Запускаем второй thunk для аналогов
+            
+            dispatch(searchUsedAnalogs(trimmedQuery));
+            
+            return inStockData;
         } catch (error) {
             return rejectWithValue(
                 error.response?.data?.detail || 'Ошибка поиска б/у запчастей'
             );
+        }
+    }
+);
+
+export const searchUsedAnalogs = createAsyncThunk(
+    'products/searchUsedAnalogs',
+    async (query, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get(`/search-products/search-used-parts`, {
+                params: { q: query, only_analogs: true },
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.response?.data?.detail);
         }
     }
 );
@@ -301,6 +331,7 @@ const productSlice = createSlice({
         vehicles: [],
         currentProduct: null,
         loading: false,
+        analogsLoading: false,
         vehiclesLoading: false,
         error: null,
         searchCache: {}, // Кэш результатов поиска: {query: {data, timestamp}}
@@ -360,13 +391,36 @@ const productSlice = createSlice({
                 state.usedPartsData = action.payload;
 
                 // Сохраняем в кэш
-                const query = action.meta.arg; // thunk получает query как первый аргумент
+                const query = action.meta.arg;
                 if (query && query.trim()) {
                     state.usedPartsCache[query.trim()] = {
                         data: action.payload,
                         timestamp: Date.now()
                     };
                 }
+            })
+            .addCase(searchUsedAnalogs.pending, (state) => {
+                state.analogsLoading = true;
+            })
+            .addCase(searchUsedAnalogs.fulfilled, (state, action) => {
+                state.analogsLoading = false;
+                if (state.usedPartsData) {
+                    // Добавляем аналоги к уже существующим данным "в наличии"
+                    state.usedPartsData.analog_parts = action.payload.analog_parts;
+                    state.usedPartsData.rossko_data = action.payload.rossko_data;
+                    
+                    // Обновляем кэш полными данными
+                    const query = action.meta.arg;
+                    if (query && query.trim()) {
+                        state.usedPartsCache[query.trim()] = {
+                            data: state.usedPartsData,
+                            timestamp: Date.now()
+                        };
+                    }
+                }
+            })
+            .addCase(searchUsedAnalogs.rejected, (state) => {
+                state.analogsLoading = false;
             })
             .addCase(searchUsedParts.rejected, (state, action) => {
                 state.loading = false;

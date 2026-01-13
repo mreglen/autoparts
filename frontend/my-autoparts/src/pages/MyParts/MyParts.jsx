@@ -210,6 +210,7 @@ function MyParts() {
   const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
   const [selectedParts, setSelectedParts] = useState(new Set());
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
+  const [searchQuery, setSearchQuery] = useState(''); // Поисковый запрос
   const [formData, setFormData] = useState({
     quantity: '',
     price: '',
@@ -338,7 +339,17 @@ function MyParts() {
 
 
 
-  const displayParts = products;
+  // Фильтрация запчастей по поисковому запросу
+  const displayParts = products.filter(part => {
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase().replace(/\s+/g, ''); // Убираем пробелы из запроса
+    return (
+      (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
+      (part.internal_code && part.internal_code.toLowerCase().replace(/\s+/g, '').includes(query)) ||
+      (part.name && part.name.toLowerCase().includes(query))
+    );
+  });
 
   // Расчет общей суммы и количества
   const totalValue = displayParts.reduce((sum, part) => sum + (part.price * part.quantity), 0);
@@ -360,11 +371,43 @@ function MyParts() {
           <div className="text-xl sm:text-2xl font-bold text-gray-700">
             {totalValue.toLocaleString('ru-RU')} ₽
           </div>
-          <div className="text-sm text-gray-500">Общая стоимость</div>
+          <div className="text-sm text-gray-500">Общая стоимость склада</div>
           <div className="text-lg font-semibold text-gray-700 mt-1">
             {totalQuantity.toLocaleString('ru-RU')} шт.
           </div>
-          <div className="text-sm text-gray-500">Общее количество</div>
+          <div className="text-sm text-gray-500">Общее количество склада</div>
+        </div>
+      </div>
+
+      {/* Поисковое поле */}
+      <div className="mb-6">
+        <div className="max-w-md">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              placeholder="Поиск по номеру, внутр. коду или названию..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-base"
+            />
+            {searchQuery && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -415,14 +458,23 @@ function MyParts() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Запчастей нет</h2>
-          <p className="text-gray-600 text-base mb-6">У вас пока нет добавленных запчастей</p>
-          <button
-            onClick={() => navigate('/my-parts/add')}
-            className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
-          >
-            Добавить первую запчасть
-          </button>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            {searchQuery ? 'Ничего не найдено' : 'Запчастей нет'}
+          </h2>
+          <p className="text-gray-600 text-base mb-6">
+            {searchQuery
+              ? `По запросу "${searchQuery}" ничего не найдено. Попробуйте изменить поисковый запрос.`
+              : 'У вас пока нет добавленных запчастей'
+            }
+          </p>
+          {!searchQuery && (
+            <button
+              onClick={() => navigate('/my-parts/add')}
+              className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
+            >
+              Добавить первую запчасть
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -432,6 +484,11 @@ function MyParts() {
               <div className="mb-3 flex items-center justify-between py-2 border-b border-gray-200">
                 <span className="text-sm text-gray-500">
                   Выбрано: {selectedParts.size}
+                  {searchQuery && (
+                    <span className="ml-2 text-indigo-600">
+                      (из {displayParts.length} найденных)
+                    </span>
+                  )}
                 </span>
                 <button
                   onClick={handleBulkAction}
@@ -452,12 +509,19 @@ function MyParts() {
                   <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <input
                       type="checkbox"
-                      checked={displayParts.length > 0 && selectedParts.size === displayParts.length}
+                      checked={displayParts.length > 0 && selectedParts.size === displayParts.length && displayParts.every(part => selectedParts.has(part.id))}
                       onChange={() => {
-                        if (selectedParts.size === displayParts.length) {
-                          setSelectedParts(new Set());
+                        const currentSelectedCount = displayParts.filter(part => selectedParts.has(part.id)).length;
+                        if (currentSelectedCount === displayParts.length) {
+                          // Снимаем выделение со всех отображаемых запчастей
+                          const newSelected = new Set(selectedParts);
+                          displayParts.forEach(part => newSelected.delete(part.id));
+                          setSelectedParts(newSelected);
                         } else {
-                          setSelectedParts(new Set(displayParts.map(part => part.id)));
+                          // Выделяем все отображаемые запчасти
+                          const newSelected = new Set(selectedParts);
+                          displayParts.forEach(part => newSelected.add(part.id));
+                          setSelectedParts(newSelected);
                         }
                       }}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
@@ -500,6 +564,11 @@ function MyParts() {
                 <div className="flex items-center justify-between">
                   <span className="text-base font-medium text-gray-900">
                     Выбрано: {selectedParts.size}
+                    {searchQuery && (
+                      <span className="block text-sm text-indigo-600 mt-1">
+                        из {displayParts.length} найденных
+                      </span>
+                    )}
                   </span>
                   <button
                     onClick={handleBulkAction}
@@ -517,12 +586,19 @@ function MyParts() {
                 <span className="text-sm font-medium text-gray-700">Выбрать все</span>
                 <input
                   type="checkbox"
-                  checked={displayParts.length > 0 && selectedParts.size === displayParts.length}
+                  checked={displayParts.length > 0 && displayParts.every(part => selectedParts.has(part.id))}
                   onChange={() => {
-                    if (selectedParts.size === displayParts.length) {
-                      setSelectedParts(new Set());
+                    const currentSelectedCount = displayParts.filter(part => selectedParts.has(part.id)).length;
+                    if (currentSelectedCount === displayParts.length) {
+                      // Снимаем выделение со всех отображаемых запчастей
+                      const newSelected = new Set(selectedParts);
+                      displayParts.forEach(part => newSelected.delete(part.id));
+                      setSelectedParts(newSelected);
                     } else {
-                      setSelectedParts(new Set(displayParts.map(part => part.id)));
+                      // Выделяем все отображаемые запчасти
+                      const newSelected = new Set(selectedParts);
+                      displayParts.forEach(part => newSelected.add(part.id));
+                      setSelectedParts(newSelected);
                     }
                   }}
                   className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"

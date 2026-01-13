@@ -2,56 +2,34 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { fetchSearchResults } from '../../../redux/slices/RosskoSlice';
+import { fetchSearchResults, setSearchQuery as setGlobalSearchQuery } from '../../../redux/slices/RosskoSlice';
 import {
-  searchAllProducts
+  searchAllProducts,
+  searchUsedParts
 } from '../../../redux/slices/ProductSlice';
 
 function Search() {
-  const [searchTerm, setSearchTerm] = useState(() => {
-    // Восстанавливаем последний поисковый запрос из localStorage
-    return localStorage.getItem('lastSearchTerm') || '';
-  });
+  const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [lastSearchTerm, setLastSearchTerm] = useState(() => {
-    return localStorage.getItem('lastSearchTerm') || '';
-  });
+  const [lastSearchTerm, setLastSearchTerm] = useState('');
   const dispatch = useDispatch();
   const navigate = useNavigate();
-
-  // Синхронизация с localStorage при изменении в других вкладках
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'lastSearchTerm') {
-        setSearchTerm(e.newValue || '');
-        setLastSearchTerm(e.newValue || '');
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
 
   const handleSearch = () => {
     const trimmedTerm = searchTerm.trim();
     if (!trimmedTerm || isSearching) return;
 
-    // Если поисковый запрос не изменился, просто переходим на страницу результатов
-    if (trimmedTerm === lastSearchTerm) {
-      navigate('/autoparts');
-      return;
-    }
-
     setIsSearching(true);
+    dispatch(setGlobalSearchQuery(trimmedTerm));
 
-    // Execute both searches in parallel
+    // Выполняем все поиски параллельно
     Promise.all([
       dispatch(searchAllProducts(trimmedTerm)),
+      dispatch(searchUsedParts(trimmedTerm)),
       dispatch(fetchSearchResults({ text: trimmedTerm }))
     ]).then(() => {
-      // Сохраняем успешный поисковый запрос
       setLastSearchTerm(trimmedTerm);
-      localStorage.setItem('lastSearchTerm', trimmedTerm);
+      setSearchTerm(''); // Очищаем строку поиска после успешного перехода
     }).finally(() => {
       setIsSearching(false);
       navigate('/autoparts');

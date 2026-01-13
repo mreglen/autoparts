@@ -29,8 +29,8 @@ export default function SalesPage() {
   }
 
   const tabs = [
-    { id: 'orders', label: 'Заказы', component: OrdersTab },
-    { id: 'returns', label: 'Возвраты', component: ReturnsTab },
+    { id: 'orders', label: 'Заказы покупателей', component: OrdersTab },
+    { id: 'returns', label: 'Возвраты покупателей', component: ReturnsTab },
   ];
 
   const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component;

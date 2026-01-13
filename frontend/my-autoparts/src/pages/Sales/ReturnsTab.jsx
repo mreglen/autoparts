@@ -8,7 +8,7 @@ export default function ReturnsTab() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
         </svg>
       </div>
-      <h2 className="text-xl md:text-2xl font-medium text-gray-900 mb-2">Возвраты</h2>
+      <h2 className="text-xl md:text-2xl font-medium text-gray-900 mb-2">Возвраты покупателей</h2>
       <p className="text-gray-500 text-base">Функционал возвратов находится в разработке</p>
     </div>
   );

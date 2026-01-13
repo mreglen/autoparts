@@ -198,6 +198,21 @@ export default function Navigation() {
                                                 {user.organization_id && <div>ID организации: {user.organization_id}</div>}
                                             </div>
                                         </div>
+
+                                        {/* Для продавцов - Главная */}
+                                        {user?.is_seller && (
+                                            <button
+                                                onClick={() => {
+                                                    setIsProfileOpen(false);
+                                                    navigate('/dashboard');
+                                                }}
+                                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                            >
+                                                Главная
+                                            </button>
+                                        )}
+
+                                        {/* Профиль */}
                                         <button
                                             onClick={() => {
                                                 setIsProfileOpen(false);
@@ -207,6 +222,93 @@ export default function Navigation() {
                                         >
                                             Профиль
                                         </button>
+
+                                        {/* Разделитель */}
+                                        <div className="border-t border-gray-200 my-1"></div>
+
+                                        {/* Покупки */}
+                                        <div className="px-4 py-1">
+                                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Покупки</div>
+                                            <button
+                                                onClick={() => {
+                                                    setIsProfileOpen(false);
+                                                    navigate('/purchases/orders');
+                                                }}
+                                                className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                            >
+                                                Заказы
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setIsProfileOpen(false);
+                                                    navigate('/purchases/returns');
+                                                }}
+                                                className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                            >
+                                                Возвраты
+                                            </button>
+                                        </div>
+
+                                        {/* Для продавцов - Продажи */}
+                                        {user?.is_seller && (
+                                            <div className="px-4 py-1 border-t border-gray-100">
+                                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Продажи</div>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/sales/orders');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Заказы покупателей
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/sales/returns');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Возвраты покупателей
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Для продавцов - Склад */}
+                                        {user?.is_seller && (
+                                            <div className="px-4 py-1 border-t border-gray-100">
+                                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Склад</div>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/my-parts');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Мои запчасти
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/stock-in');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Поступление
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/stock-out');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Расходы
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Выход */}
                                         <button
                                             onClick={handleLogout}
                                             className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-200"

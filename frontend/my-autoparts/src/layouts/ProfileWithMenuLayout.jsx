@@ -58,8 +58,8 @@ export default function ProfileWithMenuLayout() {
                 id: 'sales',
                 label: 'Продажи',
                 submenu: [
-                    { id: 'sales-orders', label: 'Заказы' },
-                    { id: 'sales-returns', label: 'Возвраты' }
+                    { id: 'sales-orders', label: 'Заказы покупателей' },
+                    { id: 'sales-returns', label: 'Возвраты покупателей' }
                 ]
             });
         }

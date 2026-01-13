@@ -63,15 +63,13 @@ function AutoParts() {
 
   // При изменении searchQuery — обновляем б/у запчасти
   useEffect(() => {
-    if (activeTab === 'my') {
-      if (searchQuery) {
-        dispatch(searchUsedParts(searchQuery));
-      } else {
-        // Для б/у запчастей без поискового запроса показываем все б/у запчасти
-        dispatch(fetchAllProducts());
-      }
+    if (searchQuery) {
+      dispatch(searchUsedParts(searchQuery));
+    } else {
+      // Для б/у запчастей без поискового запроса показываем все б/у запчасти
+      dispatch(fetchAllProducts());
     }
-  }, [searchQuery, activeTab, dispatch]);
+  }, [searchQuery, dispatch]);
 
   // Загружаем корзину при монтировании компонента
   useEffect(() => {
@@ -124,11 +122,10 @@ function AutoParts() {
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
         <button
           onClick={() => setActiveTab('rossko')}
-          className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${
-            activeTab === 'rossko'
+          className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${activeTab === 'rossko'
               ? 'bg-indigo-500 text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
+            }`}
         >
           Новые запчасти
         </button>
@@ -142,11 +139,10 @@ function AutoParts() {
               dispatch(fetchAllProducts());
             }
           }}
-          className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${
-            activeTab === 'my'
+          className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${activeTab === 'my'
               ? 'bg-indigo-500 text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
+            }`}
         >
           Б/У запчасти
         </button>
@@ -179,34 +175,34 @@ function AutoParts() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                  {allParts.map((part, idx) => {
-                    const uniqueId = `available-${part.guid || part.id || idx}`;
-                    // Преобразуем данные складов из API формата в формат для CardPart
-                    let stocksData = [];
-                    if (part.stocks && part.stocks.stock) {
-                      const stocksArray = Array.isArray(part.stocks.stock) ? part.stocks.stock : [part.stocks.stock];
-                      stocksData = stocksArray.filter(stock => stock && typeof stock === 'object').map(stock => ({
-                        stock_id: stock.id,
-                        price: parseFloat(stock.price) || 0,
-                        available_count: parseInt(stock.count) || 0,
-                        delivery_start: stock.deliveryStart,
-                        delivery_end: stock.deliveryEnd,
-                        description: stock.description
-                      }));
-                    }
+                    {allParts.map((part, idx) => {
+                      const uniqueId = `available-${part.guid || part.id || idx}`;
+                      // Преобразуем данные складов из API формата в формат для CardPart
+                      let stocksData = [];
+                      if (part.stocks && part.stocks.stock) {
+                        const stocksArray = Array.isArray(part.stocks.stock) ? part.stocks.stock : [part.stocks.stock];
+                        stocksData = stocksArray.filter(stock => stock && typeof stock === 'object').map(stock => ({
+                          stock_id: stock.id,
+                          price: parseFloat(stock.price) || 0,
+                          available_count: parseInt(stock.count) || 0,
+                          delivery_start: stock.deliveryStart,
+                          delivery_end: stock.deliveryEnd,
+                          description: stock.description
+                        }));
+                      }
 
-                    return (
-                      <CardPart
-                        key={uniqueId}
-                        part={part}
-                        stocksData={stocksData}
-                        showAllStocks
-                        sectionType="available"
-                        uniqueId={uniqueId}
-                        expandedPartId={expandedPartId}
-                        onToggleExpand={handleToggleExpand}
-                      />
-                    );
+                      return (
+                        <CardPart
+                          key={uniqueId}
+                          part={part}
+                          stocksData={stocksData}
+                          showAllStocks
+                          sectionType="available"
+                          uniqueId={uniqueId}
+                          expandedPartId={expandedPartId}
+                          onToggleExpand={handleToggleExpand}
+                        />
+                      );
                     })}
                   </tbody>
                 </table>
