@@ -30,4 +30,6 @@ class UsedPartsCart(Base):
 
     @property
     def seller(self):
+        if self.product and self.product.organization:
+            return self.product.organization.name
         return "Б/У запчасти"

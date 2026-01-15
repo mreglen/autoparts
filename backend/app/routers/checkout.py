@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.core.auth import get_current_user
 from app.models.user import User
-from app.models.carts import Cart, NewPartsCart
+from app.models.carts import Cart, NewPartsCart, UsedPartsCart
 from app.models.orders import Order, NewPartsOrder, OrderStatus, OrderItem, OrderItemStatus
 from app.schemas.checkout import CheckoutFromCartRequest, OrderFromCartResponse
 from app.routers.rossko_api.rossko_api import rossko_checkout
@@ -138,6 +138,7 @@ async def checkout_from_cart(
 
         # Очистить корзину после успешного оформления заказа
         db.query(NewPartsCart).filter(NewPartsCart.cart_id == cart.id).delete()
+        db.query(UsedPartsCart).filter(UsedPartsCart.cart_id == cart.id).delete()
 
         # Сохранить все изменения
         db.commit()

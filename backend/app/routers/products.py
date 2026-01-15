@@ -93,7 +93,12 @@ def read_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    product = db.query(ProductModel).filter(
+    product = db.query(ProductModel).options(
+        selectinload(ProductModel.photos),
+        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.storage_location),
+        selectinload(ProductModel.organization)
+    ).filter(
         ProductModel.id == product_id,
         ProductModel.organization_id == current_user.organization_id
     ).first()
@@ -332,7 +337,9 @@ def get_products(
         .options(
             selectinload(ProductModel.photos),
             selectinload(ProductModel.compatible_vehicles),
-            selectinload(ProductModel.creator)
+            selectinload(ProductModel.creator),
+            selectinload(ProductModel.storage_location),
+            selectinload(ProductModel.organization)
         )
         .filter(
             ProductModel.organization_id == current_user.organization_id,

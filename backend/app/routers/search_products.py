@@ -48,7 +48,9 @@ def search_local_products_query(db: Session, q: str, is_new: bool = None):
 
     query = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
-        selectinload(ProductModel.compatible_vehicles)
+        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.storage_location),
+        selectinload(ProductModel.organization)
     ).filter(or_(*conditions), ProductModel.quantity > 0)
     
     if is_new is not None:
@@ -112,7 +114,9 @@ async def search_combined(q: str, db: Session = Depends(get_db)):
     # Ищем в базе: по нормализованному запросу ИЛИ по артикулам из ROSSKO
     db_products = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
-        selectinload(ProductModel.compatible_vehicles)
+        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.storage_location),
+        selectinload(ProductModel.organization)
     ).filter(
         or_(
             get_sql_normalize(ProductModel.article).in_(list(all_target_pns)),
@@ -163,8 +167,11 @@ async def search_used_parts(
     rossko_response = None
 
     # --- ШАГ 1: Быстрый поиск в наличии (всё локальное наличие считаем "в наличии" для этой вкладки) ---
+    # Получаем прямые соответствия запросу для отображения или для исключения из аналогов
+    direct_matches = search_local_products_query(db, trimmed_query).all()
+    
     if not only_analogs:
-        available_parts = search_local_products_query(db, trimmed_query).all()
+        available_parts = direct_matches
 
     # --- ШАГ 2: Поиск аналогов (через ROSSKO) ---
     if not only_in_stock:
@@ -196,13 +203,16 @@ async def search_used_parts(
                 # Ищем б/у аналоги в нашей базе (показываем всё наличие, подходящее под аналоги)
                 db_analogs = db.query(ProductModel).options(
                     selectinload(ProductModel.photos),
-                    selectinload(ProductModel.compatible_vehicles)
+                    selectinload(ProductModel.compatible_vehicles),
+                    selectinload(ProductModel.storage_location),
+                    selectinload(ProductModel.organization)
                 ).filter(
                     get_sql_normalize(ProductModel.article).in_(list(analog_pns)),
                     ProductModel.quantity > 0
                 ).all()
                 
-                seen_ids = {p.id for p in available_parts}
+                # Исключаем те, что уже найдены как прямые соответствия
+                seen_ids = {p.id for p in direct_matches}
                 for a in db_analogs:
                     if a.id not in seen_ids:
                         analog_parts.append(a)

@@ -4,7 +4,7 @@ from app.db.database import get_db
 from app.core.auth import get_current_user, get_current_admin_user
 from app.models.user import User
 from app.models.orders import Order, NewPartsOrder, OrderStatus, OrderItem, OrderItemStatus, RosskoStatus
-from app.models.carts import Cart, NewPartsCart
+from app.models.carts import Cart, NewPartsCart, UsedPartsCart
 from app.schemas.orders import OrderCreate, OrderResponse, OrderStatusResponse, OrderItemResponse, NewPartsOrderResponse
 from datetime import datetime
 import random
@@ -211,17 +211,23 @@ async def create_order(
         db.commit()
 
         # Удаляем товары из корзины пользователя после успешного создания заказа
-        if order_data.cart_item_ids:
-            # Находим корзину пользователя
-            user_cart = db.query(Cart).filter(Cart.user_id == current_user.id).first()
-            if user_cart:
-                # Удаляем указанные товары из корзины
+        user_cart = db.query(Cart).filter(Cart.user_id == current_user.id).first()
+        if user_cart:
+            # Удаляем новые запчасти
+            if order_data.cart_item_ids:
                 db.query(NewPartsCart).filter(
                     NewPartsCart.cart_id == user_cart.id,
                     NewPartsCart.id.in_(order_data.cart_item_ids)
                 ).delete(synchronize_session=False)
 
-                db.commit()
+            # Удаляем б/у запчасти
+            if order_data.used_cart_item_ids:
+                db.query(UsedPartsCart).filter(
+                    UsedPartsCart.cart_id == user_cart.id,
+                    UsedPartsCart.id.in_(order_data.used_cart_item_ids)
+                ).delete(synchronize_session=False)
+
+            db.commit()
 
         # Загружаем полный заказ с отношениями
         order_with_relations = db.query(Order).options(

@@ -78,6 +78,62 @@ export const updateCartItemQuantity = createAsyncThunk(
     }
 );
 
+// Async thunk: добавление б/у запчастей в корзину
+export const addUsedPartsToCart = createAsyncThunk(
+    'cart/addUsedPartsToCart',
+    async (cartItem, { rejectWithValue, dispatch }) => {
+        try {
+            const response = await apiAxios.post(
+                `/cart/used-parts`,
+                cartItem,
+            );
+            dispatch(fetchCart());
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка добавления товара в корзину'
+            );
+        }
+    }
+);
+
+// Async thunk: удаление б/у запчастей из корзины
+export const removeUsedFromCart = createAsyncThunk(
+    'cart/removeUsedFromCart',
+    async (itemId, { rejectWithValue, dispatch }) => {
+        try {
+            await apiAxios.delete(
+                `/cart/used-parts/${itemId}`,
+            );
+            dispatch(fetchCart());
+            return itemId;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка удаления товара из корзины'
+            );
+        }
+    }
+);
+
+// Async thunk: обновление количества б/у запчастей
+export const updateUsedCartItemQuantity = createAsyncThunk(
+    'cart/updateUsedCartItemQuantity',
+    async ({ itemId, quantity }, { rejectWithValue, dispatch }) => {
+        try {
+            const response = await apiAxios.put(
+                `/cart/used-parts/${itemId}/quantity`,
+                { quantity }
+            );
+            dispatch(fetchCart());
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка обновления количества товара'
+            );
+        }
+    }
+);
+
 const cartSlice = createSlice({
     name: 'cart',
     initialState: {
@@ -140,19 +196,56 @@ const cartSlice = createSlice({
                 // При ошибке нужно перезагрузить корзину
             })
 
-            // Обновление количества
+            // Обновление количества (новые)
             .addCase(updateCartItemQuantity.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
             .addCase(updateCartItemQuantity.fulfilled, (state, action) => {
                 state.loading = false;
-                // Корзина будет перезагружена в thunk
             })
             .addCase(updateCartItemQuantity.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
-                // При ошибке нужно перезагрузить корзину
+            })
+
+            // Добавление в корзину (б/у)
+            .addCase(addUsedPartsToCart.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(addUsedPartsToCart.fulfilled, (state) => {
+                state.loading = false;
+            })
+            .addCase(addUsedPartsToCart.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+
+            // Удаление из корзины (б/у)
+            .addCase(removeUsedFromCart.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(removeUsedFromCart.fulfilled, (state) => {
+                state.loading = false;
+            })
+            .addCase(removeUsedFromCart.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+
+            // Обновление количества (б/у)
+            .addCase(updateUsedCartItemQuantity.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(updateUsedCartItemQuantity.fulfilled, (state) => {
+                state.loading = false;
+            })
+            .addCase(updateUsedCartItemQuantity.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
             });
     },
 });

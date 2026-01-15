@@ -77,6 +77,7 @@ export default function CartPage() {
           // Преобразуем item в формат, ожидаемый компонентом
           groups[seller].push({
             id: item.id,
+            type: 'new',
             seller: seller,
             brand: item.brand,
             number: item.partnumber,
@@ -100,6 +101,7 @@ export default function CartPage() {
     }
         groups[seller].push({
           id: item.id,
+          type: 'used',
           seller: seller,
           brand: item.brand,
           number: item.partnumber,

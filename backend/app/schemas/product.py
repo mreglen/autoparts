@@ -1,5 +1,7 @@
 from typing import List, Optional
 from pydantic import BaseModel
+from app.schemas.storage_location import StorageLocation
+from app.schemas.organization import Organization
 
 class ProductBase(BaseModel):
     article: str
@@ -21,6 +23,8 @@ class Product(ProductBase):
     creator_name: Optional[str] = None 
     photos: List["ProductPhoto"] = [] 
     compatible_vehicles: List["Vehicle"] = [] 
+    storage_location: Optional[StorageLocation] = None
+    organization: Optional[Organization] = None
 
     class Config:
         from_attributes = True

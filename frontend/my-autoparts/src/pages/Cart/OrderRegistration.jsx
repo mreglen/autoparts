@@ -126,7 +126,8 @@ export default function OrderRegistration() {
           price: item.price,
           status_id: 1  // В ожидании
         })),
-        cart_item_ids: selectedItems.map(item => item.id), // IDs товаров из корзины для удаления
+        cart_item_ids: selectedItems.filter(item => item.type === 'new').map(item => item.id), // IDs новых товаров
+        used_cart_item_ids: selectedItems.filter(item => item.type === 'used').map(item => item.id), // IDs б/у товаров
         new_parts_order: {
           seller: seller,
           deliver_in_parts: deliverInParts

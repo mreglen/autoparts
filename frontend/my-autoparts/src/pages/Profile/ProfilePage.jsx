@@ -37,8 +37,16 @@ export default function ProfilePage() {
         );
     }
 
-    const role = user.is_admin ? 'Администратор' : user.is_seller ? 'Продавец' : user.is_buyer ? 'Покупатель' : '—';
-    const roleColor = user.is_admin ? 'bg-purple-100 text-purple-800' : user.is_seller ? 'bg-red-100 text-red-800' : user.is_buyer ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800';
+    let role = 'Покупатель';
+    let roleColor = 'bg-blue-100 text-blue-800';
+
+    if (user.is_admin) {
+        role = 'Администратор';
+        roleColor = 'bg-purple-100 text-purple-800';
+    } else if (user.is_seller) {
+        role = 'Продавец';
+        roleColor = 'bg-red-100 text-red-800';
+    }
 
     const handleEdit = () => {
         setFormData({

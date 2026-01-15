@@ -224,43 +224,18 @@ function AutoParts() {
                     }));
                   }
 
-                  const mainStock = stocksData.find(stock => stock.price && stock.price !== '0' && stock.price !== 0 && stock.available_count > 0);
-
-                  if (!mainStock) return null;
-
                   return (
-                    <div key={uniqueId} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex-1 pr-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-base font-semibold text-gray-900">{part.brand || '—'}</span>
-                            <span className="text-sm text-gray-400">•</span>
-                            <span className="text-sm text-gray-500 font-mono">{part.partnumber || '—'}</span>
-                          </div>
-                          <h3 className="text-base font-medium text-gray-800 mb-3 leading-tight">{part.name || '—'}</h3>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <div className="text-lg font-bold text-gray-900 mb-1">
-                            {mainStock.price ? `${(parseFloat(mainStock.price) * 1.15).toFixed(2)} ₽` : '—'}
-                          </div>
-                          <div className="text-sm text-gray-600">{mainStock.available_count} шт.</div>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                        <div className="text-sm text-gray-600">
-                          {mainStock.delivery_start && mainStock.delivery_end ? (
-                            `Доставка: ${new Date(mainStock.delivery_start).toLocaleDateString('ru-RU')}`
-                          ) : '—'}
-                        </div>
-                        <button
-                          onClick={() => handleToggleExpand(uniqueId)}
-                          className="px-5 py-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[44px]"
-                        >
-                          В корзину
-                        </button>
-                      </div>
-                    </div>
+                    <CardPart
+                      key={uniqueId}
+                      part={part}
+                      stocksData={stocksData}
+                      showAllStocks
+                      sectionType="available"
+                      uniqueId={uniqueId}
+                      expandedPartId={expandedPartId}
+                      onToggleExpand={handleToggleExpand}
+                      isMobile={true}
+                    />
                   );
                 })}
               </div>
@@ -335,44 +310,18 @@ function AutoParts() {
                         }));
                       }
 
-                      const mainStock = stocksData.find(stock => stock.price && stock.price !== '0' && stock.price !== 0 && stock.available_count > 0);
-
-                      if (!mainStock) return null;
-
                       return (
-                        <div key={uniqueId} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="flex-1 pr-4">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-base font-semibold text-gray-900">{part.brand || '—'}</span>
-                                <span className="text-sm text-gray-400">•</span>
-                                <span className="text-sm text-gray-500 font-mono">{part.partnumber || '—'}</span>
-                              </div>
-                              <h3 className="text-base font-medium text-gray-800 mb-2 leading-tight">{part.name || '—'}</h3>
-                              <div className="text-sm text-orange-600 font-semibold">Аналог</div>
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <div className="text-lg font-bold text-gray-900 mb-1">
-                                {mainStock.price ? `${(parseFloat(mainStock.price) * 1.15).toFixed(2)} ₽` : '—'}
-                              </div>
-                              <div className="text-sm text-gray-600">{mainStock.available_count} шт.</div>
-                            </div>
-                          </div>
-
-                          <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                            <div className="text-sm text-gray-600">
-                              {mainStock.delivery_start && mainStock.delivery_end ? (
-                                `Доставка: ${new Date(mainStock.delivery_start).toLocaleDateString('ru-RU')}`
-                              ) : '—'}
-                            </div>
-                            <button
-                              onClick={() => handleToggleExpand(uniqueId)}
-                              className="px-5 py-3 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors min-h-[44px]"
-                            >
-                              В корзину
-                            </button>
-                          </div>
-                        </div>
+                        <CardPart
+                          key={uniqueId}
+                          part={part}
+                          stocksData={stocksData}
+                          showAllStocks
+                          sectionType="analog"
+                          uniqueId={uniqueId}
+                          expandedPartId={expandedPartId}
+                          onToggleExpand={handleToggleExpand}
+                          isMobile={true}
+                        />
                       );
                     })}
                   </div>

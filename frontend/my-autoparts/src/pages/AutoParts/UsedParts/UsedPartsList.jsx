@@ -3,6 +3,13 @@ import { useSelector, useDispatch } from 'react-redux';
 import PhotoThumbnail from '../../../components/PhotoGallery/PhotoThumbnail';
 import ImageModal from '../../../components/ImageModal/ImageModal';
 import {
+  addUsedPartsToCart,
+  removeUsedFromCart,
+  updateUsedCartItemQuantity,
+  selectCart,
+  selectCartLoading
+} from '../../../redux/slices/CartSlice';
+import {
   selectMyParts,
   selectMyPartsStatus,
   selectMyPartsError,
@@ -60,6 +67,9 @@ const UsedPartsList = () => {
   const error = useSelector(selectMyPartsError);
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
+  const cart = useSelector(selectCart);
+  const cartLoading = useSelector(selectCartLoading);
+  const [addingToCartId, setAddingToCartId] = useState(null);
   const availableParts = searchQuery
     ? (usedPartsData?.available_parts || [])
     : (myPartsItems || []);
@@ -86,10 +96,75 @@ const UsedPartsList = () => {
     setImageModalOpen(true);
   };
 
-  const getStorageAddress = (locationId) => {
+  const getStorageAddress = (locationId, partStorageLocation) => {
+    if (partStorageLocation?.address) return partStorageLocation.address;
     if (!locationId) return '—';
     const loc = storageLocations.find(l => l.id === locationId);
     return loc ? (loc.address || `Склад #${locationId}`) : `Склад #${locationId}`;
+  };
+
+  // Получаем количество товара в корзине
+  const getCartQuantity = (partId) => {
+    if (!cart?.used_parts_items) return 0;
+    const cartItem = cart.used_parts_items.find(item => item.product_id === partId);
+    return cartItem ? cartItem.quantity : 0;
+  };
+
+  // Получаем информацию о наличии товара
+  const getStockAvailability = (part) => {
+    const availableOnCurrent = part.quantity || 0;
+    const currentCartQuantity = getCartQuantity(part.id);
+
+    return {
+      availableOnCurrent,
+      currentCartQuantity,
+      isLimited: currentCartQuantity >= availableOnCurrent,
+      noStock: availableOnCurrent <= currentCartQuantity
+    };
+  };
+
+  // Функция добавления в корзину
+  const handleAddToCart = async (part) => {
+    if (!user) {
+      // Можно добавить редирект на логин или уведомление
+      return;
+    }
+    setAddingToCartId(part.id);
+    try {
+      const currentCartQuantity = getCartQuantity(part.id);
+      const availableStock = part.quantity || 0;
+
+      if (availableStock <= currentCartQuantity) {
+        setAddingToCartId(null);
+        return;
+      }
+
+      await dispatch(addUsedPartsToCart({ product_id: part.id, quantity: 1 })).unwrap();
+    } catch (error) {
+      console.error('Ошибка добавления в корзину:', error);
+    } finally {
+      setAddingToCartId(null);
+    }
+  };
+
+  // Функция уменьшения количества в корзине
+  const handleRemoveFromCart = async (part) => {
+    setAddingToCartId(part.id);
+    try {
+      const cartItem = cart?.used_parts_items?.find(item => item.product_id === part.id);
+
+      if (cartItem) {
+        if (cartItem.quantity > 1) {
+          await dispatch(updateUsedCartItemQuantity({ itemId: cartItem.id, quantity: cartItem.quantity - 1 })).unwrap();
+        } else {
+          await dispatch(removeUsedFromCart(cartItem.id)).unwrap();
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка изменения количества в корзине:', error);
+    } finally {
+      setAddingToCartId(null);
+    }
   };
 
 
@@ -165,6 +240,13 @@ const UsedPartsList = () => {
                     expandedPartId={expandedPartId}
                     handleImageClick={handleImageClick}
                     getStorageAddress={getStorageAddress}
+                    getCartQuantity={getCartQuantity}
+                    getStockAvailability={getStockAvailability}
+                    handleAddToCart={handleAddToCart}
+                    handleRemoveFromCart={handleRemoveFromCart}
+                    addingToCartId={addingToCartId}
+                    cartLoading={cartLoading}
+                    user={user}
                   />
                 ))}
               </tbody>
@@ -183,6 +265,13 @@ const UsedPartsList = () => {
                 expandedPartId={expandedPartId}
                 handleImageClick={handleImageClick}
                 getStorageAddress={getStorageAddress}
+                getCartQuantity={getCartQuantity}
+                getStockAvailability={getStockAvailability}
+                handleAddToCart={handleAddToCart}
+                handleRemoveFromCart={handleRemoveFromCart}
+                addingToCartId={addingToCartId}
+                cartLoading={cartLoading}
+                user={user}
               />
             ))}
           </div>
@@ -227,6 +316,13 @@ const UsedPartsList = () => {
                     expandedPartId={expandedPartId}
                     handleImageClick={handleImageClick}
                     getStorageAddress={getStorageAddress}
+                    getCartQuantity={getCartQuantity}
+                    getStockAvailability={getStockAvailability}
+                    handleAddToCart={handleAddToCart}
+                    handleRemoveFromCart={handleRemoveFromCart}
+                    addingToCartId={addingToCartId}
+                    cartLoading={cartLoading}
+                    user={user}
                   />
                 ))}
               </tbody>
@@ -245,6 +341,13 @@ const UsedPartsList = () => {
                 expandedPartId={expandedPartId}
                 handleImageClick={handleImageClick}
                 getStorageAddress={getStorageAddress}
+                getCartQuantity={getCartQuantity}
+                getStockAvailability={getStockAvailability}
+                handleAddToCart={handleAddToCart}
+                handleRemoveFromCart={handleRemoveFromCart}
+                addingToCartId={addingToCartId}
+                cartLoading={cartLoading}
+                user={user}
               />
             ))}
           </div>
@@ -264,7 +367,10 @@ const UsedPartsList = () => {
 };
 
 // Вспомогательный компонент для строки таблицы
-const UsedPartRow = ({ part, organization, storageLocations, toggleExpand, expandedPartId, handleImageClick, getStorageAddress }) => (
+const UsedPartRow = ({ 
+  part, organization, storageLocations, toggleExpand, expandedPartId, handleImageClick, getStorageAddress,
+  getCartQuantity, getStockAvailability, handleAddToCart, handleRemoveFromCart, addingToCartId, cartLoading, user
+}) => (
   <React.Fragment>
     {/* Основная строка */}
     <tr
@@ -288,17 +394,72 @@ const UsedPartRow = ({ part, organization, storageLocations, toggleExpand, expan
           </span>
         )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getStorageAddress(part.storage_location_id)}</td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getStorageAddress(part.storage_location_id, part.storage_location)}</td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{part.quantity || 0} шт.</td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{part.price ? `${part.price} ₽` : '—'}</td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
         <div className="flex items-center space-x-2">
+          {(() => {
+            const cartQuantity = getCartQuantity(part.id);
+            const stockInfo = getStockAvailability(part);
+            const isAdding = addingToCartId === part.id;
 
-          <button
-            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[38px]"
-          >
-            В корзину
-          </button>
+            return cartQuantity > 0 ? (
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRemoveFromCart(part);
+                  }}
+                  disabled={isAdding || cartLoading}
+                  className="w-6 h-6 flex items-center justify-center text-xs font-medium rounded border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                >
+                  −
+                </button>
+                <span className="text-xs font-medium w-6 text-center">
+                  {cartQuantity}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddToCart(part);
+                  }}
+                  disabled={isAdding || cartLoading || stockInfo.noStock}
+                  className="w-6 h-6 flex items-center justify-center text-xs font-medium rounded border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                >
+                  +
+                </button>
+                {stockInfo.noStock && (
+                  <div className="relative group">
+                    <svg className="w-4 h-4 text-orange-500 ml-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10">
+                      Товара больше нет в наличии
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToCart(part);
+                }}
+                disabled={isAdding || cartLoading}
+                className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isAdding && (
+                  <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {isAdding ? 'Добавление...' : 'В корзину'}
+              </button>
+            );
+          })()}
         </div>
       </td>
     </tr>
@@ -313,17 +474,17 @@ const UsedPartRow = ({ part, organization, storageLocations, toggleExpand, expan
               <PhotoThumbnail photos={part.photos || []} onImageClick={handleImageClick} />
 
               {/* Контактный телефон организации */}
-              {organization?.phone && (
+              {(organization?.phone || part.organization?.phone) && (
                 <div className="mt-4 flex items-center gap-2 p-2 bg-indigo-50 border-l-4 border-indigo-500 rounded-r-md">
                   <div className="flex-1 min-w-0">
                     <div className="text-xs text-indigo-700 font-medium mb-0.5">Связаться с продавцом</div>
                     <div className="text-sm font-semibold text-indigo-800">
-                      {formatPhoneNumber(organization.phone)}
+                      {formatPhoneNumber(organization?.phone || part.organization?.phone)}
                     </div>
                   </div>
                   <div className="flex-shrink-0">
                     <a
-                      href={`tel:${organization.phone.replace(/\D/g, '')}`}
+                      href={`tel:${(organization?.phone || part.organization?.phone).replace(/\D/g, '')}`}
                       className="inline-flex items-center px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 hover:bg-indigo-200 rounded transition-colors"
                     >
                       Позвонить
@@ -399,7 +560,10 @@ const UsedPartRow = ({ part, organization, storageLocations, toggleExpand, expan
 );
 
 // Вспомогательный компонент для мобильной карточки
-const UsedPartCard = ({ part, organization, storageLocations, toggleExpand, expandedPartId, handleImageClick, getStorageAddress }) => (
+const UsedPartCard = ({ 
+  part, organization, storageLocations, toggleExpand, expandedPartId, handleImageClick, getStorageAddress,
+  getCartQuantity, getStockAvailability, handleAddToCart, handleRemoveFromCart, addingToCartId, cartLoading, user
+}) => (
   <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
     <div className="flex justify-between items-start mb-4">
       <div className="flex-1 pr-4">
@@ -434,7 +598,7 @@ const UsedPartCard = ({ part, organization, storageLocations, toggleExpand, expa
 
     <div className="flex justify-between items-center pt-3 border-t border-gray-100">
       <div className="flex flex-col">
-        <div className="text-sm text-gray-600">{getStorageAddress(part.storage_location_id)}</div>
+        <div className="text-sm text-gray-600">{getStorageAddress(part.storage_location_id, part.storage_location)}</div>
         <button
           onClick={() => toggleExpand(part.id)}
           className="text-indigo-600 text-sm font-medium hover:text-indigo-800 transition-colors text-left mt-1"
@@ -442,11 +606,57 @@ const UsedPartCard = ({ part, organization, storageLocations, toggleExpand, expa
           {expandedPartId === part.id ? 'Скрыть детали' : 'Показать детали'}
         </button>
       </div>
-      <button
-        className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[38px]"
-      >
-        В корзину
-      </button>
+      <div>
+        {(() => {
+          const cartQuantity = getCartQuantity(part.id);
+          const stockInfo = getStockAvailability(part);
+          const isAdding = addingToCartId === part.id;
+
+          return cartQuantity > 0 ? (
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveFromCart(part);
+                }}
+                disabled={isAdding || cartLoading}
+                className="w-10 h-10 flex items-center justify-center text-xl font-medium rounded-lg border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+              >
+                −
+              </button>
+              <span className="text-base font-semibold w-8 text-center">
+                {cartQuantity}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToCart(part);
+                }}
+                disabled={isAdding || cartLoading || stockInfo.noStock}
+                className="w-10 h-10 flex items-center justify-center text-xl font-medium rounded-lg border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+              >
+                +
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddToCart(part);
+              }}
+              disabled={isAdding || cartLoading}
+              className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors min-h-[44px] flex items-center justify-center min-w-[120px]"
+            >
+              {isAdding ? (
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : 'В корзину'}
+            </button>
+          );
+        })()}
+      </div>
     </div>
 
     {/* Раскрывающаяся карточка для мобильной версии */}
@@ -458,17 +668,17 @@ const UsedPartCard = ({ part, organization, storageLocations, toggleExpand, expa
         </div>
 
         {/* Контактный телефон организации */}
-        {organization?.phone && (
+        {(organization?.phone || part.organization?.phone) && (
           <div className="flex items-center gap-2 p-2 bg-indigo-50 border-l-4 border-indigo-500 rounded-r-md">
             <div className="flex-1 min-w-0">
               <div className="text-xs text-indigo-700 font-medium mb-0.5">Связаться с продавцом</div>
               <div className="text-sm font-semibold text-indigo-800">
-                {formatPhoneNumber(organization.phone)}
+                {formatPhoneNumber(organization?.phone || part.organization?.phone)}
               </div>
             </div>
             <div className="flex-shrink-0">
               <a
-                href={`tel:${organization.phone.replace(/\D/g, '')}`}
+                href={`tel:${(organization?.phone || part.organization?.phone).replace(/\D/g, '')}`}
                 className="inline-flex items-center px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 hover:bg-indigo-200 rounded transition-colors"
               >
                 Позвонить

@@ -45,7 +45,8 @@ class NewPartsOrderResponse(BaseModel):
 class OrderCreate(BaseModel):
     # Информация о товарах
     items: List[OrderItemCreate]
-    cart_item_ids: Optional[List[int]] = None  # IDs товаров из корзины для удаления
+    cart_item_ids: Optional[List[int]] = None  # IDs товаров из корзины (новые)
+    used_cart_item_ids: Optional[List[int]] = None  # IDs товаров из корзины (б/у)
     new_parts_order: NewPartsOrderCreate
 
     # Информация о получателе

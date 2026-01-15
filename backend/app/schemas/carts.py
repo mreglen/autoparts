@@ -16,15 +16,20 @@ class NewPartsCartItem(BaseModel):
     delivery_end: Optional[datetime] = None
 
 
+class UsedPartsCartItem(BaseModel):
+    product_id: int
+    quantity: int = 1
+
 class CartItemResponse(BaseModel):
     id: int
-    brand: str
-    partnumber: str
-    name: Optional[str]
-    delivery: Optional[str]
+    brand: Optional[str] = None
+    partnumber: Optional[str] = None
+    name: Optional[str] = None
+    delivery: Optional[str] = None
     quantity: int
-    price: float
-    stock_id: str
+    price: Optional[float] = None
+    stock_id: Optional[str] = None
+    product_id: Optional[int] = None
     seller: str
     created_at: datetime
 

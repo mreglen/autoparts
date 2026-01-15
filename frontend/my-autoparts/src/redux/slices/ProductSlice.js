@@ -405,8 +405,11 @@ const productSlice = createSlice({
             .addCase(searchUsedAnalogs.fulfilled, (state, action) => {
                 state.analogsLoading = false;
                 if (state.usedPartsData) {
-                    // Добавляем аналоги к уже существующим данным "в наличии"
-                    state.usedPartsData.analog_parts = action.payload.analog_parts;
+                    // Исключаем из аналогов те запчасти, которые уже есть "в наличии"
+                    const availableIds = new Set((state.usedPartsData.available_parts || []).map(p => p.id));
+                    state.usedPartsData.analog_parts = (action.payload.analog_parts || []).filter(
+                        p => !availableIds.has(p.id)
+                    );
                     state.usedPartsData.rossko_data = action.payload.rossko_data;
                     
                     // Обновляем кэш полными данными

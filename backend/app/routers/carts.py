@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from app.db.database import get_db
 from app.core.auth import get_current_user
 from app.models.user import User
@@ -7,10 +7,12 @@ from app.models.organization import Organization
 from app.models.carts import Cart, NewPartsCart, UsedPartsCart
 from app.schemas.carts import (
     NewPartsCartItem,
+    UsedPartsCartItem,
     CartItemResponse,
     CartResponse,
     UpdateQuantityRequest
 )
+from app.models.product import Product
 from datetime import datetime
 
 router = APIRouter(prefix="/cart", tags=["Cart"])
@@ -95,6 +97,70 @@ def add_new_parts_to_cart(
         created_at=cart_item.created_at
     )
 
+@router.post("/used-parts", response_model=CartItemResponse)
+def add_used_parts_to_cart(
+    item: UsedPartsCartItem,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Добавить б/у запчасти в корзину"""
+    cart = get_or_create_cart(db, current_user.id)
+
+    # Найти продукт
+    product = db.query(Product).filter(Product.id == item.product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+
+    # Проверить, не добавлен ли уже этот товар в корзину
+    existing_item = db.query(UsedPartsCart).filter(
+        UsedPartsCart.cart_id == cart.id,
+        UsedPartsCart.product_id == item.product_id
+    ).first()
+
+    if existing_item:
+        existing_item.quantity += item.quantity
+        existing_item.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(existing_item)
+        return CartItemResponse(
+            id=existing_item.id,
+            brand=product.brand,
+            partnumber=product.article,
+            name=product.name,
+            quantity=existing_item.quantity,
+            price=float(product.price) if product.price else 0,
+            product_id=product.id,
+            seller=existing_item.seller,
+            created_at=existing_item.created_at
+        )
+
+    # Создать новый элемент корзины
+    cart_item = UsedPartsCart(
+        cart_id=cart.id,
+        user_id=current_user.id,
+        product_id=product.id,
+        quantity=item.quantity,
+        brand=product.brand,
+        partnumber=product.article,
+        price=product.price
+    )
+
+    db.add(cart_item)
+    db.commit()
+    db.refresh(cart_item)
+
+    return CartItemResponse(
+        id=cart_item.id,
+        brand=product.brand,
+        partnumber=product.article,
+        name=product.name,
+        quantity=cart_item.quantity,
+        price=float(product.price) if product.price else 0,
+        product_id=product.id,
+        seller=cart_item.seller,
+        created_at=cart_item.created_at
+    )
+
 @router.get("/admin-org-address")
 def get_admin_org_address(db: Session = Depends(get_db)):
     """Получить адрес организации админа для самовывоза"""
@@ -114,7 +180,10 @@ def get_cart(
     current_user: User = Depends(get_current_user)
 ):
     """Получить содержимое корзины пользователя"""
-    cart = db.query(Cart).filter(Cart.user_id == current_user.id).first()
+    cart = db.query(Cart).options(
+        selectinload(Cart.new_parts_items),
+        selectinload(Cart.used_parts_items).selectinload(UsedPartsCart.product).selectinload(Product.organization)
+    ).filter(Cart.user_id == current_user.id).first()
 
     if not cart:
         # Вернуть пустую корзину
@@ -124,16 +193,6 @@ def get_cart(
             new_parts_items=[],
             used_parts_items=[]
         )
-
-    # Найти админа и его организацию
-    admin = db.query(User).filter(User.is_admin == True).first()
-    admin_org = "Новые запчасти"  # Значение по умолчанию
-
-    if admin and admin.organization_id:
-        # Получить организацию админа
-        admin_organization = db.query(Organization).filter(Organization.id == admin.organization_id).first()
-        if admin_organization:
-            admin_org = admin_organization.name
 
     # Получить новые запчасти
     new_parts_items = []
@@ -147,12 +206,26 @@ def get_cart(
             quantity=item.quantity,
             price=item.price,
             stock_id=item.stock_id,
-            seller=admin_org,  # Всегда показываем организацию админа или "Новые запчасти"
+            seller=item.seller,  # Используем значение из модели (обычно "Новые запчасти")
             created_at=item.created_at
         ))
 
-    # Получить б/у запчасти (пока пустой список)
+    # Получить б/у запчасти
     used_parts_items = []
+    for item in cart.used_parts_items:
+        # Пытаемся получить актуальные данные о продукте
+        product = item.product
+        used_parts_items.append(CartItemResponse(
+            id=item.id,
+            brand=product.brand if product else item.brand,
+            partnumber=product.article if product else item.partnumber,
+            name=product.name if product else "Б/У запчасть",
+            quantity=item.quantity,
+            price=float(product.price) if product and product.price else (float(item.price) if item.price else 0),
+            product_id=item.product_id,
+            seller=item.seller,  # Теперь возвращает название организации
+            created_at=item.created_at
+        ))
 
     return CartResponse(
         id=cart.id,
@@ -222,6 +295,64 @@ def update_new_parts_quantity(
         quantity=cart_item.quantity,
         price=cart_item.price,
         stock_id=cart_item.stock_id,
+        seller=cart_item.seller,
+        created_at=cart_item.created_at
+    )
+
+@router.delete("/used-parts/{item_id}", status_code=204)
+def remove_used_parts_from_cart(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Удалить б/у запчасти из корзины"""
+    cart_item = db.query(UsedPartsCart).filter(
+        UsedPartsCart.id == item_id,
+        UsedPartsCart.user_id == current_user.id
+    ).first()
+
+    if not cart_item:
+        raise HTTPException(status_code=404, detail="Товар не найден в корзине")
+
+    db.delete(cart_item)
+    db.commit()
+    return
+
+@router.put("/used-parts/{item_id}/quantity", response_model=CartItemResponse)
+def update_used_parts_quantity(
+    item_id: int,
+    quantity_data: UpdateQuantityRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Обновить количество б/у запчастей в корзине"""
+    if quantity_data.quantity <= 0:
+        raise HTTPException(status_code=400, detail="Количество должно быть больше 0")
+
+    cart_item = db.query(UsedPartsCart).filter(
+        UsedPartsCart.id == item_id,
+        UsedPartsCart.user_id == current_user.id
+    ).first()
+
+    if not cart_item:
+        raise HTTPException(status_code=404, detail="Товар не найден в корзине")
+
+    # Проверяем наличие продукта для получения актуальных данных
+    product = db.query(Product).filter(Product.id == cart_item.product_id).first()
+
+    cart_item.quantity = quantity_data.quantity
+    cart_item.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(cart_item)
+
+    return CartItemResponse(
+        id=cart_item.id,
+        brand=product.brand if product else cart_item.brand,
+        partnumber=product.article if product else cart_item.partnumber,
+        name=product.name if product else "Б/У запчасть",
+        quantity=cart_item.quantity,
+        price=float(product.price) if product and product.price else (float(cart_item.price) if cart_item.price else 0),
+        product_id=cart_item.product_id,
         seller=cart_item.seller,
         created_at=cart_item.created_at
     )
