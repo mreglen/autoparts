@@ -19,6 +19,7 @@ export default function ProfileWithMenuLayout() {
             '/purchases/returns': 'purchases-returns',
             '/sales/orders': 'sales-orders',
             '/sales/returns': 'sales-returns',
+            '/warehouse-sales': 'warehouse-sales',
             '/my-parts': 'parts',
             '/stock-in': 'receipts',
             '/stock-out': 'expenses'
@@ -59,7 +60,8 @@ export default function ProfileWithMenuLayout() {
                 label: 'Продажи',
                 submenu: [
                     { id: 'sales-orders', label: 'Заказы покупателей' },
-                    { id: 'sales-returns', label: 'Возвраты покупателей' }
+                    { id: 'sales-returns', label: 'Возвраты покупателей' },
+                    { id: 'warehouse-sales', label: 'Продажи со склада' }
                 ]
             });
         }
@@ -93,6 +95,7 @@ export default function ProfileWithMenuLayout() {
             'purchases-returns': '/purchases/returns',
             'sales-orders': '/sales/orders',
             'sales-returns': '/sales/returns',
+            'warehouse-sales': '/warehouse-sales',
             'parts': '/my-parts',
             'receipts': '/stock-in',
             'expenses': '/stock-out'

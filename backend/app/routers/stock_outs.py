@@ -42,6 +42,33 @@ def create_stock_out(
     db.refresh(db_stock_out)
     return db_stock_out
 
+@router.get("/sales", response_model=list[StockOutSchema])
+def get_warehouse_sales(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all warehouse sales (stock outs with sale_price > 0)
+    """
+    if not current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Организация не указана")
+    
+    sales = (
+        db.query(StockOutModel)
+        .options(
+            joinedload(StockOutModel.product).joinedload(Product.compatible_vehicles),
+            joinedload(StockOutModel.storage_location),
+            joinedload(StockOutModel.user)
+        )
+        .filter(
+            StockOutModel.organization_id == current_user.organization_id,
+            StockOutModel.sale_price > 0
+        )
+        .order_by(StockOutModel.movement_date.desc())
+        .all()
+    )
+    return sales
+
 @router.get("/{stock_out_id}", response_model=StockOutSchema)
 def read_stock_out(stock_out_id: int, db: Session = Depends(get_db)):
     stock_out = db.query(StockOutModel).filter(StockOutModel.id == stock_out_id).first()

@@ -271,6 +271,15 @@ export default function Navigation() {
                                                 >
                                                     Возвраты покупателей
                                                 </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/warehouse-sales');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Продажи со склада
+                                                </button>
                                             </div>
                                         )}
 

@@ -24,6 +24,7 @@ import SalesOrdersPage from './pages/Sales/SalesOrdersPage';
 import SalesReturnsPage from './pages/Sales/SalesReturnsPage';
 import PurchasesOrdersPage from './pages/Sales/PurchasesOrdersPage';
 import PurchasesReturnsPage from './pages/Sales/PurchasesReturnsPage';
+import WarehouseSalesPage from './pages/Sales/WarehouseSalesPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
 
 
@@ -68,6 +69,7 @@ function App() {
           <Route path="/sales/returns" element={<SalesReturnsPage />} />
           <Route path="/stock-in" element={<StockInList />} />
           <Route path="/stock-out" element={<StockOutList />} />
+          <Route path="/warehouse-sales" element={<WarehouseSalesPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

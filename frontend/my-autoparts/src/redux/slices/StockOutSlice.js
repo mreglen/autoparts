@@ -35,6 +35,22 @@ export const fetchStockOuts = createAsyncThunk(
   }
 );
 
+export const fetchWarehouseSales = createAsyncThunk(
+  'stockOut/fetchWarehouseSales',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await apiAxios.get(
+        `/stock-outs/sales`
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.detail || 'Ошибка загрузки продаж'
+      );
+    }
+  }
+);
+
 export const createReturn = createAsyncThunk(
   'stockOut/createReturn',
   async (returnData, { rejectWithValue }) => {
@@ -56,7 +72,9 @@ const stockOutSlice = createSlice({
   name: 'stockOut',
   initialState: {
     items: [],
+    salesItems: [],
     loading: false,
+    salesLoading: false,
     error: null,
   },
   reducers: {
@@ -101,6 +119,18 @@ const stockOutSlice = createSlice({
       })
       .addCase(createReturn.rejected, (state, action) => {
         state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchWarehouseSales.pending, (state) => {
+        state.salesLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchWarehouseSales.fulfilled, (state, action) => {
+        state.salesLoading = false;
+        state.salesItems = action.payload;
+      })
+      .addCase(fetchWarehouseSales.rejected, (state, action) => {
+        state.salesLoading = false;
         state.error = action.payload;
       });
   },
