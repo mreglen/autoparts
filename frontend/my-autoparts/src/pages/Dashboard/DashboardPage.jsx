@@ -14,7 +14,8 @@ export default function DashboardPage() {
     totalSales: 0,
     newOrders: 0,
     pendingOrders: 0,
-    completedOrders: 0
+    completedOrders: 0,
+    warehouseSalesCount: 0
   });
   const [loading, setLoading] = useState(true);
 
@@ -90,20 +91,31 @@ export default function DashboardPage() {
         console.log('Products endpoint not available');
       }
 
-      // Рассчитываем общую сумму продаж
-      const totalSales = completedOrders.reduce((sum, order) =>
-        sum + parseFloat(order.total_amount || 0), 0
-      );
+      // Получаем продажи со склада
+      let warehouseSalesCount = 0;
+      let warehouseSalesAmount = 0;
+      try {
+        const warehouseSalesResponse = await apiAxios.get('/stock-outs/sales');
+        const warehouseSales = warehouseSalesResponse.data;
+        warehouseSalesCount = warehouseSales.length;
+        // Рассчитываем общую сумму продаж со склада
+        warehouseSalesAmount = warehouseSales.reduce((sum, sale) => 
+          sum + (parseFloat(sale.sale_price || 0) * parseInt(sale.quantity || 0)), 0
+        );
+      } catch (error) {
+        console.log('Warehouse sales endpoint not available');
+      }
 
       setStats({
         activeOrders: activeOrders.length,
         totalProducts,
         totalWarehouseValue,
         totalWarehouseQuantity,
-        totalSales,
+        totalSales: warehouseSalesAmount,
         newOrders: newOrders.length,
         pendingOrders: pendingOrders.length,
-        completedOrders: completedOrders.length
+        completedOrders: completedOrders.length,
+        warehouseSalesCount
       });
     } catch (error) {
       console.error('Ошибка загрузки статистики:', error);
@@ -176,7 +188,7 @@ export default function DashboardPage() {
               </svg>
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
               <p className="text-xs font-medium text-blue-600 uppercase mb-1">Активные</p>
               <p className="text-2xl font-bold text-gray-900">{stats.activeOrders}</p>
@@ -192,6 +204,10 @@ export default function DashboardPage() {
             <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
               <p className="text-xs font-medium text-indigo-600 uppercase mb-1">Завершенные</p>
               <p className="text-2xl font-bold text-gray-900">{stats.completedOrders}</p>
+            </div>
+            <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
+              <p className="text-xs font-medium text-purple-600 uppercase mb-1">Продажи</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.warehouseSalesCount}</p>
             </div>
           </div>
         </div>
