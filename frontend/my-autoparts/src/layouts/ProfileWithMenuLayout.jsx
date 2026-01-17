@@ -22,7 +22,9 @@ export default function ProfileWithMenuLayout() {
             '/warehouse-sales': 'warehouse-sales',
             '/my-parts': 'parts',
             '/stock-in': 'receipts',
-            '/stock-out': 'expenses'
+            '/stock-out': 'expenses',
+            '/settings/employees': 'settings-employees',
+            '/settings/clients': 'settings-clients'
         };
         return pathMap[path] || (user?.is_seller ? 'dashboard' : 'profile');
     };
@@ -37,7 +39,6 @@ export default function ProfileWithMenuLayout() {
     // Определяем доступные вкладки в зависимости от роли пользователя
     const getAvailableTabs = () => {
         const baseTabs = [
-            { id: 'profile', label: 'Профиль' },
             {
                 id: 'purchases',
                 label: 'Покупки',
@@ -48,9 +49,12 @@ export default function ProfileWithMenuLayout() {
             }
         ];
 
-        // Для продавцов добавляем главную страницу в начало
+        // Для продавцов добавляем отдельные вкладки Главная и Клиенты
         if (user?.is_seller) {
-            baseTabs.unshift({ id: 'dashboard', label: 'Главная' });
+            baseTabs.unshift(
+                { id: 'dashboard', label: 'Главная' },
+                { id: 'settings-clients', label: 'Клиенты' }
+            );
         }
 
         // Для продавцов добавляем продажи
@@ -79,6 +83,18 @@ export default function ProfileWithMenuLayout() {
             });
         }
 
+        // Для директоров добавляем вкладку Настройки (без клиентов)
+        if (user?.is_director) {
+            baseTabs.push({
+                id: 'settings',
+                label: 'Настройки',
+                submenu: [
+                    { id: 'profile', label: 'Профиль' },
+                    { id: 'settings-employees', label: 'Сотрудники' }
+                ]
+            });
+        }
+
         return baseTabs;
     };
 
@@ -98,7 +114,9 @@ export default function ProfileWithMenuLayout() {
             'warehouse-sales': '/warehouse-sales',
             'parts': '/my-parts',
             'receipts': '/stock-in',
-            'expenses': '/stock-out'
+            'expenses': '/stock-out',
+            'settings-employees': '/settings/employees',
+            'settings-clients': '/settings/clients'
         };
 
         const path = tabPathMap[tabId];

@@ -31,10 +31,11 @@ const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand,
   return (
   <React.Fragment>
     <tr
-      className="cursor-pointer hover:bg-gray-50"
-      onClick={onToggleExpand}
+      className="hover:bg-gray-50"
     >
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap">
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap border-r border-gray-200"
+      >
         <input
           type="checkbox"
           checked={isSelected}
@@ -42,20 +43,51 @@ const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand,
             e.stopPropagation();
             onSelect();
           }}
-          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
         />
       </td>
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{part.brand || '—'}</td>
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{part.article || '—'}</td>
-      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{part.internal_code || '—'}</td>
-      <td className="px-2 sm:px-6 py-4 text-sm text-gray-500 max-w-0 truncate sm:max-w-none sm:whitespace-normal">{part.name || '—'}</td>
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm">
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        {part.brand || '—'}
+      </td>
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        {part.article || '—'}
+      </td>
+      <td 
+        className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        {part.internal_code || '—'}
+      </td>
+      <td 
+        className="px-2 sm:px-6 py-4 text-sm text-gray-500 max-w-0 truncate sm:max-w-none sm:whitespace-normal cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        {part.name || '—'}
+      </td>
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm cursor-pointer"
+        onClick={onToggleExpand}
+      >
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
           {part.is_new ? 'Новый' : 'Б/у'}
         </span>
       </td>
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{part.quantity || 0}</td>
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        {part.quantity || 0}
+      </td>
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
+        onClick={onToggleExpand}
+      >
         {part.price != null ? `${part.price.toFixed(2)} ₽` : '—'}
       </td>
       <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -211,6 +243,7 @@ function MyParts() {
   const [selectedParts, setSelectedParts] = useState(new Set());
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
   const [searchQuery, setSearchQuery] = useState(''); // Поисковый запрос
+  const [selectedStorageLocation, setSelectedStorageLocation] = useState(''); // Выбранный склад
   const [formData, setFormData] = useState({
     quantity: '',
     price: '',
@@ -328,19 +361,31 @@ function MyParts() {
 
 
   useEffect(() => {
-    dispatch(fetchProducts());
+    // Формируем параметры для запроса
+    const params = {};
+    if (selectedStorageLocation) {
+      params.storage_location_id = selectedStorageLocation;
+    }
+    
+    dispatch(fetchProducts(params));
     if (user?.organization_id) {
       dispatch(fetchStorageLocations(user.organization_id));
     }
-  }, [dispatch, user?.organization_id]);
+  }, [dispatch, user?.organization_id, selectedStorageLocation]);
 
   if (!user) return <Navigate to="/auth" replace />;
   if (!user.is_seller) return <Navigate to="/" replace />;
 
 
 
-  // Фильтрация запчастей по поисковому запросу
+  // Фильтрация запчастей по поисковому запросу (работает всегда)
   const displayParts = products.filter(part => {
+    // Если выбран склад, сначала проверяем принадлежность к складу
+    if (selectedStorageLocation && part.storage_location_id != selectedStorageLocation) {
+      return false;
+    }
+    
+    // Поиск по всем полям
     if (!searchQuery.trim()) return true;
 
     const query = searchQuery.toLowerCase().replace(/\s+/g, ''); // Убираем пробелы из запроса
@@ -371,17 +416,42 @@ function MyParts() {
           <div className="text-xl sm:text-2xl font-bold text-gray-700">
             {totalValue.toLocaleString('ru-RU')} ₽
           </div>
-          <div className="text-sm text-gray-500">Общая стоимость склада</div>
+          <div className="text-sm text-gray-500">
+            {selectedStorageLocation ? 'Общая стоимость склада' : 'Общая стоимость всех складов'}
+          </div>
           <div className="text-lg font-semibold text-gray-700 mt-1">
             {totalQuantity.toLocaleString('ru-RU')} шт.
           </div>
-          <div className="text-sm text-gray-500">Общее количество склада</div>
+          <div className="text-sm text-gray-500">
+            {selectedStorageLocation ? 'Общее количество склада' : 'Общее количество всех складов'}
+          </div>
         </div>
       </div>
 
-      {/* Поисковое поле */}
-      <div className="mb-6">
-        <div className="max-w-md">
+      {/* Фильтр по складу и поисковое поле */}
+      <div className="mb-6 flex flex-col md:flex-row gap-4">
+        {/* Фильтр по складу */}
+        <div className="md:w-64">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Склад</label>
+          <select
+            value={selectedStorageLocation}
+            onChange={(e) => setSelectedStorageLocation(e.target.value)}
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          >
+            <option value="">Все склады</option>
+            {storageLocations.map((location) => (
+              <option key={location.id} value={location.id}>
+                {location.address || `Склад #${location.id}`}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        {/* Поисковое поле */}
+        <div className="flex-1 max-w-md">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Поиск {selectedStorageLocation && '(в выбранном складе)'}
+          </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -393,7 +463,7 @@ function MyParts() {
               placeholder="Поиск по номеру, внутр. коду или названию..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-base"
+              className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
             {searchQuery && (
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
@@ -463,8 +533,10 @@ function MyParts() {
           </h2>
           <p className="text-gray-600 text-base mb-6">
             {searchQuery
-              ? `По запросу "${searchQuery}" ничего не найдено. Попробуйте изменить поисковый запрос.`
-              : 'У вас пока нет добавленных запчастей'
+              ? `По запросу "${searchQuery}" ${selectedStorageLocation ? 'в выбранном складе ' : ''}ничего не найдено. Попробуйте изменить поисковый запрос.`
+              : selectedStorageLocation 
+                ? 'В выбранном складе пока нет запчастей'
+                : 'У вас пока нет добавленных запчастей'
             }
           </p>
           {!searchQuery && (
@@ -492,7 +564,7 @@ function MyParts() {
                 </span>
                 <button
                   onClick={handleBulkAction}
-                  className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
+                  className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
                 >
                   Действия
                   <img
@@ -509,10 +581,9 @@ function MyParts() {
                   <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <input
                       type="checkbox"
-                      checked={displayParts.length > 0 && selectedParts.size === displayParts.length && displayParts.every(part => selectedParts.has(part.id))}
+                      checked={displayParts.length > 0 && selectedParts.size === displayParts.length}
                       onChange={() => {
-                        const currentSelectedCount = displayParts.filter(part => selectedParts.has(part.id)).length;
-                        if (currentSelectedCount === displayParts.length) {
+                        if (selectedParts.size === displayParts.length) {
                           // Снимаем выделение со всех отображаемых запчастей
                           const newSelected = new Set(selectedParts);
                           displayParts.forEach(part => newSelected.delete(part.id));
@@ -586,10 +657,9 @@ function MyParts() {
                 <span className="text-sm font-medium text-gray-700">Выбрать все</span>
                 <input
                   type="checkbox"
-                  checked={displayParts.length > 0 && displayParts.every(part => selectedParts.has(part.id))}
+                  checked={displayParts.length > 0 && selectedParts.size === displayParts.length}
                   onChange={() => {
-                    const currentSelectedCount = displayParts.filter(part => selectedParts.has(part.id)).length;
-                    if (currentSelectedCount === displayParts.length) {
+                    if (selectedParts.size === displayParts.length) {
                       // Снимаем выделение со всех отображаемых запчастей
                       const newSelected = new Set(selectedParts);
                       displayParts.forEach(part => newSelected.delete(part.id));
@@ -647,7 +717,7 @@ function MyParts() {
                   <div className="relative mobile-actions-dropdown">
                     <button
                       onClick={() => toggleMobileActions(part.id)}
-                      className="w-full text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded-lg px-4 py-3 bg-transparent hover:bg-gray-50 transition-colors min-h-[44px] flex items-center justify-center gap-2"
+                      className="w-full text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
                     >
                       Действия
                       <img
@@ -659,7 +729,7 @@ function MyParts() {
                     </button>
 
                     {mobileActionsOpen === part.id && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 mobile-actions-dropdown w-48 mx-auto">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 mobile-actions-dropdown w-32 mx-auto">
                         <div className="py-1">
                           <button
                             onClick={() => {

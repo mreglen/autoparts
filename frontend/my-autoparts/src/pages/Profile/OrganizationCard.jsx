@@ -1,9 +1,8 @@
 // src/components/OrganizationCard.jsx
 import { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchEmployees, fetchOrganization, fetchStorageLocations, clearOrganization, updateOrganization } from '../../redux/slices/OrganizationSlice';
+import { fetchOrganization, fetchStorageLocations, clearOrganization, updateOrganization } from '../../redux/slices/OrganizationSlice';
 import StorageLocationsSection from './StorageLocationsSection';
-import EmployeesSection from './EmployeesSection';
 
 // Функция форматирования телефона
 const formatPhoneNumber = (value) => {
@@ -76,7 +75,6 @@ export default function OrganizationCard({ orgId }) {
         if (orgId) {
             dispatch(fetchOrganization(orgId));
             dispatch(fetchStorageLocations(orgId));
-            dispatch(fetchEmployees(orgId));
         } else {
             dispatch(clearOrganization());
         }
@@ -537,11 +535,7 @@ export default function OrganizationCard({ orgId }) {
             </div>
 
             {/* Сотрудники — отдельно под основным блоком */}
-            {user?.is_director && (
-                <div className="mt-6">
-                    <EmployeesSection orgId={orgId} />
-                </div>
-            )}
+
         </div>
     );
 }

@@ -5,6 +5,7 @@ from app.core.auth import get_current_user
 from app.models.user import User
 from app.models.organization import Organization
 from app.models.carts import Cart, NewPartsCart, UsedPartsCart
+from app.models.client import Client as ClientModel
 from app.schemas.carts import (
     NewPartsCartItem,
     UsedPartsCartItem,
@@ -13,6 +14,7 @@ from app.schemas.carts import (
     UpdateQuantityRequest
 )
 from app.models.product import Product
+from app.utils.phone import normalize_to_storage_format
 from datetime import datetime
 
 router = APIRouter(prefix="/cart", tags=["Cart"])
@@ -33,9 +35,37 @@ def add_new_parts_to_cart(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """Добавить новые запчасти в корзину и создать клиента для текущей организации"""
     """Добавить новые запчасти в корзину"""
     # Получить или создать корзину
     cart = get_or_create_cart(db, current_user.id)
+    
+    # Создать или получить клиента для организации админа
+    # Это представляет интерес пользователя к продуктам от администратора
+    client_phone = normalize_to_storage_format(current_user.phone) if current_user.phone else ""
+    
+    # Найти организацию админа (пользователя с is_admin = True)
+    admin_user = db.query(User).filter(User.is_admin == True).first()
+    admin_organization_id = admin_user.organization_id if admin_user else current_user.organization_id
+    
+    # Проверить, существует ли уже клиент для этой организации
+    existing_client = db.query(ClientModel).filter(
+        ClientModel.phone == client_phone,
+        ClientModel.organization_id == admin_organization_id
+    ).first()
+    
+    # Создать клиента если не существует
+    if not existing_client and client_phone:
+        new_client = ClientModel(
+            last_name=current_user.last_name or "",
+            first_name=current_user.first_name or "",
+            patronymic=current_user.patronymic,
+            email=current_user.email or "",
+            phone=client_phone,
+            organization_id=admin_organization_id  # Организация админа
+        )
+        db.add(new_client)
+        db.flush()  # Чтобы получить ID клиента
 
     # Проверить, не добавлен ли уже этот товар в корзину
     existing_item = db.query(NewPartsCart).filter(
@@ -103,6 +133,7 @@ def add_used_parts_to_cart(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    """Добавить б/у запчасти в корзину и создать клиента для организации-владельца"""
     """Добавить б/у запчасти в корзину"""
     cart = get_or_create_cart(db, current_user.id)
 
@@ -110,6 +141,29 @@ def add_used_parts_to_cart(
     product = db.query(Product).filter(Product.id == item.product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Товар не найден")
+    
+    # Создать или получить клиента для организации-владельца продукта
+    # Используем данные текущего пользователя как клиента для организации-владельца
+    client_phone = normalize_to_storage_format(current_user.phone) if current_user.phone else ""
+    
+    # Проверить, существует ли уже клиент для этой организации
+    existing_client = db.query(ClientModel).filter(
+        ClientModel.phone == client_phone,
+        ClientModel.organization_id == product.organization_id
+    ).first()
+    
+    # Создать клиента если не существует
+    if not existing_client and client_phone:
+        new_client = ClientModel(
+            last_name=current_user.last_name or "",
+            first_name=current_user.first_name or "",
+            patronymic=current_user.patronymic,
+            email=current_user.email or "",
+            phone=client_phone,
+            organization_id=product.organization_id  # Организация-владелец продукта
+        )
+        db.add(new_client)
+        db.flush()  # Чтобы получить ID клиента
 
     # Проверить, не добавлен ли уже этот товар в корзину
     existing_item = db.query(UsedPartsCart).filter(

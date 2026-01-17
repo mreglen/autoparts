@@ -8,6 +8,7 @@ import productReducer from './slices/ProductSlice';
 import stockInReducer from './slices/StockInSlice';
 import stockOutReducer from './slices/StockOutSlice';
 import cartReducer from './slices/CartSlice';
+import clientReducer from './slices/ClientSlice';
 
 export const store = configureStore({
   reducer: {
@@ -20,5 +21,6 @@ export const store = configureStore({
     stockIn: stockInReducer,
     stockOut: stockOutReducer,
     cart: cartReducer,
+    clients: clientReducer,
   },
 });

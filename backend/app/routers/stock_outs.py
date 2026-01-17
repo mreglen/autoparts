@@ -128,11 +128,13 @@ def create_return(
 ):
     """
     Возврат запчастей: уменьшает количество в существующей записи расхода или удаляет запись полностью
+    Создает новую запись в поступлениях (stock_in) для возвращенных запчастей
     """
     if not current_user.organization_id:
         raise HTTPException(status_code=403, detail="Организация не указана")
 
     processed_returns = []
+    created_stock_ins = []
 
     for item in return_data.items:
         # Находим запись расхода
@@ -163,6 +165,21 @@ def create_return(
         # Возвращаем количество в продукт
         product.quantity += item.quantity
 
+        # Создаем новую запись в поступлениях (stock_in)
+        from app.models.stock_in import StockIn as StockInModel
+        
+        new_stock_in = StockInModel(
+            quantity=item.quantity,
+            sale_price=item.returnPrice,
+            organization_id=current_user.organization_id,
+            storage_location_id=stock_out.storage_location_id,
+            product_id=item.productId,
+            acquired_product_id=stock_out.acquired_product_id,
+            created_by=current_user.id
+        )
+        db.add(new_stock_in)
+        created_stock_ins.append(new_stock_in)
+
         # Обновляем оригинальную запись stock_out (уменьшаем количество)
         stock_out.quantity -= item.quantity
 
@@ -179,7 +196,21 @@ def create_return(
 
     db.commit()
 
+    # Refresh для получения ID новых записей
+    for stock_in in created_stock_ins:
+        db.refresh(stock_in)
+
     return {
         "message": f"Успешно возвращено {len(processed_returns)} позиций",
-        "returns": processed_returns
+        "returns": processed_returns,
+        "created_stock_ins": [
+            {
+                "id": stock_in.id,
+                "quantity": stock_in.quantity,
+                "sale_price": float(stock_in.sale_price),
+                "product_id": stock_in.product_id,
+                "storage_location_id": stock_in.storage_location_id
+            }
+            for stock_in in created_stock_ins
+        ]
     }

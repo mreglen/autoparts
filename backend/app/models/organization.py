@@ -16,3 +16,4 @@ class Organization(Base):
     pickup_locations = relationship("PickupLocation", back_populates="organization")
     stock_ins = relationship("StockIn", back_populates="organization")
     stock_outs = relationship("StockOut", back_populates="organization")
+    clients = relationship("Client", back_populates="organization")

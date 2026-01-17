@@ -212,19 +212,7 @@ export default function Navigation() {
                                             </button>
                                         )}
 
-                                        {/* Профиль */}
-                                        <button
-                                            onClick={() => {
-                                                setIsProfileOpen(false);
-                                                navigate('/profile');
-                                            }}
-                                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                        >
-                                            Профиль
-                                        </button>
 
-                                        {/* Разделитель */}
-                                        <div className="border-t border-gray-200 my-1"></div>
 
                                         {/* Покупки */}
                                         <div className="px-4 py-1">
@@ -317,6 +305,55 @@ export default function Navigation() {
                                             </div>
                                         )}
 
+                                        {/* Для продавцов - Главная и Клиенты */}
+                                        {user?.is_seller && (
+                                            <>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/dashboard');
+                                                    }}
+                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-200"
+                                                >
+                                                    Главная
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/settings/clients');
+                                                    }}
+                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                >
+                                                    Клиенты
+                                                </button>
+                                            </>
+                                        )}
+
+                                        {/* Для директоров - Настройки без клиентов */}
+                                        {user?.is_director && (
+                                            <div className="px-4 py-1 border-t border-gray-100">
+                                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Настройки</div>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/profile');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Профиль
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/settings/employees');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Сотрудники
+                                                </button>
+                                            </div>
+                                        )}
+
                                         {/* Выход */}
                                         <button
                                             onClick={handleLogout}
@@ -387,28 +424,6 @@ export default function Navigation() {
                         {token && (
                             <>
                                 <div className="border-t border-gray-200 my-4"></div>
-                                <NavLink
-                                    to="/orders"
-                                    onClick={closeMobileMenu}
-                                    className={({ isActive }) =>
-                                        `block px-1 py-1 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
-                                            isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
-                                        }`
-                                    }
-                                >
-                                    Заказы
-                                </NavLink>
-                                <NavLink
-                                    to="/storage"
-                                    onClick={closeMobileMenu}
-                                    className={({ isActive }) =>
-                                        `block px-1 py-1 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
-                                            isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
-                                        }`
-                                    }
-                                >
-                                    Склад
-                                </NavLink>
                                 <NavLink
                                     to="/profile"
                                     onClick={closeMobileMenu}

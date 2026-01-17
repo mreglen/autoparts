@@ -9,6 +9,7 @@ from app.models.stock_in import StockIn
 from app.models.stock_out import StockOut
 from app.models.carts import Cart, NewPartsCart, UsedPartsCart
 from app.models.orders import Order, NewPartsOrder, UsedPartsOrder, OrderStatus, OrderItem, OrderItemStatus
+from app.models.client import Client
 
 from sqlalchemy.orm import relationship
 

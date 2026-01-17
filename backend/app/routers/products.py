@@ -326,25 +326,28 @@ def delete_product_photos(
 
 @router.get("/", response_model=list[ProductSchema])
 def get_products(
+    storage_location_id: int = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     if not current_user.organization_id:
         raise HTTPException(status_code=403, detail="Организация не указана")
     
-    products = (
-        db.query(ProductModel)
-        .options(
-            selectinload(ProductModel.photos),
-            selectinload(ProductModel.compatible_vehicles),
-            selectinload(ProductModel.creator),
-            selectinload(ProductModel.storage_location),
-            selectinload(ProductModel.organization)
-        )
-        .filter(
-            ProductModel.organization_id == current_user.organization_id,
-            ProductModel.quantity > 0
-        )
-        .all()
+    # Базовый запрос
+    query = db.query(ProductModel).options(
+        selectinload(ProductModel.photos),
+        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.creator),
+        selectinload(ProductModel.storage_location),
+        selectinload(ProductModel.organization)
+    ).filter(
+        ProductModel.organization_id == current_user.organization_id,
+        ProductModel.quantity > 0
     )
+    
+    # Фильтрация по складу, если указан
+    if storage_location_id is not None:
+        query = query.filter(ProductModel.storage_location_id == storage_location_id)
+    
+    products = query.all()
     return products

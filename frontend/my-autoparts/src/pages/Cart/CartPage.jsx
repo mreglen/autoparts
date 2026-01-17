@@ -6,7 +6,9 @@ import {
   selectCartError,
   fetchCart,
   updateCartItemQuantity,
-  removeFromCart
+  updateUsedCartItemQuantity,
+  removeFromCart,
+  removeUsedFromCart
 } from '../../redux/slices/CartSlice';
 
 export default function CartPage() {
@@ -131,7 +133,11 @@ export default function CartPage() {
     const cartItem = cartItems.find(item => item.id === id);
     if (!cartItem) {
       try {
-        await dispatch(updateCartItemQuantity({ itemId: id, quantity })).unwrap();
+        if (cartItem?.type === 'used') {
+          await dispatch(updateUsedCartItemQuantity({ itemId: id, quantity })).unwrap();
+        } else {
+          await dispatch(updateCartItemQuantity({ itemId: id, quantity })).unwrap();
+        }
       } catch (error) {
         dispatch(fetchCart());
       }
@@ -148,7 +154,11 @@ export default function CartPage() {
     const safeQuantity = Math.max(1, finalQuantity);
 
     try {
-      await dispatch(updateCartItemQuantity({ itemId: id, quantity: safeQuantity })).unwrap();
+      if (cartItem.type === 'used') {
+        await dispatch(updateUsedCartItemQuantity({ itemId: id, quantity: safeQuantity })).unwrap();
+      } else {
+        await dispatch(updateCartItemQuantity({ itemId: id, quantity: safeQuantity })).unwrap();
+      }
     } catch (error) {
       // При ошибке перезагрузим корзину
       dispatch(fetchCart());
@@ -162,8 +172,17 @@ export default function CartPage() {
       return newSet;
     });
 
+    // Находим товар в корзине чтобы определить его тип
+    const cartItem = cartItems.find(item => item.id === id);
+    
     try {
-      await dispatch(removeFromCart(id)).unwrap();
+      if (cartItem?.type === 'used') {
+        // Удаление б/у запчасти
+        await dispatch(removeUsedFromCart(id)).unwrap();
+      } else {
+        // Удаление новой запчасти (по умолчанию)
+        await dispatch(removeFromCart(id)).unwrap();
+      }
     } catch (error) {
       // При ошибке перезагрузим корзину
       dispatch(fetchCart());

@@ -26,6 +26,8 @@ import PurchasesOrdersPage from './pages/Sales/PurchasesOrdersPage';
 import PurchasesReturnsPage from './pages/Sales/PurchasesReturnsPage';
 import WarehouseSalesPage from './pages/Sales/WarehouseSalesPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
+import EmployeesPage from './pages/Profile/EmployeesPage';
+import ClientsPage from './pages/Profile/ClientsPage';
 
 
 function App() {
@@ -70,6 +72,8 @@ function App() {
           <Route path="/stock-in" element={<StockInList />} />
           <Route path="/stock-out" element={<StockOutList />} />
           <Route path="/warehouse-sales" element={<WarehouseSalesPage />} />
+          <Route path="/settings/employees" element={<EmployeesPage />} />
+          <Route path="/settings/clients" element={<ClientsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

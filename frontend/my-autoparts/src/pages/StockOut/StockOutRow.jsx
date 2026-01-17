@@ -22,11 +22,11 @@ export const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpande
   }, [showActionsDropdown]);
   return (
     <React.Fragment>
-      <tr
-        className="cursor-pointer hover:bg-gray-50"
-        onClick={onToggleExpand}
+      <tr className="hover:bg-gray-50">
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap border-r border-gray-200"
+        onClick={(e) => e.stopPropagation()}
       >
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap">
         <input
           type="checkbox"
           checked={isSelected}
@@ -34,23 +34,59 @@ export const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpande
             e.stopPropagation();
             onSelect();
           }}
-          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
         />
       </td>
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.product?.brand || '—'}</td>
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{item.product?.article || '—'}</td>
-      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">{item.product?.internal_code || '—'}</td>
-      <td className="px-2 sm:px-6 py-4 text-sm text-gray-500 max-w-0 truncate sm:max-w-none sm:whitespace-normal">{item.product?.name || '—'}</td>
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm">
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        {item.product?.brand || '—'}
+      </td>
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        {item.product?.article || '—'}
+      </td>
+      <td 
+        className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        {item.product?.internal_code || '—'}
+      </td>
+      <td 
+        className="px-2 sm:px-6 py-4 text-sm text-gray-500 max-w-0 truncate sm:max-w-none sm:whitespace-normal cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        {item.product?.name || '—'}
+      </td>
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm cursor-pointer"
+        onClick={onToggleExpand}
+      >
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${item.sale_price > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
           {item.sale_price > 0 ? 'Продажа' : 'Списание'}
         </span>
       </td>
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.quantity}</td>
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        {item.quantity}
+      </td>
+      <td 
+        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
+        onClick={onToggleExpand}
+      >
         {item.sale_price != null ? `${item.sale_price.toFixed(2)} ₽` : '—'}
       </td>
-      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.movement_date}</td>
+      <td 
+        className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        {item.movement_date}
+      </td>
       <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
         <div className="relative actions-dropdown">
           <button

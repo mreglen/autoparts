@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchStockOuts, createReturn } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchProducts } from '../../redux/slices/ProductSlice';
+import { fetchStockIns } from '../../redux/slices/StockInSlice';
 import { Navigate } from 'react-router-dom';
 import { StockOutRow } from './StockOutRow';
 import ImageModal from '../../components/ImageModal/ImageModal';
@@ -60,9 +61,10 @@ export const StockOutList = () => {
       // Оборачиваем данные в объект с полем items, как ожидает бекенд
       const payload = { items: returnData };
       await dispatch(createReturn(payload)).unwrap();
-      // После успешного возврата обновляем списки расходов и товаров
+      // После успешного возврата обновляем списки расходов, товаров и поступлений
       dispatch(fetchStockOuts());
       dispatch(fetchProducts());
+      dispatch(fetchStockIns());
       // Закрываем модальное окно и очищаем выбранные элементы
       setReturnModalOpen(false);
       setItemsToReturn([]);
@@ -247,7 +249,7 @@ export const StockOutList = () => {
                   </button>
 
                   {showBulkActions && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 mobile-actions-dropdown w-48 mx-auto">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 mobile-actions-dropdown w-32 mx-auto">
                       <div className="py-1">
                         <button
                           onClick={() => {
@@ -340,7 +342,7 @@ export const StockOutList = () => {
                     </button>
 
                     {mobileActionsOpen === item.id && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 mobile-actions-dropdown w-48 mx-auto">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 mobile-actions-dropdown w-32 mx-auto">
                         <div className="py-1">
                           <button
                             onClick={() => {

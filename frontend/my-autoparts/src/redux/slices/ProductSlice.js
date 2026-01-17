@@ -85,10 +85,11 @@ export const updateProduct = createAsyncThunk(
 
 export const fetchProducts = createAsyncThunk(
     'products/fetchProducts',
-    async (_, { rejectWithValue }) => {
+    async (params = {}, { rejectWithValue }) => {
         try {
             const response = await apiAxios.get(
                 '/products/',
+                { params }
             );
             return response.data;
         } catch (error) {

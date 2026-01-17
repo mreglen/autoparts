@@ -5,9 +5,11 @@ from app.core.auth import get_current_user
 from app.models.user import User
 from app.models.carts import Cart, NewPartsCart, UsedPartsCart
 from app.models.orders import Order, NewPartsOrder, OrderStatus, OrderItem, OrderItemStatus
+from app.models.client import Client as ClientModel
 from app.schemas.checkout import CheckoutFromCartRequest, OrderFromCartResponse
 from app.routers.rossko_api.rossko_api import rossko_checkout
 from app.routers.orders import generate_order_number, order_to_response, init_order_statuses, init_order_item_statuses
+from app.utils.phone import normalize_to_storage_format
 
 router = APIRouter(prefix="/checkout", tags=["Checkout"])
 
@@ -41,6 +43,43 @@ async def checkout_from_cart(
         init_order_statuses(db)
         init_order_item_statuses(db)
 
+        # Создать или получить клиента на основе контактной информации
+        # Note: Contact schema doesn't include email, using phone as primary identifier
+        client_email = None  # Contact schema doesn't have email field
+        client_phone = normalize_to_storage_format(checkout_data.contact.phone)
+        client_name_parts = checkout_data.contact.name.split()
+        
+        # Parse name (assuming format: Last First Patronymic or Last First)
+        last_name = client_name_parts[0] if len(client_name_parts) > 0 else ""
+        first_name = client_name_parts[1] if len(client_name_parts) > 1 else ""
+        patronymic = client_name_parts[2] if len(client_name_parts) > 2 else None
+        
+        # Check if client already exists for this organization
+        # Since we don't have email, check by phone only
+        existing_client = None
+        if client_phone:
+            existing_client = db.query(ClientModel).filter(
+                ClientModel.phone == client_phone,
+                ClientModel.organization_id == current_user.organization_id
+            ).first()
+        
+        # Create client if doesn't exist
+        if not existing_client:
+            # Try to find organization for the parts (for new parts, it's the user's org)
+            # For used parts, we could check the product's organization, but for now use user's org
+            organization_id = current_user.organization_id
+            
+            new_client = ClientModel(
+                last_name=last_name,
+                first_name=first_name,
+                patronymic=patronymic,
+                email="",  # No email available in contact data
+                phone=client_phone,
+                organization_id=organization_id
+            )
+            db.add(new_client)
+            db.flush()  # Get the client ID
+            
         # Получить статусы для заказа
         pending_status = db.query(OrderStatus).filter(OrderStatus.code == "pending").first()
         if not pending_status:
