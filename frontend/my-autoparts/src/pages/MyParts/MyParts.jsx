@@ -6,9 +6,10 @@ import ImageModal from '../../components/ImageModal/ImageModal';
 import { fetchProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
+import { fetchProductStorageCells, fetchStorageCells } from '../../redux/slices/StorageCellsSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
 
-const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect }) => {
+const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [] }) => {
   const [showActions, setShowActions] = useState(false);
 
   // Закрываем dropdown при клике вне
@@ -171,6 +172,30 @@ const CardPart = ({ part, getStorageAddress, onSale, onWriteoff, onToggleExpand,
                 </div>
               </div>
 
+              {/* Адрес хранения */}
+              {productStorageCells && productStorageCells.length > 0 && (
+                <div>
+                  <span className="text-xs text-gray-500">Адрес хранения</span>
+                  <div className="mt-2 space-y-1">
+                    {productStorageCells.map((cellLink) => (
+                      <div
+                        key={cellLink.id}
+                        className="p-2 bg-white rounded border text-sm"
+                      >
+                        <span className="font-medium text-gray-900">
+                          {getCellName(cellLink.storage_cell_id)}
+                        </span>
+                        {cellLink.value && (
+                          <span className="text-gray-700 ml-2">
+                            : {cellLink.value}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Автомобиль(и) */}
               {part.compatible_vehicles && part.compatible_vehicles.length > 0 && (
                 <div>
@@ -234,6 +259,7 @@ function MyParts() {
   const { items: products, loading, error } = useSelector((state) => state.products);
 
   const { storageLocations } = useSelector((state) => state.organization);
+  const { productStorageCells, storageCells } = useSelector((state) => state.storageCells);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState(null);
   const [operationType, setOperationType] = useState(null);
@@ -249,6 +275,28 @@ function MyParts() {
     price: '',
     reason: '',
   });
+
+  // Calculate displayParts BEFORE the useEffect that uses it
+  const displayParts = products.filter(part => {
+    // Если выбран склад, сначала проверяем принадлежность к складу
+    if (selectedStorageLocation && part.storage_location_id != selectedStorageLocation) {
+      return false;
+    }
+    
+    // Поиск по всем полям
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase().replace(/\s+/g, ''); // Убираем пробелы из запроса
+    return (
+      (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
+      (part.internal_code && part.internal_code.toLowerCase().replace(/\s+/g, '').includes(query)) ||
+      (part.name && part.name.toLowerCase().includes(query))
+    );
+  });
+
+  // Расчет общей суммы и количества
+  const totalValue = displayParts.reduce((sum, part) => sum + (part.price * part.quantity), 0);
+  const totalQuantity = displayParts.reduce((sum, part) => sum + part.quantity, 0);
 
   const handleImageClick = (photos, initialIndex) => {
     setSelectedImages({ photos, initialIndex });
@@ -370,40 +418,43 @@ function MyParts() {
     dispatch(fetchProducts(params));
     if (user?.organization_id) {
       dispatch(fetchStorageLocations(user.organization_id));
+      // Загружаем все ячейки организации
+      dispatch(fetchStorageCells());
     }
   }, [dispatch, user?.organization_id, selectedStorageLocation]);
 
+  // Create memoized product IDs that need storage cell data
+  const productIdsNeedingData = React.useMemo(() => {
+    if (displayParts.length === 0 || loading) return [];
+    
+    const productIds = displayParts.map(part => part.id);
+    return productIds.filter(productId => 
+      !productStorageCells[productId] || productStorageCells[productId].length === 0
+    );
+  }, [displayParts.length, loading, JSON.stringify(Object.keys(productStorageCells || {}))]);
+
+  // Fetch product storage cells for all displayed products - optimized to avoid continuous requests
+  useEffect(() => {
+    if (productIdsNeedingData.length > 0) {
+      productIdsNeedingData.forEach(productId => {
+        dispatch(fetchProductStorageCells(productId));
+      });
+    }
+  }, [dispatch, productIdsNeedingData]);
+
   if (!user) return <Navigate to="/auth" replace />;
   if (!user.is_seller) return <Navigate to="/" replace />;
-
-
-
-  // Фильтрация запчастей по поисковому запросу (работает всегда)
-  const displayParts = products.filter(part => {
-    // Если выбран склад, сначала проверяем принадлежность к складу
-    if (selectedStorageLocation && part.storage_location_id != selectedStorageLocation) {
-      return false;
-    }
-    
-    // Поиск по всем полям
-    if (!searchQuery.trim()) return true;
-
-    const query = searchQuery.toLowerCase().replace(/\s+/g, ''); // Убираем пробелы из запроса
-    return (
-      (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (part.internal_code && part.internal_code.toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (part.name && part.name.toLowerCase().includes(query))
-    );
-  });
-
-  // Расчет общей суммы и количества
-  const totalValue = displayParts.reduce((sum, part) => sum + (part.price * part.quantity), 0);
-  const totalQuantity = displayParts.reduce((sum, part) => sum + part.quantity, 0);
 
   const getStorageAddress = (locationId) => {
     if (!locationId) return '—';
     const loc = storageLocations.find(l => l.id === locationId);
     return loc ? (loc.address || `Склад #${locationId}`) : `Склад #${locationId}`;
+  };
+
+  const getCellName = (cellId) => {
+    if (!cellId) return `Ячейка #${cellId}`;
+    const cell = storageCells.find(c => c.id === cellId);
+    return cell ? cell.name : `Ячейка #${cellId}`;
   };
 
 
@@ -614,6 +665,7 @@ function MyParts() {
                     key={part.id}
                     part={part}
                     getStorageAddress={getStorageAddress}
+                    getCellName={getCellName}
                     onSale={(p) => handleOpenModal(p, 'sale')}
                     onWriteoff={(p) => handleOpenModal(p, 'writeoff')}
                     onToggleExpand={() => toggleExpand(part.id)}
@@ -621,6 +673,7 @@ function MyParts() {
                     onImageClick={handleImageClick}
                     isSelected={selectedParts.has(part.id)}
                     onSelect={() => handlePartSelect(part.id)}
+                    productStorageCells={productStorageCells[part.id] || []}
                   />
                 ))}
               </tbody>
@@ -804,6 +857,30 @@ function MyParts() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Адрес хранения */}
+                        {productStorageCells && productStorageCells.length > 0 && (
+                          <div>
+                            <span className="text-sm text-gray-500 block mb-2">Адрес хранения</span>
+                            <div className="space-y-1">
+                              {productStorageCells.map((cellLink) => (
+                                <div
+                                  key={cellLink.id}
+                                  className="p-2 bg-gray-50 rounded border text-sm"
+                                >
+                                  <span className="font-medium text-gray-900">
+                                    {getCellName(cellLink.storage_cell_id)}
+                                  </span>
+                                  {cellLink.value && (
+                                    <span className="text-gray-700 ml-2">
+                                      : {cellLink.value}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Автомобиль(и) */}
                         {part.compatible_vehicles && part.compatible_vehicles.length > 0 && (

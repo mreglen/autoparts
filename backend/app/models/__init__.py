@@ -4,6 +4,8 @@ from app.models.organization import Organization
 from app.models.product import Product
 from app.models.acquired_product import AcquiredProduct
 from app.models.storage_location import StorageLocation
+from app.models.storage_cell import StorageCell
+from app.models.product_storage_cell import ProductStorageCell
 from app.models.pickup_location import PickupLocation
 from app.models.stock_in import StockIn
 from app.models.stock_out import StockOut

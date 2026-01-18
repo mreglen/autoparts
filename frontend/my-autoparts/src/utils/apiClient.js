@@ -1,11 +1,11 @@
 // Centralized API client for consistent API calls
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://195.24.65.251/api';
-const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'http://195.24.65.251';
+// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://195.24.65.251/api';
+// const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'http://195.24.65.251';
 
-// const API_BASE = 'http://127.0.0.1:8000/api';
-// const BACKEND_BASE = 'http://127.0.0.1:8000';
+const API_BASE = 'http://127.0.0.1:8000/api';
+const BACKEND_BASE = 'http://127.0.0.1:8000';
 
 // Helper function to get auth headers
 export const getAuthHeaders = () => {
@@ -56,6 +56,11 @@ export const apiRequest = async (endpoint, options = {}) => {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Handle 204 No Content responses
+    if (response.status === 204) {
+        return { status: 204, message: 'No Content' };
     }
 
     return response.json();

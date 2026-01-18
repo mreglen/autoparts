@@ -136,6 +136,7 @@ export default function StorageLocationsSection({ orgId, storageLocations, loadi
     const [newLocationAddress, setNewLocationAddress] = useState('');
     const [newLocationData, setNewLocationData] = useState(null);
     const [isAdding, setIsAdding] = useState(false);
+    const [showActionDropdown, setShowActionDropdown] = useState(null); // Track which location's actions are open
 
     // При начале редактирования — загружаем текущий адрес
     useEffect(() => {
@@ -187,10 +188,30 @@ export default function StorageLocationsSection({ orgId, storageLocations, loadi
     };
 
     const handleDelete = (id) => {
-
         dispatch(deleteStorageLocation(id)).then(() => dispatch(fetchStorageLocations(orgId)));
-
+        setShowActionDropdown(null); // Close dropdown after delete
     };
+
+    const handleActionClick = (locationId) => {
+        setShowActionDropdown(showActionDropdown === locationId ? null : locationId);
+    };
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (showActionDropdown && !e.target.closest('.actions-dropdown-container')) {
+                setShowActionDropdown(null);
+            }
+        };
+
+        if (showActionDropdown) {
+            document.addEventListener('click', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+        };
+    }, [showActionDropdown]);
 
     const handleAddressSelect = (suggestion, targetId = null) => {
         if (targetId === 'new') {
@@ -288,20 +309,47 @@ export default function StorageLocationsSection({ orgId, storageLocations, loadi
                                         </button>
                                     </>
                                 ) : (
-                                    <>
+                                    <div className="relative actions-dropdown-container">
                                         <button
-                                            onClick={() => setEditingLocationId(loc.id)}
-                                            className="text-xs text-blue-600 hover:underline"
+                                            onClick={() => handleActionClick(loc.id)}
+                                            className="text-xs font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-100 transition-colors flex items-center gap-1"
                                         >
-                                            Ред.
+                                            Действия
+                                            <img
+                                                src="/img/arrow_sm.svg"
+                                                alt=""
+                                                className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${showActionDropdown === loc.id ? 'rotate-90' : ''}`}
+                                                style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
+                                            />
                                         </button>
-                                        <button
-                                            onClick={() => handleDelete(loc.id)}
-                                            className="text-xs text-red-600 hover:underline"
-                                        >
-                                            Удалить
-                                        </button>
-                                    </>
+                                        
+                                        {/* Action dropdown */}
+                                        {showActionDropdown === loc.id && (
+                                            <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                                                <div className="py-1">
+                                                    <button
+                                                        onClick={(e) => { 
+                                                            e.stopPropagation(); 
+                                                            setEditingLocationId(loc.id);
+                                                            setShowActionDropdown(null);
+                                                        }}
+                                                        className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                                                    >
+                                                        Редактировать
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { 
+                                                            e.stopPropagation(); 
+                                                            handleDelete(loc.id);
+                                                        }}
+                                                        className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                                                    >
+                                                        Удалить
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         </div>

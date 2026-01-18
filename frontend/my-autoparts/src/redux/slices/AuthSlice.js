@@ -266,9 +266,18 @@ const authSlice = createSlice({
             .addCase(fetchProfile.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
-                state.user = null;
-                state.token = null;
-                localStorage.removeItem('token');
+                
+                // Only clear token if it's definitely an authentication error
+                // Don't clear for network errors or other issues
+                if (action.payload?.includes('401') || 
+                    action.payload?.includes('Unauthorized') || 
+                    action.payload?.includes('invalid') ||
+                    action.payload?.includes('expired') ||
+                    action.payload?.includes('signature')) {
+                    state.user = null;
+                    state.token = null;
+                    localStorage.removeItem('token');
+                }
             })
             // logout
             .addCase(logout.fulfilled, (state) => {

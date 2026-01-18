@@ -28,6 +28,7 @@ import WarehouseSalesPage from './pages/Sales/WarehouseSalesPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
 import EmployeesPage from './pages/Profile/EmployeesPage';
 import ClientsPage from './pages/Profile/ClientsPage';
+import StorageAddressesPage from './pages/Profile/StorageAddressesPage';
 
 
 function App() {
@@ -63,6 +64,7 @@ function App() {
         {/* Layout с боковым меню для страниц профиля */}
         <Route path="/" element={<ProfileWithMenuLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/clients" element={<ClientsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-parts" element={<MyParts />} />
           <Route path="/purchases/orders" element={<PurchasesOrdersPage />} />
@@ -73,7 +75,7 @@ function App() {
           <Route path="/stock-out" element={<StockOutList />} />
           <Route path="/warehouse-sales" element={<WarehouseSalesPage />} />
           <Route path="/settings/employees" element={<EmployeesPage />} />
-          <Route path="/settings/clients" element={<ClientsPage />} />
+          <Route path="/settings/storage-addresses" element={<StorageAddressesPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

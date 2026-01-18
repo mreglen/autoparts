@@ -4,6 +4,7 @@ from app.routers.organizations import router as organizations_router
 from app.routers.products import router as products_router
 from app.routers.acquired_products import router as acquired_products_router
 from app.routers.storage_locations import router as storage_locations_router
+from app.routers.storage_cells import router as storage_cells_router
 from app.routers.pickup_locations import router as pickup_locations_router
 from app.routers.stock_ins import router as stock_ins_router
 from app.routers.stock_outs import router as stock_outs_router
@@ -34,6 +35,7 @@ api_router.include_router(organizations_router)
 api_router.include_router(products_router)
 api_router.include_router(acquired_products_router)
 api_router.include_router(storage_locations_router)
+api_router.include_router(storage_cells_router)
 api_router.include_router(pickup_locations_router)
 api_router.include_router(stock_ins_router)
 api_router.include_router(stock_outs_router)

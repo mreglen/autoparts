@@ -9,6 +9,7 @@ import stockInReducer from './slices/StockInSlice';
 import stockOutReducer from './slices/StockOutSlice';
 import cartReducer from './slices/CartSlice';
 import clientReducer from './slices/ClientSlice';
+import storageCellsReducer from './slices/StorageCellsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -22,5 +23,6 @@ export const store = configureStore({
     stockOut: stockOutReducer,
     cart: cartReducer,
     clients: clientReducer,
+    storageCells: storageCellsReducer,
   },
 });

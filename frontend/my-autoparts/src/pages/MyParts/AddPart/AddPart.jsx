@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { createProduct, uploadPhotos, clearProductError, resetProducts } from '../../../redux/slices/ProductSlice';
 import { createStockIn, clearStockInError } from '../../../redux/slices/StockInSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
+import { fetchStorageCells } from '../../../redux/slices/StorageCellsSlice';
 import VehicleModal from './VehicleModal';
 
 const AddPart = () => {
@@ -13,15 +14,52 @@ const AddPart = () => {
   const productStatus = useSelector((state) => state.products.loading);
   const productError = useSelector((state) => state.products.error);
   const { storageLocations } = useSelector((state) => state.organization);
+  const { storageCells } = useSelector((state) => state.storageCells);
   const stockInError = useSelector((state) => state.stockIn.error);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
+  
+  const [formData, setFormData] = useState({
+    article: '',
+    name: '',
+    brand: '',
+    description: '',
+    condition: 'новый',
+    quantity: '',
+    sale_price: '',
+    storage_location_id: '',
+  });
+
+  const [photos, setPhotos] = useState([]);
+  const [locationCells, setLocationCells] = useState([]);
+  const [cellQuantities, setCellQuantities] = useState({});
 
   useEffect(() => {
     if (user?.organization_id) {
       dispatch(fetchStorageLocations(user.organization_id));
     }
   }, [dispatch, user?.organization_id]);
+
+  // Fetch storage cells when storage location changes
+  useEffect(() => {
+    if (formData.storage_location_id) {
+      dispatch(fetchStorageCells(formData.storage_location_id))
+        .then((result) => {
+          if (fetchStorageCells.fulfilled.match(result)) {
+            setLocationCells(Array.isArray(result.payload) ? result.payload : []);
+            // Initialize cell quantities
+            const initialQuantities = {};
+            (Array.isArray(result.payload) ? result.payload : []).forEach(cell => {
+              initialQuantities[cell.id] = '';
+            });
+            setCellQuantities(initialQuantities);
+          }
+        });
+    } else {
+      setLocationCells([]);
+      setCellQuantities({});
+    }
+  }, [dispatch, formData.storage_location_id]);
 
   useEffect(() => {
     if (productError || stockInError) {
@@ -38,19 +76,6 @@ const AddPart = () => {
     };
   }, [dispatch]);
 
-  const [formData, setFormData] = useState({
-    article: '',
-    name: '',
-    brand: '',
-    description: '',
-    condition: 'новый',
-    quantity: '',
-    sale_price: '',
-    storage_location_id: '',
-  });
-
-  const [photos, setPhotos] = useState([]);
-
   const handlePhotoAdd = (e) => {
     const files = Array.from(e.target.files);
     setPhotos((prev) => [...prev, ...files]);
@@ -63,6 +88,19 @@ const AddPart = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCellQuantityChange = (cellId, value) => {
+    setCellQuantities(prev => ({
+      ...prev,
+      [cellId]: value
+    }));
+  };
+
+  const getTotalCellQuantities = () => {
+    return Object.values(cellQuantities)
+      .filter(val => val && !isNaN(val))
+      .reduce((sum, val) => sum + parseInt(val), 0);
   };
 
   const handleSubmit = async (e) => {
@@ -129,6 +167,30 @@ const AddPart = () => {
         return;
       }
 
+      // Save cell values if any are provided
+      const cellEntries = Object.entries(cellQuantities).filter(([cellId, value]) => 
+        value && value.trim() !== ''
+      );
+      
+      if (cellEntries.length > 0) {
+        // Import the linkProductToCell function
+        const { linkProductToCell } = await import('../../../redux/slices/StorageCellsSlice');
+        
+        // Create links for each cell with a value
+        for (const [cellId, value] of cellEntries) {
+          try {
+            await dispatch(linkProductToCell({
+              product_id: product.id,
+              storage_cell_id: parseInt(cellId, 10),
+              value: value.trim()
+            }));
+          } catch (linkError) {
+            console.warn('Failed to link product to cell:', linkError);
+            // Continue with other cells even if one fails
+          }
+        }
+      }
+
       navigate('/my-parts');
     } catch (err) {
       console.error(err);
@@ -136,9 +198,18 @@ const AddPart = () => {
     }
   };
 
+  useEffect(() => {
+    if (!user || !user.is_seller) {
+      navigate('/');
+    }
+  }, [user, navigate]);
+
   if (!user || !user.is_seller) {
-    navigate('/');
-    return null;
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="text-center py-8 text-gray-500">Перенаправление...</div>
+      </div>
+    );
   }
 
   return (
@@ -156,7 +227,6 @@ const AddPart = () => {
             className="mt-1 block w-full px-3 py-2 border rounded-md"
           />
         </div>
-
 
         {/* Наименование */}
         <div>
@@ -181,6 +251,7 @@ const AddPart = () => {
             className="mt-1 block w-full px-3 py-2 border rounded-md"
           />
         </div>
+        
         {/* Описание */}
         <div>
           <label className="block text-sm font-medium">Описание</label>
@@ -193,6 +264,7 @@ const AddPart = () => {
             placeholder="Введите описание запчасти..."
           />
         </div>
+        
         {/* Фото */}
         <div>
           <label className="block text-sm font-medium">Фотографии</label>
@@ -332,6 +404,37 @@ const AddPart = () => {
             ))}
           </select>
         </div>
+
+        {/* Адресное хранение - выбор ячеек */}
+        {formData.storage_location_id && locationCells.length > 0 && (
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-3">Адресное хранение</h3>
+            <p className="text-sm text-gray-600 mb-4">Укажите значение для каждой ячейки (не обязательно заполнять все поля)</p>
+            
+            <div className="space-y-3">
+              {locationCells.map((cell) => (
+                <div key={cell.id} className="bg-white rounded-md p-3 border border-gray-200">
+                  <div className="font-medium text-gray-900 mb-1">{cell.name}</div>
+                  {cell.description && (
+                    <div className="text-sm text-gray-600 mb-2">{cell.description}</div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Значение в ячейке
+                    </label>
+                    <input
+                      type="text"
+                      value={cellQuantities[cell.id] || ''}
+                      onChange={(e) => handleCellQuantityChange(cell.id, e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder="Введите значение"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3">
           <button

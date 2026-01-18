@@ -69,12 +69,25 @@ export default function Navigation() {
 
     // Расчет данных корзины
     const cartData = React.useMemo(() => {
-        if (!cart?.new_parts_items) {
+        if (!cart) {
             return { itemCount: 0, totalPrice: 0 };
         }
 
-        const itemCount = cart.new_parts_items.reduce((sum, item) => sum + item.quantity, 0);
-        const totalPrice = cart.new_parts_items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        // Подсчет новых запчастей
+        const newPartsCount = cart.new_parts_items ? 
+            cart.new_parts_items.reduce((sum, item) => sum + item.quantity, 0) : 0;
+        const newPartsPrice = cart.new_parts_items ? 
+            cart.new_parts_items.reduce((sum, item) => sum + (item.price * item.quantity), 0) : 0;
+
+        // Подсчет б/у запчастей
+        const usedPartsCount = cart.used_parts_items ? 
+            cart.used_parts_items.reduce((sum, item) => sum + item.quantity, 0) : 0;
+        const usedPartsPrice = cart.used_parts_items ? 
+            cart.used_parts_items.reduce((sum, item) => sum + ((item.price || 0) * item.quantity), 0) : 0;
+
+        // Общие значения
+        const itemCount = newPartsCount + usedPartsCount;
+        const totalPrice = newPartsPrice + usedPartsPrice;
 
         return { itemCount, totalPrice };
     }, [cart]);
@@ -199,17 +212,28 @@ export default function Navigation() {
                                             </div>
                                         </div>
 
-                                        {/* Для продавцов - Главная */}
+                                        {/* Для продавцов - Главная и Клиенты */}
                                         {user?.is_seller && (
-                                            <button
-                                                onClick={() => {
-                                                    setIsProfileOpen(false);
-                                                    navigate('/dashboard');
-                                                }}
-                                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                            >
-                                                Главная
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/dashboard');
+                                                    }}
+                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                >
+                                                    Главная
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/clients');
+                                                    }}
+                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-200"
+                                                >
+                                                    Клиенты
+                                                </button>
+                                            </>
                                         )}
 
 
@@ -305,51 +329,42 @@ export default function Navigation() {
                                             </div>
                                         )}
 
-                                        {/* Для продавцов - Главная и Клиенты */}
-                                        {user?.is_seller && (
-                                            <>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/dashboard');
-                                                    }}
-                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-200"
-                                                >
-                                                    Главная
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/settings/clients');
-                                                    }}
-                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                >
-                                                    Клиенты
-                                                </button>
-                                            </>
-                                        )}
 
-                                        {/* Для директоров - Настройки без клиентов */}
-                                        {user?.is_director && (
+
+                                        {/* Настройки для директоров и продавцов */}
+                                        {(user?.is_director || user?.is_seller) && (
                                             <div className="px-4 py-1 border-t border-gray-100">
                                                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Настройки</div>
+                                                {user?.is_director && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => {
+                                                                setIsProfileOpen(false);
+                                                                navigate('/profile');
+                                                            }}
+                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                        >
+                                                            Профиль
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setIsProfileOpen(false);
+                                                                navigate('/settings/employees');
+                                                            }}
+                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                        >
+                                                            Сотрудники
+                                                        </button>
+                                                    </>
+                                                )}
                                                 <button
                                                     onClick={() => {
                                                         setIsProfileOpen(false);
-                                                        navigate('/profile');
+                                                        navigate('/settings/storage-addresses');
                                                     }}
                                                     className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
                                                 >
-                                                    Профиль
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/settings/employees');
-                                                    }}
-                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                >
-                                                    Сотрудники
+                                                    Адресное хранение
                                                 </button>
                                             </div>
                                         )}

@@ -10,10 +10,10 @@ export default function ProfileWithMenuLayout() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Определяем активную вкладку на основе текущего пути
-    const getActiveTabFromPath = (path) => {
+    const [activeTab, setActiveTab] = useState(() => {
         const pathMap = {
             '/dashboard': 'dashboard',
+            '/clients': 'clients',
             '/profile': 'profile',
             '/purchases/orders': 'purchases-orders',
             '/purchases/returns': 'purchases-returns',
@@ -23,18 +23,34 @@ export default function ProfileWithMenuLayout() {
             '/my-parts': 'parts',
             '/stock-in': 'receipts',
             '/stock-out': 'expenses',
-            '/settings/employees': 'settings-employees',
-            '/settings/clients': 'settings-clients'
+            '/settings/storage-addresses': 'settings-storage-addresses'
         };
-        return pathMap[path] || (user?.is_seller ? 'dashboard' : 'profile');
-    };
-
-    const [activeTab, setActiveTab] = useState(getActiveTabFromPath(location.pathname));
+        return pathMap[location.pathname] || (user?.is_seller ? 'dashboard' : 'profile');
+    });
 
     // Обновляем активную вкладку при изменении пути
     useEffect(() => {
+        const getActiveTabFromPath = (path) => {
+            const pathMap = {
+                '/dashboard': 'dashboard',
+                '/clients': 'clients',
+                '/profile': 'profile',
+                '/purchases/orders': 'purchases-orders',
+                '/purchases/returns': 'purchases-returns',
+                '/sales/orders': 'sales-orders',
+                '/sales/returns': 'sales-returns',
+                '/warehouse-sales': 'warehouse-sales',
+                '/my-parts': 'parts',
+                '/stock-in': 'receipts',
+                '/stock-out': 'expenses',
+                '/settings/employees': 'settings-employees',
+                '/settings/storage-addresses': 'settings-storage-addresses'
+            };
+            return pathMap[path] || (user?.is_seller ? 'dashboard' : 'profile');
+        };
+        
         setActiveTab(getActiveTabFromPath(location.pathname));
-    }, [location.pathname]);
+    }, [location.pathname, user?.is_seller]);
 
     // Определяем доступные вкладки в зависимости от роли пользователя
     const getAvailableTabs = () => {
@@ -53,7 +69,7 @@ export default function ProfileWithMenuLayout() {
         if (user?.is_seller) {
             baseTabs.unshift(
                 { id: 'dashboard', label: 'Главная' },
-                { id: 'settings-clients', label: 'Клиенты' }
+                { id: 'clients', label: 'Клиенты' }
             );
         }
 
@@ -90,7 +106,8 @@ export default function ProfileWithMenuLayout() {
                 label: 'Настройки',
                 submenu: [
                     { id: 'profile', label: 'Профиль' },
-                    { id: 'settings-employees', label: 'Сотрудники' }
+                    { id: 'settings-employees', label: 'Сотрудники' },
+                    { id: 'settings-storage-addresses', label: 'Адресное хранение' }
                 ]
             });
         }
@@ -116,7 +133,8 @@ export default function ProfileWithMenuLayout() {
             'receipts': '/stock-in',
             'expenses': '/stock-out',
             'settings-employees': '/settings/employees',
-            'settings-clients': '/settings/clients'
+            'clients': '/clients',
+            'settings-storage-addresses': '/settings/storage-addresses'
         };
 
         const path = tabPathMap[tabId];

@@ -145,13 +145,13 @@ export default function ClientsPage() {
     }
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
+        <div className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Клиенты</h2>
                 <button
                     onClick={() => setShowAddForm(!showAddForm)}
                     disabled={creating}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg transition-colors"
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                     {creating ? 'Создание...' : (showAddForm ? 'Отмена' : 'Добавить клиента')}
                 </button>
@@ -160,7 +160,7 @@ export default function ClientsPage() {
             {showAddForm && (
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                     <h3 className="text-lg font-semibold mb-4">Добавить нового клиента</h3>
-                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Фамилия *
@@ -226,7 +226,7 @@ export default function ClientsPage() {
                             )}
                         </div>
 
-                        <div className="md:col-span-2">
+                        <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Телефон *
                             </label>
@@ -243,7 +243,7 @@ export default function ClientsPage() {
                             )}
                         </div>
 
-                        <div className="md:col-span-2 flex justify-end space-x-3">
+                        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
                             <button
                                 type="button"
                                 onClick={() => {
@@ -257,14 +257,14 @@ export default function ClientsPage() {
                                     });
                                     setErrors({});
                                 }}
-                                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                             >
                                 Отмена
                             </button>
                             <button
                                 type="submit"
                                 disabled={creating}
-                                className="px-4 py-2 bg-blue-600 disabled:opacity-50 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                className="w-full sm:w-auto px-4 py-2 bg-blue-600 disabled:opacity-50 text-white rounded-lg hover:bg-blue-700 transition-colors"
                             >
                                 {creating ? 'Создание...' : 'Добавить клиента'}
                             </button>
@@ -286,43 +286,93 @@ export default function ClientsPage() {
                     )}
                 </div>
             ) : (
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                ФИО
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Email
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Телефон
-                            </th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Действия
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                <div className="overflow-x-auto">
+                    {/* Desktop table view */}
+                    <table className="hidden sm:table min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    ФИО
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Email
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Телефон
+                                </th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Действия
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {clients.map((client) => (
+                                <tr key={client.id}>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm font-medium text-gray-900">
+                                            {client.last_name} {client.first_name}{client.patronymic ? ` ${client.patronymic}` : ''}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm text-gray-900">{client.email}</div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm text-gray-900">{client.phone}</div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div className="relative inline-block text-left delete-popup-container">
+                                            <button
+                                                onClick={() => handleDeleteClick(client.id)}
+                                                disabled={deleting}
+                                                className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                            >
+                                                Действия
+                                                <img
+                                                    src="/img/arrow_sm.svg"
+                                                    alt=""
+                                                    className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${showDeletePopup === client.id ? 'rotate-90' : ''}`}
+                                                    style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
+                                                />
+                                            </button>
+                                            
+                                            {/* Popup confirmation */}
+                                            {showDeletePopup === client.id && (
+                                                <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
+                                                    <div className="py-1">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); confirmDelete(); setShowDeletePopup(null); }}
+                                                            disabled={deleting}
+                                                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50"
+                                                        >
+                                                            {deleting ? 'Удаление...' : 'Удалить'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    
+                    {/* Mobile card view */}
+                    <div className="sm:hidden space-y-4">
                         {clients.map((client) => (
-                            <tr key={client.id}>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-medium text-gray-900">
-                                        {client.last_name} {client.first_name}{client.patronymic ? ` ${client.patronymic}` : ''}
+                            <div key={client.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 className="font-medium text-gray-900">
+                                            {client.last_name} {client.first_name}{client.patronymic ? ` ${client.patronymic}` : ''}
+                                        </h3>
+                                        <p className="text-sm text-gray-500 mt-1">{client.email}</p>
+                                        <p className="text-sm text-gray-500">{client.phone}</p>
                                     </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm text-gray-900">{client.email}</div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm text-gray-900">{client.phone}</div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <div className="relative inline-block text-left delete-popup-container">
+                                    <div className="relative delete-popup-container">
                                         <button
                                             onClick={() => handleDeleteClick(client.id)}
                                             disabled={deleting}
-                                            className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                            className="text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-3 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
                                         >
                                             Действия
                                             <img
@@ -333,9 +383,9 @@ export default function ClientsPage() {
                                             />
                                         </button>
                                         
-                                        {/* Popup confirmation */}
+                                        {/* Mobile popup - positioned below button */}
                                         {showDeletePopup === client.id && (
-                                            <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
+                                            <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
                                                 <div className="py-1">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); confirmDelete(); setShowDeletePopup(null); }}
@@ -348,11 +398,11 @@ export default function ClientsPage() {
                                             </div>
                                         )}
                                     </div>
-                                </td>
-                            </tr>
+                                </div>
+                            </div>
                         ))}
-                    </tbody>
-                </table>
+                    </div>
+                </div>
             )}
         </div>
     );
