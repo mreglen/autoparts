@@ -10,13 +10,13 @@ settings = Settings()
 def generate_verification_code() -> str:
     return secrets.choice("0123456789") + "".join(secrets.choice("0123456789") for _ in range(5))
 
-def send_verification_email(email: str, code: str):
+def send_verification_email(email: str, code: str, subject: str = None, body: str = None):
     msg = MIMEMultipart()
     msg["From"] = settings.EMAIL_FROM
     msg["To"] = email
-    msg["Subject"] = "Подтверждение регистрации"
-    body = f"Ваш код подтверждения: {code}"
-    msg.attach(MIMEText(body, "plain"))
+    msg["Subject"] = subject or "Подтверждение регистрации"
+    email_body = body or f"Ваш код подтверждения: {code}"
+    msg.attach(MIMEText(email_body, "plain"))
     
     try:
         # Try primary configuration (port 465 with SSL)

@@ -6,9 +6,11 @@ import {
   fetchStorageCells, 
   createStorageCell, 
   updateStorageCell, 
-  deleteStorageCell
+  deleteStorageCell,
+  fetchProductStorageCells
 } from '../../redux/slices/StorageCellsSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
+import { fetchProducts } from '../../redux/slices/ProductSlice';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 
 const StorageAddressesPage = () => {
@@ -18,7 +20,8 @@ const StorageAddressesPage = () => {
   const { 
     locationsWithCells, 
     loading, 
-    error 
+    error,
+    lastModified
   } = useSelector(state => state.storageCells);
   
   const { storageLocations } = useSelector(state => state.organization);
@@ -54,6 +57,17 @@ const StorageAddressesPage = () => {
   useEffect(() => {
     console.log('Storage cells state updated:', locationsWithCells);
   }, [locationsWithCells]);
+  
+  // Refresh all storage-related data when storage cells are modified
+  useEffect(() => {
+    // This will trigger re-fetching of all storage-related data
+    if (user?.organization_id && lastModified) {
+      dispatch(fetchProducts());
+      // Also refresh storage cell data
+      dispatch(fetchLocationsWithCells());
+      dispatch(fetchStorageCells());
+    }
+  }, [lastModified]); // Trigger when storage cells are modified
 
   // Filter locations to show only seller's organization warehouses
   const sellerLocations = storageLocations.filter(location => 

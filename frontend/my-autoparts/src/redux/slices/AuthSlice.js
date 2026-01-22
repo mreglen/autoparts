@@ -49,6 +49,21 @@ export const completeRegistration = createAsyncThunk(
     }
 );
 
+export const registerSeller = createAsyncThunk(
+    'auth/registerSeller',
+    async (formData, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest('/auth/seller/register', {
+                method: 'POST',
+                body: JSON.stringify(formData),
+            });
+            return result;
+        } catch (err) {
+            return rejectWithValue(err);
+        }
+    }
+);
+
 export const login = createAsyncThunk(
     'auth/login',
     async ({ login, password }, { rejectWithValue }) => {
@@ -136,6 +151,7 @@ const authSlice = createSlice({
             password: '',
             password_repeat: '',
             name_organization: '',
+            description_organization: '',
             address_organization: '',
             addressData: null,
             showPassword: false,
@@ -182,6 +198,7 @@ const authSlice = createSlice({
                 password: '',
                 password_repeat: '',
                 name_organization: '',
+                description_organization: '',
                 address_organization: '',
                 addressData: null,
                 showPassword: false,
@@ -239,6 +256,19 @@ const authSlice = createSlice({
             .addCase(completeRegistration.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload?.detail || 'Ошибка регистрации';
+            })
+            // registerSeller
+            .addCase(registerSeller.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(registerSeller.fulfilled, (state, action) => {
+                state.loading = false;
+                state.error = null;
+            })
+            .addCase(registerSeller.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload?.detail || 'Ошибка регистрации продавца';
             })
             // login
             .addCase(login.pending, (state) => {

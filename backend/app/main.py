@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from .db.database import Base, engine
+from app.db.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
+# Import models to register them with SQLAlchemy
+from app.models import user, organization, product, pending_user, pending_seller, password_reset_token
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 import uvicorn

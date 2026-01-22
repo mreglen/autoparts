@@ -14,7 +14,7 @@ const AddPart = () => {
   const productStatus = useSelector((state) => state.products.loading);
   const productError = useSelector((state) => state.products.error);
   const { storageLocations } = useSelector((state) => state.organization);
-  const { storageCells } = useSelector((state) => state.storageCells);
+  const { storageCells, lastModified } = useSelector((state) => state.storageCells);
   const stockInError = useSelector((state) => state.stockIn.error);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
@@ -60,6 +60,24 @@ const AddPart = () => {
       setCellQuantities({});
     }
   }, [dispatch, formData.storage_location_id]);
+  
+  // Refresh storage cells when they are modified elsewhere
+  useEffect(() => {
+    if (lastModified && formData.storage_location_id) {
+      dispatch(fetchStorageCells(formData.storage_location_id))
+        .then((result) => {
+          if (fetchStorageCells.fulfilled.match(result)) {
+            setLocationCells(Array.isArray(result.payload) ? result.payload : []);
+            // Re-initialize cell quantities preserving existing values
+            const initialQuantities = {};
+            (Array.isArray(result.payload) ? result.payload : []).forEach(cell => {
+              initialQuantities[cell.id] = cellQuantities[cell.id] || '';
+            });
+            setCellQuantities(initialQuantities);
+          }
+        });
+    }
+  }, [lastModified]);
 
   useEffect(() => {
     if (productError || stockInError) {

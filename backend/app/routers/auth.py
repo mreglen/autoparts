@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.models.organization import Organization
 from app.models.password_reset_token import PasswordResetToken
 from app.models.pending_user import PendingUser
+from app.models.pending_seller import PendingSeller
 from app.models.user import User
 from app.schemas.auth import (
     EmailOnly,
@@ -14,6 +15,7 @@ from app.schemas.auth import (
     VerifyCode,
     Token
 )
+from app.schemas.pending_seller import SellerRegisterRequest, SellerRegisterResponse
 from app.core.security import get_password_hash
 from app.core.auth import authenticate_user, create_access_token, get_current_user, oauth2_scheme
 from app.models.user_session import UserSession
@@ -393,6 +395,56 @@ def send_password_reset_code(data: PasswordResetRequest, db: Session = Depends(g
     db.commit()
     send_verification_email(email, token)
     return {"msg": "Код подтверждения отправлен на ваш email"}
+
+
+@router.post("/seller/register", response_model=SellerRegisterResponse)
+def seller_register(data: SellerRegisterRequest, db: Session = Depends(get_db)):
+    # Check if email already exists in users or pending sellers
+    if db.query(User).filter(User.email == data.email).first():
+        raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
+    
+    if db.query(PendingSeller).filter(PendingSeller.email == data.email).first():
+        raise HTTPException(status_code=400, detail="Заявка с таким email уже существует")
+    
+    try:
+        # Validate and normalize phone
+        normalized_phone = _validate_and_normalize_phone(data.phone)
+        
+        # Create pending seller record
+        pending_seller = PendingSeller(
+            last_name=data.last_name,
+            first_name=data.first_name,
+            patronymic=data.patronymic,
+            name_organization=data.name_organization,
+            description_organization=data.description_organization,
+            address_organization=data.address_organization,
+            phone=normalized_phone,
+            email=data.email.lower()
+        )
+        
+        db.add(pending_seller)
+        db.commit()
+        db.refresh(pending_seller)
+        
+        log_event(
+            db,
+            event_type="seller_registration_submitted",
+            email=pending_seller.email,
+            details={
+                "last_name": pending_seller.last_name,
+                "first_name": pending_seller.first_name,
+                "patronymic": pending_seller.patronymic,
+                "name_organization": pending_seller.name_organization,
+                "phone": normalized_phone,
+            }
+        )
+        
+        return SellerRegisterResponse(msg="Заявка успешно отправлена. Ожидайте модерации.")
+        
+    except Exception as e:
+        logger.exception("Ошибка при регистрации продавца")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 
 @router.post("/password/verify")

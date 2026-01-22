@@ -369,6 +369,22 @@ export default function Navigation() {
                                             </div>
                                         )}
 
+                                        {/* Модерация для админов */}
+                                        {user?.is_admin && (
+                                            <div className="px-4 py-1 border-t border-gray-100">
+                                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Модерация</div>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/moderation/pending-sellers');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Регистрация продавцов
+                                                </button>
+                                            </div>
+                                        )}
+
                                         {/* Выход */}
                                         <button
                                             onClick={handleLogout}

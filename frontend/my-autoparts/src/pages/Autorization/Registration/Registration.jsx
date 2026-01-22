@@ -9,6 +9,7 @@ import {
     sendVerificationCode,
     verifyEmailCode,
     completeRegistration,
+    registerSeller,
     resetEmailVerificationError,
     setAddressError,
 } from '../../../redux/slices/AuthSlice';
@@ -162,23 +163,20 @@ export default function Registration() {
     };
 
     const handleFinalSubmit = () => {
-        const { email, password, password_repeat, first_name, last_name } = formData;
-        if (!email || !password || !password_repeat || !first_name || !last_name) {
+        const { email, first_name, last_name } = formData;
+        if (!email || !first_name || !last_name) {
             dispatch({ type: 'auth/setError', payload: 'Заполните все обязательные поля' });
-            return;
-        }
-        if (password !== password_repeat) {
-            dispatch({ type: 'auth/setError', payload: 'Пароли не совпадают' });
-            return;
-        }
-        if (emailVerification.status !== 'verified') {
-            dispatch({ type: 'auth/setError', payload: 'Подтвердите email' });
             return;
         }
 
         if (isSeller) {
+            // Seller registration
             if (!formData.name_organization) {
                 dispatch({ type: 'auth/setError', payload: 'Укажите название организации' });
+                return;
+            }
+            if (!formData.description_organization) {
+                dispatch({ type: 'auth/setError', payload: 'Укажите описание организации' });
                 return;
             }
             if (!formData.address_organization) {
@@ -190,18 +188,49 @@ export default function Registration() {
                 dispatch({ type: 'auth/setError', payload: 'Адрес должен содержать город, улицу и дом' });
                 return;
             }
-        }
 
-        dispatch(completeRegistration({
-            ...formData,
-            is_buyer: isBuyer,
-            is_seller: isSeller,
-        }))
-            .unwrap()
-            .then(() => {
-                navigate('/');
-            })
-            .catch(() => { });
+            dispatch(registerSeller({
+                last_name: formData.last_name,
+                first_name: formData.first_name,
+                patronymic: formData.patronymic,
+                name_organization: formData.name_organization,
+                description_organization: formData.description_organization,
+                address_organization: formData.address_organization,
+                phone: formData.phone,
+                email: formData.email,
+            }))
+                .unwrap()
+                .then(() => {
+                    navigate('/');
+                })
+                .catch(() => { });
+        } else {
+            // Buyer registration
+            const { password, password_repeat } = formData;
+            if (!password || !password_repeat) {
+                dispatch({ type: 'auth/setError', payload: 'Введите пароль' });
+                return;
+            }
+            if (password !== password_repeat) {
+                dispatch({ type: 'auth/setError', payload: 'Пароли не совпадают' });
+                return;
+            }
+            if (emailVerification.status !== 'verified') {
+                dispatch({ type: 'auth/setError', payload: 'Подтвердите email' });
+                return;
+            }
+
+            dispatch(completeRegistration({
+                ...formData,
+                is_buyer: isBuyer,
+                is_seller: isSeller,
+            }))
+                .unwrap()
+                .then(() => {
+                    navigate('/');
+                })
+                .catch(() => { });
+        }
     };
 
     const getEmailFieldClass = () => {
@@ -322,57 +351,61 @@ export default function Registration() {
                     />
                     {phoneError && <p className="text-red-600 text-sm">{phoneError}</p>}
 
-                    {/* Password */}
-                    <div className="relative">
-                        <input
-                            type={showPassword ? 'text' : 'password'}
-                            placeholder="Пароль"
-                            value={formData.password}
-                            onChange={(e) => handleFieldChange('password', e.target.value)}
-                            className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                            required
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                            aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
-                        >
-                            {showPassword ? (
-                                            <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                                        ) : (
-                                            <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                            )}
-                        </button>
-                    </div>
+                    {!isSeller && (
+                        <>
+                            {/* Password */}
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? 'text' : 'password'}
+                                    placeholder="Пароль"
+                                    value={formData.password}
+                                    onChange={(e) => handleFieldChange('password', e.target.value)}
+                                    className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                                    aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                                >
+                                    {showPassword ? (
+                                                    <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                                                ) : (
+                                                    <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                                    )}
+                                </button>
+                            </div>
 
-                    {/* Password repeat */}
-                    <div className="relative">
-                        <input
-                            type={showPasswordRepeat ? 'text' : 'password'}
-                            placeholder="Повторите пароль"
-                            value={formData.password_repeat}
-                            onChange={(e) => handleFieldChange('password_repeat', e.target.value)}
-                            className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                            required
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowPasswordRepeat(!showPasswordRepeat)}
-                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                            aria-label={showPasswordRepeat ? "Скрыть пароль" : "Показать пароль"}
-                        >
-                            {showPasswordRepeat ? (
-                                            <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                                        ) : (
-                                            <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                            )}
-                        </button>
-                    </div>
+                            {/* Password repeat */}
+                            <div className="relative">
+                                <input
+                                    type={showPasswordRepeat ? 'text' : 'password'}
+                                    placeholder="Повторите пароль"
+                                    value={formData.password_repeat}
+                                    onChange={(e) => handleFieldChange('password_repeat', e.target.value)}
+                                    className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPasswordRepeat(!showPasswordRepeat)}
+                                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                                    aria-label={showPasswordRepeat ? "Скрыть пароль" : "Показать пароль"}
+                                >
+                                    {showPasswordRepeat ? (
+                                                    <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                                                ) : (
+                                                    <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                                    )}
+                                </button>
+                            </div>
 
-                    {/* Password mismatch hint */}
-                    {formData.password && formData.password_repeat && formData.password !== formData.password_repeat && (
-                        <p className="text-sm text-red-600 mt-1">Пароли не совпадают</p>
+                            {/* Password mismatch hint */}
+                            {formData.password && formData.password_repeat && formData.password !== formData.password_repeat && (
+                                <p className="text-sm text-red-600 mt-1">Пароли не совпадают</p>
+                            )}
+                        </>
                     )}
 
                     {isSeller && (
@@ -382,6 +415,14 @@ export default function Registration() {
                                 value={formData.name_organization}
                                 onChange={(e) => handleFieldChange('name_organization', e.target.value)}
                                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                                required
+                            />
+                            <textarea
+                                placeholder="Описание организации"
+                                value={formData.description_organization}
+                                onChange={(e) => handleFieldChange('description_organization', e.target.value)}
+                                rows="3"
+                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition resize-none"
                                 required
                             />
                             {/* Адрес организации — улучшенная версия */}

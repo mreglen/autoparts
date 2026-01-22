@@ -65,11 +65,12 @@ export default function ProfileWithMenuLayout() {
             }
         ];
 
-        // Для продавцов добавляем отдельные вкладки Главная и Клиенты
+        // Для продавцов добавляем отдельные вкладки Главная, Клиенты и Продавцы
         if (user?.is_seller) {
             baseTabs.unshift(
                 { id: 'dashboard', label: 'Главная' },
-                { id: 'clients', label: 'Клиенты' }
+                { id: 'clients', label: 'Клиенты' },
+                { id: 'sellers', label: 'Продавцы' }
             );
         }
 
@@ -112,6 +113,17 @@ export default function ProfileWithMenuLayout() {
             });
         }
 
+        // Для админов добавляем вкладку Модерация
+        if (user?.is_admin) {
+            baseTabs.push({
+                id: 'moderation',
+                label: 'Модерация',
+                submenu: [
+                    { id: 'pending-sellers', label: 'Регистрация продавцов' }
+                ]
+            });
+        }
+
         return baseTabs;
     };
 
@@ -134,7 +146,9 @@ export default function ProfileWithMenuLayout() {
             'expenses': '/stock-out',
             'settings-employees': '/settings/employees',
             'clients': '/clients',
-            'settings-storage-addresses': '/settings/storage-addresses'
+            'sellers': '/sellers',
+            'settings-storage-addresses': '/settings/storage-addresses',
+            'pending-sellers': '/moderation/pending-sellers'
         };
 
         const path = tabPathMap[tabId];

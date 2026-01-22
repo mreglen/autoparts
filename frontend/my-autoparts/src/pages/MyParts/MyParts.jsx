@@ -259,7 +259,7 @@ function MyParts() {
   const { items: products, loading, error } = useSelector((state) => state.products);
 
   const { storageLocations } = useSelector((state) => state.organization);
-  const { productStorageCells, storageCells } = useSelector((state) => state.storageCells);
+  const { productStorageCells, storageCells, lastModified } = useSelector((state) => state.storageCells);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState(null);
   const [operationType, setOperationType] = useState(null);
@@ -441,6 +441,22 @@ function MyParts() {
       });
     }
   }, [dispatch, productIdsNeedingData]);
+  
+  // Refresh product storage cell data when storage cells are modified
+  // This ensures we get updated data after additions/deletions
+  useEffect(() => {
+    // Force refresh of all currently displayed product storage cell data
+    if (lastModified) {
+      displayParts.forEach(part => {
+        if (part.id) {
+          dispatch(fetchProductStorageCells(part.id));
+        }
+      });
+      
+      // Also refresh storage cells data
+      dispatch(fetchStorageCells());
+    }
+  }, [lastModified]); // Trigger when storage cells are modified
 
   if (!user) return <Navigate to="/auth" replace />;
   if (!user.is_seller) return <Navigate to="/" replace />;

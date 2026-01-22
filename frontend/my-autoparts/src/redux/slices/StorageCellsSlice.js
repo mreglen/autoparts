@@ -129,13 +129,6 @@ export const fetchProductStorageCells = createAsyncThunk(
             return Promise.reject('Request already in progress');
         }
         
-        // Check if data already exists in state
-        const state = getState();
-        if (state.storageCells.productStorageCells[productId] && 
-            state.storageCells.productStorageCells[productId].length > 0) {
-            return { productId, links: state.storageCells.productStorageCells[productId] };
-        }
-        
         try {
             ongoingRequests.add(productId);
             
@@ -196,6 +189,7 @@ const storageCellsSlice = createSlice({
         error: null,
         linksError: null,
         productStorageCells: {}, // { productId: [{cell_id, cell_name, value}, ...] }
+        lastModified: null, // Timestamp of last storage cell modification
     },
     reducers: {
         clearStorageCells: (state) => {
@@ -251,6 +245,9 @@ const storageCellsSlice = createSlice({
                 if (locationIndex !== -1) {
                     state.locationsWithCells[locationIndex].cells.push(action.payload);
                 }
+                
+                // Set modification flag
+                state.lastModified = Date.now();
             })
             
             // Update storage cell
@@ -268,6 +265,9 @@ const storageCellsSlice = createSlice({
                         location.cells[cellIndex] = action.payload;
                     }
                 });
+                
+                // Set modification flag
+                state.lastModified = Date.now();
             })
             
             // Delete storage cell
@@ -279,6 +279,15 @@ const storageCellsSlice = createSlice({
                 state.locationsWithCells.forEach(location => {
                     location.cells = location.cells.filter(cell => cell.id !== action.payload);
                 });
+                
+                // Invalidate productStorageCells cache for any products that had links to this cell
+                // We'll mark all product storage cell data as stale by clearing it
+                // This will force re-fetching when components access the data
+                state.productStorageCells = {};
+                
+                // Set a flag to indicate that storage cells have been modified
+                // This will be used by components to trigger refreshes
+                state.lastModified = Date.now();
             })
             .addCase(deleteStorageCell.rejected, (state, action) => {
                 console.error('Delete storage cell failed:', action.payload);

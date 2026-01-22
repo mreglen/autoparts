@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateProduct, uploadPhotos, clearProductError, resetProducts, fetchProduct, deleteProductPhotos } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
+import { fetchStorageCells, fetchProductStorageCells, linkProductToCell, deleteProductCellLink } from '../../../redux/slices/StorageCellsSlice';
 import VehicleModal from '../AddPart/VehicleModal';
 import PhotoGallery from '../../../components/PhotoGallery/PhotoGallery';
 import ImageModal from '../../../components/ImageModal/ImageModal';
@@ -16,10 +17,16 @@ const EditPart = () => {
   const productError = useSelector((state) => state.products.error);
   const currentProduct = useSelector((state) => state.products.currentProduct);
   const { storageLocations } = useSelector((state) => state.organization);
+  const { storageCells, productStorageCells, lastModified } = useSelector((state) => state.storageCells);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
+  
+  // Storage cells state
+  const [locationCells, setLocationCells] = useState([]);
+  const [cellValues, setCellValues] = useState({}); // {cellId: value}
+  const [existingLinks, setExistingLinks] = useState([]); // Existing product-cell links
 
   useEffect(() => {
     if (user?.organization_id) {
@@ -88,8 +95,57 @@ const EditPart = () => {
       if (currentProduct.compatible_vehicles && currentProduct.compatible_vehicles.length > 0) {
         setSelectedVehicle(currentProduct.compatible_vehicles[0]);
       }
+
+      // Загрузка существующих связей продукта с ячейками
+      if (currentProduct.id) {
+        dispatch(fetchProductStorageCells(currentProduct.id))
+          .then((result) => {
+            if (fetchProductStorageCells.fulfilled.match(result)) {
+              const links = result.payload.links || [];
+              setExistingLinks(links);
+              
+              // Инициализация значений ячеек из существующих связей
+              const initialValues = {};
+              links.forEach(link => {
+                initialValues[link.storage_cell_id] = link.value || '';
+              });
+              setCellValues(initialValues);
+            }
+          });
+      }
     }
-  }, [currentProduct, productLoaded]);
+  }, [currentProduct, productLoaded, dispatch]);
+  
+  // Refresh storage cell data when storage cells are modified
+  // This ensures we get updated data after additions/deletions
+  useEffect(() => {
+    if (currentProduct?.id && productLoaded && lastModified) {
+      dispatch(fetchProductStorageCells(currentProduct.id))
+        .then((result) => {
+          if (fetchProductStorageCells.fulfilled.match(result)) {
+            const links = result.payload.links || [];
+            setExistingLinks(links);
+            
+            // Update cell values with latest data
+            const initialValues = {};
+            links.forEach(link => {
+              initialValues[link.storage_cell_id] = link.value || '';
+            });
+            setCellValues(initialValues);
+          }
+        });
+      
+      // Also refresh available storage cells for the current location
+      if (formData.storage_location_id) {
+        dispatch(fetchStorageCells(formData.storage_location_id))
+          .then((result) => {
+            if (fetchStorageCells.fulfilled.match(result)) {
+              setLocationCells(Array.isArray(result.payload) ? result.payload : []);
+            }
+          });
+      }
+    }
+  }, [lastModified]); // Trigger when storage cells are modified
 
   // Сброс состояния при изменении ID продукта
   useEffect(() => {
@@ -97,6 +153,9 @@ const EditPart = () => {
     setExistingPhotos([]);
     setPhotos([]);
     setSelectedPhotosForRemoval([]);
+    setLocationCells([]);
+    setCellValues({});
+    setExistingLinks([]);
   }, [id]);
 
   const handlePhotoAdd = (e) => {
@@ -160,9 +219,30 @@ const EditPart = () => {
     }
   };
 
+  // Fetch storage cells when storage location changes
+  useEffect(() => {
+    if (formData.storage_location_id) {
+      dispatch(fetchStorageCells(formData.storage_location_id))
+        .then((result) => {
+          if (fetchStorageCells.fulfilled.match(result)) {
+            setLocationCells(Array.isArray(result.payload) ? result.payload : []);
+          }
+        });
+    } else {
+      setLocationCells([]);
+    }
+  }, [dispatch, formData.storage_location_id]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCellValueChange = (cellId, value) => {
+    setCellValues(prev => ({
+      ...prev,
+      [cellId]: value
+    }));
   };
 
   const handleImageClick = (photos, initialIndex) => {
@@ -221,6 +301,42 @@ const EditPart = () => {
       const result = await dispatch(updateProduct({ id: parseInt(id, 10), productData }));
       if (updateProduct.rejected.match(result)) {
         return;
+      }
+
+      // Handle storage cell links update
+      const productId = parseInt(id, 10);
+      
+      // Get current cell entries (including empty ones to identify removals)
+      const currentCellEntries = Object.entries(cellValues);
+      
+      // Get existing link IDs for cleanup
+      const existingLinkIds = existingLinks.map(link => link.id);
+      const existingCellIds = existingLinks.map(link => link.storage_cell_id);
+      
+      // Delete all existing links first
+      for (const linkId of existingLinkIds) {
+        try {
+          await dispatch(deleteProductCellLink(linkId));
+        } catch (error) {
+          console.warn('Failed to delete existing link:', error);
+        }
+      }
+      
+      // Create new links only for cells with non-empty values
+      for (const [cellId, value] of currentCellEntries) {
+        // Only create link if value is not empty
+        if (value && value.trim() !== '') {
+          try {
+            await dispatch(linkProductToCell({
+              product_id: productId,
+              storage_cell_id: parseInt(cellId, 10),
+              value: value.trim()
+            }));
+          } catch (error) {
+            console.warn('Failed to create link:', error);
+          }
+        }
+        // If value is empty, we simply don't create a new link, effectively removing it
       }
 
       // Очищаем выбранные фото после успешного сохранения
@@ -481,6 +597,69 @@ const EditPart = () => {
             ))}
           </select>
         </div>
+
+        {/* Адресное хранение - выбор ячеек */}
+        {formData.storage_location_id && locationCells.length > 0 && (
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-3">Адресное хранение</h3>
+            <p className="text-sm text-gray-600 mb-4">Укажите значение для каждой ячейки (не обязательно заполнять все поля)</p>
+            
+            <div className="space-y-3">
+              {locationCells.map((cell) => (
+                <div key={cell.id} className="bg-white rounded-md p-3 border border-gray-200">
+                  <div className="font-medium text-gray-900 mb-1">{cell.name}</div>
+                  {cell.description && (
+                    <div className="text-sm text-gray-600 mb-2">{cell.description}</div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Значение в ячейке
+                    </label>
+                    <input
+                      type="text"
+                      value={cellValues[cell.id] || ''}
+                      onChange={(e) => handleCellValueChange(cell.id, e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                        (!cellValues[cell.id] || cellValues[cell.id].trim() === '') && existingLinks.some(link => link.storage_cell_id === cell.id)
+                          ? 'border-orange-300 bg-orange-50' 
+                          : 'border-gray-300'
+                      }`}
+                      placeholder="Введите значение"
+                    />
+                    {(!cellValues[cell.id] || cellValues[cell.id].trim() === '') && existingLinks.some(link => link.storage_cell_id === cell.id) && (
+                      <div className="mt-1 text-xs text-orange-600">
+                        При сохранении адрес хранения будет удален
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Existing links display */}
+            {existingLinks.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <h4 className="text-sm font-medium text-gray-900 mb-2">Текущие адреса хранения:</h4>
+                <div className="space-y-2">
+                  {existingLinks.map((link) => {
+                    const cell = storageCells.find(c => c.id === link.storage_cell_id);
+                    const willBeRemoved = !cellValues[link.storage_cell_id] || cellValues[link.storage_cell_id].trim() === '';
+                    return (
+                      <div key={link.id} className={`text-sm ${willBeRemoved ? 'text-orange-600 line-through' : 'text-gray-600'}`}>
+                        <span className="font-medium">{cell?.name || `Ячейка #${link.storage_cell_id}`}</span>
+                        {link.value && <span>: {link.value}</span>}
+                        {willBeRemoved && <span className="ml-2 text-xs">(будет удален)</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 text-xs text-gray-500">
+                  Чтобы удалить адрес хранения, очистите значение в соответствующем поле выше
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-3">
           <button

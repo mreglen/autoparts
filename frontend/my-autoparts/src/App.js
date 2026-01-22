@@ -29,6 +29,8 @@ import DashboardPage from './pages/Dashboard/DashboardPage';
 import EmployeesPage from './pages/Profile/EmployeesPage';
 import ClientsPage from './pages/Profile/ClientsPage';
 import StorageAddressesPage from './pages/Profile/StorageAddressesPage';
+import PendingSellersPage from './pages/Moderation/PendingSellersPage';
+import SellersPage from './pages/Profile/SellersPage';
 
 
 function App() {
@@ -76,6 +78,8 @@ function App() {
           <Route path="/warehouse-sales" element={<WarehouseSalesPage />} />
           <Route path="/settings/employees" element={<EmployeesPage />} />
           <Route path="/settings/storage-addresses" element={<StorageAddressesPage />} />
+          <Route path="/moderation/pending-sellers" element={<PendingSellersPage />} />
+          <Route path="/sellers" element={<SellersPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
