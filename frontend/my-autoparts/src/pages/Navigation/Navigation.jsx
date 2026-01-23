@@ -187,7 +187,7 @@ export default function Navigation() {
 
                     {/* Профиль / Вход */}
                     <div className="flex items-center gap-3 sm:gap-6 relative">
-                        {token ? (
+                        {token && user ? (
                             <div
                                 className="relative"
                                 onMouseEnter={handleMouseEnter}
@@ -232,6 +232,15 @@ export default function Navigation() {
                                                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-200"
                                                 >
                                                     Клиенты
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/sellers');
+                                                    }}
+                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-200"
+                                                >
+                                                    Продавцы
                                                 </button>
                                             </>
                                         )}
@@ -382,6 +391,15 @@ export default function Navigation() {
                                                 >
                                                     Регистрация продавцов
                                                 </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/moderation/products');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Проверка запчастей
+                                                </button>
                                             </div>
                                         )}
 
@@ -466,6 +484,35 @@ export default function Navigation() {
                                 >
                                     Профиль
                                 </NavLink>
+                                
+                                {/* Модерация для админов в мобильном меню */}
+                                {user?.is_admin && (
+                                    <>
+                                        <div className="border-t border-gray-200 my-4"></div>
+                                        <div className="px-1 py-1">
+                                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Модерация</div>
+                                            <button
+                                                onClick={() => {
+                                                    closeMobileMenu();
+                                                    navigate('/moderation/pending-sellers');
+                                                }}
+                                                className="block w-full text-left px-2 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded mb-1"
+                                            >
+                                                Регистрация продавцов
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    closeMobileMenu();
+                                                    navigate('/moderation/products');
+                                                }}
+                                                className="block w-full text-left px-2 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                            >
+                                                Проверка запчастей
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                                
                                 <button
                                     onClick={handleLogout}
                                     className="block w-full text-left px-1 py-1 text-lg font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-lg min-h-[48px] flex items-center"

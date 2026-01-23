@@ -14,6 +14,7 @@ export default function ProfileWithMenuLayout() {
         const pathMap = {
             '/dashboard': 'dashboard',
             '/clients': 'clients',
+            '/sellers': 'sellers',
             '/profile': 'profile',
             '/purchases/orders': 'purchases-orders',
             '/purchases/returns': 'purchases-returns',
@@ -23,7 +24,9 @@ export default function ProfileWithMenuLayout() {
             '/my-parts': 'parts',
             '/stock-in': 'receipts',
             '/stock-out': 'expenses',
-            '/settings/storage-addresses': 'settings-storage-addresses'
+            '/settings/storage-addresses': 'settings-storage-addresses',
+            '/moderation/products': 'product-moderation',
+            '/moderation/pending-sellers': 'pending-sellers'
         };
         return pathMap[location.pathname] || (user?.is_seller ? 'dashboard' : 'profile');
     });
@@ -34,6 +37,7 @@ export default function ProfileWithMenuLayout() {
             const pathMap = {
                 '/dashboard': 'dashboard',
                 '/clients': 'clients',
+                '/sellers': 'sellers',
                 '/profile': 'profile',
                 '/purchases/orders': 'purchases-orders',
                 '/purchases/returns': 'purchases-returns',
@@ -44,7 +48,9 @@ export default function ProfileWithMenuLayout() {
                 '/stock-in': 'receipts',
                 '/stock-out': 'expenses',
                 '/settings/employees': 'settings-employees',
-                '/settings/storage-addresses': 'settings-storage-addresses'
+                '/settings/storage-addresses': 'settings-storage-addresses',
+                '/moderation/products': 'product-moderation',
+                '/moderation/pending-sellers': 'pending-sellers'
             };
             return pathMap[path] || (user?.is_seller ? 'dashboard' : 'profile');
         };
@@ -119,7 +125,8 @@ export default function ProfileWithMenuLayout() {
                 id: 'moderation',
                 label: 'Модерация',
                 submenu: [
-                    { id: 'pending-sellers', label: 'Регистрация продавцов' }
+                    { id: 'pending-sellers', label: 'Регистрация продавцов' },
+                    { id: 'product-moderation', label: 'Проверка запчастей' }
                 ]
             });
         }
@@ -148,7 +155,8 @@ export default function ProfileWithMenuLayout() {
             'clients': '/clients',
             'sellers': '/sellers',
             'settings-storage-addresses': '/settings/storage-addresses',
-            'pending-sellers': '/moderation/pending-sellers'
+            'pending-sellers': '/moderation/pending-sellers',
+            'product-moderation': '/moderation/products'
         };
 
         const path = tabPathMap[tabId];

@@ -2,7 +2,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect } from 'react';
-import { fetchProfile } from './redux/slices/AuthSlice';
+import { fetchProfile, logout } from './redux/slices/AuthSlice';
 
 // Pages
 import Authorization from './pages/Autorization/Authorization';
@@ -30,6 +30,7 @@ import EmployeesPage from './pages/Profile/EmployeesPage';
 import ClientsPage from './pages/Profile/ClientsPage';
 import StorageAddressesPage from './pages/Profile/StorageAddressesPage';
 import PendingSellersPage from './pages/Moderation/PendingSellersPage';
+import ProductModeration from './pages/Moderation/ProductModeration/ProductModeration';
 import SellersPage from './pages/Profile/SellersPage';
 
 
@@ -37,9 +38,35 @@ function App() {
   const dispatch = useDispatch();
   const { token } = useSelector((state) => state.auth);
 
+  // Check auth status on app load
+  useEffect(() => {
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      dispatch(fetchProfile())
+        .unwrap()
+        .catch((error) => {
+          // If profile fetch fails due to auth error, clear everything
+          if (error?.includes('401') || error?.includes('Unauthorized')) {
+            localStorage.removeItem('token');
+            // Force a Redux state update by dispatching logout
+            dispatch(logout());
+          }
+        });
+    }
+  }, [dispatch]);
+
+  // Fetch profile when token changes
   useEffect(() => {
     if (token) {
-      dispatch(fetchProfile());
+      dispatch(fetchProfile())
+        .unwrap()
+        .catch((error) => {
+          // If profile fetch fails due to auth error, clear local storage
+          if (error?.includes('401') || error?.includes('Unauthorized')) {
+            localStorage.removeItem('token');
+            dispatch(logout());
+          }
+        });
     }
   }, [dispatch, token]);
 
@@ -79,6 +106,7 @@ function App() {
           <Route path="/settings/employees" element={<EmployeesPage />} />
           <Route path="/settings/storage-addresses" element={<StorageAddressesPage />} />
           <Route path="/moderation/pending-sellers" element={<PendingSellersPage />} />
+          <Route path="/moderation/products" element={<ProductModeration />} />
           <Route path="/sellers" element={<SellersPage />} />
         </Route>
       </Routes>

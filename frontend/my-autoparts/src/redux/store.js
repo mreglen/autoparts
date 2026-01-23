@@ -11,6 +11,7 @@ import cartReducer from './slices/CartSlice';
 import clientReducer from './slices/ClientSlice';
 import storageCellsReducer from './slices/StorageCellsSlice';
 import moderationReducer from './slices/ModerationSlice';
+import moderationProductsReducer from './slices/ModerationProductsSlice';
 import sellersReducer from './slices/SellerSlice';
 
 export const store = configureStore({
@@ -27,6 +28,7 @@ export const store = configureStore({
     clients: clientReducer,
     storageCells: storageCellsReducer,
     moderation: moderationReducer,
+    moderationProducts: moderationProductsReducer,
     sellers: sellersReducer,
   },
 });

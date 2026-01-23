@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { createProduct, uploadPhotos, clearProductError, resetProducts } from '../../../redux/slices/ProductSlice';
+import { createPendingProduct, uploadPhotos, clearProductError, resetProducts } from '../../../redux/slices/ProductSlice';
 import { createStockIn, clearStockInError } from '../../../redux/slices/StockInSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { fetchStorageCells } from '../../../redux/slices/StorageCellsSlice';
@@ -165,50 +165,12 @@ const AddPart = () => {
     };
 
     try {
-      const productAction = await dispatch(createProduct(productData));
-      if (createProduct.rejected.match(productAction)) {
+      const productAction = await dispatch(createPendingProduct(productData));
+      if (createPendingProduct.rejected.match(productAction)) {
         return;
       }
 
-      const product = productAction.payload;
-
-      const stockInData = {
-        product_id: product.id,
-        storage_location_id: parseInt(formData.storage_location_id, 10),
-        quantity: parseInt(formData.quantity, 10),
-        sale_price: parseFloat(formData.sale_price),
-        movement_date: new Date().toISOString().split('T')[0],
-      };
-
-      const stockInAction = await dispatch(createStockIn(stockInData));
-      if (createStockIn.rejected.match(stockInAction)) {
-        return;
-      }
-
-      // Save cell values if any are provided
-      const cellEntries = Object.entries(cellQuantities).filter(([cellId, value]) => 
-        value && value.trim() !== ''
-      );
-      
-      if (cellEntries.length > 0) {
-        // Import the linkProductToCell function
-        const { linkProductToCell } = await import('../../../redux/slices/StorageCellsSlice');
-        
-        // Create links for each cell with a value
-        for (const [cellId, value] of cellEntries) {
-          try {
-            await dispatch(linkProductToCell({
-              product_id: product.id,
-              storage_cell_id: parseInt(cellId, 10),
-              value: value.trim()
-            }));
-          } catch (linkError) {
-            console.warn('Failed to link product to cell:', linkError);
-            // Continue with other cells even if one fails
-          }
-        }
-      }
-
+      // Успешно создано в pending_products, переходим к списку
       navigate('/my-parts');
     } catch (err) {
       console.error(err);

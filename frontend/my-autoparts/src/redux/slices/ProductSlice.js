@@ -30,6 +30,33 @@ export const uploadPhotos = createAsyncThunk(
     }
 );
 
+// Async thunk: создание продукта в статусе ожидания
+export const createPendingProduct = createAsyncThunk(
+    'products/createPendingProduct',
+    async (productData, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.post(
+                '/pending-products/',
+                productData,
+            );
+            return response.data;
+        } catch (error) {
+            // Обработка детализированных ошибок FastAPI
+            let errorMessage = 'Ошибка создания товара';
+            if (error.response?.data?.detail) {
+                if (Array.isArray(error.response.data.detail)) {
+                    errorMessage = error.response.data.detail.map(err =>
+                        typeof err === 'string' ? err : err.msg || 'Ошибка валидации'
+                    ).join(', ');
+                } else if (typeof error.response.data.detail === 'string') {
+                    errorMessage = error.response.data.detail;
+                }
+            }
+            return rejectWithValue(errorMessage);
+        }
+    }
+);
+
 // Async thunk: создание продукта
 export const createProduct = createAsyncThunk(
     'products/createProduct',
@@ -479,6 +506,18 @@ const productSlice = createSlice({
             })
             .addCase(fetchVehicles.rejected, (state, action) => {
                 state.vehiclesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(createPendingProduct.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(createPendingProduct.fulfilled, (state, action) => {
+                state.loading = false;
+                // Не добавляем в items, так как это pending product
+            })
+            .addCase(createPendingProduct.rejected, (state, action) => {
+                state.loading = false;
                 state.error = action.payload;
             })
             .addCase(createProduct.pending, (state) => {
