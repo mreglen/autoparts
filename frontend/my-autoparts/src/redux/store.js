@@ -13,6 +13,7 @@ import storageCellsReducer from './slices/StorageCellsSlice';
 import moderationReducer from './slices/ModerationSlice';
 import moderationProductsReducer from './slices/ModerationProductsSlice';
 import sellersReducer from './slices/SellerSlice';
+import publicInfoReducer from './slices/PublicInfoSlice';
 
 export const store = configureStore({
   reducer: {
@@ -30,5 +31,6 @@ export const store = configureStore({
     moderation: moderationReducer,
     moderationProducts: moderationProductsReducer,
     sellers: sellersReducer,
+    publicInfo: publicInfoReducer,
   },
 });

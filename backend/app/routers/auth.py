@@ -217,7 +217,7 @@ def get_profile(current_user: User = Depends(get_current_user), db: Session = De
     # Получаем пользователя с данными организации
     user_data = db.query(User).filter(User.id == current_user.id).first()
 
-    # Создаем объект ответа с названием организации
+    # Создаем объект ответа с названием и телефоном организации
     response_data = {
         "id": user_data.id,
         "last_name": user_data.last_name,
@@ -230,7 +230,8 @@ def get_profile(current_user: User = Depends(get_current_user), db: Session = De
         "is_admin": user_data.is_admin,
         "is_director": user_data.is_director,
         "organization_id": user_data.organization_id,
-        "organization_name": user_data.organization.name if user_data.organization_id and user_data.organization else None
+        "organization_name": user_data.organization.name if user_data.organization_id and user_data.organization else None,
+        "organization_phone": user_data.organization.phone if user_data.organization_id and user_data.organization else None
     }
 
     return response_data
@@ -474,3 +475,24 @@ def verify_password_reset(data: PasswordResetConfirm, db: Session = Depends(get_
     db.delete(token_record)
     db.commit()
     return {"msg": "Пароль успешно изменён"}
+
+
+@router.get("/admin-organization-phone")
+def get_admin_organization_phone(db: Session = Depends(get_db)):
+    """Get the phone number of the admin organization for public display"""
+    # Find the admin user (is_admin = True)
+    admin_user = db.query(User).filter(User.is_admin == True).first()
+    
+    if not admin_user or not admin_user.organization_id:
+        raise HTTPException(status_code=404, detail="Admin organization not found")
+    
+    # Get the organization
+    organization = db.query(Organization).filter(Organization.id == admin_user.organization_id).first()
+    
+    if not organization or not organization.phone:
+        raise HTTPException(status_code=404, detail="Organization phone not found")
+    
+    return {
+        "organization_name": organization.name,
+        "organization_phone": organization.phone
+    }

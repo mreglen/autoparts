@@ -4,7 +4,38 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { logout } from '../../redux/slices/AuthSlice';
 import { selectCart } from '../../redux/slices/CartSlice';
+import { fetchAdminOrganizationPhone } from '../../redux/slices/PublicInfoSlice';
 import Search from './Search/Search';
+import MobileBottomNav from '../../components/MobileBottomNav/MobileBottomNav';
+
+const formatPhoneNumber = (phone) => {
+  if (!phone) return '';
+
+  // Удаляем все нецифровые символы
+  let digits = phone.replace(/\D/g, '');
+
+  // Если начинается с 7 или 8, заменяем на 7
+  if (digits.startsWith('7') || digits.startsWith('8')) {
+    digits = '7' + digits.slice(1);
+  }
+
+  // Форматируем как +7 (XXX) XXX-XX-XX
+  let formatted = '+7 ';
+  if (digits.length > 1) {
+    formatted += '(' + digits.slice(1, 4);
+  }
+  if (digits.length > 4) {
+    formatted += ') ' + digits.slice(4, 7);
+  }
+  if (digits.length > 7) {
+    formatted += '-' + digits.slice(7, 9);
+  }
+  if (digits.length > 9) {
+    formatted += '-' + digits.slice(9, 11);
+  }
+
+  return formatted;
+};
 
 
 export default function Navigation() {
@@ -12,9 +43,15 @@ export default function Navigation() {
     const navigate = useNavigate();
     const { user, token } = useSelector((state) => state.auth);
     const cart = useSelector(selectCart);
+    const { adminOrganizationPhone } = useSelector((state) => state.publicInfo);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [closeTimeout, setCloseTimeout] = useState(null);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    // Fetch admin organization phone on component mount
+    useEffect(() => {
+        dispatch(fetchAdminOrganizationPhone());
+    }, [dispatch]);
 
     const handleLogout = () => {
         dispatch(logout());
@@ -101,7 +138,8 @@ export default function Navigation() {
 
     return (
         <header className="bg-white shadow-md">
-            <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
+            {/* Десктопная версия */}
+            <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 hidden md:block">
                 {/* Верхняя строка: локация + навигация */}
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-2">
@@ -111,10 +149,26 @@ export default function Navigation() {
                             className="filter invert w-5 h-5"
                         />
                         <p className="text-sm sm:text-lg">г. Екатеринбург</p>
+                        {adminOrganizationPhone?.organization_phone && (
+                            <>
+                                <span className="text-sm sm:text-lg text-gray-400 mx-2">|</span>
+                                <a 
+                                    href={`tel:${adminOrganizationPhone.organization_phone.replace(/\D/g, '')}`}
+                                    className="text-sm sm:text-lg text-gray-600 hover:text-indigo-600 transition-colors flex items-center gap-1"
+                                >
+                                    <img
+                                        src="/img/telephone 1.svg"
+                                        alt="Телефон"
+                                        className="w-4 h-4 sm:w-5 sm:h-5"
+                                    />
+                                    {formatPhoneNumber(adminOrganizationPhone.organization_phone)}
+                                </a>
+                            </>
+                        )}
                     </div>
 
                     {/* Десктопное меню */}
-                    <nav className="hidden md:flex flex-wrap justify-center gap-4">
+                    <nav className="flex flex-wrap justify-center gap-4">
                         {/* Всегда видимые пункты */}
                         <NavLink
                             to="/autoparts"
@@ -134,31 +188,7 @@ export default function Navigation() {
                         >
                             Сервис
                         </NavLink>
-
-
-
                     </nav>
-
-                    {/* Мобильное бургер-меню */}
-                    <div className="md:hidden">
-                        <button
-                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            className="p-2 rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
-                        >
-                            <svg
-                                className="h-6 w-6"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                {isMobileMenuOpen ? (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                ) : (
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                )}
-                            </svg>
-                        </button>
-                    </div>
                 </div>
 
                 {/* Основная часть */}
@@ -173,13 +203,11 @@ export default function Navigation() {
                             </div>
                         </NavLink>
 
-                        
-                            <NavLink to="/catalog">
-                                <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition">
-                                    Каталог
-                                </button>
-                            </NavLink>
-                        
+                        <NavLink to="/catalog">
+                            <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition">
+                                Каталог
+                            </button>
+                        </NavLink>
                     </div>
 
                     {/* Поиск */}
@@ -244,8 +272,6 @@ export default function Navigation() {
                                                 </button>
                                             </>
                                         )}
-
-
 
                                         {/* Покупки */}
                                         <div className="px-4 py-1">
@@ -337,8 +363,6 @@ export default function Navigation() {
                                                 </button>
                                             </div>
                                         )}
-
-
 
                                         {/* Настройки для директоров и продавцов */}
                                         {(user?.is_director || user?.is_seller) && (
@@ -440,101 +464,36 @@ export default function Navigation() {
                 </div>
             </div>
 
-            {/* Мобильное меню */}
-            {isMobileMenuOpen && (
-                <div className="md:hidden bg-white border-t border-gray-200">
-                    <div className="px-0.5 py-1 space-y-2">
-                        {/* Основные пункты меню */}
-                        <NavLink
-                            to="/autoparts"
-                            onClick={closeMobileMenu}
-                            className={({ isActive }) =>
-                                `block px-1 py-1 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
-                                    isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
-                                }`
-                            }
-                        >
-                            Автозапчасти
-                        </NavLink>
-                        <NavLink
-                            to="/autoservice"
-                            onClick={closeMobileMenu}
-                            className={({ isActive }) =>
-                                `block px-1 py-1 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
-                                    isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
-                                }`
-                            }
-                        >
-                            Сервис
-                        </NavLink>
-
-
-                        {/* Дополнительные пункты для всех авторизованных */}
-                        {token && (
-                            <>
-                                <div className="border-t border-gray-200 my-4"></div>
-                                <NavLink
-                                    to="/profile"
-                                    onClick={closeMobileMenu}
-                                    className={({ isActive }) =>
-                                        `block px-1 py-1 text-lg font-medium rounded-lg min-h-[48px] flex items-center ${
-                                            isActive ? 'text-indigo-700 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50'
-                                        }`
-                                    }
-                                >
-                                    Профиль
-                                </NavLink>
-                                
-                                {/* Модерация для админов в мобильном меню */}
-                                {user?.is_admin && (
-                                    <>
-                                        <div className="border-t border-gray-200 my-4"></div>
-                                        <div className="px-1 py-1">
-                                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Модерация</div>
-                                            <button
-                                                onClick={() => {
-                                                    closeMobileMenu();
-                                                    navigate('/moderation/pending-sellers');
-                                                }}
-                                                className="block w-full text-left px-2 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded mb-1"
-                                            >
-                                                Регистрация продавцов
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    closeMobileMenu();
-                                                    navigate('/moderation/products');
-                                                }}
-                                                className="block w-full text-left px-2 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                            >
-                                                Проверка запчастей
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
-                                
-                                <button
-                                    onClick={handleLogout}
-                                    className="block w-full text-left px-1 py-1 text-lg font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-lg min-h-[48px] flex items-center"
-                                >
-                                    Выход
-                                </button>
-                            </>
-                        )}
-
-                        {/* Кнопка входа для неавторизованных */}
-                        {!token && (
-                            <NavLink
-                                to="/auth"
-                                onClick={closeMobileMenu}
-                                className="block px-1 py-1 text-lg font-medium text-gray-700 hover:text-indigo-600 hover:bg-gray-50 rounded-lg min-h-[48px] flex items-center"
-                            >
-                                Войти
-                            </NavLink>
-                        )}
+            {/* Мобильная версия - локация и телефон над поиском */}
+            <div className="md:hidden bg-white border-b border-gray-200 px-3 py-2">
+                <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-1">
+                        <img
+                            src="/img/location_on_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg"
+                            alt="Локация"
+                            className="filter invert w-4 h-4"
+                        />
+                        <p className="text-sm">г. Екатеринбург</p>
                     </div>
+                    {adminOrganizationPhone?.organization_phone && (
+                        <a 
+                            href={`tel:${adminOrganizationPhone.organization_phone.replace(/\D/g, '')}`}
+                            className="flex items-center gap-1 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+                        >
+                            <img
+                                src="/img/telephone 1.svg"
+                                alt="Телефон"
+                                className="w-4 h-4"
+                            />
+                            <span>{formatPhoneNumber(adminOrganizationPhone.organization_phone)}</span>
+                        </a>
+                    )}
                 </div>
-            )}
+                <Search />
+            </div>
+
+            {/* Мобильная нижняя навигация */}
+            <MobileBottomNav />
         </header>
     );
 }

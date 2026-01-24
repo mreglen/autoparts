@@ -46,6 +46,7 @@ class UserResponse(BaseModel):
     is_director: bool
     organization_id: Optional[str] = None
     organization_name: Optional[str] = None
+    organization_phone: Optional[str] = None
 
     class Config:
         from_attributes = True 
