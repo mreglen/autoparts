@@ -100,6 +100,22 @@ def get_pending_products(
         .offset(skip)\
         .limit(limit)\
         .all()
+
+
+@router.get("/my", response_model=List[PendingProduct])
+def get_my_pending_products(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Получить список запчастей в ожидании модерации, созданных текущим пользователем"""
+    
+    products = db.query(PendingProductModel)\
+        .filter(PendingProductModel.created_by == current_user.id)\
+        .offset(skip)\
+        .limit(limit)\
+        .all()
     
     # Преобразуем JSON строки обратно в списки
     result = []

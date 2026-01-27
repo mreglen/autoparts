@@ -3,11 +3,12 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import ImageModal from '../../components/ImageModal/ImageModal';
-import { fetchProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
+import { fetchProducts, fetchMyPendingProducts, fetchMyRejectedProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchProductStorageCells, fetchStorageCells } from '../../redux/slices/StorageCellsSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
+import PendingParts from './PendingParts/PendingParts';
 
 const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [] }) => {
   const [showActions, setShowActions] = useState(false);
@@ -89,7 +90,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
         className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
         onClick={onToggleExpand}
       >
-        {part.price != null ? `${part.price.toFixed(2)} ₽` : '—'}
+        {part.price != null && !isNaN(parseFloat(part.price)) ? `${parseFloat(part.price).toFixed(2)} ₽` : '—'}
       </td>
       <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
         <div className="relative actions-dropdown">
@@ -248,7 +249,7 @@ function MyParts() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
-  const { items: products, loading, error } = useSelector((state) => state.products);
+  const { items: products, pendingItems, rejectedItems, loading, error } = useSelector((state) => state.products);
 
   const { storageLocations } = useSelector((state) => state.organization);
   const { productStorageCells, storageCells, lastModified } = useSelector((state) => state.storageCells);
@@ -262,6 +263,7 @@ function MyParts() {
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
   const [searchQuery, setSearchQuery] = useState(''); // Поисковый запрос
   const [selectedStorageLocation, setSelectedStorageLocation] = useState(''); // Выбранный склад
+  const [activeTab, setActiveTab] = useState('in-stock'); // 'in-stock' or 'pending'
   const [formData, setFormData] = useState({
     quantity: '',
     price: '',
@@ -415,6 +417,14 @@ function MyParts() {
     }
   }, [dispatch, user?.organization_id, selectedStorageLocation]);
 
+  // Load pending and rejected products when pending tab is active
+  useEffect(() => {
+    if (activeTab === 'pending' && user?.id) {
+      dispatch(fetchMyPendingProducts());
+      dispatch(fetchMyRejectedProducts());
+    }
+  }, [dispatch, activeTab, user?.id]);
+
   // Create memoized product IDs that need storage cell data
   const productIdsNeedingData = React.useMemo(() => {
     if (displayParts.length === 0 || loading) return [];
@@ -549,11 +559,40 @@ function MyParts() {
         </button>
       </div>
 
-      <div className="font-medium text-lg sm:text-base mb-4 px-0">
-        <h2 className="border-b-4 border-blue-500 pb-2 inline-block">В наличии</h2>
+      {/* Tabs */}
+      <div className="mb-6">
+        <div className="flex space-x-8">
+          <button
+            onClick={() => setActiveTab('in-stock')}
+            className={`font-medium text-lg sm:text-base ${activeTab === 'in-stock' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <div className="pb-2 inline-block border-b-4 border-blue-500">
+              В наличии
+              {products.length > 0 && (
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                  {products.length}
+                </span>
+              )}
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`font-medium text-lg sm:text-base ${activeTab === 'pending' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <div className="pb-2 inline-block border-b-4 border-yellow-500">
+              На модерации
+              {(pendingItems?.length > 0 || rejectedItems?.length > 0) && (
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  {(pendingItems?.length || 0) + (rejectedItems?.length || 0)}
+                </span>
+              )}
+            </div>
+          </button>
+        </div>
       </div>
 
-      {loading ? (
+      {activeTab === 'in-stock' && (
+        loading ? (
         <div className="mt-8 text-center py-16 px-6">
           <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
             <svg className="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -766,7 +805,7 @@ function MyParts() {
                     />
                     <div className="text-right">
                       <div className="text-lg font-bold text-gray-900 mb-1">
-                        {part.price != null ? `${part.price.toFixed(2)} ₽` : '—'}
+                        {part.price != null && !isNaN(parseFloat(part.price)) ? `${parseFloat(part.price).toFixed(2)} ₽` : '—'}
                       </div>
                       <div className="text-sm text-gray-600">{part.quantity || 0} шт.</div>
                     </div>
@@ -938,6 +977,22 @@ function MyParts() {
             ))}
           </div>
         </>
+      ))}
+
+      {/* Pending Parts Tab Content */}
+      {activeTab === 'pending' && (
+        <PendingParts 
+          pendingParts={pendingItems || []}
+          rejectedParts={rejectedItems || []}
+          loading={loading}
+          error={error}
+          onImageClick={handleImageClick}
+          getStorageAddress={(id) => {
+            const location = storageLocations.find(loc => loc.id === id);
+            return location?.address || `Склад #${id}`;
+          }}
+          productStorageCells={productStorageCells}
+        />
       )}
 
       <StockOutModal

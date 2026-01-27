@@ -3,7 +3,6 @@ from fastapi.staticfiles import StaticFiles
 from app.db.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
-# Import models to register them with SQLAlchemy
 from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
@@ -13,7 +12,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Автозапчасти")
 
-# Middleware для обработки больших файлов
+
 @app.middleware("http")
 async def handle_large_files(request: Request, call_next):
     try:

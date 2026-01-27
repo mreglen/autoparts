@@ -16,7 +16,7 @@ from app.models.pending_product_storage_cell import PendingProductStorageCell
 from app.schemas.moderation import ModerateProductRequest, ModerateProductResponse
 from app.schemas.rejected_product import RejectedProductCreate
 from app.schemas.product import ProductCreate
-from app.core.auth import get_current_admin_user
+from app.core.auth import get_current_admin_user, get_current_user
 # Sequential code generation is handled inline
 
 router = APIRouter(prefix="/moderation/products", tags=["Moderation Products"])
@@ -32,6 +32,48 @@ def get_pending_products(
     """Получить список всех запчастей в ожидании модерации"""
     
     products = db.query(PendingProductModel)\
+        .offset(skip)\
+        .limit(limit)\
+        .all()
+    
+    # Преобразуем JSON строки обратно в списки
+    result = []
+    for product in products:
+        product_dict = product.__dict__.copy()
+        if product_dict.get('photos'):
+            try:
+                product_dict['photos'] = json.loads(product_dict['photos'])
+            except:
+                product_dict['photos'] = []
+        else:
+            product_dict['photos'] = []
+            
+        if product_dict.get('vehicle_ids'):
+            try:
+                product_dict['vehicle_ids'] = json.loads(product_dict['vehicle_ids'])
+            except:
+                product_dict['vehicle_ids'] = []
+        else:
+            product_dict['vehicle_ids'] = []
+            
+        # Удаляем SQLAlchemy состояние
+        product_dict.pop('_sa_instance_state', None)
+        result.append(product_dict)
+    
+    return result
+
+
+@router.get("/rejected/my", response_model=list)
+def get_my_rejected_products(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Получить список отклоненных запчастей, созданных текущим пользователем"""
+    
+    products = db.query(RejectedProductModel)\
+        .filter(RejectedProductModel.created_by == current_user.id)\
         .offset(skip)\
         .limit(limit)\
         .all()

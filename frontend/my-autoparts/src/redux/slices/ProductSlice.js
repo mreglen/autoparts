@@ -30,6 +30,36 @@ export const uploadPhotos = createAsyncThunk(
     }
 );
 
+// Async thunk: получение отклоненных запчастей пользователя
+export const fetchMyRejectedProducts = createAsyncThunk(
+    'products/fetchMyRejectedProducts',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get('/moderation/products/rejected/my');
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки отклоненных запчастей'
+            );
+        }
+    }
+);
+
+// Async thunk: получение запчастей пользователя в ожидании модерации
+export const fetchMyPendingProducts = createAsyncThunk(
+    'products/fetchMyPendingProducts',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get('/pending-products/my');
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки запчастей на модерации'
+            );
+        }
+    }
+);
+
 // Async thunk: создание продукта в статусе ожидания
 export const createPendingProduct = createAsyncThunk(
     'products/createPendingProduct',
@@ -356,6 +386,8 @@ const productSlice = createSlice({
     name: 'products',
     initialState: {
         items: [],
+        pendingItems: [], // Запчасти на модерации
+        rejectedItems: [], // Отклоненные запчасти
         vehicles: [],
         currentProduct: null,
         loading: false,
@@ -392,6 +424,32 @@ const productSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder
+            .addCase(fetchMyRejectedProducts.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(fetchMyRejectedProducts.fulfilled, (state, action) => {
+                state.loading = false;
+                state.rejectedItems = action.payload;
+            })
+            .addCase(fetchMyRejectedProducts.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+                state.rejectedItems = [];
+            })
+            .addCase(fetchMyPendingProducts.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(fetchMyPendingProducts.fulfilled, (state, action) => {
+                state.loading = false;
+                state.pendingItems = action.payload;
+            })
+            .addCase(fetchMyPendingProducts.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+                state.pendingItems = [];
+            })
             .addCase(searchAllProducts.pending, (state) => {
                 state.loading = true;
                 state.error = null;
