@@ -1,7 +1,11 @@
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://195.24.65.251/api';
-const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://195.24.65.251';
+
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://VM2512296768.vds.ru';
+const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://VM2512296768.vds.ru';
+
+// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://195.24.65.251/api';
+// const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://195.24.65.251';
 // локально
 
 // const API_BASE = 'http://127.0.0.1:8000/api';
