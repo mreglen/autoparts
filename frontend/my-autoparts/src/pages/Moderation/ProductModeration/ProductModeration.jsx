@@ -11,6 +11,9 @@ import {
 } from '../../../redux/slices/ModerationProductsSlice.js';
 import ProductModerationCard from '../../../components/ProductModerationCard/ProductModerationCard.jsx';
 import RejectProductModal from '../../../components/RejectProductModal/RejectProductModal.jsx';
+import SuccessModal from '../../../components/SuccessModal/SuccessModal.jsx';
+import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal.jsx';
+import ErrorModal from '../../../components/ErrorModal/ErrorModal.jsx';
 
 const ProductModeration = () => {
     const dispatch = useDispatch();
@@ -22,6 +25,20 @@ const ProductModeration = () => {
     const [showRejected, setShowRejected] = useState(false);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
+    
+    // Modal states
+    const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+    const [successModalData, setSuccessModalData] = useState({ title: '', message: '' });
+    
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [confirmModalData, setConfirmModalData] = useState({ 
+        title: '', 
+        message: '', 
+        onConfirm: null 
+    });
+    
+    const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+    const [errorModalData, setErrorModalData] = useState({ title: '', message: '' });
 
     // Проверка прав администратора
     useEffect(() => {
@@ -48,20 +65,33 @@ const ProductModeration = () => {
     // Обработка ошибок
     useEffect(() => {
         if (error) {
-            alert(`Ошибка: ${error}`);
+            setErrorModalData({
+                title: 'Ошибка',
+                message: error
+            });
+            setIsErrorModalOpen(true);
             dispatch(clearModerationError());
         }
     }, [error, dispatch]);
 
     const handleApprove = async (productId) => {
-        if (window.confirm('Вы уверены, что хотите одобрить эту запчасть?')) {
-            try {
-                await dispatch(approveProduct(productId)).unwrap();
-                alert('Запчасть успешно одобрена и добавлена в каталог');
-            } catch (err) {
-                // Ошибка будет обработана в useEffect
+        setConfirmModalData({
+            title: 'Одобрить запчасть',
+            message: 'Вы уверены, что хотите одобрить эту запчасть?',
+            onConfirm: async () => {
+                try {
+                    await dispatch(approveProduct(productId)).unwrap();
+                    setSuccessModalData({
+                        title: 'Успешно!',
+                        message: 'Запчасть успешно одобрена и добавлена в каталог 🎉'
+                    });
+                    setIsSuccessModalOpen(true);
+                } catch (err) {
+                    // Ошибка будет обработана в useEffect
+                }
             }
-        }
+        });
+        setIsConfirmModalOpen(true);
     };
 
     const handleRejectClick = (product) => {
@@ -75,7 +105,11 @@ const ProductModeration = () => {
                 productId: selectedProduct.id,
                 reason
             })).unwrap();
-            alert('Запчасть отклонена');
+            setSuccessModalData({
+                title: 'Успешно!',
+                message: 'Запчасть отклонена ❌'
+            });
+            setIsSuccessModalOpen(true);
             setIsRejectModalOpen(false);
             setSelectedProduct(null);
         } catch (err) {
@@ -203,7 +237,7 @@ const ProductModeration = () => {
                 </>
             )}
 
-            {/* Reject Modal */}
+            {/* Modals */}
             <RejectProductModal
                 isOpen={isRejectModalOpen}
                 onClose={() => {
@@ -212,6 +246,28 @@ const ProductModeration = () => {
                 }}
                 onReject={handleRejectSubmit}
                 productName={selectedProduct?.name}
+            />
+            
+            <SuccessModal
+                isOpen={isSuccessModalOpen}
+                onClose={() => setIsSuccessModalOpen(false)}
+                title={successModalData.title}
+                message={successModalData.message}
+            />
+            
+            <ConfirmModal
+                isOpen={isConfirmModalOpen}
+                onClose={() => setIsConfirmModalOpen(false)}
+                title={confirmModalData.title}
+                message={confirmModalData.message}
+                onConfirm={confirmModalData.onConfirm}
+            />
+            
+            <ErrorModal
+                isOpen={isErrorModalOpen}
+                onClose={() => setIsErrorModalOpen(false)}
+                title={errorModalData.title}
+                message={errorModalData.message}
             />
         </div>
     );

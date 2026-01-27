@@ -176,22 +176,14 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
               {productStorageCells && productStorageCells.length > 0 && (
                 <div>
                   <span className="text-xs text-gray-500">Адрес хранения</span>
-                  <div className="mt-2 space-y-1">
-                    {productStorageCells.map((cellLink) => (
-                      <div
-                        key={cellLink.id}
-                        className="p-2 bg-white rounded border text-sm"
-                      >
-                        <span className="font-medium text-gray-900">
-                          {getCellName(cellLink.storage_cell_id)}
-                        </span>
-                        {cellLink.value && (
-                          <span className="text-gray-700 ml-2">
-                            : {cellLink.value}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                  <div className="mt-2">
+                    <div className="px-3 py-2 bg-gray-50 rounded text-sm text-gray-700 border border-gray-200">
+                      {productStorageCells
+                        .map((cellLink) => cellLink.value)
+                        .filter(value => value)
+                        .join('; ')
+                      }
+                    </div>
                   </div>
                 </div>
               )}
@@ -878,22 +870,14 @@ function MyParts() {
                         {productStorageCells && productStorageCells.length > 0 && (
                           <div>
                             <span className="text-sm text-gray-500 block mb-2">Адрес хранения</span>
-                            <div className="space-y-1">
-                              {productStorageCells.map((cellLink) => (
-                                <div
-                                  key={cellLink.id}
-                                  className="p-2 bg-gray-50 rounded border text-sm"
-                                >
-                                  <span className="font-medium text-gray-900">
-                                    {getCellName(cellLink.storage_cell_id)}
-                                  </span>
-                                  {cellLink.value && (
-                                    <span className="text-gray-700 ml-2">
-                                      : {cellLink.value}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
+                            <div>
+                              <div className="px-3 py-2 bg-gray-50 rounded text-sm text-gray-700 border border-gray-200">
+                                {productStorageCells
+                                  .map((cellLink) => cellLink.value)
+                                  .filter(value => value)
+                                  .join('; ')
+                                }
+                              </div>
                             </div>
                           </div>
                         )}

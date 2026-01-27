@@ -4,6 +4,8 @@ from app.routers.organizations import router as organizations_router
 from app.routers.products import router as products_router
 from app.routers.pending_products import router as pending_products_router
 from app.routers.moderation_products import router as moderation_products_router
+from app.routers.pending_product_storage_cells import router as pending_product_storage_cells_router
+
 from app.routers.acquired_products import router as acquired_products_router
 from app.routers.storage_locations import router as storage_locations_router
 from app.routers.storage_cells import router as storage_cells_router
@@ -37,6 +39,8 @@ api_router.include_router(organizations_router)
 api_router.include_router(products_router)
 api_router.include_router(pending_products_router)
 api_router.include_router(moderation_products_router)
+api_router.include_router(pending_product_storage_cells_router)
+
 api_router.include_router(acquired_products_router)
 api_router.include_router(storage_locations_router)
 api_router.include_router(storage_cells_router)

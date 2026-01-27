@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { fetchSellers } from '../../redux/slices/SellerSlice';
 
 export default function SellersPage() {
     const dispatch = useDispatch();
+    const navigate = useNavigate();
+    const { user } = useSelector((state) => state.auth);
     const [showDeletePopup, setShowDeletePopup] = useState(null);
     
     // Select data from Redux store
@@ -11,9 +14,26 @@ export default function SellersPage() {
     const loading = useSelector((state) => state.sellers.loading);
     const error = useSelector((state) => state.sellers.error);
     
+    // Check admin rights and fetch data
     useEffect(() => {
-        dispatch(fetchSellers());
-    }, [dispatch]);
+        if (!user?.is_admin) {
+            navigate('/', { replace: true });
+        } else {
+            dispatch(fetchSellers());
+        }
+    }, [user, navigate, dispatch]);
+    
+    // If not admin, show access denied
+    if (!user?.is_admin) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Доступ запрещен</h2>
+                    <p className="text-gray-600">У вас нет прав для просмотра этой страницы</p>
+                </div>
+            </div>
+        );
+    }
 
     if (loading && sellers.length === 0) {
         return (

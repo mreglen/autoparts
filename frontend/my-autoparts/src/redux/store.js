@@ -10,6 +10,8 @@ import stockOutReducer from './slices/StockOutSlice';
 import cartReducer from './slices/CartSlice';
 import clientReducer from './slices/ClientSlice';
 import storageCellsReducer from './slices/StorageCellsSlice';
+import pendingProductStorageCellsReducer from './slices/PendingProductStorageCellsSlice';
+
 import moderationReducer from './slices/ModerationSlice';
 import moderationProductsReducer from './slices/ModerationProductsSlice';
 import sellersReducer from './slices/SellerSlice';
@@ -28,6 +30,8 @@ export const store = configureStore({
     cart: cartReducer,
     clients: clientReducer,
     storageCells: storageCellsReducer,
+    pendingProductStorageCells: pendingProductStorageCellsReducer,
+
     moderation: moderationReducer,
     moderationProducts: moderationProductsReducer,
     sellers: sellersReducer,

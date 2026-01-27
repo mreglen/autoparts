@@ -1,11 +1,13 @@
 // src/components/ProfileActions.jsx
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { requestPasswordReset, confirmPasswordReset } from '../../../redux/slices/AuthSlice';
+import { requestPasswordReset, confirmPasswordReset, logout } from '../../../redux/slices/AuthSlice';
+import ConfirmationModal from '../../../components/ConfirmationModal/ConfirmationModal';
 
 export default function ProfileActions({ onEditProfile }) {
     const dispatch = useDispatch();
+    const navigate = useNavigate();
     const { user, loading, error } = useSelector((state) => state.auth);
 
     const [action, setAction] = useState('idle'); // 'idle' | 'changePassword' | 'verifyCode'
@@ -17,6 +19,7 @@ export default function ProfileActions({ onEditProfile }) {
     const [success, setSuccess] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordRepeat, setShowPasswordRepeat] = useState(false);
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -72,6 +75,24 @@ export default function ProfileActions({ onEditProfile }) {
         setShowPasswordRepeat(false);
     };
 
+    const handleLogout = () => {
+        dispatch(logout());
+        navigate('/', { replace: true });
+    };
+
+    const handleLogoutClick = () => {
+        setShowLogoutModal(true);
+    };
+
+    const handleLogoutConfirm = () => {
+        setShowLogoutModal(false);
+        handleLogout();
+    };
+
+    const handleLogoutCancel = () => {
+        setShowLogoutModal(false);
+    };
+
     // Локальные проверки ошибок
     const hasPasswordMismatch = formData.password !== formData.password_repeat;
     const hasShortPassword = formData.password.length > 0 && formData.password.length < 6;
@@ -98,12 +119,12 @@ export default function ProfileActions({ onEditProfile }) {
                     >
                         Сменить пароль
                     </button>
-                    <Link
-                        to="/"
-                        className="block w-full text-center px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                    <button
+                        onClick={handleLogoutClick}
+                        className="block w-full text-center px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                     >
-                        Назад
-                    </Link>
+                        Выход
+                    </button>
                 </div>
             ) : action === 'changePassword' ? (
                 <div>
@@ -223,6 +244,17 @@ export default function ProfileActions({ onEditProfile }) {
                     </form>
                 </div>
             ) : null}
+            
+            <ConfirmationModal
+                isOpen={showLogoutModal}
+                onClose={handleLogoutCancel}
+                onConfirm={handleLogoutConfirm}
+                title="Выход из аккаунта"
+                message="Вы действительно хотите выйти из своего аккаунта?"
+                confirmText="Выйти"
+                cancelText="Отмена"
+                danger={true}
+            />
         </div>
     );
 }

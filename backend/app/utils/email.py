@@ -17,6 +17,29 @@ def send_verification_email(email: str, code: str, subject: str = None, body: st
     msg["Subject"] = subject or "Подтверждение регистрации"
     email_body = body or f"Ваш код подтверждения: {code}"
     msg.attach(MIMEText(email_body, "plain"))
+
+def send_seller_application_confirmation(email: str, full_name: str, organization_name: str):
+    """Send confirmation email to seller after application submission""" 
+    msg = MIMEMultipart()
+    msg["From"] = settings.EMAIL_FROM
+    msg["To"] = email
+    msg["Subject"] = "Заявка на регистрацию продавца отправлена"
+    
+    email_body = f"""Здравствуйте, {full_name}!
+
+Вы успешно оставили заявку на регистрацию на сайте как продавец.
+
+Данные вашей заявки:
+- Организация: {organization_name}
+- Email: {email}
+
+Ваша заявка находится на рассмотрении администратором. После проверки вы получите уведомление о результате модерации.
+
+С уважением,
+Свой Гараж
+    """
+    
+    msg.attach(MIMEText(email_body, "plain"))
     
     try:
         # Try primary configuration (port 465 with SSL)

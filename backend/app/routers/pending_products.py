@@ -8,7 +8,7 @@ from app.models.pending_product import PendingProduct as PendingProductModel
 from app.models.user import User
 from app.schemas.pending_product import PendingProductCreate, PendingProduct, PendingProductUpdate
 from app.core.auth import get_current_user
-from app.utils.id_generator import generate_internal_code
+# Sequential code generation is handled inline
 
 router = APIRouter(prefix="/pending-products", tags=["Pending Products"])
 
@@ -21,12 +21,21 @@ def create_pending_product(
 ):
     """Создать новую запчасть в статусе ожидания модерации"""
     
-    # Генерируем уникальный внутренний код
-    internal_code = generate_internal_code()
+    # Генерируем последовательный числовой внутренний код
+    # Находим все существующие internal_code для организации
+    existing_codes_result = db.query(PendingProductModel.internal_code).all()
     
-    # Проверяем уникальность internal_code
-    while db.query(PendingProductModel).filter(PendingProductModel.internal_code == internal_code).first():
-        internal_code = generate_internal_code()
+    # Извлекаем существующие коды как строки
+    existing_codes = [code_tuple[0] for code_tuple in existing_codes_result]
+    
+    # Начинаем с 1 и находим следующий свободный код в формате 00001
+    next_code = 1
+    while True:
+        candidate_code = f"{next_code:05d}"  # Формат 00001, 00002, etc.
+        if candidate_code not in existing_codes:
+            internal_code = candidate_code
+            break
+        next_code += 1
     
     # Преобразуем списки в JSON строки
     photos_json = json.dumps(product_data.photos) if product_data.photos else None

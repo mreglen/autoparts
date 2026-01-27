@@ -71,11 +71,17 @@ export default function ProfileWithMenuLayout() {
             }
         ];
 
-        // Для продавцов добавляем отдельные вкладки Главная, Клиенты и Продавцы
+        // Для продавцов добавляем отдельные вкладки Главная и Клиенты
         if (user?.is_seller) {
             baseTabs.unshift(
                 { id: 'dashboard', label: 'Главная' },
-                { id: 'clients', label: 'Клиенты' },
+                { id: 'clients', label: 'Клиенты' }
+            );
+        }
+        
+        // Для админов добавляем вкладку Продавцы
+        if (user?.is_admin) {
+            baseTabs.unshift(
                 { id: 'sellers', label: 'Продавцы' }
             );
         }

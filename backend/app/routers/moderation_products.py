@@ -10,11 +10,14 @@ from app.models.vehicle import Vehicle as VehicleModel
 from app.models.product_vehicle import ProductVehicleAssociation
 from app.models.stock_in import StockIn as StockInModel
 from app.models.user import User
+
+from app.models.product_storage_cell import ProductStorageCell
+from app.models.pending_product_storage_cell import PendingProductStorageCell
 from app.schemas.moderation import ModerateProductRequest, ModerateProductResponse
 from app.schemas.rejected_product import RejectedProductCreate
 from app.schemas.product import ProductCreate
 from app.core.auth import get_current_admin_user
-from app.utils.id_generator import generate_internal_code
+# Sequential code generation is handled inline
 
 router = APIRouter(prefix="/moderation/products", tags=["Moderation Products"])
 
@@ -79,10 +82,21 @@ def approve_product(
             detail="Запчасть не найдена"
         )
     
-    # Проверить, что internal_code уникален
-    internal_code = pending_product.internal_code
-    while db.query(ProductModel).filter(ProductModel.internal_code == internal_code).first():
-        internal_code = generate_internal_code()
+    # Генерируем последовательный числовой внутренний код для продуктов
+    # Находим все существующие internal_code в products
+    existing_codes_result = db.query(ProductModel.internal_code).all()
+    
+    # Извлекаем существующие коды как строки
+    existing_codes = [code_tuple[0] for code_tuple in existing_codes_result]
+    
+    # Начинаем с 1 и находим следующий свободный код в формате 00001
+    next_code = 1
+    while True:
+        candidate_code = f"{next_code:05d}"  # Формат 00001, 00002, etc.
+        if candidate_code not in existing_codes:
+            internal_code = candidate_code
+            break
+        next_code += 1
     
     # Создать запись в products (без vehicle_ids и photos)
     db_product = ProductModel(
@@ -154,10 +168,23 @@ def approve_product(
     )
     db.add(stock_in)
     
+    # Переносим данные адресного хранения из pending в основную таблицу
+    pending_storage_cells = db.query(PendingProductStorageCell).filter(
+        PendingProductStorageCell.pending_product_id == pending_product.id
+    ).all()
+    
+    for pending_cell in pending_storage_cells:
+        product_storage_cell = ProductStorageCell(
+            product_id=db_product.id,
+            storage_cell_id=pending_cell.storage_cell_id,
+            value=pending_cell.value
+        )
+        db.add(product_storage_cell)
+    
     # Сохраняем изменения
     db.commit()
     
-    # Удалить из pending
+    # Удалить из pending (включая pending storage cells из-за cascade)
     db.delete(pending_product)
     
     db.commit()

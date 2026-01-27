@@ -56,6 +56,37 @@ class ProductWithStorageCells(BaseModel):
     class Config:
         from_attributes = True
 
+# Pending Product Storage Cell Schemas
+class PendingProductStorageCellBase(BaseModel):
+    pending_product_id: int
+    storage_cell_id: int
+    value: Optional[str] = None
+
+class PendingProductStorageCellCreate(PendingProductStorageCellBase):
+    pass
+
+class PendingProductStorageCellUpdate(BaseModel):
+    pending_product_id: Optional[int] = None
+    storage_cell_id: Optional[int] = None
+    value: Optional[str] = None
+
+class PendingProductStorageCell(PendingProductStorageCellBase):
+    id: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class PendingProductStorageCellResponse(BaseModel):
+    id: int
+    product_id: int  # Alias for pending_product_id
+    storage_cell_id: int
+    value: Optional[str] = None
+    storage_cell_name: str
+    
+    class Config:
+        from_attributes = True
+
 # Import for forward references
 from .storage_location import StorageLocation
 from .product import Product

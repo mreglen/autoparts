@@ -1,6 +1,7 @@
 // src/pages/Authorization/Registration/Registration.jsx
 import { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import SuccessNotification from '../../../components/UI/SuccessNotification';
 import {
     setIsBuyer,
     updateField,
@@ -37,6 +38,7 @@ export default function Registration() {
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordRepeat, setShowPasswordRepeat] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
     const dropdownRef = useRef(null);
     const inputRef = useRef(null);
 
@@ -201,7 +203,8 @@ export default function Registration() {
             }))
                 .unwrap()
                 .then(() => {
-                    navigate('/');
+                    // Show success modal instead of alert
+                    setShowSuccessModal(true);
                 })
                 .catch(() => { });
         } else {
@@ -486,10 +489,20 @@ export default function Registration() {
                             disabled={loading || emailVerification.status !== 'verified'}
                             className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 transition-colors"
                         >
-                            {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+                            {loading ? (isSeller ? 'Отправка заявки...' : 'Регистрация...') : (isSeller ? 'Отправить заявку' : 'Зарегистрироваться')}
                         </button>
                     </div>
                 </div>
+            )}
+            {showSuccessModal && (
+                <SuccessNotification 
+                    message="На ваш email отправлено подтверждение о регистрации как продавец. Ваша заявка находится на рассмотрении администратором. После проверки вы получите уведомление о результате модерации."
+                    onClose={() => setShowSuccessModal(false)}
+                    onConfirm={() => {
+                        setShowSuccessModal(false);
+                        navigate('/');
+                    }}
+                />
             )}
         </div>
     );

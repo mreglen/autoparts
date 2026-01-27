@@ -5,6 +5,8 @@ import { createPendingProduct, uploadPhotos, clearProductError, resetProducts } 
 import { createStockIn, clearStockInError } from '../../../redux/slices/StockInSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { fetchStorageCells } from '../../../redux/slices/StorageCellsSlice';
+import { createPendingProductStorageCellsBatch } from '../../../redux/slices/PendingProductStorageCellsSlice';
+
 import VehicleModal from './VehicleModal';
 
 const AddPart = () => {
@@ -15,6 +17,7 @@ const AddPart = () => {
   const productError = useSelector((state) => state.products.error);
   const { storageLocations } = useSelector((state) => state.organization);
   const { storageCells, lastModified } = useSelector((state) => state.storageCells);
+
   const stockInError = useSelector((state) => state.stockIn.error);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
@@ -168,6 +171,31 @@ const AddPart = () => {
       const productAction = await dispatch(createPendingProduct(productData));
       if (createPendingProduct.rejected.match(productAction)) {
         return;
+      }
+
+      // Get the created pending product ID
+      const pendingProductId = productAction.payload.id;
+
+      // Handle storage cell assignments
+      const storageCellAssignments = [];
+      Object.entries(cellQuantities).forEach(([cellId, value]) => {
+        if (value && value.trim()) {
+          storageCellAssignments.push({
+            pending_product_id: pendingProductId,
+            storage_cell_id: parseInt(cellId, 10),
+            value: value.trim()
+          });
+        }
+      });
+
+      // Create storage cell links if any assignments exist
+      if (storageCellAssignments.length > 0) {
+        try {
+          await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments));
+        } catch (storageError) {
+          console.error('Error creating storage cell assignments:', storageError);
+          // Don't fail the whole operation if storage cell creation fails
+        }
       }
 
       // Успешно создано в pending_products, переходим к списку

@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from jose import jwt
 from app.core.config import Settings
 from app.schemas.user import UserResponse
-from app.utils.email import generate_verification_code, send_verification_email
+from app.utils.email import generate_verification_code, send_verification_email, send_seller_application_confirmation
 from app.utils.event_logger import log_event
 from app.utils.id_generator import random_id
 from app.utils.phone import normalize_to_storage_format  
@@ -440,7 +440,18 @@ def seller_register(data: SellerRegisterRequest, db: Session = Depends(get_db)):
             }
         )
         
-        return SellerRegisterResponse(msg="Заявка успешно отправлена. Ожидайте модерации.")
+        # Send confirmation email to seller
+        full_name = f"{pending_seller.first_name} {pending_seller.last_name}".strip()
+        if pending_seller.patronymic:
+            full_name += f" {pending_seller.patronymic}"
+            
+        send_seller_application_confirmation(
+            email=pending_seller.email,
+            full_name=full_name,
+            organization_name=pending_seller.name_organization
+        )
+        
+        return SellerRegisterResponse(msg="Заявка успешно отправлена. Ожидайте модерации. Подтверждение отправлено на ваш email.")
         
     except Exception as e:
         logger.exception("Ошибка при регистрации продавца")
