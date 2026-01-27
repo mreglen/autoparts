@@ -1,10 +1,10 @@
 import axios from 'axios';
 
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://svoygarage.ru';
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://svoygarage.ru/api';
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygarage.ru';
 
-// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://VM2512296768.vds.ru';
+// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://VM2512296768.vds.ru/api';
 // const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://VM2512296768.vds.ru';
 
 // const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://195.24.65.251/api';
