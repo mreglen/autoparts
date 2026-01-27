@@ -60,34 +60,54 @@ export default function ProfileWithMenuLayout() {
 
     // Определяем доступные вкладки в зависимости от роли пользователя
     const getAvailableTabs = () => {
-        const baseTabs = [
-            {
-                id: 'purchases',
-                label: 'Покупки',
-                submenu: [
-                    { id: 'purchases-orders', label: 'Заказы' },
-                    { id: 'purchases-returns', label: 'Возвраты' }
-                ]
-            }
-        ];
+        let baseTabs = [];
 
-        // Для продавцов добавляем отдельные вкладки Главная и Клиенты
-        if (user?.is_seller) {
-            baseTabs.unshift(
-                { id: 'dashboard', label: 'Главная' },
-                { id: 'clients', label: 'Клиенты' }
-            );
-        }
-        
-        // Для админов добавляем вкладку Продавцы
+        // Для админов добавляем Главную и Продавцы
         if (user?.is_admin) {
-            baseTabs.unshift(
-                { id: 'sellers', label: 'Продавцы' }
-            );
+            baseTabs = [
+                { id: 'dashboard', label: 'Главная' },
+                { id: 'sellers', label: 'Продавцы' },
+                {
+                    id: 'purchases',
+                    label: 'Покупки',
+                    submenu: [
+                        { id: 'purchases-orders', label: 'Заказы' },
+                        { id: 'purchases-returns', label: 'Возвраты' }
+                    ]
+                }
+            ];
+        }
+        // Для продавцов добавляем Главную, Клиенты и Покупки
+        else if (user?.is_seller) {
+            baseTabs = [
+                { id: 'dashboard', label: 'Главная' },
+                { id: 'clients', label: 'Клиенты' },
+                {
+                    id: 'purchases',
+                    label: 'Покупки',
+                    submenu: [
+                        { id: 'purchases-orders', label: 'Заказы' },
+                        { id: 'purchases-returns', label: 'Возвраты' }
+                    ]
+                }
+            ];
+        }
+        // Для обычных пользователей только Покупки
+        else {
+            baseTabs = [
+                {
+                    id: 'purchases',
+                    label: 'Покупки',
+                    submenu: [
+                        { id: 'purchases-orders', label: 'Заказы' },
+                        { id: 'purchases-returns', label: 'Возвраты' }
+                    ]
+                }
+            ];
         }
 
-        // Для продавцов добавляем продажи
-        if (user?.is_seller) {
+        // Для продавцов и админов добавляем продажи
+        if (user?.is_seller || user?.is_admin) {
             baseTabs.push({
                 id: 'sales',
                 label: 'Продажи',
@@ -99,8 +119,8 @@ export default function ProfileWithMenuLayout() {
             });
         }
 
-        // Для продавцов добавляем вкладку склад с подменю
-        if (user?.is_seller) {
+        // Для продавцов и админов добавляем вкладку склад с подменю
+        if (user?.is_seller || user?.is_admin) {
             baseTabs.push({
                 id: 'warehouse',
                 label: 'Склад',
