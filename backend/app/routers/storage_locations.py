@@ -13,7 +13,7 @@ def create_storage_location(loc: StorageLocationCreate, db: Session = Depends(ge
     db.commit()
     db.refresh(db_loc)
     return db_loc
-
+# 
 @router.get("/{loc_id}", response_model=StorageLocationSchema)
 def read_storage_location(loc_id: int, db: Session = Depends(get_db)):
     loc = db.query(StorageLocationModel).filter(StorageLocationModel.id == loc_id).first()

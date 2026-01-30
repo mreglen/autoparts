@@ -181,7 +181,7 @@ def create_organization(org: OrganizationCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_org)
     return db_org
-
+# 
 @router.get("/{org_id}", response_model=OrganizationSchema)
 def read_organization(org_id: str, db: Session = Depends(get_db)):
     org = db.query(OrganizationModel).filter(OrganizationModel.id == org_id).first()

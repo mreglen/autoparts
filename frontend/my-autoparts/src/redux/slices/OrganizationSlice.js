@@ -15,6 +15,7 @@ export const fetchOrganization = createAsyncThunk(
     }
 );
 
+
 // Обновление организации
 export const updateOrganization = createAsyncThunk(
     'organization/updateOrganization',
@@ -31,18 +32,6 @@ export const updateOrganization = createAsyncThunk(
     }
 );
 
-// Загрузка складов по organization_id
-export const fetchStorageLocations = createAsyncThunk(
-    'organization/fetchStorageLocations',
-    async (orgId, { rejectWithValue }) => {
-        try {
-            const result = await apiRequest(`/storage-locations?organization_id=${orgId}`);
-            return result;
-        } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка загрузки складов');
-        }
-    }
-);
 
 // Создание склада
 export const createStorageLocation = createAsyncThunk(
@@ -60,6 +49,18 @@ export const createStorageLocation = createAsyncThunk(
     }
 );
 
+// Загрузка складов по organization_id
+export const fetchStorageLocations = createAsyncThunk(
+    'organization/fetchStorageLocations',
+    async (orgId, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest(`/storage-locations?organization_id=${orgId}`);
+            return result;
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка загрузки складов');
+        }
+    }
+);
 // Обновление склада
 export const updateStorageLocation = createAsyncThunk(
     'organization/updateStorageLocation',
