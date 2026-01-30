@@ -36,7 +36,7 @@ export const fetchStorageLocations = createAsyncThunk(
     'organization/fetchStorageLocations',
     async (orgId, { rejectWithValue }) => {
         try {
-            const result = await apiRequest(`/api/api/storage-locations?organization_id=${orgId}`);
+            const result = await apiRequest(`/storage-locations?organization_id=${orgId}`);
             return result;
         } catch (err) {
             return rejectWithValue(err?.detail || 'Ошибка загрузки складов');
