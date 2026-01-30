@@ -24,9 +24,8 @@ from app.routers.orders import router as orders_router
 from app.routers.clients import router as clients_router
 
 
-# api_router = APIRouter(prefix="/api")
+api_router = APIRouter(prefix="/api")
 
-api_router = APIRouter()
 
 
 api_router.include_router(search_products_router)
