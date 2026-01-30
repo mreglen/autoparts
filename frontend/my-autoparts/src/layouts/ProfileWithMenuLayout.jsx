@@ -47,7 +47,6 @@ export default function ProfileWithMenuLayout() {
                 '/my-parts': 'parts',
                 '/stock-in': 'receipts',
                 '/stock-out': 'expenses',
-                '/settings/employees': 'settings-employees',
                 '/settings/storage-addresses': 'settings-storage-addresses',
                 '/moderation/products': 'product-moderation',
                 '/moderation/pending-sellers': 'pending-sellers'
@@ -56,7 +55,7 @@ export default function ProfileWithMenuLayout() {
         };
         
         setActiveTab(getActiveTabFromPath(location.pathname));
-    }, [location.pathname, user?.is_seller]);
+    }, [location.pathname, user?.is_seller, user?.is_employee]);
 
     // Определяем доступные вкладки в зависимости от роли пользователя
     const getAvailableTabs = () => {
@@ -106,8 +105,8 @@ export default function ProfileWithMenuLayout() {
             ];
         }
 
-        // Для продавцов и админов добавляем продажи
-        if (user?.is_seller || user?.is_admin) {
+        // Для продавцов, админов и сотрудников добавляем продажи
+        if (user?.is_seller || user?.is_admin || user?.is_employee) {
             baseTabs.push({
                 id: 'sales',
                 label: 'Продажи',
@@ -119,8 +118,8 @@ export default function ProfileWithMenuLayout() {
             });
         }
 
-        // Для продавцов и админов добавляем вкладку склад с подменю
-        if (user?.is_seller || user?.is_admin) {
+        // Для продавцов, админов и сотрудников добавляем вкладку склад с подменю
+        if (user?.is_seller || user?.is_admin || user?.is_employee) {
             baseTabs.push({
                 id: 'warehouse',
                 label: 'Склад',
@@ -128,6 +127,18 @@ export default function ProfileWithMenuLayout() {
                     { id: 'parts', label: 'Мои запчасти' },
                     { id: 'receipts', label: 'Поступление' },
                     { id: 'expenses', label: 'Расходы' }
+                ]
+            });
+        }
+
+        // Для продавцов и админов (не директоров) добавляем настройки
+        if ((user?.is_seller || user?.is_admin) && !user?.is_director) {
+            baseTabs.push({
+                id: 'settings',
+                label: 'Настройки',
+                submenu: [
+                    { id: 'profile', label: 'Профиль' },
+                    { id: 'settings-storage-addresses', label: 'Адресное хранение' }
                 ]
             });
         }
@@ -140,6 +151,53 @@ export default function ProfileWithMenuLayout() {
                 submenu: [
                     { id: 'profile', label: 'Профиль' },
                     { id: 'settings-employees', label: 'Сотрудники' },
+                    { id: 'settings-storage-addresses', label: 'Адресное хранение' }
+                ]
+            });
+        }
+
+        // Для сотрудников добавляем настройки без сотрудников
+        if (user?.is_employee) {
+            baseTabs = [
+                { id: 'dashboard', label: 'Главная' },
+                { id: 'clients', label: 'Клиенты' },
+                {
+                    id: 'purchases',
+                    label: 'Покупки',
+                    submenu: [
+                        { id: 'purchases-orders', label: 'Заказы' },
+                        { id: 'purchases-returns', label: 'Возвраты' }
+                    ]
+                }
+            ];
+            
+            // Добавляем продажи для сотрудников
+            baseTabs.push({
+                id: 'sales',
+                label: 'Продажи',
+                submenu: [
+                    { id: 'sales-orders', label: 'Заказы покупателей' },
+                    { id: 'sales-returns', label: 'Возвраты покупателей' },
+                    { id: 'warehouse-sales', label: 'Продажи со склада' }
+                ]
+            });
+            
+            // Добавляем склад для сотрудников
+            baseTabs.push({
+                id: 'warehouse',
+                label: 'Склад',
+                submenu: [
+                    { id: 'parts', label: 'Мои запчасти' },
+                    { id: 'receipts', label: 'Поступление' },
+                    { id: 'expenses', label: 'Расходы' }
+                ]
+            });
+            
+            baseTabs.push({
+                id: 'settings',
+                label: 'Настройки',
+                submenu: [
+                    { id: 'profile', label: 'Профиль' },
                     { id: 'settings-storage-addresses', label: 'Адресное хранение' }
                 ]
             });
@@ -177,10 +235,9 @@ export default function ProfileWithMenuLayout() {
             'parts': '/my-parts',
             'receipts': '/stock-in',
             'expenses': '/stock-out',
-            'settings-employees': '/settings/employees',
+            'settings-storage-addresses': '/settings/storage-addresses',
             'clients': '/clients',
             'sellers': '/sellers',
-            'settings-storage-addresses': '/settings/storage-addresses',
             'pending-sellers': '/moderation/pending-sellers',
             'product-moderation': '/moderation/products'
         };

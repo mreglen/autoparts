@@ -229,6 +229,7 @@ def get_profile(current_user: User = Depends(get_current_user), db: Session = De
         "is_seller": user_data.is_seller,
         "is_admin": user_data.is_admin,
         "is_director": user_data.is_director,
+        "is_employee": user_data.is_employee,
         "organization_id": user_data.organization_id,
         "organization_name": user_data.organization.name if user_data.organization_id and user_data.organization else None,
         "organization_phone": user_data.organization.phone if user_data.organization_id and user_data.organization else None

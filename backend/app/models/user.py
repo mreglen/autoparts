@@ -15,6 +15,7 @@ class User(Base):
     is_seller = Column(Boolean, default=False)
     is_admin = Column(Boolean, default=False)
     is_director = Column(Boolean, default=False)
+    is_employee = Column(Boolean, default=False)
     hashed_password = Column(String) 
 
     organization_id = Column(String(10), ForeignKey("organizations.id"))

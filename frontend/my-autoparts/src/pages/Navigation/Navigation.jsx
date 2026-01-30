@@ -101,8 +101,8 @@ export default function Navigation() {
     }, [isMobileMenuOpen]);
 
     const fullName = `${user?.last_name || ''} ${user?.first_name || ''} ${user?.patronymic || ''}`.trim();
-    // Для директоров показываем ФИО, для остальных - название организации или ФИО
-    const displayName = user?.is_director ? (fullName || 'Директор') : (user?.organization_name || fullName || 'Пользователь');
+    // Для директоров и сотрудников показываем ФИО, для остальных - название организации или ФИО
+    const displayName = (user?.is_director || user?.is_employee) ? (fullName || 'Сотрудник') : (user?.organization_name || fullName || 'Пользователь');
 
     // Расчет данных корзины
     const cartData = React.useMemo(() => {
@@ -241,7 +241,7 @@ export default function Navigation() {
                                         </div>
 
                                         {/* Для продавцов - Главная и Клиенты */}
-                                        {user?.is_seller && (
+                                        {(user?.is_seller || user?.is_employee) && (
                                             <>
                                                 <button
                                                     onClick={() => {
@@ -300,8 +300,8 @@ export default function Navigation() {
                                             </button>
                                         </div>
 
-                                        {/* Для продавцов - Продажи */}
-                                        {user?.is_seller && (
+                                        {/* Для продавцов и сотрудников - Продажи */}
+                                        {(user?.is_seller || user?.is_employee) && (
                                             <div className="px-4 py-1 border-t border-gray-100">
                                                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Продажи</div>
                                                 <button
@@ -334,8 +334,8 @@ export default function Navigation() {
                                             </div>
                                         )}
 
-                                        {/* Для продавцов - Склад */}
-                                        {user?.is_seller && (
+                                        {/* Для продавцов и сотрудников - Склад */}
+                                        {(user?.is_seller || user?.is_employee) && (
                                             <div className="px-4 py-1 border-t border-gray-100">
                                                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Склад</div>
                                                 <button
@@ -368,21 +368,21 @@ export default function Navigation() {
                                             </div>
                                         )}
 
-                                        {/* Настройки для директоров и продавцов */}
-                                        {(user?.is_director || user?.is_seller) && (
+                                        {/* Настройки для директоров, продавцов и сотрудников */}
+                                        {(user?.is_director || user?.is_seller || user?.is_employee) && (
                                             <div className="px-4 py-1 border-t border-gray-100">
                                                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Настройки</div>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/profile');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Профиль
+                                                </button>
                                                 {user?.is_director && (
                                                     <>
-                                                        <button
-                                                            onClick={() => {
-                                                                setIsProfileOpen(false);
-                                                                navigate('/profile');
-                                                            }}
-                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                        >
-                                                            Профиль
-                                                        </button>
                                                         <button
                                                             onClick={() => {
                                                                 setIsProfileOpen(false);

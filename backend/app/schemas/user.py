@@ -27,9 +27,9 @@ class UserUpdate(BaseModel):
     first_name: str | None = None
     patronymic: str | None = None
     email: EmailStr | None = None      
-    phone: str | None = None              
-    password: str | None = None            
-
+    phone: str | None = None
+    password: str | None = None
+    
     class Config:
         extra = "ignore"
 
@@ -44,6 +44,7 @@ class UserResponse(BaseModel):
     is_seller: bool
     is_admin: bool
     is_director: bool
+    is_employee: bool
     organization_id: Optional[str] = None
     organization_name: Optional[str] = None
     organization_phone: Optional[str] = None
@@ -58,4 +59,3 @@ class EmployeeCreate(BaseModel):
     email: EmailStr
     phone: str
     password: str
-    is_seller: bool = True

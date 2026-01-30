@@ -15,13 +15,13 @@ export default function SalesOrdersPage() {
 
   // Проверка прав администратора или продавца
   useEffect(() => {
-    if (!user?.is_admin && !user?.is_seller) {
+    if (!user?.is_admin && !user?.is_seller && !user?.is_employee) {
       navigate('/', { replace: true });
     }
   }, [user, navigate]);
 
   useEffect(() => {
-    if (user && (user.is_admin || user.is_seller)) {
+    if (user && (user.is_admin || user.is_seller || user.is_employee)) {
       fetchOrders();
     }
   }, [user]);

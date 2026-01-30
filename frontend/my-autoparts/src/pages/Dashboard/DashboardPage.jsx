@@ -21,13 +21,13 @@ export default function DashboardPage() {
 
   // Проверка прав продавца
   useEffect(() => {
-    if (!user?.is_seller) {
+    if (!user?.is_seller && !user?.is_employee) {
       navigate('/', { replace: true });
     }
   }, [user, navigate]);
 
   useEffect(() => {
-    if (user?.is_seller) {
+    if (user?.is_seller || user?.is_employee) {
       fetchDashboardStats();
     }
   }, [user]);

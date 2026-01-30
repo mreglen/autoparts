@@ -461,7 +461,7 @@ function MyParts() {
   }, [lastModified]); // Trigger when storage cells are modified
 
   if (!user) return <Navigate to="/auth" replace />;
-  if (!user.is_seller) return <Navigate to="/" replace />;
+  if (!user.is_seller && !user.is_employee) return <Navigate to="/" replace />;
 
   const getStorageAddress = (locationId) => {
     if (!locationId) return '—';

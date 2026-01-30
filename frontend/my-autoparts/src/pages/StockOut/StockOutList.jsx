@@ -84,14 +84,14 @@ export const StockOutList = () => {
   };
 
   useEffect(() => {
-    if (user?.is_seller && user.organization_id) {
+    if ((user?.is_seller || user?.is_employee) && user.organization_id) {
       dispatch(fetchStockOuts());
       dispatch(fetchStorageLocations(user.organization_id));
     }
   }, [dispatch, user]);
 
   if (!user) return <Navigate to="/auth" replace />;
-  if (!user.is_seller) return <Navigate to="/" replace />;
+  if (!user.is_seller && !user.is_employee) return <Navigate to="/" replace />;
 
   const toggleExpand = (id) => {
     setExpandedDocId(expandedDocId === id ? null : id);

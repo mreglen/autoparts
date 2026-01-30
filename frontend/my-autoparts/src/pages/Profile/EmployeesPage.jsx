@@ -29,6 +29,8 @@ export default function EmployeesPage() {
     });
     const [editForm, setEditForm] = useState({});
     const [errors, setErrors] = useState({});
+    const [isCreating, setIsCreating] = useState(false);
+    const [openDropdownId, setOpenDropdownId] = useState(null);
 
     // Проверяем права доступа - только директор может просматривать эту страницу
     useEffect(() => {
@@ -44,6 +46,18 @@ export default function EmployeesPage() {
             dispatch(fetchEmployees(user.organization_id));
         }
     }, [dispatch, user?.organization_id]);
+
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (openDropdownId && !event.target.closest('.relative')) {
+                setOpenDropdownId(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [openDropdownId]);
 
     if (!user?.is_director) {
         return null;
@@ -108,24 +122,43 @@ export default function EmployeesPage() {
             return;
         }
         
+        setIsCreating(true);
+        
         const employeeData = {
-            ...formData,
-            organization_id: user.organization_id
+            last_name: formData.last_name.trim(),
+            first_name: formData.first_name.trim(),
+            patronymic: formData.patronymic.trim() || undefined,
+            email: formData.email.trim(),
+            phone: formData.phone.trim(),
+            password: formData.password
         };
         
-        await dispatch(addEmployee({ orgId: user.organization_id, employeeData }));
-        
-        // Reset form on success
-        setFormData({
-            last_name: '',
-            first_name: '',
-            patronymic: '',
-            email: '',
-            phone: '',
-            password: ''
-        });
-        setShowAddForm(false);
-        setErrors({});
+        try {
+            const resultAction = await dispatch(addEmployee({ orgId: user.organization_id, employeeData }));
+            
+            if (addEmployee.fulfilled.match(resultAction)) {
+                // Success - reset form and hide it
+                setFormData({
+                    last_name: '',
+                    first_name: '',
+                    patronymic: '',
+                    email: '',
+                    phone: '',
+                    password: ''
+                });
+                setShowAddForm(false);
+                setErrors({});
+            } else {
+                // Handle error
+                const errorMessage = resultAction.payload || 'Ошибка при создании сотрудника';
+                alert(errorMessage);
+            }
+        } catch (error) {
+            console.error('Error creating employee:', error);
+            alert('Произошла ошибка при создании сотрудника');
+        } finally {
+            setIsCreating(false);
+        }
     };
 
     const startEditing = (emp) => {
@@ -296,9 +329,10 @@ export default function EmployeesPage() {
                             </button>
                             <button
                                 type="submit"
-                                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                disabled={isCreating}
+                                className={`w-full sm:w-auto px-4 py-2 rounded-lg transition-colors ${isCreating ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
                             >
-                                Добавить сотрудника
+                                {isCreating ? 'Создание...' : 'Добавить сотрудника'}
                             </button>
                         </div>
                     </form>
@@ -339,6 +373,9 @@ export default function EmployeesPage() {
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Телефон
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Пароль
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Роль
@@ -418,6 +455,20 @@ export default function EmployeesPage() {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
+                                            {isEditing ? (
+                                                <input
+                                                    type="password"
+                                                    name="password"
+                                                    value={editForm.password || ''}
+                                                    onChange={handleEditChange}
+                                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                    placeholder="Новый пароль (опционально)"
+                                                />
+                                            ) : (
+                                                <div className="text-sm text-gray-900">••••••••</div>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm text-gray-900">
                                                 {emp.is_director ? (
                                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -447,21 +498,41 @@ export default function EmployeesPage() {
                                                     </button>
                                                 </div>
                                             ) : (
-                                                <div className="flex justify-end space-x-2">
+                                                <div className="relative flex justify-end">
                                                     {emp.id !== user?.id && (
                                                         <>
                                                             <button
-                                                                onClick={() => startEditing(emp)}
-                                                                className="text-blue-600 hover:text-blue-900 text-xs"
+                                                                onClick={() => setOpenDropdownId(openDropdownId === emp.id ? null : emp.id)}
+                                                                className="text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-3 py-2 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
                                                             >
-                                                                Редактировать
+                                                                Действия
+                                                                <svg className="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}>
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                                </svg>
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleDelete(emp.id, fullName)}
-                                                                className="text-red-600 hover:text-red-900 text-xs"
-                                                            >
-                                                                Удалить
-                                                            </button>
+                                                            
+                                                            {openDropdownId === emp.id && (
+                                                                <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            startEditing(emp);
+                                                                            setOpenDropdownId(null);
+                                                                        }}
+                                                                        className="block w-full text-left px-4 py-2 text-sm text-black hover:bg-gray-100"
+                                                                    >
+                                                                        Редактировать
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            handleDelete(emp.id, fullName);
+                                                                            setOpenDropdownId(null);
+                                                                        }}
+                                                                        className="block w-full text-left px-4 py-2 text-sm text-black hover:bg-gray-100 border-t border-gray-200"
+                                                                    >
+                                                                        Удалить
+                                                                    </button>
+                                                                </div>
+                                                            )}
                                                         </>
                                                     )}
                                                 </div>
@@ -530,14 +601,23 @@ export default function EmployeesPage() {
                                                         name="phone"
                                                         value={editForm.phone || ''}
                                                         onChange={handleEditChange}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded mb-2"
                                                         placeholder="Телефон"
+                                                    />
+                                                    <input
+                                                        type="password"
+                                                        name="password"
+                                                        value={editForm.password || ''}
+                                                        onChange={handleEditChange}
+                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                                                        placeholder="Новый пароль (опционально)"
                                                     />
                                                 </>
                                             ) : (
                                                 <>
                                                     <p className="text-sm text-gray-500">{emp.email}</p>
                                                     <p className="text-sm text-gray-500">{emp.phone}</p>
+                                                    <p className="text-sm text-gray-500">••••••••</p>
                                                 </>
                                             )}
                                         </div>
@@ -567,20 +647,40 @@ export default function EmployeesPage() {
                                         ) : (
                                             <>
                                                 {emp.id !== user?.id && (
-                                                    <>
+                                                    <div className="relative">
                                                         <button
-                                                            onClick={() => startEditing(emp)}
-                                                            className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                                                            onClick={() => setOpenDropdownId(openDropdownId === emp.id ? null : emp.id)}
+                                                            className="text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-3 py-2 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
                                                         >
-                                                            Редактировать
+                                                            Действия
+                                                            <svg className="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                            </svg>
                                                         </button>
-                                                        <button
-                                                            onClick={() => handleDelete(emp.id, fullName)}
-                                                            className="text-red-600 hover:text-red-900 text-sm font-medium"
-                                                        >
-                                                            Удалить
-                                                        </button>
-                                                    </>
+                                                        
+                                                        {openDropdownId === emp.id && (
+                                                            <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        startEditing(emp);
+                                                                        setOpenDropdownId(null);
+                                                                    }}
+                                                                    className="block w-full text-left px-4 py-2 text-sm text-black hover:bg-gray-100"
+                                                                >
+                                                                    Редактировать
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        handleDelete(emp.id, fullName);
+                                                                        setOpenDropdownId(null);
+                                                                    }}
+                                                                    className="block w-full text-left px-4 py-2 text-sm text-black hover:bg-gray-100 border-t border-gray-200"
+                                                                >
+                                                                    Удалить
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </>
                                         )}

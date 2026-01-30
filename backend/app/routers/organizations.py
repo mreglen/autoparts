@@ -10,6 +10,10 @@ from app.schemas.user import EmployeeCreate, UserResponse, UserUpdate
 from app.utils.id_generator import random_id
 from app.utils.phone import normalize_to_storage_format
 from app.models.orders import OrderStatus, OrderItemStatus
+from app.utils.event_logger import log_event
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
@@ -103,37 +107,66 @@ def remove_employee(
     return
 
 @router.post("/{org_id}/employees", response_model=UserResponse)
-def add_employee(org_id: str, employee: EmployeeCreate, db: Session = Depends(get_db)):
-   
+def add_employee(org_id: str, employee: EmployeeCreate, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
+    
+    # Verify that the current user is authorized to add employees
+    if current_user.organization_id != org_id or not current_user.is_director:
+        raise HTTPException(status_code=403, detail="Доступ запрещён: только директор может добавлять сотрудников")
+    
     org = db.query(OrganizationModel).filter(OrganizationModel.id == org_id).first()
     if not org:
         raise HTTPException(status_code=404, detail="Организация не найдена")
 
-  
+    # Check if email already exists
     if db.query(UserModel).filter(UserModel.email == employee.email).first():
         raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
 
+    # Validate and normalize phone
     normalized_phone = normalize_to_storage_format(employee.phone)
     if not normalized_phone:
         raise HTTPException(status_code=400, detail="Неверный формат телефона")
 
-  
+    # Create new employee
     new_user = UserModel(
-        last_name=employee.last_name,
-        first_name=employee.first_name,
-        patronymic=employee.patronymic,
-        email=employee.email,
+        last_name=employee.last_name.strip(),
+        first_name=employee.first_name.strip(),
+        patronymic=employee.patronymic.strip() if employee.patronymic else None,
+        email=employee.email.lower().strip(),
         phone=normalized_phone,
         hashed_password=get_password_hash(employee.password),
-        is_seller=True,            
+        is_seller=False,            
+        is_employee=True,
         is_buyer=False,
         is_director=False,         
         organization_id=org_id,
     )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return new_user
+    
+    try:
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        # Log the event (if logger is available)
+        try:
+            log_event(
+                db,
+                event_type="employee_created",
+                user_id=current_user.id,
+                email=current_user.email,
+                details={
+                    "employee_id": new_user.id,
+                    "employee_email": new_user.email,
+                    "organization_id": org_id
+                }
+            )
+        except Exception as log_error:
+            logger.warning(f"Failed to log employee creation event: {log_error}")
+        
+        return new_user
+    except Exception as e:
+        db.rollback()
+        logger.exception("Ошибка при создании сотрудника")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 @router.get("/{org_id}/employees", response_model=list[UserResponse])
 def get_organization_employees(org_id: str, db: Session = Depends(get_db)):

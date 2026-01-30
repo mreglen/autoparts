@@ -10,12 +10,14 @@ const formatDeliveryTime = (deliveryStart, deliveryEnd) => {
         const startDate = new Date(deliveryStart);
         const endDate = new Date(deliveryEnd);
 
-        const dayText = startDate.toLocaleDateString('ru-RU', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
-
+        // Форматируем дату: число + полное название месяца + день недели (сокращенно)
+        const day = startDate.getDate();
+        const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+        const month = monthNames[startDate.getMonth()];
+        const weekdays = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+        const weekday = weekdays[startDate.getDay()];
+        
+        // Форматируем время
         const startTime = startDate.toLocaleTimeString('ru-RU', {
             hour: '2-digit',
             minute: '2-digit'
@@ -25,7 +27,13 @@ const formatDeliveryTime = (deliveryStart, deliveryEnd) => {
             minute: '2-digit'
         });
 
-        return `${dayText} с ${startTime} до ${endTime}`;
+        // Возвращаем в две строки: первая - дата с днем недели, вторая - время
+        return (
+            <>
+                <div>{day} {month} {weekday}</div>
+                <div>с {startTime} до {endTime}</div>
+            </>
+        );
     } catch (error) {
         console.error('Error formatting delivery time:', error);
         return '—';
@@ -359,7 +367,7 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                 </div>
 
                 <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-gray-600 text-center">
                         {formatDeliveryTime(mainStock.delivery_start, mainStock.delivery_end)}
                     </div>
                     
@@ -430,7 +438,7 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                     return (
                         <div key={`mobile-stock-${idx}`} className="mt-4 pt-4 border-t border-dashed border-gray-200 bg-gray-50 -mx-5 px-5">
                             <div className="flex justify-between items-start mb-3">
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-gray-600 text-center flex-1">
                                     <div className="font-medium text-gray-700 mb-1">Дополнительный склад</div>
                                     {formatDeliveryTime(stock.delivery_start, stock.delivery_end)}
                                 </div>
@@ -509,7 +517,9 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                         {/* Объединяем бренд, номер и наименование */}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 w-36">
-                        {formatDeliveryTime(stock?.delivery_start, stock?.delivery_end)}
+                        <div className="text-center">
+                            {formatDeliveryTime(stock?.delivery_start, stock?.delivery_end)}
+                        </div>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 w-24">
                         {stock?.available_count ?? '—'} шт.

@@ -46,6 +46,9 @@ export default function ProfilePage() {
     } else if (user.is_seller) {
         role = 'Продавец';
         roleColor = 'bg-red-100 text-red-800';
+    } else if (user.is_employee) {
+        role = 'Сотрудник';
+        roleColor = 'bg-green-100 text-green-800';
     }
 
     const handleEdit = () => {

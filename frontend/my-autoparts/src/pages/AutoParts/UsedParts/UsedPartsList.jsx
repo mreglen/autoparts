@@ -80,8 +80,8 @@ const UsedPartsList = () => {
   const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
 
   useEffect(() => {
-    // Загружаем информацию об организации только для авторизованных продавцов
-    if (user?.is_seller && user.organization_id) {
+    // Загружаем информацию об организации только для авторизованных продавцов и сотрудников
+    if ((user?.is_seller || user?.is_employee) && user.organization_id) {
       dispatch(fetchStorageLocations(user.organization_id));
       dispatch(fetchOrganization(user.organization_id));
     }

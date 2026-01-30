@@ -12,6 +12,14 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Автозапчасти")
 
+# Add CORS middleware early
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.middleware("http")
 async def handle_large_files(request: Request, call_next):
@@ -29,14 +37,6 @@ async def handle_large_files(request: Request, call_next):
 app.include_router(api_router)
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 @app.get("/")

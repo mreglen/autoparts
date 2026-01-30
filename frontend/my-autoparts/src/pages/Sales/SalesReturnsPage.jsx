@@ -8,13 +8,13 @@ export default function SalesReturnsPage() {
 
   // Проверка прав администратора или продавца
   React.useEffect(() => {
-    if (!user?.is_admin && !user?.is_seller) {
+    if (!user?.is_admin && !user?.is_seller && !user?.is_employee) {
       navigate('/', { replace: true });
     }
   }, [user, navigate]);
 
-  // Если пользователь не админ и не продавец, не показываем страницу
-  if (!user?.is_admin && !user?.is_seller) {
+  // Если пользователь не админ, не продавец и не сотрудник, не показываем страницу
+  if (!user?.is_admin && !user?.is_seller && !user?.is_employee) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

@@ -201,6 +201,12 @@ const organizationSlice = createSlice({
             })
             .addCase(addEmployee.fulfilled, (state, action) => {
                 state.employees.push(action.payload);
+                state.loadingEmployees = false;
+                state.employeesError = null;
+            })
+            .addCase(addEmployee.rejected, (state, action) => {
+                state.loadingEmployees = false;
+                state.employeesError = action.payload;
             })
             .addCase(createStorageLocation.fulfilled, (state, action) => {
                 state.storageLocations.push(action.payload);

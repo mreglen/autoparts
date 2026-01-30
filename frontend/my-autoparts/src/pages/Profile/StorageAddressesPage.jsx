@@ -81,7 +81,7 @@ const StorageAddressesPage = () => {
 
   // Redirect unauthorized users - this must come after all hooks
   if (!user) return <Navigate to="/auth" replace />;
-  if (!user.is_seller) return <Navigate to="/" replace />;
+  if (!user.is_seller && !user.is_employee) return <Navigate to="/" replace />;
 
   const handleInputChange = (e) => {
     setFormData({

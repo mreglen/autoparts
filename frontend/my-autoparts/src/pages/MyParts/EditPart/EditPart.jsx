@@ -349,7 +349,7 @@ const EditPart = () => {
     }
   };
 
-  if (!user || !user.is_seller) {
+  if (!user || (!user.is_seller && !user.is_employee)) {
     navigate('/');
     return null;
   }
