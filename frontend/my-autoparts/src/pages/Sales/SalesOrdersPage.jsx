@@ -165,10 +165,12 @@ export default function SalesOrdersPage() {
     return 'Способ доставки не указан';
   };
 
-  // Get storage address for a product by joining cell values
-  const getProductStorageAddress = (productId) => {
-    const cells = productStorageCells[productId] || [];
-    return cells
+  // Get storage address for a product from the order item's product_storage_cells
+  const getProductStorageAddressFromItem = (item) => {
+    if (!item.product_storage_cells || !Array.isArray(item.product_storage_cells)) {
+      return null;
+    }
+    return item.product_storage_cells
       .map(cellLink => cellLink.value)
       .filter(value => value)
       .join('; ') || null; // Return null if no valid values
@@ -226,18 +228,19 @@ export default function SalesOrdersPage() {
     setExpandedOrderId(isExpanding ? orderId : null);
     
     if (isExpanding) {
-      // When expanding an order, fetch storage cells for all items in the order
-      const order = orders.find(o => o.id === orderId);
-      if (order && order.items) {
-        order.items.forEach(item => {
-          // Try to get product ID from various possible fields
-          const productId = item.product_id || item.product?.id;
-          if (productId) {
-            // Use the Redux action to fetch storage cells
-            dispatch(fetchProductStorageCells(productId));
-          }
-        });
-      }
+      // When expanding an order, no need to fetch storage cells since they come with the order data
+      // The storage cells are already included in the order items
+      // const order = orders.find(o => o.id === orderId);
+      // if (order && order.items) {
+      //   order.items.forEach(item => {
+      //     // Try to get product ID from various possible fields
+      //     const productId = item.product_id || item.product?.id;
+      //     if (productId) {
+      //       // Use the Redux action to fetch storage cells
+      //       dispatch(fetchProductStorageCells(productId));
+      //     }
+      //   });
+      // }
     }
   };
 
@@ -250,8 +253,8 @@ export default function SalesOrdersPage() {
 
       <div className="space-y-6">
         {/* Десктопная версия - таблица */}
-        <div className="hidden md:block bg-white shadow-sm rounded-lg overflow-hidden">
-          <div className="overflow-hidden">
+        <div className="hidden md:block bg-white shadow-sm rounded-lg">
+          <div className="overflow-x-auto">
             <table className="w-full table-fixed divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -276,7 +279,7 @@ export default function SalesOrdersPage() {
                   <th className="w-[10%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Статус
                   </th>
-                  <th className="w-[9%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-[11%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Сумма
                   </th>
                 </tr>
@@ -354,52 +357,53 @@ export default function SalesOrdersPage() {
                           <table className="w-full table-fixed divide-y divide-gray-200">
                             <thead className="bg-gray-100">
                               <tr>
-                                <th className="w-1/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-[15%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Товар
                                 </th>
-                                <th className="w-3/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-[35%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Наименование
                                 </th>
-                                <th className="w-1/12 px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-[8%] px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Кол-во
                                 </th>
-                                <th className="w-1/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-[12%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Сумма
                                 </th>
-                                <th className="w-1/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-[20%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Адрес хранения
                                 </th>
-                                <th className="w-2/6 px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-[10%] px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Статус
                                 </th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {order.items.map((item) => (
+                              {order.items.filter((item, index, self) =>
+                                index === self.findIndex(i => i.id === item.id)  // Remove duplicates by ID
+                              ).map((item) => (
                                 <tr key={item.id} className="hover:bg-gray-50">
-                                  <td className="px-2 py-2 text-sm text-gray-900">
+                                  <td className="w-[15%] px-2 py-2 text-sm text-gray-900">
                                     <div className="leading-tight">
                                       <div className="font-medium">{item.brand}</div>
                                       <div className="text-gray-600">{item.partnumber}</div>
                                     </div>
                                   </td>
-                                  <td className="px-2 py-2 text-sm text-gray-900">
+                                  <td className="w-[35%] px-2 py-2 text-sm text-gray-900">
                                     <div className="leading-tight break-words max-w-xs">
                                       {item.name}
                                     </div>
                                   </td>
-                                  <td className="px-2 py-2 text-sm text-gray-900 text-center">
+                                  <td className="w-[8%] px-2 py-2 text-sm text-gray-900 text-center">
                                     {item.quantity} шт.
                                   </td>
-                                  <td className="px-2 py-2 text-sm font-medium text-gray-900 text-left">
+                                  <td className="w-[12%] px-2 py-2 text-sm font-medium text-gray-900 text-left">
                                     {formatPrice(item.price * item.quantity)}
                                   </td>
-                                  <td className="px-2 py-2 text-sm text-gray-900">
-                                    {item.is_new === false ? (
+                                  <td className="w-[20%] px-2 py-2 text-sm text-gray-900">
+                                    {item.product_id ? (
                                       <div>
                                         {(() => {
-                                          const productId = item.product_id || item.product?.id;
-                                          const storageAddress = productId ? getProductStorageAddress(productId) : null;
+                                          const storageAddress = getProductStorageAddressFromItem(item);
                                           return storageAddress ? (
                                             <div className="px-3 py-2 bg-gray-50 rounded text-sm text-gray-700 border border-gray-200">
                                               {storageAddress}
@@ -413,7 +417,7 @@ export default function SalesOrdersPage() {
                                       <div className="text-gray-400 italic">-</div>
                                     )}
                                   </td>
-                                  <td className="px-2 py-2 text-center">
+                                  <td className="w-[10%] px-2 py-2 text-center">
                                     {editingStatus?.type === 'item' && editingStatus?.id === item.id ? (
                                       <select
                                         value={item.status.code}
@@ -541,7 +545,9 @@ export default function SalesOrdersPage() {
               {expandedOrderId === order.id && order.items && order.items.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <div className="space-y-3">
-                    {order.items.map((item) => (
+                    {order.items.filter((item, index, self) =>
+                      index === self.findIndex(i => i.id === item.id)  // Remove duplicates by ID
+                    ).map((item) => (
                       <div key={item.id} className="bg-gray-50 rounded-lg p-3">
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex-1 pr-3">
@@ -559,12 +565,11 @@ export default function SalesOrdersPage() {
                             <div className="text-xs text-gray-600">{item.quantity} шт.</div>
                           </div>
                         </div>
-                        {item.is_new === false && (
+                        {item.product_id && (
                           <div className="mb-2">
                             <div className="text-xs text-gray-500">Адрес хранения</div>
                             {(() => {
-                              const productId = item.product_id || item.product?.id;
-                              const storageAddress = productId ? getProductStorageAddress(productId) : null;
+                              const storageAddress = getProductStorageAddressFromItem(item);
                               return storageAddress ? (
                                 <div className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-700 border border-gray-200">
                                   {storageAddress}

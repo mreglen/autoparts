@@ -2,6 +2,11 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 from app.schemas.storage_location import StorageLocation
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.schemas.storage_cell import ProductStorageCell
+
+from app.schemas.storage_location import StorageLocation
 
 class OrderStatusResponse(BaseModel):
     id: int
@@ -30,6 +35,7 @@ class OrderItemResponse(BaseModel):
     status: OrderStatusResponse
     storage_location: Optional[StorageLocation] = None
     product_id: Optional[int] = None
+    product_storage_cells: Optional[List[dict]] = None
 
     class Config:
         from_attributes = True

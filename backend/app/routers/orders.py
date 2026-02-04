@@ -8,6 +8,8 @@ from app.models.product import Product
 from app.models.carts import Cart, NewPartsCart, UsedPartsCart
 from app.schemas.orders import OrderCreate, OrderResponse, OrderStatusResponse, OrderItemResponse, NewPartsOrderResponse
 from app.schemas.storage_location import StorageLocation
+from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
+from app.schemas.storage_cell import ProductStorageCell as ProductStorageCellSchema
 from datetime import datetime
 import random
 import string
@@ -39,6 +41,24 @@ def order_to_response(order: Order, db_session=None) -> OrderResponse:
             if product and product.storage_location:
                 storage_location = StorageLocation.from_orm(product.storage_location)
         
+        # Fetch product storage cells if product_id exists
+        product_storage_cells = []
+        if item.product_id:
+            storage_cells = db_session.query(ProductStorageCellModel).filter(
+                ProductStorageCellModel.product_id == item.product_id
+            ).all()
+            
+            # Convert to response format
+            product_storage_cells = [
+                {
+                    "id": cell.id,
+                    "product_id": cell.product_id,
+                    "storage_cell_id": cell.storage_cell_id,
+                    "value": cell.value
+                }
+                for cell in storage_cells
+            ]
+        
         items_response.append(OrderItemResponse(
             id=item.id,
             name=item.name,
@@ -48,7 +68,8 @@ def order_to_response(order: Order, db_session=None) -> OrderResponse:
             price=item.price,
             status=item.status,
             storage_location=storage_location,
-            product_id=item.product_id
+            product_id=item.product_id,
+            product_storage_cells=product_storage_cells
         ))
 
     new_parts_order_response = None
@@ -206,7 +227,10 @@ async def create_order(
         db.flush()
 
         # Создаем элементы заказа
-        # Сначала создаем элементы заказа из переданных данных
+        # Создаем элементы заказа только из переданных данных, без повторного добавления из корзины
+        # так как все необходимые элементы уже содержатся в order_data.items
+        added_product_ids = set()
+        
         for item_data in order_data.items:
             order_item = OrderItem(
                 order_id=order.id,
@@ -219,25 +243,8 @@ async def create_order(
                 product_id=item_data.product_id  # Сохраняем ID конкретной запчасти
             )
             db.add(order_item)
-        
-        # Добавляем элементы заказа для б/у запчастей из корзины с сохранением product_id
-        if order_data.used_cart_item_ids:
-            used_cart_items = db.query(UsedPartsCart).filter(
-                UsedPartsCart.id.in_(order_data.used_cart_item_ids)
-            ).all()
-            
-            for cart_item in used_cart_items:
-                order_item = OrderItem(
-                    order_id=order.id,
-                    name=cart_item.product.name if cart_item.product else "Б/у запчасть",
-                    brand=cart_item.product.brand if cart_item.product else cart_item.brand,
-                    partnumber=cart_item.product.article if cart_item.product else cart_item.partnumber,
-                    quantity=cart_item.quantity,
-                    price=float(cart_item.price) if cart_item.price else 0,
-                    status_id=pending_item_status.id,
-                    product_id=cart_item.product_id  # Сохраняем ID конкретной запчасти из корзины
-                )
-                db.add(order_item)
+            if item_data.product_id:
+                added_product_ids.add(item_data.product_id)
 
         # Создаем запись для новых запчастей
         new_parts_order = NewPartsOrder(
