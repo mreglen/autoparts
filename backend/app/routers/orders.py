@@ -4,8 +4,10 @@ from app.db.database import get_db
 from app.core.auth import get_current_user, get_current_admin_user
 from app.models.user import User
 from app.models.orders import Order, NewPartsOrder, OrderStatus, OrderItem, OrderItemStatus, RosskoStatus
+from app.models.product import Product
 from app.models.carts import Cart, NewPartsCart, UsedPartsCart
 from app.schemas.orders import OrderCreate, OrderResponse, OrderStatusResponse, OrderItemResponse, NewPartsOrderResponse
+from app.schemas.storage_location import StorageLocation
 from datetime import datetime
 import random
 import string
@@ -18,10 +20,25 @@ def generate_order_number():
     random_chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
     return f"ORD-{timestamp}-{random_chars}"
 
-def order_to_response(order: Order) -> OrderResponse:
+def order_to_response(order: Order, db_session=None) -> OrderResponse:
     """Конвертирует SQLAlchemy объект Order в Pydantic OrderResponse"""
     items_response = []
     for item in order.items:
+        # Find product by brand and partnumber since there's no direct relationship in the model
+        storage_location = None
+        if db_session:
+            # Query product by brand and partnumber (article in Product model)
+            from sqlalchemy import and_
+            product = db_session.query(Product).filter(
+                and_(
+                    Product.brand == item.brand,
+                    Product.article == item.partnumber
+                )
+            ).first()
+            
+            if product and product.storage_location:
+                storage_location = StorageLocation.from_orm(product.storage_location)
+        
         items_response.append(OrderItemResponse(
             id=item.id,
             name=item.name,
@@ -29,7 +46,9 @@ def order_to_response(order: Order) -> OrderResponse:
             partnumber=item.partnumber,
             quantity=item.quantity,
             price=item.price,
-            status=item.status
+            status=item.status,
+            storage_location=storage_location,
+            product_id=item.product_id
         ))
 
     new_parts_order_response = None
@@ -187,6 +206,7 @@ async def create_order(
         db.flush()
 
         # Создаем элементы заказа
+        # Сначала создаем элементы заказа из переданных данных
         for item_data in order_data.items:
             order_item = OrderItem(
                 order_id=order.id,
@@ -195,9 +215,29 @@ async def create_order(
                 partnumber=item_data.partnumber,
                 quantity=item_data.quantity,
                 price=item_data.price,
-                status_id=pending_item_status.id
+                status_id=pending_item_status.id,
+                product_id=item_data.product_id  # Сохраняем ID конкретной запчасти
             )
             db.add(order_item)
+        
+        # Добавляем элементы заказа для б/у запчастей из корзины с сохранением product_id
+        if order_data.used_cart_item_ids:
+            used_cart_items = db.query(UsedPartsCart).filter(
+                UsedPartsCart.id.in_(order_data.used_cart_item_ids)
+            ).all()
+            
+            for cart_item in used_cart_items:
+                order_item = OrderItem(
+                    order_id=order.id,
+                    name=cart_item.product.name if cart_item.product else "Б/у запчасть",
+                    brand=cart_item.product.brand if cart_item.product else cart_item.brand,
+                    partnumber=cart_item.product.article if cart_item.product else cart_item.partnumber,
+                    quantity=cart_item.quantity,
+                    price=float(cart_item.price) if cart_item.price else 0,
+                    status_id=pending_item_status.id,
+                    product_id=cart_item.product_id  # Сохраняем ID конкретной запчасти из корзины
+                )
+                db.add(order_item)
 
         # Создаем запись для новых запчастей
         new_parts_order = NewPartsOrder(
@@ -207,8 +247,6 @@ async def create_order(
         )
         db.add(new_parts_order)
 
-        # Один коммит для всех изменений
-        db.commit()
 
         # Удаляем товары из корзины пользователя после успешного создания заказа
         user_cart = db.query(Cart).filter(Cart.user_id == current_user.id).first()
@@ -236,7 +274,7 @@ async def create_order(
         ).filter(Order.id == order.id).first()
 
 
-        return order_to_response(order_with_relations)
+        return order_to_response(order_with_relations, db)
 
     except Exception as e:
         db.rollback()
@@ -258,7 +296,7 @@ async def get_orders(
         selectinload(Order.items).joinedload(OrderItem.status)
     ).offset(skip).limit(limit).all()
 
-    return [order_to_response(order) for order in orders]
+    return [order_to_response(order, db) for order in orders]
 
 @router.get("/my", response_model=list[OrderResponse])
 async def get_my_orders(
@@ -273,7 +311,7 @@ async def get_my_orders(
         selectinload(Order.items).joinedload(OrderItem.status)
     ).filter(Order.user_id == current_user.id).offset(skip).limit(limit).all()
 
-    return [order_to_response(order) for order in orders]
+    return [order_to_response(order, db) for order in orders]
 
 @router.get("/{order_id}", response_model=OrderResponse)
 async def get_order(
@@ -293,7 +331,7 @@ async def get_order(
     if order.user_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Недостаточно прав для просмотра заказа")
 
-    return order_to_response(order)
+    return order_to_response(order, db)
 
 @router.get("/statuses/", response_model=list[OrderStatusResponse])
 async def get_order_statuses(

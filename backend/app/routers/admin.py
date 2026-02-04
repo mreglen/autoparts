@@ -15,7 +15,7 @@ from app.core.auth import get_current_admin_user
 from app.core.security import get_password_hash
 from app.utils.id_generator import random_id
 from app.utils.event_logger import log_event
-from app.utils.email import send_verification_email
+from app.utils.email import send_verification_email, send_welcome_email
 import secrets
 import string 
 
@@ -161,29 +161,19 @@ def approve_pending_seller(
             }
         )
         
-        # Send password to seller's email
-        email_subject = "Ваша учетная запись продавца одобрена"
-        email_body = f"""
-Здравствуйте, {pending_seller.first_name}!
-
-Ваша заявка на регистрацию продавца была одобрена.
-
-Ваши учетные данные для входа:
-Логин: {user.email}
-Пароль: {password}
-
-
-После первого входа рекомендуем изменить пароль в настройках профиля.
-
-С уважением,
-Команда SvoyGarage
-"""
-        
+        # Send welcome email to seller with credentials
         try:
-            send_verification_email(user.email, password, subject=email_subject, body=email_body)
+            from app.utils.email import send_welcome_email
+            send_welcome_email(
+                email=user.email,
+                full_name=f"{pending_seller.first_name} {pending_seller.last_name}".strip(),
+                login=user.email,
+                password=password,  # Send the auto-generated password
+                organization_name=pending_seller.name_organization
+            )
         except Exception as email_error:
             # Log email error but don't fail the approval
-            print(f"Failed to send email to {user.email}: {email_error}")
+            print(f"Failed to send welcome email to {user.email}: {email_error}")
         
         return {
             "msg": "Продавец одобрен и уведомлен по email",

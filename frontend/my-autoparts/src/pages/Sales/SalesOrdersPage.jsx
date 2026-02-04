@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
+import { fetchProductStorageCells } from '../../redux/slices/StorageCellsSlice';
 
 export default function SalesOrdersPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+  const { productStorageCells } = useSelector((state) => state.storageCells);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -162,6 +165,15 @@ export default function SalesOrdersPage() {
     return 'Способ доставки не указан';
   };
 
+  // Get storage address for a product by joining cell values
+  const getProductStorageAddress = (productId) => {
+    const cells = productStorageCells[productId] || [];
+    return cells
+      .map(cellLink => cellLink.value)
+      .filter(value => value)
+      .join('; ') || null; // Return null if no valid values
+  };
+
   // Если пользователь не админ и не продавец, не показываем страницу
   if (!user?.is_admin && !user?.is_seller) {
     return (
@@ -210,7 +222,23 @@ export default function SalesOrdersPage() {
   }
 
   const toggleOrderExpansion = (orderId) => {
-    setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
+    const isExpanding = expandedOrderId !== orderId;
+    setExpandedOrderId(isExpanding ? orderId : null);
+    
+    if (isExpanding) {
+      // When expanding an order, fetch storage cells for all items in the order
+      const order = orders.find(o => o.id === orderId);
+      if (order && order.items) {
+        order.items.forEach(item => {
+          // Try to get product ID from various possible fields
+          const productId = item.product_id || item.product?.id;
+          if (productId) {
+            // Use the Redux action to fetch storage cells
+            dispatch(fetchProductStorageCells(productId));
+          }
+        });
+      }
+    }
   };
 
   return (
@@ -338,6 +366,9 @@ export default function SalesOrdersPage() {
                                 <th className="w-1/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Сумма
                                 </th>
+                                <th className="w-1/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Адрес хранения
+                                </th>
                                 <th className="w-2/6 px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Статус
                                 </th>
@@ -362,6 +393,25 @@ export default function SalesOrdersPage() {
                                   </td>
                                   <td className="px-2 py-2 text-sm font-medium text-gray-900 text-left">
                                     {formatPrice(item.price * item.quantity)}
+                                  </td>
+                                  <td className="px-2 py-2 text-sm text-gray-900">
+                                    {item.is_new === false ? (
+                                      <div>
+                                        {(() => {
+                                          const productId = item.product_id || item.product?.id;
+                                          const storageAddress = productId ? getProductStorageAddress(productId) : null;
+                                          return storageAddress ? (
+                                            <div className="px-3 py-2 bg-gray-50 rounded text-sm text-gray-700 border border-gray-200">
+                                              {storageAddress}
+                                            </div>
+                                          ) : (
+                                            <div className="text-gray-400 italic">-</div>
+                                          );
+                                        })()}
+                                      </div>
+                                    ) : (
+                                      <div className="text-gray-400 italic">-</div>
+                                    )}
                                   </td>
                                   <td className="px-2 py-2 text-center">
                                     {editingStatus?.type === 'item' && editingStatus?.id === item.id ? (
@@ -509,6 +559,22 @@ export default function SalesOrdersPage() {
                             <div className="text-xs text-gray-600">{item.quantity} шт.</div>
                           </div>
                         </div>
+                        {item.is_new === false && (
+                          <div className="mb-2">
+                            <div className="text-xs text-gray-500">Адрес хранения</div>
+                            {(() => {
+                              const productId = item.product_id || item.product?.id;
+                              const storageAddress = productId ? getProductStorageAddress(productId) : null;
+                              return storageAddress ? (
+                                <div className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-700 border border-gray-200">
+                                  {storageAddress}
+                                </div>
+                              ) : (
+                                <div className="text-gray-400 italic text-xs">-</div>
+                              );
+                            })()}
+                          </div>
+                        )}
                         <div className="flex justify-end">
                           {editingStatus?.type === 'item' && editingStatus?.id === item.id ? (
                             <select

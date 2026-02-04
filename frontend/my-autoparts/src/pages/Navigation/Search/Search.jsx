@@ -29,7 +29,8 @@ function Search() {
       dispatch(fetchSearchResults({ text: trimmedTerm }))
     ]).then(() => {
       setLastSearchTerm(trimmedTerm);
-      setSearchTerm(''); // Очищаем строку поиска после успешного перехода
+      // Сохраняем поисковый запрос в строке поиска вместо очистки
+      setSearchTerm(trimmedTerm);
     }).finally(() => {
       setIsSearching(false);
       navigate('/autoparts');

@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+from app.schemas.storage_location import StorageLocation
 
 class OrderStatusResponse(BaseModel):
     id: int
@@ -17,6 +18,7 @@ class OrderItemCreate(BaseModel):
     quantity: int
     price: float
     status_id: int
+    product_id: Optional[int] = None
 
 class OrderItemResponse(BaseModel):
     id: int
@@ -26,6 +28,8 @@ class OrderItemResponse(BaseModel):
     quantity: int
     price: float
     status: OrderStatusResponse
+    storage_location: Optional[StorageLocation] = None
+    product_id: Optional[int] = None
 
     class Config:
         from_attributes = True

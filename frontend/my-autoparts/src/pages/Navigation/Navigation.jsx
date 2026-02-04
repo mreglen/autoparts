@@ -100,9 +100,10 @@ export default function Navigation() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isMobileMenuOpen]);
 
+    const firstName = user?.first_name || 'Пользователь';
     const fullName = `${user?.last_name || ''} ${user?.first_name || ''} ${user?.patronymic || ''}`.trim();
-    // Для директоров и сотрудников показываем ФИО, для остальных - название организации или ФИО
-    const displayName = (user?.is_director || user?.is_employee) ? (fullName || 'Сотрудник') : (user?.organization_name || fullName || 'Пользователь');
+    // Для директоров и сотрудников показываем только имя, для остальных - название организации или имя
+    const displayName = (user?.is_director || user?.is_employee) ? (firstName) : (user?.organization_name || firstName);
 
     // Расчет данных корзины
     const cartData = React.useMemo(() => {

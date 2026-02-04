@@ -1,6 +1,6 @@
 # app/routers/auth.py
 from fastapi import APIRouter, Depends, Form, HTTPException, status, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.models.organization import Organization
 from app.models.password_reset_token import PasswordResetToken
 from app.models.pending_user import PendingUser
@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from jose import jwt
 from app.core.config import Settings
 from app.schemas.user import UserResponse
-from app.utils.email import generate_verification_code, send_verification_email, send_seller_application_confirmation
+from app.utils.email import generate_verification_code, send_verification_email, send_seller_application_confirmation, send_welcome_email
 from app.utils.event_logger import log_event
 from app.utils.id_generator import random_id
 from app.utils.phone import normalize_to_storage_format  
@@ -146,6 +146,10 @@ def register_confirm(data: VerifyCode, db: Session = Depends(get_db)):
     db.delete(pending)
     db.commit()
     db.refresh(user)
+    
+    # Refresh user with organization data
+    user_with_org = db.query(User).options(joinedload(User.organization)).filter(User.id == user.id).first()
+    
     log_event(
         db,
         event_type="user_registered",
@@ -156,6 +160,23 @@ def register_confirm(data: VerifyCode, db: Session = Depends(get_db)):
             "is_seller": user.is_seller,
             "phone": user.phone,
         }
+    )
+
+    # Send welcome email to user
+    full_name = f"{user.first_name} {user.last_name}".strip()
+    if user.patronymic:
+        full_name += f" {user.patronymic}"
+    
+    organization_name = None
+    if user_with_org and user_with_org.organization:
+        organization_name = user_with_org.organization.name
+    
+    send_welcome_email(
+        email=user.email,
+        full_name=full_name,
+        login=user.email,
+        password=pending.password,  # Send the original password
+        organization_name=organization_name
     )
 
     # Создаем токен с сессией
@@ -320,6 +341,10 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
         db.delete(pending)
         db.commit()
         db.refresh(user)
+        
+        # Refresh user with organization data
+        user_with_org = db.query(User).options(joinedload(User.organization)).filter(User.id == user.id).first()
+        
         log_event(
             db,
             event_type="user_registered",
@@ -330,6 +355,23 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
                 "is_seller": user.is_seller,
                 "phone": user.phone,
             }
+        )
+
+        # Send welcome email to user
+        full_name = f"{user.first_name} {user.last_name}".strip()
+        if user.patronymic:
+            full_name += f" {user.patronymic}"
+        
+        organization_name = None
+        if user_with_org and user_with_org.organization:
+            organization_name = user_with_org.organization.name
+        
+        send_welcome_email(
+            email=user.email,
+            full_name=full_name,
+            login=user.email,
+            password=data.password,  # Send the original password
+            organization_name=organization_name
         )
 
         # Создаем токен с сессией

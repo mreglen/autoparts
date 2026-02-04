@@ -15,12 +15,16 @@ class OrderItem(Base):
     quantity = Column(Integer, nullable=False)  # Количество
     price = Column(Float, nullable=False)  # Цена за единицу
 
+    # ID конкретной запчасти в заказе (для б/у запчастей)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=True)  # Ссылка на конкретный товар
+
     # Статус элемента заказа
     status_id = Column(Integer, ForeignKey("order_item_statuses.id"), nullable=False)
 
     # Связи
     order = relationship("Order", back_populates="items")
     status = relationship("OrderItemStatus", back_populates="order_items")
+    product = relationship("Product")
 
     def __repr__(self):
         return f"<OrderItem(id={self.id}, order_id={self.order_id}, brand='{self.brand}', partnumber='{self.partnumber}')>"

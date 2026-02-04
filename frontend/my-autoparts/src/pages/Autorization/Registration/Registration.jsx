@@ -39,6 +39,8 @@ export default function Registration() {
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordRepeat, setShowPasswordRepeat] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    // Add state for step management
+    const [currentStep, setCurrentStep] = useState(1); // 1: personal info, 2: verification, 3: additional info
     const dropdownRef = useRef(null);
     const inputRef = useRef(null);
 
@@ -59,6 +61,13 @@ export default function Registration() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    // Effect to handle step navigation after email verification
+    useEffect(() => {
+        if (currentStep === 2 && emailVerification.status === 'verified') {
+            setCurrentStep(3);
+        }
+    }, [emailVerification.status, currentStep]);
 
     const validateEmail = (email) => {
         const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -157,6 +166,7 @@ export default function Registration() {
 
     const handleVerifyCode = () => {
         if (!formData.email || !code) return;
+        // Dispatch the verification action
         dispatch(verifyEmailCode({ email: formData.email, code }));
     };
 
@@ -244,6 +254,317 @@ export default function Registration() {
 
     const showCodeInput = emailVerification.status === 'sent' || emailVerification.status === 'error';
 
+    // Step navigation handlers
+    const goToStep2 = () => {
+        // Validate step 1 before proceeding
+        if (!formData.first_name || !formData.last_name || !formData.email) {
+            dispatch({ type: 'auth/setError', payload: 'Заполните все обязательные поля' });
+            return;
+        }
+        if (!validateEmail(formData.email)) {
+            dispatch({ type: 'auth/setError', payload: 'Неверный формат email' });
+            return;
+        }
+        if (!formData.phone) {
+            dispatch({ type: 'auth/setError', payload: 'Введите номер телефона' });
+            return;
+        }
+        // Automatically send verification code when moving to step 2
+        handleSendCode();
+        setCurrentStep(2);
+    };
+
+    const goToStep1 = () => {
+        setCurrentStep(1);
+    };
+
+    const goToStep3 = () => {
+        // Navigate to step 3
+        setCurrentStep(3);
+    };
+
+    const renderStep1 = () => (
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+                <input placeholder="Фамилия" value={formData.last_name} onChange={(e) => handleFieldChange('last_name', e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" required />
+                <input placeholder="Имя" value={formData.first_name} onChange={(e) => handleFieldChange('first_name', e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" required />
+                <input placeholder="Отчество (необязательно)" value={formData.patronymic} onChange={(e) => handleFieldChange('patronymic', e.target.value)} className="w-full col-span-2 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" />
+            </div>
+
+            {/* Email */}
+            <div className="relative">
+                <input
+                    type="email"
+                    placeholder="Email"
+                    value={formData.email}
+                    onChange={(e) => {
+                        const email = e.target.value;
+                        handleFieldChange('email', email);
+                        if (email === '') {
+                            setEmailError('');
+                        } else if (!validateEmail(email)) {
+                            setEmailError('Неверный формат email');
+                        } else {
+                            setEmailError('');
+                        }
+                        if (emailVerification.status) {
+                            dispatch(resetRegistration());
+                            setEmailError('');
+                        }
+                    }}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition ${getEmailFieldClass()}`}
+                    required
+                />
+                {emailError && <p className="text-red-600 text-sm mt-1">{emailError}</p>}
+            </div>
+
+            {/* Phone */}
+            <input
+                type="tel"
+                placeholder="+7 (___) ___-__-__"
+                value={formData.phone}
+                onChange={handlePhoneChange}
+                className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition ${phoneError ? 'border-red-500' : 'border-gray-300'}`}
+                required
+            />
+            {phoneError && <p className="text-red-600 text-sm">{phoneError}</p>}
+
+            <div className="flex justify-end pt-2">
+                <button
+                    type="button"
+                    onClick={goToStep2}
+                    className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 transition-colors"
+                >
+                    Далее
+                </button>
+            </div>
+        </div>
+    );
+
+    const renderStep2 = () => (
+        <div className="space-y-4">
+            <div className="mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Подтверждение email</h3>
+                <p className="text-gray-500 text-sm mt-1">Мы отправили код подтверждения на {formData.email}</p>
+            </div>
+
+            {/* Code input with 6 boxes */}
+            <div className="space-y-4">
+                <div className="flex justify-center space-x-2">
+                    {Array.from({ length: 6 }, (_, index) => (
+                        <input
+                            key={index}
+                            type="text"
+                            maxLength="1"
+                            value={code[index] || ''}
+                            onChange={(e) => {
+                                const newCode = code.split('');
+                                newCode[index] = e.target.value;
+                                dispatch(updateCode(newCode.join('')));
+                                
+                                // Move to next input automatically
+                                if (e.target.value && index < 5) {
+                                    const nextInput = document.getElementById(`code-input-${index + 1}`);
+                                    if (nextInput) nextInput.focus();
+                                }
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Backspace' && !code[index] && index > 0) {
+                                    const prevInput = document.getElementById(`code-input-${index - 1}`);
+                                    if (prevInput) prevInput.focus();
+                                }
+                            }}
+                            id={`code-input-${index}`}
+                            className="w-12 h-12 text-center text-xl border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                        />
+                    ))}
+                </div>
+
+                {emailVerification.status === 'error' && (
+                    <p className="text-red-600 text-sm text-center">{error || 'Неверный код'}</p>
+                )}
+
+                <div className="flex justify-between items-center">
+                    <button
+                        type="button"
+                        onClick={goToStep1}
+                        className="text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                    >
+                        Назад
+                    </button>
+                    
+                    <div className="text-center">
+                        <button
+                            type="button"
+                            onClick={handleResendCode}
+                            disabled={loading}
+                            className="text-indigo-600 hover:text-indigo-800 font-medium text-sm transition-colors"
+                        >
+                            Не пришёл код? Отправить снова
+                        </button>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={handleVerifyCode}
+                        disabled={loading || code.length !== 6}
+                        className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+                    >
+                        Продолжить
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    const renderStep3 = () => (
+        <div className="space-y-4">
+            {!isSeller ? (
+                <>
+                    {/* Password fields for buyer */}
+                    <div className="relative">
+                        <input
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="Пароль"
+                            value={formData.password}
+                            onChange={(e) => handleFieldChange('password', e.target.value)}
+                            className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                            required
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                            aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                        >
+                            {showPassword ? (
+                                <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                            ) : (
+                                <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Password repeat */}
+                    <div className="relative">
+                        <input
+                            type={showPasswordRepeat ? 'text' : 'password'}
+                            placeholder="Повторите пароль"
+                            value={formData.password_repeat}
+                            onChange={(e) => handleFieldChange('password_repeat', e.target.value)}
+                            className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                            required
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowPasswordRepeat(!showPasswordRepeat)}
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                            aria-label={showPasswordRepeat ? "Скрыть пароль" : "Показать пароль"}
+                        >
+                            {showPasswordRepeat ? (
+                                <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                            ) : (
+                                <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Password mismatch hint */}
+                    {formData.password && formData.password_repeat && formData.password !== formData.password_repeat && (
+                        <p className="text-sm text-red-600 mt-1">Пароли не совпадают</p>
+                    )}
+                </>
+            ) : (
+                <>
+                    {/* Organization fields for seller */}
+                    <input
+                        placeholder="Название организации"
+                        value={formData.name_organization}
+                        onChange={(e) => handleFieldChange('name_organization', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                        required
+                    />
+                    <textarea
+                        placeholder="Описание организации"
+                        value={formData.description_organization}
+                        onChange={(e) => handleFieldChange('description_organization', e.target.value)}
+                        rows="3"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition resize-none"
+                        required
+                    />
+                    {/* Адрес организации — улучшенная версия */}
+                    <div className="relative" ref={dropdownRef}>
+                        <input
+                            ref={inputRef}
+                            placeholder="Адрес организации (город, улица, дом)"
+                            value={addressInput}
+                            onChange={(e) => handleAddressChange(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (!suggestions.length) return;
+
+                                if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    setHighlightedIndex((prev) =>
+                                        prev < suggestions.length - 1 ? prev + 1 : prev
+                                    );
+                                } else if (e.key === 'ArrowUp') {
+                                    e.preventDefault();
+                                    setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+                                } else if (e.key === 'Enter' && highlightedIndex >= 0) {
+                                    e.preventDefault();
+                                    selectAddress(suggestions[highlightedIndex]);
+                                } else if (e.key === 'Escape') {
+                                    setSuggestions([]);
+                                    setHighlightedIndex(-1);
+                                }
+                            }}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                            required
+                        />
+                        {suggestions.length > 0 && (
+                            <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-60 overflow-auto">
+                                {suggestions.map((s, i) => (
+                                    <li
+                                        key={i}
+                                        onClick={() => selectAddress(s)}
+                                        onMouseEnter={() => setHighlightedIndex(i)}
+                                        className={`px-4 py-2 cursor-pointer ${i === highlightedIndex
+                                            ? 'bg-indigo-100 text-indigo-800'
+                                            : 'hover:bg-gray-100'
+                                            }`}
+                                    >
+                                        {s.value}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                    {addressError && (
+                        <p className="text-red-600 text-sm mt-1">{addressError}</p>
+                    )}
+                </>
+            )}
+
+            <div className="flex justify-between pt-2">
+                <button
+                    type="button"
+                    onClick={goToStep2}
+                    className="text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                >
+                    Назад
+                </button>
+                <button
+                    type="button"
+                    onClick={handleFinalSubmit}
+                    disabled={loading || emailVerification.status !== 'verified'}
+                    className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 transition-colors"
+                >
+                    {loading ? (isSeller ? 'Отправка заявки...' : 'Регистрация...') : (isSeller ? 'Отправить заявку' : 'Зарегистрироваться')}
+                </button>
+            </div>
+        </div>
+    );
+
     return (
         <div className="space-y-6">
             <div>
@@ -265,233 +586,33 @@ export default function Registration() {
                     <button type="button" onClick={() => handleRoleSelect('seller')} className="w-full py-3 px-4 bg-white border border-gray-300 rounded-xl text-gray-800 font-medium hover:bg-gray-50 transition-colors shadow-sm">Продавец</button>
                 </div>
             ) : (
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                        <input placeholder="Фамилия" value={formData.last_name} onChange={(e) => handleFieldChange('last_name', e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" required />
-                        <input placeholder="Имя" value={formData.first_name} onChange={(e) => handleFieldChange('first_name', e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" required />
-                        <input placeholder="Отчество (необязательно)" value={formData.patronymic} onChange={(e) => handleFieldChange('patronymic', e.target.value)} className="w-full col-span-2 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" />
-                    </div>
-
-                    {/* Email */}
-                    <div className="relative">
-                        <div className="flex items-center">
-                            <input
-                                type="email"
-                                placeholder="Email"
-                                value={formData.email}
-                                onChange={(e) => {
-                                    const email = e.target.value;
-                                    handleFieldChange('email', email);
-                                    if (email === '') {
-                                        setEmailError('');
-                                    } else if (!validateEmail(email)) {
-                                        setEmailError('Неверный формат email');
-                                    } else {
-                                        setEmailError('');
-                                    }
-                                    if (emailVerification.status) {
-                                        dispatch(resetRegistration());
-                                        setEmailError('');
-                                    }
-                                }}
-                                className={`flex-1 px-4 py-2.5 rounded-l-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition border ${getEmailFieldClass()}`}
-                                required
-                            />
-                            {emailVerification.status === 'verified' ? (
-                                <button type="button" disabled className="ml-2 px-3 py-1.5 bg-green-100 text-green-800 rounded text-sm font-medium">Подтверждено</button>
-                            ) : emailVerification.status === 'error' ? (
-                                <button type="button" onClick={handleResendCode} disabled={loading} className="ml-2 px-3 py-1.5 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 disabled:opacity-60">Ещё раз</button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={handleSendCode}
-                                    disabled={loading || !formData.email || !!emailError}
-                                    className="ml-2 px-3 py-1.5 bg-indigo-600 text-white rounded text-sm font-medium hover:bg-indigo-700 disabled:opacity-60"
-                                >
-                                    Отправить код
-                                </button>
-                            )}
+                <div>
+                    {/* Progress indicator */}
+                    <div className="flex justify-between mb-6">
+                        <div className={`flex flex-col items-center ${currentStep >= 1 ? 'text-indigo-600' : 'text-gray-400'}`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep >= 1 ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}>
+                                1
+                            </div>
+                            <span className="text-xs">Данные</span>
                         </div>
-                        {emailError && <p className="text-red-600 text-sm mt-1">{emailError}</p>}
-                    </div>
-
-                    {/* Code input */}
-                    {showCodeInput && (
-                        <div className="space-y-1">
-                            <input
-                                placeholder="Код подтверждения"
-                                value={code}
-                                onChange={(e) => {
-                                    const newCode = e.target.value;
-                                    dispatch(updateCode(newCode));
-                                    if (emailVerification.status === 'error' && newCode.length > 0) {
-                                        dispatch(resetEmailVerificationError());
-                                    }
-                                }}
-                                className={`w-full px-4 py-2.5 text-center border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition ${emailVerification.status === 'error' ? 'border-red-500' : 'border-gray-300'}`}
-                            />
-                            {emailVerification.status !== 'error' && (
-                                <button
-                                    type="button"
-                                    onClick={handleVerifyCode}
-                                    disabled={loading || !code}
-                                    className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
-                                >
-                                    Проверить почту
-                                </button>
-                            )}
+                        <div className={`flex flex-col items-center ${currentStep >= 2 ? 'text-indigo-600' : 'text-gray-400'}`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep >= 2 ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}>
+                                2
+                            </div>
+                            <span className="text-xs">Подтверждение</span>
                         </div>
-                    )}
-
-                    {/* Phone */}
-                    <input
-                        type="tel"
-                        placeholder="+7 (___) ___-__-__"
-                        value={formData.phone}
-                        onChange={handlePhoneChange}
-                        className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition ${phoneError ? 'border-red-500' : 'border-gray-300'}`}
-                        required
-                    />
-                    {phoneError && <p className="text-red-600 text-sm">{phoneError}</p>}
-
-                    {!isSeller && (
-                        <>
-                            {/* Password */}
-                            <div className="relative">
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    placeholder="Пароль"
-                                    value={formData.password}
-                                    onChange={(e) => handleFieldChange('password', e.target.value)}
-                                    className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                                    required
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                                    aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
-                                >
-                                    {showPassword ? (
-                                                    <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                                                ) : (
-                                                    <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                                    )}
-                                </button>
+                        <div className={`flex flex-col items-center ${currentStep >= 3 ? 'text-indigo-600' : 'text-gray-400'}`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep >= 3 ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}>
+                                3
                             </div>
-
-                            {/* Password repeat */}
-                            <div className="relative">
-                                <input
-                                    type={showPasswordRepeat ? 'text' : 'password'}
-                                    placeholder="Повторите пароль"
-                                    value={formData.password_repeat}
-                                    onChange={(e) => handleFieldChange('password_repeat', e.target.value)}
-                                    className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                                    required
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPasswordRepeat(!showPasswordRepeat)}
-                                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                                    aria-label={showPasswordRepeat ? "Скрыть пароль" : "Показать пароль"}
-                                >
-                                    {showPasswordRepeat ? (
-                                                    <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                                                ) : (
-                                                    <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                                    )}
-                                </button>
-                            </div>
-
-                            {/* Password mismatch hint */}
-                            {formData.password && formData.password_repeat && formData.password !== formData.password_repeat && (
-                                <p className="text-sm text-red-600 mt-1">Пароли не совпадают</p>
-                            )}
-                        </>
-                    )}
-
-                    {isSeller && (
-                        <>
-                            <input
-                                placeholder="Название организации"
-                                value={formData.name_organization}
-                                onChange={(e) => handleFieldChange('name_organization', e.target.value)}
-                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
-                                required
-                            />
-                            <textarea
-                                placeholder="Описание организации"
-                                value={formData.description_organization}
-                                onChange={(e) => handleFieldChange('description_organization', e.target.value)}
-                                rows="3"
-                                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition resize-none"
-                                required
-                            />
-                            {/* Адрес организации — улучшенная версия */}
-                            <div className="relative" ref={dropdownRef}>
-                                <input
-                                    ref={inputRef}
-                                    placeholder="Адрес организации (город, улица, дом)"
-                                    value={addressInput}
-                                    onChange={(e) => handleAddressChange(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (!suggestions.length) return;
-
-                                        if (e.key === 'ArrowDown') {
-                                            e.preventDefault();
-                                            setHighlightedIndex((prev) =>
-                                                prev < suggestions.length - 1 ? prev + 1 : prev
-                                            );
-                                        } else if (e.key === 'ArrowUp') {
-                                            e.preventDefault();
-                                            setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : -1));
-                                        } else if (e.key === 'Enter' && highlightedIndex >= 0) {
-                                            e.preventDefault();
-                                            selectAddress(suggestions[highlightedIndex]);
-                                        } else if (e.key === 'Escape') {
-                                            setSuggestions([]);
-                                            setHighlightedIndex(-1);
-                                        }
-                                    }}
-                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                                    required
-                                />
-                                {suggestions.length > 0 && (
-                                    <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-60 overflow-auto">
-                                        {suggestions.map((s, i) => (
-                                            <li
-                                                key={i}
-                                                onClick={() => selectAddress(s)}
-                                                onMouseEnter={() => setHighlightedIndex(i)}
-                                                className={`px-4 py-2 cursor-pointer ${i === highlightedIndex
-                                                    ? 'bg-indigo-100 text-indigo-800'
-                                                    : 'hover:bg-gray-100'
-                                                    }`}
-                                            >
-                                                {s.value}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </div>
-                            {addressError && (
-                                <p className="text-red-600 text-sm mt-1">{addressError}</p>
-                            )}
-                        </>
-                    )}
-
-                    <div className="flex justify-between pt-2">
-                        <button type="button" onClick={() => dispatch(resetRegistration())} className="text-gray-600 hover:text-gray-800 font-medium transition-colors">Назад</button>
-                        <button
-                            type="button"
-                            onClick={handleFinalSubmit}
-                            disabled={loading || emailVerification.status !== 'verified'}
-                            className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 transition-colors"
-                        >
-                            {loading ? (isSeller ? 'Отправка заявки...' : 'Регистрация...') : (isSeller ? 'Отправить заявку' : 'Зарегистрироваться')}
-                        </button>
+                            <span className="text-xs">Доп. инфо</span>
+                        </div>
                     </div>
+
+                    {/* Render current step */}
+                    {currentStep === 1 && renderStep1()}
+                    {currentStep === 2 && renderStep2()}
+                    {currentStep === 3 && renderStep3()}
                 </div>
             )}
             {showSuccessModal && (

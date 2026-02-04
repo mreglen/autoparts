@@ -9,6 +9,19 @@ const formatDeliveryTime = (deliveryStart, deliveryEnd) => {
     try {
         const startDate = new Date(deliveryStart);
         const endDate = new Date(deliveryEnd);
+        
+        // Проверяем, является ли дата сегодняшней или завтрашней
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        const isToday = startDate.getDate() === today.getDate() &&
+                       startDate.getMonth() === today.getMonth() &&
+                       startDate.getFullYear() === today.getFullYear();
+        
+        const isTomorrow = startDate.getDate() === tomorrow.getDate() &&
+                          startDate.getMonth() === tomorrow.getMonth() &&
+                          startDate.getFullYear() === tomorrow.getFullYear();
 
         // Форматируем дату: число + полное название месяца + день недели (сокращенно)
         const day = startDate.getDate();
@@ -27,10 +40,20 @@ const formatDeliveryTime = (deliveryStart, deliveryEnd) => {
             minute: '2-digit'
         });
 
-        // Возвращаем в две строки: первая - дата с днем недели, вторая - время
+        // Если дата сегодня или завтра, показываем соответствующее слово, иначе обычный формат
+        let dateDisplay;
+        if (isToday) {
+            dateDisplay = 'Сегодня';
+        } else if (isTomorrow) {
+            dateDisplay = 'Завтра';
+        } else {
+            dateDisplay = `${day} ${month} ${weekday}`;
+        }
+
+        // Возвращаем в две строки: первая - дата или "Сегодня"/"Завтра", вторая - время
         return (
             <>
-                <div>{day} {month} {weekday}</div>
+                <div>{dateDisplay}</div>
                 <div>с {startTime} до {endTime}</div>
             </>
         );
@@ -235,7 +258,9 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                     </div>
                 </td> */}
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 w-36">
-                    {formatDeliveryTime(mainStock?.delivery_start, mainStock?.delivery_end)}
+                    <div className="font-medium">
+                        {formatDeliveryTime(mainStock?.delivery_start, mainStock?.delivery_end)}
+                    </div>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 w-24">
                     <div className="flex flex-col">
@@ -367,7 +392,7 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                 </div>
 
                 <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                    <div className="text-sm text-gray-600 text-center">
+                    <div className="text-sm text-gray-600 text-center font-medium">
                         {formatDeliveryTime(mainStock.delivery_start, mainStock.delivery_end)}
                     </div>
                     
@@ -440,7 +465,9 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                             <div className="flex justify-between items-start mb-3">
                                 <div className="text-sm text-gray-600 text-center flex-1">
                                     <div className="font-medium text-gray-700 mb-1">Дополнительный склад</div>
-                                    {formatDeliveryTime(stock.delivery_start, stock.delivery_end)}
+                                    <div className="font-medium">
+                                        {formatDeliveryTime(stock.delivery_start, stock.delivery_end)}
+                                    </div>
                                 </div>
                                 <div className="text-right">
                                     <div className="font-bold text-gray-900">
@@ -517,7 +544,7 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                         {/* Объединяем бренд, номер и наименование */}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 w-36">
-                        <div className="text-center">
+                        <div className="text-center font-medium">
                             {formatDeliveryTime(stock?.delivery_start, stock?.delivery_end)}
                         </div>
                     </td>
