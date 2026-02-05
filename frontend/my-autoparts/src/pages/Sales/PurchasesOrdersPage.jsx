@@ -180,7 +180,7 @@ export default function PurchasesOrdersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {orders.map(order => 
+                {orders.map((order) => (
                   <React.Fragment key={order.id}>
                     <tr
                       className="hover:bg-gray-50 cursor-pointer"
@@ -203,8 +203,8 @@ export default function PurchasesOrdersPage() {
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-center">
                         <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${order.is_paid
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
                           }`}>
                           {order.is_paid ? 'Оплачено' : 'Не оплачено'}
                         </span>
@@ -278,7 +278,7 @@ export default function PurchasesOrdersPage() {
                       </tr>
                     )}
                   </React.Fragment>
-                )}
+                ))}
               </tbody>
             </table>
           </div>
@@ -315,8 +315,8 @@ export default function PurchasesOrdersPage() {
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full self-end ${order.is_paid
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
                       }`}>
                       {order.is_paid ? 'Оплачено' : 'Не оплачено'}
                     </span>
