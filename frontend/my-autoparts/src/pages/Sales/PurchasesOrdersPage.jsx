@@ -180,7 +180,7 @@ export default function PurchasesOrdersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {orders.map((order) => (
+                {orders.map(order => (
                   <React.Fragment key={order.id}>
                     <tr
                       className="hover:bg-gray-50 cursor-pointer"

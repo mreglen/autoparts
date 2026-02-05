@@ -12,7 +12,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Автозапчасти")
 
-# Add CORS middleware early
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
