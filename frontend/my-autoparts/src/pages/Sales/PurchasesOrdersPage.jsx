@@ -34,6 +34,7 @@ export default function PurchasesOrdersPage() {
       const ordersResponse = await apiAxios.get('/orders/my/');
 
       setOrders(ordersResponse.data);
+
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
       setError('Не удалось загрузить заказы');
@@ -297,7 +298,7 @@ export default function PurchasesOrdersPage() {
 
         {/* Мобильная версия - карточки */}
         <div className="md:hidden space-y-5">
-          {orders.map((order) => (
+          {Array.isArray(orders) && orders.map((order) => (
             <div key={order.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               {/* Заголовок карточки */}
               <div className="flex justify-between items-start mb-4">
@@ -342,7 +343,7 @@ export default function PurchasesOrdersPage() {
               {expandedOrderId === order.id && order.items && order.items.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <div className="space-y-3">
-                    {order.items.map((item) => (
+                    {Array.isArray(order.items) && order.items.map((item) => (
                       <div key={item.id} className="bg-gray-50 rounded-lg p-3">
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex-1 pr-3">
