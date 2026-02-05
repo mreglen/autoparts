@@ -33,13 +33,7 @@ export default function PurchasesOrdersPage() {
       // Получаем заказы пользователя
       const ordersResponse = await apiAxios.get('/orders/my/');
 
-      setOrders(
-        ordersResponse.data.map(order => ({
-          ...order,
-          items: Array.isArray(order.items) ? order.items : []
-        }))
-      );
-      
+      setOrders(ordersResponse.data);
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
       setError('Не удалось загрузить заказы');
