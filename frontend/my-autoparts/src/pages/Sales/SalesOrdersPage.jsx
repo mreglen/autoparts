@@ -16,6 +16,7 @@ export default function SalesOrdersPage() {
   const [editingStatus, setEditingStatus] = useState(null); // {type: 'order'|'item', id: number}
   const [availableStatuses, setAvailableStatuses] = useState([]);
 
+  console.log(orders)
   // Проверка прав администратора или продавца
   useEffect(() => {
     if (!user?.is_admin && !user?.is_seller && !user?.is_employee) {
