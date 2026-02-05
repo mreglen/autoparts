@@ -180,106 +180,105 @@ export default function PurchasesOrdersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {orders.map(order => (
+                {orders.map(order => 
                   <React.Fragment key={order.id}>
                     <tr
                       className="hover:bg-gray-50 cursor-pointer"
                       onClick={() => toggleOrderExpansion(order.id)}
                     >
-                    <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {order.order_number}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(order.created_at)}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order.new_parts_order?.seller || 'Не указан'}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {'Не указан'}
-                    </td>
-                    <td className="px-3 py-4 text-sm text-gray-900">
-                      {getDeliveryInfo(order)}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-center">
-                      <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${
-                        order.is_paid
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {order.is_paid ? 'Оплачено' : 'Не оплачено'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-center">
-                      <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(order.status.code)}`}>
-                        {order.status.name}
-                      </span>
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-left">
-                      {formatPrice(order.total_amount)}
-                    </td>
-                  </tr>
-
-                  {/* Детали заказа - таблица с запчастями */}
-                  {expandedOrderId === order.id && order.items && order.items.length > 0 && (
-                    <tr>
-                      <td colSpan="8" className="px-6 py-4 bg-gray-50">
-                        <div className="border border-gray-200 rounded-lg overflow-hidden">
-                          <table className="w-full table-fixed divide-y divide-gray-200">
-                            <thead className="bg-gray-100">
-                              <tr>
-                                <th className="w-1/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Товар
-                                </th>
-                                <th className="w-3/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Наименование
-                                </th>
-                                <th className="w-1/12 px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Кол-во
-                                </th>
-                                <th className="w-1/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Сумма
-                                </th>
-                                <th className="w-2/6 px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                  Статус
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {order.items.map((item) => (
-                                <tr key={item.id} className="hover:bg-gray-50">
-                                  <td className="px-2 py-2 text-sm text-gray-900">
-                                    <div className="leading-tight">
-                                      <div className="font-medium">{item.brand}</div>
-                                      <div className="text-gray-600">{item.partnumber}</div>
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-2 text-sm text-gray-900">
-                                    <div className="leading-tight break-words max-w-xs">
-                                      {item.name}
-                                    </div>
-                                  </td>
-                                  <td className="px-2 py-2 text-sm text-gray-900 text-center">
-                                    {item.quantity} шт.
-                                  </td>
-                                  <td className="px-2 py-2 text-sm font-medium text-gray-900 text-left">
-                                    {formatPrice(item.price * item.quantity)}
-                                  </td>
-                                  <td className="px-2 py-2 text-center">
-                                    <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(item.status.code)}`}>
-                                      {item.status.name}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {order.order_number}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatDate(order.created_at)}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {order.new_parts_order?.seller || 'Не указан'}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {'Не указан'}
+                      </td>
+                      <td className="px-3 py-4 text-sm text-gray-900">
+                        {getDeliveryInfo(order)}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-center">
+                        <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${order.is_paid
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                          }`}>
+                          {order.is_paid ? 'Оплачено' : 'Не оплачено'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-center">
+                        <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(order.status.code)}`}>
+                          {order.status.name}
+                        </span>
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-left">
+                        {formatPrice(order.total_amount)}
                       </td>
                     </tr>
-                  )}
-                </React.Fragment>
-                ))}
+
+                    {/* Детали заказа - таблица с запчастями */}
+                    {expandedOrderId === order.id && order.items && order.items.length > 0 && (
+                      <tr>
+                        <td colSpan="8" className="px-6 py-4 bg-gray-50">
+                          <div className="border border-gray-200 rounded-lg overflow-hidden">
+                            <table className="w-full table-fixed divide-y divide-gray-200">
+                              <thead className="bg-gray-100">
+                                <tr>
+                                  <th className="w-1/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Товар
+                                  </th>
+                                  <th className="w-3/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Наименование
+                                  </th>
+                                  <th className="w-1/12 px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Кол-во
+                                  </th>
+                                  <th className="w-1/6 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Сумма
+                                  </th>
+                                  <th className="w-2/6 px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Статус
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {order.items.map((item) => (
+                                  <tr key={item.id} className="hover:bg-gray-50">
+                                    <td className="px-2 py-2 text-sm text-gray-900">
+                                      <div className="leading-tight">
+                                        <div className="font-medium">{item.brand}</div>
+                                        <div className="text-gray-600">{item.partnumber}</div>
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-2 text-sm text-gray-900">
+                                      <div className="leading-tight break-words max-w-xs">
+                                        {item.name}
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-2 text-sm text-gray-900 text-center">
+                                      {item.quantity} шт.
+                                    </td>
+                                    <td className="px-2 py-2 text-sm font-medium text-gray-900 text-left">
+                                      {formatPrice(item.price * item.quantity)}
+                                    </td>
+                                    <td className="px-2 py-2 text-center">
+                                      <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${getStatusColor(item.status.code)}`}>
+                                        {item.status.name}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                )}
               </tbody>
             </table>
           </div>
@@ -315,11 +314,10 @@ export default function PurchasesOrdersPage() {
                     {formatPrice(order.total_amount)}
                   </div>
                   <div className="flex flex-col gap-1">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full self-end ${
-                      order.is_paid
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full self-end ${order.is_paid
                         ? 'bg-green-100 text-green-800'
                         : 'bg-red-100 text-red-800'
-                    }`}>
+                      }`}>
                       {order.is_paid ? 'Оплачено' : 'Не оплачено'}
                     </span>
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full self-end ${getStatusColor(order.status.code)}`}>
