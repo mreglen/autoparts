@@ -32,6 +32,7 @@ import StorageAddressesPage from './pages/Profile/StorageAddressesPage';
 import PendingSellersPage from './pages/Moderation/PendingSellersPage';
 import ProductModeration from './pages/Moderation/ProductModeration/ProductModeration';
 import SellersPage from './pages/Profile/SellersPage';
+import Help from './pages/Help/Help';
 
 
 function App() {
@@ -86,6 +87,7 @@ function App() {
           <Route path="/order-reg" element={<OrderRegistration />} />
           <Route path="/my-parts/add" element={<AddPart />} />
           <Route path="/my-parts/edit/:id" element={<EditPart />} />
+          <Route path="/help" element={<Help />} />
 
           <Route path="*" element={<div>404</div>} />
         </Route>
