@@ -192,52 +192,10 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
             }
         }
         
-        // Add delivery info if available - convert to string format
-        if (stock?.delivery_start && stock?.delivery_end) {
-            const startDate = new Date(stock.delivery_start);
-            const endDate = new Date(stock.delivery_end);
-            
-            // Format as a readable string instead of React elements
-            if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-                const day = startDate.getDate();
-                const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-                const month = monthNames[startDate.getMonth()];
-                const weekdays = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
-                const weekday = weekdays[startDate.getDay()];
-                
-                const startTime = startDate.toLocaleTimeString('ru-RU', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-                const endTime = endDate.toLocaleTimeString('ru-RU', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-                
-                // Check if date is today or tomorrow for special display
-                const today = new Date();
-                const tomorrow = new Date(today);
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                
-                const isToday = startDate.getDate() === today.getDate() &&
-                               startDate.getMonth() === today.getMonth() &&
-                               startDate.getFullYear() === today.getFullYear();
-                
-                const isTomorrow = startDate.getDate() === tomorrow.getDate() &&
-                                  startDate.getMonth() === tomorrow.getMonth() &&
-                                  startDate.getFullYear() === tomorrow.getFullYear();
-                
-                let dateDisplay;
-                if (isToday) {
-                    dateDisplay = 'Сегодня';
-                } else if (isTomorrow) {
-                    dateDisplay = 'Завтра';
-                } else {
-                    dateDisplay = `${day} ${month} ${weekday}`;
-                }
-                
-                cartItem.delivery = `${dateDisplay} с ${startTime} до ${endTime}`;
-            }
+        // Add delivery info if available
+        const formattedDelivery = formatDeliveryTime(stock?.delivery_start, stock?.delivery_end);
+        if (formattedDelivery && formattedDelivery !== '') {
+            cartItem.delivery = formattedDelivery;
         }
         
         if (part?.guid) {

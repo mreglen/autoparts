@@ -189,15 +189,6 @@ export default function Navigation() {
                         >
                             Сервис
                         </NavLink>
-                        <NavLink
-                            to="/help"
-                            className={({ isActive }) =>
-                                `text-lg transition-colors ease-in-out ${
-                                    isActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
-                                }`}
-                        >
-                            Помощь
-                        </NavLink>
                     </nav>
                 </div>
 

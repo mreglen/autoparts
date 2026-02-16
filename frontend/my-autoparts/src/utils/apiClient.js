@@ -11,8 +11,8 @@ const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygara
 // const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://195.24.65.251';
 // локально
 
-// const API_BASE = 'http://127.0.0.1:8001/api';
-// const BACKEND_BASE = 'http://127.0.0.1:8001';
+// const API_BASE = 'http://127.0.0.1:8000/api';
+// const BACKEND_BASE = 'http://127.0.0.1:8000';
 
 // Helper function to get auth headers
 export const getAuthHeaders = () => {

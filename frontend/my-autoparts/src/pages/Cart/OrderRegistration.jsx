@@ -124,6 +124,7 @@ export default function OrderRegistration() {
           partnumber: item.number,
           quantity: item.quantity,
           price: item.price,
+          product_id: item.product_id, // Добавляем product_id если он есть
           status_id: 1  // В ожидании
         })),
         cart_item_ids: selectedItems.filter(item => item.type === 'new').map(item => item.id), // IDs новых товаров

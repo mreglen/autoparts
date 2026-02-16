@@ -177,6 +177,14 @@ export default function SalesOrdersPage() {
       .join('; ') || null; // Return null if no valid values
   };
 
+  // Get storage address by brand and part number
+  const getProductStorageAddressByBrandPartNumber = (item) => {
+    if (item.storage_location && item.storage_location.address) {
+      return item.storage_location.address;
+    }
+    return null;
+  };
+
   // Если пользователь не админ и не продавец, не показываем страницу
   if (!user?.is_admin && !user?.is_seller) {
     return (
@@ -401,22 +409,26 @@ export default function SalesOrdersPage() {
                                     {formatPrice(item.price * item.quantity)}
                                   </td>
                                   <td className="w-[20%] px-2 py-2 text-sm text-gray-900">
-                                    {item.product_id ? (
-                                      <div>
-                                        {(() => {
-                                          const storageAddress = getProductStorageAddressFromItem(item);
-                                          return storageAddress ? (
-                                            <div className="px-3 py-2 bg-gray-50 rounded text-sm text-gray-700 border border-gray-200">
-                                              {storageAddress}
-                                            </div>
-                                          ) : (
-                                            <div className="text-gray-400 italic">-</div>
-                                          );
-                                        })()}
-                                      </div>
-                                    ) : (
-                                      <div className="text-gray-400 italic">-</div>
-                                    )}
+                                    <div>
+                                      {(() => {
+                                        let storageAddress = null;
+                                        // First, try to get storage address by product_id
+                                        if (item.product_id) {
+                                          storageAddress = getProductStorageAddressFromItem(item);
+                                        }
+                                        // If no storage address found and no product_id, try to get by brand/partnumber
+                                        if (!storageAddress && !item.product_id) {
+                                          storageAddress = getProductStorageAddressByBrandPartNumber(item);
+                                        }
+                                        return storageAddress ? (
+                                          <div className="px-3 py-2 bg-gray-50 rounded text-sm text-gray-700 border border-gray-200">
+                                            {storageAddress}
+                                          </div>
+                                        ) : (
+                                          <div className="text-gray-400 italic">-</div>
+                                        );
+                                      })()}
+                                    </div>
                                   </td>
                                   <td className="w-[10%] px-2 py-2 text-center">
                                     {editingStatus?.type === 'item' && editingStatus?.id === item.id ? (
@@ -566,21 +578,27 @@ export default function SalesOrdersPage() {
                             <div className="text-xs text-gray-600">{item.quantity} шт.</div>
                           </div>
                         </div>
-                        {item.product_id && (
-                          <div className="mb-2">
-                            <div className="text-xs text-gray-500">Адрес хранения</div>
-                            {(() => {
-                              const storageAddress = getProductStorageAddressFromItem(item);
-                              return storageAddress ? (
-                                <div className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-700 border border-gray-200">
-                                  {storageAddress}
-                                </div>
-                              ) : (
-                                <div className="text-gray-400 italic text-xs">-</div>
-                              );
-                            })()}
-                          </div>
-                        )}
+                        <div className="mb-2">
+                          <div className="text-xs text-gray-500">Адрес хранения</div>
+                          {(() => {
+                            let storageAddress = null;
+                            // First, try to get storage address by product_id
+                            if (item.product_id) {
+                              storageAddress = getProductStorageAddressFromItem(item);
+                            }
+                            // If no storage address found and no product_id, try to get by brand/partnumber
+                            if (!storageAddress && !item.product_id) {
+                              storageAddress = getProductStorageAddressByBrandPartNumber(item);
+                            }
+                            return storageAddress ? (
+                              <div className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-700 border border-gray-200">
+                                {storageAddress}
+                              </div>
+                            ) : (
+                              <div className="text-gray-400 italic text-xs">-</div>
+                            );
+                          })()}
+                        </div>
                         <div className="flex justify-end">
                           {editingStatus?.type === 'item' && editingStatus?.id === item.id ? (
                             <select

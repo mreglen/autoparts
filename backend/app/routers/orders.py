@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload, joinedload
+from sqlalchemy import func, cast, Integer
 from app.db.database import get_db
 from app.core.auth import get_current_user, get_current_admin_user
 from app.models.user import User
@@ -16,11 +17,20 @@ import string
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
-def generate_order_number():
-    """Генерирует уникальный номер заказа"""
-    timestamp = datetime.now().strftime("%Y%m%d")
-    random_chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    return f"ORD-{timestamp}-{random_chars}"
+def generate_order_number(db: Session):
+    """Генерирует уникальный номер заказа в формате 9-значного числа с ведущими нулями"""
+    # Находим максимальный номер заказа в базе данных
+    # Предполагаем, что номера заказов могут быть представлены как числа
+    max_order_number = db.query(func.max(cast(func.nullif(Order.order_number, ''), Integer))).scalar()
+    if max_order_number is None:
+        # Если нет существующих заказов, начать с 1
+        next_number = 1
+    else:
+        # Иначе использовать следующий номер
+        next_number = max_order_number + 1
+    
+    # Форматируем номер как 9-значное число с ведущими нулями
+    return f"{next_number:09d}"
 
 def order_to_response(order: Order, db_session=None) -> OrderResponse:
     """Конвертирует SQLAlchemy объект Order в Pydantic OrderResponse"""
@@ -208,7 +218,7 @@ async def create_order(
 
         # Создаем заказ
         order = Order(
-            order_number=generate_order_number(),
+            order_number=generate_order_number(db),
             user_id=current_user.id,
             recipient_name=order_data.recipient_name,
             recipient_phone=order_data.recipient_phone,
@@ -232,9 +242,11 @@ async def create_order(
         added_product_ids = set()
         
         for item_data in order_data.items:
+            # Ensure the name field contains only the product name, not brand + partnumber
+            # Also make sure product_id is properly preserved
             order_item = OrderItem(
                 order_id=order.id,
-                name=item_data.name,
+                name=item_data.name if item_data.name and item_data.name.strip() else f"{item_data.brand} {item_data.partnumber}",
                 brand=item_data.brand,
                 partnumber=item_data.partnumber,
                 quantity=item_data.quantity,

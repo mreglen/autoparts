@@ -30,8 +30,12 @@ async def checkout_from_cart(
                 detail="Корзина не найдена"
             )
 
-        # Получить товары из корзины
-        cart_items = db.query(NewPartsCart).filter(NewPartsCart.cart_id == cart.id).all()
+        # Получить товары из корзины (новые и б/у запчасти)
+        new_parts_items = db.query(NewPartsCart).filter(NewPartsCart.cart_id == cart.id).all()
+        used_parts_items = db.query(UsedPartsCart).filter(UsedPartsCart.cart_id == cart.id).all()
+        
+        # Объединить все элементы корзины
+        cart_items = new_parts_items + used_parts_items
 
         if not cart_items:
             raise HTTPException(
@@ -100,7 +104,7 @@ async def checkout_from_cart(
 
         # Создать локальный заказ
         local_order = Order(
-            order_number=generate_order_number(),
+            order_number=generate_order_number(db),
             user_id=current_user.id,
             recipient_name=checkout_data.contact.name,
             recipient_phone=checkout_data.contact.phone,
@@ -118,28 +122,46 @@ async def checkout_from_cart(
 
         # Создать элементы заказа
         for item in cart_items:
+            # For used parts, get name from product if available
+            item_name = item.name
+            if hasattr(item, 'product') and item.product and not item_name:
+                item_name = item.product.name
+            elif not item_name:
+                # Fallback to concatenating brand and partnumber
+                item_name = f"{item.brand} {item.partnumber}".strip()
+            
+            # Ensure product_id is properly set for both new and used parts
+            product_id_value = getattr(item, 'product_id', None)
+            if not product_id_value and hasattr(item, 'product') and item.product:
+                product_id_value = item.product.id
+            
             order_item = OrderItem(
                 order_id=local_order.id,
-                name=f"{item.brand} {item.partnumber}",
+                name=item_name,
                 brand=item.brand,
                 partnumber=item.partnumber,
                 quantity=item.quantity,
                 price=float(item.price) if item.price else 0,
-                status_id=pending_item_status.id
+                status_id=pending_item_status.id,
+                product_id=product_id_value  # Ensure product_id is always set
             )
             db.add(order_item)
 
-        # Создать запись для новых запчастей
-        new_parts_order = NewPartsOrder(
-            order_id=local_order.id,
-            seller="Росско",  # По умолчанию Росско как продавец
-            deliver_in_parts=checkout_data.delivery_parts
-        )
-        db.add(new_parts_order)
+        # Создать записи для соответствующих типов заказов в зависимости от содержимого корзины
+        if new_parts_items:
+            new_parts_order = NewPartsOrder(
+                order_id=local_order.id,
+                seller="Росско",  # Росско как продавец для новых запчастей
+                deliver_in_parts=checkout_data.delivery_parts
+            )
+            db.add(new_parts_order)
+        
+        # If there are used parts items, we could create a separate UsedPartsOrder if needed
+        # For now, just ensure the product_id is properly stored in order items for used parts
 
-        # Подготовить данные для RossKo API
+        # Подготовить данные для RossKo API (только для новых запчастей)
         parts = []
-        for item in cart_items:
+        for item in new_parts_items:  # Только новые запчасти отправляем в Росско
             parts.append({
                 "partnumber": item.partnumber,
                 "brand": item.brand,

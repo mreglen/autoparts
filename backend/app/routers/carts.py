@@ -29,17 +29,63 @@ def get_or_create_cart(db: Session, user_id: int) -> Cart:
         db.refresh(cart)
     return cart
 
+from fastapi import Request
+
 @router.post("/new-parts", response_model=CartItemResponse)
-def add_new_parts_to_cart(
+async def add_new_parts_to_cart(
     item: NewPartsCartItem,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Добавить новые запчасти в корзину и создать клиента для текущей организации"""
-    """Добавить новые запчасти в корзину"""
+    """Добавить новые запчасти в корзину и создать клиента для текущей организации
+    
+    Добавить новые запчасти в корзину
+    """
+    # Debug: Print incoming item data
+    print(f"DEBUG: Adding new parts to cart - Brand: '{item.brand}', Partnumber: '{item.partnumber}', GUID: '{item.guid}', Stock ID: '{item.stock_id}'")
+    print(f"DEBUG: Price: {item.price}, Quantity: {item.quantity}")
+    print(f"DEBUG: Current user ID: {current_user.id}")
+    
+    # Validate required fields
+    if not item.brand or not item.brand.strip():
+        print(f"DEBUG: Invalid brand: '{item.brand}'")
+        raise HTTPException(status_code=422, detail="Brand is required and cannot be empty")
+    
+    if not item.partnumber or not item.partnumber.strip():
+        print(f"DEBUG: Invalid partnumber: '{item.partnumber}'")
+        raise HTTPException(status_code=422, detail="Part number is required and cannot be empty")
+    
+    if not item.stock_id or not item.stock_id.strip():
+        print(f"DEBUG: Invalid stock_id: '{item.stock_id}'")
+        raise HTTPException(status_code=422, detail="Stock ID is required and cannot be empty")
+    
+    if item.price is None or item.price <= 0:
+        print(f"DEBUG: Invalid price: {item.price}")
+        raise HTTPException(status_code=422, detail="Price is required and must be greater than 0")
+    
+    if item.quantity <= 0:
+        print(f"DEBUG: Invalid quantity: {item.quantity}")
+        raise HTTPException(status_code=422, detail="Quantity must be greater than 0")
+    
+    # Handle delivery field - convert to string if it's not already a string or None
+    delivery_str = None
+    if item.delivery is not None:
+        if isinstance(item.delivery, dict):
+            # If delivery is a dictionary (React element-like), extract the string representation
+            print(f"DEBUG: Delivery field is a dict: {item.delivery}")
+            # Handle dictionary objects coming from frontend
+            delivery_str = str(item.delivery) if str(item.delivery) != '{}' else None
+        elif hasattr(item.delivery, '__dict__'):
+            # If delivery is an object with attributes
+            print(f"DEBUG: Delivery field is an object: {item.delivery}")
+            delivery_str = str(item.delivery)
+        else:
+            delivery_str = str(item.delivery) if item.delivery else None
+    
     # Получить или создать корзину
     cart = get_or_create_cart(db, current_user.id)
-    
+
     # Создать или получить клиента для организации админа
     # Это представляет интерес пользователя к продуктам от администратора
     client_phone = normalize_to_storage_format(current_user.phone) if current_user.phone else ""
@@ -78,6 +124,9 @@ def add_new_parts_to_cart(
     if existing_item:
         # Обновить количество
         existing_item.quantity += item.quantity
+        # Also update delivery if provided
+        if delivery_str is not None:
+            existing_item.delivery = delivery_str
         existing_item.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(existing_item)
@@ -101,7 +150,7 @@ def add_new_parts_to_cart(
         brand=item.brand,
         partnumber=item.partnumber,
         name=item.name,
-        delivery=item.delivery,
+        delivery=delivery_str,
         quantity=item.quantity,
         price=item.price,
         stock_id=item.stock_id,

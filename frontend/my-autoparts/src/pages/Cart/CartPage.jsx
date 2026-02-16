@@ -88,6 +88,7 @@ export default function CartPage() {
             price: item.price,
             quantity: item.quantity,
             stock_id: item.stock_id, // Добавляем stock_id для ограничения количества
+            product_id: item.product_id, // Добавляем product_id для передачи в заказ
             image: '/api/placeholder/80/80'
           });
         });
@@ -112,6 +113,7 @@ export default function CartPage() {
           deliveryDate: item.delivery,
           price: item.price,
           quantity: item.quantity,
+          product_id: item.product_id, // Добавляем product_id для передачи в заказ
           image: '/api/placeholder/80/80'
         });
       });
