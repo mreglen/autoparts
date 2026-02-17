@@ -237,7 +237,7 @@ export default function OrdersTab() {
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
                     {formatDate(order.created_at)}
                   </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-3 py-4 text-sm text-gray-900">
                     {order.recipient_name}
                   </td>
                   <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">

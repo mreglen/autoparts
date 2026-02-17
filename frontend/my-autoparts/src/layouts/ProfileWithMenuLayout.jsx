@@ -238,6 +238,7 @@ export default function ProfileWithMenuLayout() {
             'settings-storage-addresses': '/settings/storage-addresses',
             'clients': '/clients',
             'sellers': '/sellers',
+            'settings-employees': '/settings/employees',
             'pending-sellers': '/moderation/pending-sellers',
             'product-moderation': '/moderation/products'
         };

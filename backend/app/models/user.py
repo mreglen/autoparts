@@ -25,4 +25,5 @@ class User(Base):
     carts = relationship("Cart", back_populates="user")
     orders = relationship("Order", back_populates="user")
     sessions = relationship("UserSession", back_populates="user")
+    user_permissions = relationship("UserPermission", back_populates="user")
 

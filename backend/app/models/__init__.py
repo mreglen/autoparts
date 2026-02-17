@@ -14,6 +14,8 @@ from app.models.stock_out import StockOut
 from app.models.carts import Cart, NewPartsCart, UsedPartsCart
 from app.models.orders import Order, NewPartsOrder, UsedPartsOrder, OrderStatus, OrderItem, OrderItemStatus
 from app.models.client import Client
+from app.models.permission import Permission
+from app.models.user_permission import UserPermission
 
 from sqlalchemy.orm import relationship
 

@@ -194,7 +194,7 @@ export default function PurchasesOrdersPage() {
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatDate(order.created_at)}
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-3 py-4 text-sm text-gray-900">
                         {order.new_parts_order?.seller || 'Не указан'}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -308,7 +308,7 @@ export default function PurchasesOrdersPage() {
                     <span className="text-sm text-gray-400">•</span>
                     <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
                   </div>
-                  <div className="text-base text-gray-800 mb-2">{order.new_parts_order?.seller || 'Продавец не указан'}</div>
+                  <div className="text-base text-gray-800 mb-2 leading-tight break-words max-w-xs">{order.new_parts_order?.seller || 'Продавец не указан'}</div>
                   <div className="text-sm text-gray-600 mb-3">{getDeliveryInfo(order)}</div>
                 </div>
                 <div className="text-right flex-shrink-0">
