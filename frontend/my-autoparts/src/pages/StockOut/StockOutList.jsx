@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { fetchStockOuts, createReturn } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchProducts } from '../../redux/slices/ProductSlice';
@@ -11,10 +12,11 @@ import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import ReturnModal from './ReturnModal';
 
 export const StockOutList = () => {
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const { items: stockOuts, loading, error } = useSelector((state) => state.stockOut);
   const { storageLocations } = useSelector((state) => state.organization);
-  const user = useSelector((state) => state.auth.user);
+  const { user, permissionCodes } = useSelector((state) => state.auth);
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
@@ -23,6 +25,43 @@ export const StockOutList = () => {
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [itemsToReturn, setItemsToReturn] = useState([]);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Check if user has permission to view this page
+  // Admin and sellers always have access
+  // Employees need 'stock-out' permission code
+  const hasPermission = user?.is_admin || user?.is_seller || 
+    (user?.is_employee && permissionCodes && permissionCodes.includes('stock-out'));
+
+  // Fetch data - must be before any early returns
+  useEffect(() => {
+    if (authChecked && hasPermission && (user?.is_seller || user?.is_employee) && user.organization_id) {
+      dispatch(fetchStockOuts());
+      dispatch(fetchStorageLocations(user.organization_id));
+    }
+  }, [dispatch, user, authChecked, hasPermission]);
+
+  // Check auth - wait for user data to load
+  useEffect(() => {
+    if (user === undefined || user === null) {
+      const token = localStorage.getItem('token');
+      if (token) return;
+    }
+    setAuthChecked(true);
+    if (!hasPermission) navigate('/', { replace: true });
+  }, [user, permissionCodes, hasPermission, navigate]);
+
+  // Show loading while auth data is loading
+  if (!authChecked) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/auth" replace />;
+  if (!hasPermission) return <Navigate to="/" replace />;
 
   const handleImageClick = (photos, initialIndex) => {
     setSelectedImages({ photos, initialIndex });
@@ -82,16 +121,6 @@ export const StockOutList = () => {
     setSelectedItems(prev => prev.filter(id => id !== itemId));
     setItemsToReturn(prev => prev.filter(item => item.id !== itemId));
   };
-
-  useEffect(() => {
-    if ((user?.is_seller || user?.is_employee) && user.organization_id) {
-      dispatch(fetchStockOuts());
-      dispatch(fetchStorageLocations(user.organization_id));
-    }
-  }, [dispatch, user]);
-
-  if (!user) return <Navigate to="/auth" replace />;
-  if (!user.is_seller && !user.is_employee) return <Navigate to="/" replace />;
 
   const toggleExpand = (id) => {
     setExpandedDocId(expandedDocId === id ? null : id);

@@ -14,6 +14,8 @@ const EmployeesPage = () => {
     const [showPermissionModal, setShowPermissionModal] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
     const [showEditForm, setShowEditForm] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [employeeToDelete, setEmployeeToDelete] = useState(null);
     
     const [formData, setFormData] = useState({
         last_name: '',
@@ -133,13 +135,22 @@ const EmployeesPage = () => {
 
 
 
-    const handleDelete = async (empId, empName) => {
-        if (!window.confirm(`Удалить сотрудника "${empName}"?`)) {
-            return;
-        }
+    const openDeleteModal = (empId, empName) => {
+        setEmployeeToDelete({ id: empId, name: empName });
+        setShowDeleteModal(true);
+    };
+
+    const closeDeleteModal = () => {
+        setShowDeleteModal(false);
+        setEmployeeToDelete(null);
+    };
+
+    const confirmDelete = async () => {
+        if (!employeeToDelete) return;
         
         try {
-            await dispatch(deleteEmployee({ orgId: user.organization_id, userId: empId }));
+            await dispatch(deleteEmployee({ orgId: user.organization_id, userId: employeeToDelete.id }));
+            closeDeleteModal();
         } catch (error) {
             console.error('Ошибка удаления сотрудника:', error);
             alert('Ошибка удаления сотрудника: ' + (error.message || 'Неизвестная ошибка'));
@@ -281,15 +292,15 @@ const EmployeesPage = () => {
                                                                     >
                                                                         Назначить права
                                                                     </button>
-                                                                    <button
+                                                                    {/* <button
                                                                         onClick={() => {
-                                                                            handleDelete(emp.id, fullName);
+                                                                            openDeleteModal(emp.id, fullName);
                                                                             setOpenDropdownId(null);
                                                                         }}
                                                                         className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 border-t border-gray-200"
                                                                     >
                                                                         Удалить
-                                                                    </button>
+                                                                    </button> */}
                                                                 </div>
                                                             </div>
                                                         )}
@@ -363,7 +374,7 @@ const EmployeesPage = () => {
                                                 </button>
                                                 <button
                                                     onClick={() => {
-                                                        handleDelete(emp.id, fullName);
+                                                        openDeleteModal(emp.id, fullName);
                                                         setOpenDropdownId(null);
                                                     }}
                                                     className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 border-t border-gray-200"
@@ -702,6 +713,41 @@ const EmployeesPage = () => {
                                     </button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && employeeToDelete && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-md w-full p-6">
+                        <div className="flex items-center justify-center mb-4">
+                            <div className="bg-red-100 rounded-full p-3">
+                                <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 className="text-lg font-semibold text-center text-gray-900 mb-2">
+                            Удалить сотрудника?
+                        </h3>
+                        <p className="text-center text-gray-600 mb-6">
+                            Вы уверены, что хотите удалить сотрудника <strong>"{employeeToDelete.name}"</strong>? Это действие нельзя отменить.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <button
+                                onClick={closeDeleteModal}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                            >
+                                Удалить
+                            </button>
                         </div>
                     </div>
                 </div>

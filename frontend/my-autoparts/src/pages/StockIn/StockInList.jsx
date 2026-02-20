@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate, Navigate } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import ImageModal from '../../components/ImageModal/ImageModal';
 import { fetchStockIns } from '../../redux/slices/StockInSlice';
@@ -135,14 +136,52 @@ const StockInRow = ({ doc, onToggleExpand, isExpanded, onImageClick }) => (
 );
 
 const StockInList = () => {
+  const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { user, permissionCodes } = useSelector((state) => state.auth);
   const { items: stockIns, loading, error } = useSelector((state) => state.stockIn);
+  const [authChecked, setAuthChecked] = useState(false);
 
   // Состояние для модального окна автомобилей
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [expandedDocId, setExpandedDocId] = useState(null);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
+
+  // Check if user has permission to view this page
+  // Admin and sellers always have access
+  // Employees need 'stock-in' permission code
+  const hasPermission = user?.is_admin || user?.is_seller || 
+    (user?.is_employee && permissionCodes && permissionCodes.includes('stock-in'));
+
+  // Fetch data - must be before any early returns
+  useEffect(() => {
+    if (authChecked && hasPermission) {
+      dispatch(fetchStockIns());
+    }
+  }, [dispatch, authChecked, hasPermission]);
+
+  // Check auth - wait for user data to load
+  useEffect(() => {
+    if (user === undefined || user === null) {
+      const token = localStorage.getItem('token');
+      if (token) return;
+    }
+    setAuthChecked(true);
+    if (!hasPermission) navigate('/', { replace: true });
+  }, [user, permissionCodes, hasPermission, navigate]);
+
+  // Show loading while auth data is loading
+  if (!authChecked) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/auth" replace />;
+  if (!hasPermission) return <Navigate to="/" replace />;
 
   const handleImageClick = (photos, initialIndex) => {
     setSelectedImages({ photos, initialIndex });
@@ -152,10 +191,6 @@ const StockInList = () => {
   const toggleExpand = (id) => {
     setExpandedDocId(expandedDocId === id ? null : id);
   };
-
-  useEffect(() => {
-    dispatch(fetchStockIns());
-  }, [dispatch]);
 
   if (loading) {
     return (

@@ -14,7 +14,6 @@ const PermissionAssignmentModal = ({
     const dispatch = useDispatch();
     const [localPermissions, setLocalPermissions] = useState([]);
     
- 
     const {
         permissions,
         loadingPermissions,

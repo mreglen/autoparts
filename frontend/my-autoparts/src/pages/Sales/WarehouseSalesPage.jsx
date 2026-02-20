@@ -25,9 +25,9 @@ const WarehouseSalesPage = () => {
 
     // Check if user has permission to view this page
     // Admin and sellers always have access
-    // Employees need 'warehouse.sales' permission code
+    // Employees need 'warehouse-sales' permission code
     const hasPermission = user?.is_admin || user?.is_seller || 
-        (user?.is_employee && permissionCodes && permissionCodes.includes('warehouse.sales'));
+        (user?.is_employee && permissionCodes && permissionCodes.includes('warehouse-sales'));
 
     // Проверка прав доступа - делаем проверку только когда user загружен
     useEffect(() => {

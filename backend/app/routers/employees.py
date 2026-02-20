@@ -6,6 +6,7 @@ from app.core.auth import get_current_user
 from app.models.user import User as UserModel
 from app.models.permission import Permission
 from app.models.user_permission import UserPermission
+from app.models.user_session import UserSession
 from app.schemas.employee import (
     EmployeeCreate, 
     EmployeeResponse, 
@@ -144,6 +145,14 @@ def assign_permissions_to_employee(
             user_perm = UserPermission(user_id=employee_id, permission_id=perm_id)
             db.add(user_perm)
     
+    db.commit()
+    
+    # Deactivate all active sessions for this employee to force re-login
+    # This ensures the employee gets new permissions on next login
+    db.query(UserSession).filter(
+        UserSession.user_id == employee_id,
+        UserSession.is_active == True
+    ).update({"is_active": False})
     db.commit()
     
     return {"message": "Permissions assigned successfully"}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { 
   fetchLocationsWithCells, 
   fetchStorageCells, 
@@ -15,8 +15,10 @@ import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationMo
 
 const StorageAddressesPage = () => {
   // All hooks must be called at the top level
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector(state => state.auth.user);
+  const permissionCodes = useSelector(state => state.auth.permissionCodes);
   const { 
     locationsWithCells, 
     loading, 
@@ -41,9 +43,17 @@ const StorageAddressesPage = () => {
   
   // Notification state
   const [notification, setNotification] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
+  // Check if user has permission to view this page
+  // Admin and sellers always have access
+  // Employees need 'storage-addresses' permission code
+  const hasPermission = user?.is_admin || user?.is_seller || 
+    (user?.is_employee && permissionCodes && permissionCodes.includes('storage-addresses'));
+
+  // Fetch data - must be before any early returns
   useEffect(() => {
-    if (user?.organization_id) {
+    if (authChecked && hasPermission && user?.organization_id) {
       // Fetch seller's storage locations
       dispatch(fetchStorageLocations(user.organization_id));
       // Fetch all locations with cells (will be filtered on display)
@@ -51,7 +61,17 @@ const StorageAddressesPage = () => {
       // Fetch seller's storage cells
       dispatch(fetchStorageCells());
     }
-  }, [dispatch, user?.organization_id]);
+  }, [dispatch, user?.organization_id, authChecked, hasPermission]);
+
+  // Check auth - wait for user data to load
+  useEffect(() => {
+    if (user === undefined || user === null) {
+      const token = localStorage.getItem('token');
+      if (token) return;
+    }
+    setAuthChecked(true);
+    if (!hasPermission) navigate('/', { replace: true });
+  }, [user, permissionCodes, hasPermission, navigate]);
 
   // Debug: Log state changes
   useEffect(() => {
@@ -79,9 +99,18 @@ const StorageAddressesPage = () => {
     location.organization_id === user?.organization_id
   );
 
+  // Show loading while auth data is loading
+  if (!authChecked) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   // Redirect unauthorized users - this must come after all hooks
   if (!user) return <Navigate to="/auth" replace />;
-  if (!user.is_seller && !user.is_employee) return <Navigate to="/" replace />;
+  if (!hasPermission) return <Navigate to="/" replace />;
 
   const handleInputChange = (e) => {
     setFormData({

@@ -80,12 +80,10 @@ def remove_employee(
     current_user: UserResponse = Depends(get_current_user), 
     db: Session = Depends(get_db)
 ):
-   
     org = db.query(OrganizationModel).filter(OrganizationModel.id == org_id).first()
     if not org:
         raise HTTPException(status_code=404, detail="Организация не найдена")
 
-    
     if current_user.organization_id != org_id or not current_user.is_director:
         raise HTTPException(status_code=403, detail="Доступ запрещён: только директор может управлять сотрудниками")
 
@@ -96,15 +94,55 @@ def remove_employee(
     if not employee:
         raise HTTPException(status_code=404, detail="Сотрудник не найден в этой организации")
 
-   
     if employee.id == current_user.id:
         raise HTTPException(status_code=400, detail="Нельзя удалить самого себя")
 
-    # 5. Удаляем
+    # Delete related data first (cascading delete)
+    from app.models.user_permission import UserPermission
+    from app.models.user_session import UserSession
+    from app.models.carts import Cart, NewPartsCart, UsedPartsCart
+    from app.models.orders.order import Order
+    from app.models.orders.order_item import OrderItem
+    from app.models.pending_product import PendingProduct
+    from app.models.product import Product
+    from app.models.rejected_product import RejectedProduct
+    from app.models.stock_in import StockIn
+    from app.models.stock_out import StockOut
+    
+    # Delete user permissions
+    db.query(UserPermission).filter(UserPermission.user_id == user_id).delete()
+    
+    # Delete user sessions
+    db.query(UserSession).filter(UserSession.user_id == user_id).delete()
+    
+    # Delete user's carts
+    db.query(Cart).filter(Cart.user_id == user_id).delete()
+    db.query(NewPartsCart).filter(NewPartsCart.user_id == user_id).delete()
+    db.query(UsedPartsCart).filter(UsedPartsCart.user_id == user_id).delete()
+    
+    # Delete user's stock out records
+    db.query(StockOut).filter(StockOut.user_id == user_id).delete()
+    
+    # Delete orders and their items
+    # First delete order items, then orders
+    user_orders = db.query(Order).filter(Order.user_id == user_id).all()
+    for order in user_orders:
+        db.query(OrderItem).filter(OrderItem.order_id == order.id).delete()
+        db.delete(order)
+    
+    # Products created by this user - set created_by to NULL
+    db.query(Product).filter(Product.created_by == user_id).update({"created_by": None})
+    db.query(PendingProduct).filter(PendingProduct.created_by == user_id).update({"created_by": None})
+    db.query(RejectedProduct).filter(RejectedProduct.created_by == user_id).update({"created_by": None})
+    
+    # Stock in records - set created_by to NULL
+    db.query(StockIn).filter(StockIn.created_by == user_id).update({"created_by": None})
+    
+    # Delete the employee from users table
     db.delete(employee)
     db.commit()
 
-    return
+    return {"message": "Сотрудник успешно удален"}
 
 @router.post("/{org_id}/employees", response_model=UserResponse)
 def add_employee(org_id: str, employee: EmployeeCreate, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):

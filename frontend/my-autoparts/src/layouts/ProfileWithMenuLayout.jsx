@@ -133,8 +133,8 @@ export default function ProfileWithMenuLayout() {
                 salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты покупателей' });
             }
             
-            // Продажи со склада - только для продавцов, админов или сотрудников с правом warehouse.sales
-            if (user?.is_seller || user?.is_admin || hasPermission('warehouse.sales')) {
+            // Продажи со склада - только для продавцов, админов или сотрудников с правом warehouse-sales
+            if (user?.is_seller || user?.is_admin || hasPermission('warehouse-sales')) {
                 salesSubmenu.push({ id: 'warehouse-sales', label: 'Продажи со склада' });
             }
             
@@ -150,15 +150,31 @@ export default function ProfileWithMenuLayout() {
 
         // Для продавцов, админов и сотрудников добавляем вкладку склад с подменю
         if (user?.is_seller || user?.is_admin || user?.is_employee) {
-            baseTabs.push({
-                id: 'warehouse',
-                label: 'Склад',
-                submenu: [
-                    { id: 'parts', label: 'Мои запчасти' },
-                    { id: 'receipts', label: 'Поступление' },
-                    { id: 'expenses', label: 'Расходы' }
-                ]
-            });
+            const warehouseSubmenu = [];
+            
+            // Мои запчасти - только для продавцов, админов или сотрудников с правом my-parts
+            if (user?.is_seller || user?.is_admin || hasPermission('my-parts')) {
+                warehouseSubmenu.push({ id: 'parts', label: 'Мои запчасти' });
+            }
+            
+            // Поступление - только для продавцов, админов или сотрудников с правом stock-in
+            if (user?.is_seller || user?.is_admin || hasPermission('stock-in')) {
+                warehouseSubmenu.push({ id: 'receipts', label: 'Поступление' });
+            }
+            
+            // Расходы - только для продавцов, админов или сотрудников с правом stock-out
+            if (user?.is_seller || user?.is_admin || hasPermission('stock-out')) {
+                warehouseSubmenu.push({ id: 'expenses', label: 'Расходы' });
+            }
+            
+            // Добавляем раздел Склад только если есть хотя бы один пункт
+            if (warehouseSubmenu.length > 0) {
+                baseTabs.push({
+                    id: 'warehouse',
+                    label: 'Склад',
+                    submenu: warehouseSubmenu
+                });
+            }
         }
 
         // Для сотрудников только Главная, Покупки и Настройки (Профиль)
@@ -189,8 +205,8 @@ export default function ProfileWithMenuLayout() {
                 salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты покупателей' });
             }
             
-            // Продажи со склада - только для сотрудников с правом warehouse.sales
-            if (hasPermission('warehouse.sales')) {
+            // Продажи со склада - только для сотрудников с правом warehouse-sales
+            if (hasPermission('warehouse-sales')) {
                 salesSubmenu.push({ id: 'warehouse-sales', label: 'Продажи со склада' });
             }
             
@@ -203,13 +219,47 @@ export default function ProfileWithMenuLayout() {
                 });
             }
             
-            // Добавляем Настройки
+            // Добавляем раздел Склад для сотрудников с соответствующими правами
+            const warehouseSubmenu = [];
+            
+            // Мои запчасти - только для сотрудников с правом my-parts
+            if (hasPermission('my-parts')) {
+                warehouseSubmenu.push({ id: 'parts', label: 'Мои запчасти' });
+            }
+            
+            // Поступление - только для сотрудников с правом stock-in
+            if (hasPermission('stock-in')) {
+                warehouseSubmenu.push({ id: 'receipts', label: 'Поступление' });
+            }
+            
+            // Расходы - только для сотрудников с правом stock-out
+            if (hasPermission('stock-out')) {
+                warehouseSubmenu.push({ id: 'expenses', label: 'Расходы' });
+            }
+            
+            // Добавляем раздел Склад только если есть хотя бы один пункт
+            if (warehouseSubmenu.length > 0) {
+                baseTabs.push({
+                    id: 'warehouse',
+                    label: 'Склад',
+                    submenu: warehouseSubmenu
+                });
+            }
+            
+            // Добавляем Настройки для сотрудников
+            const settingsSubmenu = [
+                { id: 'profile', label: 'Профиль' }
+            ];
+            
+            // Адресное хранение - только для сотрудников с правом storage-addresses
+            if (hasPermission('storage-addresses')) {
+                settingsSubmenu.push({ id: 'settings-storage-addresses', label: 'Адресное хранение' });
+            }
+            
             baseTabs.push({
                 id: 'settings',
                 label: 'Настройки',
-                submenu: [
-                    { id: 'profile', label: 'Профиль' }
-                ]
+                submenu: settingsSubmenu
             });
         }
         // Для директора добавляем Настройки с Профилем, Сотрудниками и Адресным хранением
