@@ -2,6 +2,23 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
 
+// Helper function to decode JWT token
+const decodeToken = (token) => {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+            atob(base64)
+                .split('')
+                .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+        );
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        return null;
+    }
+};
+
 // --- Async Thunks ---
 export const sendVerificationCode = createAsyncThunk(
     'auth/sendVerificationCode',
@@ -166,6 +183,24 @@ const authSlice = createSlice({
         // Аутентификация
         token: localStorage.getItem('token') || null,
         user: null,
+        userPermissions: (() => {
+            // Initialize userPermissions from existing token on app load
+            const token = localStorage.getItem('token');
+            if (token) {
+                const decodedToken = decodeToken(token);
+                return decodedToken?.user_permissions || null;
+            }
+            return null;
+        })(), // Stores permission IDs for employees (from JWT token)
+        permissionCodes: (() => {
+            // Initialize permissionCodes from existing token on app load
+            const token = localStorage.getItem('token');
+            if (token) {
+                const decodedToken = decodeToken(token);
+                return decodedToken?.permission_codes || null;
+            }
+            return null;
+        })(), // Stores permission codes for employees (from JWT token) - e.g., ['sellers', 'orders.view']
 
         // Общее
         loading: false,
@@ -252,6 +287,15 @@ const authSlice = createSlice({
             .addCase(completeRegistration.fulfilled, (state, action) => {
                 state.loading = false;
                 state.token = action.payload.access_token;
+                
+                // Decode token to extract user_permissions and permission_codes for employees
+                const decodedToken = decodeToken(action.payload.access_token);
+                if (decodedToken && decodedToken.user_permissions) {
+                    state.userPermissions = decodedToken.user_permissions;
+                }
+                if (decodedToken && decodedToken.permission_codes) {
+                    state.permissionCodes = decodedToken.permission_codes;
+                }
             })
             .addCase(completeRegistration.rejected, (state, action) => {
                 state.loading = false;
@@ -279,6 +323,15 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.token = action.payload.access_token;
                 localStorage.setItem('token', action.payload.access_token);
+                
+                // Decode token to extract user_permissions and permission_codes for employees
+                const decodedToken = decodeToken(action.payload.access_token);
+                if (decodedToken && decodedToken.user_permissions) {
+                    state.userPermissions = decodedToken.user_permissions;
+                }
+                if (decodedToken && decodedToken.permission_codes) {
+                    state.permissionCodes = decodedToken.permission_codes;
+                }
             })
             .addCase(login.rejected, (state, action) => {
                 state.loading = false;
@@ -306,6 +359,8 @@ const authSlice = createSlice({
                     action.payload?.includes('signature')) {
                     state.user = null;
                     state.token = null;
+                    state.userPermissions = null;
+                    state.permissionCodes = null;
                     localStorage.removeItem('token');
                 }
             })
@@ -313,6 +368,8 @@ const authSlice = createSlice({
             .addCase(logout.fulfilled, (state) => {
                 state.token = null;
                 state.user = null;
+                state.userPermissions = null;
+                state.permissionCodes = null;
             })
             // requestPasswordReset
             .addCase(requestPasswordReset.pending, (state) => {

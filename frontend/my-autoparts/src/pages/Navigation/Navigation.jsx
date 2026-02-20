@@ -41,12 +41,17 @@ const formatPhoneNumber = (phone) => {
 export default function Navigation() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const { user, token } = useSelector((state) => state.auth);
+    const { user, token, permissionCodes } = useSelector((state) => state.auth);
     const cart = useSelector(selectCart);
     const { adminOrganizationPhone } = useSelector((state) => state.publicInfo);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [closeTimeout, setCloseTimeout] = useState(null);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    
+    // Helper to check if user has specific permission
+    const hasPermission = (code) => {
+        return permissionCodes && permissionCodes.includes(code);
+    };
 
     // Fetch admin organization phone on component mount
     useEffect(() => {
@@ -304,38 +309,49 @@ export default function Navigation() {
                                             </button>
                                         </div>
 
-                                        {/* Для продавцов и сотрудников - Продажи */}
+                                        {/* Для продавцов и сотрудников - Продажи (только если есть хотя бы одно право) */}
                                         {(user?.is_seller || user?.is_employee) && (
-                                            <div className="px-4 py-1 border-t border-gray-100">
-                                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Продажи</div>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/sales/orders');
-                                                    }}
-                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                >
-                                                    Заказы покупателей
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/sales/returns');
-                                                    }}
-                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                >
-                                                    Возвраты покупателей
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/warehouse-sales');
-                                                    }}
-                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                >
-                                                    Продажи со склада
-                                                </button>
-                                            </div>
+                                            (user?.is_seller || hasPermission('sales.orders') || hasPermission('sales.returns') || hasPermission('warehouse.sales')) && (
+                                                <div className="px-4 py-1 border-t border-gray-100">
+                                                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Продажи</div>
+                                                    {/* Заказы покупателей - только для продавцов или сотрудников с правом sales.orders */}
+                                                    {(user?.is_seller || hasPermission('sales.orders')) && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setIsProfileOpen(false);
+                                                                navigate('/sales/orders');
+                                                            }}
+                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                        >
+                                                            Заказы покупателей
+                                                        </button>
+                                                    )}
+                                                    {/* Возвраты покупателей - только для продавцов или сотрудников с правом sales.returns */}
+                                                    {(user?.is_seller || hasPermission('sales.returns')) && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setIsProfileOpen(false);
+                                                                navigate('/sales/returns');
+                                                            }}
+                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                        >
+                                                            Возвраты покупателей
+                                                        </button>
+                                                    )}
+                                                    {/* Продажи со склада - только для продавцов или сотрудников с правом warehouse.sales */}
+                                                    {(user?.is_seller || hasPermission('warehouse.sales')) && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setIsProfileOpen(false);
+                                                                navigate('/warehouse-sales');
+                                                            }}
+                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                        >
+                                                            Продажи со склада
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )
                                         )}
 
                                         {/* Для продавцов и сотрудников - Склад */}
@@ -372,8 +388,8 @@ export default function Navigation() {
                                             </div>
                                         )}
 
-                                        {/* Настройки для директоров, продавцов и сотрудников */}
-                                        {(user?.is_director || user?.is_seller || user?.is_employee) && (
+                                        {/* Настройки для директоров - Профиль, Сотрудники, Адресное хранение */}
+                                        {user?.is_director && (
                                             <div className="px-4 py-1 border-t border-gray-100">
                                                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Настройки</div>
                                                 <button
@@ -385,19 +401,15 @@ export default function Navigation() {
                                                 >
                                                     Профиль
                                                 </button>
-                                                {user?.is_director && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => {
-                                                                setIsProfileOpen(false);
-                                                                navigate('/settings/employees');
-                                                            }}
-                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                        >
-                                                            Сотрудники
-                                                        </button>
-                                                    </>
-                                                )}
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/settings/employees');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Сотрудники
+                                                </button>
                                                 <button
                                                     onClick={() => {
                                                         setIsProfileOpen(false);
@@ -406,6 +418,22 @@ export default function Navigation() {
                                                     className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
                                                 >
                                                     Адресное хранение
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Настройки для остальных - только Профиль */}
+                                        {!user?.is_director && (
+                                            <div className="px-4 py-1 border-t border-gray-100">
+                                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Настройки</div>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsProfileOpen(false);
+                                                        navigate('/profile');
+                                                    }}
+                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                                >
+                                                    Профиль
                                                 </button>
                                             </div>
                                         )}

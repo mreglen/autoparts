@@ -13,7 +13,6 @@ const EmployeesPage = () => {
     const [openDropdownId, setOpenDropdownId] = useState(null);
     const [showPermissionModal, setShowPermissionModal] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState(null);
-    const [savingPermissions, setSavingPermissions] = useState(false);
     const [showEditForm, setShowEditForm] = useState(false);
     
     const [formData, setFormData] = useState({
@@ -132,21 +131,7 @@ const EmployeesPage = () => {
         setShowPermissionModal(true);
     };
 
-    const savePermissions = async (employeeId, permissionIds) => {
-        setSavingPermissions(true);
-        try {
-            // Permission assignment functionality is not implemented in the OrganizationSlice yet
-            // This would be implemented in the future with a proper API endpoint
-            console.log('Assigning permissions', employeeId, permissionIds);
-            setShowPermissionModal(false);
-            setSelectedEmployee(null);
-        } catch (error) {
-            console.error('Ошибка назначения прав:', error);
-            alert('Ошибка назначения прав: ' + (error.message || 'Неизвестная ошибка'));
-        } finally {
-            setSavingPermissions(false);
-        }
-    };
+
 
     const handleDelete = async (empId, empName) => {
         if (!window.confirm(`Удалить сотрудника "${empName}"?`)) {
@@ -186,8 +171,8 @@ const EmployeesPage = () => {
 
 
             {loadingEmployees ? (
-                <div className="text-center py-12">
-                    <p className="text-gray-500">Загрузка сотрудников...</p>
+                <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                 </div>
             ) : employeesError ? (
                 <div className="text-center py-12">
@@ -206,87 +191,84 @@ const EmployeesPage = () => {
                     )}
                 </div>
             ) : (
-                <div className="-mx-4 sm:-mx-6 lg:-mx-8">
-                    <div className="inline-block min-w-full py-2 align-middle">
-                        {/* Desktop table view */}
-                        <table className="hidden sm:table w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        ФИО
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Email
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Телефон
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Пароль
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Роль
-                                    </th>
-                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                                        Действия
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {employees.map((emp) => {
-                                    const fullName = `${emp.last_name || ''} ${emp.first_name || ''} ${emp.patronymic || ''}`.trim();
-                                    
-                                    return (
-                                        <tr key={emp.id}>
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <div className="text-sm font-medium text-gray-900">
-                                                    {fullName}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-900">{emp.email}</div>
-                                            </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-900">{emp.phone}</div>
-                                            </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-900">••••••••</div>
-                                            </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-900">
-                                                    {emp.is_director ? (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                            Директор
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                            Сотрудник
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium w-32">
-                                                <div className="relative flex justify-end">
-                                                    {emp.id !== user?.id && (
-                                                        <>
-                                                            <button
-                                                                onClick={() => setOpenDropdownId(openDropdownId === emp.id ? null : emp.id)}
-                                                                className="text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 text-nowrap"
-                                                            >
-                                                                Действия
-                                                                <svg className="w-3 h-3 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}>
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                                </svg>
-                                                            </button>
-                                                            
-                                                            {openDropdownId === emp.id && (
-                                                                <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                <div className="overflow-x-auto">
+                    {/* Desktop table view */}
+                    <table className="hidden sm:table min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    ФИО
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Email
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Телефон
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Роль
+                                </th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Действия
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {employees.map((emp) => {
+                                const fullName = `${emp.last_name || ''} ${emp.first_name || ''} ${emp.patronymic || ''}`.trim();
+                                
+                                return (
+                                    <tr key={emp.id}>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm font-medium text-gray-900">
+                                                {fullName}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm text-gray-900">{emp.email}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm text-gray-900">{emp.phone}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm text-gray-900">
+                                                {emp.is_director ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        Директор
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                        Сотрудник
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <div className="relative inline-block text-left">
+                                                {emp.id !== user?.id && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => setOpenDropdownId(openDropdownId === emp.id ? null : emp.id)}
+                                                            className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                                        >
+                                                            Действия
+                                                            <img
+                                                                src="/img/arrow_sm.svg"
+                                                                alt=""
+                                                                className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${openDropdownId === emp.id ? 'rotate-90' : ''}`}
+                                                                style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
+                                                            />
+                                                        </button>
+                                                        
+                                                        {openDropdownId === emp.id && (
+                                                            <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
+                                                                <div className="py-1">
                                                                     <button
                                                                         onClick={() => {
                                                                             startEditing(emp);
                                                                             setOpenDropdownId(null);
                                                                         }}
-                                                                        className="block w-full text-left px-4 py-2 text-sm text-black hover:bg-gray-100"
+                                                                        className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
                                                                     >
                                                                         Редактировать
                                                                     </button>
@@ -295,7 +277,7 @@ const EmployeesPage = () => {
                                                                             openPermissionModal(emp);
                                                                             setOpenDropdownId(null);
                                                                         }}
-                                                                        className="block w-full text-left px-4 py-2 text-sm text-black hover:bg-gray-100"
+                                                                        className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
                                                                     >
                                                                         Назначить права
                                                                     </button>
@@ -304,22 +286,22 @@ const EmployeesPage = () => {
                                                                             handleDelete(emp.id, fullName);
                                                                             setOpenDropdownId(null);
                                                                         }}
-                                                                        className="block w-full text-left px-4 py-2 text-sm text-black hover:bg-gray-100 border-t border-gray-200"
+                                                                        className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 border-t border-gray-200"
                                                                     >
                                                                         Удалить
                                                                     </button>
                                                                 </div>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
                 </div>
             )}
 
@@ -329,65 +311,70 @@ const EmployeesPage = () => {
                     const fullName = `${emp.last_name || ''} ${emp.first_name || ''} ${emp.patronymic || ''}`.trim();
                     
                     return (
-                        <div key={emp.id} className="bg-white p-4 rounded-lg border border-gray-200">
-                            <>
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h3 className="font-medium text-gray-900">{fullName}</h3>
-                                        <p className="text-sm text-gray-500">{emp.email}</p>
-                                        <p className="text-sm text-gray-500">{emp.phone}</p>
-                                    </div>
-                                    <div className="flex flex-col items-end">
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                            {emp.is_director ? 'Директор' : 'Сотрудник'}
-                                        </span>
-                                        <div className="relative mt-2">
-                                            {emp.id !== user?.id && (
-                                                <>
-                                                    <button
-                                                        onClick={() => setOpenDropdownId(openDropdownId === emp.id ? null : emp.id)}
-                                                        className="text-gray-600 hover:text-gray-800 text-sm font-medium border border-gray-400 rounded px-2 py-1"
-                                                    >
-                                                        Действия
-                                                    </button>
-                                                    
-                                                    {openDropdownId === emp.id && (
-                                                        <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10">
-                                                            <button
-                                                                onClick={() => {
-                                                                    startEditing(emp);
-                                                                    setOpenDropdownId(null);
-                                                                }}
-                                                                className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-100"
-                                                            >
-                                                                Редактировать
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    openPermissionModal(emp);
-                                                                    setOpenDropdownId(null);
-                                                                }}
-                                                                className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-100"
-                                                            >
-                                                                Назначить права
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    handleDelete(emp.id, fullName);
-                                                                    setOpenDropdownId(null);
-                                                                }}
-                                                                className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-100 border-t border-gray-200"
-                                                            >
-                                                                Удалить
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
+                        <div key={emp.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                            <div className="flex justify-between items-start mb-3">
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="font-medium text-gray-900 truncate">{fullName}</h3>
+                                    <p className="text-sm text-gray-500 mt-1">{emp.email}</p>
+                                    <p className="text-sm text-gray-500">{emp.phone}</p>
                                 </div>
-                            </>
+                                <div className="flex flex-col items-end ml-3">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${emp.is_director ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                                        {emp.is_director ? 'Директор' : 'Сотрудник'}
+                                    </span>
+                                </div>
+                            </div>
+                            {emp.id !== user?.id && (
+                                <div className="relative flex justify-end pt-2 border-t border-gray-100">
+                                    <button
+                                        onClick={() => setOpenDropdownId(openDropdownId === emp.id ? null : emp.id)}
+                                        className="text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-3 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
+                                    >
+                                        Действия
+                                        <img
+                                            src="/img/arrow_sm.svg"
+                                            alt=""
+                                            className={`w-3 h-3 transition-transform duration-200 ${openDropdownId === emp.id ? 'rotate-90' : ''}`}
+                                            style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
+                                        />
+                                    </button>
+                                    
+                                    {/* Mobile popup - positioned below button */}
+                                    {openDropdownId === emp.id && (
+                                        <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
+                                            <div className="py-1">
+                                                <button
+                                                    onClick={() => {
+                                                        startEditing(emp);
+                                                        setOpenDropdownId(null);
+                                                    }}
+                                                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                                                >
+                                                    Редактировать
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        openPermissionModal(emp);
+                                                        setOpenDropdownId(null);
+                                                    }}
+                                                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                                                >
+                                                    Назначить права
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        handleDelete(emp.id, fullName);
+                                                        setOpenDropdownId(null);
+                                                    }}
+                                                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 border-t border-gray-200"
+                                                >
+                                                    Удалить
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
@@ -397,11 +384,10 @@ const EmployeesPage = () => {
             <PermissionAssignmentModal
                 show={showPermissionModal}
                 employee={selectedEmployee}
-                onClose={() => setShowPermissionModal(false)}
-                onSave={savePermissions}
-                loading={false}
-                saving={savingPermissions}
-                token={localStorage.getItem('token')}
+                onClose={() => {
+                    setShowPermissionModal(false);
+                    setSelectedEmployee(null);
+                }}
             />
             
             {/* Add Employee Modal */}
@@ -530,7 +516,7 @@ const EmployeesPage = () => {
                                     )}
                                 </div>
 
-                                <div className="flex justify-end gap-3 pt-4">
+                                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -545,14 +531,14 @@ const EmployeesPage = () => {
                                             });
                                             setErrors({});
                                         }}
-                                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                                        className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                                     >
                                         Отмена
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={isCreating}
-                                        className={`px-4 py-2 rounded-lg transition-colors ${isCreating ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
+                                        className={`w-full sm:w-auto px-4 py-2 rounded-lg transition-colors ${isCreating ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
                                     >
                                         {isCreating ? 'Создание...' : 'Добавить сотрудника'}
                                     </button>
@@ -689,7 +675,7 @@ const EmployeesPage = () => {
                                     )}
                                 </div>
 
-                                <div className="flex justify-end gap-3 pt-4">
+                                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -704,13 +690,13 @@ const EmployeesPage = () => {
                                             });
                                             setErrors({});
                                         }}
-                                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                                        className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                                     >
                                         Отмена
                                     </button>
                                     <button
                                         type="submit"
-                                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                                        className="w-full sm:w-auto px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
                                     >
                                         Сохранить изменения
                                     </button>

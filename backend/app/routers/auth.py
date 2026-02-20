@@ -6,6 +6,7 @@ from app.models.password_reset_token import PasswordResetToken
 from app.models.pending_user import PendingUser
 from app.models.pending_seller import PendingSeller
 from app.models.user import User
+from app.models.user_permission import UserPermission
 from app.schemas.auth import (
     EmailOnly,
     PasswordResetConfirm,
@@ -222,9 +223,24 @@ def login(
         "device_info": device_info
     })
 
+    # Формируем данные для токена
+    token_data = {"sub": user.email}
+    
+    # Если пользователь является сотрудником, добавляем права доступа в токен
+    if user.is_employee:
+        from app.models.permission import Permission
+        user_permissions = db.query(UserPermission, Permission).join(
+            Permission, UserPermission.permission_id == Permission.id
+        ).filter(
+            UserPermission.user_id == user.id
+        ).all()
+        # Store both permission IDs and codes for easy checking
+        token_data["user_permissions"] = [up.UserPermission.permission_id for up in user_permissions]
+        token_data["permission_codes"] = [up.Permission.code for up in user_permissions]
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email},
+        data=token_data,
         expires_delta=access_token_expires,
         db=db,
         user=user,

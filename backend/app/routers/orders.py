@@ -265,7 +265,7 @@ async def create_order(
             deliver_in_parts=order_data.new_parts_order.deliver_in_parts
         )
         db.add(new_parts_order)
-
+        db.flush()
 
         # Удаляем товары из корзины пользователя после успешного создания заказа
         user_cart = db.query(Cart).filter(Cart.user_id == current_user.id).first()
@@ -284,12 +284,14 @@ async def create_order(
                     UsedPartsCart.id.in_(order_data.used_cart_item_ids)
                 ).delete(synchronize_session=False)
 
-            db.commit()
+        # Коммитим все изменения (заказ, элементы заказа, new_parts_order, удаление из корзины)
+        db.commit()
 
         # Загружаем полный заказ с отношениями
         order_with_relations = db.query(Order).options(
             joinedload(Order.status),
-            selectinload(Order.items).joinedload(OrderItem.status)
+            selectinload(Order.items).joinedload(OrderItem.status),
+            joinedload(Order.new_parts_order)
         ).filter(Order.id == order.id).first()
 
 
@@ -329,6 +331,34 @@ async def get_my_orders(
         joinedload(Order.status),
         selectinload(Order.items).joinedload(OrderItem.status)
     ).filter(Order.user_id == current_user.id).offset(skip).limit(limit).all()
+
+    return [order_to_response(order, db) for order in orders]
+
+
+@router.get("/organization/my", response_model=list[OrderResponse])
+async def get_organization_orders(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Получение заказов организации текущего пользователя (для сотрудников и директоров)"""
+    # Проверяем, что пользователь привязан к организации
+    if not current_user.organization_id:
+        return []
+
+    # Получаем всех пользователей организации
+    from app.models.user import User
+    org_user_ids = db.query(User.id).filter(
+        User.organization_id == current_user.organization_id
+    ).all()
+    org_user_ids = [user_id for (user_id,) in org_user_ids]
+
+    # Получаем заказы всех пользователей организации
+    orders = db.query(Order).options(
+        joinedload(Order.status),
+        selectinload(Order.items).joinedload(OrderItem.status)
+    ).filter(Order.user_id.in_(org_user_ids)).offset(skip).limit(limit).all()
 
     return [order_to_response(order, db) for order in orders]
 

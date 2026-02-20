@@ -1,50 +1,46 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useDispatch, useSelector } from 'react-redux';
+import { 
+    fetchPermissions, 
+    fetchEmployeePermissions, 
+    saveEmployeePermissions 
+} from '../../redux/slices/OrganizationSlice';
 
 const PermissionAssignmentModal = ({ 
     show, 
     employee, 
-    onClose, 
-    onSave, 
-    loading, 
-    saving, 
-    token 
+    onClose
 }) => {
-    const [availablePermissions, setAvailablePermissions] = useState([]);
-    const [employeePermissions, setEmployeePermissions] = useState([]);
-    const [loadingPermissions, setLoadingPermissions] = useState(false);
+    const dispatch = useDispatch();
+    const [localPermissions, setLocalPermissions] = useState([]);
+    
+ 
+    const {
+        permissions,
+        loadingPermissions,
+        employeePermissions,
+        loadingEmployeePermissions,
+        savingEmployeePermissions,
+        permissionsError
+    } = useSelector(state => state.organization);
 
     useEffect(() => {
         if (show && employee) {
-            loadPermissions();
+            // Load available permissions and employee's current permissions
+            dispatch(fetchPermissions());
+            dispatch(fetchEmployeePermissions(employee.id));
         }
-    }, [show, employee]);
+    }, [show, employee, dispatch]);
 
-    const loadPermissions = async () => {
-        try {
-            setLoadingPermissions(true);
-            
-            // Load available permissions
-            const permissionsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/employees/permissions/all`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            setAvailablePermissions(permissionsResponse.data);
-
-            // For now, we're not loading current permissions since the backend doesn't return them
-            // We'll just initialize with empty array or implement a separate endpoint later
-            setEmployeePermissions([]);
-        } catch (error) {
-            console.error('Error loading permissions:', error);
-            alert('Ошибка при загрузке прав доступа');
-        } finally {
-            setLoadingPermissions(false);
+    // Sync local state with Redux state when employee permissions are loaded
+    useEffect(() => {
+        if (employee && employeePermissions[employee.id]) {
+            setLocalPermissions(employeePermissions[employee.id]);
         }
-    };
+    }, [employee, employeePermissions]);
 
     const togglePermission = (permissionId) => {
-        setEmployeePermissions(prev => {
+        setLocalPermissions(prev => {
             if (prev.includes(permissionId)) {
                 return prev.filter(id => id !== permissionId);
             } else {
@@ -53,9 +49,23 @@ const PermissionAssignmentModal = ({
         });
     };
 
-    const handleSave = () => {
-        onSave(employee, employeePermissions);
+    const handleSave = async () => {
+        if (!employee) return;
+        
+        const resultAction = await dispatch(saveEmployeePermissions({
+            employeeId: employee.id,
+            permissionIds: localPermissions
+        }));
+        
+        if (saveEmployeePermissions.fulfilled.match(resultAction)) {
+            onClose();
+        } else {
+            alert('Ошибка при сохранении прав: ' + (resultAction.payload || 'Неизвестная ошибка'));
+        }
     };
+
+    const isLoading = loadingPermissions || loadingEmployeePermissions;
+    const isSaving = savingEmployeePermissions;
 
     if (!show || !employee) return null;
 
@@ -73,25 +83,24 @@ const PermissionAssignmentModal = ({
                         </button>
                     </div>
                     
-                    {loadingPermissions || loading ? (
+                    {isLoading ? (
                         <div className="text-center py-8">
                             <p>Загрузка прав доступа...</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {availablePermissions.map(permission => (
+                            {permissions.map(permission => (
                                 <div key={permission.id} className="flex items-center p-3 border rounded-lg">
                                     <input
                                         type="checkbox"
                                         id={`perm-${permission.id}`}
-                                        checked={employeePermissions.includes(permission.id)}
+                                        checked={localPermissions.includes(permission.id)}
                                         onChange={() => togglePermission(permission.id)}
                                         className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
-                                        disabled={saving}
+                                        disabled={isSaving}
                                     />
                                     <label htmlFor={`perm-${permission.id}`} className="ml-3 flex-1">
                                         <div className="font-medium">{permission.name}</div>
-                                        <div className="text-sm text-gray-500">{permission.code}</div>
                                     </label>
                                 </div>
                             ))}
@@ -102,16 +111,16 @@ const PermissionAssignmentModal = ({
                         <button
                             onClick={onClose}
                             className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                            disabled={saving}
+                            disabled={isSaving}
                         >
                             Отмена
                         </button>
                         <button
                             onClick={handleSave}
-                            className={`px-4 py-2 rounded-lg text-white transition-colors ${saving ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-                            disabled={saving}
+                            className={`px-4 py-2 rounded-lg text-white transition-colors ${isSaving ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                            disabled={isSaving}
                         >
-                            {saving ? 'Сохранение...' : 'Сохранить права'}
+                            {isSaving ? 'Сохранение...' : 'Сохранить права'}
                         </button>
                     </div>
                 </div>

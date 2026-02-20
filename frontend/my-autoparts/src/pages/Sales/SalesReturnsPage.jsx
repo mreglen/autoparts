@@ -1,20 +1,48 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 export default function SalesReturnsPage() {
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const { user, permissionCodes } = useSelector((state) => state.auth);
+  const [authChecked, setAuthChecked] = useState(false);
 
-  // Проверка прав администратора или продавца
-  React.useEffect(() => {
-    if (!user?.is_admin && !user?.is_seller && !user?.is_employee) {
+  // Check if user has permission to view this page
+  // Admin and sellers always have access
+  // Employees need 'sales.returns' permission code
+  const hasPermission = user?.is_admin || user?.is_seller || 
+    (user?.is_employee && permissionCodes && permissionCodes.includes('sales.returns'));
+
+  // Проверка прав доступа - делаем проверку только когда user загружен
+  useEffect(() => {
+    // Если user еще не загружен (null), ждем
+    if (user === undefined || user === null) {
+      // Проверяем есть ли токен - если есть, ждем загрузки профиля
+      const token = localStorage.getItem('token');
+      if (token) {
+        return; // Ждем пока загрузится профиль
+      }
+    }
+    
+    // Отмечаем что проверка auth выполнена
+    setAuthChecked(true);
+    
+    if (!hasPermission) {
       navigate('/', { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, permissionCodes, hasPermission, navigate]);
 
-  // Если пользователь не админ, не продавец и не сотрудник, не показываем страницу
-  if (!user?.is_admin && !user?.is_seller && !user?.is_employee) {
+  // Показываем загрузку пока auth данные загружаются
+  if (!authChecked) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Если пользователь не имеет прав доступа, не показываем страницу
+  if (!hasPermission) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

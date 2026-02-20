@@ -7,8 +7,14 @@ import ProfileMenuTabs from '../pages/Profile/menu/ProfileMenuTabs';
 
 export default function ProfileWithMenuLayout() {
     const user = useSelector((state) => state.auth.user);
+    const permissionCodes = useSelector((state) => state.auth.permissionCodes);
     const location = useLocation();
     const navigate = useNavigate();
+    
+    // Helper to check if user has specific permission
+    const hasPermission = (code) => {
+        return permissionCodes && permissionCodes.includes(code);
+    };
 
     const [activeTab, setActiveTab] = useState(() => {
         const pathMap = {
@@ -61,11 +67,12 @@ export default function ProfileWithMenuLayout() {
     const getAvailableTabs = () => {
         let baseTabs = [];
 
-        // Для админов добавляем Главную и Продавцы
+        // Для админов добавляем Главную, Продавцы и Клиенты
         if (user?.is_admin) {
             baseTabs = [
                 { id: 'dashboard', label: 'Главная' },
                 { id: 'sellers', label: 'Продавцы' },
+                { id: 'clients', label: 'Клиенты' },
                 {
                     id: 'purchases',
                     label: 'Покупки',
@@ -91,7 +98,7 @@ export default function ProfileWithMenuLayout() {
                 }
             ];
         }
-        // Для обычных пользователей только Покупки
+        // Для обычных пользователей (покупателей) - только Покупки и Настройки (Профиль)
         else {
             baseTabs = [
                 {
@@ -101,21 +108,44 @@ export default function ProfileWithMenuLayout() {
                         { id: 'purchases-orders', label: 'Заказы' },
                         { id: 'purchases-returns', label: 'Возвраты' }
                     ]
+                },
+                {
+                    id: 'settings',
+                    label: 'Настройки',
+                    submenu: [
+                        { id: 'profile', label: 'Профиль' }
+                    ]
                 }
             ];
         }
 
         // Для продавцов, админов и сотрудников добавляем продажи
         if (user?.is_seller || user?.is_admin || user?.is_employee) {
-            baseTabs.push({
-                id: 'sales',
-                label: 'Продажи',
-                submenu: [
-                    { id: 'sales-orders', label: 'Заказы покупателей' },
-                    { id: 'sales-returns', label: 'Возвраты покупателей' },
-                    { id: 'warehouse-sales', label: 'Продажи со склада' }
-                ]
-            });
+            const salesSubmenu = [];
+            
+            // Заказы покупателей - только для продавцов, админов или сотрудников с правом sales.orders
+            if (user?.is_seller || user?.is_admin || hasPermission('sales.orders')) {
+                salesSubmenu.push({ id: 'sales-orders', label: 'Заказы покупателей' });
+            }
+            
+            // Возвраты покупателей - только для продавцов, админов или сотрудников с правом sales.returns
+            if (user?.is_seller || user?.is_admin || hasPermission('sales.returns')) {
+                salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты покупателей' });
+            }
+            
+            // Продажи со склада - только для продавцов, админов или сотрудников с правом warehouse.sales
+            if (user?.is_seller || user?.is_admin || hasPermission('warehouse.sales')) {
+                salesSubmenu.push({ id: 'warehouse-sales', label: 'Продажи со склада' });
+            }
+            
+            // Добавляем раздел Продажи только если есть хотя бы один пункт
+            if (salesSubmenu.length > 0) {
+                baseTabs.push({
+                    id: 'sales',
+                    label: 'Продажи',
+                    submenu: salesSubmenu
+                });
+            }
         }
 
         // Для продавцов, админов и сотрудников добавляем вкладку склад с подменю
@@ -131,36 +161,11 @@ export default function ProfileWithMenuLayout() {
             });
         }
 
-        // Для продавцов и админов (не директоров) добавляем настройки
-        if ((user?.is_seller || user?.is_admin) && !user?.is_director) {
-            baseTabs.push({
-                id: 'settings',
-                label: 'Настройки',
-                submenu: [
-                    { id: 'profile', label: 'Профиль' },
-                    { id: 'settings-storage-addresses', label: 'Адресное хранение' }
-                ]
-            });
-        }
-
-        // Для директоров добавляем вкладку Настройки (без клиентов)
-        if (user?.is_director) {
-            baseTabs.push({
-                id: 'settings',
-                label: 'Настройки',
-                submenu: [
-                    { id: 'profile', label: 'Профиль' },
-                    { id: 'settings-employees', label: 'Сотрудники' },
-                    { id: 'settings-storage-addresses', label: 'Адресное хранение' }
-                ]
-            });
-        }
-
-        // Для сотрудников добавляем настройки без сотрудников
+        // Для сотрудников только Главная, Покупки и Настройки (Профиль)
+        // Плюс Продажи если есть соответствующие права
         if (user?.is_employee) {
             baseTabs = [
                 { id: 'dashboard', label: 'Главная' },
-                { id: 'clients', label: 'Клиенты' },
                 {
                     id: 'purchases',
                     label: 'Покупки',
@@ -171,34 +176,61 @@ export default function ProfileWithMenuLayout() {
                 }
             ];
             
-            // Добавляем продажи для сотрудников
+            // Добавляем Продажи для сотрудников с соответствующими правами
+            const salesSubmenu = [];
+            
+            // Заказы покупателей - только для сотрудников с правом sales.orders
+            if (hasPermission('sales.orders')) {
+                salesSubmenu.push({ id: 'sales-orders', label: 'Заказы покупателей' });
+            }
+            
+            // Возвраты покупателей - только для сотрудников с правом sales.returns
+            if (hasPermission('sales.returns')) {
+                salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты покупателей' });
+            }
+            
+            // Продажи со склада - только для сотрудников с правом warehouse.sales
+            if (hasPermission('warehouse.sales')) {
+                salesSubmenu.push({ id: 'warehouse-sales', label: 'Продажи со склада' });
+            }
+            
+            // Добавляем раздел Продажи только если есть хотя бы один пункт
+            if (salesSubmenu.length > 0) {
+                baseTabs.push({
+                    id: 'sales',
+                    label: 'Продажи',
+                    submenu: salesSubmenu
+                });
+            }
+            
+            // Добавляем Настройки
             baseTabs.push({
-                id: 'sales',
-                label: 'Продажи',
+                id: 'settings',
+                label: 'Настройки',
                 submenu: [
-                    { id: 'sales-orders', label: 'Заказы покупателей' },
-                    { id: 'sales-returns', label: 'Возвраты покупателей' },
-                    { id: 'warehouse-sales', label: 'Продажи со склада' }
+                    { id: 'profile', label: 'Профиль' }
                 ]
             });
-            
-            // Добавляем склад для сотрудников
-            baseTabs.push({
-                id: 'warehouse',
-                label: 'Склад',
-                submenu: [
-                    { id: 'parts', label: 'Мои запчасти' },
-                    { id: 'receipts', label: 'Поступление' },
-                    { id: 'expenses', label: 'Расходы' }
-                ]
-            });
-            
+        }
+        // Для директора добавляем Настройки с Профилем, Сотрудниками и Адресным хранением
+        else if (user?.is_director) {
             baseTabs.push({
                 id: 'settings',
                 label: 'Настройки',
                 submenu: [
                     { id: 'profile', label: 'Профиль' },
+                    { id: 'settings-employees', label: 'Сотрудники' },
                     { id: 'settings-storage-addresses', label: 'Адресное хранение' }
+                ]
+            });
+        }
+        // Для продавцов и админов добавляем Настройки только с Профилем
+        else if (user?.is_seller || user?.is_admin) {
+            baseTabs.push({
+                id: 'settings',
+                label: 'Настройки',
+                submenu: [
+                    { id: 'profile', label: 'Профиль' }
                 ]
             });
         }

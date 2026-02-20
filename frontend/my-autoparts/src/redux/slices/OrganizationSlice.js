@@ -151,6 +151,66 @@ export const updateEmployee = createAsyncThunk(
     }
 );
 
+// Загрузка всех доступных прав (permissions)
+export const fetchPermissions = createAsyncThunk(
+    'organization/fetchPermissions',
+    async (_, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest('/employees/permissions/all');
+            return result;
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка загрузки прав');
+        }
+    }
+);
+
+// Загрузка прав сотрудника
+export const fetchEmployeePermissions = createAsyncThunk(
+    'organization/fetchEmployeePermissions',
+    async (employeeId, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest(`/employees/${employeeId}/permissions`);
+            return { employeeId, permissions: result };
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка загрузки прав сотрудника');
+        }
+    }
+);
+
+// Сохранение прав сотрудника
+export const saveEmployeePermissions = createAsyncThunk(
+    'organization/saveEmployeePermissions',
+    async ({ employeeId, permissionIds }, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest(`/employees/${employeeId}/permissions`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    employee_id: employeeId,
+                    permission_ids: permissionIds
+                }),
+            });
+            return { employeeId, permissionIds };
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка сохранения прав');
+        }
+    }
+);
+
+// Инициализация прав (для директоров)
+export const initPermissions = createAsyncThunk(
+    'organization/initPermissions',
+    async (_, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest('/employees/permissions/init', {
+                method: 'POST',
+            });
+            return result;
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка инициализации прав');
+        }
+    }
+);
+
 
 const organizationSlice = createSlice({
     name: 'organization',
@@ -164,6 +224,13 @@ const organizationSlice = createSlice({
         employees: [],
         loadingEmployees: false,
         employeesError: null,
+        // Permissions state
+        permissions: [],
+        loadingPermissions: false,
+        permissionsError: null,
+        employeePermissions: {}, // Map: employeeId -> [permissionIds]
+        loadingEmployeePermissions: false,
+        savingEmployeePermissions: false,
     },
     reducers: {
         clearOrganization: (state) => {
@@ -171,6 +238,9 @@ const organizationSlice = createSlice({
             state.storageLocations = [];
             state.error = null;
             state.locationsError = null;
+        },
+        clearPermissionsError: (state) => {
+            state.permissionsError = null;
         },
     },
     extraReducers: (builder) => {
@@ -246,9 +316,50 @@ const organizationSlice = createSlice({
             .addCase(fetchStorageLocations.rejected, (state, action) => {
                 state.loadingLocations = false;
                 state.locationsError = action.payload;
+            })
+            // Permissions
+            .addCase(fetchPermissions.pending, (state) => {
+                state.loadingPermissions = true;
+                state.permissionsError = null;
+            })
+            .addCase(fetchPermissions.fulfilled, (state, action) => {
+                state.loadingPermissions = false;
+                state.permissions = action.payload;
+            })
+            .addCase(fetchPermissions.rejected, (state, action) => {
+                state.loadingPermissions = false;
+                state.permissionsError = action.payload;
+            })
+            .addCase(fetchEmployeePermissions.pending, (state) => {
+                state.loadingEmployeePermissions = true;
+                state.permissionsError = null;
+            })
+            .addCase(fetchEmployeePermissions.fulfilled, (state, action) => {
+                state.loadingEmployeePermissions = false;
+                state.employeePermissions[action.payload.employeeId] = action.payload.permissions;
+            })
+            .addCase(fetchEmployeePermissions.rejected, (state, action) => {
+                state.loadingEmployeePermissions = false;
+                state.permissionsError = action.payload;
+            })
+            .addCase(saveEmployeePermissions.pending, (state) => {
+                state.savingEmployeePermissions = true;
+                state.permissionsError = null;
+            })
+            .addCase(saveEmployeePermissions.fulfilled, (state, action) => {
+                state.savingEmployeePermissions = false;
+                state.employeePermissions[action.payload.employeeId] = action.payload.permissionIds;
+            })
+            .addCase(saveEmployeePermissions.rejected, (state, action) => {
+                state.savingEmployeePermissions = false;
+                state.permissionsError = action.payload;
+            })
+            .addCase(initPermissions.fulfilled, (state, action) => {
+                // Refresh permissions after init
+                state.permissions = action.payload.created || state.permissions;
             });
     },
 });
 
-export const { clearOrganization } = organizationSlice.actions;
+export const { clearOrganization, clearPermissionsError } = organizationSlice.actions;
 export default organizationSlice.reducer;

@@ -157,3 +157,67 @@ def get_all_permissions(
     """Get all available permissions"""
     permissions = db.query(Permission).all()
     return permissions
+
+
+@router.post("/permissions/init")
+def init_permissions(
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Initialize default permissions (only for directors)"""
+    if not current_user.is_director:
+        raise HTTPException(
+            status_code=403,
+            detail="Только директор может инициализировать права"
+        )
+    
+    # Create default permissions if they don't exist
+    default_permissions = [
+        {"id": 1, "code": "sellers", "name": "Продавцы"},
+    ]
+    
+    created = []
+    for perm_data in default_permissions:
+        existing = db.query(Permission).filter(Permission.id == perm_data["id"]).first()
+        if not existing:
+            permission = Permission(
+                id=perm_data["id"],
+                code=perm_data["code"],
+                name=perm_data["name"]
+            )
+            db.add(permission)
+            created.append(perm_data)
+    
+    db.commit()
+    return {"message": "Permissions initialized", "created": created}
+
+
+@router.get("/{employee_id}/permissions", response_model=List[int])
+def get_employee_permissions(
+    employee_id: int,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get permissions assigned to an employee"""
+    if not current_user.is_director:
+        raise HTTPException(
+            status_code=403,
+            detail="Только директор может просматривать права сотрудников"
+        )
+    
+    # Verify employee belongs to the same organization
+    employee = db.query(UserModel).filter(
+        UserModel.id == employee_id,
+        UserModel.organization_id == current_user.organization_id,
+        UserModel.is_employee == True
+    ).first()
+    
+    if not employee:
+        raise HTTPException(status_code=404, detail="Сотрудник не найден")
+    
+    # Get permission IDs for the employee
+    permissions = db.query(UserPermission.permission_id).filter(
+        UserPermission.user_id == employee_id
+    ).all()
+    
+    return [perm_id for (perm_id,) in permissions]

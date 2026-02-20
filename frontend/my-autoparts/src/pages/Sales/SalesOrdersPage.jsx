@@ -7,7 +7,7 @@ import { fetchProductStorageCells } from '../../redux/slices/StorageCellsSlice';
 export default function SalesOrdersPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
+  const { user, permissionCodes } = useSelector((state) => state.auth);
   const { productStorageCells } = useSelector((state) => state.storageCells);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,20 +15,45 @@ export default function SalesOrdersPage() {
   const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [editingStatus, setEditingStatus] = useState(null); // {type: 'order'|'item', id: number}
   const [availableStatuses, setAvailableStatuses] = useState([]);
+  const [authChecked, setAuthChecked] = useState(false);
 
-  console.log(orders)
-  // Проверка прав администратора или продавца
+  console.log('orders:', orders);
+  console.log('user:', user);
+  console.log('permissionCodes:', permissionCodes);
+  
+  // Check if user has permission to view this page
+  // Admin and sellers always have access
+  // Employees need 'sales.orders' permission code
+  const hasPermission = user?.is_admin || user?.is_seller || 
+    (user?.is_employee && permissionCodes && permissionCodes.includes('sales.orders'));
+  
+  // Проверка прав доступа - делаем проверку только когда user загружен
   useEffect(() => {
-    if (!user?.is_admin && !user?.is_seller && !user?.is_employee) {
+    // Если user еще не загружен (null), ждем
+    if (user === undefined || user === null) {
+      // Проверяем есть ли токен - если есть, ждем загрузки профиля
+      const token = localStorage.getItem('token');
+      if (token) {
+        return; // Ждем пока загрузится профиль
+      }
+    }
+    
+    // Отмечаем что проверка auth выполнена
+    setAuthChecked(true);
+    
+    if (!hasPermission) {
       navigate('/', { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, permissionCodes, hasPermission, navigate]);
 
   useEffect(() => {
-    if (user && (user.is_admin || user.is_seller || user.is_employee)) {
+    // Ждем пока auth проверка завершится
+    if (!authChecked) return;
+    
+    if (hasPermission) {
       fetchOrders();
     }
-  }, [user]);
+  }, [hasPermission, authChecked]);
 
   const fetchOrders = async () => {
     try {
@@ -185,8 +210,17 @@ export default function SalesOrdersPage() {
     return null;
   };
 
-  // Если пользователь не админ и не продавец, не показываем страницу
-  if (!user?.is_admin && !user?.is_seller) {
+  // Показываем загрузку пока auth данные загружаются
+  if (!authChecked) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
+  // Если пользователь не имеет прав доступа, не показываем страницу
+  if (!hasPermission) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

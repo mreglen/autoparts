@@ -19,7 +19,7 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  // Проверка прав продавца
+  // Проверка прав продавца или сотрудника
   useEffect(() => {
     if (!user?.is_seller && !user?.is_employee) {
       navigate('/', { replace: true });
@@ -37,10 +37,19 @@ export default function DashboardPage() {
       setLoading(true);
 
       // Получаем статистику заказов
-      const ordersResponse = await apiAxios.get('/orders/');
+      // Для админов - все заказы, для сотрудников - заказы организации, для продавцов - свои заказы
+      let ordersEndpoint;
+      if (user?.is_admin) {
+        ordersEndpoint = '/orders/';
+      } else if (user?.is_employee) {
+        ordersEndpoint = '/orders/organization/my';
+      } else {
+        ordersEndpoint = '/orders/my';
+      }
+      const ordersResponse = await apiAxios.get(ordersEndpoint);
       const orders = ordersResponse.data;
 
-      // Фильтруем заказы по организации продавца
+      // Фильтруем заказы
       const filteredOrders = orders.filter(order => {
         // Заказы из новых автозапчастей фильтруем по организации
         if (order.new_parts_order) {
@@ -131,8 +140,8 @@ export default function DashboardPage() {
     }).format(amount);
   };
 
-  // Если пользователь не продавец, не показываем страницу
-  if (!user?.is_seller) {
+  // Если пользователь не продавец и не сотрудник, не показываем страницу
+  if (!user?.is_seller && !user?.is_employee) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
