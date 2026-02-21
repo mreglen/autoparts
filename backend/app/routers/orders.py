@@ -32,10 +32,22 @@ def generate_order_number(db: Session):
     # Форматируем номер как 9-значное число с ведущими нулями
     return f"{next_number:09d}"
 
-def order_to_response(order: Order, db_session=None) -> OrderResponse:
-    """Конвертирует SQLAlchemy объект Order в Pydantic OrderResponse"""
+def order_to_response(order: Order, db_session=None, filter_organization_id=None) -> OrderResponse:
+    """Конвертирует SQLAlchemy объект Order в Pydantic OrderResponse
+    
+    Args:
+        order: SQLAlchemy Order object
+        db_session: Database session for additional queries
+        filter_organization_id: If provided, filters used parts items to only show those from this organization.
+                               New parts items (seller_organization_id=None) are always shown.
+    """
     items_response = []
     for item in order.items:
+        # Filter items based on organization if filter_organization_id is provided
+        if filter_organization_id is not None:
+            # If item has seller_organization_id (used part), only show if it matches user's organization
+            if item.seller_organization_id is not None and item.seller_organization_id != filter_organization_id:
+                continue  # Skip used parts from other organizations
         # Find product by brand and partnumber since there's no direct relationship in the model
         storage_location = None
         if db_session:
@@ -69,6 +81,14 @@ def order_to_response(order: Order, db_session=None) -> OrderResponse:
                 for cell in storage_cells
             ]
         
+        # Get seller organization info if available
+        seller_organization = None
+        if item.seller_organization_id and item.seller_organization:
+            seller_organization = {
+                "id": item.seller_organization_id,
+                "name": item.seller_organization.name
+            }
+        
         items_response.append(OrderItemResponse(
             id=item.id,
             name=item.name,
@@ -79,7 +99,9 @@ def order_to_response(order: Order, db_session=None) -> OrderResponse:
             status=item.status,
             storage_location=storage_location,
             product_id=item.product_id,
-            product_storage_cells=product_storage_cells
+            product_storage_cells=product_storage_cells,
+            seller_organization_id=item.seller_organization_id,
+            seller_organization=seller_organization
         ))
 
     new_parts_order_response = None
@@ -242,6 +264,13 @@ async def create_order(
         added_product_ids = set()
         
         for item_data in order_data.items:
+            # Для б/у запчастей определяем организацию продавца
+            seller_organization_id = None
+            if item_data.product_id:
+                product = db.query(Product).filter(Product.id == item_data.product_id).first()
+                if product:
+                    seller_organization_id = product.organization_id
+            
             # Ensure the name field contains only the product name, not brand + partnumber
             # Also make sure product_id is properly preserved
             order_item = OrderItem(
@@ -252,7 +281,8 @@ async def create_order(
                 quantity=item_data.quantity,
                 price=item_data.price,
                 status_id=pending_item_status.id,
-                product_id=item_data.product_id  # Сохраняем ID конкретной запчасти
+                product_id=item_data.product_id,  # Сохраняем ID конкретной запчасти
+                seller_organization_id=seller_organization_id  # Сохраняем организацию продавца для б/у запчастей
             )
             db.add(order_item)
             if item_data.product_id:
@@ -361,6 +391,107 @@ async def get_organization_orders(
     ).filter(Order.user_id.in_(org_user_ids)).offset(skip).limit(limit).all()
 
     return [order_to_response(order, db) for order in orders]
+
+
+@router.get("/sales/all", response_model=list[OrderResponse])
+async def get_sales_orders(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Получение заказов для страницы продаж с учетом роли пользователя и is_admin директора"""
+    from app.models.user import User
+    from app.models.organization import Organization
+    from sqlalchemy import or_, and_
+    
+    # Проверяем, что пользователь имеет право просматривать заказы продаж
+    # (продавец, админ, директор, или сотрудник)
+    has_sales_permission = (
+        current_user.is_admin or 
+        current_user.is_seller or 
+        current_user.is_director or
+        current_user.is_employee
+    )
+    
+    if not has_sales_permission:
+        raise HTTPException(status_code=403, detail="Недостаточно прав для просмотра заказов")
+    
+    # Определяем, должен ли пользователь видеть заказы новых запчастей (от Rossko)
+    # Пользователь видит new_parts_order если:
+    # 1. Он is_admin=True, или
+    # 2. Его директор (is_director=True в той же организации) имеет is_admin=True
+    can_view_new_parts_orders = current_user.is_admin
+    
+    if not can_view_new_parts_orders and current_user.organization_id:
+        # Ищем директора организации с is_admin=True
+        director = db.query(User).filter(
+            User.organization_id == current_user.organization_id,
+            User.is_director == True,
+            User.is_admin == True
+        ).first()
+        if director:
+            can_view_new_parts_orders = True
+    
+    # Получаем заказы в зависимости от роли
+    if current_user.organization_id:
+        # Все продавцы и сотрудники видят заказы б/у запчастей своей организации
+        # (где seller_organization_id = organization_id пользователя)
+        
+        # Получаем ID заказов, где есть б/у запчасти от организации пользователя
+        used_parts_order_ids = db.query(OrderItem.order_id).filter(
+            OrderItem.seller_organization_id == current_user.organization_id
+        ).distinct().all()
+        used_parts_order_ids = [oid for (oid,) in used_parts_order_ids]
+        
+        if can_view_new_parts_orders:
+            # Если директор is_admin=true - также видим заказы новых запчастей от Rossko
+            orders = db.query(Order).options(
+                joinedload(Order.status),
+                selectinload(Order.items).joinedload(OrderItem.status)
+            ).filter(
+                or_(
+                    # Б/у запчасти от своей организации
+                    Order.id.in_(used_parts_order_ids),
+                    # Новые запчасти от Rossko
+                    Order.new_parts_order != None
+                )
+            ).offset(skip).limit(limit).all()
+        else:
+            # Обычные продавцы/сотрудники - только б/у запчасти своей организации
+            orders = db.query(Order).options(
+                joinedload(Order.status),
+                selectinload(Order.items).joinedload(OrderItem.status)
+            ).filter(
+                Order.id.in_(used_parts_order_ids)
+            ).offset(skip).limit(limit).all()
+    else:
+        # Пользователь без организации (включая админов без организации) - пустой результат
+        # или только новые запчасти если can_view_new_parts_orders
+        if can_view_new_parts_orders:
+            orders = db.query(Order).options(
+                joinedload(Order.status),
+                selectinload(Order.items).joinedload(OrderItem.status)
+            ).filter(
+                Order.new_parts_order != None
+            ).offset(skip).limit(limit).all()
+        else:
+            return []
+    
+    # Filter order items by organization - admin/staff should only see their org's used parts
+    # but can see all new parts (items without seller_organization_id)
+    filter_org_id = current_user.organization_id
+    
+    # Build response with filtered items
+    result = []
+    for order in orders:
+        order_response = order_to_response(order, db, filter_organization_id=filter_org_id)
+        # Only include orders that have at least one visible item after filtering
+        if order_response.items:
+            result.append(order_response)
+    
+    return result
+
 
 @router.get("/{order_id}", response_model=OrderResponse)
 async def get_order(

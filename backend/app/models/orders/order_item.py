@@ -18,6 +18,9 @@ class OrderItem(Base):
     # ID конкретной запчасти в заказе (для б/у запчастей)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=True)  # Ссылка на конкретный товар
 
+    # ID организации продавца (для б/у запчастей - организация владелец запчасти)
+    seller_organization_id = Column(String(10), ForeignKey("organizations.id"), nullable=True)
+
     # Статус элемента заказа
     status_id = Column(Integer, ForeignKey("order_item_statuses.id"), nullable=False)
 
@@ -25,6 +28,7 @@ class OrderItem(Base):
     order = relationship("Order", back_populates="items")
     status = relationship("OrderItemStatus", back_populates="order_items")
     product = relationship("Product")
+    seller_organization = relationship("Organization")
 
     def __repr__(self):
         return f"<OrderItem(id={self.id}, order_id={self.order_id}, brand='{self.brand}', partnumber='{self.partnumber}')>"

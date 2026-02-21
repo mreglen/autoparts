@@ -135,6 +135,14 @@ async def checkout_from_cart(
             if not product_id_value and hasattr(item, 'product') and item.product:
                 product_id_value = item.product.id
             
+            # Для б/у запчастей определяем организацию продавца
+            seller_organization_id = None
+            if product_id_value:
+                from app.models.product import Product
+                product = db.query(Product).filter(Product.id == product_id_value).first()
+                if product:
+                    seller_organization_id = product.organization_id
+            
             order_item = OrderItem(
                 order_id=local_order.id,
                 name=item_name,
@@ -143,7 +151,8 @@ async def checkout_from_cart(
                 quantity=item.quantity,
                 price=float(item.price) if item.price else 0,
                 status_id=pending_item_status.id,
-                product_id=product_id_value  # Ensure product_id is always set
+                product_id=product_id_value,  # Ensure product_id is always set
+                seller_organization_id=seller_organization_id  # Сохраняем организацию продавца для б/у запчастей
             )
             db.add(order_item)
 

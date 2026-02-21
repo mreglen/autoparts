@@ -58,33 +58,12 @@ export default function SalesOrdersPage() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
 
-      // Получаем заказы
-      const ordersResponse = await apiAxios.get('/orders/');
+      // Используем новый endpoint /orders/sales/all который учитывает роль пользователя
+      // и is_admin директора организации
+      const ordersResponse = await apiAxios.get('/orders/sales/all');
 
-      let filteredOrders = ordersResponse.data;
-
-      // Фильтруем заказы по организации продавца
-      if (user?.organization_id) {
-        filteredOrders = filteredOrders.filter(order => {
-          // Заказы из новых автозапчастей фильтруем по организации (если есть такая информация)
-          if (order.new_parts_order) {
-            // Пока оставляем логику для админов, но можно добавить проверку организации
-            return user?.is_admin;
-          }
-          // Для обычных заказов проверяем связь с организацией
-          // Предполагаем, что заказы содержат organization_id или связь через товары
-          return order.organization_id === user.organization_id || !order.organization_id; // пока показываем без organization_id
-        });
-      }
-
-      // Фильтруем заказы: заказы из новых автозапчастей (new_parts_order) показываем только админам
-      if (!user?.is_admin) {
-        filteredOrders = filteredOrders.filter(order => !order.new_parts_order);
-      }
-
-      setOrders(filteredOrders);
+      setOrders(ordersResponse.data);
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
       setError('Не удалось загрузить заказы');
@@ -400,19 +379,19 @@ export default function SalesOrdersPage() {
                           <table className="w-full table-fixed divide-y divide-gray-200">
                             <thead className="bg-gray-100">
                               <tr>
-                                <th className="w-[15%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-[17%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Товар
                                 </th>
-                                <th className="w-[35%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-[25%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Наименование
                                 </th>
                                 <th className="w-[8%] px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Кол-во
                                 </th>
-                                <th className="w-[12%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-[10%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Сумма
                                 </th>
-                                <th className="w-[20%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="w-[30%] px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                   Адрес хранения
                                 </th>
                                 <th className="w-[10%] px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -425,13 +404,13 @@ export default function SalesOrdersPage() {
                                 index === self.findIndex(i => i.id === item.id)  // Remove duplicates by ID
                               ).map((item) => (
                                 <tr key={item.id} className="hover:bg-gray-50">
-                                  <td className="w-[15%] px-2 py-2 text-sm text-gray-900">
+                                  <td className="w-[17%] px-2 py-2 text-sm text-gray-900">
                                     <div className="leading-tight">
                                       <div className="font-medium">{item.brand}</div>
                                       <div className="text-gray-600">{item.partnumber}</div>
                                     </div>
                                   </td>
-                                  <td className="w-[35%] px-2 py-2 text-sm text-gray-900">
+                                  <td className="w-[25%] px-2 py-2 text-sm text-gray-900">
                                     <div className="leading-tight break-words max-w-xs">
                                       {item.name}
                                     </div>
@@ -439,10 +418,10 @@ export default function SalesOrdersPage() {
                                   <td className="w-[8%] px-2 py-2 text-sm text-gray-900 text-center">
                                     {item.quantity} шт.
                                   </td>
-                                  <td className="w-[12%] px-2 py-2 text-sm font-medium text-gray-900 text-left">
+                                  <td className="w-[10%] px-2 py-2 text-sm font-medium text-gray-900 text-left">
                                     {formatPrice(item.price * item.quantity)}
                                   </td>
-                                  <td className="w-[20%] px-2 py-2 text-sm text-gray-900">
+                                  <td className="w-[30%] px-2 py-2 text-sm text-gray-900">
                                     <div>
                                       {(() => {
                                         let storageAddress = null;

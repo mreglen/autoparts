@@ -14,17 +14,16 @@ const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygara
 // const API_BASE = 'http://127.0.0.1:8000/api';
 // const BACKEND_BASE = 'http://127.0.0.1:8000';
 
-// Helper function to get auth headers
 export const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-// Helper function to normalize image URLs
+
 export const normalizeImageUrl = (imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
 
-    // If URL is already from current backend, return as is
+  
     if (imageUrl.startsWith(BACKEND_BASE) ||
         imageUrl.startsWith('blob:') ||
         imageUrl.startsWith('data:')) {

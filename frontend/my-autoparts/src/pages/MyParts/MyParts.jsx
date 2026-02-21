@@ -36,7 +36,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
       className="hover:bg-gray-50"
     >
       <td 
-        className="px-2 sm:px-6 py-4 whitespace-nowrap border-r border-gray-200"
+        className="px-2 py-3 whitespace-nowrap border-r border-gray-200"
       >
         <input
           type="checkbox"
@@ -49,31 +49,31 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
         />
       </td>
       <td 
-        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 cursor-pointer"
+        className="px-2 py-3 whitespace-nowrap text-sm font-medium text-gray-900 cursor-pointer"
         onClick={onToggleExpand}
       >
         {part.brand || '—'}
       </td>
       <td 
-        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono cursor-pointer"
+        className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 font-mono cursor-pointer"
         onClick={onToggleExpand}
       >
         {part.article || '—'}
       </td>
       <td 
-        className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono cursor-pointer"
+        className="hidden md:table-cell px-3 py-3 whitespace-nowrap text-sm text-gray-500 font-mono cursor-pointer"
         onClick={onToggleExpand}
       >
         {part.internal_code || '—'}
       </td>
       <td 
-        className="px-2 sm:px-6 py-4 text-sm text-gray-500 max-w-0 truncate sm:max-w-none sm:whitespace-normal cursor-pointer"
+        className="px-2 py-3 text-sm text-gray-500 max-w-0 truncate sm:max-w-none sm:whitespace-normal cursor-pointer"
         onClick={onToggleExpand}
       >
         {part.name || '—'}
       </td>
       <td 
-        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm cursor-pointer"
+        className="px-2 py-3 whitespace-nowrap text-sm cursor-pointer"
         onClick={onToggleExpand}
       >
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
@@ -81,18 +81,18 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
         </span>
       </td>
       <td 
-        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
+        className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
         onClick={onToggleExpand}
       >
         {part.quantity || 0}
       </td>
       <td 
-        className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
+        className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
         onClick={onToggleExpand}
       >
         {part.price != null && !isNaN(parseFloat(part.price)) ? `${parseFloat(part.price).toFixed(2)} ₽` : '—'}
       </td>
-      <td className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+      <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-500">
         <div className="relative actions-dropdown">
           <button
             onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
@@ -702,7 +702,7 @@ function MyParts() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <input
                       type="checkbox"
                       checked={displayParts.length > 0 && selectedParts.size === displayParts.length}
@@ -722,14 +722,14 @@ function MyParts() {
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                   </th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бренд</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Номер</th>
-                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Внутр. код</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Наименование</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Состояние</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Остаток</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена, ₽</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бренд</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Номер</th>
+                  <th className="hidden md:table-cell px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Внутр. код</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Наименование</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Состояние</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Остаток</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена, ₽</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">

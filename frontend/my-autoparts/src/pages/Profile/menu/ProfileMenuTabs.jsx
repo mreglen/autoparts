@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 // Icon mapping for menu items
 const getMenuIcon = (menuId) => {
@@ -124,12 +125,39 @@ const getMenuIcon = (menuId) => {
 
 export default function ProfileMenuTabs({ tabs, activeTab, onTabChange }) {
     const [expandedMenus, setExpandedMenus] = useState({});
+    const location = useLocation();
 
     const toggleSubmenu = (menuId) => {
         setExpandedMenus(prev => ({
             ...prev,
             [menuId]: !prev[menuId]
         }));
+    };
+
+    // Function to handle tab change with scroll to top on mobile
+    const handleTabChange = (tabId) => {
+        onTabChange(tabId);
+        // Scroll to top of content area on mobile (below the sticky menu)
+        if (window.innerWidth < 1024) { // lg breakpoint
+            // Small delay to allow page content to update
+            setTimeout(() => {
+                // Scroll to the main content area (below the sticky top menu)
+                const mainContent = document.querySelector('main');
+                if (mainContent) {
+                    const headerOffset = 80; // Account for sticky header
+                    const elementPosition = mainContent.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                    
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                } else {
+                    // Fallback: scroll to top
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+            }, 100);
+        }
     };
 
     const renderMenuItem = (tab) => {
@@ -165,7 +193,7 @@ export default function ProfileMenuTabs({ tabs, activeTab, onTabChange }) {
                             {tab.submenu.map((subTab) => (
                                 <button
                                     key={subTab.id}
-                                    onClick={() => onTabChange(subTab.id)}
+                                    onClick={() => handleTabChange(subTab.id)}
                                     className={`w-full px-4 py-2 text-left text-sm font-medium border-l-4 transition-colors flex items-center gap-3 ${
                                         activeTab === subTab.id
                                             ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
@@ -185,7 +213,7 @@ export default function ProfileMenuTabs({ tabs, activeTab, onTabChange }) {
         return (
             <button
                 key={tab.id}
-                onClick={() => onTabChange(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`px-4 py-3 text-left text-sm font-medium border-l-4 transition-colors flex items-center gap-3 ${
                     activeTab === tab.id
                         ? 'border-indigo-500 text-indigo-600 bg-indigo-50'

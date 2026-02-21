@@ -25,6 +25,13 @@ class OrderItemCreate(BaseModel):
     status_id: int
     product_id: Optional[int] = None
 
+class SellerOrganizationResponse(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 class OrderItemResponse(BaseModel):
     id: int
     name: str
@@ -36,6 +43,8 @@ class OrderItemResponse(BaseModel):
     storage_location: Optional[StorageLocation] = None
     product_id: Optional[int] = None
     product_storage_cells: Optional[List[dict]] = None
+    seller_organization_id: Optional[str] = None
+    seller_organization: Optional[SellerOrganizationResponse] = None
 
     class Config:
         from_attributes = True
