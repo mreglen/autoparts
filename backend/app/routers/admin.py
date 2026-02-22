@@ -5,6 +5,8 @@ from app.models.event_log import EventLog
 from app.models.user import User
 from app.models.organization import Organization
 from app.models.pending_seller import PendingSeller
+from app.models.product import Product
+from app.models.stock_out import StockOut
 from app.db.database import get_db
 from app.schemas.event_log import EventLogResponse
 from app.schemas.user import UserResponse, UserUpdate
@@ -18,6 +20,7 @@ from app.utils.event_logger import log_event
 from app.utils.email import send_verification_email, send_welcome_email
 import secrets
 import string 
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -97,6 +100,86 @@ def get_all_sellers(
         }
         sellers_data.append(seller_dict)
     return sellers_data
+
+
+class SellerDashboardStats(BaseModel):
+    seller_id: str
+    seller_name: str
+    organization_name: Optional[str]
+    activeOrders: int
+    totalProducts: int
+    totalWarehouseValue: float
+    totalWarehouseQuantity: int
+    totalSales: float
+    newOrders: int
+    pendingOrders: int
+    completedOrders: int
+    warehouseSalesCount: int
+
+
+@router.get("/sellers/{seller_id}/dashboard", response_model=SellerDashboardStats)
+def get_seller_dashboard_stats(
+    seller_id: str,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Get dashboard statistics for a specific seller (admin only)"""
+    seller = db.query(User).filter(User.id == seller_id, User.is_seller == True).first()
+    if not seller:
+        raise HTTPException(status_code=404, detail="Продавец не найден")
+    
+    # Get seller's organization
+    organization_id = seller.organization_id
+    
+    # Get orders where items belong to this seller's organization
+    # We need to join Order with OrderItem to find orders containing items from this organization
+    from app.models.orders import Order, OrderItem
+    orders = db.query(Order).join(Order.items).filter(OrderItem.seller_organization_id == organization_id).distinct().all()
+    
+    # Filter orders from new parts (Rossko) - exclude them
+    filtered_orders = [order for order in orders if order.new_parts_order is None]
+    
+    # Calculate order statistics
+    active_orders = [o for o in filtered_orders if o.status.code not in ['closed', 'cancelled']]
+    
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    new_orders = [o for o in filtered_orders if o.created_at > seven_days_ago]
+    
+    pending_orders = [o for o in filtered_orders if o.status.code == 'pending']
+    completed_orders = [o for o in filtered_orders if o.status.code in ['delivered', 'closed']]
+    
+    # Get products for this organization
+    products = db.query(Product).filter(Product.organization_id == organization_id).all()
+    total_products = len(products)
+    total_warehouse_value = sum((p.price or 0) * (p.quantity or 0) for p in products)
+    total_warehouse_quantity = sum(p.quantity or 0 for p in products)
+    
+    # Get warehouse sales for this organization
+    warehouse_sales = db.query(StockOut).filter(
+        StockOut.organization_id == organization_id,
+        StockOut.sale_price > 0
+    ).all()
+    warehouse_sales_count = len(warehouse_sales)
+    total_sales = sum(float(s.sale_price or 0) * int(s.quantity or 0) for s in warehouse_sales)
+    
+    seller_name = f"{seller.last_name} {seller.first_name}".strip()
+    if seller.patronymic:
+        seller_name += f" {seller.patronymic}"
+    
+    return SellerDashboardStats(
+        seller_id=str(seller.id),
+        seller_name=seller_name,
+        organization_name=seller.organization.name if seller.organization else None,
+        activeOrders=len(active_orders),
+        totalProducts=total_products,
+        totalWarehouseValue=total_warehouse_value,
+        totalWarehouseQuantity=total_warehouse_quantity,
+        totalSales=total_sales,
+        newOrders=len(new_orders),
+        pendingOrders=len(pending_orders),
+        completedOrders=len(completed_orders),
+        warehouseSalesCount=warehouse_sales_count
+    )
 
 
 def generate_random_password(length=10):
