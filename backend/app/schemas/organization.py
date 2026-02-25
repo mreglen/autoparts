@@ -5,6 +5,8 @@ class OrganizationBase(BaseModel):
     name: str
     address: str
     phone: Optional[str] = None
+    logo_organization: Optional[str] = None
+    description: Optional[str] = None
 
 class OrganizationCreate(OrganizationBase):
     pass
@@ -13,6 +15,8 @@ class OrganizationUpdate(BaseModel):
     name: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None
+    logo_organization: Optional[str] = None
+    description: Optional[str] = None
 
 class Organization(OrganizationBase):
     id: str

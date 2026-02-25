@@ -95,7 +95,7 @@ const PermissionAssignmentModal = ({
                                         id={`perm-${permission.id}`}
                                         checked={localPermissions.includes(permission.id)}
                                         onChange={() => togglePermission(permission.id)}
-                                        className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+                                        className="h-4 w-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-500 focus:ring-blue-500 checked:bg-blue-600 checked:border-blue-600 focus:outline-none"
                                         disabled={isSaving}
                                     />
                                     <label htmlFor={`perm-${permission.id}`} className="ml-3 flex-1">

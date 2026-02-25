@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from ..db.database import Base
 
+
 class Organization(Base):
     __tablename__ = "organizations"
 
@@ -9,6 +10,8 @@ class Organization(Base):
     name = Column(String(255))
     address = Column(Text)
     phone = Column(String(20))
+    logo_organization = Column(Text)
+    description = Column(Text)
     users = relationship("User", back_populates="organization")
     products = relationship("Product", back_populates="organization")
     acquired_products = relationship("AcquiredProduct", back_populates="organization")

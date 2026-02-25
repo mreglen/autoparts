@@ -9,7 +9,7 @@ function Footer() {
             <div className='flex flex-col md:flex-row justify-between items-center gap-6'>
                 {/* Логотип и название */}
                 <NavLink exact to='/' className='flex items-center gap-4'>
-                    <img src="/img/orig 1.png" alt="Логотип" className='h-10 w-auto' />
+                    <img src="/img/orig-1.png" alt="Логотип" className='h-10 w-auto' />
                     <div className='flex flex-col text-white'>
                         <p className='font-bold'>Свой</p>
                         <p className='font-bold'>гараж</p>

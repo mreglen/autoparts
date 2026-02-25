@@ -9,32 +9,32 @@ import Search from './Search/Search';
 import MobileBottomNav from '../../components/MobileBottomNav/MobileBottomNav';
 
 const formatPhoneNumber = (phone) => {
-  if (!phone) return '';
+    if (!phone) return '';
 
-  // Удаляем все нецифровые символы
-  let digits = phone.replace(/\D/g, '');
+    // Удаляем все нецифровые символы
+    let digits = phone.replace(/\D/g, '');
 
-  // Если начинается с 7 или 8, заменяем на 7
-  if (digits.startsWith('7') || digits.startsWith('8')) {
-    digits = '7' + digits.slice(1);
-  }
+    // Если начинается с 7 или 8, заменяем на 7
+    if (digits.startsWith('7') || digits.startsWith('8')) {
+        digits = '7' + digits.slice(1);
+    }
 
-  // Форматируем как +7 (XXX) XXX-XX-XX
-  let formatted = '+7 ';
-  if (digits.length > 1) {
-    formatted += '(' + digits.slice(1, 4);
-  }
-  if (digits.length > 4) {
-    formatted += ') ' + digits.slice(4, 7);
-  }
-  if (digits.length > 7) {
-    formatted += '-' + digits.slice(7, 9);
-  }
-  if (digits.length > 9) {
-    formatted += '-' + digits.slice(9, 11);
-  }
+    // Форматируем как +7 (XXX) XXX-XX-XX
+    let formatted = '+7 ';
+    if (digits.length > 1) {
+        formatted += '(' + digits.slice(1, 4);
+    }
+    if (digits.length > 4) {
+        formatted += ') ' + digits.slice(4, 7);
+    }
+    if (digits.length > 7) {
+        formatted += '-' + digits.slice(7, 9);
+    }
+    if (digits.length > 9) {
+        formatted += '-' + digits.slice(9, 11);
+    }
 
-  return formatted;
+    return formatted;
 };
 
 
@@ -47,7 +47,7 @@ export default function Navigation() {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [closeTimeout, setCloseTimeout] = useState(null);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    
+
     // Helper to check if user has specific permission
     const hasPermission = (code) => {
         return permissionCodes && permissionCodes.includes(code);
@@ -117,15 +117,15 @@ export default function Navigation() {
         }
 
         // Подсчет новых запчастей
-        const newPartsCount = cart.new_parts_items ? 
+        const newPartsCount = cart.new_parts_items ?
             cart.new_parts_items.reduce((sum, item) => sum + item.quantity, 0) : 0;
-        const newPartsPrice = cart.new_parts_items ? 
+        const newPartsPrice = cart.new_parts_items ?
             cart.new_parts_items.reduce((sum, item) => sum + (item.price * item.quantity), 0) : 0;
 
         // Подсчет б/у запчастей
-        const usedPartsCount = cart.used_parts_items ? 
+        const usedPartsCount = cart.used_parts_items ?
             cart.used_parts_items.reduce((sum, item) => sum + item.quantity, 0) : 0;
-        const usedPartsPrice = cart.used_parts_items ? 
+        const usedPartsPrice = cart.used_parts_items ?
             cart.used_parts_items.reduce((sum, item) => sum + ((item.price || 0) * item.quantity), 0) : 0;
 
         // Общие значения
@@ -158,12 +158,12 @@ export default function Navigation() {
                         {adminOrganizationPhone?.organization_phone && (
                             <>
                                 <span className="text-sm sm:text-lg text-gray-400 mx-2">|</span>
-                                <a 
+                                <a
                                     href={`tel:${adminOrganizationPhone.organization_phone.replace(/\D/g, '')}`}
                                     className="text-sm sm:text-lg text-gray-600 hover:text-indigo-600 transition-colors flex items-center gap-1"
                                 >
                                     <img
-                                        src="/img/telephone 1.svg"
+                                        src="/img/telephone-1.svg"
                                         alt="Телефон"
                                         className="w-4 h-4 sm:w-5 sm:h-5"
                                     />
@@ -179,8 +179,7 @@ export default function Navigation() {
                         <NavLink
                             to="/autoparts"
                             className={({ isActive }) =>
-                                `text-lg transition-colors ease-in-out ${
-                                    isActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
+                                `text-lg transition-colors ease-in-out ${isActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
                                 }`}
                         >
                             Автозапчасти
@@ -188,8 +187,7 @@ export default function Navigation() {
                         <NavLink
                             to="/autoservice"
                             className={({ isActive }) =>
-                                `text-lg transition-colors ease-in-out ${
-                                    isActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
+                                `text-lg transition-colors ease-in-out ${isActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
                                 }`}
                         >
                             Сервис
@@ -202,7 +200,7 @@ export default function Navigation() {
                     {/* Логотип + каталог */}
                     <div className="flex items-center gap-6">
                         <NavLink to="/" className="flex items-center gap-3">
-                            <img src="/img/orig 1.png" alt="Логотип" className="h-10 w-auto" />
+                            <img src="/img/orig-1.png" alt="Логотип" className="h-10 w-auto" />
                             <div className="flex flex-col">
                                 <p className="font-bold">Свой</p>
                                 <p className="font-bold">гараж</p>
@@ -227,14 +225,16 @@ export default function Navigation() {
                                 onMouseEnter={handleMouseEnter}
                                 onMouseLeave={handleMouseLeave}
                             >
-                                <button
-                                    className="flex items-center gap-2 text-sm sm:text-base font-bold text-gray-700 hover:text-indigo-600 whitespace-nowrap"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                    </svg>
-                                    {firstName}
-                                </button>
+                                <NavLink to="/profile">
+                                    <button
+                                        className="flex items-center gap-2 text-sm sm:text-base font-bold text-gray-700 hover:text-indigo-600 whitespace-nowrap"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                        {firstName}
+                                    </button>
+                                </NavLink>
 
                                 {isProfileOpen && (
                                     <div
@@ -249,44 +249,31 @@ export default function Navigation() {
                                             </div>
                                         </div>
 
-                                        {/* Для продавцов - Главная и Клиенты */}
-                                        {(user?.is_seller || user?.is_employee) && (
-                                            <>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/dashboard');
-                                                    }}
-                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                >
-                                                    Главная
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/clients');
-                                                    }}
-                                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-200"
-                                                >
-                                                    Клиенты
-                                                </button>
-                                            </>
-                                        )}
-                                        
-                                        {/* Для админов - Продавцы */}
-                                        {user?.is_admin && (
+                                        {/* Главная - только для продавцов */}
+                                        {user?.is_seller && (
                                             <button
                                                 onClick={() => {
                                                     setIsProfileOpen(false);
-                                                    navigate('/sellers');
+                                                    navigate('/dashboard');
                                                 }}
-                                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-200"
+                                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                                             >
-                                                Продавцы
+                                                Главная
                                             </button>
                                         )}
 
-                                        {/* Покупки */}
+                                        {/* Профиль - для всех пользователей */}
+                                        <button
+                                            onClick={() => {
+                                                setIsProfileOpen(false);
+                                                navigate('/profile');
+                                            }}
+                                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-200"
+                                        >
+                                            Профиль
+                                        </button>
+
+                                        {/* Покупки - Заказы для всех пользователей */}
                                         <div className="px-4 py-1">
                                             <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Покупки</div>
                                             <button
@@ -298,209 +285,33 @@ export default function Navigation() {
                                             >
                                                 Заказы
                                             </button>
-                                            <button
-                                                onClick={() => {
-                                                    setIsProfileOpen(false);
-                                                    navigate('/purchases/returns');
-                                                }}
-                                                className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                            >
-                                                Возвраты
-                                            </button>
                                         </div>
 
-                                        {/* Для продавцов и сотрудников - Продажи (только если есть хотя бы одно право) */}
-                                        {(user?.is_seller || user?.is_employee) && (
-                                            (user?.is_seller || hasPermission('sales.orders') || hasPermission('sales.returns') || hasPermission('warehouse-sales')) && (
-                                                <div className="px-4 py-1 border-t border-gray-100">
-                                                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Продажи</div>
-                                                    {/* Заказы покупателей - только для продавцов или сотрудников с правом sales.orders */}
-                                                    {(user?.is_seller || hasPermission('sales.orders')) && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setIsProfileOpen(false);
-                                                                navigate('/sales/orders');
-                                                            }}
-                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                        >
-                                                            Заказы покупателей
-                                                        </button>
-                                                    )}
-                                                    {/* Возвраты покупателей - только для продавцов или сотрудников с правом sales.returns */}
-                                                    {(user?.is_seller || hasPermission('sales.returns')) && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setIsProfileOpen(false);
-                                                                navigate('/sales/returns');
-                                                            }}
-                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                        >
-                                                            Возвраты покупателей
-                                                        </button>
-                                                    )}
-                                                    {/* Продажи со склада - только для продавцов или сотрудников с правом warehouse-sales */}
-                                                    {(user?.is_seller || hasPermission('warehouse-sales')) && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setIsProfileOpen(false);
-                                                                navigate('/warehouse-sales');
-                                                            }}
-                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                        >
-                                                            Продажи со склада
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )
-                                        )}
-
-                                        {/* Для продавцов и сотрудников - Склад (только если есть хотя бы одно право) */}
-                                        {(user?.is_seller || user?.is_employee) && (
-                                            (user?.is_seller || hasPermission('my-parts') || hasPermission('stock-in') || hasPermission('stock-out')) && (
-                                                <div className="px-4 py-1 border-t border-gray-100">
-                                                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Склад</div>
-                                                    {/* Мои запчасти - только для продавцов или сотрудников с правом my-parts */}
-                                                    {(user?.is_seller || hasPermission('my-parts')) && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setIsProfileOpen(false);
-                                                                navigate('/my-parts');
-                                                            }}
-                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                        >
-                                                            Мои запчасти
-                                                        </button>
-                                                    )}
-                                                    {/* Поступление - только для продавцов или сотрудников с правом stock-in */}
-                                                    {(user?.is_seller || hasPermission('stock-in')) && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setIsProfileOpen(false);
-                                                                navigate('/stock-in');
-                                                            }}
-                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                        >
-                                                            Поступление
-                                                        </button>
-                                                    )}
-                                                    {/* Расходы - только для продавцов или сотрудников с правом stock-out */}
-                                                    {(user?.is_seller || hasPermission('stock-out')) && (
-                                                        <button
-                                                            onClick={() => {
-                                                                setIsProfileOpen(false);
-                                                                navigate('/stock-out');
-                                                            }}
-                                                            className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                        >
-                                                            Расходы
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )
-                                        )}
-
-                                        {/* Настройки для директоров - Профиль, Сотрудники, Адресное хранение */}
-                                        {user?.is_director && (
+                                        {/* Продажи - Заказы покупателей только для тех, у кого есть доступ */}
+                                        {(user?.is_seller || user?.is_admin || hasPermission('sales.orders')) && (
                                             <div className="px-4 py-1 border-t border-gray-100">
-                                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Настройки</div>
+                                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Продажи</div>
                                                 <button
                                                     onClick={() => {
                                                         setIsProfileOpen(false);
-                                                        navigate('/profile');
+                                                        navigate('/sales/orders');
                                                     }}
                                                     className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
                                                 >
-                                                    Профиль
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/settings/employees');
-                                                    }}
-                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                >
-                                                    Сотрудники
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/settings/storage-addresses');
-                                                    }}
-                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                >
-                                                    Адресное хранение
+                                                    Заказы покупателей
                                                 </button>
                                             </div>
                                         )}
 
-                                        {/* Настройки для сотрудников */}
-                                        {user?.is_employee && (
-                                            <div className="px-4 py-1 border-t border-gray-100">
-                                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Настройки</div>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/profile');
-                                                    }}
-                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                >
-                                                    Профиль
-                                                </button>
-                                                {/* Адресное хранение - только для сотрудников с правом storage-addresses */}
-                                                {hasPermission('storage-addresses') && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setIsProfileOpen(false);
-                                                            navigate('/settings/storage-addresses');
-                                                        }}
-                                                        className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                    >
-                                                        Адресное хранение
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
 
-                                        {/* Настройки для продавцов и админов - только Профиль */}
-                                        {(user?.is_seller || user?.is_admin) && (
-                                            <div className="px-4 py-1 border-t border-gray-100">
-                                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Настройки</div>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/profile');
-                                                    }}
-                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                >
-                                                    Профиль
-                                                </button>
-                                            </div>
-                                        )}
 
-                                        {/* Модерация для админов */}
-                                        {user?.is_admin && (
-                                            <div className="px-4 py-1 border-t border-gray-100">
-                                                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Модерация</div>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/moderation/pending-sellers');
-                                                    }}
-                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                >
-                                                    Регистрация продавцов
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsProfileOpen(false);
-                                                        navigate('/moderation/products');
-                                                    }}
-                                                    className="block w-full text-left px-2 py-1 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                                >
-                                                    Проверка запчастей
-                                                </button>
-                                            </div>
-                                        )}
+
+
+
+
+
+
+
 
                                         {/* Выход */}
                                         <button
@@ -514,7 +325,7 @@ export default function Navigation() {
                             </div>
                         ) : (
                             <NavLink to="/auth" className="flex flex-col items-center justify-center text-center text-xs sm:text-sm text-gray-700 hover:text-indigo-600">
-                                <img src="/img/log-in 1.svg" alt="Войти" className="w-5 h-5 sm:w-6 sm:h-6" />
+                                <img src="/img/log-in-1.svg" alt="Войти" className="w-5 h-5 sm:w-6 sm:h-6" />
                                 <p className="font-bold">Войти</p>
                             </NavLink>
                         )}
@@ -551,12 +362,12 @@ export default function Navigation() {
                         <p className="text-sm">г. Екатеринбург</p>
                     </div>
                     {adminOrganizationPhone?.organization_phone && (
-                        <a 
+                        <a
                             href={`tel:${adminOrganizationPhone.organization_phone.replace(/\D/g, '')}`}
                             className="flex items-center gap-1 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
                         >
                             <img
-                                src="/img/telephone 1.svg"
+                                src="/img/telephone-1.svg"
                                 alt="Телефон"
                                 className="w-4 h-4"
                             />

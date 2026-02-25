@@ -286,21 +286,21 @@ export default function ClientsPage() {
                     )}
                 </div>
             ) : (
-                <div className="overflow-x-auto">
+                <div className="w-full">
                     {/* Desktop table view */}
-                    <table className="hidden sm:table min-w-full divide-y divide-gray-200">
+                    <table className="hidden sm:table w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     ФИО
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Email
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Телефон
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Действия
                                 </th>
                             </tr>
@@ -308,21 +308,21 @@ export default function ClientsPage() {
                         <tbody className="bg-white divide-y divide-gray-200">
                             {clients.map((client) => (
                                 <tr key={client.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                                         <div className="text-sm font-medium text-gray-900">
                                             {client.last_name} {client.first_name}{client.patronymic ? ` ${client.patronymic}` : ''}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                                         <div className="text-sm text-gray-900">{client.email}</div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                                         <div className="text-sm text-gray-900">{client.phone}</div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <div className="relative inline-block text-left delete-popup-container">
                                             <button
-                                                onClick={() => handleDeleteClick(client.id)}
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(client.id); }}
                                                 disabled={deleting}
                                                 className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
                                             >
@@ -359,18 +359,18 @@ export default function ClientsPage() {
                     {/* Mobile card view */}
                     <div className="sm:hidden space-y-4">
                         {clients.map((client) => (
-                            <div key={client.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-                                <div className="flex justify-between items-start mb-3">
-                                    <div>
-                                        <h3 className="font-medium text-gray-900">
+                            <div key={client.id} className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-medium text-gray-900 truncate">
                                             {client.last_name} {client.first_name}{client.patronymic ? ` ${client.patronymic}` : ''}
                                         </h3>
-                                        <p className="text-sm text-gray-500 mt-1">{client.email}</p>
-                                        <p className="text-sm text-gray-500">{client.phone}</p>
+                                        <p className="text-sm text-gray-500 mt-1 truncate">{client.email}</p>
+                                        <p className="text-sm text-gray-500 truncate">{client.phone}</p>
                                     </div>
-                                    <div className="relative delete-popup-container">
+                                    <div className="relative delete-popup-container flex-shrink-0">
                                         <button
-                                            onClick={() => handleDeleteClick(client.id)}
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(client.id); }}
                                             disabled={deleting}
                                             className="text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-3 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
                                         >

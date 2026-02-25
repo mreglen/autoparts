@@ -102,6 +102,30 @@ def get_all_sellers(
     return sellers_data
 
 
+@router.get("/public/sellers")
+def get_public_sellers(
+    db: Session = Depends(get_db)
+):
+    """Public endpoint to get all sellers with their organization information"""
+    sellers = db.query(User).filter(User.is_seller == True).all()
+    # Convert to dict format with organization names
+    sellers_data = []
+    for seller in sellers:
+        seller_dict = {
+            "id": seller.id,
+            "last_name": seller.last_name,
+            "first_name": seller.first_name,
+            "patronymic": seller.patronymic,
+            "email": seller.email,
+            "phone": seller.phone,
+            "organization_name": seller.organization.name if seller.organization else None,
+            "organization_id": seller.organization_id,
+            "logo_organization": seller.organization.logo_organization if seller.organization else None
+        }
+        sellers_data.append(seller_dict)
+    return sellers_data
+
+
 class SellerDashboardStats(BaseModel):
     seller_id: str
     seller_name: str

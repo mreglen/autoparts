@@ -1,6 +1,7 @@
 // src/components/AutoParts.js
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import {
   selectRosskoItems,
   selectRosskoStatus,
@@ -44,11 +45,20 @@ const EmptySearchState = ({ query }) => (
 
 
 function AutoParts() {
+  const [searchParams] = useSearchParams();
   const dispatch = useDispatch();
   const partsData = useSelector(selectRosskoItems);
   const status = useSelector(selectRosskoStatus);
   const error = useSelector(selectRosskoError);
   const searchQuery = useSelector(selectSearchQuery);
+  
+  // Initialize search query from URL if present and not already set
+  useEffect(() => {
+    const urlQuery = searchParams.get('q');
+    if (urlQuery && !searchQuery) {
+      dispatch({ type: 'rossko/setSearchQuery', payload: decodeURIComponent(urlQuery) });
+    }
+  }, [searchParams, searchQuery, dispatch]);
 
   // Состояние для переключения вкладок
   const [activeTab, setActiveTab] = useState('rossko');

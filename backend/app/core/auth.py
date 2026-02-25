@@ -121,3 +121,54 @@ def get_current_admin_user(
             detail="Доступ запрещён: требуется роль администратора"
         )
     return current_user
+
+def cleanup_old_user_sessions(db: Session, user_id: int, ip_address: str, max_sessions_per_ip: int = 5):
+    """
+    Удаляет старые сессии для конкретного пользователя с одного и того же IP-адреса.
+    Оставляет только последние max_sessions_per_ip сессий.
+    
+    Args:
+        db: Database session
+        user_id: ID пользователя
+        ip_address: IP-адрес, для которого нужно очистить сессии
+        max_sessions_per_ip: Максимальное количество сессий, которые можно оставить для одного IP (по умолчанию 5)
+    """
+    from sqlalchemy import and_
+    
+    # Получаем старые сессии для конкретного пользователя с указанного IP
+    old_sessions = db.query(UserSession)\
+        .filter(and_(UserSession.user_id == user_id, UserSession.ip_address == ip_address))\
+        .order_by(UserSession.created_at.desc())\
+        .offset(max_sessions_per_ip)\
+        .all()
+    
+    # Удаляем старые сессии
+    for session in old_sessions:
+        db.delete(session)
+
+    db.commit()
+    
+    return len(old_sessions)  # Возвращаем количество удаленных сессий
+
+
+def cleanup_expired_sessions(db: Session, hours_threshold: int = 24):
+    """
+    Удаляет просроченные сессии, которые не были активны указанное количество часов.
+    
+    Args:
+        db: Database session
+        hours_threshold: Количество часов, после которых сессия считается просроченной
+    """
+    from datetime import datetime, timedelta
+    
+    threshold_time = datetime.utcnow() - timedelta(hours=hours_threshold)
+    expired_sessions = db.query(UserSession)\
+        .filter(UserSession.last_activity < threshold_time)\
+        .all()
+
+    for session in expired_sessions:
+        db.delete(session)
+
+    db.commit()
+    
+    return len(expired_sessions)  # Возвращаем количество удаленных сессий

@@ -218,6 +218,32 @@ def create_organization(org: OrganizationCreate, db: Session = Depends(get_db)):
     db.add(db_org)
     db.commit()
     db.refresh(db_org)
+    
+    # Assign default delivery method (ID=1) to the new organization
+    from app.models.delivery_method import DeliveryMethod, organization_delivery_methods
+    
+    # Check if delivery method with ID=1 exists
+    default_delivery_method = db.query(DeliveryMethod).filter(DeliveryMethod.id == 1).first()
+    if default_delivery_method:
+        # Check if this combination already exists
+        existing = db.execute(
+            organization_delivery_methods.select().where(
+                organization_delivery_methods.c.organization_id == organization_id,
+                organization_delivery_methods.c.delivery_method_id == 1
+            )
+        ).fetchone()
+        
+        if not existing:
+            # Add the association for default delivery method
+            db.execute(
+                organization_delivery_methods.insert().values(
+                    organization_id=organization_id,
+                    delivery_method_id=1
+                )
+            )
+    
+    db.commit()
+    
     return db_org
 # 
 @router.get("/{org_id}", response_model=OrganizationSchema)
@@ -228,19 +254,117 @@ def read_organization(org_id: str, db: Session = Depends(get_db)):
     return org
 
 @router.put("/{org_id}", response_model=OrganizationSchema)
-def update_organization(org_id: str, org: OrganizationUpdate, db: Session = Depends(get_db)):
+def update_organization(
+    org_id: str, 
+    org: OrganizationUpdate, 
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     db_org = db.query(OrganizationModel).filter(OrganizationModel.id == org_id).first()
     if not db_org:
         raise HTTPException(status_code=404, detail="Организация не найдена")
 
+    # Check if user has permission to update this organization
+    if current_user.organization_id != org_id or not current_user.is_director:
+        raise HTTPException(
+            status_code=403, 
+            detail="Доступ запрещён: только директор может редактировать организацию"
+        )
+
+    # Debug logging
+    print(f"=== UPDATE ORGANIZATION DEBUG ===")
+    print(f"org_id: {org_id}")
+    print(f"Current logo_organization value: {getattr(db_org, 'logo_organization', 'NOT_FOUND')}")
+    print(f"Incoming update data: {org.dict(exclude_unset=True)}")
+    
     # Обновляем только переданные поля
     update_data = org.dict(exclude_unset=True)
     for key, value in update_data.items():
+        print(f"Setting {key} = {value}")
         setattr(db_org, key, value)
 
     db.commit()
     db.refresh(db_org)
+    print(f"After update - logo_organization value: {getattr(db_org, 'logo_organization', 'NOT_FOUND')}")
+    print(f"Full updated organization: {db_org.__dict__}")
+    print("=== END UPDATE ORGANIZATION DEBUG ===")
     return db_org
+
+
+@router.post("/{org_id}/assign-default-delivery-methods")
+def assign_default_delivery_methods(
+    org_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    """
+    Assign default delivery methods to an organization
+    """
+    # Check if user has permission to modify this organization
+    org = db.query(OrganizationModel).filter(OrganizationModel.id == org_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Организация не найдена")
+
+    # Verify user has permission to modify this organization
+    if (current_user.organization_id != org_id and 
+        not current_user.is_admin and 
+        not current_user.is_director):
+        raise HTTPException(
+            status_code=403, 
+            detail="Нет прав для изменения способов доставки этой организации"
+        )
+    
+    # Get all delivery methods
+    from app.models.delivery_method import DeliveryMethod, organization_delivery_methods
+    all_delivery_methods = db.query(DeliveryMethod).all()
+    
+    # Assign all delivery methods to this organization
+    for dm in all_delivery_methods:
+        # Check if this combination already exists
+        existing = db.execute(
+            organization_delivery_methods.select().where(
+                organization_delivery_methods.c.organization_id == org_id,
+                organization_delivery_methods.c.delivery_method_id == dm.id
+            )
+        ).fetchone()
+        
+        if not existing:
+            # Add the association
+            db.execute(
+                organization_delivery_methods.insert().values(
+                    organization_id=org_id,
+                    delivery_method_id=dm.id
+                )
+            )
+    
+    db.commit()
+    
+    # Also ensure the default delivery method (ID=1) is always assigned
+    from app.models.delivery_method import DeliveryMethod, organization_delivery_methods
+    
+    # Check if delivery method with ID=1 exists
+    default_delivery_method = db.query(DeliveryMethod).filter(DeliveryMethod.id == 1).first()
+    if default_delivery_method:
+        # Check if this combination already exists
+        existing = db.execute(
+            organization_delivery_methods.select().where(
+                organization_delivery_methods.c.organization_id == org_id,
+                organization_delivery_methods.c.delivery_method_id == 1
+            )
+        ).fetchone()
+        
+        if not existing:
+            # Add the association for default delivery method
+            db.execute(
+                organization_delivery_methods.insert().values(
+                    organization_id=org_id,
+                    delivery_method_id=1
+                )
+            )
+    
+    db.commit()
+    
+    return {"message": "Default delivery methods assigned successfully"}
 
 @router.delete("/{org_id}", status_code=204)
 def delete_organization(org_id: str, db: Session = Depends(get_db)):

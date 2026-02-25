@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { updateProfile } from '../../redux/slices/UserSlice';
-import OrganizationCard from './OrganizationCard';
 import ProfileActions from './ProfileActions/ProfileActions';
 
 export default function ProfilePage() {
@@ -198,9 +197,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Организация и склады */}
-            {user.is_seller && user.organization_id && (
-                <OrganizationCard orgId={user.organization_id} />
-            )}
+            
         </>
     );
 }

@@ -1,6 +1,6 @@
 // src/redux/slices/OrganizationSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { apiRequest } from '../../utils/apiClient';
+import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
 
 // Загрузка организации
 export const fetchOrganization = createAsyncThunk(
@@ -16,18 +16,45 @@ export const fetchOrganization = createAsyncThunk(
 );
 
 
+// Загрузка логотипа организации
+export const uploadOrganizationLogo = createAsyncThunk(
+    'organization/uploadOrganizationLogo',
+    async (file, { rejectWithValue }) => {
+        try {
+            console.log('Uploading organization logo:', file.name);
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await apiRequestFormData('/upload/organization-logo', formData);
+            console.log('Organization logo upload response:', res);
+            return res.url;
+        } catch (error) {
+            console.error('Organization logo upload error:', error);
+            return rejectWithValue(
+                error.response?.data?.detail || error.message || 'Ошибка загрузки логотипа'
+            );
+        }
+    }
+);
+
+
 // Обновление организации
 export const updateOrganization = createAsyncThunk(
     'organization/updateOrganization',
     async ({ id, ...updateData }, { rejectWithValue }) => {
         try {
+            console.log('Updating organization with data:', { id, ...updateData });
+            console.log('Specifically checking logo_organization field:', updateData.logo_organization);
             const result = await apiRequest(`/organizations/${id}`, {
                 method: 'PUT',
                 body: JSON.stringify(updateData),
             });
+            console.log('Organization update successful:', result);
+            console.log('Updated logo_organization field:', result.logo_organization);
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка обновления организации');
+            console.error('Organization update error:', err);
+            console.error('Error details:', err?.response?.data);
+            return rejectWithValue(err?.response?.data?.detail || err?.detail || 'Ошибка обновления организации');
         }
     }
 );
@@ -217,7 +244,7 @@ const organizationSlice = createSlice({
     initialState: {
         data: null,
         storageLocations: [],
-        loading: false,
+        loading: false, // Loading state for organization data
         loadingLocations: false,
         error: null,
         locationsError: null,
@@ -231,6 +258,14 @@ const organizationSlice = createSlice({
         employeePermissions: {}, // Map: employeeId -> [permissionIds]
         loadingEmployeePermissions: false,
         savingEmployeePermissions: false,
+        // Delivery methods state
+        allDeliveryMethods: [],
+        orgDeliveryMethods: [],
+        loadingDeliveryMethods: {
+            deliveryMethods: false,
+            deliveryMethodAssignments: false,
+        },
+        deliveryMethodsError: null,
     },
     reducers: {
         clearOrganization: (state) => {
@@ -241,6 +276,9 @@ const organizationSlice = createSlice({
         },
         clearPermissionsError: (state) => {
             state.permissionsError = null;
+        },
+        clearDeliveryMethodsError: (state) => {
+            state.deliveryMethodsError = null;
         },
     },
     extraReducers: (builder) => {
@@ -357,9 +395,118 @@ const organizationSlice = createSlice({
             .addCase(initPermissions.fulfilled, (state, action) => {
                 // Refresh permissions after init
                 state.permissions = action.payload.created || state.permissions;
+            })
+            // Delivery methods
+            .addCase(fetchAllDeliveryMethods.pending, (state) => {
+                state.loadingDeliveryMethods.deliveryMethods = true;
+                state.deliveryMethodsError = null;
+            })
+            .addCase(fetchAllDeliveryMethods.fulfilled, (state, action) => {
+                state.loadingDeliveryMethods.deliveryMethods = false;
+                state.allDeliveryMethods = Array.isArray(action.payload) ? action.payload : [];
+            })
+            .addCase(fetchAllDeliveryMethods.rejected, (state, action) => {
+                state.loadingDeliveryMethods.deliveryMethods = false;
+                state.deliveryMethodsError = action.payload;
+            })
+            .addCase(fetchOrgDeliveryMethods.pending, (state) => {
+                state.loadingDeliveryMethods.deliveryMethods = true;
+                state.deliveryMethodsError = null;
+            })
+            .addCase(fetchOrgDeliveryMethods.fulfilled, (state, action) => {
+                state.loadingDeliveryMethods.deliveryMethods = false;
+                state.orgDeliveryMethods = Array.isArray(action.payload) ? action.payload : [];
+            })
+            .addCase(fetchOrgDeliveryMethods.rejected, (state, action) => {
+                state.loadingDeliveryMethods.deliveryMethods = false;
+                state.deliveryMethodsError = action.payload;
+            })
+            .addCase(assignDeliveryMethod.pending, (state) => {
+                state.loadingDeliveryMethods.deliveryMethodAssignments = true;
+                state.deliveryMethodsError = null;
+            })
+            .addCase(assignDeliveryMethod.fulfilled, (state, action) => {
+                state.loadingDeliveryMethods.deliveryMethodAssignments = false;
+                // Add the assigned method to orgDeliveryMethods if not already present
+                const method = state.allDeliveryMethods.find(m => m.id === action.meta.arg.methodId);
+                if (method && !state.orgDeliveryMethods.some(m => m.id === method.id)) {
+                    state.orgDeliveryMethods.push(method);
+                }
+            })
+            .addCase(assignDeliveryMethod.rejected, (state, action) => {
+                state.loadingDeliveryMethods.deliveryMethodAssignments = false;
+                state.deliveryMethodsError = action.payload;
+            })
+            .addCase(removeDeliveryMethod.pending, (state) => {
+                state.loadingDeliveryMethods.deliveryMethodAssignments = true;
+                state.deliveryMethodsError = null;
+            })
+            .addCase(removeDeliveryMethod.fulfilled, (state, action) => {
+                state.loadingDeliveryMethods.deliveryMethodAssignments = false;
+                // Remove the method from orgDeliveryMethods
+                state.orgDeliveryMethods = state.orgDeliveryMethods.filter(
+                    m => m.id !== action.payload.methodId
+                );
+            })
+            .addCase(removeDeliveryMethod.rejected, (state, action) => {
+                state.loadingDeliveryMethods.deliveryMethodAssignments = false;
+                state.deliveryMethodsError = action.payload;
             });
     },
 });
 
-export const { clearOrganization, clearPermissionsError } = organizationSlice.actions;
+// Async thunks for delivery methods
+export const fetchAllDeliveryMethods = createAsyncThunk(
+    'organization/fetchAllDeliveryMethods',
+    async (_, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest('/delivery-methods/');
+            return result;
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка загрузки способов доставки');
+        }
+    }
+);
+
+export const fetchOrgDeliveryMethods = createAsyncThunk(
+    'organization/fetchOrgDeliveryMethods',
+    async (orgId, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest(`/delivery-methods/by-organization/${orgId}`);
+            return result;
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка загрузки способов доставки организации');
+        }
+    }
+);
+
+export const assignDeliveryMethod = createAsyncThunk(
+    'organization/assignDeliveryMethod',
+    async ({ orgId, methodId }, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest(`/delivery-methods/assign-to-org?organization_id=${orgId}&delivery_method_id=${methodId}`, {
+                method: 'POST',
+            });
+            return result;
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка добавления способа доставки');
+        }
+    }
+);
+
+export const removeDeliveryMethod = createAsyncThunk(
+    'organization/removeDeliveryMethod',
+    async ({ orgId, methodId }, { rejectWithValue }) => {
+        try {
+            await apiRequest(`/delivery-methods/remove-from-org/${orgId}/${methodId}`, {
+                method: 'DELETE',
+            });
+            return { orgId, methodId };
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка удаления способа доставки');
+        }
+    }
+);
+
+export const { clearOrganization, clearPermissionsError, clearDeliveryMethodsError } = organizationSlice.actions;
 export default organizationSlice.reducer;

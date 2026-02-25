@@ -23,6 +23,8 @@ from app.routers.checkout import router as checkout_router
 from app.routers.orders import router as orders_router
 from app.routers.clients import router as clients_router
 from app.routers.employees import router as employees_router
+from app.routers.delivery_methods import router as delivery_methods_router
+
 
 
 api_router = APIRouter(prefix="/api")
@@ -54,3 +56,5 @@ api_router.include_router(checkout_router)
 api_router.include_router(orders_router)
 api_router.include_router(clients_router)
 api_router.include_router(employees_router)
+api_router.include_router(delivery_methods_router)
+

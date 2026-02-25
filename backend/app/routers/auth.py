@@ -18,7 +18,7 @@ from app.schemas.auth import (
 )
 from app.schemas.pending_seller import SellerRegisterRequest, SellerRegisterResponse
 from app.core.security import get_password_hash
-from app.core.auth import authenticate_user, create_access_token, get_current_user, oauth2_scheme
+from app.core.auth import authenticate_user, create_access_token, get_current_user, oauth2_scheme, cleanup_old_user_sessions
 from app.models.user_session import UserSession
 from app.db.database import get_db
 from datetime import datetime, timedelta, timezone
@@ -190,8 +190,10 @@ def register_confirm(data: VerifyCode, db: Session = Depends(get_db)):
         device_info="Registration",
         ip_address=None
     )
+    
+    # Clean up old sessions for this user (IP is None during registration)
+    # We can't clean up by IP here since IP is not available during registration
     return {"access_token": access_token, "token_type": "bearer"}
-
 
 
 @router.post("/login", response_model=Token)
@@ -247,6 +249,11 @@ def login(
         device_info=device_info,
         ip_address=ip_address
     )
+    
+    # Clean up old sessions for this user from the same IP
+    if ip_address:
+        cleanup_old_user_sessions(db, user.id, ip_address)
+        
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/profile", response_model=UserResponse)
@@ -400,6 +407,12 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
             device_info="Registration Complete",
             ip_address=request.client.host if request else None
         )
+        
+        # Clean up old sessions for this user from the same IP
+        ip_address = request.client.host if request else None
+        if ip_address:
+            cleanup_old_user_sessions(db, user.id, ip_address)
+            
         return {"access_token": access_token, "token_type": "bearer"}
 
     except Exception as e:

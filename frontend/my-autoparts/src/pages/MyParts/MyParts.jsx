@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Navigate, useNavigate, Link } from 'react-router-dom';
+import { Navigate, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import ImageModal from '../../components/ImageModal/ImageModal';
 import { fetchProducts, fetchMyPendingProducts, fetchMyRejectedProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
@@ -246,6 +246,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
 };
 
 function MyParts() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, permissionCodes } = useSelector((state) => state.auth);
@@ -262,9 +263,9 @@ function MyParts() {
   const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
   const [selectedParts, setSelectedParts] = useState(new Set());
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
-  const [searchQuery, setSearchQuery] = useState(''); // Поисковый запрос
-  const [selectedStorageLocation, setSelectedStorageLocation] = useState(''); // Выбранный склад
-  const [activeTab, setActiveTab] = useState('in-stock'); // 'in-stock' or 'pending'
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || ''); // Поисковый запрос
+  const [selectedStorageLocation, setSelectedStorageLocation] = useState(searchParams.get('storage') || ''); // Выбранный склад
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'in-stock'); // 'in-stock' or 'pending'
   const [formData, setFormData] = useState({
     quantity: '',
     price: '',
@@ -402,6 +403,31 @@ function MyParts() {
     }
   }, [modalOpen])
 
+
+  // Sync URL parameters with component state
+  useEffect(() => {
+    const params = new URLSearchParams();
+    
+    if (searchQuery) {
+      params.set('q', searchQuery);
+    } else {
+      params.delete('q');
+    }
+    
+    if (selectedStorageLocation) {
+      params.set('storage', selectedStorageLocation);
+    } else {
+      params.delete('storage');
+    }
+    
+    if (activeTab && activeTab !== 'in-stock') {
+      params.set('tab', activeTab);
+    } else {
+      params.delete('tab');
+    }
+    
+    setSearchParams(params);
+  }, [searchQuery, selectedStorageLocation, activeTab, setSearchParams]);
 
   useEffect(() => {
     // Формируем параметры для запроса

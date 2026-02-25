@@ -31,6 +31,8 @@ export default function ProfileWithMenuLayout() {
             '/stock-in': 'receipts',
             '/stock-out': 'expenses',
             '/settings/storage-addresses': 'settings-storage-addresses',
+            '/settings/organization': 'settings-organization',
+            '/settings/employees': 'settings-employees',
             '/moderation/products': 'product-moderation',
             '/moderation/pending-sellers': 'pending-sellers'
         };
@@ -54,6 +56,8 @@ export default function ProfileWithMenuLayout() {
                 '/stock-in': 'receipts',
                 '/stock-out': 'expenses',
                 '/settings/storage-addresses': 'settings-storage-addresses',
+                '/settings/organization': 'settings-organization',
+                '/settings/employees': 'settings-employees',
                 '/moderation/products': 'product-moderation',
                 '/moderation/pending-sellers': 'pending-sellers'
             };
@@ -270,12 +274,30 @@ export default function ProfileWithMenuLayout() {
                 submenu: [
                     { id: 'profile', label: 'Профиль' },
                     { id: 'settings-employees', label: 'Сотрудники' },
-                    { id: 'settings-storage-addresses', label: 'Адресное хранение' }
+                    { id: 'settings-storage-addresses', label: 'Адресное хранение' },
+                    { id: 'settings-organization', label: 'Организация' }
                 ]
             });
         }
-        // Для продавцов и админов добавляем Настройки только с Профилем
-        else if (user?.is_seller || user?.is_admin) {
+        // For sellers, add Settings with Profile and Organization
+        else if (user?.is_seller) {
+            const settingsSubmenu = [
+                { id: 'profile', label: 'Профиль' }
+            ];
+            
+            // Add organization if user has organization
+            if (user?.organization_id) {
+                settingsSubmenu.push({ id: 'settings-organization', label: 'Организация' });
+            }
+            
+            baseTabs.push({
+                id: 'settings',
+                label: 'Настройки',
+                submenu: settingsSubmenu
+            });
+        }
+        // Для админов добавляем Настройки только с Профилем
+        else if (user?.is_admin) {
             baseTabs.push({
                 id: 'settings',
                 label: 'Настройки',
@@ -318,6 +340,7 @@ export default function ProfileWithMenuLayout() {
             'receipts': '/stock-in',
             'expenses': '/stock-out',
             'settings-storage-addresses': '/settings/storage-addresses',
+            'settings-organization': '/settings/organization',
             'clients': '/clients',
             'sellers': '/sellers',
             'settings-employees': '/settings/employees',

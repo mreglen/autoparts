@@ -16,7 +16,10 @@ export default function SellersPage() {
     const [loadingStats, setLoadingStats] = useState(false);
     
     // Select data from Redux store
-    const sellers = useSelector((state) => state.sellers.sellers);
+    const allSellers = useSelector((state) => state.sellers.sellers);
+    
+    // Filter sellers to only show those who are not employees
+    const sellers = allSellers.filter(seller => !seller.is_employees || seller.is_employees === false);
     const loading = useSelector((state) => state.sellers.loading);
     const error = useSelector((state) => state.sellers.error);
     

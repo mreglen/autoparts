@@ -53,6 +53,9 @@ export default function OrganizationCard({ orgId }) {
     // 👇 Добавляем получение user из auth slice
     const user = useSelector((state) => state.auth.user);
 
+    // Ref to track if initial data has been loaded for this orgId
+    const initialLoadRef = useRef({});
+
     // Состояние для редактирования телефона
     const [isEditingPhone, setIsEditingPhone] = useState(false);
     const [phoneValue, setPhoneValue] = useState('');
@@ -73,15 +76,32 @@ export default function OrganizationCard({ orgId }) {
 
     useEffect(() => {
         if (orgId) {
-            dispatch(fetchOrganization(orgId));
-            dispatch(fetchStorageLocations(orgId));
-        } else {
-            dispatch(clearOrganization());
+            // Check if we've already loaded data for this orgId
+            const hasLoadedOrg = initialLoadRef.current[`org_${orgId}`];
+            const hasLoadedLocations = initialLoadRef.current[`locs_${orgId}`];
+            
+            // Only fetch organization if not already loaded
+            if (!hasLoadedOrg && (!org || org.id !== orgId)) {
+                dispatch(fetchOrganization(orgId));
+                initialLoadRef.current[`org_${orgId}`] = true;
+            }
+            
+            // Only fetch storage locations if not already loaded
+            if (!hasLoadedLocations) {
+                dispatch(fetchStorageLocations(orgId));
+                initialLoadRef.current[`locs_${orgId}`] = true;
+            }
         }
+
         return () => {
             dispatch(clearOrganization());
+            // Clear the load flags when component unmounts
+            if (orgId) {
+                delete initialLoadRef.current[`org_${orgId}`];
+                delete initialLoadRef.current[`locs_${orgId}`];
+            }
         };
-    }, [dispatch, orgId]);
+    }, [dispatch, orgId, org, storageLocations]);
 
     // Инициализируем значения при загрузке организации
     useEffect(() => {

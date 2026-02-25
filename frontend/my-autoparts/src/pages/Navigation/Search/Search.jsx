@@ -1,7 +1,7 @@
 // src/components/Search.js
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchSearchResults, setSearchQuery as setGlobalSearchQuery } from '../../../redux/slices/RosskoSlice';
 import {
   searchAllProducts,
@@ -9,7 +9,8 @@ import {
 } from '../../../redux/slices/ProductSlice';
 
 function Search() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [isSearching, setIsSearching] = useState(false);
   const [lastSearchTerm, setLastSearchTerm] = useState('');
   const dispatch = useDispatch();
@@ -33,7 +34,7 @@ function Search() {
       setSearchTerm(trimmedTerm);
     }).finally(() => {
       setIsSearching(false);
-      navigate('/autoparts');
+      navigate(`/autoparts?q=${encodeURIComponent(trimmedTerm)}`);
     });
   };
 
@@ -69,7 +70,7 @@ function Search() {
           </div>
         ) : (
           <img
-            src="/img/search-interface-symbol 1.svg"
+            src="/img/search-interface-symbol-1.svg"
             alt="Поиск"
             className="w-7 h-7 md:w-6 md:h-6 text-gray-500 hover:text-blue-500 transition"
           />

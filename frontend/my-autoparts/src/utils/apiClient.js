@@ -14,6 +14,9 @@ const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygara
 // const API_BASE = 'http://127.0.0.1:8000/api';
 // const BACKEND_BASE = 'http://127.0.0.1:8000';
 
+// const API_BASE = 'http://localhost:3000/api';
+// const BACKEND_BASE = 'http://localhost:3000';
+
 export const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -23,22 +26,24 @@ export const getAuthHeaders = () => {
 export const normalizeImageUrl = (imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
 
-  
-    if (imageUrl.startsWith(BACKEND_BASE) ||
+    // Get the current domain from window.location
+    const currentDomain = `${window.location.protocol}//${window.location.host}`;
+    
+    if (imageUrl.startsWith(currentDomain) ||
         imageUrl.startsWith('blob:') ||
         imageUrl.startsWith('data:')) {
         return imageUrl;
     }
 
-    // If URL starts with /uploads/, convert to full backend URL
+    // If URL starts with /uploads/, convert to full current domain URL
     if (imageUrl.startsWith('/uploads/')) {
-        return BACKEND_BASE + imageUrl;
+        return currentDomain + imageUrl;
     }
 
-    // If URL contains /uploads/, replace the domain with current backend
+    // If URL contains /uploads/, replace the domain with current domain
     if (imageUrl.includes('/uploads/')) {
         const uploadsIndex = imageUrl.indexOf('/uploads/');
-        return BACKEND_BASE + imageUrl.substring(uploadsIndex);
+        return currentDomain + imageUrl.substring(uploadsIndex);
     }
 
     // For other absolute URLs, return as is

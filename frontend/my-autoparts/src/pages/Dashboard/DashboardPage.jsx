@@ -155,10 +155,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Главная</h1>
-          <p className="mt-2 text-gray-600 text-base sm:text-base">Общая информация о вашем бизнесе</p>
-        </div>
+
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -181,10 +178,7 @@ export default function DashboardPage() {
 
   return (
     <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Главная</h1>
-        <p className="mt-2 text-gray-600 text-base sm:text-base">Общая информация о вашем бизнесе</p>
-      </div>
+
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Панель заказов */}

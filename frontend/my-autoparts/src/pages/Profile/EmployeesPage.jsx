@@ -4,755 +4,736 @@ import { fetchEmployees, addEmployee as createEmployee, updateEmployee, deleteEm
 import PermissionAssignmentModal from '../../components/Employees/PermissionAssignmentModal';
 
 const EmployeesPage = () => {
-    const dispatch = useDispatch();
-    const { user } = useSelector(state => state.auth);
-    const { employees, loadingEmployees, employeesError } = useSelector(state => state.organization);
+  const dispatch = useDispatch();
+  const { user } = useSelector(state => state.auth);
+  const { employees, loadingEmployees, employeesError } = useSelector(state => state.organization);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState(null);
+  const [formData, setFormData] = useState({
+    last_name: '',
+    first_name: '',
+    patronymic: '',
+    email: '',
+    phone: '',
+    password: ''
+  });
+  const [errors, setErrors] = useState({});
+  const [isCreating, setIsCreating] = useState(false);
 
-    const [showAddForm, setShowAddForm] = useState(false);
-    const [editingId, setEditingId] = useState(null);
-    const [openDropdownId, setOpenDropdownId] = useState(null);
-    const [showPermissionModal, setShowPermissionModal] = useState(false);
-    const [selectedEmployee, setSelectedEmployee] = useState(null);
-    const [showEditForm, setShowEditForm] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [employeeToDelete, setEmployeeToDelete] = useState(null);
-    
-    const [formData, setFormData] = useState({
+  useEffect(() => {
+    if (user && user.organization_id) {
+      dispatch(fetchEmployees(user.organization_id));
+    }
+  }, [dispatch, user]);
+
+  // Close dropdown when clicking outside (same as SellersPage)
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (openDropdownId && !e.target.closest('.actions-popup-container')) {
+        setOpenDropdownId(null);
+      }
+    };
+    if (openDropdownId) {
+      document.addEventListener('click', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [openDropdownId]);
+
+  const validateForm = (data) => {
+    const newErrors = {};
+    if (!data.last_name?.trim()) newErrors.last_name = 'Фамилия обязательна';
+    if (!data.first_name?.trim()) newErrors.first_name = 'Имя обязательно';
+    if (!data.email?.trim()) newErrors.email = 'Email обязателен';
+    else if (!/\S+@\S+\.\S+/.test(data.email)) newErrors.email = 'Неверный формат email';
+    if (!data.phone?.trim()) newErrors.phone = 'Телефон обязателен';
+    if (!data.password?.trim() && !editingId) newErrors.password = 'Пароль обязателен';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm(formData)) {
+      return;
+    }
+    setIsCreating(true);
+    try {
+      const employeeData = {
+        ...formData,
+      };
+      await dispatch(createEmployee({ orgId: user.organization_id, employeeData })).unwrap();
+      setFormData({
         last_name: '',
         first_name: '',
         patronymic: '',
         email: '',
         phone: '',
         password: ''
+      });
+      setErrors({});
+      setShowAddForm(false);
+    } catch (error) {
+      console.error('Ошибка создания сотрудника:', error);
+      alert('Ошибка создания сотрудника: ' + (error.message || 'Неизвестная ошибка'));
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const startEditing = (employee) => {
+    setFormData({
+      last_name: employee.last_name || '',
+      first_name: employee.first_name || '',
+      patronymic: employee.patronymic || '',
+      email: employee.email || '',
+      phone: employee.phone || '',
+      password: '' // Password is optional when editing
     });
-    
-    const [errors, setErrors] = useState({});
-    const [isCreating, setIsCreating] = useState(false);
+    setEditingId(employee.id);
+    setShowEditForm(true); // Show the edit modal instead of inline editing
+  };
 
-    useEffect(() => {
-        if (user && user.organization_id) {
-            dispatch(fetchEmployees(user.organization_id));
-        }
-    }, [dispatch, user]);
+  const saveEdit = async () => {
+    if (!validateForm(formData)) {
+      return;
+    }
+    try {
+      await dispatch(updateEmployee({
+        orgId: user.organization_id,
+        userId: editingId,
+        updateData: formData
+      })).unwrap();
+      setEditingId(null);
+      setFormData({
+        last_name: '',
+        first_name: '',
+        patronymic: '',
+        email: '',
+        phone: '',
+        password: ''
+      });
+      setShowEditForm(false);
+    } catch (error) {
+      console.error('Ошибка обновления сотрудника:', error);
+      alert('Ошибка обновления сотрудника: ' + (error.message || 'Неизвестная ошибка'));
+    }
+  };
 
-    const validateForm = (data) => {
-        const newErrors = {};
-        if (!data.last_name?.trim()) newErrors.last_name = 'Фамилия обязательна';
-        if (!data.first_name?.trim()) newErrors.first_name = 'Имя обязательно';
-        if (!data.email?.trim()) newErrors.email = 'Email обязателен';
-        else if (!/\S+@\S+\.\S+/.test(data.email)) newErrors.email = 'Неверный формат email';
-        if (!data.phone?.trim()) newErrors.phone = 'Телефон обязателен';
-        if (!data.password?.trim() && !editingId) newErrors.password = 'Пароль обязателен';
+  const openPermissionModal = (employee) => {
+    setSelectedEmployee(employee);
+    setShowPermissionModal(true);
+  };
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
+  const openDeleteModal = (empId, empName) => {
+    setEmployeeToDelete({ id: empId, name: empName });
+    setShowDeleteModal(true);
+  };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        
-        if (!validateForm(formData)) {
-            return;
-        }
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setEmployeeToDelete(null);
+  };
 
-        setIsCreating(true);
-        try {
-            const employeeData = {
-                ...formData,
-            };
-            
-            await dispatch(createEmployee({ orgId: user.organization_id, employeeData })).unwrap();
+  const confirmDelete = async () => {
+    if (!employeeToDelete) return;
+    try {
+      await dispatch(deleteEmployee({ orgId: user.organization_id, userId: employeeToDelete.id }));
+      closeDeleteModal();
+    } catch (error) {
+      console.error('Ошибка удаления сотрудника:', error);
+      alert('Ошибка удаления сотрудника: ' + (error.message || 'Неизвестная ошибка'));
+    }
+  };
+
+  return (
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">Сотрудники</h2>
+        <button
+          onClick={() => {
             setFormData({
-                last_name: '',
-                first_name: '',
-                patronymic: '',
-                email: '',
-                phone: '',
-                password: ''
+              last_name: '',
+              first_name: '',
+              patronymic: '',
+              email: '',
+              phone: '',
+              password: ''
             });
             setErrors({});
-            setShowAddForm(false);
-        } catch (error) {
-            console.error('Ошибка создания сотрудника:', error);
-            alert('Ошибка создания сотрудника: ' + (error.message || 'Неизвестная ошибка'));
-        } finally {
-            setIsCreating(false);
-        }
-    };
-
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-    };
-
-    const startEditing = (employee) => {
-        setFormData({
-            last_name: employee.last_name || '',
-            first_name: employee.first_name || '',
-            patronymic: employee.patronymic || '',
-            email: employee.email || '',
-            phone: employee.phone || '',
-            password: '' // Password is optional when editing
-        });
-        setEditingId(employee.id);
-        setShowEditForm(true); // Show the edit modal instead of inline editing
-    };
-
-    const saveEdit = async () => {
-        if (!validateForm(formData)) {
-            return;
-        }
-
-        try {
-            await dispatch(updateEmployee({
-                orgId: user.organization_id,
-                userId: editingId,
-                updateData: formData
-            })).unwrap();
-            setEditingId(null);
-            setFormData({
-                last_name: '',
-                first_name: '',
-                patronymic: '',
-                email: '',
-                phone: '',
-                password: ''
-            });
-            setShowEditForm(false);
-        } catch (error) {
-            console.error('Ошибка обновления сотрудника:', error);
-            alert('Ошибка обновления сотрудника: ' + (error.message || 'Неизвестная ошибка'));
-        }
-    };
-
-    const openPermissionModal = (employee) => {
-        setSelectedEmployee(employee);
-        setShowPermissionModal(true);
-    };
-
-
-
-    const openDeleteModal = (empId, empName) => {
-        setEmployeeToDelete({ id: empId, name: empName });
-        setShowDeleteModal(true);
-    };
-
-    const closeDeleteModal = () => {
-        setShowDeleteModal(false);
-        setEmployeeToDelete(null);
-    };
-
-    const confirmDelete = async () => {
-        if (!employeeToDelete) return;
-        
-        try {
-            await dispatch(deleteEmployee({ orgId: user.organization_id, userId: employeeToDelete.id }));
-            closeDeleteModal();
-        } catch (error) {
-            console.error('Ошибка удаления сотрудника:', error);
-            alert('Ошибка удаления сотрудника: ' + (error.message || 'Неизвестная ошибка'));
-        }
-    };
-
-    return (
-        <div className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Сотрудники</h2>
-                <button
-                    onClick={() => {
-                        setFormData({
-                            last_name: '',
-                            first_name: '',
-                            patronymic: '',
-                            email: '',
-                            phone: '',
-                            password: ''
-                        });
-                        setErrors({});
-                        setShowAddForm(true);
-                    }}
-                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                    Добавить сотрудника
-                </button>
-            </div>
-
-
-            {loadingEmployees ? (
-                <div className="flex justify-center items-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                </div>
-            ) : employeesError ? (
-                <div className="text-center py-12">
-                    <p className="text-red-600">{employeesError}</p>
-                </div>
-            ) : employees.length === 0 ? (
-                <div className="text-center py-12">
-                    <p className="text-gray-500">Нет сотрудников</p>
-                    {!showAddForm && (
-                        <button
-                            onClick={() => setShowAddForm(true)}
-                            className="mt-4 text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                            Добавить первого сотрудника
-                        </button>
-                    )}
-                </div>
-            ) : (
-                <div className="overflow-x-auto">
-                    {/* Desktop table view */}
-                    <table className="hidden sm:table min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    ФИО
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Email
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Телефон
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Роль
-                                </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Действия
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {employees.map((emp) => {
-                                const fullName = `${emp.last_name || ''} ${emp.first_name || ''} ${emp.patronymic || ''}`.trim();
-                                
-                                return (
-                                    <tr key={emp.id}>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-gray-900">
-                                                {fullName}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-900">{emp.email}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-900">{emp.phone}</div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-900">
-                                                {emp.is_director ? (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                        Директор
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                        Сотрудник
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div className="relative inline-block text-left">
-                                                {emp.id !== user?.id && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => setOpenDropdownId(openDropdownId === emp.id ? null : emp.id)}
-                                                            className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
-                                                        >
-                                                            Действия
-                                                            <img
-                                                                src="/img/arrow_sm.svg"
-                                                                alt=""
-                                                                className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${openDropdownId === emp.id ? 'rotate-90' : ''}`}
-                                                                style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
-                                                            />
-                                                        </button>
-                                                        
-                                                        {openDropdownId === emp.id && (
-                                                            <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
-                                                                <div className="py-1">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            startEditing(emp);
-                                                                            setOpenDropdownId(null);
-                                                                        }}
-                                                                        className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                                                                    >
-                                                                        Редактировать
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            openPermissionModal(emp);
-                                                                            setOpenDropdownId(null);
-                                                                        }}
-                                                                        className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                                                                    >
-                                                                        Назначить права
-                                                                    </button>
-                                                                    {/* <button
-                                                                        onClick={() => {
-                                                                            openDeleteModal(emp.id, fullName);
-                                                                            setOpenDropdownId(null);
-                                                                        }}
-                                                                        className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 border-t border-gray-200"
-                                                                    >
-                                                                        Удалить
-                                                                    </button> */}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {/* Mobile card view */}
-            <div className="sm:hidden space-y-4">
-                {employees.map((emp) => {
-                    const fullName = `${emp.last_name || ''} ${emp.first_name || ''} ${emp.patronymic || ''}`.trim();
-                    
-                    return (
-                        <div key={emp.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-                            <div className="flex justify-between items-start mb-3">
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-medium text-gray-900 truncate">{fullName}</h3>
-                                    <p className="text-sm text-gray-500 mt-1">{emp.email}</p>
-                                    <p className="text-sm text-gray-500">{emp.phone}</p>
-                                </div>
-                                <div className="flex flex-col items-end ml-3">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${emp.is_director ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
-                                        {emp.is_director ? 'Директор' : 'Сотрудник'}
-                                    </span>
-                                </div>
-                            </div>
-                            {emp.id !== user?.id && (
-                                <div className="relative flex justify-end pt-2 border-t border-gray-100">
-                                    <button
-                                        onClick={() => setOpenDropdownId(openDropdownId === emp.id ? null : emp.id)}
-                                        className="text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-3 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
-                                    >
-                                        Действия
-                                        <img
-                                            src="/img/arrow_sm.svg"
-                                            alt=""
-                                            className={`w-3 h-3 transition-transform duration-200 ${openDropdownId === emp.id ? 'rotate-90' : ''}`}
-                                            style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
-                                        />
-                                    </button>
-                                    
-                                    {/* Mobile popup - positioned below button */}
-                                    {openDropdownId === emp.id && (
-                                        <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
-                                            <div className="py-1">
-                                                <button
-                                                    onClick={() => {
-                                                        startEditing(emp);
-                                                        setOpenDropdownId(null);
-                                                    }}
-                                                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                                                >
-                                                    Редактировать
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        openPermissionModal(emp);
-                                                        setOpenDropdownId(null);
-                                                    }}
-                                                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                                                >
-                                                    Назначить права
-                                                </button>
-                                                <button
-                                                    onClick={() => {
-                                                        openDeleteModal(emp.id, fullName);
-                                                        setOpenDropdownId(null);
-                                                    }}
-                                                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 border-t border-gray-200"
-                                                >
-                                                    Удалить
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-            </div>
-
-            {/* Permission Assignment Modal */}
-            <PermissionAssignmentModal
-                show={showPermissionModal}
-                employee={selectedEmployee}
-                onClose={() => {
-                    setShowPermissionModal(false);
-                    setSelectedEmployee(null);
-                }}
-            />
-            
-            {/* Add Employee Modal */}
-            {showAddForm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-semibold">Добавить нового сотрудника</h3>
-                                <button 
-                                    onClick={() => {
-                                        setShowAddForm(false);
-                                        setFormData({
-                                            last_name: '',
-                                            first_name: '',
-                                            patronymic: '',
-                                            email: '',
-                                            phone: '',
-                                            password: ''
-                                        });
-                                        setErrors({});
-                                    }}
-                                    className="text-gray-500 hover:text-gray-700 text-xl"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                            
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Фамилия *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="last_name"
-                                        value={formData.last_name}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.last_name ? 'border-red-500' : 'border-gray-300'}`}
-                                        placeholder="Введите фамилию"
-                                    />
-                                    {errors.last_name && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.last_name}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Имя *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="first_name"
-                                        value={formData.first_name}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.first_name ? 'border-red-500' : 'border-gray-300'}`}
-                                        placeholder="Введите имя"
-                                    />
-                                    {errors.first_name && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.first_name}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Отчество
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="patronymic"
-                                        value={formData.patronymic}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Введите отчество"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Email *
-                                    </label>
-                                    <input
-                                        type="email"
-                                        name="email"
-                                        value={formData.email}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
-                                        placeholder="Введите email"
-                                    />
-                                    {errors.email && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Телефон *
-                                    </label>
-                                    <input
-                                        type="tel"
-                                        name="phone"
-                                        value={formData.phone}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.phone ? 'border-red-500' : 'border-gray-300'}`}
-                                        placeholder="Введите телефон"
-                                    />
-                                    {errors.phone && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Пароль *
-                                    </label>
-                                    <input
-                                        type="password"
-                                        name="password"
-                                        value={formData.password}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
-                                        placeholder="Введите пароль"
-                                    />
-                                    {errors.password && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-                                    )}
-                                </div>
-
-                                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowAddForm(false);
-                                            setFormData({
-                                                last_name: '',
-                                                first_name: '',
-                                                patronymic: '',
-                                                email: '',
-                                                phone: '',
-                                                password: ''
-                                            });
-                                            setErrors({});
-                                        }}
-                                        className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        Отмена
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={isCreating}
-                                        className={`w-full sm:w-auto px-4 py-2 rounded-lg transition-colors ${isCreating ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
-                                    >
-                                        {isCreating ? 'Создание...' : 'Добавить сотрудника'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-            
-            {/* Edit Employee Modal */}
-            {showEditForm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-semibold">Редактировать сотрудника</h3>
-                                <button 
-                                    onClick={() => {
-                                        setShowEditForm(false);
-                                        setFormData({
-                                            last_name: '',
-                                            first_name: '',
-                                            patronymic: '',
-                                            email: '',
-                                            phone: '',
-                                            password: ''
-                                        });
-                                        setErrors({});
-                                    }}
-                                    className="text-gray-500 hover:text-gray-700 text-xl"
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                            
-                            <form onSubmit={(e) => { e.preventDefault(); saveEdit(); }} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Фамилия *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="last_name"
-                                        value={formData.last_name}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.last_name ? 'border-red-500' : 'border-gray-300'}`}
-                                        placeholder="Введите фамилию"
-                                    />
-                                    {errors.last_name && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.last_name}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Имя *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="first_name"
-                                        value={formData.first_name}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.first_name ? 'border-red-500' : 'border-gray-300'}`}
-                                        placeholder="Введите имя"
-                                    />
-                                    {errors.first_name && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.first_name}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Отчество
-                                    </label>
-                                    <input
-                                        type="text"
-                                        name="patronymic"
-                                        value={formData.patronymic}
-                                        onChange={handleInputChange}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Введите отчество"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Email *
-                                    </label>
-                                    <input
-                                        type="email"
-                                        name="email"
-                                        value={formData.email}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
-                                        placeholder="Введите email"
-                                    />
-                                    {errors.email && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Телефон *
-                                    </label>
-                                    <input
-                                        type="tel"
-                                        name="phone"
-                                        value={formData.phone}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.phone ? 'border-red-500' : 'border-gray-300'}`}
-                                        placeholder="Введите телефон"
-                                    />
-                                    {errors.phone && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Пароль
-                                    </label>
-                                    <input
-                                        type="password"
-                                        name="password"
-                                        value={formData.password}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
-                                        placeholder="Новый пароль (если нужно изменить)"
-                                    />
-                                    {errors.password && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-                                    )}
-                                </div>
-
-                                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowEditForm(false);
-                                            setFormData({
-                                                last_name: '',
-                                                first_name: '',
-                                                patronymic: '',
-                                                email: '',
-                                                phone: '',
-                                                password: ''
-                                            });
-                                            setErrors({});
-                                        }}
-                                        className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                                    >
-                                        Отмена
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="w-full sm:w-auto px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-                                    >
-                                        Сохранить изменения
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Delete Confirmation Modal */}
-            {showDeleteModal && employeeToDelete && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg max-w-md w-full p-6">
-                        <div className="flex items-center justify-center mb-4">
-                            <div className="bg-red-100 rounded-full p-3">
-                                <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 className="text-lg font-semibold text-center text-gray-900 mb-2">
-                            Удалить сотрудника?
-                        </h3>
-                        <p className="text-center text-gray-600 mb-6">
-                            Вы уверены, что хотите удалить сотрудника <strong>"{employeeToDelete.name}"</strong>? Это действие нельзя отменить.
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-3">
-                            <button
-                                onClick={closeDeleteModal}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                Отмена
-                            </button>
-                            <button
-                                onClick={confirmDelete}
-                                className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                            >
-                                Удалить
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            setShowAddForm(true);
+          }}
+          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+        >
+          Добавить сотрудника
+        </button>
+      </div>
+      {loadingEmployees ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
-    );
+      ) : employeesError ? (
+        <div className="text-center py-12">
+          <p className="text-red-600">{employeesError}</p>
+        </div>
+      ) : employees.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500">Нет сотрудников</p>
+          {!showAddForm && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="mt-4 text-blue-600 hover:text-blue-800 font-medium"
+            >
+              Добавить первого сотрудника
+            </button>
+          )}
+        </div>
+      ) : (
+        // ИЗМЕНЕНИЕ: Динамический класс overflow для предотвращения скролла при открытом меню
+        <div className={openDropdownId ? 'overflow-visible' : 'overflow-x-auto'}>
+          {/* Desktop table view */}
+          <table className="hidden sm:table min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ФИО
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Email
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Телефон
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Роль
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Действия
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {employees.map((emp) => {
+                const fullName = `${emp.last_name || ''} ${emp.first_name || ''} ${emp.patronymic || ''}`.trim();
+                return (
+                  <tr key={emp.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {fullName}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{emp.email}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{emp.phone}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {emp.is_director ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Директор
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Сотрудник
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="relative inline-block text-left actions-popup-container">
+                        {emp.id !== user?.id && (
+                          <>
+                            <button
+                              onClick={() => setOpenDropdownId(openDropdownId === emp.id ? null : emp.id)}
+                              className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
+                            >
+                              Действия
+                              <img
+                                src="/img/arrow_sm.svg"
+                                alt=""
+                                className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${openDropdownId === emp.id ? 'rotate-90' : ''}`}
+                                style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
+                              />
+                            </button>
+                            {openDropdownId === emp.id && (
+                              <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-50 actions-dropdown">
+                                <div className="py-1">
+                                  <button
+                                    onClick={() => {
+                                      startEditing(emp);
+                                      setOpenDropdownId(null);
+                                    }}
+                                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                                  >
+                                    Редактировать
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      openPermissionModal(emp);
+                                      setOpenDropdownId(null);
+                                    }}
+                                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                                  >
+                                    Назначить права
+                                  </button>
+                                  {/* <button
+                                    onClick={() => {
+                                      openDeleteModal(emp.id, fullName);
+                                      setOpenDropdownId(null);
+                                    }}
+                                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 border-t border-gray-200"
+                                  >
+                                    Удалить
+                                  </button> */}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {/* Mobile card view */}
+      <div className="sm:hidden space-y-4">
+        {employees.map((emp) => {
+          const fullName = `${emp.last_name || ''} ${emp.first_name || ''} ${emp.patronymic || ''}`.trim();
+          return (
+            <div key={emp.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-medium text-gray-900 break-words">{fullName}</h3>
+                  <p className="text-sm text-gray-500 mt-1">{emp.email}</p>
+                  <p className="text-sm text-gray-500">{emp.phone}</p>
+                </div>
+                <div className="flex flex-col items-end ml-3">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${emp.is_director ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                    {emp.is_director ? 'Директор' : 'Сотрудник'}
+                  </span>
+                </div>
+              </div>
+              {emp.id !== user?.id && (
+                <div className="relative flex justify-end pt-2 border-t border-gray-100 actions-popup-container">
+                  <button
+                    onClick={() => setOpenDropdownId(openDropdownId === emp.id ? null : emp.id)}
+                    className="text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-3 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
+                  >
+                    Действия
+                    <img
+                      src="/img/arrow_sm.svg"
+                      alt=""
+                      className={`w-3 h-3 transition-transform duration-200 ${openDropdownId === emp.id ? 'rotate-90' : ''}`}
+                      style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
+                    />
+                  </button>
+                  {/* Mobile popup - positioned below button */}
+                  {openDropdownId === emp.id && (
+                    <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-50 actions-dropdown">
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            startEditing(emp);
+                            setOpenDropdownId(null);
+                          }}
+                          className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                        >
+                          Редактировать
+                        </button>
+                        <button
+                          onClick={() => {
+                            openPermissionModal(emp);
+                            setOpenDropdownId(null);
+                          }}
+                          className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                        >
+                          Назначить права
+                        </button>
+                        <button
+                          onClick={() => {
+                            openDeleteModal(emp.id, fullName);
+                            setOpenDropdownId(null);
+                          }}
+                          className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 border-t border-gray-200"
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {/* Permission Assignment Modal */}
+      <PermissionAssignmentModal
+        show={showPermissionModal}
+        employee={selectedEmployee}
+        onClose={() => {
+          setShowPermissionModal(false);
+          setSelectedEmployee(null);
+        }}
+      />
+      {/* Add Employee Modal */}
+      {showAddForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Добавить нового сотрудника</h3>
+                <button
+                  onClick={() => {
+                    setShowAddForm(false);
+                    setFormData({
+                      last_name: '',
+                      first_name: '',
+                      patronymic: '',
+                      email: '',
+                      phone: '',
+                      password: ''
+                    });
+                    setErrors({});
+                  }}
+                  className="text-gray-500 hover:text-gray-700 text-xl"
+                >
+                  ✕
+                </button>
+              </div>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Фамилия *
+                  </label>
+                  <input
+                    type="text"
+                    name="last_name"
+                    value={formData.last_name}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.last_name ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Введите фамилию"
+                  />
+                  {errors.last_name && (
+                    <p className="mt-1 text-sm text-red-600">{errors.last_name}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Имя *
+                  </label>
+                  <input
+                    type="text"
+                    name="first_name"
+                    value={formData.first_name}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.first_name ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Введите имя"
+                  />
+                  {errors.first_name && (
+                    <p className="mt-1 text-sm text-red-600">{errors.first_name}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Отчество
+                  </label>
+                  <input
+                    type="text"
+                    name="patronymic"
+                    value={formData.patronymic}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Введите отчество"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Введите email"
+                  />
+                  {errors.email && (
+                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Телефон *
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.phone ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Введите телефон"
+                  />
+                  {errors.phone && (
+                    <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Пароль *
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Введите пароль"
+                  />
+                  {errors.password && (
+                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setFormData({
+                        last_name: '',
+                        first_name: '',
+                        patronymic: '',
+                        email: '',
+                        phone: '',
+                        password: ''
+                      });
+                      setErrors({});
+                    }}
+                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isCreating}
+                    className={`w-full sm:w-auto px-4 py-2 rounded-lg transition-colors ${isCreating ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
+                  >
+                    {isCreating ? 'Создание...' : 'Добавить сотрудника'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Edit Employee Modal */}
+      {showEditForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Редактировать сотрудника</h3>
+                <button
+                  onClick={() => {
+                    setShowEditForm(false);
+                    setFormData({
+                      last_name: '',
+                      first_name: '',
+                      patronymic: '',
+                      email: '',
+                      phone: '',
+                      password: ''
+                    });
+                    setErrors({});
+                  }}
+                  className="text-gray-500 hover:text-gray-700 text-xl"
+                >
+                  ✕
+                </button>
+              </div>
+              <form onSubmit={(e) => { e.preventDefault(); saveEdit(); }} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Фамилия *
+                  </label>
+                  <input
+                    type="text"
+                    name="last_name"
+                    value={formData.last_name}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.last_name ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Введите фамилию"
+                  />
+                  {errors.last_name && (
+                    <p className="mt-1 text-sm text-red-600">{errors.last_name}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Имя *
+                  </label>
+                  <input
+                    type="text"
+                    name="first_name"
+                    value={formData.first_name}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.first_name ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Введите имя"
+                  />
+                  {errors.first_name && (
+                    <p className="mt-1 text-sm text-red-600">{errors.first_name}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Отчество
+                  </label>
+                  <input
+                    type="text"
+                    name="patronymic"
+                    value={formData.patronymic}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Введите отчество"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Введите email"
+                  />
+                  {errors.email && (
+                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Телефон *
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.phone ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Введите телефон"
+                  />
+                  {errors.phone && (
+                    <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Пароль
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Новый пароль (если нужно изменить)"
+                  />
+                  {errors.password && (
+                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditForm(false);
+                      setFormData({
+                        last_name: '',
+                        first_name: '',
+                        patronymic: '',
+                        email: '',
+                        phone: '',
+                        password: ''
+                      });
+                      setErrors({});
+                    }}
+                    className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-full sm:w-auto px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                  >
+                    Сохранить изменения
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && employeeToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex items-center justify-center mb-4">
+              <div className="bg-red-100 rounded-full p-3">
+                <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-lg font-semibold text-center text-gray-900 mb-2">
+              Удалить сотрудника?
+            </h3>
+            <p className="text-center text-gray-600 mb-6">
+              Вы уверены, что хотите удалить сотрудника <strong>"{employeeToDelete.name}"</strong>? Это действие нельзя отменить.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={closeDeleteModal}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
+
 export default EmployeesPage;
