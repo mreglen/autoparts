@@ -370,3 +370,26 @@ def get_products(
     
     products = query.all()
     return products
+
+
+@router.get("/public/", response_model=list[ProductSchema])
+def get_public_products(
+    storage_location_id: int = None,
+    db: Session = Depends(get_db)
+):
+    # Базовый запрос - получить все товары, которые есть в наличии
+    query = db.query(ProductModel).options(
+        selectinload(ProductModel.photos),
+        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.storage_location),
+        selectinload(ProductModel.organization)
+    ).filter(
+        ProductModel.quantity > 0  # Только товары, которые есть в наличии
+    )
+    
+    # Фильтрация по складу, если указан
+    if storage_location_id is not None:
+        query = query.filter(ProductModel.storage_location_id == storage_location_id)
+    
+    products = query.all()
+    return products

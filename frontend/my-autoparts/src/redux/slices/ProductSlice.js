@@ -145,7 +145,7 @@ export const fetchProducts = createAsyncThunk(
     async (params = {}, { rejectWithValue }) => {
         try {
             const response = await apiAxiosUnauth.get(
-                '/products/',
+                '/products/public/',
                 { params }
             );
             return response.data;
