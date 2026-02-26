@@ -34,6 +34,7 @@ import ProductModeration from './pages/Moderation/ProductModeration/ProductModer
 import SellersPage from './pages/Profile/SellersPage';
 import Organization from './pages/Settings/Organization';
 import NotFound from './pages/NotFound/NotFound';
+import PartDetail from './pages/PartDetail/PartDetail';
 
 
 
@@ -89,6 +90,8 @@ function App() {
           <Route path="/order-reg" element={<OrderRegistration />} />
           <Route path="/my-parts/add" element={<AddPart />} />
           <Route path="/my-parts/edit/:id" element={<EditPart />} />
+          <Route path="/part/:id" element={<PartDetail />} />
+                    <Route path="/part/:brand/:article" element={<PartDetail />} />
 
           <Route path="*" element={<NotFound />} />
         </Route>

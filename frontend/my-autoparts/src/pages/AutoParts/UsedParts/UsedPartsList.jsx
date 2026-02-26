@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate, generatePath } from 'react-router-dom';
 import PhotoThumbnail from '../../../components/PhotoGallery/PhotoThumbnail';
 import ImageModal from '../../../components/ImageModal/ImageModal';
 import {
@@ -58,6 +59,7 @@ const formatPhoneNumber = (phone) => {
 
 const UsedPartsList = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const usedPartsData = useSelector(selectUsedPartsData);
   const myPartsItems = useSelector(selectMyPartsItems);
@@ -370,19 +372,51 @@ const UsedPartsList = () => {
 const UsedPartRow = ({ 
   part, organization, storageLocations, toggleExpand, expandedPartId, handleImageClick, getStorageAddress,
   getCartQuantity, getStockAvailability, handleAddToCart, handleRemoveFromCart, addingToCartId, cartLoading, user
-}) => (
+}) => {
+  const navigate = useNavigate();
+
+  const handleArticleClick = (e) => {
+    e.stopPropagation(); // Prevent row expand when clicking on article
+    // Use human-readable URL with brand and article for both new and used parts
+    const brand = encodeURIComponent(part.brand || 'unknown');
+    const article = encodeURIComponent(part.article || 'unknown');
+    navigate(`/part/${brand}/${article}`);
+  };
+
+  return (
   <React.Fragment>
     {/* Основная строка */}
     <tr
       className="cursor-pointer hover:bg-gray-50"
       onClick={() => toggleExpand(part.id)}
     >
-      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{part.brand || '—'}</td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{part.article || '—'}</td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+        <span 
+          className="hover:text-indigo-800 cursor-pointer border-b border-gray-900"
+          onClick={handleArticleClick}
+        >
+          {part.brand || '—'}
+        </span>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        <span 
+          className="text-indigo-600 hover:text-indigo-800 cursor-pointer border-b border-gray-500"
+          onClick={handleArticleClick}
+        >
+          {part.article || '—'}
+        </span>
+      </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700 px-2 py-1 rounded">
         {part.internal_code || '—'}
       </td>
-      <td className="px-6 py-4 text-sm text-gray-500">{part.name || '—'}</td>
+      <td className="px-6 py-4 text-sm text-gray-500">
+        <span 
+          className="text-gray-500 hover:text-indigo-800 cursor-pointer"
+          onClick={handleArticleClick}
+        >
+          {part.name || '—'}
+        </span>
+      </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm">
         {part.is_new ? (
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -557,22 +591,53 @@ const UsedPartRow = ({
       </tr>
     )}
   </React.Fragment>
-);
+  );
+};
 
 // Вспомогательный компонент для мобильной карточки
 const UsedPartCard = ({ 
   part, organization, storageLocations, toggleExpand, expandedPartId, handleImageClick, getStorageAddress,
   getCartQuantity, getStockAvailability, handleAddToCart, handleRemoveFromCart, addingToCartId, cartLoading, user
-}) => (
+}) => {
+  const navigate = useNavigate();
+
+  const handleArticleClick = (e) => {
+    e.stopPropagation(); // Prevent card expand when clicking on article
+    if (!part.is_new) { // Only for used parts
+      // Use human-readable URL with brand and article
+      const brand = encodeURIComponent(part.brand || 'unknown');
+      const article = encodeURIComponent(part.article || 'unknown');
+      navigate(`/part/${brand}/${article}`);
+    }
+  };
+
+  return (
   <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
     <div className="flex justify-between items-start mb-4">
       <div className="flex-1 pr-4">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-base font-semibold text-gray-900">{part.brand || '—'}</span>
+          <span 
+            className="text-base font-semibold text-gray-900 cursor-pointer border-b border-gray-900 hover:text-indigo-800"
+            onClick={handleArticleClick}
+          >
+            {part.brand || '—'}
+          </span>
           <span className="text-sm text-gray-400">•</span>
-          <span className="text-sm text-gray-500 font-mono">{part.article || '—'}</span>
+          <span 
+            className="text-sm text-indigo-600 font-mono border-b border-gray-500 cursor-pointer hover:text-indigo-800"
+            onClick={handleArticleClick}
+          >
+            {part.article || '—'}
+          </span>
         </div>
-        <h3 className="text-base font-medium text-gray-800 mb-3 leading-tight">{part.name || '—'}</h3>
+        <h3 className="text-base font-medium text-gray-800 mb-3 leading-tight">
+          <span 
+            className="cursor-pointer hover:text-indigo-800"
+            onClick={handleArticleClick}
+          >
+            {part.name || '—'}
+          </span>
+        </h3>
         <div className="flex items-center gap-2 mb-3">
           {part.is_new ? (
             <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
@@ -745,6 +810,7 @@ const UsedPartCard = ({
       </div>
     )}
   </div>
-);
-
+  );
+};
+ 
 export default UsedPartsList;
