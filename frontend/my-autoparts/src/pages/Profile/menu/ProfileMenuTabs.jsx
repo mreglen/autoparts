@@ -181,11 +181,13 @@ export default function ProfileMenuTabs({ tabs, activeTab, onTabChange, badgeCou
                         }`}
                     >
                         <div className="flex items-center gap-3">
-                            {getMenuIcon(tab.id)}
-                            <span className="flex items-center gap-2">
+                            <div className="flex-shrink-0">
+                                {getMenuIcon(tab.id)}
+                            </div>
+                            <span className="flex items-center gap-2 flex-grow">
                                 {tab.label}
                                 {badgeCounts[tab.id] !== undefined && badgeCounts[tab.id] > 0 && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 flex-shrink-0">
                                         {badgeCounts[tab.id] > 99 ? '99+' : badgeCounts[tab.id]}
                                     </span>
                                 )}
@@ -212,11 +214,13 @@ export default function ProfileMenuTabs({ tabs, activeTab, onTabChange, badgeCou
                                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                                     }`}
                                 >
-                                    {getMenuIcon(subTab.id)}
-                                    <span className="flex items-center gap-2">
+                                    <div className="flex-shrink-0">
+                                        {getMenuIcon(subTab.id)}
+                                    </div>
+                                    <span className="flex items-center gap-2 flex-grow">
                                         {subTab.label}
                                         {badgeCounts[subTab.id] !== undefined && badgeCounts[subTab.id] > 0 && (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 flex-shrink-0">
                                                 {badgeCounts[subTab.id] > 99 ? '99+' : badgeCounts[subTab.id]}
                                             </span>
                                         )}
@@ -239,11 +243,13 @@ export default function ProfileMenuTabs({ tabs, activeTab, onTabChange, badgeCou
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}
             >
-                {getMenuIcon(tab.id)}
-                <span className="flex items-center gap-2">
+                <div className="flex-shrink-0">
+                    {getMenuIcon(tab.id)}
+                </div>
+                <span className="flex items-center gap-2 flex-grow">
                     {tab.label}
                     {badgeCounts[tab.id] !== undefined && badgeCounts[tab.id] > 0 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 flex-shrink-0">
                             {badgeCounts[tab.id] > 99 ? '99+' : badgeCounts[tab.id]}
                         </span>
                     )}
