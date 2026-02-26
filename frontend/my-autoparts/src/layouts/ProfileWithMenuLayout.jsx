@@ -1,13 +1,18 @@
 // src/layouts/ProfileWithMenuLayout.jsx
 import { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { fetchPendingProducts } from '../redux/slices/ModerationProductsSlice';
+import { fetchPendingSellers } from '../redux/slices/ModerationSlice';
 import Navigation from '../pages/Navigation/Navigation';
 import ProfileMenuTabs from '../pages/Profile/menu/ProfileMenuTabs';
 
 export default function ProfileWithMenuLayout() {
+    const dispatch = useDispatch();
     const user = useSelector((state) => state.auth.user);
     const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+    const moderationProducts = useSelector((state) => state.moderationProducts);
+    const moderation = useSelector((state) => state.moderation);
     const location = useLocation();
     const navigate = useNavigate();
     
@@ -324,6 +329,14 @@ export default function ProfileWithMenuLayout() {
 
     const tabs = getAvailableTabs();
 
+    // Load pending products and pending sellers count when component mounts and user is admin
+    useEffect(() => {
+        if (user?.is_admin) {
+            dispatch(fetchPendingProducts());
+            dispatch(fetchPendingSellers());
+        }
+    }, [dispatch, user?.is_admin]);
+
     const handleTabChange = (tabId) => {
         setActiveTab(tabId);
 
@@ -366,6 +379,11 @@ export default function ProfileWithMenuLayout() {
                             tabs={tabs}
                             activeTab={activeTab}
                             onTabChange={handleTabChange}
+                            badgeCounts={{
+                                'product-moderation': moderationProducts?.pendingProducts?.length || 0,
+                                'pending-sellers': moderation?.pendingSellers?.length || 0,
+                                'moderation': ((moderationProducts?.pendingProducts?.length || 0) + (moderation?.pendingSellers?.length || 0))
+                            }}
                         />
                     </div>
 

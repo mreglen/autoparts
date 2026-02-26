@@ -37,4 +37,12 @@ export const store = configureStore({
     sellers: sellersReducer,
     publicInfo: publicInfoReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        ignoredActions: ['auth/login/rejected', 'auth/register/rejected', 'auth/seller/register/rejected', 'auth/fetchProfile/rejected', 'auth/requestPasswordReset/rejected', 'auth/confirmPasswordReset/rejected', 'auth/sendVerificationCode/rejected', 'auth/verifyEmailCode/rejected', 'auth/completeRegistration/rejected', 'auth/registerSeller/rejected'],
+        ignoredActionPaths: ['error', 'payload', 'meta.arg'],
+        ignoredPaths: ['auth.error'],
+      },
+    }),
 });

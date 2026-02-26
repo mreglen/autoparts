@@ -128,7 +128,7 @@ const getMenuIcon = (menuId) => {
     return icons[menuId] || null;
 };
 
-export default function ProfileMenuTabs({ tabs, activeTab, onTabChange }) {
+export default function ProfileMenuTabs({ tabs, activeTab, onTabChange, badgeCounts = {} }) {
     const [expandedMenus, setExpandedMenus] = useState({});
     const location = useLocation();
 
@@ -182,7 +182,14 @@ export default function ProfileMenuTabs({ tabs, activeTab, onTabChange }) {
                     >
                         <div className="flex items-center gap-3">
                             {getMenuIcon(tab.id)}
-                            <span>{tab.label}</span>
+                            <span className="flex items-center gap-2">
+                                {tab.label}
+                                {badgeCounts[tab.id] !== undefined && badgeCounts[tab.id] > 0 && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        {badgeCounts[tab.id] > 99 ? '99+' : badgeCounts[tab.id]}
+                                    </span>
+                                )}
+                            </span>
                         </div>
                         <svg
                             className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
@@ -206,7 +213,14 @@ export default function ProfileMenuTabs({ tabs, activeTab, onTabChange }) {
                                     }`}
                                 >
                                     {getMenuIcon(subTab.id)}
-                                    <span>{subTab.label}</span>
+                                    <span className="flex items-center gap-2">
+                                        {subTab.label}
+                                        {badgeCounts[subTab.id] !== undefined && badgeCounts[subTab.id] > 0 && (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                {badgeCounts[subTab.id] > 99 ? '99+' : badgeCounts[subTab.id]}
+                                            </span>
+                                        )}
+                                    </span>
                                 </button>
                             ))}
                         </div>
@@ -226,7 +240,14 @@ export default function ProfileMenuTabs({ tabs, activeTab, onTabChange }) {
                 }`}
             >
                 {getMenuIcon(tab.id)}
-                <span>{tab.label}</span>
+                <span className="flex items-center gap-2">
+                    {tab.label}
+                    {badgeCounts[tab.id] !== undefined && badgeCounts[tab.id] > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            {badgeCounts[tab.id] > 99 ? '99+' : badgeCounts[tab.id]}
+                        </span>
+                    )}
+                </span>
             </button>
         );
     };

@@ -30,7 +30,7 @@ export const sendVerificationCode = createAsyncThunk(
             });
             return { email };
         } catch (err) {
-            return rejectWithValue(err);
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'An error occurred');
         }
     }
 );
@@ -45,7 +45,7 @@ export const verifyEmailCode = createAsyncThunk(
             });
             return result;
         } catch (err) {
-            return rejectWithValue(err);
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'An error occurred');
         }
     }
 );
@@ -61,7 +61,7 @@ export const completeRegistration = createAsyncThunk(
             localStorage.setItem('token', result.access_token);
             return result;
         } catch (err) {
-            return rejectWithValue(err);
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'An error occurred');
         }
     }
 );
@@ -76,7 +76,7 @@ export const registerSeller = createAsyncThunk(
             });
             return result;
         } catch (err) {
-            return rejectWithValue(err);
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'An error occurred');
         }
     }
 );
@@ -97,7 +97,7 @@ export const login = createAsyncThunk(
             localStorage.setItem('token', result.access_token);
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Ошибка входа');
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Ошибка входа');
         }
     }
 );
@@ -111,7 +111,7 @@ export const fetchProfile = createAsyncThunk(
             const result = await apiRequest('/auth/profile');
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Не удалось загрузить профиль');
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Не удалось загрузить профиль');
         }
     }
 );
@@ -130,7 +130,7 @@ export const requestPasswordReset = createAsyncThunk(
             });
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Не удалось отправить код');
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Не удалось отправить код');
         }
     }
 );
@@ -145,7 +145,7 @@ export const confirmPasswordReset = createAsyncThunk(
             });
             return result;
         } catch (err) {
-            return rejectWithValue(err?.detail || 'Неверный код или ошибка сервера');
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Неверный код или ошибка сервера');
         }
     }
 );
@@ -262,7 +262,7 @@ const authSlice = createSlice({
             })
             .addCase(sendVerificationCode.rejected, (state, action) => {
                 state.loading = false;
-                state.error = action.payload?.detail || 'Не удалось отправить код';
+                state.error = action.payload || 'Не удалось отправить код';
                 state.emailVerification.status = 'error';
             })
             // verifyEmailCode
@@ -276,7 +276,7 @@ const authSlice = createSlice({
             })
             .addCase(verifyEmailCode.rejected, (state, action) => {
                 state.loading = false;
-                state.error = action.payload?.detail || 'Неверный код';
+                state.error = action.payload || 'Неверный код';
                 state.emailVerification.status = 'error';
             })
             // completeRegistration
@@ -299,7 +299,7 @@ const authSlice = createSlice({
             })
             .addCase(completeRegistration.rejected, (state, action) => {
                 state.loading = false;
-                state.error = action.payload?.detail || 'Ошибка регистрации';
+                state.error = action.payload || 'Ошибка регистрации';
             })
             // registerSeller
             .addCase(registerSeller.pending, (state) => {
@@ -312,7 +312,7 @@ const authSlice = createSlice({
             })
             .addCase(registerSeller.rejected, (state, action) => {
                 state.loading = false;
-                state.error = action.payload?.detail || 'Ошибка регистрации продавца';
+                state.error = action.payload || 'Ошибка регистрации продавца';
             })
             // login
             .addCase(login.pending, (state) => {
@@ -335,7 +335,7 @@ const authSlice = createSlice({
             })
             .addCase(login.rejected, (state, action) => {
                 state.loading = false;
-                state.error = action.payload?.detail || 'Ошибка входа';
+                state.error = action.payload || 'Ошибка входа';
             })
             // fetchProfile
             .addCase(fetchProfile.pending, (state) => {
@@ -352,11 +352,12 @@ const authSlice = createSlice({
                 
                 // Only clear token if it's definitely an authentication error
                 // Don't clear for network errors or other issues
-                if (action.payload?.includes('401') || 
-                    action.payload?.includes('Unauthorized') || 
-                    action.payload?.includes('invalid') ||
-                    action.payload?.includes('expired') ||
-                    action.payload?.includes('signature')) {
+                const errorMessage = action.payload || '';
+                if (errorMessage.includes('401') || 
+                    errorMessage.includes('Unauthorized') || 
+                    errorMessage.includes('invalid') ||
+                    errorMessage.includes('expired') ||
+                    errorMessage.includes('signature')) {
                     state.user = null;
                     state.token = null;
                     state.userPermissions = null;
