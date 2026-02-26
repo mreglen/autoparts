@@ -603,12 +603,10 @@ const UsedPartCard = ({
 
   const handleArticleClick = (e) => {
     e.stopPropagation(); // Prevent card expand when clicking on article
-    if (!part.is_new) { // Only for used parts
-      // Use human-readable URL with brand and article
-      const brand = encodeURIComponent(part.brand || 'unknown');
-      const article = encodeURIComponent(part.article || 'unknown');
-      navigate(`/part/${brand}/${article}`);
-    }
+    // Use human-readable URL with brand and article for both new and used parts
+    const brand = encodeURIComponent(part.brand || 'unknown');
+    const article = encodeURIComponent(part.article || 'unknown');
+    navigate(`/part/${brand}/${article}`);
   };
 
   return (

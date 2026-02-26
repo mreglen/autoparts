@@ -1,5 +1,6 @@
 import React, { useState, Fragment, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { addNewPartsToCart, selectCartLoading, selectCart, updateCartItemQuantity, removeFromCart } from '../../../redux/slices/CartSlice';
 
 
@@ -65,6 +66,7 @@ const formatDeliveryTime = (deliveryStart, deliveryEnd) => {
 
 function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onToggleExpand, sectionType = '', uniqueId, isMobile = false }) {
     const dispatch = useDispatch();
+    const navigate = useNavigate();
     const cartLoading = useSelector(selectCartLoading);
     const cart = useSelector(selectCart);
     // Используем только переданные данные складов
@@ -91,6 +93,14 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
     const [showDetails, setShowDetails] = useState(false);
     const isLongTitle = title && title.length > 100;
     const isExpanded = expandedPartId === uniqueId;
+
+    const handleNavigateToDetail = (e) => {
+        e.stopPropagation();
+        // Navigate to product detail page using brand and article
+        const brand = encodeURIComponent(part.brand || 'unknown');
+        const article = encodeURIComponent(part.partnumber || 'unknown');
+        navigate(`/part/${brand}/${article}`);
+    };
 
     // Загрузка данных о складах при монтировании компонента больше не нужна
 
@@ -542,11 +552,24 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                 <div className="flex justify-between items-start mb-4">
                     <div className="flex-1 pr-4">
                         <div className="flex items-center gap-2 mb-2">
-                            <span className="text-base font-semibold text-gray-900">{brand}</span>
+                            <span 
+                                className="text-base font-semibold text-gray-900 cursor-pointer hover:text-indigo-800 border-b border-gray-900"
+                                onClick={handleNavigateToDetail}
+                            >
+                                {brand}
+                            </span>
                             <span className="text-sm text-gray-400">•</span>
-                            <span className="text-sm text-gray-500 font-mono">{number}</span>
+                            <span 
+                                className="text-sm text-indigo-600 font-mono border-b border-gray-500 cursor-pointer hover:text-indigo-800"
+                                onClick={handleNavigateToDetail}
+                            >
+                                {number}
+                            </span>
                         </div>
-                        <h3 className="text-base font-medium text-gray-800 mb-2 leading-tight">
+                        <h3 
+                            className="text-base font-medium text-gray-800 mb-2 leading-tight cursor-pointer hover:text-indigo-800"
+                            onClick={handleNavigateToDetail}
+                        >
                             {title}
                         </h3>
                         {sectionType === 'analog' && (
