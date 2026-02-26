@@ -106,6 +106,25 @@ def read_product(
         raise HTTPException(status_code=404, detail="Продукт не найден или недоступен")
     return product
 
+
+@router.get("/public/{product_id}", response_model=ProductSchema)
+def read_public_product(
+    product_id: int,
+    db: Session = Depends(get_db)
+):
+    product = db.query(ProductModel).options(
+        selectinload(ProductModel.photos),
+        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.storage_location),
+        selectinload(ProductModel.organization)
+    ).filter(
+        ProductModel.id == product_id,
+        ProductModel.quantity > 0  # Only show products that are in stock
+    ).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Продукт не найден или недоступен")
+    return product
+
 @router.put("/{product_id}", response_model=ProductSchema)
 def update_product(
     product_id: int,

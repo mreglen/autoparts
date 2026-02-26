@@ -1,6 +1,6 @@
 // src/store/slices/ProductSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { apiAxios, apiRequestFormData } from '../../utils/apiClient';
+import { apiAxios, apiAxiosUnauth, apiRequestFormData } from '../../utils/apiClient';
 
 
 
@@ -144,7 +144,7 @@ export const fetchProducts = createAsyncThunk(
     'products/fetchProducts',
     async (params = {}, { rejectWithValue }) => {
         try {
-            const response = await apiAxios.get(
+            const response = await apiAxiosUnauth.get(
                 '/products/',
                 { params }
             );
@@ -161,8 +161,8 @@ export const fetchProduct = createAsyncThunk(
     'products/fetchProduct',
     async (productId, { rejectWithValue }) => {
         try {
-            const response = await apiAxios.get(
-                `/products/${productId}`,
+            const response = await apiAxiosUnauth.get(
+                `/products/public/${productId}`,
             );
             return response.data;
         } catch (error) {
@@ -268,7 +268,7 @@ const fetchAllProducts = createAsyncThunk(
     async (_, { rejectWithValue }) => {
         try {
             console.log('fetchAllProducts: Making API call');
-            const response = await apiAxios.get(`/search-products/search`, {
+            const response = await apiAxiosUnauth.get(`/search-products/search`, {
                 params: { q: '' }, // Пустой запрос для получения всех продуктов
             });
 
@@ -299,7 +299,7 @@ export const searchAllProducts = createAsyncThunk(
 
         try {
             // Используем новый комбинированный endpoint
-            const response = await apiAxios.get(`/search-products/search-combined`, {
+            const response = await apiAxiosUnauth.get(`/search-products/search-combined`, {
                 params: { q: trimmedQuery },
             });
 
@@ -337,7 +337,7 @@ export const searchUsedParts = createAsyncThunk(
 
         try {
             // ШАГ 1: Быстрый поиск запчастей в наличии
-            const inStockResponse = await apiAxios.get(`/search-products/search-used-parts`, {
+            const inStockResponse = await apiAxiosUnauth.get(`/search-products/search-used-parts`, {
                 params: { q: trimmedQuery, only_in_stock: true },
             });
             
@@ -372,7 +372,7 @@ export const searchUsedAnalogs = createAsyncThunk(
     'products/searchUsedAnalogs',
     async (query, { rejectWithValue }) => {
         try {
-            const response = await apiAxios.get(`/search-products/search-used-parts`, {
+            const response = await apiAxiosUnauth.get(`/search-products/search-used-parts`, {
                 params: { q: query, only_analogs: true },
             });
             return response.data;
@@ -703,7 +703,7 @@ export const fetchPublicProducts = createAsyncThunk(
     async (_, { rejectWithValue }) => {
         try {
             // Запрос без авторизации к публичному endpoint поиска
-            const response = await apiAxios.get(`/search-products/search`, {
+            const response = await apiAxiosUnauth.get(`/search-products/search`, {
                 params: { q: '' }, // Пустой запрос для получения всех продуктов
             });
 

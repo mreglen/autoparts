@@ -77,6 +77,32 @@ export const apiRequest = async (endpoint, options = {}) => {
     return response.json();
 };
 
+// Unauthenticated API request function
+export const apiRequestUnauth = async (endpoint, options = {}) => {
+    const url = `${API_BASE}${endpoint}`;
+    const defaultOptions = {
+        headers: {
+            'Content-Type': 'application/json',
+            ...options.headers
+        },
+        ...options
+    };
+
+    const response = await fetch(url, defaultOptions);
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    // Handle 204 No Content responses
+    if (response.status === 204) {
+        return { status: 204, message: 'No Content' };
+    }
+
+    return response.json();
+};
+
 // For FormData requests (like file uploads)
 export const apiRequestFormData = async (endpoint, formData, options = {}) => {
     const url = `${API_BASE}${endpoint}`;
@@ -118,6 +144,14 @@ apiAxios.interceptors.request.use((config) => {
         config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
+});
+
+// Axios instance without authentication
+export const apiAxiosUnauth = axios.create({
+    baseURL: API_BASE,
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
 
 export default apiRequest;
