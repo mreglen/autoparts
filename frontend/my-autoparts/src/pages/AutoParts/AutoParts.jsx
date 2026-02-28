@@ -122,7 +122,7 @@ function AutoParts() {
   const hasRosskoResults = allParts.length > 0 || allCrossParts.length > 0;
 
   return (
-    <div className="mt-4 sm:mt-5 px-0">
+    <div className="mt-4 sm:mt-5 px-0 w-full">
       <h1 className="font-bold text-2xl sm:text-2xl my-4 sm:my-5 px-4 sm:px-0">
         {/* {searchQuery || 'Результаты поиска'} */}
         Автозапчасти

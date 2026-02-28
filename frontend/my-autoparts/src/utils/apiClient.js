@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://svoygarage.ru/server/api';
-const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygarage.ru';
+// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://svoygarage.ru/server/api';
+// const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygarage.ru';
 
 // const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://VM2512296768.vds.ru/api';
 // const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://VM2512296768.vds.ru';
@@ -11,8 +11,8 @@ const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygara
 // const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://195.24.65.251';
 // локально
 
-// const API_BASE = 'http://127.0.0.1:8000/api';
-// const BACKEND_BASE = 'http://127.0.0.1:8000';
+const API_BASE = 'http://127.0.0.1:8000/api';
+const BACKEND_BASE = 'http://127.0.0.1:8000';
 
 // const API_BASE = 'http://localhost:3000/api';
 // const BACKEND_BASE = 'http://localhost:3000';
@@ -26,24 +26,21 @@ export const getAuthHeaders = () => {
 export const normalizeImageUrl = (imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
 
-    // Get the current domain from window.location
-    const currentDomain = `${window.location.protocol}//${window.location.host}`;
-    
-    if (imageUrl.startsWith(currentDomain) ||
+    if (imageUrl.startsWith(BACKEND_BASE) ||
         imageUrl.startsWith('blob:') ||
         imageUrl.startsWith('data:')) {
         return imageUrl;
     }
 
-    // If URL starts with /uploads/, convert to full current domain URL
+    // If URL starts with /uploads/, convert to full backend base URL
     if (imageUrl.startsWith('/uploads/')) {
-        return currentDomain + imageUrl;
+        return BACKEND_BASE + imageUrl;
     }
 
-    // If URL contains /uploads/, replace the domain with current domain
+    // If URL contains /uploads/, replace the domain with backend base URL
     if (imageUrl.includes('/uploads/')) {
         const uploadsIndex = imageUrl.indexOf('/uploads/');
-        return currentDomain + imageUrl.substring(uploadsIndex);
+        return BACKEND_BASE + imageUrl.substring(uploadsIndex);
     }
 
     // For other absolute URLs, return as is

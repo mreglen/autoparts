@@ -157,6 +157,24 @@ export const fetchProducts = createAsyncThunk(
     }
 );
 
+// New action for fetching user's own products
+export const fetchMyProducts = createAsyncThunk(
+    'products/fetchMyProducts',
+    async (params = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get(
+                '/products/',
+                { params }
+            );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки моих товаров'
+            );
+        }
+    }
+);
+
 export const fetchProduct = createAsyncThunk(
     'products/fetchProduct',
     async (productId, { rejectWithValue }) => {
@@ -617,6 +635,18 @@ const productSlice = createSlice({
                 state.items = action.payload;
             })
             .addCase(fetchProducts.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            .addCase(fetchMyProducts.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(fetchMyProducts.fulfilled, (state, action) => {
+                state.loading = false;
+                state.items = action.payload;
+            })
+            .addCase(fetchMyProducts.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })

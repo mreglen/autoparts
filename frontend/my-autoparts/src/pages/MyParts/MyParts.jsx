@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import ImageModal from '../../components/ImageModal/ImageModal';
-import { fetchProducts, fetchMyPendingProducts, fetchMyRejectedProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
+import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchProductStorageCells, fetchStorageCells } from '../../redux/slices/StorageCellsSlice';
@@ -436,7 +436,7 @@ function MyParts() {
       params.storage_location_id = selectedStorageLocation;
     }
     
-    dispatch(fetchProducts(params));
+    dispatch(fetchMyProducts(params));
     if (user?.organization_id) {
       dispatch(fetchStorageLocations(user.organization_id));
       // Загружаем все ячейки организации
@@ -665,7 +665,7 @@ function MyParts() {
           <h2 className="text-xl font-medium text-gray-900 mb-2">Ошибка загрузки запчастей</h2>
           <p className="text-gray-500 mb-6 text-base">{error}</p>
           <button
-            onClick={() => dispatch(fetchProducts())}
+            onClick={() => dispatch(fetchMyProducts())}
             className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
           >
             Попробовать снова

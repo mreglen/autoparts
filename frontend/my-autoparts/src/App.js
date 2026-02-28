@@ -91,7 +91,7 @@ function App() {
           <Route path="/my-parts/add" element={<AddPart />} />
           <Route path="/my-parts/edit/:id" element={<EditPart />} />
           <Route path="/part/:id" element={<PartDetail />} />
-                    <Route path="/part/:brand/:article" element={<PartDetail />} />
+          <Route path="/part/:brand/:article" element={<PartDetail />} />
 
           <Route path="*" element={<NotFound />} />
         </Route>
