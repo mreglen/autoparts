@@ -2,6 +2,47 @@ import React, { useState, useEffect } from 'react';
 import { normalizeImageUrl } from '../../utils/apiClient';
 
 const PhotoGallery = ({ photos = [], onImageClick, selectedPhotos = [], onPhotoSelect, onDeletePhoto }) => {
+  // Function to check if the file is a video
+  const isVideo = (item) => {
+    if (typeof item === 'string') {
+      return item.toLowerCase().endsWith('.mp4') ||
+             item.toLowerCase().endsWith('.avi') ||
+             item.toLowerCase().endsWith('.mov') ||
+             item.toLowerCase().endsWith('.wmv') ||
+             item.toLowerCase().endsWith('.flv') ||
+             item.toLowerCase().endsWith('.mkv') ||
+             item.toLowerCase().endsWith('.webm') ||
+             item.toLowerCase().endsWith('.m4v') ||
+             item.toLowerCase().endsWith('.3gp') ||
+             item.toLowerCase().endsWith('.mpeg') ||
+             item.toLowerCase().endsWith('.mpg') ||
+             item.toLowerCase().endsWith('.3gpp') ||
+             item.toLowerCase().endsWith('.3gpp2') ||
+             item.includes('/uploads/videos/') ||
+             item.includes('video/');
+    }
+    if (item instanceof File) {
+      return item.type && item.type.startsWith('video/');
+    }
+    if (item?.photo_url) {
+      return item.photo_url.toLowerCase().endsWith('.mp4') ||
+             item.photo_url.toLowerCase().endsWith('.avi') ||
+             item.photo_url.toLowerCase().endsWith('.mov') ||
+             item.photo_url.toLowerCase().endsWith('.wmv') ||
+             item.photo_url.toLowerCase().endsWith('.flv') ||
+             item.photo_url.toLowerCase().endsWith('.mkv') ||
+             item.photo_url.toLowerCase().endsWith('.webm') ||
+             item.photo_url.toLowerCase().endsWith('.m4v') ||
+             item.photo_url.toLowerCase().endsWith('.3gp') ||
+             item.photo_url.toLowerCase().endsWith('.mpeg') ||
+             item.photo_url.toLowerCase().endsWith('.mpg') ||
+             item.photo_url.toLowerCase().endsWith('.3gpp') ||
+             item.photo_url.toLowerCase().endsWith('.3gpp2') ||
+             item.photo_url.includes('/uploads/videos/') ||
+             item.photo_url.includes('video/');
+    }
+    return false;
+  };
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [objectUrls, setObjectUrls] = useState(new Map());
 
@@ -41,29 +82,53 @@ const PhotoGallery = ({ photos = [], onImageClick, selectedPhotos = [], onPhotoS
 
   const currentPhoto = photos[currentPhotoIndex];
   let photoUrl;
+  let isCurrentPhotoVideo = false;
 
   if (typeof currentPhoto === 'string') {
     photoUrl = normalizeImageUrl(currentPhoto);
+    isCurrentPhotoVideo = isVideo(currentPhoto);
   } else if (currentPhoto?.full_url) {
     photoUrl = normalizeImageUrl(currentPhoto.full_url);
+    isCurrentPhotoVideo = isVideo(currentPhoto.full_url);
   } else if (currentPhoto?.photo_url) {
     photoUrl = normalizeImageUrl(currentPhoto.photo_url);
+    isCurrentPhotoVideo = isVideo(currentPhoto.photo_url);
   } else if (currentPhoto instanceof File) {
     photoUrl = objectUrls.get(currentPhotoIndex) || '';
+    isCurrentPhotoVideo = currentPhoto.type && currentPhoto.type.startsWith('video/');
   } else {
     photoUrl = '';
+    isCurrentPhotoVideo = false;
   }
 
   return (
     <div className="space-y-3">
       {/* Основная большая фотография */}
       <div className="relative">
-        <img
-          src={photoUrl}
-          alt={`Фото ${currentPhotoIndex + 1}`}
-          className="w-full max-w-md h-56 object-contain rounded-lg border shadow-sm cursor-pointer hover:opacity-95 transition-opacity"
-          onClick={() => onImageClick && onImageClick(photoUrl, `Фото ${currentPhotoIndex + 1}`)}
-        />
+        {isCurrentPhotoVideo ? (
+          <div className="relative w-full max-w-md h-56 flex items-center justify-center rounded-lg border shadow-sm cursor-pointer hover:opacity-95 transition-opacity overflow-hidden"
+            onClick={() => onImageClick && onImageClick(photoUrl, `Видео ${currentPhotoIndex + 1}`)}>
+            <video
+              src={photoUrl}
+              className="max-h-full max-w-full object-contain"
+              controls={false}
+              muted
+              playsInline
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+              <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+              </svg>
+            </div>
+          </div>
+        ) : (
+          <img
+            src={photoUrl}
+            alt={`Фото ${currentPhotoIndex + 1}`}
+            className="w-full max-w-md h-56 object-contain rounded-lg border shadow-sm cursor-pointer hover:opacity-95 transition-opacity"
+            onClick={() => onImageClick && onImageClick(photoUrl, `Фото ${currentPhotoIndex + 1}`)}
+          />
+        )}
 
         {/* Кнопка удаления для одиночного фото */}
         {onDeletePhoto && photos.length === 1 && (
@@ -119,6 +184,7 @@ const PhotoGallery = ({ photos = [], onImageClick, selectedPhotos = [], onPhotoS
         <div className="flex flex-wrap gap-2">
           {photos.map((photo, index) => {
             let thumbUrl;
+            const isThumbVideo = isVideo(photo);
 
             if (typeof photo === 'string') {
               thumbUrl = normalizeImageUrl(photo);
@@ -143,11 +209,28 @@ const PhotoGallery = ({ photos = [], onImageClick, selectedPhotos = [], onPhotoS
                       : 'border-gray-300 hover:border-gray-400'
                   }`}
                 >
-                  <img
-                    src={thumbUrl}
-                    alt={`Миниатюра ${index + 1}`}
-                    className="w-12 h-12 object-contain rounded"
-                  />
+                  {isThumbVideo ? (
+                    <div className="relative">
+                      <video
+                        src={thumbUrl}
+                        className="w-12 h-12 object-cover rounded"
+                        controls={false}
+                        muted
+                        playsInline
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                        </svg>
+                      </div>
+                    </div>
+                  ) : (
+                    <img
+                      src={thumbUrl}
+                      alt={`Миниатюра ${index + 1}`}
+                      className="w-12 h-12 object-contain rounded"
+                    />
+                  )}
                 </button>
                 {onPhotoSelect && (
                   <div className="absolute -top-1 -right-1">

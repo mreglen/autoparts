@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { createPendingProduct, uploadPhotos, clearProductError, resetProducts } from '../../../redux/slices/ProductSlice';
+import { createPendingProduct, uploadPhotos, uploadMedia, clearProductError, resetProducts } from '../../../redux/slices/ProductSlice';
 import { createStockIn, clearStockInError } from '../../../redux/slices/StockInSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
-import { fetchStorageCells } from '../../../redux/slices/StorageCellsSlice';
+import { fetchStorageCells, createStorageCell } from '../../../redux/slices/StorageCellsSlice';
 import { createPendingProductStorageCellsBatch } from '../../../redux/slices/PendingProductStorageCellsSlice';
 
 import VehicleModal from './VehicleModal';
@@ -34,8 +34,12 @@ const AddPart = () => {
   });
 
   const [photos, setPhotos] = useState([]);
+  const [videos, setVideos] = useState([]);
   const [locationCells, setLocationCells] = useState([]);
   const [cellQuantities, setCellQuantities] = useState({});
+  const [newCellName, setNewCellName] = useState('');
+  const [newCellValue, setNewCellValue] = useState('');
+  const [showNewCellForm, setShowNewCellForm] = useState(false);
 
   useEffect(() => {
     if (user?.organization_id) {
@@ -102,8 +106,83 @@ const AddPart = () => {
     setPhotos((prev) => [...prev, ...files]);
   };
 
+  const compressVideo = (file) => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Store original file in case compression fails
+      const originalFile = file;
+      
+      video.onloadedmetadata = () => {
+        // Set canvas dimensions to half the original for compression
+        canvas.width = video.videoWidth / 2;
+        canvas.height = video.videoHeight / 2;
+        
+        // Create a temporary video element to hold the compressed version
+        const tempVideo = document.createElement('video');
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        
+        // Draw the original video to the canvas frame by frame
+        video.currentTime = 0;
+        
+        video.oncanplay = () => {
+          // Draw the video frame to canvas
+          tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+          
+          // Convert the canvas to a video blob using a workaround
+          // Since we can't directly convert video to compressed video in browser, 
+          // we'll just return the original file with a note that browser-based 
+          // video compression is complex and would require a library
+          console.warn('Full video compression requires specialized libraries. Returning original file.');
+          resolve(originalFile);
+        };
+        
+        video.play().catch(() => {
+          // If play fails, return original file
+          resolve(originalFile);
+        });
+      };
+      
+      video.onerror = () => {
+        // If there's an error loading the video, return original file
+        resolve(originalFile);
+      };
+      
+      video.src = URL.createObjectURL(file);
+    });
+  };
+  
+  const handleVideoAdd = async (e) => {
+    const files = Array.from(e.target.files);
+    
+    // Compress video files before adding
+    const processedFiles = [];
+    for (const file of files) {
+      if (file.type.startsWith('video/')) {
+        // Show a message that compression is happening
+        console.log('Processing video...');
+        const processedFile = await compressVideo(file);
+        processedFiles.push(processedFile);
+      } else {
+        processedFiles.push(file);
+      }
+    }
+    
+    setVideos((prev) => [...prev, ...processedFiles]);
+  };
+
   const handlePhotoRemove = (index) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleVideoRemove = (index) => {
+    setVideos((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleInputChange = (e) => {
@@ -116,6 +195,45 @@ const AddPart = () => {
       ...prev,
       [cellId]: value
     }));
+  };
+
+  const handleAddNewCell = async () => {
+    if (!newCellName.trim()) {
+      alert('Пожалуйста, введите название ячейки');
+      return;
+    }
+
+    if (!formData.storage_location_id) {
+      alert('Пожалуйста, выберите склад');
+      return;
+    }
+
+    try {
+      // Create new storage cell
+      const newCellData = {
+        name: newCellName,
+        storage_location_id: parseInt(formData.storage_location_id, 10),
+      };
+      
+      const result = await dispatch(createStorageCell(newCellData));
+      
+      // Add the new cell to locationCells
+      setLocationCells(prev => [...prev, result]);
+      
+      // Initialize quantity for the new cell
+      setCellQuantities(prev => ({
+        ...prev,
+        [result.id]: newCellValue
+      }));
+      
+      // Reset form
+      setNewCellName('');
+      setNewCellValue('');
+      setShowNewCellForm(false);
+    } catch (error) {
+      console.error('Error creating storage cell:', error);
+      alert('Ошибка при создании ячейки');
+    }
   };
 
   const getTotalCellQuantities = () => {
@@ -132,24 +250,27 @@ const AddPart = () => {
       return;
     }
 
-    let photoUrls = [];
+    let mediaUrls = [];
 
-    if (photos.length > 0) {
+    // Combine photos and videos into one array for upload
+    const allMedia = [...photos, ...videos];
+    
+    if (allMedia.length > 0) {
       try {
-        const uploadAction = await dispatch(uploadPhotos(photos));
+        const uploadAction = await dispatch(uploadMedia(allMedia));
 
-        if (uploadPhotos.rejected.match(uploadAction)) {
-          alert(`Ошибка загрузки фото: ${uploadAction.payload}`);
+        if (uploadMedia.rejected.match(uploadAction)) {
+          alert(`Ошибка загрузки медиа: ${uploadAction.payload}`);
           return;
         }
-        photoUrls = uploadAction.payload;
-        if (!photoUrls || !Array.isArray(photoUrls)) {
-          alert('Ошибка: неправильный формат URL фото');
+        mediaUrls = uploadAction.payload;
+        if (!mediaUrls || !Array.isArray(mediaUrls)) {
+          alert('Ошибка: неправильный формат URL медиа');
           return;
         }
       } catch (error) {
-        console.error('Unexpected error during photo upload:', error);
-        alert(`Неожиданная ошибка при загрузке фото: ${error.message}`);
+        console.error('Unexpected error during media upload:', error);
+        alert(`Неожиданная ошибка при загрузке медиа: ${error.message}`);
         return;
       }
     }
@@ -164,7 +285,7 @@ const AddPart = () => {
       is_new: formData.condition === 'новый',
       storage_location_id: parseInt(formData.storage_location_id, 10),
       vehicle_ids: selectedVehicle ? [selectedVehicle.id] : [],
-      photos: photoUrls.length > 0 ? photoUrls : null,
+      photos: mediaUrls.length > 0 ? mediaUrls : null,
     };
 
     try {
@@ -273,22 +394,37 @@ const AddPart = () => {
           />
         </div>
         
-        {/* Фото */}
+        {/* Медиафайлы (фото и видео) */}
         <div>
-          <label className="block text-sm font-medium">Фотографии</label>
+          <label className="block text-sm font-medium">Фотографии и видео</label>
           <input
             type="file"
             multiple
-            accept="image/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2"
-            onChange={handlePhotoAdd}
+            accept="image/*,video/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2,.mp4,.avi,.mov,.wmv,.flv,.mkv,.webm,.m4v,.3gp,.mpeg,.mpg"
+            onChange={(e) => {
+              const files = Array.from(e.target.files);
+              const photosToAdd = [];
+              const videosToAdd = [];
+              
+              files.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                  photosToAdd.push(file);
+                } else if (file.type.startsWith('video/')) {
+                  videosToAdd.push(file);
+                }
+              });
+              
+              setPhotos(prev => [...prev, ...photosToAdd]);
+              setVideos(prev => [...prev, ...videosToAdd]);
+            }}
             className="mt-1"
           />
           <div className="mt-2 flex flex-wrap gap-2">
             {photos.map((file, idx) => (
-              <div key={idx} className="relative">
+              <div key={`photo-${idx}`} className="relative">
                 <img
                   src={URL.createObjectURL(file)}
-                  alt={`preview-${idx}`}
+                  alt={`photo-preview-${idx}`}
                   className="w-16 h-16 object-cover rounded border"
                   onLoad={() => {
                   }}
@@ -302,9 +438,25 @@ const AddPart = () => {
                 </button>
               </div>
             ))}
+            {videos.map((file, idx) => (
+              <div key={`video-${idx}`} className="relative">
+                <video
+                  src={URL.createObjectURL(file)}
+                  className="w-16 h-16 object-cover rounded border"
+                  controls={false}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleVideoRemove(idx)}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                >
+                  <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
-
+                
         {/* Состояние */}
         <div>
           <label className="block text-sm font-medium">Состояние</label>
@@ -414,33 +566,82 @@ const AddPart = () => {
         </div>
 
         {/* Адресное хранение - выбор ячеек */}
-        {formData.storage_location_id && locationCells.length > 0 && (
+        {formData.storage_location_id && (
           <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">Адресное хранение</h3>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-medium text-gray-900">Адресное хранение</h3>
+              <button
+                type="button"
+                onClick={() => setShowNewCellForm(!showNewCellForm)}
+                className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+              >
+                {showNewCellForm ? 'Отмена' : '+'}
+              </button>
+            </div>
             <p className="text-sm text-gray-600 mb-4">Укажите значение для каждой ячейки (не обязательно заполнять все поля)</p>
             
-            <div className="space-y-3">
-              {locationCells.map((cell) => (
-                <div key={cell.id} className="bg-white rounded-md p-3 border border-gray-200">
-                  <div className="font-medium text-gray-900 mb-1">{cell.name}</div>
-                  {cell.description && (
-                    <div className="text-sm text-gray-600 mb-2">{cell.description}</div>
-                  )}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Значение в ячейке
-                    </label>
-                    <input
-                      type="text"
-                      value={cellQuantities[cell.id] || ''}
-                      onChange={(e) => handleCellQuantityChange(cell.id, e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      placeholder="Введите значение"
-                    />
-                  </div>
+            {showNewCellForm && (
+              <div className="mb-4 p-3 bg-white rounded-md border border-gray-300">
+                <div className="mb-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Название ячейки</label>
+                  <input
+                    type="text"
+                    value={newCellName}
+                    onChange={(e) => setNewCellName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Введите название ячейки"
+                  />
                 </div>
-              ))}
-            </div>
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Значение в ячейке</label>
+                  <input
+                    type="text"
+                    value={newCellValue}
+                    onChange={(e) => setNewCellValue(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Введите значение"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddNewCell}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                >
+                  Добавить ячейку
+                </button>
+              </div>
+            )}
+            
+            {locationCells.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-300 border-collapse rounded-lg">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      {locationCells.map((cell) => (
+                        <th key={cell.id} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 last:border-r-0">
+                          {cell.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      {locationCells.map((cell) => (
+                        <td key={cell.id} className="px-4 py-3 border-r border-gray-300 last:border-r-0">
+                          <input
+                            type="text"
+                            value={cellQuantities[cell.id] || ''}
+                            onChange={(e) => handleCellQuantityChange(cell.id, e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="Введите значение"
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 

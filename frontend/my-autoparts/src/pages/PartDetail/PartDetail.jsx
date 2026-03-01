@@ -6,6 +6,7 @@ import { fetchProduct, searchAllProducts } from '../../redux/slices/ProductSlice
 import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart } from '../../redux/slices/CartSlice';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import ImageModal from '../../components/ImageModal/ImageModal';
+import { normalizeImageUrl } from '../../utils/apiClient';
 
 const PartDetail = () => {
   const { id, brand, article } = useParams();
@@ -253,10 +254,199 @@ const PartDetail = () => {
             {/* Photos */}
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Фото запчасти</h2>
-              <PhotoThumbnail 
-                photos={currentProduct.photos || []} 
-                onImageClick={handleImageClick} 
-              />
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Large main photo */}
+                <div className="flex-1">
+                  {currentProduct.photos && currentProduct.photos.length > 0 && (
+                    <div className="bg-gray-200 aspect-square rounded-xl overflow-hidden flex items-center justify-center cursor-pointer"
+                         onClick={() => handleImageClick(currentProduct.photos, 0)}>
+                      {(() => {
+                        const firstPhoto = currentProduct.photos[0];
+                        let mediaUrl;
+                        
+                        if (typeof firstPhoto === 'string') {
+                          mediaUrl = firstPhoto;
+                        } else if (firstPhoto?.full_url) {
+                          mediaUrl = firstPhoto.full_url;
+                        } else if (firstPhoto?.photo_url) {
+                          mediaUrl = firstPhoto.photo_url;
+                        } else {
+                          mediaUrl = '';
+                        }
+                        
+                        const isVideo = (item) => {
+                          if (typeof item === 'string') {
+                            return item.toLowerCase().endsWith('.mp4') ||
+                                   item.toLowerCase().endsWith('.avi') ||
+                                   item.toLowerCase().endsWith('.mov') ||
+                                   item.toLowerCase().endsWith('.wmv') ||
+                                   item.toLowerCase().endsWith('.flv') ||
+                                   item.toLowerCase().endsWith('.mkv') ||
+                                   item.toLowerCase().endsWith('.webm') ||
+                                   item.toLowerCase().endsWith('.m4v') ||
+                                   item.toLowerCase().endsWith('.3gp') ||
+                                   item.toLowerCase().endsWith('.mpeg') ||
+                                   item.toLowerCase().endsWith('.mpg') ||
+                                   item.includes('/uploads/videos/') ||
+                                   item.includes('video/');
+                          }
+                          if (item instanceof File) {
+                            return item.type && item.type.startsWith('video/');
+                          }
+                          if (item?.photo_url) {
+                            return item.photo_url.toLowerCase().endsWith('.mp4') ||
+                                   item.photo_url.toLowerCase().endsWith('.avi') ||
+                                   item.photo_url.toLowerCase().endsWith('.mov') ||
+                                   item.photo_url.toLowerCase().endsWith('.wmv') ||
+                                   item.photo_url.toLowerCase().endsWith('.flv') ||
+                                   item.photo_url.toLowerCase().endsWith('.mkv') ||
+                                   item.photo_url.toLowerCase().endsWith('.webm') ||
+                                   item.photo_url.toLowerCase().endsWith('.m4v') ||
+                                   item.photo_url.toLowerCase().endsWith('.3gp') ||
+                                   item.photo_url.toLowerCase().endsWith('.mpeg') ||
+                                   item.photo_url.toLowerCase().endsWith('.mpg') ||
+                                   item.photo_url.includes('/uploads/videos/') ||
+                                   item.photo_url.includes('video/');
+                          }
+                          return false;
+                        };
+                        
+                        if (isVideo(firstPhoto)) {
+                          return (
+                            <div className="relative w-full h-full flex items-center justify-center">
+                              <video
+                                src={mediaUrl}
+                                className="max-h-full max-w-full object-contain"
+                                controls={false}
+                                muted
+                                playsInline
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                                <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                                </svg>
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <img
+                              src={normalizeImageUrl(mediaUrl)}
+                              alt="Основное фото товара"
+                              className="max-h-full max-w-full object-contain"
+                              onError={(e) => {
+                                console.warn(`Failed to load media: ${mediaUrl}`);
+                                e.target.style.display = 'none';
+                              }}
+                              loading="eager"
+                            />
+                          );
+                        }
+                      })()}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Small thumbnail photos */}
+                {currentProduct.photos && currentProduct.photos.length > 1 && (
+                  <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-y-auto max-w-full md:max-w-[120px] max-h-[200px] md:max-h-full">
+                    {currentProduct.photos.slice(1).map((item, index) => {
+                      let mediaUrl;
+                      
+                      if (typeof item === 'string') {
+                        mediaUrl = item;
+                      } else if (item?.full_url) {
+                        mediaUrl = item.full_url;
+                      } else if (item?.photo_url) {
+                        mediaUrl = item.photo_url;
+                      } else {
+                        mediaUrl = '';
+                      }
+                      
+                      const isVideo = (item) => {
+                        if (typeof item === 'string') {
+                          return item.toLowerCase().endsWith('.mp4') ||
+                                 item.toLowerCase().endsWith('.avi') ||
+                                 item.toLowerCase().endsWith('.mov') ||
+                                 item.toLowerCase().endsWith('.wmv') ||
+                                 item.toLowerCase().endsWith('.flv') ||
+                                 item.toLowerCase().endsWith('.mkv') ||
+                                 item.toLowerCase().endsWith('.webm') ||
+                                 item.toLowerCase().endsWith('.m4v') ||
+                                 item.toLowerCase().endsWith('.3gp') ||
+                                 item.toLowerCase().endsWith('.mpeg') ||
+                                 item.toLowerCase().endsWith('.mpg') ||
+                                 item.includes('/uploads/videos/') ||
+                                 item.includes('video/');
+                        }
+                        if (item instanceof File) {
+                          return item.type && item.type.startsWith('video/');
+                        }
+                        if (item?.photo_url) {
+                          return item.photo_url.toLowerCase().endsWith('.mp4') ||
+                                 item.photo_url.toLowerCase().endsWith('.avi') ||
+                                 item.photo_url.toLowerCase().endsWith('.mov') ||
+                                 item.photo_url.toLowerCase().endsWith('.wmv') ||
+                                 item.photo_url.toLowerCase().endsWith('.flv') ||
+                                 item.photo_url.toLowerCase().endsWith('.mkv') ||
+                                 item.photo_url.toLowerCase().endsWith('.webm') ||
+                                 item.photo_url.toLowerCase().endsWith('.m4v') ||
+                                 item.photo_url.toLowerCase().endsWith('.3gp') ||
+                                 item.photo_url.toLowerCase().endsWith('.mpeg') ||
+                                 item.photo_url.toLowerCase().endsWith('.mpg') ||
+                                 item.photo_url.includes('/uploads/videos/') ||
+                                 item.photo_url.includes('video/');
+                        }
+                        return false;
+                      };
+                      
+                      if (isVideo(item)) {
+                        return (
+                          <div 
+                            key={index}
+                            className="w-20 h-20 flex-shrink-0 cursor-pointer"
+                            onClick={() => handleImageClick(currentProduct.photos, index + 1)}
+                          >
+                            <div className="relative w-full h-full">
+                              <video
+                                src={mediaUrl}
+                                className="w-full h-full object-cover rounded-lg border"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleImageClick(currentProduct.photos, index + 1);
+                                }}
+                                controls={false}
+                                muted
+                                playsInline
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg">
+                                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <img
+                            key={index}
+                            src={normalizeImageUrl(mediaUrl)}
+                            alt={`Фото товара ${index + 2}`}
+                            className="w-20 h-20 object-cover rounded-lg border cursor-pointer flex-shrink-0"
+                            onClick={() => handleImageClick(currentProduct.photos, index + 1)}
+                            onError={(e) => {
+                              console.warn(`Failed to load media: ${mediaUrl}`);
+                              e.target.style.display = 'none';
+                            }}
+                            loading="lazy"
+                          />
+                        );
+                      }
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Seller Info */}

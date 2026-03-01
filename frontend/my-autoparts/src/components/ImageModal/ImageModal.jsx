@@ -2,6 +2,47 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { normalizeImageUrl } from '../../utils/apiClient';
 
 const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'Изображение' }) => {
+  // Function to check if the file is a video
+  const isVideo = (item) => {
+    if (typeof item === 'string') {
+      return item.toLowerCase().endsWith('.mp4') ||
+             item.toLowerCase().endsWith('.avi') ||
+             item.toLowerCase().endsWith('.mov') ||
+             item.toLowerCase().endsWith('.wmv') ||
+             item.toLowerCase().endsWith('.flv') ||
+             item.toLowerCase().endsWith('.mkv') ||
+             item.toLowerCase().endsWith('.webm') ||
+             item.toLowerCase().endsWith('.m4v') ||
+             item.toLowerCase().endsWith('.3gp') ||
+             item.toLowerCase().endsWith('.mpeg') ||
+             item.toLowerCase().endsWith('.mpg') ||
+             item.toLowerCase().endsWith('.3gpp') ||
+             item.toLowerCase().endsWith('.3gpp2') ||
+             item.includes('/uploads/videos/') ||
+             item.includes('video/');
+    }
+    if (item instanceof File) {
+      return item.type && item.type.startsWith('video/');
+    }
+    if (item?.photo_url) {
+      return item.photo_url.toLowerCase().endsWith('.mp4') ||
+             item.photo_url.toLowerCase().endsWith('.avi') ||
+             item.photo_url.toLowerCase().endsWith('.mov') ||
+             item.photo_url.toLowerCase().endsWith('.wmv') ||
+             item.photo_url.toLowerCase().endsWith('.flv') ||
+             item.photo_url.toLowerCase().endsWith('.mkv') ||
+             item.photo_url.toLowerCase().endsWith('.webm') ||
+             item.photo_url.toLowerCase().endsWith('.m4v') ||
+             item.photo_url.toLowerCase().endsWith('.3gp') ||
+             item.photo_url.toLowerCase().endsWith('.mpeg') ||
+             item.photo_url.toLowerCase().endsWith('.mpg') ||
+             item.photo_url.toLowerCase().endsWith('.3gpp') ||
+             item.photo_url.toLowerCase().endsWith('.3gpp2') ||
+             item.photo_url.includes('/uploads/videos/') ||
+             item.photo_url.includes('video/');
+    }
+    return false;
+  };
   const [zoom, setZoom] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -112,21 +153,29 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
     setPosition({ x: 0, y: 0 });
   };
 
-  // Получаем URL текущего изображения
-  const getCurrentImageUrl = () => {
-    if (!photos.length) return '';
+  // Получаем URL текущего медиа и информацию о том, видео ли это
+  const getCurrentMediaData = () => {
+    if (!photos.length) return { url: '', isVideo: false };
 
     const currentPhoto = photos[currentIndex];
+    let url = '';
+    let isCurrentVideo = false;
+
     if (typeof currentPhoto === 'string') {
-      return normalizeImageUrl(currentPhoto);
+      url = normalizeImageUrl(currentPhoto);
+      isCurrentVideo = isVideo(currentPhoto);
     } else if (currentPhoto?.full_url) {
-      return normalizeImageUrl(currentPhoto.full_url);
+      url = normalizeImageUrl(currentPhoto.full_url);
+      isCurrentVideo = isVideo(currentPhoto.full_url);
     } else if (currentPhoto?.photo_url) {
-      return normalizeImageUrl(currentPhoto.photo_url);
+      url = normalizeImageUrl(currentPhoto.photo_url);
+      isCurrentVideo = isVideo(currentPhoto.photo_url);
     } else if (currentPhoto instanceof File) {
-      return objectUrls.get(currentIndex) || '';
+      url = objectUrls.get(currentIndex) || '';
+      isCurrentVideo = currentPhoto.type && currentPhoto.type.startsWith('video/');
     }
-    return '';
+    
+    return { url, isVideo: isCurrentVideo };
   };
 
   const handleMouseDown = (e) => {
@@ -236,9 +285,9 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
 
   if (!isOpen) return null;
 
-  const currentImageUrl = getCurrentImageUrl();
+  const currentMediaData = getCurrentMediaData();
 
-  if (!photos.length || !currentImageUrl) return null;
+  if (!photos.length || !currentMediaData.url) return null;
 
   return (
     <div
@@ -324,19 +373,38 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
             }
           }}
         >
-          <img
-            src={currentImageUrl}
-            alt={`${alt} ${currentIndex + 1}`}
-            className={`max-w-full max-h-full md:max-w-[90vw] md:max-h-[90vh] object-contain transition-transform duration-200 ${
-              isDragging ? 'cursor-grabbing' : 'cursor-grab'
-            }`}
-            style={{
-              transform: `scale(${zoom}) translate(${position.x}px, ${position.y}px)`,
-              transformOrigin: 'center center'
-            }}
-            onClick={handleImageClick}
-            draggable={false}
-          />
+          {currentMediaData.isVideo ? (
+            <div className="relative">
+              <video
+                src={currentMediaData.url}
+                className={`max-w-full max-h-full md:max-w-[90vw] md:max-h-[90vh] object-contain transition-transform duration-200 ${
+                  isDragging ? 'cursor-grabbing' : 'cursor-grab'
+                }`}
+                style={{
+                  transform: `scale(${zoom}) translate(${position.x}px, ${position.y}px)`,
+                  transformOrigin: 'center center'
+                }}
+                onClick={handleImageClick}
+                controls={true}
+                muted
+                playsInline
+              />
+            </div>
+          ) : (
+            <img
+              src={currentMediaData.url}
+              alt={`${alt} ${currentIndex + 1}`}
+              className={`max-w-full max-h-full md:max-w-[90vw] md:max-h-[90vh] object-contain transition-transform duration-200 ${
+                isDragging ? 'cursor-grabbing' : 'cursor-grab'
+              }`}
+              style={{
+                transform: `scale(${zoom}) translate(${position.x}px, ${position.y}px)`,
+                transformOrigin: 'center center'
+              }}
+              onClick={handleImageClick}
+              draggable={false}
+            />
+          )}
         </div>
       </div>
 
@@ -352,6 +420,7 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
         <div className="absolute bottom-20 md:bottom-16 left-1/2 transform -translate-x-1/2 z-60 flex gap-2 max-w-full overflow-x-auto px-4">
           {photos.map((photo, index) => {
             let thumbUrl;
+            const isThumbVideo = isVideo(photo);
 
             if (typeof photo === 'string') {
               thumbUrl = normalizeImageUrl(photo);
@@ -375,11 +444,28 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
                     : 'border-white border-opacity-50 hover:border-opacity-75'
                 }`}
               >
-                <img
-                  src={thumbUrl}
-                  alt={`Миниатюра ${index + 1}`}
-                  className="w-12 h-12 object-contain rounded"
-                />
+                {isThumbVideo ? (
+                  <div className="relative">
+                    <video
+                      src={thumbUrl}
+                      className="w-12 h-12 object-contain rounded"
+                      controls={false}
+                      muted
+                      playsInline
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  <img
+                    src={thumbUrl}
+                    alt={`Миниатюра ${index + 1}`}
+                    className="w-12 h-12 object-contain rounded"
+                  />
+                )}
               </button>
             );
           })}

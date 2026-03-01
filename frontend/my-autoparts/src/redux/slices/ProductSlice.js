@@ -30,6 +30,32 @@ export const uploadPhotos = createAsyncThunk(
     }
 );
 
+// НОВЫЙ thunk: загрузка медиа (фото и видео)
+export const uploadMedia = createAsyncThunk(
+    'products/uploadMedia',
+    async (files, { rejectWithValue }) => {
+        try {
+            const uploadPromises = Array.from(files).map(async file => {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const res = await apiRequestFormData('/upload/media', formData);
+                    return res.url;
+                } catch (error) {
+                    console.error('Failed to upload media:', file.name, error);
+                    throw error;
+                }
+            });
+            const urls = await Promise.all(uploadPromises);
+            return urls;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || error.message || 'Ошибка загрузки медиа'
+            );
+        }
+    }
+);
+
 // Async thunk: получение отклоненных запчастей пользователя
 export const fetchMyRejectedProducts = createAsyncThunk(
     'products/fetchMyRejectedProducts',

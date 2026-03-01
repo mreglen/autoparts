@@ -152,42 +152,8 @@ const UsedPartsList = () => {
             <h2 className="border-b-4 border-blue-500 pb-2 inline-block">В наличии</h2>
           </div>
 
-          {/* Десктопная версия - карточки для всех запчастей в разделе б/у */}
-          <div className="hidden md:block">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {availableParts.map((part) => (
-                <ProductCard 
-                  key={part.id}
-                  part={{
-                    id: part.id,
-                    title: part.name || part.article || '—',
-                    price: part.price ? `${part.price} ₽` : '—',
-                    originalPrice: null, // No original price in current data
-                    discount: null, // No discount info in current data
-                    brand: part.brand || '—',
-                    article: part.article || '—',
-                    location: part.storage_location?.address || '—',
-                    description: part.description || '',
-                    sellerName: organization?.name || part.organization?.name || 'Продавец',
-                    rating: 4.7, // Default rating since not in data
-                    reviewCount: 152, // Default review count
-                    isDiscount: false, // No discount info in current data
-                    isNew: part.is_new,
-                    sellerReliable: true, // Default value
-                    sellerVerified: true, // Default value
-                    photos: part.photos || [],
-                    image: (part.photos && part.photos.length > 0) ? (part.photos[0].full_url || part.photos[0]) : '/api/placeholder/200/200',
-                    sellerLogo: organization?.name?.substring(0, 4).toUpperCase() || 'SELL',
-                    phone: organization?.phone || part.organization?.phone || '+7 (999) 123-45-67' // Use phone from organization if available
-                  }}
-                  isTestOrganization={true}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Мобильная версия - карточки */}
-          <div className="md:hidden space-y-4">
+          {/* Десктопная и мобильная версия - карточки для всех запчастей в разделе б/у */}
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {availableParts.map((part) => (
               <ProductCard 
                 key={part.id}
@@ -206,6 +172,7 @@ const UsedPartsList = () => {
                   reviewCount: 152, // Default review count
                   isDiscount: false, // No discount info in current data
                   isNew: part.is_new,
+                  quantity: part.quantity || part.available_count || 0,
                   sellerReliable: true, // Default value
                   sellerVerified: true, // Default value
                   photos: part.photos || [],
@@ -220,7 +187,47 @@ const UsedPartsList = () => {
         </>
       )}
 
-      
+      {/* Аналоги */}
+      {hasAnalogParts && (
+        <>
+          <div className="font-medium text-lg sm:text-lg my-6 sm:my-10 px-4 sm:px-0">
+            <h2 className="border-b-4 border-blue-500 pb-2 inline-block">Аналоги</h2>
+          </div>
+
+          {/* Десктопная и мобильная версия - карточки для аналогов */}
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {analogParts.map((part) => (
+              <ProductCard 
+                key={`analog-${part.id}`}
+                part={{
+                  id: part.id,
+                  title: part.name || part.article || '—',
+                  price: part.price ? `${part.price} ₽` : '—',
+                  originalPrice: null, // No original price in current data
+                  discount: null, // No discount info in current data
+                  brand: part.brand || '—',
+                  article: part.article || '—',
+                  location: part.storage_location?.address || '—',
+                  description: part.description || '',
+                  sellerName: organization?.name || part.organization?.name || 'Продавец',
+                  rating: 4.7, // Default rating since not in data
+                  reviewCount: 152, // Default review count
+                  isDiscount: false, // No discount info in current data
+                  isNew: part.is_new,
+                  quantity: part.quantity || part.available_count || 0,
+                  sellerReliable: true, // Default value
+                  sellerVerified: true, // Default value
+                  photos: part.photos || [],
+                  image: (part.photos && part.photos.length > 0) ? (part.photos[0].full_url || part.photos[0]) : '/api/placeholder/200/200',
+                  sellerLogo: organization?.name?.substring(0, 4).toUpperCase() || 'SELL',
+                  phone: organization?.phone || part.organization?.phone || '+7 (999) 123-45-67' // Use phone from organization if available
+                }}
+                isTestOrganization={true}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 };
