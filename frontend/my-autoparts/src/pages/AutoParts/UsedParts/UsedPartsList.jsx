@@ -148,7 +148,7 @@ const UsedPartsList = () => {
       {/* В наличии */}
       {hasAvailableParts && (
         <>
-          <div className="font-medium text-lg sm:text-lg my-6 sm:my-10 px-4 sm:px-0">
+          <div className="font-medium text-xl sm:text-xl my-6 sm:my-10 px-4 sm:px-0">
             <h2 className="border-b-4 border-blue-500 pb-2 inline-block">В наличии</h2>
           </div>
 
@@ -190,7 +190,7 @@ const UsedPartsList = () => {
       {/* Аналоги */}
       {hasAnalogParts && (
         <>
-          <div className="font-medium text-lg sm:text-lg my-6 sm:my-10 px-4 sm:px-0">
+          <div className="font-medium text-xl sm:text-xl my-6 sm:my-10 px-4 sm:px-0">
             <h2 className="border-b-4 border-blue-500 pb-2 inline-block">Аналоги</h2>
           </div>
 

@@ -48,6 +48,9 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
   };
   const [isAdding, setIsAdding] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState(0);
+  const [touchEndX, setTouchEndX] = useState(0);
+  const [showCallModal, setShowCallModal] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const cart = useSelector(selectCart);
@@ -118,7 +121,7 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
   return (
     <div className="w-full">
       <div 
-        className="h-full flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
+        className="h-full flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
       >
         {/* Product Image - Large placeholder area */}
         <div 
@@ -201,6 +204,32 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
                         }
                       }
                     }}
+                    onTouchStart={(e) => {
+                      setTouchStartX(e.targetTouches[0].clientX);
+                    }}
+                    onTouchMove={(e) => {
+                      setTouchEndX(e.targetTouches[0].clientX);
+                    }}
+                    onTouchEnd={() => {
+                      if (product.photos && Array.isArray(product.photos) && product.photos.length > 1) {
+                        const swipeThreshold = 50; // Minimum distance to trigger swipe
+                        const diffX = touchStartX - touchEndX;
+                        
+                        if (Math.abs(diffX) > swipeThreshold) {
+                          if (diffX > 0) {
+                            // Swipe left - go to next image
+                            setCurrentImageIndex(prev => 
+                              prev < product.photos.length - 1 ? prev + 1 : 0
+                            );
+                          } else {
+                            // Swipe right - go to previous image
+                            setCurrentImageIndex(prev => 
+                              prev > 0 ? prev - 1 : product.photos.length - 1
+                            );
+                          }
+                        }
+                      }
+                    }}
                   />
                 );
               }
@@ -231,15 +260,15 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
           <div className="p-2 space-y-0.5 flex-[2]">
             {/* Price */}
             <div className="flex items-center gap-1">
-              <span className="text-[13px] font-bold text-gray-900">{product.price}</span>
+              <span className="text-[17px] font-bold text-gray-900">{product.price}</span>
             
               {product.originalPrice && (
-                <span className="text-gray-400 line-through text-xs">{product.originalPrice}</span>
+                <span className="text-gray-400 line-through text-[16px]">{product.originalPrice}</span>
               )}
             </div>
 
             {/* Brand and Article */}
-            <div className="flex flex-wrap gap-0.5 text-[12px] text-gray-700">
+            <div className="flex flex-wrap gap-0.5 text-[14px] text-gray-700">
               <span className="font-medium truncate">{product.brand}</span>
               <span className="text-gray-400">•</span>
               <span className="truncate">{product.article}</span>
@@ -248,7 +277,7 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
             {/* Product Title - Clickable with hover effect */}
             <div className="space-y-0.5 flex-1">
               <p 
-                className="text-[11px] text-gray-900 line-clamp-2 cursor-pointer hover:text-indigo-600 font-medium"
+                className="text-[15px] text-gray-900 line-clamp-2 cursor-pointer hover:text-indigo-600 font-medium"
                 onClick={handleTitleClick}
               >
                 {product.title}
@@ -256,13 +285,13 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
             </div>
 
             {/* Stock/Warehouse Info */}
-            <div className="flex items-center gap-0.5 text-[12px] text-gray-600">
+            <div className="flex items-center gap-0.5 text-[14px] text-gray-600">
               <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
               <span>{product.location || 'Скл'}</span>
               {product.stock && (
-                <span className={`text-[12px] px-0.5 py-0.5 rounded-full ${
+                <span className={`text-[14px] px-0.5 py-0.5 rounded-full ${
                   product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                 }`}>
                   {product.stock > 0 ? `В н: ${product.stock}` : 'Нет'}
@@ -273,27 +302,93 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
             {/* Condition Badge and Quantity */}
             <div className="flex gap-0.5 pt-0.5 flex-wrap">
               {product.isNew ? (
-                <span className="bg-green-500 text-white px-1 py-0.5 rounded-full text-[12px] font-medium">
+                <span className="bg-green-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
                   Новое
                 </span>
               ) : (
-                <span className="bg-yellow-500 text-white px-1 py-0.5 rounded-full text-[12px] font-medium">
+                <span className="bg-yellow-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
                   Б/у
                 </span>
               )}
               {product.quantity !== undefined && (
-                <span className="bg-blue-500 text-white px-1 py-0.5 rounded-full text-[12px] font-medium">
+                <span className="bg-blue-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
                   {product.quantity} шт.
                 </span>
               )}
               {product.isDiscount && (
-                <span className="bg-red-500 text-white px-1 py-0.5 rounded-full text-[12px] font-medium">
+                <span className="bg-red-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
                   Скидка
                 </span>
               )}
             </div>
           </div>
 
+          {/* Contact Buttons */}
+          <div className="p-1.5 pt-0 flex space-x-1.5">
+            <button 
+              className="flex-1 py-3 px-1.5 rounded-xl bg-slate-500 text-white font-medium transition-all duration-200 hover:bg-slate-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Open modal with seller phone and organization
+                setShowCallModal(true);
+              }}
+            >
+              Позвонить
+            </button>
+            <button 
+              className="flex-1 py-3 px-1.5 rounded-xl bg-blue-500 text-white font-medium transition-all duration-200 hover:bg-blue-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Placeholder for message functionality
+                alert('Написать functionality coming soon');
+              }}
+            >
+              Написать
+            </button>
+          </div>
+                  
+          {/* Call Modal */}
+          {showCallModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl p-6 w-full max-w-md">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-bold text-gray-900">Контакты продавца</h3>
+                  <button 
+                    onClick={() => setShowCallModal(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                        
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Организация:</p>
+                    <p className="text-[14px] font-medium text-gray-900">{product.sellerName || 'Не указана'}</p>
+                  </div>
+                          
+                  <div>
+                    <p className="text-sm text-gray-600">Телефон:</p>
+                    <p className="text-[14px] font-medium text-gray-900">{(product.phone && !product.phone.startsWith('+')) ? '+' + product.phone : product.phone || 'Не указан'}</p>
+                  </div>
+                          
+                  {product.phone && (
+                    <div className="pt-4">
+                      <a 
+                        href={`tel:${product.phone.startsWith('+') ? product.phone : '+' + product.phone}`}
+                        className="w-full py-3 px-4 bg-green-500 text-white font-medium rounded-lg text-center block transition-colors hover:bg-green-600"
+                      >
+                        Позвонить
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+                  
           {/* Add to Cart Button - Stays at bottom */}
           <div className="p-1.5 pt-0">
             {currentQuantity > 0 ? (
@@ -301,27 +396,27 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
                 <button
                   onClick={handleRemoveFromCart}
                   disabled={isAdding}
-                  className="w-6 h-6 flex items-center justify-center text-base font-medium rounded border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-6 h-8 flex items-center justify-center text-base font-medium rounded border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                 >
                   −
                 </button>
-                <span className="text-xs font-semibold w-5 text-center">
+                <span className="text-[14px] font-semibold w-5 text-center">
                   {currentQuantity}
                 </span>
                 <button
                   onClick={handleAddToCart}
                   disabled={isAdding || isStockLimited}
-                  className="w-6 h-6 flex items-center justify-center text-base font-medium rounded border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-6 h-8 flex items-center justify-center text-base font-medium rounded border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                 >
                   +
                 </button>
                 {isStockLimited && (
-                  <div className="text-xs text-orange-600 ml-1">Нет в наличии</div>
+                  <div className="text-[14px] text-orange-600 ml-1">Нет в наличии</div>
                 )}
               </div>
             ) : (
               <button 
-                className={`w-full py-2 px-1.5 rounded text-sm font-medium text-white transition-all duration-200 flex items-center justify-center ${
+                className={`w-full py-3 px-1.5 rounded-xl text-[14px] font-medium text-white transition-all duration-200 flex items-center justify-center ${
                   isAdding 
                     ? 'bg-green-600 hover:bg-green-700' 
                     : 'bg-indigo-600 hover:bg-indigo-700'
@@ -341,7 +436,7 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
                   'В корзину'
                 )}
                 {isStockLimited && !isAdding && currentQuantity === 0 && (
-                  <div className="ml-0.5 text-[10px] text-orange-600">Нет в н</div>
+                  <div className="ml-0.5 text-[14px] text-orange-600">Нет в н</div>
                 )}
               </button>
             )}

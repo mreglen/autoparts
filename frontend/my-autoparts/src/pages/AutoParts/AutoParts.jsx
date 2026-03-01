@@ -166,7 +166,7 @@ function AutoParts() {
 
           {hasRosskoResults ? (
             <>
-              <div className="font-medium text-lg sm:text-lg my-6 sm:my-10 px-4 sm:px-0">
+              <div className="font-medium text-xl sm:text-xl my-6 sm:my-10 px-4 sm:px-0">
                 <h2 className="border-b-4 border-blue-500 pb-2 inline-block">В наличии</h2>
               </div>
 
@@ -175,13 +175,13 @@ function AutoParts() {
                 <table className="min-w-full divide-y divide-gray-200 table-fixed">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Бренд</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Номер</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-64">Наименование</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Поставка</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Остаток</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Цена, ₽</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">К заказу</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-20">Бренд</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">Номер</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-64">Наименование</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-36">Поставка</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">Остаток</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-20">Цена, ₽</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">К заказу</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -252,7 +252,7 @@ function AutoParts() {
 
               {allCrossParts.length > 0 && (
                 <>
-                  <div className="font-medium text-lg sm:text-lg my-6 sm:my-10 px-4 sm:px-0">
+                  <div className="font-medium text-xl sm:text-xl my-6 sm:my-10 px-4 sm:px-0">
                     <h2 className="border-b-4 border-blue-500 pb-2 inline-block">Аналоги</h2>
                   </div>
 
@@ -261,13 +261,13 @@ function AutoParts() {
                     <table className="min-w-full divide-y divide-gray-200 table-fixed">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Бренд</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Номер</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-64">Наименование</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Поставка</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Остаток</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Цена, ₽</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">К заказу</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-20">Бренд</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">Номер</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-64">Наименование</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-36">Поставка</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">Остаток</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-20">Цена, ₽</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">К заказу</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
