@@ -225,7 +225,7 @@ export default function Navigation() {
                                 onMouseEnter={handleMouseEnter}
                                 onMouseLeave={handleMouseLeave}
                             >
-                                <NavLink to="/profile">
+                                <NavLink to="/dashboard">
                                     <button
                                         className="flex items-center gap-2 text-sm sm:text-base font-bold text-gray-700 hover:text-indigo-600 whitespace-nowrap"
                                     >
@@ -266,7 +266,7 @@ export default function Navigation() {
                                         <button
                                             onClick={() => {
                                                 setIsProfileOpen(false);
-                                                navigate('/profile');
+                                                navigate('/dashboard');
                                             }}
                                             className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-t border-gray-200"
                                         >

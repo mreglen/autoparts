@@ -34,6 +34,8 @@ class ProductPhoto(BaseModel):
     id: int
     photo_url: str
     full_url: str
+    organization_id: Optional[str] = None
+    processing_status: Optional[str] = None
 
     class Config:
         from_attributes = True

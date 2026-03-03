@@ -63,7 +63,12 @@ def create_product(
     # Сохраняем фото
     if product.photos:
         for url in product.photos:
-            photo = ProductPhoto(product_id=db_product.id, photo_url=url)
+            photo = ProductPhoto(
+                product_id=db_product.id, 
+                photo_url=url,
+                organization_id=current_user.organization_id,
+                processing_status='completed'
+            )
             db.add(photo)
         db.commit()
 

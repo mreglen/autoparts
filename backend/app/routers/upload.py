@@ -1,7 +1,14 @@
 # app/routers/upload.py
 import os
 import uuid
-from fastapi import APIRouter, File, UploadFile, HTTPException, Response
+import base64
+from fastapi import APIRouter, File, UploadFile, HTTPException, Depends, Response
+from sqlalchemy.orm import Session
+from ..db.database import get_db
+from ..core.auth import get_current_user
+from ..models.user import User
+from ..tasks.photo_tasks import process_and_upload_photo
+from ..utils.photo_naming import generate_photo_filename
 from ..s3 import upload_file as s3_upload_file
 
 # Максимальный размер файла в байтах (50MB для фото, 70MB для видео)
@@ -12,11 +19,22 @@ router = APIRouter(prefix="/upload", tags=["Upload"])
 
 
 @router.post("/photo-s3")
-async def upload_photo_to_s3(file: UploadFile = File(...)):
+async def upload_photo_to_s3(
+    file: UploadFile = File(...),
+    organization_id: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     print(f"=== PHOTO UPLOAD TO S3 REQUEST ===")
     print(f"Filename: {file.filename}")
     print(f"Content-Type: {file.content_type}")
-    print(f"Headers: {dict(file.headers) if hasattr(file, 'headers') else 'No headers'}")
+    
+    # Use user's organization_id if not provided
+    if not organization_id:
+        organization_id = current_user.organization_id
+    
+    if not organization_id:
+        raise HTTPException(400, "organization_id обязателен")
 
     if not file.content_type or not file.content_type.startswith("image/"):
         print(f"Rejected: invalid content type {file.content_type}")
@@ -62,30 +80,59 @@ async def upload_photo_to_s3(file: UploadFile = File(...)):
         if not ext:
             raise HTTPException(400, "Недопустимый тип файла")
 
-    filename = f"photos/{uuid.uuid4().hex}{ext}"
+    # Generate filename with organization ID
+    filename = generate_photo_filename(organization_id, file.filename)
     
-    print(f"Uploading file to S3 with filename: {filename}")
+    print(f"Processing photo with Celery. Filename: {filename}, Organization: {organization_id}")
     
     try:
-        # Upload to S3/MinIO
-        file_url = s3_upload_file(file_content, filename, file.content_type)
-        print(f"File uploaded successfully to S3: {file_url}")
+        # Encode file data to base64 for Celery task
+        file_data_base64 = base64.b64encode(file_content).decode('utf-8')
         
-        result = {"url": file_url, "provider": "s3"}
-        print(f"Upload successful: {result}")
+        # Queue Celery task for async processing
+        task = process_and_upload_photo.delay(
+            file_data_base64,
+            filename,
+            file.content_type,
+            organization_id
+        )
+        
+        print(f"Celery task queued: {task.id}")
+        
+        # Return task info and temporary URL structure
+        result = {
+            "task_id": task.id,
+            "status": "processing",
+            "filename": filename,
+            "organization_id": organization_id
+        }
+        
+        print(f"Upload queued for processing: {result}")
         print("=== END PHOTO UPLOAD TO S3 ===")
         return result
+        
     except Exception as e:
-        print(f"Error uploading to S3: {str(e)}")
-        raise HTTPException(500, f"Ошибка при загрузке файла в хранилище: {str(e)}")
+        print(f"Error queuing upload task: {str(e)}")
+        raise HTTPException(500, f"Ошибка при постановке задачи в очередь: {str(e)}")
 
 
 @router.post("/media-s3")
-async def upload_media_to_s3(file: UploadFile = File(...)):
+async def upload_media_to_s3(
+    file: UploadFile = File(...),
+    organization_id: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     print(f"=== MEDIA UPLOAD TO S3 REQUEST ===")
     print(f"Filename: {file.filename}")
     print(f"Content-Type: {file.content_type}")
-    print(f"Headers: {dict(file.headers) if hasattr(file, 'headers') else 'No headers'}")
+    
+    # Use user's organization_id if not provided
+    if not organization_id:
+        organization_id = current_user.organization_id
+    
+    if not organization_id:
+        raise HTTPException(400, "organization_id обязателен")
 
     # Check if file is an image or video
     is_image = file.content_type and file.content_type.startswith("image/")
@@ -136,8 +183,8 @@ async def upload_media_to_s3(file: UploadFile = File(...)):
             if not ext:
                 raise HTTPException(400, "Недопустимый тип файла")
         
-        # Prepare filename for S3
-        filename = f"photos/{uuid.uuid4().hex}{ext}"
+        # Prepare filename for S3 with organization ID
+        filename = generate_photo_filename(organization_id, file.filename)
         
     elif is_video:
         allowed_extensions = (
@@ -157,23 +204,40 @@ async def upload_media_to_s3(file: UploadFile = File(...)):
             if not ext:
                 raise HTTPException(400, "Недопустимый тип файла")
         
-        # Prepare filename for S3
-        filename = f"videos/{uuid.uuid4().hex}{ext}"
+        # Prepare filename for S3 with organization ID
+        filename = generate_photo_filename(organization_id, file.filename)
 
-    print(f"Uploading media to S3 with filename: {filename}")
+    print(f"Processing media with Celery. Filename: {filename}, Organization: {organization_id}")
     
     try:
-        # Upload to S3/MinIO
-        file_url = s3_upload_file(file_content, filename, file.content_type)
-        print(f"File uploaded successfully to S3: {file_url}")
+        # Encode file data to base64 for Celery task
+        file_data_base64 = base64.b64encode(file_content).decode('utf-8')
         
-        result = {"url": file_url, "provider": "s3"}
-        print(f"Upload successful: {result}")
+        # Queue Celery task for async processing (works for both images and videos)
+        task = process_and_upload_photo.delay(
+            file_data_base64,
+            filename,
+            file.content_type,
+            organization_id
+        )
+        
+        print(f"Celery task queued: {task.id}")
+        
+        # Return task info and temporary URL structure
+        result = {
+            "task_id": task.id,
+            "status": "processing",
+            "filename": filename,
+            "organization_id": organization_id
+        }
+        
+        print(f"Media upload queued for processing: {result}")
         print("=== END MEDIA UPLOAD TO S3 ===")
         return result
+        
     except Exception as e:
-        print(f"Error uploading to S3: {str(e)}")
-        raise HTTPException(500, f"Ошибка при загрузке файла в хранилище: {str(e)}")
+        print(f"Error queuing upload task: {str(e)}")
+        raise HTTPException(500, f"Ошибка при постановке задачи в очередь: {str(e)}")
 
 
 @router.post("/organization-logo-s3")
@@ -243,3 +307,47 @@ async def upload_organization_logo_to_s3(file: UploadFile = File(...)):
     except Exception as e:
         print(f"Error uploading to S3: {str(e)}")
         raise HTTPException(500, f"Ошибка при загрузке файла в хранилище: {str(e)}")
+
+
+@router.get("/photo-status/{task_id}")
+async def get_photo_upload_status(task_id: str):
+    """
+    Get the status of a photo processing task.
+    
+    Returns:
+        dict: Task status and result
+    """
+    from celery.result import AsyncResult
+    
+    task_result = AsyncResult(task_id, app=process_and_upload_photo.app)
+    
+    if task_result.state == 'PENDING':
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": "Task is waiting to be processed"
+        }
+    elif task_result.state == 'STARTED':
+        return {
+            "task_id": task_id,
+            "status": "processing",
+            "message": "Task is being processed"
+        }
+    elif task_result.state == 'SUCCESS':
+        result = task_result.result
+        return {
+            "task_id": task_id,
+            "status": "completed",
+            "result": result
+        }
+    elif task_result.state == 'FAILURE':
+        return {
+            "task_id": task_id,
+            "status": "failed",
+            "error": str(task_result.result)
+        }
+    else:
+        return {
+            "task_id": task_id,
+            "status": task_result.state.lower()
+        }

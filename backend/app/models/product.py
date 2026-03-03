@@ -43,8 +43,11 @@ class ProductPhoto(Base):
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"))
     photo_url = Column(Text, nullable=False)
-
+    organization_id = Column(String, ForeignKey("organizations.id"), nullable=True, index=True)
+    processing_status = Column(String(20), default='pending')  # pending, processing, completed, failed
+    
     product = relationship("Product", back_populates="photos")
+    organization = relationship("Organization")
 
     @property
     def full_url(self):
