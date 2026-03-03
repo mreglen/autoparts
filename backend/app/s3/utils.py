@@ -31,10 +31,10 @@ def upload_file(file_data, filename: str, content_type: str = None) -> str:
             file_data.seek(0, 2)  # Seek to end to get size
             size = file_data.tell()
             file_data.seek(0)  # Reset to beginning
-            minio_client.put_object(settings.MINIO_BUCKET_NAME, filename, file_data, size, **extra_args)
+            minio_client.put_object(Bucket=settings.MINIO_BUCKET_NAME, Key=filename, Body=file_data, ContentLength=size, **extra_args)
         else:
             # Raw bytes
-            minio_client.put_object(settings.MINIO_BUCKET_NAME, filename, BytesIO(file_data), len(file_data), **extra_args)
+            minio_client.put_object(Bucket=settings.MINIO_BUCKET_NAME, Key=filename, Body=BytesIO(file_data), ContentLength=len(file_data), **extra_args)
     
     # Return the file URL
     return f"{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET_NAME}/{filename}"

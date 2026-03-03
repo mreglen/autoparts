@@ -24,7 +24,7 @@ export const uploadOrganizationLogo = createAsyncThunk(
             console.log('Uploading organization logo:', file.name);
             const formData = new FormData();
             formData.append('file', file);
-            const res = await apiRequestFormData('/upload/organization-logo', formData);
+            const res = await apiRequestFormData('/upload/organization-logo-s3', formData);
             console.log('Organization logo upload response:', res);
             return res.url;
         } catch (error) {

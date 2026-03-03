@@ -269,16 +269,9 @@ def delete_product_photo(
             detail="Фото не найдено"
         )
 
-    # Удаляем файл с диска, если это локальный файл
-    if photo.photo_url.startswith('/uploads/'):
-        filename = photo.photo_url.replace('/uploads/', '')
-        filepath = os.path.join('uploads', filename)
-        if os.path.exists(filepath):
-            try:
-                os.remove(filepath)
-            except OSError:
-                # Логируем ошибку, но не прерываем выполнение
-                pass
+    # Skipping local file deletion as we're using S3 storage
+    # Old local file deletion code removed
+    pass
 
     # Удаляем запись из базы данных
     db.delete(photo)
@@ -323,18 +316,10 @@ def delete_product_photos(
             detail="Некоторые фото не найдены"
         )
 
-    # Удаляем файлы с диска и записи из базы
+    # Skipping local file deletion as we're using S3 storage
     for photo in photos:
-        # Удаляем файл с диска, если это локальный файл
-        if photo.photo_url.startswith('/uploads/'):
-            filename = photo.photo_url.replace('/uploads/', '')
-            filepath = os.path.join('uploads', filename)
-            if os.path.exists(filepath):
-                try:
-                    os.remove(filepath)
-                except OSError:
-                    # Логируем ошибку, но не прерываем выполнение
-                    pass
+        # Old local file deletion code removed
+        pass
 
         # Удаляем запись из базы данных
         db.delete(photo)

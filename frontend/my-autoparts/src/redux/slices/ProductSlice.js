@@ -13,7 +13,7 @@ export const uploadPhotos = createAsyncThunk(
                 try {
                     const formData = new FormData();
                     formData.append('file', file);
-                    const res = await apiRequestFormData('/upload/photo', formData);
+                    const res = await apiRequestFormData('/upload/photo-s3', formData);
                     return res.url;
                 } catch (error) {
                     console.error('Failed to upload file:', file.name, error);
@@ -39,7 +39,7 @@ export const uploadMedia = createAsyncThunk(
                 try {
                     const formData = new FormData();
                     formData.append('file', file);
-                    const res = await apiRequestFormData('/upload/media', formData);
+                    const res = await apiRequestFormData('/upload/media-s3', formData);
                     return res.url;
                 } catch (error) {
                     console.error('Failed to upload media:', file.name, error);

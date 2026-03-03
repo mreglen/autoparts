@@ -48,15 +48,10 @@ class ProductPhoto(Base):
 
     @property
     def full_url(self):
-        # Если photo_url уже содержит полный URL, используем как есть
+        # If photo_url already contains a full URL, use as is
         if self.photo_url.startswith('http://') or self.photo_url.startswith('https://'):
             return self.photo_url
-        # Если photo_url относительный, формируем полный URL
+        # For S3 URLs, return as is since they are already full URLs
         else:
-            # Для localhost используем http://localhost:8000
-            base_url = "http://localhost:8000"
-            if self.photo_url.startswith('/uploads/'):
-                return f"{base_url}{self.photo_url}"
-            else:
-                filename = self.photo_url.split('/')[-1]
-                return f"{base_url}/uploads/{filename}"
+            # Assuming S3 URLs are stored as full URLs
+            return self.photo_url

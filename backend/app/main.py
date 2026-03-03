@@ -151,7 +151,8 @@ async def run_cleanup_expired_sessions():
 
 app.include_router(api_router)
 
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Removed local uploads directory mount, using S3 for file storage
+# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 @app.get("/")

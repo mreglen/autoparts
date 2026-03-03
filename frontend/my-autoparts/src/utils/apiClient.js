@@ -32,17 +32,6 @@ export const normalizeImageUrl = (imageUrl) => {
         return imageUrl;
     }
 
-    // If URL starts with /uploads/, convert to full backend base URL
-    if (imageUrl.startsWith('/uploads/')) {
-        return BACKEND_BASE + imageUrl;
-    }
-
-    // If URL contains /uploads/, replace the domain with backend base URL
-    if (imageUrl.includes('/uploads/')) {
-        const uploadsIndex = imageUrl.indexOf('/uploads/');
-        return BACKEND_BASE + imageUrl.substring(uploadsIndex);
-    }
-
     // For other absolute URLs, return as is
     return imageUrl;
 };
