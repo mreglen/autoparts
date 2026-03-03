@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 from fastapi import APIRouter, File, UploadFile, HTTPException, Response
 from fastapi.responses import FileResponse
+from ..s3 import upload_file as s3_upload_file
 
 # Максимальный размер файла в байтах (50MB для фото, 70MB для видео)
 MAX_PHOTO_SIZE = 50 * 1024 * 1024  # 50MB
@@ -354,3 +355,72 @@ async def get_uploaded_video(filename: str):
     if not os.path.isfile(filepath):
         raise HTTPException(404, "Видео не найдено")
     return FileResponse(filepath)
+
+
+@router.post("/photo-s3")
+async def upload_photo_to_s3(file: UploadFile = File(...)):
+    print(f"=== PHOTO UPLOAD TO S3 REQUEST ===")
+    print(f"Filename: {file.filename}")
+    print(f"Content-Type: {file.content_type}")
+    print(f"Headers: {dict(file.headers) if hasattr(file, 'headers') else 'No headers'}")
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        print(f"Rejected: invalid content type {file.content_type}")
+        print("=== END PHOTO UPLOAD TO S3 (REJECTED) ===")
+        raise HTTPException(400, "Разрешены только изображения")
+
+    # Проверяем размер файла перед загрузкой
+    file_content = await file.read()
+    file_size = len(file_content)
+
+    if file_size > MAX_PHOTO_SIZE:
+        raise HTTPException(
+            413,
+            f"Файл слишком большой. Размер: {file_size/1024/1024:.1f}MB. Максимальный размер: {MAX_PHOTO_SIZE/1024/1024}MB"
+        )
+
+    # Возвращаем указатель файла в начало для повторного чтения
+    await file.seek(0)
+
+    # Получаем расширение файла
+    ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
+
+    # Список поддерживаемых форматов изображений
+    allowed_extensions = (
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".jfif", ".jfif-tbn",
+        ".heic", ".heif", ".tiff", ".tif", ".bmp", ".svg", ".ico",
+        ".raw", ".cr2", ".nef", ".arw", ".dng", ".orf", ".rw2"
+    )
+
+    # Проверяем расширение файла
+    if ext and ext not in allowed_extensions:
+        raise HTTPException(400, "Недопустимый формат изображения")
+
+    # Дополнительная проверка по MIME типу для распространенных форматов
+    allowed_mime_types = (
+        "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+        "image/bmp", "image/tiff", "image/x-icon", "image/heic", "image/heif"
+    )
+
+    if file.content_type not in allowed_mime_types:
+        # Для неизвестных MIME типов, но с правильным расширением - позволяем
+        # (например, некоторые форматы могут иметь специфические MIME типы)
+        if not ext:
+            raise HTTPException(400, "Недопустимый тип файла")
+
+    filename = f"photos/{uuid.uuid4().hex}{ext}"
+    
+    print(f"Uploading file to S3 with filename: {filename}")
+    
+    try:
+        # Upload to S3/MinIO
+        file_url = s3_upload_file(file_content, filename, file.content_type)
+        print(f"File uploaded successfully to S3: {file_url}")
+        
+        result = {"url": file_url, "provider": "s3"}
+        print(f"Upload successful: {result}")
+        print("=== END PHOTO UPLOAD TO S3 ===")
+        return result
+    except Exception as e:
+        print(f"Error uploading to S3: {str(e)}")
+        raise HTTPException(500, f"Ошибка при загрузке файла в хранилище: {str(e)}")
