@@ -18,14 +18,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Create tables only if they don't exist
+# Using create_all() ensures foreign key constraints are handled correctly
 from sqlalchemy import inspect
 inspector = inspect(engine)
 existing_tables = inspector.get_table_names()
 
 # Only create tables that don't already exist to avoid constraint errors
-for table_name, table in Base.metadata.tables.items():
-    if table_name not in existing_tables:
-        table.create(bind=engine)
+if len(existing_tables) < len(Base.metadata.tables):
+    # Create all missing tables at once to properly handle foreign key dependencies
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Автозапчасти")
 
@@ -151,8 +152,24 @@ async def run_cleanup_expired_sessions():
 
 app.include_router(api_router)
 
-# Removed local uploads directory mount, using S3 for file storage
-# app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Serve static files from uploads directory
+import os
+from pathlib import Path
+
+# Get the absolute path to the uploads directory
+# Note: uploads directory is at backend/uploads, not backend/app/uploads
+uploads_dir = Path(__file__).parent.parent / "uploads"
+if uploads_dir.exists():
+    app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+else:
+    logger.error(f"Uploads directory not found: {uploads_dir}")
+
+# Also mount pictures directory for direct access
+pictures_dir = Path(__file__).parent.parent / "uploads" / "pictures"
+if pictures_dir.exists():
+    app.mount("/pictures", StaticFiles(directory=str(pictures_dir)), name="pictures")
+else:
+    logger.error(f"Pictures directory not found: {pictures_dir}")
 
 
 @app.get("/")

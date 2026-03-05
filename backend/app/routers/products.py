@@ -274,9 +274,8 @@ def delete_product_photo(
             detail="Фото не найдено"
         )
 
-    # Skipping local file deletion as we're using S3 storage
-    # Old local file deletion code removed
-    pass
+    # Delete photo records from database
+    # (No local file deletion needed - files remain in storage)
 
     # Удаляем запись из базы данных
     db.delete(photo)

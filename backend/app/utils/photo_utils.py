@@ -41,11 +41,11 @@ def construct_temp_photo_url(filename: str, organization_id: str) -> str:
     Construct a temporary photo URL that can be used before processing completes.
     
     Args:
-        filename: Generated filename
+        filename: Generated filename (UUID)
         organization_id: Organization ID
     
     Returns:
         str: Temporary URL structure
     """
     from app.core.config import settings
-    return f"{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET_NAME}/uploads/pictures/{organization_id}/{filename}"
+    return f"{settings.BASE_URL}temp/{filename}"

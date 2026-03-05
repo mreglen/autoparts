@@ -9,7 +9,7 @@ from ..core.auth import get_current_user
 from ..models.user import User
 from ..tasks.photo_tasks import process_and_upload_photo
 from ..utils.photo_naming import generate_photo_filename
-from ..s3 import upload_file as s3_upload_file
+from ..core.config import settings
 
 # Максимальный размер файла в байтах (50MB для фото, 70MB для видео)
 MAX_PHOTO_SIZE = 50 * 1024 * 1024  # 50MB
@@ -18,14 +18,14 @@ MAX_VIDEO_SIZE = 70 * 1024 * 1024  # 70MB
 router = APIRouter(prefix="/upload", tags=["Upload"])
 
 
-@router.post("/photo-s3")
-async def upload_photo_to_s3(
+@router.post("/photo")
+async def upload_photo(
     file: UploadFile = File(...),
     organization_id: str = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    print(f"=== PHOTO UPLOAD TO S3 REQUEST ===")
+    print(f"=== PHOTO UPLOAD REQUEST ===")
     print(f"Filename: {file.filename}")
     print(f"Content-Type: {file.content_type}")
     
@@ -38,7 +38,7 @@ async def upload_photo_to_s3(
 
     if not file.content_type or not file.content_type.startswith("image/"):
         print(f"Rejected: invalid content type {file.content_type}")
-        print("=== END PHOTO UPLOAD TO S3 (REJECTED) ===")
+        print("=== END PHOTO UPLOAD (REJECTED) ===")
         raise HTTPException(400, "Разрешены только изображения")
 
     # Проверяем размер файла перед загрузкой
@@ -80,20 +80,30 @@ async def upload_photo_to_s3(
         if not ext:
             raise HTTPException(400, "Недопустимый тип файла")
 
-    # Generate filename with organization ID
-    filename = generate_photo_filename(organization_id, file.filename)
+    # Generate UUID filename for temp storage
+    unique_filename = f"{uuid.uuid4().hex}{ext}"
+    temp_dir = "uploads/temp"
+    temp_path = os.path.join(temp_dir, unique_filename)
     
-    print(f"Processing photo with Celery. Filename: {filename}, Organization: {organization_id}")
+    # Create temp directory if it doesn't exist
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Save original file to temp folder
+    try:
+        with open(temp_path, 'wb') as f:
+            f.write(file_content)
+        print(f"Saved original photo to temp: {temp_path}")
+    except Exception as e:
+        print(f"Error saving temp file: {str(e)}")
+        raise HTTPException(500, f"Ошибка при сохранении временного файла: {str(e)}")
+    
+    print(f"Processing photo with Celery. Temp path: {temp_path}, Organization: {organization_id}")
     
     try:
-        # Encode file data to base64 for Celery task
-        file_data_base64 = base64.b64encode(file_content).decode('utf-8')
-        
         # Queue Celery task for async processing
         task = process_and_upload_photo.delay(
-            file_data_base64,
-            filename,
-            file.content_type,
+            temp_path,
+            file.filename,  # Original filename for reference
             organization_id
         )
         
@@ -103,12 +113,12 @@ async def upload_photo_to_s3(
         result = {
             "task_id": task.id,
             "status": "processing",
-            "filename": filename,
+            "temp_filename": unique_filename,
             "organization_id": organization_id
         }
         
         print(f"Upload queued for processing: {result}")
-        print("=== END PHOTO UPLOAD TO S3 ===")
+        print("=== END PHOTO UPLOAD ===")
         return result
         
     except Exception as e:
@@ -116,14 +126,25 @@ async def upload_photo_to_s3(
         raise HTTPException(500, f"Ошибка при постановке задачи в очередь: {str(e)}")
 
 
-@router.post("/media-s3")
-async def upload_media_to_s3(
+@router.post("/photo-s3")
+async def upload_photo_s3(
     file: UploadFile = File(...),
     organization_id: str = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    print(f"=== MEDIA UPLOAD TO S3 REQUEST ===")
+    """Alias for upload_photo - kept for backwards compatibility"""
+    return await upload_photo(file=file, organization_id=organization_id, db=db, current_user=current_user)
+
+
+@router.post("/media")
+async def upload_media(
+    file: UploadFile = File(...),
+    organization_id: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    print(f"=== MEDIA UPLOAD REQUEST ===")
     print(f"Filename: {file.filename}")
     print(f"Content-Type: {file.content_type}")
     
@@ -140,7 +161,7 @@ async def upload_media_to_s3(
     
     if not is_image and not is_video:
         print(f"Rejected: invalid content type {file.content_type}")
-        print("=== END MEDIA UPLOAD TO S3 (REJECTED) ===")
+        print("=== END MEDIA UPLOAD (REJECTED) ===")
         raise HTTPException(400, "Разрешены только изображения и видео")
 
     # Determine max file size based on file type
@@ -183,7 +204,7 @@ async def upload_media_to_s3(
             if not ext:
                 raise HTTPException(400, "Недопустимый тип файла")
         
-        # Prepare filename for S3 with organization ID
+        # Prepare filename with organization ID
         filename = generate_photo_filename(organization_id, file.filename)
         
     elif is_video:
@@ -204,35 +225,52 @@ async def upload_media_to_s3(
             if not ext:
                 raise HTTPException(400, "Недопустимый тип файла")
         
-        # Prepare filename for S3 with organization ID
+        # Prepare filename with organization ID
         filename = generate_photo_filename(organization_id, file.filename)
 
     print(f"Processing media with Celery. Filename: {filename}, Organization: {organization_id}")
     
+    # Generate UUID filename for temp storage
+    unique_filename = f"{uuid.uuid4().hex}{ext}"
+    temp_dir = "uploads/temp"
+    temp_path = os.path.join(temp_dir, unique_filename)
+    
+    # Create temp directory if it doesn't exist
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Save original file to temp folder
     try:
-        # Encode file data to base64 for Celery task
-        file_data_base64 = base64.b64encode(file_content).decode('utf-8')
-        
-        # Queue Celery task for async processing (works for both images and videos)
+        with open(temp_path, 'wb') as f:
+            f.write(file_content)
+        print(f"Saved original media to temp: {temp_path}")
+    except Exception as e:
+        print(f"Error saving temp file: {str(e)}")
+        raise HTTPException(500, f"Ошибка при сохранении временного файла: {str(e)}")
+    
+    try:
+        # Queue Celery task for async processing
         task = process_and_upload_photo.delay(
-            file_data_base64,
-            filename,
-            file.content_type,
+            temp_path,
+            filename,  # Use generated filename
             organization_id
         )
         
         print(f"Celery task queued: {task.id}")
         
-        # Return task info and temporary URL structure
+        # Return task info and relative path (frontend will construct full URL)
+        # The Celery task will save the file with this naming pattern
+        predicted_path = f"/pictures/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.webp')}"
         result = {
             "task_id": task.id,
             "status": "processing",
-            "filename": filename,
-            "organization_id": organization_id
+            "temp_filename": unique_filename,
+            "organization_id": organization_id,
+            "path": predicted_path
         }
         
+        print(f"Predicted path: {predicted_path}")
         print(f"Media upload queued for processing: {result}")
-        print("=== END MEDIA UPLOAD TO S3 ===")
+        print("=== END MEDIA UPLOAD ===")
         return result
         
     except Exception as e:
@@ -240,16 +278,27 @@ async def upload_media_to_s3(
         raise HTTPException(500, f"Ошибка при постановке задачи в очередь: {str(e)}")
 
 
-@router.post("/organization-logo-s3")
-async def upload_organization_logo_to_s3(file: UploadFile = File(...)):
-    print(f"=== ORGANIZATION LOGO UPLOAD TO S3 REQUEST ===")
+@router.post("/media-s3")
+async def upload_media_s3(
+    file: UploadFile = File(...),
+    organization_id: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Alias for upload_media - kept for backwards compatibility"""
+    return await upload_media(file=file, organization_id=organization_id, db=db, current_user=current_user)
+
+
+@router.post("/organization-logo")
+async def upload_organization_logo(file: UploadFile = File(...)):
+    print(f"=== ORGANIZATION LOGO UPLOAD REQUEST ===")
     print(f"Filename: {file.filename}")
     print(f"Content-Type: {file.content_type}")
     print(f"Headers: {dict(file.headers) if hasattr(file, 'headers') else 'No headers'}")
 
     if not file.content_type or not file.content_type.startswith("image/"):
         print(f"Rejected: invalid content type {file.content_type}")
-        print("=== END ORGANIZATION LOGO UPLOAD TO S3 (REJECTED) ===")
+        print("=== END ORGANIZATION LOGO UPLOAD (REJECTED) ===")
         raise HTTPException(400, "Разрешены только изображения")
 
     # Проверяем размер файла перед загрузкой
@@ -293,19 +342,23 @@ async def upload_organization_logo_to_s3(file: UploadFile = File(...)):
 
     filename = f"logos/{uuid.uuid4().hex}{ext}"
     
-    print(f"Uploading organization logo to S3 with filename: {filename}")
+    # Save to local storage
+    upload_path = os.path.join("uploads", filename)
+    os.makedirs(os.path.dirname(upload_path), exist_ok=True)
     
     try:
-        # Upload to S3/MinIO
-        file_url = s3_upload_file(file_content, filename, file.content_type)
-        print(f"File uploaded successfully to S3: {file_url}")
+        with open(upload_path, 'wb') as f:
+            f.write(file_content)
+        print(f"File uploaded successfully: {upload_path}")
         
-        result = {"url": file_url, "provider": "s3"}
+        # Construct URL using BASE_URL
+        file_url = f"{settings.BASE_URL}{upload_path}"
+        result = {"url": file_url}
         print(f"Upload successful: {result}")
-        print("=== END ORGANIZATION LOGO UPLOAD TO S3 ===")
+        print("=== END ORGANIZATION LOGO UPLOAD ===")
         return result
     except Exception as e:
-        print(f"Error uploading to S3: {str(e)}")
+        print(f"Error uploading file: {str(e)}")
         raise HTTPException(500, f"Ошибка при загрузке файла в хранилище: {str(e)}")
 
 

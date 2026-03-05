@@ -1,27 +1,55 @@
 from celery import Task
 from app.celery_app import celery_app
-from app.s3.minio_client import get_minio_client
 from app.core.config import settings
 from PIL import Image
 from io import BytesIO
 import os
+import exifread
+from pillow_heif import register_heif_opener
 
 
-def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: int = 85):
+# Register HEIF opener for .heic/.heif support
+register_heif_opener()
+
+
+def remove_exif_data(image: Image.Image) -> Image.Image:
     """
-    Optimizes an image using Pillow.
+    Remove all EXIF/metadata from image including geotags.
+    
+    Args:
+        image: PIL Image object
+    
+    Returns:
+        PIL Image object without metadata
+    """
+    # Create a new image without any metadata
+    data = image.tobytes()
+    mode = image.mode
+    size = image.size
+    
+    # Recreate image from raw data (this strips all metadata)
+    clean_image = Image.frombytes(mode, size, data)
+    return clean_image
+
+
+def optimize_image(image_data: bytes, max_size: tuple = (1600, 1200), quality: int = 75):
+    """
+    Optimizes an image using Pillow, removes metadata, converts to WebP.
     
     Args:
         image_data: Raw image bytes
-        max_size: Maximum dimensions (width, height)
-        quality: JPEG quality (1-100)
+        max_size: Maximum dimensions (width, height) - reduced for better compression
+        quality: WebP quality (1-100) - lowered to 75 for stronger compression
     
     Returns:
-        bytes: Optimized image bytes
+        bytes: Optimized WebP image bytes
     """
     img = Image.open(BytesIO(image_data))
     
-    # Convert to RGB if necessary (for PNG with transparency, etc.)
+    # Remove EXIF and all metadata
+    img = remove_exif_data(img)
+    
+    # Convert to RGB if necessary (WebP doesn't support all modes)
     if img.mode in ('RGBA', 'LA', 'P'):
         # Create white background for transparent images
         background = Image.new('RGB', img.size, (255, 255, 255))
@@ -35,84 +63,86 @@ def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: i
     # Resize if needed
     img.thumbnail(max_size, Image.Resampling.LANCZOS)
     
-    # Save to bytes
+    # Save to WebP format with stronger compression
     output = BytesIO()
-    img.save(output, format='JPEG', quality=quality, optimize=True, progressive=True)
+    img.save(output, format='WebP', quality=quality, method=6, lossless=False)
     
     return output.getvalue()
 
 
 @celery_app.task(bind=True, max_retries=3)
-def process_and_upload_photo(self, file_data: str, filename: str, content_type: str, organization_id: str):
+def process_and_upload_photo(self, temp_file_path: str, original_filename: str, organization_id: str):
     """
-    Celery task to process and upload photo/video to MinIO.
+    Celery task to process photo: remove metadata, convert to WebP, compress, and move to final location.
     
     Steps:
-    1. For images: optimize using Pillow
-    2. For videos: pass through as-is
-    3. Upload to MinIO in uploads/pictures/{organization_id}/ or uploads/videos/{organization_id}/
-    4. Return URL
+    1. Read image from temp folder
+    2. Remove all EXIF/metadata (including geotags)
+    3. Optimize and convert to WebP
+    4. Save to uploads/pictures/{organization_id}/
+    5. Delete original from temp folder
+    6. Return URL
     
     Args:
         self: Task instance
-        file_data: Base64 encoded image/video data
-        filename: Original filename
-        content_type: MIME type
+        temp_file_path: Path to temporary file
+        original_filename: Original filename (for reference)
         organization_id: ID of the organization owning the media
     
     Returns:
-        dict: {'url': str, 'status': str}
+        dict: {'url': str, 'status': str, 'filename': str}
     """
     try:
-        from base64 import b64decode
+        # Check if temp file exists
+        if not os.path.exists(temp_file_path):
+            raise Exception(f"Temp file not found: {temp_file_path}")
         
-        # Decode base64 data
-        if ',' in file_data:
-            # Data URL format: data:image/jpeg;base64,...
-            file_data = file_data.split(',')[1]
+        # Read the image from temp location
+        with open(temp_file_path, 'rb') as f:
+            image_data = f.read()
         
-        media_bytes = b64decode(file_data)
-        
-        # Determine if it's a video or image based on content type
-        is_video = content_type.startswith('video/')
-        
-        if is_video:
-            # For videos, just use the original bytes without optimization
-            processed_bytes = media_bytes
-            final_content_type = content_type
-        else:
-            # For images, optimize with Pillow
-            processed_bytes = optimize_image(media_bytes)
-            final_content_type = 'image/jpeg'  # Always convert to JPEG after optimization
+        # Process and optimize image (removes metadata, converts to WebP)
+        processed_bytes = optimize_image(image_data)
         
         # Generate final path with organization ID
-        # Determine folder based on media type
-        folder = "uploads/videos" if is_video else "uploads/pictures"
-        final_filename = f"{folder}/{organization_id}/{filename}"
+        # Change extension to .webp
+        base_name = os.path.splitext(original_filename)[0]
+        final_filename = f"{base_name}.webp"
         
-        # Upload to MinIO
-        minio_client = get_minio_client()
+        upload_dir = os.path.join("uploads", "pictures", organization_id)
+        final_path = os.path.join(upload_dir, final_filename)
         
+        # Create directory if it doesn't exist
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Save optimized image to final location
         try:
-            minio_client.put_object(
-                Bucket=settings.MINIO_BUCKET_NAME,
-                Key=final_filename,
-                Body=BytesIO(processed_bytes),
-                ContentLength=len(processed_bytes),
-                ContentType=final_content_type
-            )
-        except Exception as upload_error:
+            with open(final_path, 'wb') as f:
+                f.write(processed_bytes)
+        except Exception as save_error:
             # Retry logic
-            raise self.retry(exc=upload_error, countdown=60)
+            raise self.retry(exc=save_error, countdown=60)
         
-        # Construct URL
-        media_url = f"{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET_NAME}/{final_filename}"
+        # Delete original temp file
+        try:
+            os.remove(temp_file_path)
+            print(f"Deleted temp file: {temp_file_path}")
+        except Exception as delete_error:
+            print(f"Warning: Could not delete temp file {temp_file_path}: {str(delete_error)}")
+        
+        # Construct relative path (without domain) - frontend will add backend base URL
+        media_path = f"/pictures/{organization_id}/{final_filename}"
+        
+        print(f"✓ Photo saved successfully!")
+        print(f"  Final path: {final_path}")
+        print(f"  Media URL path: {media_path}")
         
         return {
-            'url': media_url,
+            'path': media_path,  # Relative path for database storage
+            'url': f"{settings.BASE_URL}{media_path}",  # Full URL for immediate use
             'status': 'success',
             'filename': final_filename,
-            'is_video': is_video
+            'organization_id': organization_id
         }
         
     except Exception as exc:

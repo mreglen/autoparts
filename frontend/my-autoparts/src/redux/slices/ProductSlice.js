@@ -13,7 +13,7 @@ export const uploadPhotos = createAsyncThunk(
                 try {
                     const formData = new FormData();
                     formData.append('file', file);
-                    const res = await apiRequestFormData('/upload/photo-s3', formData);
+                    const res = await apiRequestFormData('/upload/photo', formData);
                     return res.url;
                 } catch (error) {
                     console.error('Failed to upload file:', file.name, error);
@@ -39,14 +39,25 @@ export const uploadMedia = createAsyncThunk(
                 try {
                     const formData = new FormData();
                     formData.append('file', file);
-                    const res = await apiRequestFormData('/upload/media-s3', formData);
-                    return res.url;
+                    const res = await apiRequestFormData('/upload/media', formData);
+                    
+                    // Use the relative path from backend response
+                    if (res.path) {
+                        return res.path;
+                    }
+                    // Fallback: construct predictive URL from temp_filename
+                    if (res.organization_id && res.temp_filename) {
+                        const webpFilename = res.temp_filename.replace(/\.[^/.]+$/, '.webp');
+                        return `/pictures/${res.organization_id}/${webpFilename}`;
+                    }
+                    return res.url || null;
                 } catch (error) {
                     console.error('Failed to upload media:', file.name, error);
                     throw error;
                 }
             });
             const urls = await Promise.all(uploadPromises);
+            console.log('Uploaded media paths:', urls);
             return urls;
         } catch (error) {
             return rejectWithValue(
@@ -91,12 +102,16 @@ export const createPendingProduct = createAsyncThunk(
     'products/createPendingProduct',
     async (productData, { rejectWithValue }) => {
         try {
+            console.log('Sending product data:', JSON.stringify(productData, null, 2));
             const response = await apiAxios.post(
                 '/pending-products/',
                 productData,
             );
+            console.log('Response:', response.data);
             return response.data;
         } catch (error) {
+            console.error('Full error:', error);
+            console.error('Error response:', error.response?.data);
             // Обработка детализированных ошибок FastAPI
             let errorMessage = 'Ошибка создания товара';
             if (error.response?.data?.detail) {

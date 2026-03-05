@@ -6,6 +6,7 @@ import { createStockIn, clearStockInError } from '../../../redux/slices/StockInS
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { fetchStorageCells, createStorageCell } from '../../../redux/slices/StorageCellsSlice';
 import { createPendingProductStorageCellsBatch } from '../../../redux/slices/PendingProductStorageCellsSlice';
+import { normalizeImageUrl } from '../../../utils/apiClient';
 
 import VehicleModal from './VehicleModal';
 
@@ -250,6 +251,32 @@ const AddPart = () => {
       return;
     }
 
+    // Validate required fields
+    if (!formData.article || !formData.article.trim()) {
+      alert('Артикул обязателен');
+      return;
+    }
+    if (!formData.name || !formData.name.trim()) {
+      alert('Название обязательно');
+      return;
+    }
+    if (!formData.brand || !formData.brand.trim()) {
+      alert('Бренд обязателен');
+      return;
+    }
+    if (!formData.sale_price || isNaN(parseFloat(formData.sale_price))) {
+      alert('Укажите корректную цену');
+      return;
+    }
+    if (!formData.quantity || isNaN(parseInt(formData.quantity, 10))) {
+      alert('Укажите корректное количество');
+      return;
+    }
+    if (!formData.storage_location_id) {
+      alert('Выберите место хранения');
+      return;
+    }
+
     let mediaUrls = [];
 
     // Combine photos and videos into one array for upload
@@ -276,14 +303,14 @@ const AddPart = () => {
     }
 
     const productData = {
-      article: formData.article,
-      name: formData.name,
-      brand: formData.brand,
-      description: formData.description || null,
-      price: formData.sale_price,
-      quantity: formData.quantity,
+      article: formData.article?.toString().trim() || '',
+      name: formData.name?.toString().trim() || '',
+      brand: formData.brand?.toString().trim() || '',
+      description: formData.description ? String(formData.description).trim() : null,
+      price: parseFloat(formData.sale_price) || 0,
+      quantity: parseInt(formData.quantity, 10) || 1,
       is_new: formData.condition === 'новый',
-      storage_location_id: parseInt(formData.storage_location_id, 10),
+      storage_location_id: parseInt(formData.storage_location_id, 10) || 1,
       vehicle_ids: selectedVehicle ? [selectedVehicle.id] : [],
       photos: mediaUrls.length > 0 ? mediaUrls : null,
     };
@@ -420,24 +447,40 @@ const AddPart = () => {
             className="mt-1"
           />
           <div className="mt-2 flex flex-wrap gap-2">
-            {photos.map((file, idx) => (
-              <div key={`photo-${idx}`} className="relative">
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt={`photo-preview-${idx}`}
-                  className="w-16 h-16 object-cover rounded border"
-                  onLoad={() => {
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => handlePhotoRemove(idx)}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
-                >
-                  <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
-                </button>
-              </div>
-            ))}
+            {photos.map((file, idx) => {
+              // Handle both File objects (before upload) and URL strings (after upload)
+              let photoSrc;
+              if (file instanceof File || file instanceof Blob) {
+                photoSrc = URL.createObjectURL(file);
+              } else if (typeof file === 'string') {
+                photoSrc = normalizeImageUrl(file);
+              } else {
+                photoSrc = '';
+              }
+              
+              return (
+                <div key={`photo-${idx}`} className="relative">
+                  <img
+                    src={photoSrc}
+                    alt={`photo-preview-${idx}`}
+                    className="w-16 h-16 object-cover rounded border"
+                    onLoad={() => {
+                      // Cleanup for blob URLs
+                      if (file instanceof File || file instanceof Blob) {
+                        // URL.revokeObjectURL(photoSrc); // Optional: manage cleanup if needed
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handlePhotoRemove(idx)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                  >
+                    <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              );
+            })}
             {videos.map((file, idx) => (
               <div key={`video-${idx}`} className="relative">
                 <video

@@ -54,7 +54,6 @@ class ProductPhoto(Base):
         # If photo_url already contains a full URL, use as is
         if self.photo_url.startswith('http://') or self.photo_url.startswith('https://'):
             return self.photo_url
-        # For S3 URLs, return as is since they are already full URLs
         else:
-            # Assuming S3 URLs are stored as full URLs
+            # Return as is (local storage path)
             return self.photo_url

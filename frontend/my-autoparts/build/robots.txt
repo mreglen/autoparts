@@ -1,3 +1,18 @@
-# https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Disallow:
+
+# Allow all crawlers to access all pages
+Allow: /
+
+# Sitemap reference
+Sitemap: https://www.my-autoparts.com/sitemap.xml
+
+# Disallow access to certain directories
+User-agent: *
+Disallow: /admin/
+Disallow: /private/
+Disallow: /uploads/
+Disallow: /node_modules/
+
+# Crawl delay (in seconds)
+Crawl-delay: 1

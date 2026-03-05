@@ -7,6 +7,7 @@ import { fetchStorageCells, fetchProductStorageCells, linkProductToCell, deleteP
 import VehicleModal from '../AddPart/VehicleModal';
 import PhotoGallery from '../../../components/PhotoGallery/PhotoGallery';
 import ImageModal from '../../../components/ImageModal/ImageModal';
+import { normalizeImageUrl } from '../../../utils/apiClient';
 
 const EditPart = () => {
   const navigate = useNavigate();
@@ -469,22 +470,34 @@ const EditPart = () => {
             <div className="mt-2">
               <p className="text-sm text-gray-600 mb-2">Новые фотографии:</p>
               <div className="flex flex-wrap gap-2">
-                {photos.map((file, idx) => (
-                  <div key={idx} className="relative">
-                    <img
-                      src={URL.createObjectURL(file)}
-                      alt={`new-${idx}`}
-                      className="w-16 h-16 object-contain rounded border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handlePhotoRemove(idx)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
-                    >
-                      <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
-                    </button>
-                  </div>
-                ))}
+                {photos.map((file, idx) => {
+                  // Handle both File objects (before upload) and URL strings (after upload)
+                  let photoSrc;
+                  if (file instanceof File || file instanceof Blob) {
+                    photoSrc = URL.createObjectURL(file);
+                  } else if (typeof file === 'string') {
+                    photoSrc = normalizeImageUrl(file);
+                  } else {
+                    photoSrc = '';
+                  }
+                  
+                  return (
+                    <div key={idx} className="relative">
+                      <img
+                        src={photoSrc}
+                        alt={`new-${idx}`}
+                        className="w-16 h-16 object-contain rounded border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handlePhotoRemove(idx)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                      >
+                        <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -9,10 +9,12 @@ const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygara
 
 // const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://195.24.65.251/api';
 // const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://195.24.65.251';
-// локально
 
 // const API_BASE = 'http://127.0.0.1:8000/api';
 // const BACKEND_BASE = 'http://127.0.0.1:8000';
+
+// Export for use in components
+export { API_BASE, BACKEND_BASE };
 
 // const API_BASE = 'http://localhost:3000/api';
 // const BACKEND_BASE = 'http://localhost:3000';
@@ -26,10 +28,16 @@ export const getAuthHeaders = () => {
 export const normalizeImageUrl = (imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
 
+    // If already has backend base or is a blob/data URL, return as is
     if (imageUrl.startsWith(BACKEND_BASE) ||
         imageUrl.startsWith('blob:') ||
         imageUrl.startsWith('data:')) {
         return imageUrl;
+    }
+
+    // If it's a relative path starting with /, prepend BACKEND_BASE
+    if (imageUrl.startsWith('/')) {
+        return `${BACKEND_BASE}${imageUrl}`;
     }
 
     // For other absolute URLs, return as is
