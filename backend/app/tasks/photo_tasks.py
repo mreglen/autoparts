@@ -94,8 +94,16 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
     """
     try:
         # Check if temp file exists
+        print(f"=== PHOTO PROCESSING TASK STARTED ===")
+        print(f"Temp file path: {temp_file_path}")
+        print(f"Original filename: {original_filename}")
+        print(f"Organization ID: {organization_id}")
+        
         if not os.path.exists(temp_file_path):
+            print(f"ERROR: Temp file not found at: {temp_file_path}")
             raise Exception(f"Temp file not found: {temp_file_path}")
+        
+        print(f"✓ Temp file exists, size: {os.path.getsize(temp_file_path)} bytes")
         
         # Read the image from temp location
         with open(temp_file_path, 'rb') as f:
@@ -112,14 +120,21 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
         upload_dir = os.path.join("uploads", "pictures", organization_id)
         final_path = os.path.join(upload_dir, final_filename)
         
+        print(f"Generated final filename: {final_filename}")
+        print(f"Upload directory: {upload_dir}")
+        print(f"Final path: {final_path}")
+        
         # Create directory if it doesn't exist
         os.makedirs(upload_dir, exist_ok=True)
         
         # Save optimized image to final location
         try:
+            print(f"Saving optimized image to: {final_path}")
             with open(final_path, 'wb') as f:
                 f.write(processed_bytes)
+            print(f"✓ Successfully saved file: {final_path}")
         except Exception as save_error:
+            print(f"ERROR saving file: {save_error}")
             # Retry logic
             raise self.retry(exc=save_error, countdown=60)
         

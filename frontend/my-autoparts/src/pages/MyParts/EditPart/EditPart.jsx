@@ -298,6 +298,11 @@ const EditPart = () => {
       photos: allPhotoUrls.length > 0 ? allPhotoUrls : null,
     };
 
+    console.log('=== UPDATE PRODUCT REQUEST ===');
+    console.log('Product Data:', JSON.stringify(productData, null, 2));
+    console.log('All Photo URLs:', allPhotoUrls);
+    console.log('================================');
+
     try {
       const result = await dispatch(updateProduct({ id: parseInt(id, 10), productData }));
       if (updateProduct.rejected.match(result)) {

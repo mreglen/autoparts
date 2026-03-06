@@ -4,7 +4,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.models.product import ProductPhoto, Product as ProductModel
 from app.models.product_vehicle import ProductVehicleAssociation
-from app.schemas.product import Product as ProductSchema, ProductCreate, ProductQuantityUpdate, Vehicle, DeletePhotosRequest
+from app.schemas.product import Product as ProductSchema, ProductCreate, ProductUpdate, ProductQuantityUpdate, Vehicle, DeletePhotosRequest
 from app.models.vehicle import Vehicle as VehicleModel
 from app.db.database import get_db
 from app.core.auth import get_current_user
@@ -133,11 +133,16 @@ def read_public_product(
 @router.put("/{product_id}", response_model=ProductSchema)
 def update_product(
     product_id: int,
-    product: ProductCreate,
+    product: ProductUpdate,  # Changed from ProductCreate to ProductUpdate
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    db_product = db.query(ProductModel).filter(
+    db_product = db.query(ProductModel).options(
+        selectinload(ProductModel.photos),
+        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.storage_location),
+        selectinload(ProductModel.organization)
+    ).filter(
         ProductModel.id == product_id,
         ProductModel.organization_id == current_user.organization_id
     ).first()

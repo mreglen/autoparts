@@ -14,13 +14,24 @@ export const uploadPhotos = createAsyncThunk(
                     const formData = new FormData();
                     formData.append('file', file);
                     const res = await apiRequestFormData('/upload/photo', formData);
-                    return res.url;
+                    
+                    // Use the predicted path from backend response
+                    if (res.path) {
+                        return res.path;
+                    }
+                    // Fallback: construct predictive URL from temp_filename
+                    if (res.organization_id && res.temp_filename) {
+                        const webpFilename = res.temp_filename.replace(/\.[^/.]+$/, '.webp');
+                        return `/pictures/${res.organization_id}/${webpFilename}`;
+                    }
+                    return res.url || null;
                 } catch (error) {
                     console.error('Failed to upload file:', file.name, error);
                     throw error;
                 }
             });
             const urls = await Promise.all(uploadPromises);
+            console.log('Uploaded photo paths:', urls);
             return urls;
         } catch (error) {
             return rejectWithValue(
@@ -159,12 +170,17 @@ export const updateProduct = createAsyncThunk(
     'products/updateProduct',
     async ({ id, productData }, { rejectWithValue }) => {
         try {
+            console.log('Sending PUT request to /products/' + id);
+            console.log('Request data:', JSON.stringify(productData, null, 2));
             const response = await apiAxios.put(
                 `/products/${id}`,
                 productData,
             );
+            console.log('Response received:', response.data);
             return response.data;
         } catch (error) {
+            console.error('Full error:', error);
+            console.error('Error response:', error.response?.data);
             // Обработка детализированных ошибок FastAPI
             let errorMessage = 'Ошибка обновления товара';
             if (error.response?.data?.detail) {

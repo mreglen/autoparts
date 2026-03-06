@@ -80,6 +80,11 @@ async def upload_photo(
         if not ext:
             raise HTTPException(400, "Недопустимый тип файла")
 
+    # Generate filename with organization ID and timestamp
+    filename = generate_photo_filename(organization_id, file.filename)
+    
+    print(f"Generated filename: {filename}")
+    
     # Generate UUID filename for temp storage
     unique_filename = f"{uuid.uuid4().hex}{ext}"
     temp_dir = "uploads/temp"
@@ -98,25 +103,30 @@ async def upload_photo(
         raise HTTPException(500, f"Ошибка при сохранении временного файла: {str(e)}")
     
     print(f"Processing photo with Celery. Temp path: {temp_path}, Organization: {organization_id}")
+    print(f"Final filename will be: {filename}")
     
     try:
         # Queue Celery task for async processing
         task = process_and_upload_photo.delay(
             temp_path,
-            file.filename,  # Original filename for reference
+            filename,  # Use generated filename with org ID and timestamp
             organization_id
         )
         
         print(f"Celery task queued: {task.id}")
         
-        # Return task info and temporary URL structure
+        # Return task info and predicted path (frontend will construct full URL)
+        # The Celery task will save the file with this naming pattern
+        predicted_path = f"/pictures/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.webp')}"
         result = {
             "task_id": task.id,
             "status": "processing",
             "temp_filename": unique_filename,
-            "organization_id": organization_id
+            "organization_id": organization_id,
+            "path": predicted_path
         }
         
+        print(f"Predicted path: {predicted_path}")
         print(f"Upload queued for processing: {result}")
         print("=== END PHOTO UPLOAD ===")
         return result

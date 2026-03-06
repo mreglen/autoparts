@@ -72,6 +72,21 @@ class ProductCreate(ProductBase):
     vehicle_ids: Optional[List[int]] = None
     photos: Optional[List[str]] = None
 
+
+class ProductUpdate(BaseModel):
+    """Schema for updating an existing product - all fields are optional"""
+    article: Optional[str] = None
+    name: Optional[str] = None
+    brand: Optional[str] = None
+    price: Optional[float] = None
+    internal_code: Optional[str] = None
+    description: Optional[str] = None
+    quantity: Optional[int] = None
+    is_new: Optional[bool] = None
+    storage_location_id: Optional[int] = None
+    vehicle_ids: Optional[List[int]] = None
+    photos: Optional[List[str]] = None
+
 class ProductQuantityUpdate(BaseModel):
     quantity: int
 

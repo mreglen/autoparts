@@ -1,23 +1,22 @@
 import axios from 'axios';
 
 
+
+// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000/api';
+// const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'http://127.0.0.1:8000';
+
 const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://svoygarage.ru/server/api';
 const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygarage.ru';
 
-// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://VM2512296768.vds.ru/api';
-// const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://VM2512296768.vds.ru';
 
-// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://195.24.65.251/api';
-// const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://195.24.65.251';
+console.log('REACT_APP_API_BASE_URL', process.env.REACT_APP_API_BASE_URL);
+console.log('REACT_APP_BACKEND_BASE_URL', process.env.REACT_APP_BACKEND_BASE_URL);
+console.log('API_BASE:', API_BASE);
+console.log('BACKEND_BASE:', BACKEND_BASE);
 
-// const API_BASE = 'http://127.0.0.1:8000/api';
-// const BACKEND_BASE = 'http://127.0.0.1:8000';
 
-// Export for use in components
 export { API_BASE, BACKEND_BASE };
 
-// const API_BASE = 'http://localhost:3000/api';
-// const BACKEND_BASE = 'http://localhost:3000';
 
 export const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -28,23 +27,23 @@ export const getAuthHeaders = () => {
 export const normalizeImageUrl = (imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
 
-    // If already has backend base or is a blob/data URL, return as is
+  
     if (imageUrl.startsWith(BACKEND_BASE) ||
         imageUrl.startsWith('blob:') ||
         imageUrl.startsWith('data:')) {
         return imageUrl;
     }
 
-    // If it's a relative path starting with /, prepend BACKEND_BASE
+   
     if (imageUrl.startsWith('/')) {
         return `${BACKEND_BASE}${imageUrl}`;
     }
 
-    // For other absolute URLs, return as is
+
     return imageUrl;
 };
 
-// Generic fetch wrapper for API calls
+
 export const apiRequest = async (endpoint, options = {}) => {
     const url = `${API_BASE}${endpoint}`;
     const defaultOptions = {
@@ -63,7 +62,7 @@ export const apiRequest = async (endpoint, options = {}) => {
         throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
     }
 
-    // Handle 204 No Content responses
+
     if (response.status === 204) {
         return { status: 204, message: 'No Content' };
     }
@@ -71,7 +70,7 @@ export const apiRequest = async (endpoint, options = {}) => {
     return response.json();
 };
 
-// Unauthenticated API request function
+
 export const apiRequestUnauth = async (endpoint, options = {}) => {
     const url = `${API_BASE}${endpoint}`;
     const defaultOptions = {
@@ -89,7 +88,7 @@ export const apiRequestUnauth = async (endpoint, options = {}) => {
         throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
     }
 
-    // Handle 204 No Content responses
+
     if (response.status === 204) {
         return { status: 204, message: 'No Content' };
     }
@@ -97,12 +96,12 @@ export const apiRequestUnauth = async (endpoint, options = {}) => {
     return response.json();
 };
 
-// For FormData requests (like file uploads)
+
 export const apiRequestFormData = async (endpoint, formData, options = {}) => {
     const url = `${API_BASE}${endpoint}`;
 
     const defaultOptions = {
-        method: 'POST', // Explicitly set POST method for uploads
+        method: 'POST',
         headers: {
             ...getAuthHeaders(),
             ...options.headers
@@ -123,7 +122,7 @@ export const apiRequestFormData = async (endpoint, formData, options = {}) => {
     return response.json();
 };
 
-// Axios instance for backward compatibility (if needed)
+
 export const apiAxios = axios.create({
     baseURL: API_BASE,
     headers: {
@@ -131,7 +130,7 @@ export const apiAxios = axios.create({
     },
 });
 
-// Add auth token to axios requests
+
 apiAxios.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
     if (token) {
@@ -140,7 +139,7 @@ apiAxios.interceptors.request.use((config) => {
     return config;
 });
 
-// Axios instance without authentication
+
 export const apiAxiosUnauth = axios.create({
     baseURL: API_BASE,
     headers: {

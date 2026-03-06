@@ -43,7 +43,7 @@ class ReturnItem(BaseModel):
     storageLocationId: int
 
     class Config:
-        allow_population_by_field_name = True
+        validate_by_name = True
         # Разрешаем дополнительные поля, которые могут прийти
         extra = "ignore"
         # Преобразовываем поля из snake_case в camelCase и наоборот

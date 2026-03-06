@@ -6,14 +6,69 @@ from app.db.database import get_db
 from datetime import datetime
 from zeep import Client
 from zeep.helpers import serialize_object
+from zeep.transports import Transport
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/rossko", tags=["ROSSKO API"])
 settings = Settings()
 
-client_search = Client(settings.GET_SEARCH)
-client_details = Client(settings.GET_CHECK_OUT_DETAILS)
-client_checkout = Client(settings.GET_CHECK_OUT)
-client_orders = Client(settings.GET_ORDERS)
+# Lazy initialization - create clients only when needed
+_client_search = None
+_client_details = None
+_client_checkout = None
+_client_orders = None
+
+def get_search_client():
+    global _client_search
+    if _client_search is None:
+        try:
+            transport = Transport()
+            # Remove ?wsdl from URL if present, zeep adds it automatically
+            wsdl_url = settings.GET_SEARCH.replace('?wsdl', '').rstrip('?')
+            logger.info(f"Creating search client with URL: {wsdl_url}?wsdl")
+            _client_search = Client(wsdl_url + '?wsdl', transport=transport)
+        except Exception as e:
+            logger.error(f"Failed to create search client: {e}")
+            raise
+    return _client_search
+
+def get_details_client():
+    global _client_details
+    if _client_details is None:
+        try:
+            transport = Transport()
+            wsdl_url = settings.GET_CHECK_OUT_DETAILS.replace('?wsdl', '').rstrip('?')
+            _client_details = Client(wsdl_url + '?wsdl', transport=transport)
+        except Exception as e:
+            logger.error(f"Failed to create details client: {e}")
+            raise
+    return _client_details
+
+def get_checkout_client():
+    global _client_checkout
+    if _client_checkout is None:
+        try:
+            transport = Transport()
+            wsdl_url = settings.GET_CHECK_OUT.replace('?wsdl', '').rstrip('?')
+            _client_checkout = Client(wsdl_url + '?wsdl', transport=transport)
+        except Exception as e:
+            logger.error(f"Failed to create checkout client: {e}")
+            raise
+    return _client_checkout
+
+def get_orders_client():
+    global _client_orders
+    if _client_orders is None:
+        try:
+            transport = Transport()
+            wsdl_url = settings.GET_ORDERS.replace('?wsdl', '').rstrip('?')
+            _client_orders = Client(wsdl_url + '?wsdl', transport=transport)
+        except Exception as e:
+            logger.error(f"Failed to create orders client: {e}")
+            raise
+    return _client_orders
 
 
 rossko_delivery_id = "000000001"
@@ -51,7 +106,7 @@ async def rossko_checkout(checkout_data):
 
         params = clean(params)
 
-        result = client_checkout.service.GetCheckout(**params)
+        result = get_checkout_client().service.GetCheckout(**params)
         serialized_result = serialize_object(result)
         return serialized_result
 
@@ -69,7 +124,7 @@ async def rossko_search(request: SearchRequest, db: Session = Depends(get_db)):
         if request.address_id is not None:
             params["address_id"] = request.address_id
 
-        result = client_search.service.GetSearch(**params)
+        result = get_search_client().service.GetSearch(**params)
 
         serialized_result = serialize_object(result)
 
@@ -103,7 +158,7 @@ async def get_details():
             "KEY2": settings.ROSSKO_KEY2,
         }
 
-        result = client_details.service.GetCheckoutDetails(**params)
+        result = get_details_client().service.GetCheckoutDetails(**params)
         return result
 
     except Exception as error:
@@ -159,7 +214,7 @@ async def get_checkout(request: CheckoutRequest):
 
         params = clean(params)
 
-        result = client_checkout.service.GetCheckout(**params)
+        result = get_checkout_client().service.GetCheckout(**params)
 
         return serialize_object(result)
 
@@ -204,7 +259,7 @@ async def get_orders(request: GetOrdersRequest):
 
         params = clean(params)
 
-        result = client_orders.service.GetOrders(**params)
+        result = get_orders_client().service.GetOrders(**params)
 
         return serialize_object(result)
 
