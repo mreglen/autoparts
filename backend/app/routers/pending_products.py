@@ -39,6 +39,7 @@ def create_pending_product(
     
     # Преобразуем списки в JSON строки
     photos_json = json.dumps(product_data.photos) if product_data.photos else None
+    videos_json = json.dumps(product_data.videos) if product_data.videos else None
     vehicle_ids_json = json.dumps(product_data.vehicle_ids) if product_data.vehicle_ids else None
     
     # Создаем запись
@@ -52,6 +53,7 @@ def create_pending_product(
         quantity=product_data.quantity,
         storage_location_id=product_data.storage_location_id,
         photos=photos_json,
+        videos=videos_json,
         vehicle_ids=vehicle_ids_json,
         internal_code=internal_code,
         organization_id=current_user.organization_id,
@@ -71,6 +73,14 @@ def create_pending_product(
             product_dict['photos'] = []
     else:
         product_dict['photos'] = []
+    
+    if product_dict.get('videos'):
+        try:
+            product_dict['videos'] = json.loads(product_dict['videos'])
+        except:
+            product_dict['videos'] = []
+    else:
+        product_dict['videos'] = []
         
     if product_dict.get('vehicle_ids'):
         try:
@@ -128,6 +138,14 @@ def get_my_pending_products(
                 product_dict['photos'] = []
         else:
             product_dict['photos'] = []
+        
+        if product_dict.get('videos'):
+            try:
+                product_dict['videos'] = json.loads(product_dict['videos'])
+            except:
+                product_dict['videos'] = []
+        else:
+            product_dict['videos'] = []
             
         if product_dict.get('vehicle_ids'):
             try:
@@ -174,6 +192,14 @@ def get_pending_product(
             product_dict['photos'] = []
     else:
         product_dict['photos'] = []
+    
+    if product_dict.get('videos'):
+        try:
+            product_dict['videos'] = json.loads(product_dict['videos'])
+        except:
+            product_dict['videos'] = []
+    else:
+        product_dict['videos'] = []
         
     if product_dict.get('vehicle_ids'):
         try:
@@ -217,6 +243,8 @@ def update_pending_product(
     # Преобразуем списки в JSON строки если они были изменены
     if 'photos' in update_data:
         update_data['photos'] = json.dumps(update_data['photos']) if update_data['photos'] else None
+    if 'videos' in update_data:
+        update_data['videos'] = json.dumps(update_data['videos']) if update_data['videos'] else None
     if 'vehicle_ids' in update_data:
         update_data['vehicle_ids'] = json.dumps(update_data['vehicle_ids']) if update_data['vehicle_ids'] else None
     

@@ -176,11 +176,13 @@ const UsedPartsList = () => {
                   sellerReliable: true, // Default value
                   sellerVerified: true, // Default value
                   photos: part.photos || [],
+                  videos: part.videos || [], // Add videos from backend
                   image: (part.photos && part.photos.length > 0) ? (part.photos[0].full_url || part.photos[0]) : '/api/placeholder/200/200',
                   sellerLogo: organization?.name?.substring(0, 4).toUpperCase() || 'SELL',
                   phone: organization?.phone || part.organization?.phone || '+7 (999) 123-45-67' // Use phone from organization if available
                 }}
                 isTestOrganization={true}
+                hideConditionAndQuantity={true}
               />
             ))}
           </div>
@@ -218,11 +220,13 @@ const UsedPartsList = () => {
                   sellerReliable: true, // Default value
                   sellerVerified: true, // Default value
                   photos: part.photos || [],
+                  videos: part.videos || [], // Add videos from backend
                   image: (part.photos && part.photos.length > 0) ? (part.photos[0].full_url || part.photos[0]) : '/api/placeholder/200/200',
                   sellerLogo: organization?.name?.substring(0, 4).toUpperCase() || 'SELL',
                   phone: organization?.phone || part.organization?.phone || '+7 (999) 123-45-67' // Use phone from organization if available
                 }}
                 isTestOrganization={true}
+                hideConditionAndQuantity={true}
               />
             ))}
           </div>

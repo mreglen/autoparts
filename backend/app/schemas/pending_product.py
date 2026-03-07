@@ -13,6 +13,7 @@ class PendingProductBase(BaseModel):
     quantity: Optional[int] = None
     storage_location_id: Optional[int] = None
     photos: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
     vehicle_ids: Optional[List[int]] = None
     
     @model_validator(mode='after')
@@ -50,6 +51,7 @@ class PendingProductUpdate(BaseModel):
     quantity: Optional[int] = None
     storage_location_id: Optional[int] = None
     photos: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
     vehicle_ids: Optional[List[int]] = None
 
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { updateProduct, uploadPhotos, clearProductError, resetProducts, fetchProduct, deleteProductPhotos } from '../../../redux/slices/ProductSlice';
+import { updateProduct, uploadPhotos, uploadMedia, clearProductError, resetProducts, fetchProduct, deleteProductPhotos } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { fetchStorageCells, fetchProductStorageCells, linkProductToCell, deleteProductCellLink } from '../../../redux/slices/StorageCellsSlice';
 import VehicleModal from '../AddPart/VehicleModal';
@@ -66,9 +66,12 @@ const EditPart = () => {
   });
 
   const [photos, setPhotos] = useState([]);
+  const [videos, setVideos] = useState([]);
   const [existingPhotos, setExistingPhotos] = useState([]);
+  const [existingVideos, setExistingVideos] = useState([]);
   const [productLoaded, setProductLoaded] = useState(false);
   const [selectedPhotosForRemoval, setSelectedPhotosForRemoval] = useState([]);
+  const [selectedVideosForRemoval, setSelectedVideosForRemoval] = useState([]);
 
   // Загрузка данных продукта при получении
   useEffect(() => {
@@ -90,6 +93,13 @@ const EditPart = () => {
       );
 
       setExistingPhotos(photos);
+      
+      // Загружаем существующие видео
+      const videos = (currentProduct.videos || []).filter(video =>
+        video && (video.video_url || typeof video === 'string')
+      );
+      setExistingVideos(videos);
+      
       setProductLoaded(true);
 
       // Установка выбранного автомобиля
@@ -164,8 +174,17 @@ const EditPart = () => {
     setPhotos((prev) => [...prev, ...files]);
   };
 
+  const handleVideoAdd = (e) => {
+    const files = Array.from(e.target.files);
+    setVideos((prev) => [...prev, ...files]);
+  };
+
   const handlePhotoRemove = (index) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleVideoRemove = (index) => {
+    setVideos((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleRemoveSelectedPhotos = async () => {
@@ -260,12 +279,24 @@ const EditPart = () => {
     }
 
     let photoUrls = [];
+    let videoUrls = [];
+    
+    // Upload new photos
     if (photos.length > 0) {
       const uploadResult = await dispatch(uploadPhotos(photos));
       if (uploadPhotos.rejected.match(uploadResult)) {
         return;
       }
       photoUrls = uploadResult.payload;
+    }
+    
+    // Upload new videos
+    if (videos.length > 0) {
+      const uploadResult = await dispatch(uploadMedia(videos));
+      if (uploadMedia.rejected.match(uploadResult)) {
+        return;
+      }
+      videoUrls = uploadResult.payload;
     }
 
     // Комбинируем существующие и новые фото
@@ -283,6 +314,22 @@ const EditPart = () => {
         .filter(url => url !== null),
       ...photoUrls
     ];
+    
+    // Комбинируем существующие и новые видео
+    const allVideoUrls = [
+      ...existingVideos
+        .filter(video => video) // Фильтруем null/undefined
+        .map(video => {
+          // Если video - строка, возвращаем как есть
+          if (typeof video === 'string') return video;
+          // Если video - объект с video_url, возвращаем video_url
+          if (video.video_url) return video.video_url;
+          // Иначе пропускаем
+          return null;
+        })
+        .filter(url => url !== null),
+      ...videoUrls
+    ];
 
     const productData = {
       article: formData.article,
@@ -296,6 +343,7 @@ const EditPart = () => {
       internal_code: currentProduct?.internal_code || null,
       vehicle_ids: selectedVehicle ? [selectedVehicle.id] : [],
       photos: allPhotoUrls.length > 0 ? allPhotoUrls : null,
+      videos: allVideoUrls.length > 0 ? allVideoUrls : null,
     };
 
     console.log('=== UPDATE PRODUCT REQUEST ===');
@@ -436,7 +484,7 @@ const EditPart = () => {
 
         {/* Фото */}
         <div>
-          <label className="block text-sm font-medium">Фотографии</label>
+          <label className="block text-sm font-medium">Фотографии и видео *</label>
 
           {/* Существующие фото */}
           {existingPhotos.length > 0 && (
@@ -467,16 +515,32 @@ const EditPart = () => {
           <input
             type="file"
             multiple
-            accept="image/*,image/jfif,image/jfif-tbn"
-            onChange={handlePhotoAdd}
+            accept="image/*,video/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2,.mp4,.avi,.mov,.wmv,.flv,.mkv,.webm,.m4v,.3gp,.mpeg,.mpg"
+            onChange={(e) => {
+              const files = Array.from(e.target.files);
+              const photosToAdd = [];
+              const videosToAdd = [];
+              
+              files.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                  photosToAdd.push(file);
+                } else if (file.type.startsWith('video/')) {
+                  videosToAdd.push(file);
+                }
+              });
+              
+              setPhotos(prev => [...prev, ...photosToAdd]);
+              setVideos(prev => [...prev, ...videosToAdd]);
+            }}
             className="mt-1"
           />
+          
+          {/* Новые фото */}
           {photos.length > 0 && (
             <div className="mt-2">
               <p className="text-sm text-gray-600 mb-2">Новые фотографии:</p>
               <div className="flex flex-wrap gap-2">
                 {photos.map((file, idx) => {
-                  // Handle both File objects (before upload) and URL strings (after upload)
                   let photoSrc;
                   if (file instanceof File || file instanceof Blob) {
                     photoSrc = URL.createObjectURL(file);
@@ -487,7 +551,7 @@ const EditPart = () => {
                   }
                   
                   return (
-                    <div key={idx} className="relative">
+                    <div key={`photo-${idx}`} className="relative">
                       <img
                         src={photoSrc}
                         alt={`new-${idx}`}
@@ -503,6 +567,31 @@ const EditPart = () => {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+          
+          {/* Новые видео */}
+          {videos.length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-600 mb-2">Новые видео:</p>
+              <div className="flex flex-wrap gap-2">
+                {videos.map((file, idx) => (
+                  <div key={`video-${idx}`} className="relative">
+                    <video
+                      src={URL.createObjectURL(file)}
+                      className="w-16 h-16 object-cover rounded border"
+                      controls={false}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleVideoRemove(idx)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                    >
+                      <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}

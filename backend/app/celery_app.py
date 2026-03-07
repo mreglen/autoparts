@@ -9,7 +9,7 @@ celery_app = Celery(
     'autoparts',
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=['app.tasks.photo_tasks']
+    include=['app.tasks.photo_tasks', 'app.tasks.video_tasks']
 )
 
 # Configure Celery with more explicit settings

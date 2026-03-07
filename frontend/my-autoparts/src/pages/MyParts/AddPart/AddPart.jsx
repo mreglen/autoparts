@@ -107,75 +107,9 @@ const AddPart = () => {
     setPhotos((prev) => [...prev, ...files]);
   };
 
-  const compressVideo = (file) => {
-    return new Promise((resolve) => {
-      const video = document.createElement('video');
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      // Store original file in case compression fails
-      const originalFile = file;
-      
-      video.onloadedmetadata = () => {
-        // Set canvas dimensions to half the original for compression
-        canvas.width = video.videoWidth / 2;
-        canvas.height = video.videoHeight / 2;
-        
-        // Create a temporary video element to hold the compressed version
-        const tempVideo = document.createElement('video');
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-        
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = canvas.height;
-        
-        // Draw the original video to the canvas frame by frame
-        video.currentTime = 0;
-        
-        video.oncanplay = () => {
-          // Draw the video frame to canvas
-          tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
-          
-          // Convert the canvas to a video blob using a workaround
-          // Since we can't directly convert video to compressed video in browser, 
-          // we'll just return the original file with a note that browser-based 
-          // video compression is complex and would require a library
-          console.warn('Full video compression requires specialized libraries. Returning original file.');
-          resolve(originalFile);
-        };
-        
-        video.play().catch(() => {
-          // If play fails, return original file
-          resolve(originalFile);
-        });
-      };
-      
-      video.onerror = () => {
-        // If there's an error loading the video, return original file
-        resolve(originalFile);
-      };
-      
-      video.src = URL.createObjectURL(file);
-    });
-  };
-  
-  const handleVideoAdd = async (e) => {
+  const handleVideoAdd = (e) => {
     const files = Array.from(e.target.files);
-    
-    // Compress video files before adding
-    const processedFiles = [];
-    for (const file of files) {
-      if (file.type.startsWith('video/')) {
-        // Show a message that compression is happening
-        console.log('Processing video...');
-        const processedFile = await compressVideo(file);
-        processedFiles.push(processedFile);
-      } else {
-        processedFiles.push(file);
-      }
-    }
-    
-    setVideos((prev) => [...prev, ...processedFiles]);
+    setVideos((prev) => [...prev, ...files]);
   };
 
   const handlePhotoRemove = (index) => {
@@ -277,27 +211,46 @@ const AddPart = () => {
       return;
     }
 
-    let mediaUrls = [];
+    let photoUrls = [];
+    let videoUrls = [];
 
-    // Combine photos and videos into one array for upload
-    const allMedia = [...photos, ...videos];
-    
-    if (allMedia.length > 0) {
+    // Upload photos and videos separately
+    if (photos.length > 0) {
       try {
-        const uploadAction = await dispatch(uploadMedia(allMedia));
+        const uploadAction = await dispatch(uploadPhotos(photos));
 
-        if (uploadMedia.rejected.match(uploadAction)) {
-          alert(`Ошибка загрузки медиа: ${uploadAction.payload}`);
+        if (uploadPhotos.rejected.match(uploadAction)) {
+          alert(`Ошибка загрузки фото: ${uploadAction.payload}`);
           return;
         }
-        mediaUrls = uploadAction.payload;
-        if (!mediaUrls || !Array.isArray(mediaUrls)) {
-          alert('Ошибка: неправильный формат URL медиа');
+        photoUrls = uploadAction.payload;
+        if (!photoUrls || !Array.isArray(photoUrls)) {
+          alert('Ошибка: неправильный формат URL фото');
           return;
         }
       } catch (error) {
-        console.error('Unexpected error during media upload:', error);
-        alert(`Неожиданная ошибка при загрузке медиа: ${error.message}`);
+        console.error('Unexpected error during photo upload:', error);
+        alert(`Неожиданная ошибка при загрузке фото: ${error.message}`);
+        return;
+      }
+    }
+    
+    if (videos.length > 0) {
+      try {
+        const uploadAction = await dispatch(uploadMedia(videos));
+
+        if (uploadMedia.rejected.match(uploadAction)) {
+          alert(`Ошибка загрузки видео: ${uploadAction.payload}`);
+          return;
+        }
+        videoUrls = uploadAction.payload;
+        if (!videoUrls || !Array.isArray(videoUrls)) {
+          alert('Ошибка: неправильный формат URL видео');
+          return;
+        }
+      } catch (error) {
+        console.error('Unexpected error during video upload:', error);
+        alert(`Неожиданная ошибка при загрузке видео: ${error.message}`);
         return;
       }
     }
@@ -312,7 +265,8 @@ const AddPart = () => {
       is_new: formData.condition === 'новый',
       storage_location_id: parseInt(formData.storage_location_id, 10) || 1,
       vehicle_ids: selectedVehicle ? [selectedVehicle.id] : [],
-      photos: mediaUrls.length > 0 ? mediaUrls : null,
+      photos: photoUrls.length > 0 ? photoUrls : null,
+      videos: videoUrls.length > 0 ? videoUrls : null,
     };
 
     try {
@@ -423,7 +377,7 @@ const AddPart = () => {
         
         {/* Медиафайлы (фото и видео) */}
         <div>
-          <label className="block text-sm font-medium">Фотографии и видео</label>
+          <label className="block text-sm font-medium">Фотографии и видео *</label>
           <input
             type="file"
             multiple

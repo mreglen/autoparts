@@ -141,9 +141,13 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
       <tr className="bg-gray-50">
         <td colSpan="9" className="px-6 py-4 border-t">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Фото */}
+            {/* Фото и видео */}
             <div>
-              <PhotoThumbnail photos={part.photos || []} onImageClick={onImageClick} />
+              <PhotoThumbnail 
+                photos={part.photos || []} 
+                videos={part.videos || []}
+                onImageClick={onImageClick} 
+              />
             </div>
 
             {/* Описание и авто */}
@@ -928,9 +932,13 @@ function MyParts() {
                 {expandedPartId === part.id && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="grid grid-cols-1 gap-4">
-                      {/* Фото */}
+                      {/* Фото и видео */}
                       <div>
-                        <PhotoThumbnail photos={part.photos || []} onImageClick={handleImageClick} />
+                        <PhotoThumbnail 
+                          photos={part.photos || []} 
+                          videos={part.videos || []}
+                          onImageClick={handleImageClick} 
+                        />
                       </div>
 
                       {/* Описание и информация */}

@@ -1,17 +1,18 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
 from app.db.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
 from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, orders
 from fastapi.requests import Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from app.db.database import get_db
 from app.core.auth import cleanup_expired_sessions
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -170,6 +171,54 @@ if pictures_dir.exists():
     app.mount("/pictures", StaticFiles(directory=str(pictures_dir)), name="pictures")
 else:
     logger.error(f"Pictures directory not found: {pictures_dir}")
+
+# Mount videos directory for direct access
+videos_dir = Path(__file__).parent.parent / "uploads" / "videos"
+if videos_dir.exists():
+    app.mount("/videos", StaticFiles(directory=str(videos_dir)), name="videos")
+else:
+    logger.error(f"Videos directory not found: {videos_dir}")
+
+
+# Endpoint to serve media files with CORS headers
+@app.get("/media/{path:path}")
+async def get_media_file(path: str):
+    """
+    Serve media files (photos/videos) with CORS headers.
+    This endpoint allows frontend to access media from different origin.
+    """
+    # Determine file type and appropriate directory
+    if path.startswith("pictures/"):
+        base_dir = Path(__file__).parent.parent / "uploads" / "pictures"
+        relative_path = path.replace("pictures/", "")
+    elif path.startswith("videos/"):
+        base_dir = Path(__file__).parent.parent / "uploads" / "videos"
+        relative_path = path.replace("videos/", "")
+    else:
+        return FileResponse(status_code=404, content={"detail": "File not found"})
+    
+    # Construct full file path
+    file_path = base_dir / relative_path
+    
+    # Check if file exists
+    if not file_path.exists():
+        return FileResponse(status_code=404, content={"detail": "File not found"})
+    
+    # Determine media type
+    media_type = "image/webp"
+    if path.endswith(".mp4") or path.endswith(".avi") or path.endswith(".mov"):
+        media_type = "video/mp4"
+    elif path.endswith(".jpg") or path.endswith(".jpeg"):
+        media_type = "image/jpeg"
+    elif path.endswith(".png"):
+        media_type = "image/png"
+    
+    # Return file with CORS headers
+    response = FileResponse(str(file_path), media_type=media_type)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 
 @app.get("/")

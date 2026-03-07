@@ -22,6 +22,7 @@ class Product(ProductBase):
     created_by: int
     creator_name: Optional[str] = None 
     photos: List["ProductPhoto"] = [] 
+    videos: List["ProductVideo"] = []
     compatible_vehicles: List["Vehicle"] = [] 
     storage_location: Optional[StorageLocation] = None
     organization: Optional[Organization] = None
@@ -33,6 +34,23 @@ class Product(ProductBase):
 class ProductPhoto(BaseModel):
     id: int
     photo_url: str
+    full_url: str
+    organization_id: Optional[str] = None
+    processing_status: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+    @classmethod
+    def from_orm(cls, obj):
+        data = super().from_orm(obj)
+        data.full_url = obj.full_url  
+        return data
+
+
+class ProductVideo(BaseModel):
+    id: int
+    video_url: str
     full_url: str
     organization_id: Optional[str] = None
     processing_status: Optional[str] = None
@@ -71,6 +89,7 @@ class ProductCreate(ProductBase):
     internal_code: Optional[str] = None  # Теперь опционально, будет генерироваться автоматически
     vehicle_ids: Optional[List[int]] = None
     photos: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
 
 
 class ProductUpdate(BaseModel):
@@ -86,9 +105,14 @@ class ProductUpdate(BaseModel):
     storage_location_id: Optional[int] = None
     vehicle_ids: Optional[List[int]] = None
     photos: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
 
 class ProductQuantityUpdate(BaseModel):
     quantity: int
 
 class DeletePhotosRequest(BaseModel):
     photo_ids: List[int]  
+
+
+class DeleteVideosRequest(BaseModel):
+    video_ids: List[int]  

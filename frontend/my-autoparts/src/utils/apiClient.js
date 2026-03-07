@@ -2,11 +2,11 @@ import axios from 'axios';
 
 
 
-// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000/api';
-// const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'http://127.0.0.1:8000';
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000/api';
+const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'http://127.0.0.1:8000';
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://svoygarage.ru/server/api';
-const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygarage.ru/server';
+// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://svoygarage.ru/server/api';
+// const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygarage.ru/server';
 
 
 console.log('REACT_APP_API_BASE_URL', process.env.REACT_APP_API_BASE_URL);
@@ -35,6 +35,19 @@ export const normalizeImageUrl = (imageUrl) => {
     }
 
    
+    // Replace /pictures/ and /videos/ with /media/ to use CORS-enabled endpoint
+    if (imageUrl.startsWith('/pictures/') || imageUrl.startsWith('/videos/')) {
+        const path = imageUrl.startsWith('/pictures/') 
+            ? imageUrl.replace('/pictures/', '') 
+            : imageUrl.replace('/videos/', '');
+        
+        // Determine original type
+        const type = imageUrl.startsWith('/pictures/') ? 'pictures' : 'videos';
+        
+        // Use /media/ endpoint for CORS support
+        return `${BACKEND_BASE}/media/${type}/${path}`;
+    }
+    
     if (imageUrl.startsWith('/')) {
         return `${BACKEND_BASE}${imageUrl}`;
     }

@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart } from '../../redux/slices/CartSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
 
-const ProductCard = ({ part, isTestOrganization = false }) => {
+const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantity = false }) => {
   // Function to check if the file is a video
   const isVideo = (item) => {
     if (typeof item === 'string') {
@@ -55,12 +55,29 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
   const dispatch = useDispatch();
   const cart = useSelector(selectCart);
   
-  // Update current image index when product photos change
+  // Combine photos and videos into a single media array
+  const allMedia = React.useMemo(() => {
+    const photos = (part.photos || []).map(photo => ({
+      type: 'photo',
+      url: typeof photo === 'string' ? photo : (photo.full_url || photo.photo_url || photo.url || ''),
+      original: photo
+    }));
+    
+    const videos = (part.videos || []).map(video => ({
+      type: 'video',
+      url: typeof video === 'string' ? video : (video.full_url || video.video_url || video.url || ''),
+      original: video
+    }));
+    
+    return [...photos, ...videos];
+  }, [part.photos, part.videos]);
+  
+  // Update current image index when product media changes
   useEffect(() => {
-    if (part.photos && Array.isArray(part.photos) && currentImageIndex >= part.photos.length) {
-      setCurrentImageIndex(Math.max(0, part.photos.length - 1));
+    if (allMedia.length > 0 && currentImageIndex >= allMedia.length) {
+      setCurrentImageIndex(Math.max(0, allMedia.length - 1));
     }
-  }, [part.photos, currentImageIndex]);
+  }, [allMedia, currentImageIndex]);
 
   const product = part;
 
@@ -134,21 +151,15 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
             }
           }}
         >
-            {product.image || (product.photos && Array.isArray(product.photos) && product.photos.length > 0) ? (
+            {product.image || (allMedia && allMedia.length > 0) ? (
             (() => {
               // Determine the current media item to display
               const currentMedia = product.image || 
-                (product.photos && Array.isArray(product.photos) && product.photos.length > 0) ? 
+                (allMedia && allMedia.length > 0) ? 
                   (() => {
-                    const currentPhotoIndex = Math.min(currentImageIndex, product.photos.length - 1);
-                    const currentPhoto = product.photos[currentPhotoIndex];
-                    
-                    if (typeof currentPhoto === 'string') {
-                      return currentPhoto;
-                    } else if (typeof currentPhoto === 'object' && currentPhoto !== null) {
-                      return currentPhoto.full_url || currentPhoto.photo_url || currentPhoto.url || String(currentPhoto);
-                    }
-                    return '';
+                    const currentIndex = Math.min(currentImageIndex, allMedia.length - 1);
+                    const currentMediaItem = allMedia[currentIndex];
+                    return currentMediaItem ? currentMediaItem.url : '';
                   })() : 
                 product.image || 
                 null;
@@ -156,83 +167,93 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
               const normalizedMediaUrl = normalizeImageUrl(currentMedia);
               
               // Check if the current media is a video
-              const currentMediaIsVideo = isVideo(currentMedia);
+              const currentMediaItem = allMedia && allMedia.length > 0 ? allMedia[Math.min(currentImageIndex, allMedia.length - 1)] : null;
+              const currentMediaIsVideo = currentMediaItem && currentMediaItem.type === 'video';
               
-              if (currentMediaIsVideo) {
-                return (
-                  <div className="relative w-full h-full flex items-center justify-center">
-                    <video
-                      src={normalizedMediaUrl}
-                      className="max-h-full max-w-full object-contain"
-                      controls={false}
-                      muted
-                      playsInline
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
-                      <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+              return (
+                <div className="relative w-full h-full">
+                  {/* Video badge overlay */}
+                  {currentMediaIsVideo && (
+                    <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded-md text-xs font-medium z-10 flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                       </svg>
+                      Видео
                     </div>
-                  </div>
-                );
-              } else {
-                return (
-                  <img 
-                    key={`product-media-${currentImageIndex}`}
-                    src={normalizedMediaUrl}
-                    alt={product.title} 
-                    className="max-h-full max-w-full object-contain transition-opacity duration-300"
-                    onMouseMove={(e) => {
-                      if (product.photos && Array.isArray(product.photos) && product.photos.length > 1) {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const x = e.clientX - rect.left;
-                        const width = rect.width;
-                        
-                        // Calculate which image index based on horizontal position
-                        const percentage = x / width;
-                        
-                        // Adjust percentage to map to image indices properly
-                        // Adding a small buffer to prevent rapid switching at boundaries
-                        const calculatedIndex = Math.floor(percentage * product.photos.length);
-                        
-                        // Ensure index is within bounds
-                        const newIndex = Math.max(0, Math.min(calculatedIndex, product.photos.length - 1));
-                        
-                        // Only update if the index has changed
-                        if (newIndex !== currentImageIndex) {
-                          setCurrentImageIndex(newIndex);
-                        }
-                      }
-                    }}
-                    onTouchStart={(e) => {
-                      setTouchStartX(e.targetTouches[0].clientX);
-                    }}
-                    onTouchMove={(e) => {
-                      setTouchEndX(e.targetTouches[0].clientX);
-                    }}
-                    onTouchEnd={() => {
-                      if (product.photos && Array.isArray(product.photos) && product.photos.length > 1) {
-                        const swipeThreshold = 50; // Minimum distance to trigger swipe
-                        const diffX = touchStartX - touchEndX;
-                        
-                        if (Math.abs(diffX) > swipeThreshold) {
-                          if (diffX > 0) {
-                            // Swipe left - go to next image
-                            setCurrentImageIndex(prev => 
-                              prev < product.photos.length - 1 ? prev + 1 : 0
-                            );
-                          } else {
-                            // Swipe right - go to previous image
-                            setCurrentImageIndex(prev => 
-                              prev > 0 ? prev - 1 : product.photos.length - 1
-                            );
+                  )}
+                  
+                  {currentMediaIsVideo ? (
+                    <>
+                      <video
+                        src={normalizedMediaUrl}
+                        className="max-h-full max-w-full object-contain"
+                        controls={false}
+                        muted
+                        playsInline
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                        <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                        </svg>
+                      </div>
+                    </>
+                  ) : (
+                    <img 
+                      key={`product-media-${currentImageIndex}`}
+                      src={normalizedMediaUrl}
+                      alt={product.title} 
+                      className="max-h-full max-w-full object-contain transition-opacity duration-300"
+                      onMouseMove={(e) => {
+                        if (allMedia && allMedia.length > 1) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const x = e.clientX - rect.left;
+                          const width = rect.width;
+                          
+                          // Calculate which index based on horizontal position
+                          const percentage = x / width;
+                          
+                          // Adjust percentage to map to media indices properly
+                          const calculatedIndex = Math.floor(percentage * allMedia.length);
+                          
+                          // Ensure index is within bounds
+                          const newIndex = Math.max(0, Math.min(calculatedIndex, allMedia.length - 1));
+                          
+                          // Only update if the index has changed
+                          if (newIndex !== currentImageIndex) {
+                            setCurrentImageIndex(newIndex);
                           }
                         }
-                      }
-                    }}
-                  />
-                );
-              }
+                      }}
+                      onTouchStart={(e) => {
+                        setTouchStartX(e.targetTouches[0].clientX);
+                      }}
+                      onTouchMove={(e) => {
+                        setTouchEndX(e.targetTouches[0].clientX);
+                      }}
+                      onTouchEnd={() => {
+                        if (allMedia && allMedia.length > 1) {
+                          const swipeThreshold = 50; // Minimum distance to trigger swipe
+                          const diffX = touchStartX - touchEndX;
+                          
+                          if (Math.abs(diffX) > swipeThreshold) {
+                            if (diffX > 0) {
+                              // Swipe left - go to next media
+                              setCurrentImageIndex(prev => 
+                                prev < allMedia.length - 1 ? prev + 1 : 0
+                              );
+                            } else {
+                              // Swipe right - go to previous media
+                              setCurrentImageIndex(prev => 
+                                prev > 0 ? prev - 1 : allMedia.length - 1
+                              );
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  )}
+                </div>
+              );
             })()
           ) : (
             <div className="text-gray-400">
@@ -243,13 +264,22 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
           )}
           
           {/* Thumbnail indicators for multiple media */}
-          {product.photos && Array.isArray(product.photos) && product.photos.length > 1 && (
+          {allMedia && allMedia.length > 1 && (
             <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1 bg-black bg-opacity-50 rounded-full p-1">
-              {product.photos.map((_, index) => (
+              {allMedia.map((media, index) => (
                 <div 
                   key={index}
-                  className={`w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-white' : 'bg-gray-400'}`}
-                />
+                  className={`relative w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-white' : 'bg-gray-400'}`}
+                >
+                  {/* Video icon overlay for video thumbnails */}
+                  {media.type === 'video' && currentImageIndex === index && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -296,28 +326,30 @@ const ProductCard = ({ part, isTestOrganization = false }) => {
               )}
             </div>
 
-            {/* Condition Badge and Quantity */}
-            <div className="flex gap-0.5 pt-0.5 flex-wrap">
-              {product.isNew ? (
-                <span className="bg-green-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
-                  Новое
-                </span>
-              ) : (
-                <span className="bg-yellow-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
-                  Б/у
-                </span>
-              )}
-              {product.quantity !== undefined && (
-                <span className="bg-blue-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
-                  {product.quantity} шт.
-                </span>
-              )}
-              {product.isDiscount && (
-                <span className="bg-red-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
-                  Скидка
-                </span>
-              )}
-            </div>
+            {/* Condition Badge and Quantity - Hidden for used parts */}
+            {!hideConditionAndQuantity && (
+              <div className="flex gap-0.5 pt-0.5 flex-wrap">
+                {product.isNew ? (
+                  <span className="bg-green-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
+                    Новое
+                  </span>
+                ) : (
+                  <span className="bg-yellow-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
+                    Б/у
+                  </span>
+                )}
+                {product.quantity !== undefined && (
+                  <span className="bg-blue-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
+                    {product.quantity} шт.
+                  </span>
+                )}
+                {product.isDiscount && (
+                  <span className="bg-red-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
+                    Скидка
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Contact Buttons */}

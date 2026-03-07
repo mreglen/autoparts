@@ -22,6 +22,7 @@ class Product(Base):
    
     creator = relationship("User", foreign_keys=[created_by])
     photos = relationship("ProductPhoto", back_populates="product", cascade="all, delete-orphan")
+    videos = relationship("ProductVideo", back_populates="product", cascade="all, delete-orphan")
     acquired_products = relationship("AcquiredProduct", back_populates="product")
     stock_ins = relationship("StockIn", back_populates="product")
     stock_outs = relationship("StockOut", back_populates="product")
@@ -57,3 +58,25 @@ class ProductPhoto(Base):
         else:
             # Return as is (local storage path)
             return self.photo_url
+
+
+class ProductVideo(Base):
+    __tablename__ = "product_videos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"))
+    video_url = Column(Text, nullable=False)
+    organization_id = Column(String, ForeignKey("organizations.id"), nullable=True, index=True)
+    processing_status = Column(String(20), default='pending')  # pending, processing, completed, failed
+    
+    product = relationship("Product", back_populates="videos")
+    organization = relationship("Organization")
+
+    @property
+    def full_url(self):
+        # If video_url already contains a full URL, use as is
+        if self.video_url.startswith('http://') or self.video_url.startswith('https://'):
+            return self.video_url
+        else:
+            # Return as is (local storage path)
+            return self.video_url

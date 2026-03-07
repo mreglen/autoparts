@@ -1,8 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { normalizeImageUrl } from '../../utils/apiClient';
 
-const PhotoThumbnail = ({ photos = [], onImageClick }) => {
+const PhotoThumbnail = ({ photos = [], videos = [], onImageClick }) => {
   const [objectUrls, setObjectUrls] = useState(new Map());
+  
+  // Combine photos and videos into a single media array
+  const allMedia = React.useMemo(() => {
+    const photoItems = (photos || []).map(photo => ({
+      type: 'photo',
+      item: photo,
+      url: typeof photo === 'string' ? photo : (photo.full_url || photo.photo_url || '')
+    }));
+    
+    const videoItems = (videos || []).map(video => ({
+      type: 'video',
+      item: video,
+      url: typeof video === 'string' ? video : (video.full_url || video.video_url || '')
+    }));
+    
+    return [...photoItems, ...videoItems];
+  }, [photos, videos]);
 
   // Создаем и очищаем object URLs для File объектов
   useEffect(() => {
@@ -34,73 +51,27 @@ const PhotoThumbnail = ({ photos = [], onImageClick }) => {
     };
   }, [objectUrls]);
 
-  if (!photos || photos.length === 0) {
-    return <div className="text-gray-500 italic">Нет фото</div>;
+  if (!allMedia || allMedia.length === 0) {
+    return <div className="text-gray-500 italic">Нет медиа</div>;
   }
 
-  const isVideo = (item) => {
-    if (typeof item === 'string') {
-      return item.toLowerCase().endsWith('.mp4') ||
-             item.toLowerCase().endsWith('.avi') ||
-             item.toLowerCase().endsWith('.mov') ||
-             item.toLowerCase().endsWith('.wmv') ||
-             item.toLowerCase().endsWith('.flv') ||
-             item.toLowerCase().endsWith('.mkv') ||
-             item.toLowerCase().endsWith('.webm') ||
-             item.toLowerCase().endsWith('.m4v') ||
-             item.toLowerCase().endsWith('.3gp') ||
-             item.toLowerCase().endsWith('.mpeg') ||
-             item.toLowerCase().endsWith('.mpg') ||
-             item.includes('/uploads/videos/') ||
-             item.includes('video/');
-    }
-    if (item instanceof File) {
-      return item.type && item.type.startsWith('video/');
-    }
-    if (item?.photo_url) {
-      return item.photo_url.toLowerCase().endsWith('.mp4') ||
-             item.photo_url.toLowerCase().endsWith('.avi') ||
-             item.photo_url.toLowerCase().endsWith('.mov') ||
-             item.photo_url.toLowerCase().endsWith('.wmv') ||
-             item.photo_url.toLowerCase().endsWith('.flv') ||
-             item.photo_url.toLowerCase().endsWith('.mkv') ||
-             item.photo_url.toLowerCase().endsWith('.webm') ||
-             item.photo_url.toLowerCase().endsWith('.m4v') ||
-             item.photo_url.toLowerCase().endsWith('.3gp') ||
-             item.photo_url.toLowerCase().endsWith('.mpeg') ||
-             item.photo_url.toLowerCase().endsWith('.mpg') ||
-             item.photo_url.includes('/uploads/videos/') ||
-             item.photo_url.includes('video/');
-    }
-    return false;
-  };
+  const isVideoItem = (media) => media.type === 'video';
 
   return (
     <div className="flex flex-wrap gap-2">
-      {photos.map((item, index) => {
-        let mediaUrl;
+      {allMedia.map((media, index) => {
+        const mediaUrl = normalizeImageUrl(media.url);
 
-        if (typeof item === 'string') {
-          mediaUrl = normalizeImageUrl(item);
-        } else if (item?.full_url) {
-          mediaUrl = normalizeImageUrl(item.full_url);
-        } else if (item?.photo_url) {
-          mediaUrl = normalizeImageUrl(item.photo_url);
-        } else if (item instanceof File) {
-          mediaUrl = objectUrls.get(index) || '';
-        } else {
-          mediaUrl = '';
-        }
-
-        if (isVideo(item)) {
+        if (isVideoItem(media)) {
           return (
             <div key={index} className="relative">
               <video
                 src={mediaUrl}
                 className="w-20 h-20 md:w-24 md:h-24 object-contain rounded-lg border shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={(e) => {
-                  e.stopPropagation(); // Предотвращаем всплытие события
-                  onImageClick && onImageClick(photos, index);
+                  e.stopPropagation();
+                  // Pass the original item instead of the wrapped media object
+                  onImageClick && onImageClick(allMedia.map(m => m.item), index);
                 }}
                 controls={false}
                 muted
@@ -118,15 +89,16 @@ const PhotoThumbnail = ({ photos = [], onImageClick }) => {
             <img
               key={index}
               src={mediaUrl}
-              alt={`Фото товара ${index + 1}`}
+              alt={`Медиа ${index + 1}`}
               className="w-20 h-20 md:w-24 md:h-24 object-contain rounded-lg border shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
               onClick={(e) => {
-                e.stopPropagation(); // Предотвращаем всплытие события
-                onImageClick && onImageClick(photos, index);
+                e.stopPropagation();
+                // Pass the original item instead of the wrapped media object
+                onImageClick && onImageClick(allMedia.map(m => m.item), index);
               }}
               onError={(e) => {
                 console.warn(`Failed to load media: ${mediaUrl}`);
-                e.target.style.display = 'none'; // Скрываем сломанное изображение
+                e.target.style.display = 'none';
               }}
               loading="lazy"
             />

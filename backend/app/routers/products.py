@@ -2,9 +2,9 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from app.models.product import ProductPhoto, Product as ProductModel
+from app.models.product import ProductPhoto, ProductVideo, Product as ProductModel
 from app.models.product_vehicle import ProductVehicleAssociation
-from app.schemas.product import Product as ProductSchema, ProductCreate, ProductUpdate, ProductQuantityUpdate, Vehicle, DeletePhotosRequest
+from app.schemas.product import Product as ProductSchema, ProductCreate, ProductUpdate, ProductQuantityUpdate, Vehicle, DeletePhotosRequest, DeleteVideosRequest
 from app.models.vehicle import Vehicle as VehicleModel
 from app.db.database import get_db
 from app.core.auth import get_current_user
@@ -29,7 +29,7 @@ def create_product(
         )
 
     # Подготавливаем данные продукта
-    product_data = product.dict(exclude={"vehicle_ids", "photos"})
+    product_data = product.dict(exclude={"vehicle_ids", "photos", "videos"})
 
     # Автоматическая генерация internal_code, если не предоставлен
     if not product_data.get("internal_code"):
@@ -70,7 +70,18 @@ def create_product(
                 processing_status='completed'
             )
             db.add(photo)
-        db.commit()
+    
+    # Сохраняем видео
+    if product.videos:
+        for url in product.videos:
+            video = ProductVideo(
+                product_id=db_product.id, 
+                video_url=url,
+                organization_id=current_user.organization_id,
+                processing_status='completed'
+            )
+            db.add(video)
+    db.commit()
 
     # Связываем с автомобилями
     if product.vehicle_ids:
@@ -100,6 +111,7 @@ def read_product(
 ):
     product = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
+        selectinload(ProductModel.videos),
         selectinload(ProductModel.compatible_vehicles),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
@@ -119,6 +131,7 @@ def read_public_product(
 ):
     product = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
+        selectinload(ProductModel.videos),
         selectinload(ProductModel.compatible_vehicles),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
@@ -139,6 +152,7 @@ def update_product(
 ):
     db_product = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
+        selectinload(ProductModel.videos),
         selectinload(ProductModel.compatible_vehicles),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
@@ -163,7 +177,7 @@ def update_product(
             )
 
     # Обновляем основные поля
-    update_data = product.dict(exclude={"vehicle_ids", "photos"})
+    update_data = product.dict(exclude={"vehicle_ids", "photos", "videos"})
 
     # Исключаем internal_code, если он пустой или null
     if not update_data.get("internal_code"):
@@ -180,6 +194,15 @@ def update_product(
         for url in product.photos:
             photo = ProductPhoto(product_id=product_id, photo_url=url)
             db.add(photo)
+    
+    # Обновляем видео: удаляем старые, добавляем новые
+    if product.videos is not None:
+        # Удаляем все предыдущие видео
+        db.query(ProductVideo).filter(ProductVideo.product_id == product_id).delete()
+        # Добавляем новые
+        for url in product.videos:
+            video = ProductVideo(product_id=product_id, video_url=url)
+            db.add(video)
 
     # Обновляем связи с автомобилями
     if product.vehicle_ids is not None:
@@ -337,6 +360,96 @@ def delete_product_photos(
 
     return
 
+
+@router.delete("/{product_id}/videos/{video_id}", status_code=204)
+def delete_product_video(
+    product_id: int,
+    video_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Проверяем, что продукт принадлежит организации пользователя
+    product = db.query(ProductModel).filter(
+        ProductModel.id == product_id,
+        ProductModel.organization_id == current_user.organization_id
+    ).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Продукт не найден или недоступен"
+        )
+
+    # Проверяем, что пользователь является продавцом
+    if not current_user.is_seller:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Только продавцы могут удалять видео товаров"
+        )
+
+    # Находим видео
+    video = db.query(ProductVideo).filter(
+        ProductVideo.id == video_id,
+        ProductVideo.product_id == product_id
+    ).first()
+    if not video:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Видео не найдено"
+        )
+
+    # Удаляем запись из базы данных
+    db.delete(video)
+    db.commit()
+
+    return
+
+
+@router.delete("/{product_id}/videos", status_code=204)
+def delete_product_videos(
+    product_id: int,
+    request: DeleteVideosRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Проверяем, что продукт принадлежит организации пользователя
+    product = db.query(ProductModel).filter(
+        ProductModel.id == product_id,
+        ProductModel.organization_id == current_user.organization_id
+    ).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Продукт не найден или недоступен"
+        )
+
+    # Проверяем, что пользователь является продавцом
+    if not current_user.is_seller:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Только продавцы могут удалять видео товаров"
+        )
+
+    # Находим все видео для удаления
+    videos = db.query(ProductVideo).filter(
+        ProductVideo.id.in_(request.video_ids),
+        ProductVideo.product_id == product_id
+    ).all()
+
+    if len(videos) != len(request.video_ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Некоторые видео не найдены"
+        )
+
+    # Удаляем записи из базы данных
+    for video in videos:
+        db.delete(video)
+
+    db.commit()
+
+    return
+
+
 @router.get("/", response_model=list[ProductSchema])
 def get_products(
     storage_location_id: int = None,
@@ -349,6 +462,7 @@ def get_products(
     # Базовый запрос
     query = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
+        selectinload(ProductModel.videos),
         selectinload(ProductModel.compatible_vehicles),
         selectinload(ProductModel.creator),
         selectinload(ProductModel.storage_location),
@@ -374,6 +488,7 @@ def get_public_products(
     # Базовый запрос - получить все товары, которые есть в наличии
     query = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
+        selectinload(ProductModel.videos),
         selectinload(ProductModel.compatible_vehicles),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
