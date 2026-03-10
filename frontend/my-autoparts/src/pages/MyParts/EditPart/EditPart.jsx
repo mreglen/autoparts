@@ -578,7 +578,7 @@ const EditPart = () => {
               <PhotoGallery
                 photos={[
                   ...existingPhotos.map(photo => {
-                   const url = typeof photo === 'string' ? photo : photo.photo_url;
+                  const url = typeof photo === 'string' ? photo : photo.photo_url;
                     return {
                       id: typeof photo === 'object' ? photo.id : `photo-${photo}`,
                       photo_url: url,
@@ -586,7 +586,7 @@ const EditPart = () => {
                     };
                   }),
                   ...existingVideos.map((video, idx) => {
-                   const url = typeof video === 'string' ? video : video.video_url;
+                  const url = typeof video === 'string' ? video : video.video_url;
                     return {
                       id: typeof video === 'object' ? video.id : `video-${idx}`,
                       photo_url: url,
@@ -616,73 +616,31 @@ const EditPart = () => {
           )}
 
           {/* Добавление новых фото и видео */}
-        <div className="flex flex-col gap-3">
-          {/* Кнопки для добавления медиа */}
-          <div className="flex flex-wrap gap-3">
-            {/* Кнопка выбора фото/видео из галереи */}
-            <label className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 cursor-pointer">
-              <svg className="w-5 h-5"fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <span>Выбрать фото/видео</span>
-              <input
-                type="file"
-                multiple
-                accept="image/*,video/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2,.mp4,.avi,.mov,.wmv,.flv,.mkv,.webm,.m4v,.3gp,.mpeg,.mpg"
-                onChange={(e) => {
-               const files = Array.from(e.target.files);
-               const photosToAdd = [];
-               const videosToAdd = [];
-                  
-                  files.forEach(file => {
-                 if (file.type.startsWith('image/')) {
-                      photosToAdd.push(file);
-                    } else if (file.type.startsWith('video/')) {
-                      videosToAdd.push(file);
-                    }
-                  });
-                  
-                  setPhotos(prev => [...prev, ...photosToAdd]);
-                  setVideos(prev => [...prev, ...videosToAdd]);
-                }}
-                className="hidden"
-              />
-            </label>
-            
-            {/* Кнопка записи видео */}
-            <button
-              type="button"
-              onClick={handleCaptureVideo}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-            >
-              <svg className="w-5 h-5"fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              <span>Снять видео</span>
-            </button>
-          </div>
-          
-          {/* Отдельная кнопка только для фото */}
-          <label className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 cursor-pointer w-fit">
-            <svg className="w-5 h-5"fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-            </svg>
-            <span>Только фото</span>
-            <input
-              type="file"
-              multiple
-              accept="image/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2"
-              onChange={(e) => {
-             const files = Array.from(e.target.files);
-                setPhotos(prev => [...prev, ...files]);
-              }}
-              className="hidden"
-            />
-          </label>
-        </div>
+          <input
+            type="file"
+            multiple
+            accept="image/*,video/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2,.mp4,.avi,.mov,.wmv,.flv,.mkv,.webm,.m4v,.3gp,.mpeg,.mpg"
+            onChange={(e) => {
+            const files = Array.from(e.target.files);
+            const photosToAdd = [];
+            const videosToAdd = [];
+              
+              files.forEach(file => {
+                if (file.type.startsWith('image/')) {
+                  photosToAdd.push(file);
+                } else if (file.type.startsWith('video/')) {
+                  videosToAdd.push(file);
+                }
+              });
+              
+              setPhotos(prev => [...prev, ...photosToAdd]);
+              setVideos(prev => [...prev, ...videosToAdd]);
+            }}
+            className="mt-1"
+          />
 
-          {/* Новые фото */}
-          {photos.length > 0 && (
+        {/* Новые фото */}
+        {photos.length > 0 && (
             <div className="mt-2">
               <p className="text-sm text-gray-600 mb-2">Новые фотографии:</p>
               <div className="flex flex-wrap gap-2">
