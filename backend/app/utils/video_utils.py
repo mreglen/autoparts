@@ -173,7 +173,7 @@ def validate_video_file(video_path: str, max_size_mb: int = 100, max_duration_se
     duration_sec = get_video_duration(video_path)
     if duration_sec > max_duration_sec:
         raise ValueError(
-            f"Видео слишком длинное. Длительность: {duration_sec:.1f} сек. "
+             f"Видео слишком длинное. Длительность: {duration_sec:.1f} сек. "
             f"Максимальная длительность: {max_duration_sec} сек."
         )
     

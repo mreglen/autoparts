@@ -95,7 +95,7 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         # Create directory if it doesn't exist
         os.makedirs(upload_dir, exist_ok=True)
         
-        # Compress video
+        # Compress video with optimized settings for speed (same as your working command)
         try:
             print(f"Compressing video...")
             compressed_path = compress_video(
