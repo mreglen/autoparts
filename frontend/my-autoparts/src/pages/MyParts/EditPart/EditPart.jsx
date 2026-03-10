@@ -621,9 +621,9 @@ const EditPart = () => {
             multiple
             accept="image/*,video/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2,.mp4,.avi,.mov,.wmv,.flv,.mkv,.webm,.m4v,.3gp,.mpeg,.mpg"
             onChange={(e) => {
-            const files = Array.from(e.target.files);
-            const photosToAdd = [];
-            const videosToAdd = [];
+             const files = Array.from(e.target.files);
+             const photosToAdd = [];
+             const videosToAdd = [];
               
               files.forEach(file => {
                 if (file.type.startsWith('image/')) {
