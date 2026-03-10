@@ -32,14 +32,15 @@ def remove_exif_data(image: Image.Image) -> Image.Image:
     return clean_image
 
 
-def optimize_image(image_data: bytes, max_size: tuple = (1600, 1200), quality: int = 75):
+def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: int = 85):
     """
     Optimizes an image using Pillow, removes metadata, converts to WebP.
+    Preserves original aspect ratio while reducing file size.
     
     Args:
         image_data: Raw image bytes
-        max_size: Maximum dimensions (width, height) - reduced for better compression
-        quality: WebP quality (1-100) - lowered to 75 for stronger compression
+        max_size: Maximum dimensions (width, height) - image will fit within these bounds while preserving aspect ratio
+        quality: WebP quality (1-100) - balanced for good quality and compression
     
     Returns:
         bytes: Optimized WebP image bytes

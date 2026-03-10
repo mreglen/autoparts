@@ -9,6 +9,7 @@ import { createPendingProductStorageCellsBatch } from '../../../redux/slices/Pen
 import { normalizeImageUrl } from '../../../utils/apiClient';
 
 import VehicleModal from './VehicleModal';
+import ImageModal from '../../../components/ImageModal/ImageModal';
 
 const AddPart = () => {
   const navigate = useNavigate();
@@ -41,6 +42,11 @@ const AddPart = () => {
   const [newCellName, setNewCellName] = useState('');
   const [newCellValue, setNewCellValue] = useState('');
   const [showNewCellForm, setShowNewCellForm] = useState(false);
+  
+  // Image modal state
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState([]);
+  const [initialMediaIndex, setInitialMediaIndex] = useState(0);
 
   useEffect(() => {
     if (user?.organization_id) {
@@ -118,6 +124,26 @@ const AddPart = () => {
 
   const handleVideoRemove = (index) => {
     setVideos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMediaClick = (mediaIndex) => {
+    // Combine all photos and videos into one array for the lightbox
+   const allMedia = [
+      ...photos.map((file, idx) => ({
+        id: `photo-${idx}`,
+        url: file instanceof File || file instanceof Blob ? URL.createObjectURL(file) : normalizeImageUrl(file),
+        type: 'image'
+      })),
+      ...videos.map((file, idx) => ({
+        id: `video-${idx}`,
+        url: file instanceof File || file instanceof Blob ? URL.createObjectURL(file) : normalizeImageUrl(file),
+        type: 'video'
+      }))
+    ];
+    
+    setSelectedMedia(allMedia);
+    setInitialMediaIndex(mediaIndex);
+    setIsImageModalOpen(true);
   };
 
   const handleInputChange = (e) => {
@@ -404,7 +430,7 @@ const AddPart = () => {
             {photos.map((file, idx) => {
               // Handle both File objects (before upload) and URL strings (after upload)
               let photoSrc;
-              if (file instanceof File || file instanceof Blob) {
+             if (file instanceof File || file instanceof Blob) {
                 photoSrc = URL.createObjectURL(file);
               } else if (typeof file === 'string') {
                 photoSrc = normalizeImageUrl(file);
@@ -417,18 +443,19 @@ const AddPart = () => {
                   <img
                     src={photoSrc}
                     alt={`photo-preview-${idx}`}
-                    className="w-16 h-16 object-cover rounded border"
+                    className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => handleMediaClick(idx)}
                     onLoad={() => {
                       // Cleanup for blob URLs
-                      if (file instanceof File || file instanceof Blob) {
+                     if (file instanceof File || file instanceof Blob) {
                         // URL.revokeObjectURL(photoSrc); // Optional: manage cleanup if needed
                       }
                     }}
                   />
                   <button
                     type="button"
-                    onClick={() => handlePhotoRemove(idx)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                    onClick={(e) => { e.stopPropagation(); handlePhotoRemove(idx); }}
+                    className="absolute-top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
                   >
                     <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
                   </button>
@@ -439,12 +466,13 @@ const AddPart = () => {
               <div key={`video-${idx}`} className="relative">
                 <video
                   src={URL.createObjectURL(file)}
-                  className="w-16 h-16 object-cover rounded border"
-                  controls={false}
+                  className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
+                 controls={false}
+                  onClick={() => handleMediaClick(idx + photos.length)}
                 />
                 <button
                   type="button"
-                  onClick={() => handleVideoRemove(idx)}
+                  onClick={(e) => { e.stopPropagation(); handleVideoRemove(idx); }}
                   className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
                 >
                   <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
@@ -452,6 +480,7 @@ const AddPart = () => {
               </div>
             ))}
           </div>
+
         </div>
                 
         {/* Состояние */}
@@ -570,9 +599,9 @@ const AddPart = () => {
               <button
                 type="button"
                 onClick={() => setShowNewCellForm(!showNewCellForm)}
-                className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
               >
-                {showNewCellForm ? 'Отмена' : '+'}
+                {showNewCellForm ? 'Отмена' : 'Добавить адрес'}
               </button>
             </div>
             <p className="text-sm text-gray-600 mb-4">Укажите значение для каждой ячейки (не обязательно заполнять все поля)</p>
@@ -668,6 +697,14 @@ const AddPart = () => {
         onClose={() => setIsVehicleModalOpen(false)}
         onSelectVehicle={setSelectedVehicle}
         selectedVehicle={selectedVehicle}
+      />
+      
+      <ImageModal
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        photos={selectedMedia}
+        initialIndex={initialMediaIndex}
+        alt="Preview"
       />
     </div>
   );

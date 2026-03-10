@@ -28,6 +28,9 @@ const EditPart = () => {
   const [locationCells, setLocationCells] = useState([]);
   const [cellValues, setCellValues] = useState({}); // {cellId: value}
   const [existingLinks, setExistingLinks] = useState([]); // Existing product-cell links
+  const [showNewCellForm, setShowNewCellForm] = useState(false);
+  const [newCellName, setNewCellName] = useState('');
+  const [newCellValue, setNewCellValue] = useState('');
 
   useEffect(() => {
     if (user?.organization_id) {
@@ -265,8 +268,73 @@ const EditPart = () => {
     }));
   };
 
-  const handleImageClick = (photos, initialIndex) => {
-    setSelectedImages({ photos, initialIndex });
+  const handleAddNewCell = () => {
+   if (!newCellName.trim()) {
+      alert('Введите название ячейки');
+     return;
+    }
+    
+    // Create a new cell object
+   const newCell = {
+      id: `temp_${Date.now()}`,
+      name: newCellName.trim(),
+      description: '',
+      storage_location_id: parseInt(formData.storage_location_id, 10)
+    };
+    
+    // Add to location cells
+    setLocationCells(prev => [...prev, newCell]);
+    
+    // Initialize value for the new cell
+   if (newCellValue.trim()) {
+      setCellValues(prev => ({
+        ...prev,
+        [newCell.id]: newCellValue.trim()
+      }));
+    }
+    
+    // Reset form
+    setNewCellName('');
+    setNewCellValue('');
+    setShowNewCellForm(false);
+  };
+
+  const handleImageClick = (allMedia, initialIndex) => {
+    // Separate photos and videos from the combined media array
+  const photos = allMedia.filter(item => {
+      // Check if it's a photo by looking at the structure or file type
+    if (typeof item === 'string') {
+        return !item.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
+      }
+    if (item instanceof File) {
+        return item.type && item.type.startsWith('image/');
+      }
+    if (item?.photo_url || item?.full_url) {
+       const url = item.photo_url || item.full_url;
+        return !url.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
+      }
+      return true; // Default to photo
+    });
+    
+  const videos = allMedia.filter(item => {
+      // Check if it's a video
+    if (typeof item === 'string') {
+        return item.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
+      }
+    if (item instanceof File) {
+        return item.type && item.type.startsWith('video/');
+      }
+    if (item?.video_url || item?.full_url) {
+       const url = item.video_url || item.full_url;
+        return url.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
+      }
+    if (item?.photo_url) {
+        return item.photo_url.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
+      }
+      return false; // Default to not video
+    });
+    
+    setSelectedImages({ photos, videos, initialIndex });
     setImageModalOpen(true);
   };
 
@@ -482,20 +550,38 @@ const EditPart = () => {
           />
         </div>
 
-        {/* Фото */}
+        {/* Медиа */}
         <div>
-          <label className="block text-sm font-medium">Фотографии и видео *</label>
+          <label className="block text-sm font-medium">Медиа *</label>
 
-          {/* Существующие фото */}
-          {existingPhotos.length > 0 && (
+          {/* Существующие медиа (фото и видео) */}
+          {(existingPhotos.length > 0 || existingVideos.length > 0) && (
             <div className="mt-2 mb-4">
-              <p className="text-sm text-gray-600 mb-2">Существующие фотографии:</p>
               <PhotoGallery
-                photos={existingPhotos || []}
-                onImageClick={handleImageClick}
+                photos={[
+                  ...existingPhotos.map(photo => {
+                   const url = typeof photo === 'string' ? photo : photo.photo_url;
+                    return {
+                      id: typeof photo === 'object' ? photo.id : `photo-${photo}`,
+                      photo_url: url,
+                      full_url: url
+                    };
+                  }),
+                  ...existingVideos.map((video, idx) => {
+                   const url = typeof video === 'string' ? video : video.video_url;
+                    return {
+                      id: typeof video === 'object' ? video.id : `video-${idx}`,
+                      photo_url: url,
+                      full_url: url
+                    };
+                  })
+                ]}
+                onImageClick={(allPhotos, initialIndex) => {
+                  handleImageClick(allPhotos, initialIndex);
+                }}
                 selectedPhotos={selectedPhotosForRemoval}
                 onPhotoSelect={handlePhotoSelectionToggle}
-                onDeletePhoto={existingPhotos.length === 1 ? handleDeleteSinglePhoto : null}
+                onDeletePhoto={existingPhotos.length + existingVideos.length === 1 ? handleDeleteSinglePhoto : null}
               />
               {selectedPhotosForRemoval.length > 0 && (
                 <div className="mt-2">
@@ -706,63 +792,80 @@ const EditPart = () => {
         </div>
 
         {/* Адресное хранение - выбор ячеек */}
-        {formData.storage_location_id && locationCells.length > 0 && (
+        {formData.storage_location_id && (
           <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">Адресное хранение</h3>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-medium text-gray-900">Адресное хранение</h3>
+              <button
+                type="button"
+                onClick={() => setShowNewCellForm(!showNewCellForm)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+              >
+                {showNewCellForm ? 'Отмена' : 'Добавить адрес'}
+              </button>
+            </div>
             <p className="text-sm text-gray-600 mb-4">Укажите значение для каждой ячейки (не обязательно заполнять все поля)</p>
             
-            <div className="space-y-3">
-              {locationCells.map((cell) => (
-                <div key={cell.id} className="bg-white rounded-md p-3 border border-gray-200">
-                  <div className="font-medium text-gray-900 mb-1">{cell.name}</div>
-                  {cell.description && (
-                    <div className="text-sm text-gray-600 mb-2">{cell.description}</div>
-                  )}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Значение в ячейке
-                    </label>
-                    <input
-                      type="text"
-                      value={cellValues[cell.id] || ''}
-                      onChange={(e) => handleCellValueChange(cell.id, e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                        (!cellValues[cell.id] || cellValues[cell.id].trim() === '') && existingLinks.some(link => link.storage_cell_id === cell.id)
-                          ? 'border-orange-300 bg-orange-50' 
-                          : 'border-gray-300'
-                      }`}
-                      placeholder="Введите значение"
-                    />
-                    {(!cellValues[cell.id] || cellValues[cell.id].trim() === '') && existingLinks.some(link => link.storage_cell_id === cell.id) && (
-                      <div className="mt-1 text-xs text-orange-600">
-                        При сохранении адрес хранения будет удален
-                      </div>
-                    )}
-                  </div>
+            {showNewCellForm && (
+              <div className="mb-4 p-3 bg-white rounded-md border border-gray-300">
+                <div className="mb-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Название ячейки</label>
+                  <input
+                    type="text"
+                    value={newCellName}
+                    onChange={(e) => setNewCellName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Введите название ячейки"
+                  />
                 </div>
-              ))}
-            </div>
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Значение в ячейке</label>
+                  <input
+                    type="text"
+                    value={newCellValue}
+                    onChange={(e) => setNewCellValue(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Введите значение"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddNewCell}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                >
+                  Добавить ячейку
+                </button>
+              </div>
+            )}
             
-            {/* Existing links display */}
-            {existingLinks.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">Текущие адреса хранения:</h4>
-                <div className="space-y-2">
-                  {existingLinks.map((link) => {
-                    const cell = storageCells.find(c => c.id === link.storage_cell_id);
-                    const willBeRemoved = !cellValues[link.storage_cell_id] || cellValues[link.storage_cell_id].trim() === '';
-                    return (
-                      <div key={link.id} className={`text-sm ${willBeRemoved ? 'text-orange-600 line-through' : 'text-gray-600'}`}>
-                        <span className="font-medium">{cell?.name || `Ячейка #${link.storage_cell_id}`}</span>
-                        {link.value && <span>: {link.value}</span>}
-                        {willBeRemoved && <span className="ml-2 text-xs">(будет удален)</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-3 text-xs text-gray-500">
-                  Чтобы удалить адрес хранения, очистите значение в соответствующем поле выше
-                </div>
+            {locationCells.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-300 border-collapse rounded-lg">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      {locationCells.map((cell) => (
+                        <th key={cell.id} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 last:border-r-0">
+                          {cell.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      {locationCells.map((cell) => (
+                        <td key={cell.id} className="px-4 py-3 border-r border-gray-300 last:border-r-0">
+                          <input
+                            type="text"
+                            value={cellValues[cell.id] || ''}
+                            onChange={(e) => handleCellValueChange(cell.id, e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="Введите значение"
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -793,6 +896,7 @@ const EditPart = () => {
         isOpen={imageModalOpen}
         onClose={() => setImageModalOpen(false)}
         photos={selectedImages.photos}
+      videos={selectedImages.videos || []}
         initialIndex={selectedImages.initialIndex}
         alt="Фото товара"
       />

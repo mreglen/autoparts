@@ -107,7 +107,7 @@ const ProductModeration = () => {
             })).unwrap();
             setSuccessModalData({
                 title: 'Успешно!',
-                message: 'Запчасть отклонена ❌'
+                message: 'Запчасть отклонена '
             });
             setIsSuccessModalOpen(true);
             setIsRejectModalOpen(false);

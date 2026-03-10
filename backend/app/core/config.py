@@ -22,13 +22,11 @@ class Settings(BaseSettings):
     GET_SETTLEMETNS: str
     GET_BROKEN_WAVE: str
     BASE_URL: str
-    
-    # Redis/Celery 
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
     
-    # FFmpeg paths for video processing
+    # Пути к FFmpeg для обработки видео
     FFPROBE_PATH: Optional[str] = r"C:\ffmpeg\bin\ffprobe.exe"
     FFMPEG_PATH: Optional[str] = r"C:\ffmpeg\bin\ffmpeg.exe"
 

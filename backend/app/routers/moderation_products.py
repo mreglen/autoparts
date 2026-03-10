@@ -5,7 +5,7 @@ import json
 from app.db.database import get_db
 from app.models.pending_product import PendingProduct as PendingProductModel
 from app.models.rejected_product import RejectedProduct as RejectedProductModel
-from app.models.product import Product as ProductModel, ProductPhoto
+from app.models.product import Product as ProductModel, ProductPhoto, ProductVideo
 from app.models.vehicle import Vehicle as VehicleModel
 from app.models.product_vehicle import ProductVehicleAssociation
 from app.models.stock_in import StockIn as StockInModel
@@ -17,7 +17,7 @@ from app.schemas.moderation import ModerateProductRequest, ModerateProductRespon
 from app.schemas.rejected_product import RejectedProductCreate
 from app.schemas.product import ProductCreate
 from app.core.auth import get_current_admin_user, get_current_user
-# Sequential code generation is handled inline
+
 
 router = APIRouter(prefix="/moderation/products", tags=["Moderation Products"])
 
@@ -48,6 +48,14 @@ def get_pending_products(
         else:
             product_dict['photos'] = []
             
+        if product_dict.get('videos'):
+            try:
+                product_dict['videos'] = json.loads(product_dict['videos'])
+            except:
+                product_dict['videos'] = []
+        else:
+            product_dict['videos'] = []
+            
         if product_dict.get('vehicle_ids'):
             try:
                 product_dict['vehicle_ids'] = json.loads(product_dict['vehicle_ids'])
@@ -55,8 +63,7 @@ def get_pending_products(
                 product_dict['vehicle_ids'] = []
         else:
             product_dict['vehicle_ids'] = []
-            
-        # Удаляем SQLAlchemy состояние
+
         product_dict.pop('_sa_instance_state', None)
         result.append(product_dict)
     
@@ -78,7 +85,7 @@ def get_my_rejected_products(
         .limit(limit)\
         .all()
     
-    # Преобразуем JSON строки обратно в списки
+    
     result = []
     for product in products:
         product_dict = product.__dict__.copy()
@@ -98,7 +105,7 @@ def get_my_rejected_products(
         else:
             product_dict['vehicle_ids'] = []
             
-        # Удаляем SQLAlchemy состояние
+
         product_dict.pop('_sa_instance_state', None)
         result.append(product_dict)
     
@@ -174,6 +181,21 @@ def approve_product(
         except Exception as e:
             print(f"Error processing photos: {e}")
     
+    # Обработка videos - создаем ProductVideo записи
+    if pending_product.videos:
+        try:
+            videos_list = json.loads(pending_product.videos)
+            for video_url in videos_list:
+                video = ProductVideo(
+                    product_id=db_product.id,
+                    video_url=video_url,
+                    organization_id=pending_product.organization_id,
+                    processing_status='completed'
+                )
+                db.add(video)
+        except Exception as e:
+            print(f"Error processing videos: {e}")
+    
     # Обработка vehicle_ids - создаем связи с автомобилями
     if pending_product.vehicle_ids:
         try:
@@ -205,7 +227,7 @@ def approve_product(
         organization_id=pending_product.organization_id,
         storage_location_id=pending_product.storage_location_id,
         product_id=db_product.id,
-        acquired_product_id=None,  # Не создаем связанную запись в acquired_products
+        acquired_product_id=None, 
         created_by=pending_product.created_by
     )
     db.add(stock_in)
@@ -279,6 +301,7 @@ def reject_product(
         created_by=pending_product.created_by,
         rejection_reason=moderation_data.rejection_reason.strip(),
         photos=json.loads(pending_product.photos) if pending_product.photos else None,
+        videos=json.loads(pending_product.videos) if pending_product.videos else None,
         vehicle_ids=json.loads(pending_product.vehicle_ids) if pending_product.vehicle_ids else None
     )
     
@@ -322,6 +345,14 @@ def get_rejected_products(
                 product_dict['photos'] = []
         else:
             product_dict['photos'] = []
+            
+        if product_dict.get('videos'):
+            try:
+                product_dict['videos'] = json.loads(product_dict['videos'])
+            except:
+                product_dict['videos'] = []
+        else:
+            product_dict['videos'] = []
             
         if product_dict.get('vehicle_ids'):
             try:

@@ -1,69 +1,103 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { normalizeImageUrl } from '../../utils/apiClient';
 
-const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'Изображение' }) => {
+const ImageModal = ({ isOpen, onClose, photos = [], videos = [], initialIndex = 0, alt = 'Изображение' }) => {
+  // Combine photos and videos into a single media array
+ const allMedia = React.useMemo(() => {
+   const photoItems = (photos || []).map(photo => ({
+      type: 'photo',
+     item: photo,
+      url: typeof photo === 'string' ? photo : (photo.full_url || photo.photo_url || '')
+    }));
+    
+   const videoItems = (videos || []).map(video => ({
+      type: 'video',
+     item: video,
+      url: typeof video === 'string' ? video : (video.full_url || video.video_url || '')
+    }));
+    
+    return [...photoItems, ...videoItems];
+  }, [photos, videos]);
+
   // Function to check if the file is a video
-  const isVideo = (item) => {
-    if (typeof item === 'string') {
+ const isVideo = (item) => {
+   if (typeof item === 'string') {
       return item.toLowerCase().endsWith('.mp4') ||
-             item.toLowerCase().endsWith('.avi') ||
-             item.toLowerCase().endsWith('.mov') ||
-             item.toLowerCase().endsWith('.wmv') ||
-             item.toLowerCase().endsWith('.flv') ||
-             item.toLowerCase().endsWith('.mkv') ||
-             item.toLowerCase().endsWith('.webm') ||
-             item.toLowerCase().endsWith('.m4v') ||
-             item.toLowerCase().endsWith('.3gp') ||
-             item.toLowerCase().endsWith('.mpeg') ||
-             item.toLowerCase().endsWith('.mpg') ||
-             item.toLowerCase().endsWith('.3gpp') ||
-             item.toLowerCase().endsWith('.3gpp2') ||
-             item.includes('/uploads/videos/') ||
-             item.includes('video/');
+           item.toLowerCase().endsWith('.avi') ||
+           item.toLowerCase().endsWith('.mov') ||
+           item.toLowerCase().endsWith('.wmv') ||
+           item.toLowerCase().endsWith('.flv') ||
+           item.toLowerCase().endsWith('.mkv') ||
+           item.toLowerCase().endsWith('.webm') ||
+           item.toLowerCase().endsWith('.m4v') ||
+           item.toLowerCase().endsWith('.3gp') ||
+           item.toLowerCase().endsWith('.mpeg') ||
+           item.toLowerCase().endsWith('.mpg') ||
+           item.toLowerCase().endsWith('.3gpp') ||
+           item.toLowerCase().endsWith('.3gpp2') ||
+           item.includes('/uploads/videos/') ||
+           item.includes('video/');
     }
-    if (item instanceof File) {
+   if (item instanceof File) {
       return item.type && item.type.startsWith('video/');
     }
-    if (item?.photo_url) {
+   if (item?.photo_url) {
       return item.photo_url.toLowerCase().endsWith('.mp4') ||
-             item.photo_url.toLowerCase().endsWith('.avi') ||
-             item.photo_url.toLowerCase().endsWith('.mov') ||
-             item.photo_url.toLowerCase().endsWith('.wmv') ||
-             item.photo_url.toLowerCase().endsWith('.flv') ||
-             item.photo_url.toLowerCase().endsWith('.mkv') ||
-             item.photo_url.toLowerCase().endsWith('.webm') ||
-             item.photo_url.toLowerCase().endsWith('.m4v') ||
-             item.photo_url.toLowerCase().endsWith('.3gp') ||
-             item.photo_url.toLowerCase().endsWith('.mpeg') ||
-             item.photo_url.toLowerCase().endsWith('.mpg') ||
-             item.photo_url.toLowerCase().endsWith('.3gpp') ||
-             item.photo_url.toLowerCase().endsWith('.3gpp2') ||
-             item.photo_url.includes('/uploads/videos/') ||
-             item.photo_url.includes('video/');
+           item.photo_url.toLowerCase().endsWith('.avi') ||
+           item.photo_url.toLowerCase().endsWith('.mov') ||
+           item.photo_url.toLowerCase().endsWith('.wmv') ||
+           item.photo_url.toLowerCase().endsWith('.flv') ||
+           item.photo_url.toLowerCase().endsWith('.mkv') ||
+           item.photo_url.toLowerCase().endsWith('.webm') ||
+           item.photo_url.toLowerCase().endsWith('.m4v') ||
+           item.photo_url.toLowerCase().endsWith('.3gp') ||
+           item.photo_url.toLowerCase().endsWith('.mpeg') ||
+           item.photo_url.toLowerCase().endsWith('.mpg') ||
+           item.photo_url.toLowerCase().endsWith('.3gpp') ||
+           item.photo_url.toLowerCase().endsWith('.3gpp2') ||
+           item.photo_url.includes('/uploads/videos/') ||
+           item.photo_url.includes('video/');
+    }
+   if (item?.video_url) {
+      return item.video_url.toLowerCase().endsWith('.mp4') ||
+           item.video_url.toLowerCase().endsWith('.avi') ||
+           item.video_url.toLowerCase().endsWith('.mov') ||
+           item.video_url.toLowerCase().endsWith('.wmv') ||
+           item.video_url.toLowerCase().endsWith('.flv') ||
+           item.video_url.toLowerCase().endsWith('.mkv') ||
+           item.video_url.toLowerCase().endsWith('.webm') ||
+           item.video_url.toLowerCase().endsWith('.m4v') ||
+           item.video_url.toLowerCase().endsWith('.3gp') ||
+           item.video_url.toLowerCase().endsWith('.mpeg') ||
+           item.video_url.toLowerCase().endsWith('.mpg') ||
+           item.video_url.toLowerCase().endsWith('.3gpp') ||
+           item.video_url.toLowerCase().endsWith('.3gpp2') ||
+           item.video_url.includes('/uploads/videos/') ||
+           item.video_url.includes('video/');
     }
     return false;
   };
-  const [zoom, setZoom] = useState(1);
-  const [isDragging, setIsDragging] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [objectUrls, setObjectUrls] = useState(new Map());
+ const [zoom, setZoom] = useState(1);
+ const [isDragging, setIsDragging] = useState(false);
+ const [position, setPosition] = useState({ x: 0, y: 0 });
+ const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+ const [currentIndex, setCurrentIndex] = useState(initialIndex);
+ const [objectUrls, setObjectUrls] = useState(new Map());
 
   // Swipe states
-  const [swipeStart, setSwipeStart] = useState(null);
-  const [swipeCurrent, setSwipeCurrent] = useState(null);
-  const [isSwiping, setIsSwiping] = useState(false);
+ const [swipeStart, setSwipeStart] = useState(null);
+ const [swipeCurrent, setSwipeCurrent] = useState(null);
+ const [isSwiping, setIsSwiping] = useState(false);
 
   // Создаем и очищаем object URLs для File объектов
   useEffect(() => {
-    if (!isOpen || !photos.length) return;
+   if (!isOpen || !allMedia.length) return;
 
-    const newUrls = new Map();
+   const newUrls = new Map();
 
-    photos.forEach((photo, index) => {
-      if (photo instanceof File) {
-        const url = URL.createObjectURL(photo);
+    allMedia.forEach((media, index) => {
+     if (media.item instanceof File) {
+       const url = URL.createObjectURL(media.item);
         newUrls.set(index, url);
       }
     });
@@ -76,11 +110,11 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
         URL.revokeObjectURL(url);
       });
     };
-  }, [isOpen, photos]);
+  }, [isOpen, allMedia]);
 
   // Сброс состояния при закрытии
   useEffect(() => {
-    if (!isOpen) {
+   if (!isOpen) {
       setZoom(1);
       setPosition({ x: 0, y: 0 });
       setIsDragging(false);
@@ -88,33 +122,33 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
     }
   }, [isOpen, initialIndex]);
 
-  const goToPrevious = useCallback(() => {
-    setCurrentIndex(prev => prev === 0 ? photos.length - 1 : prev - 1);
+ const goToPrevious = useCallback(() => {
+    setCurrentIndex(prev => prev === 0 ? allMedia.length - 1 : prev - 1);
     setZoom(1);
     setPosition({ x: 0, y: 0 });
-  }, [photos.length]);
+  }, [allMedia.length]);
 
-  const goToNext = useCallback(() => {
-    setCurrentIndex(prev => prev === photos.length - 1 ? 0 : prev + 1);
+ const goToNext = useCallback(() => {
+    setCurrentIndex(prev => prev === allMedia.length - 1 ? 0 : prev + 1);
     setZoom(1);
     setPosition({ x: 0, y: 0 });
-  }, [photos.length]);
+  }, [allMedia.length]);
 
   // Обработчик клавиатуры для закрытия и навигации
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (!isOpen) return;
+   const handleKeyDown = (e) => {
+     if (!isOpen) return;
 
       switch (e.key) {
         case 'Escape':
-          onClose();
+         onClose();
           break;
         case 'ArrowLeft':
           e.preventDefault();
           goToPrevious();
           break;
         case 'ArrowRight':
-          e.preventDefault();
+         e.preventDefault();
           goToNext();
           break;
         default:
@@ -122,7 +156,7 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
       }
     };
 
-    if (isOpen) {
+   if (isOpen) {
       document.addEventListener('keydown', handleKeyDown);
       // Предотвращаем скролл body
       document.body.style.overflow = 'hidden';
@@ -132,54 +166,60 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose, photos.length, goToNext, goToPrevious]);
+  }, [isOpen, onClose, allMedia.length, goToNext, goToPrevious]);
 
-  const handleZoomIn = () => {
+ const handleZoomIn = () => {
     setZoom(prev => Math.min(prev * 1.2, 3));
   };
 
-  const handleZoomOut = () => {
+ const handleZoomOut = () => {
     setZoom(prev => Math.max(prev / 1.2, 0.5));
   };
 
-  const handleResetZoom = () => {
+ const handleResetZoom = () => {
     setZoom(1);
     setPosition({ x: 0, y: 0 });
   };
 
-  const goToImage = (index) => {
+ const goToImage = (index) => {
     setCurrentIndex(index);
     setZoom(1);
     setPosition({ x: 0, y: 0 });
   };
 
   // Получаем URL текущего медиа и информацию о том, видео ли это
-  const getCurrentMediaData = () => {
-    if (!photos.length) return { url: '', isVideo: false };
+ const getCurrentMediaData = () => {
+   if (!allMedia.length) return { url: '', isVideo: false };
 
-    const currentPhoto = photos[currentIndex];
+   const currentMedia = allMedia[currentIndex];
     let url = '';
     let isCurrentVideo = false;
 
-    if (typeof currentPhoto === 'string') {
-      url = normalizeImageUrl(currentPhoto);
-      isCurrentVideo = isVideo(currentPhoto);
-    } else if (currentPhoto?.full_url) {
-      url = normalizeImageUrl(currentPhoto.full_url);
-      isCurrentVideo = isVideo(currentPhoto.full_url);
-    } else if (currentPhoto?.photo_url) {
-      url = normalizeImageUrl(currentPhoto.photo_url);
-      isCurrentVideo = isVideo(currentPhoto.photo_url);
-    } else if (currentPhoto instanceof File) {
+   if (currentMedia.type === 'video') {
+      url = normalizeImageUrl(currentMedia.url);
+      isCurrentVideo = true;
+    } else if (typeof currentMedia.item === 'string') {
+      url = normalizeImageUrl(currentMedia.item);
+      isCurrentVideo = isVideo(currentMedia.item);
+    } else if (currentMedia.item?.full_url) {
+      url = normalizeImageUrl(currentMedia.item.full_url);
+      isCurrentVideo = isVideo(currentMedia.item.full_url);
+    } else if (currentMedia.item?.photo_url) {
+      url = normalizeImageUrl(currentMedia.item.photo_url);
+      isCurrentVideo = isVideo(currentMedia.item.photo_url);
+    } else if (currentMedia.item?.video_url) {
+      url = normalizeImageUrl(currentMedia.item.video_url);
+      isCurrentVideo = isVideo(currentMedia.item.video_url);
+    } else if (currentMedia.item instanceof File) {
       url = objectUrls.get(currentIndex) || '';
-      isCurrentVideo = currentPhoto.type && currentPhoto.type.startsWith('video/');
+      isCurrentVideo = currentMedia.item.type && currentMedia.item.type.startsWith('video/');
     }
     
     return { url, isVideo: isCurrentVideo };
   };
 
-  const handleMouseDown = (e) => {
-    if (zoom > 1) {
+ const handleMouseDown = (e) => {
+   if (zoom > 1) {
       setIsDragging(true);
       setDragStart({
         x: e.clientX - position.x,
@@ -188,8 +228,8 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
     }
   };
 
-  const handleMouseMove = (e) => {
-    if (isDragging && zoom > 1) {
+ const handleMouseMove = (e) => {
+   if (isDragging && zoom > 1) {
       setPosition({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y
@@ -197,15 +237,15 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
     }
   };
 
-  const handleMouseUp = () => {
+ const handleMouseUp = () => {
     setIsDragging(false);
   };
 
   // Обработка touch событий для мобильных устройств
-  const handleTouchStart = (e) => {
-    if (zoom > 1 && e.touches.length === 1) {
+ const handleTouchStart = (e) => {
+   if (zoom > 1 && e.touches.length === 1) {
       setIsDragging(true);
-      const touch = e.touches[0];
+     const touch = e.touches[0];
       setDragStart({
         x: touch.clientX - position.x,
         y: touch.clientY - position.y
@@ -213,9 +253,9 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
     }
   };
 
-  const handleTouchMove = (e) => {
-    if (isDragging && zoom > 1 && e.touches.length === 1) {
-      const touch = e.touches[0];
+ const handleTouchMove = (e) => {
+   if (isDragging && zoom > 1 && e.touches.length === 1) {
+     const touch = e.touches[0];
       setPosition({
         x: touch.clientX - dragStart.x,
         y: touch.clientY - dragStart.y
@@ -223,42 +263,42 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
     }
   };
 
-  const handleTouchEnd = () => {
+ const handleTouchEnd = () => {
     setIsDragging(false);
   };
 
   // Swipe handling functions
-  const handleSwipeStart = (e) => {
-    if (zoom > 1 || photos.length <= 1) return; // Disable swipe when zoomed or single image
+ const handleSwipeStart = (e) => {
+   if (zoom > 1 || allMedia.length <= 1) return; // Disable swipe when zoomed or single item
 
-    const touch = e.touches[0];
+   const touch = e.touches[0];
     setSwipeStart({ x: touch.clientX, y: touch.clientY });
     setSwipeCurrent({ x: touch.clientX, y: touch.clientY });
     setIsSwiping(true);
   };
 
-  const handleSwipeMove = (e) => {
-    if (!isSwiping || zoom > 1) return;
+ const handleSwipeMove = (e) => {
+   if (!isSwiping || zoom > 1) return;
 
-    const touch = e.touches[0];
+   const touch = e.touches[0];
     setSwipeCurrent({ x: touch.clientX, y: touch.clientY });
   };
 
-  const handleSwipeEnd = () => {
-    if (!isSwiping || !swipeStart || !swipeCurrent) {
+ const handleSwipeEnd = () => {
+   if (!isSwiping || !swipeStart || !swipeCurrent) {
       setIsSwiping(false);
       setSwipeStart(null);
       setSwipeCurrent(null);
       return;
     }
 
-    const deltaX = swipeCurrent.x - swipeStart.x;
-    const deltaY = Math.abs(swipeCurrent.y - swipeStart.y);
-    const minSwipeDistance = 50; // Minimum distance for swipe recognition
+   const deltaX = swipeCurrent.x - swipeStart.x;
+   const deltaY = Math.abs(swipeCurrent.y - swipeStart.y);
+   const minSwipeDistance = 50; // Minimum distance for swipe recognition
 
     // Check if horizontal swipe is significant and not too vertical
-    if (Math.abs(deltaX) > minSwipeDistance && deltaY < minSwipeDistance) {
-      if (deltaX > 0) {
+   if (Math.abs(deltaX) > minSwipeDistance && deltaY < minSwipeDistance) {
+     if (deltaX > 0) {
         // Swipe right - go to previous image
         goToPrevious();
       } else {
@@ -273,10 +313,10 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
     setSwipeCurrent(null);
   };
 
-  const handleImageClick = (e) => {
-    e.stopPropagation();
+ const handleImageClick= (e) => {
+   e.stopPropagation();
     // При клике на изображение увеличиваем/уменьшаем зум
-    if (zoom === 1) {
+   if (zoom === 1) {
       handleZoomIn();
     } else {
       handleResetZoom();
@@ -285,18 +325,18 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
 
   if (!isOpen) return null;
 
-  const currentMediaData = getCurrentMediaData();
+ const currentMediaData = getCurrentMediaData();
 
-  if (!photos.length || !currentMediaData.url) return null;
+  if (!allMedia.length || !currentMediaData.url) return null;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90"
-      onClick={onClose}
+     onClick={onClose}
     >
       {/* Кнопка закрытия */}
       <button
-        onClick={onClose}
+       onClick={onClose}
         className="absolute top-4 right-4 z-60 text-white hover:text-gray-300 transition-colors"
       >
         <img src="/img/close_md.svg" alt="Закрыть" className="w-6 h-6" />
@@ -305,19 +345,19 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
       {/* Кнопки управления зумом */}
       <div className="absolute top-4 left-4 z-60 flex flex-col gap-2">
         <button
-          onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
+         onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
           className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-3 py-1 rounded transition-colors"
         >
           +
         </button>
         <button
-          onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
+         onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
           className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-3 py-1 rounded transition-colors"
         >
           −
         </button>
         <button
-          onClick={(e) => { e.stopPropagation(); handleResetZoom(); }}
+         onClick={(e) => { e.stopPropagation(); handleResetZoom(); }}
           className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-2 py-1 rounded text-xs transition-colors"
         >
           1:1
@@ -325,16 +365,16 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
       </div>
 
       {/* Кнопки навигации между изображениями (только для десктопа) */}
-      {photos.length > 1 && (
+      {allMedia.length > 1 && (
         <>
           <button
-            onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
+           onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
             className="hidden md:flex absolute left-4 top-1/2 transform -translate-y-1/2 z-60 bg-white bg-opacity-20 hover:bg-opacity-30 text-white w-12 h-12 rounded-full items-center justify-center transition-colors"
           >
             ‹
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); goToNext(); }}
+           onClick={(e) => { e.stopPropagation(); goToNext(); }}
             className="hidden md:flex absolute right-4 top-1/2 transform -translate-y-1/2 z-60 bg-white bg-opacity-20 hover:bg-opacity-30 text-white w-12 h-12 rounded-full items-center justify-center transition-colors"
           >
             ›
@@ -346,27 +386,27 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
       <div className="flex items-center justify-center w-full h-full p-4">
         <div
           className="relative overflow-hidden cursor-move"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onTouchStart={(e) => {
-            if (zoom <= 1) {
+         onClick={(e) => e.stopPropagation()}
+         onMouseDown={handleMouseDown}
+         onMouseMove={handleMouseMove}
+         onMouseUp={handleMouseUp}
+         onMouseLeave={handleMouseUp}
+         onTouchStart={(e) => {
+           if (zoom <= 1) {
               handleSwipeStart(e);
             } else {
               handleTouchStart(e);
             }
           }}
-          onTouchMove={(e) => {
-            if (isSwiping) {
+         onTouchMove={(e) => {
+           if (isSwiping) {
               handleSwipeMove(e);
             } else {
               handleTouchMove(e);
             }
           }}
-          onTouchEnd={() => {
-            if (isSwiping) {
+         onTouchEnd={() => {
+           if (isSwiping) {
               handleSwipeEnd();
             } else {
               handleTouchEnd();
@@ -384,8 +424,8 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
                   transform: `scale(${zoom}) translate(${position.x}px, ${position.y}px)`,
                   transformOrigin: 'center center'
                 }}
-                onClick={handleImageClick}
-                controls={true}
+               onClick={handleImageClick}
+               controls={true}
                 muted
                 playsInline
               />
@@ -401,7 +441,7 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
                 transform: `scale(${zoom}) translate(${position.x}px, ${position.y}px)`,
                 transformOrigin: 'center center'
               }}
-              onClick={handleImageClick}
+             onClick={handleImageClick}
               draggable={false}
             />
           )}
@@ -409,26 +449,28 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
       </div>
 
       {/* Индикатор текущего изображения */}
-      {photos.length > 1 && (
+      {allMedia.length > 1 && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-60 bg-black bg-opacity-50 text-white px-3 py-1 rounded text-sm">
-          {currentIndex + 1} / {photos.length}
+          {currentIndex + 1} / {allMedia.length}
         </div>
       )}
 
       {/* Миниатюры */}
-      {photos.length > 1 && (
+      {allMedia.length > 1 && (
         <div className="absolute bottom-20 md:bottom-16 left-1/2 transform -translate-x-1/2 z-60 flex gap-2 max-w-full overflow-x-auto px-4">
-          {photos.map((photo, index) => {
+          {allMedia.map((media, index) => {
             let thumbUrl;
-            const isThumbVideo = isVideo(photo);
+           const isThumbVideo = media.type === 'video' || isVideo(media.item);
 
-            if (typeof photo === 'string') {
-              thumbUrl = normalizeImageUrl(photo);
-            } else if (photo?.full_url) {
-              thumbUrl = normalizeImageUrl(photo.full_url);
-            } else if (photo?.photo_url) {
-              thumbUrl = normalizeImageUrl(photo.photo_url);
-            } else if (photo instanceof File) {
+           if (media.type === 'video') {
+              thumbUrl = normalizeImageUrl(media.url);
+            } else if (typeof media.item === 'string') {
+              thumbUrl = normalizeImageUrl(media.item);
+            } else if (media.item?.full_url) {
+              thumbUrl = normalizeImageUrl(media.item.full_url);
+            } else if (media.item?.photo_url) {
+              thumbUrl = normalizeImageUrl(media.item.photo_url);
+            } else if (media.item instanceof File) {
               thumbUrl = objectUrls.get(index) || '';
             } else {
               thumbUrl = '';
@@ -437,7 +479,7 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
             return (
               <button
                 key={index}
-                onClick={(e) => { e.stopPropagation(); goToImage(index); }}
+               onClick={(e) => { e.stopPropagation(); goToImage(index); }}
                 className={`relative rounded border-2 transition-all flex-shrink-0 ${
                   index === currentIndex
                     ? 'border-white shadow-lg scale-110'
@@ -449,7 +491,7 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
                     <video
                       src={thumbUrl}
                       className="w-12 h-12 object-contain rounded"
-                      controls={false}
+                     controls={false}
                       muted
                       playsInline
                     />
@@ -480,18 +522,18 @@ const ImageModal = ({ isOpen, onClose, photos = [], initialIndex = 0, alt = 'И�
         <div className="md:hidden">
           Двойное касание для зума • Используйте кнопки + и −
         </div>
-        {photos.length > 1 && (
+        {allMedia.length > 1 && (
           <div className="hidden md:block">
             Стрелки ← → для навигации • Escape для выхода
           </div>
         )}
-        {photos.length > 1 && (
+        {allMedia.length > 1 && (
           <div className="md:hidden">
             Свайп влево/вправо для перелистывания • Нажмите вне изображения для выхода
           </div>
         )}
-        {photos.length === 1 && <div className="hidden md:block">Escape для выхода</div>}
-        {photos.length === 1 && <div className="md:hidden">Нажмите вне изображения для выхода</div>}
+        {allMedia.length === 1 && <div className="hidden md:block">Escape для выхода</div>}
+        {allMedia.length === 1 && <div className="md:hidden">Нажмите вне изображения для выхода</div>}
       </div>
     </div>
   );

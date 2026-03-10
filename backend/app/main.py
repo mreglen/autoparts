@@ -61,7 +61,6 @@ async def startup_event():
     global scheduler
     scheduler = AsyncIOScheduler()
     
-    # Add a job to clean up expired sessions every hour
     scheduler.add_job(
         func=run_cleanup_expired_sessions,
         trigger=IntervalTrigger(hours=1),
@@ -70,28 +69,25 @@ async def startup_event():
         replace_existing=True
     )
     
-    # Start the scheduler
     scheduler.start()
     logger.info("Scheduler started. Expired session cleanup job scheduled.")
     
-    # Populate default delivery methods for organizations that don't have any
+    
     try:
         from app.models.delivery_method import DeliveryMethod, organization_delivery_methods
         from app.models.organization import Organization
         from app.db.database import get_db
         
-        # Get a database session
+ 
         db = next(get_db())
         try:
-            # Check if delivery method with ID=1 exists
             default_delivery_method = db.query(DeliveryMethod).filter(DeliveryMethod.id == 1).first()
             if default_delivery_method:
-                # Get all organizations
                 organizations = db.query(Organization).all()
                 
                 populated_count = 0
                 for org in organizations:
-                    # Check if this organization already has delivery method ID=1 assigned
+                   
                     from sqlalchemy import text
                     result = db.execute(text(
                         "SELECT * FROM organization_delivery_methods WHERE organization_id = :org_id AND delivery_method_id = :method_id"
@@ -99,7 +95,6 @@ async def startup_event():
                     existing = result.fetchone()
                     
                     if not existing:
-                        # Add the default delivery method for this organization
                         db.execute(
                             organization_delivery_methods.insert().values(
                                 organization_id=org.id,
@@ -110,84 +105,67 @@ async def startup_event():
                 
                 if populated_count > 0:
                     db.commit()
-                    logger.info(f"Populated {populated_count} organization(s) with default delivery method (ID=1)")
+                    logger.info(f" {populated_count}")
                 else:
-                    logger.info("All organizations already have the default delivery method assigned")
+                    logger.info("Все организации с методами доставки настроены")
             else:
-                logger.warning("Default delivery method (ID=1) not found")
+                logger.warning("Метод доставки по умолчанию (ID=1) не найден")
         finally:
             db.close()
     except Exception as e:
-        logger.error(f"Error populating default delivery methods: {str(e)}")
+        logger.error(f"Ошибка при заполнении методами доставки: {str(e)}")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Shutdown the scheduler when the application stops."""
     global scheduler
     if scheduler:
         scheduler.shutdown()
-        logger.info("Scheduler shut down.")
+        logger.info("Scheduler уничтожен")
 
 
 async def run_cleanup_expired_sessions():
-    """
-    Wrapper function to run the cleanup of expired sessions in a separate thread.
-    This function is called by the scheduler.
-    """
     try:
-        # Create a new database session for this background task
         db_gen = get_db()
         db = next(db_gen)
         
         try:
-            # Clean up sessions that haven't been active for more than 24 hours
             deleted_count = cleanup_expired_sessions(db, hours_threshold=24)
-            logger.info(f"Cleaned up {deleted_count} expired user sessions")
+            logger.info(f"Удалено {deleted_count} сессий пользователей с истекшим сроком действия")
         finally:
-            # Close the database session
             db.close()
     except Exception as e:
-        logger.error(f"Error during expired session cleanup: {str(e)}")
+        logger.error(f"Ошибка при очистке сессий пользователей: {str(e)}")
 
 
 app.include_router(api_router)
 
-# Serve static files from uploads directory
 import os
 from pathlib import Path
 
-# Get the absolute path to the uploads directory
-# Note: uploads directory is at backend/uploads, not backend/app/uploads
 uploads_dir = Path(__file__).parent.parent / "uploads"
 if uploads_dir.exists():
     app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
 else:
-    logger.error(f"Uploads directory not found: {uploads_dir}")
+    logger.error(f"Каталог загрузок не найден: {uploads_dir}")
 
-# Also mount pictures directory for direct access
 pictures_dir = Path(__file__).parent.parent / "uploads" / "pictures"
 if pictures_dir.exists():
     app.mount("/pictures", StaticFiles(directory=str(pictures_dir)), name="pictures")
 else:
-    logger.error(f"Pictures directory not found: {pictures_dir}")
+    logger.error(f"Каталог изображений не найден: {pictures_dir}")
 
-# Mount videos directory for direct access
 videos_dir = Path(__file__).parent.parent / "uploads" / "videos"
 if videos_dir.exists():
     app.mount("/videos", StaticFiles(directory=str(videos_dir)), name="videos")
 else:
-    logger.error(f"Videos directory not found: {videos_dir}")
+    logger.error(f"Каталог видео не найден: {videos_dir}")
 
 
-# Endpoint to serve media files with CORS headers
+
 @app.get("/media/{path:path}")
 async def get_media_file(path: str):
-    """
-    Serve media files (photos/videos) with CORS headers.
-    This endpoint allows frontend to access media from different origin.
-    """
-    # Determine file type and appropriate directory
+
     if path.startswith("pictures/"):
         base_dir = Path(__file__).parent.parent / "uploads" / "pictures"
         relative_path = path.replace("pictures/", "")
@@ -197,14 +175,12 @@ async def get_media_file(path: str):
     else:
         return FileResponse(status_code=404, content={"detail": "File not found"})
     
-    # Construct full file path
     file_path = base_dir / relative_path
     
-    # Check if file exists
+   
     if not file_path.exists():
         return FileResponse(status_code=404, content={"detail": "File not found"})
     
-    # Determine media type
     media_type = "image/webp"
     if path.endswith(".mp4") or path.endswith(".avi") or path.endswith(".mov"):
         media_type = "video/mp4"
@@ -213,7 +189,7 @@ async def get_media_file(path: str):
     elif path.endswith(".png"):
         media_type = "image/png"
     
-    # Return file with CORS headers
+    
     response = FileResponse(str(file_path), media_type=media_type)
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"

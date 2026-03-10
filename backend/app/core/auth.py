@@ -21,15 +21,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None, d
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=30))
     to_encode.update({"exp": expire})
 
-    # Создаем JWT токен
     token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
-    # Если переданы параметры для создания сессии, создаем её в БД
+
     if db and user:
-        # Генерируем уникальный идентификатор сессии
         session_token = secrets.token_hex(32)
 
-        # Создаем новую сессию
+
         session = UserSession(
             user_id=user.id,
             session_token=session_token,
@@ -40,7 +38,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None, d
         db.add(session)
         db.commit()
 
-        # Добавляем session_token в payload токена
+
         to_encode.update({"session_token": session_token})
         token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -53,10 +51,8 @@ def authenticate_user(db: Session, login: str, password: str):
     login = login.strip()
 
     if '@' in login and '.' in login:
-        # Это email — ищем без учета регистра
         user = db.query(User).filter(User.email.ilike(login)).first()
     else:
-        # Это телефон — нормализуем к формату хранения
         normalized = normalize_to_storage_format(login)
         if not normalized:
             return False
@@ -72,26 +68,26 @@ def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> User:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Не удалось проверить учетные данные",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        email: str = payload.get("sub")
-        session_token: str = payload.get("session_token")
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    email: str = payload.get("sub")
+    session_token: str = payload.get("session_token")
 
-        if email is None:
-            raise credentials_exception
-    except Exception:
-        raise credentials_exception
+    if email is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Не удалось проверить учетные данные",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     user = get_user_by_email(db, email)
     if user is None:
-        raise credentials_exception
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Не удалось проверить учетные данные",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
-    # Если в токене есть session_token, проверяем валидность сессии
+
     if session_token:
         session = db.query(UserSession).filter(
             UserSession.user_id == user.id,
@@ -106,7 +102,7 @@ def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # Обновляем время последней активности
+
         session.last_activity = datetime.utcnow()
         db.commit()
 
@@ -123,42 +119,22 @@ def get_current_admin_user(
     return current_user
 
 def cleanup_old_user_sessions(db: Session, user_id: int, ip_address: str, max_sessions_per_ip: int = 5):
-    """
-    Удаляет старые сессии для конкретного пользователя с одного и того же IP-адреса.
-    Оставляет только последние max_sessions_per_ip сессий.
-    
-    Args:
-        db: Database session
-        user_id: ID пользователя
-        ip_address: IP-адрес, для которого нужно очистить сессии
-        max_sessions_per_ip: Максимальное количество сессий, которые можно оставить для одного IP (по умолчанию 5)
-    """
     from sqlalchemy import and_
-    
-    # Получаем старые сессии для конкретного пользователя с указанного IP
     old_sessions = db.query(UserSession)\
         .filter(and_(UserSession.user_id == user_id, UserSession.ip_address == ip_address))\
         .order_by(UserSession.created_at.desc())\
         .offset(max_sessions_per_ip)\
         .all()
-    
-    # Удаляем старые сессии
+
     for session in old_sessions:
         db.delete(session)
 
     db.commit()
     
-    return len(old_sessions)  # Возвращаем количество удаленных сессий
+    return len(old_sessions)
 
 
 def cleanup_expired_sessions(db: Session, hours_threshold: int = 24):
-    """
-    Удаляет просроченные сессии, которые не были активны указанное количество часов.
-    
-    Args:
-        db: Database session
-        hours_threshold: Количество часов, после которых сессия считается просроченной
-    """
     from datetime import datetime, timedelta
     
     threshold_time = datetime.utcnow() - timedelta(hours=hours_threshold)
@@ -171,4 +147,4 @@ def cleanup_expired_sessions(db: Session, hours_threshold: int = 24):
 
     db.commit()
     
-    return len(expired_sessions)  # Возвращаем количество удаленных сессий
+    return len(expired_sessions)

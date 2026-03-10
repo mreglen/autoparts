@@ -20,7 +20,7 @@ const PartDetail = () => {
   const cart = useSelector(selectCart);
 
   const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
+  const [selectedImages, setSelectedImages] = useState({ photos: [], videos: [], initialIndex: 0 });
   const [addingToCartId, setAddingToCartId] = useState(null);
 
   useEffect(() => {
@@ -67,8 +67,8 @@ const PartDetail = () => {
     }
   }, [dispatch, id, brand, article]);
 
-  const handleImageClick = (photos, initialIndex) => {
-    setSelectedImages({ photos, initialIndex });
+  const handleImageClick = (photos, videos, initialIndex) => {
+    setSelectedImages({ photos, videos, initialIndex });
     setImageModalOpen(true);
   };
 
@@ -253,13 +253,13 @@ const PartDetail = () => {
           <div className="space-y-6">
             {/* Photos */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Фото запчасти</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Фото и видео запчасти</h2>
               <div className="flex flex-col md:flex-row gap-4">
                 {/* Large main photo */}
                 <div className="flex-1">
                   {currentProduct.photos && currentProduct.photos.length > 0 && (
                     <div className="bg-gray-200 aspect-square rounded-xl overflow-hidden flex items-center justify-center cursor-pointer"
-                         onClick={() => handleImageClick(currentProduct.photos, 0)}>
+                         onClick={() => handleImageClick(currentProduct.photos, currentProduct.videos || [], 0)}>
                       {(() => {
                         const firstPhoto = currentProduct.photos[0];
                         let mediaUrl;
@@ -313,7 +313,10 @@ const PartDetail = () => {
                         
                         if (isVideo(firstPhoto)) {
                           return (
-                            <div className="relative w-full h-full flex items-center justify-center">
+                            <div className="relative w-full h-full flex items-center justify-center" onClick={(e) => {
+                              e.stopPropagation();
+                              handleImageClick(currentProduct.photos, currentProduct.videos || [], 0);
+                            }}>
                               <video
                                 src={mediaUrl}
                                 className="max-h-full max-w-full object-contain"
@@ -405,7 +408,7 @@ const PartDetail = () => {
                           <div 
                             key={index}
                             className="w-20 h-20 flex-shrink-0 cursor-pointer"
-                            onClick={() => handleImageClick(currentProduct.photos, index + 1)}
+                            onClick={() => handleImageClick(currentProduct.photos, currentProduct.videos || [], index + 1)}
                           >
                             <div className="relative w-full h-full">
                               <video
@@ -413,9 +416,9 @@ const PartDetail = () => {
                                 className="w-full h-full object-cover rounded-lg border"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleImageClick(currentProduct.photos, index + 1);
+                                  handleImageClick(currentProduct.photos, currentProduct.videos || [], index + 1);
                                 }}
-                                controls={false}
+                               controls={false}
                                 muted
                                 playsInline
                               />
@@ -434,9 +437,9 @@ const PartDetail = () => {
                             src={normalizeImageUrl(mediaUrl)}
                             alt={`Фото товара ${index + 2}`}
                             className="w-20 h-20 object-cover rounded-lg border cursor-pointer flex-shrink-0"
-                            onClick={() => handleImageClick(currentProduct.photos, index + 1)}
+                            onClick={() => handleImageClick(currentProduct.photos, currentProduct.videos || [], index + 1)}
                             onError={(e) => {
-                              console.warn(`Failed to load media: ${mediaUrl}`);
+                             console.warn(`Failed to load media: ${mediaUrl}`);
                               e.target.style.display = 'none';
                             }}
                             loading="lazy"
@@ -649,6 +652,7 @@ const PartDetail = () => {
         isOpen={imageModalOpen}
         onClose={() => setImageModalOpen(false)}
         photos={selectedImages.photos}
+        videos={selectedImages.videos}
         initialIndex={selectedImages.initialIndex}
         alt="Фото товара"
       />

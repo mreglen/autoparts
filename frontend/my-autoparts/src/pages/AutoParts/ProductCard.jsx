@@ -51,6 +51,7 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
   const [touchStartX, setTouchStartX] = useState(0);
   const [touchEndX, setTouchEndX] = useState(0);
   const [showCallModal, setShowCallModal] = useState(false);
+  const [hoverSide, setHoverSide] = useState(null); // 'left' or 'right'
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const cart = useSelector(selectCart);
@@ -171,16 +172,42 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
               const currentMediaIsVideo = currentMediaItem && currentMediaItem.type === 'video';
               
               return (
-                <div className="relative w-full h-full">
-                  {/* Video badge overlay */}
-                  {currentMediaIsVideo && (
-                    <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded-md text-xs font-medium z-10 flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                      </svg>
-                      Видео
-                    </div>
+                <div 
+                  className="relative w-full h-full"
+                  onMouseLeave={() => setHoverSide(null)}
+                >
+                  {/* Navigation arrows for multiple media */}
+                  {allMedia && allMedia.length > 1 && (
+                    <>
+                      {/* Left arrow */}
+                      <button
+                        className={`absolute left-0 top-1/2 transform -translate-y-1/2 z-20 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-r-md transition-opacity duration-200 ${hoverSide === 'left' ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentImageIndex(prev => prev > 0 ? prev - 1 : allMedia.length - 1);
+                        }}
+                        onMouseEnter={() => setHoverSide('left')}
+                      >
+                        <svg className="w-6 h-6"fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      {/* Right arrow */}
+                      <button
+                        className={`absolute right-0 top-1/2 transform -translate-y-1/2 z-20 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-l-md transition-opacity duration-200 ${hoverSide === 'right' ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentImageIndex(prev => prev < allMedia.length - 1 ? prev + 1 : 0);
+                        }}
+                        onMouseEnter={() => setHoverSide('right')}
+                      >
+                        <svg className="w-6 h-6"fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </>
                   )}
+    
                   
                   {currentMediaIsVideo ? (
                     <>
@@ -219,8 +246,17 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
                           const newIndex = Math.max(0, Math.min(calculatedIndex, allMedia.length - 1));
                           
                           // Only update if the index has changed
-                          if (newIndex !== currentImageIndex) {
+                         if (newIndex !== currentImageIndex) {
                             setCurrentImageIndex(newIndex);
+                          }
+                          
+                          // Set hover side based on mouse position
+                         if (x < width * 0.3) {
+                            setHoverSide('left');
+                          } else if (x > width * 0.7) {
+                            setHoverSide('right');
+                          } else {
+                            setHoverSide(null);
                           }
                         }
                       }}

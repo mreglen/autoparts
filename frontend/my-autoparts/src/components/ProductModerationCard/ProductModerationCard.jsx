@@ -110,7 +110,7 @@ const ProductModerationCard = ({ product, onApprove, onReject }) => {
                         <div>
                             <span className="text-gray-500">Склад:</span>
                             <div className="font-medium text-gray-900">
-                                {product.storage_location?.address || `#${product.storage_location_id}`}
+                                {product.storage_location_address || `#${product.storage_location_id}`}
                             </div>
                         </div>
                     </div>

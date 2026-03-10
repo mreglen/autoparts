@@ -13,7 +13,7 @@ import PendingParts from './PendingParts/PendingParts';
 const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [] }) => {
   const [showActions, setShowActions] = useState(false);
 
-  // Закрываем dropdown при клике вне
+  
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (!event.target.closest('.actions-dropdown')) {
@@ -298,9 +298,43 @@ function MyParts() {
   const totalValue = displayParts.reduce((sum, part) => sum + (part.price * part.quantity), 0);
   const totalQuantity = displayParts.reduce((sum, part) => sum + part.quantity, 0);
 
-  const handleImageClick = (photos, initialIndex) => {
-    setSelectedImages({ photos, initialIndex });
-    setImageModalOpen(true);
+  const handleImageClick = (allMedia, initialIndex) => {
+   // Separate photos and videos from the combined media array
+  const photos = allMedia.filter(item => {
+    // Check if it's a photo by looking at the structure or file type
+  if (typeof item === 'string') {
+    return !item.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
+    }
+  if (item instanceof File) {
+    return item.type && item.type.startsWith('image/');
+   }
+  if (item?.photo_url || item?.full_url) {
+  const url = item.photo_url || item.full_url;
+    return !url.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
+   }
+   return true; // Default to photo
+   });
+   
+  const videos = allMedia.filter(item => {
+   // Check if it's a video
+  if (typeof item === 'string') {
+    return item.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
+   }
+  if (item instanceof File) {
+    return item.type && item.type.startsWith('video/');
+   }
+  if (item?.video_url || item?.full_url) {
+  const url = item.video_url || item.full_url;
+    return url.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
+   }
+  if (item?.photo_url) {
+    return item.photo_url.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
+   }
+   return false; // Default to not video
+   });
+   
+   setSelectedImages({ photos, videos, initialIndex });
+   setImageModalOpen(true);
   };
 
   const handleOpenModal = (part, type) => {
@@ -348,8 +382,8 @@ function MyParts() {
   }, [mobileActionsOpen]);
 
   const handleBulkAction = () => {
-    // Заглушка для будущих действий
-    console.log(`Выбрано ${selectedParts.size} запчастей для массовых действий`);
+    
+    console.log(`Выбрано ${selectedParts.size} запчастей`);
   };
 
   const handleConfirm = async () => {
@@ -566,7 +600,7 @@ function MyParts() {
             <option value="">Все склады</option>
             {storageLocations.map((location) => (
               <option key={location.id} value={location.id}>
-                {location.address || `Склад #${location.id}`}
+                {location.address}
               </option>
             ))}
           </select>
@@ -1069,8 +1103,9 @@ function MyParts() {
 
       <ImageModal
         isOpen={imageModalOpen}
-        onClose={() => setImageModalOpen(false)}
+       onClose={() => setImageModalOpen(false)}
         photos={selectedImages.photos}
+        videos={selectedImages.videos || []}
         initialIndex={selectedImages.initialIndex}
         alt="Фото товара"
       />

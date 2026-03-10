@@ -21,9 +21,9 @@ const StockOutModal = ({
 
           {selectedPart && (
             <div className="text-sm text-gray-600 mb-4">
-              <div>{selectedPart.brand} {selectedPart.name}</div>
+              <div>Бренд: {selectedPart.brand || '—'}</div>
               <div>Артикул: {selectedPart.article || '—'}</div>
-              <div>Остаток: {selectedPart.quantity}</div>
+              <div>Остаток: {selectedPart.quantity || '—'}</div>
             </div>
           )}
 

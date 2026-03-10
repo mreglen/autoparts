@@ -23,6 +23,7 @@ class RejectedProduct(Base):
     rejected_at = Column(DateTime, default=func.now())
     rejection_reason = Column(Text, nullable=False)
     photos = Column(Text)  # JSON строка с URL фото
+    videos = Column(Text)  # JSON строка с URL видео
     vehicle_ids = Column(Text)  # JSON строка с ID автомобилей
     
     # Relationships

@@ -4,19 +4,16 @@ from datetime import datetime
 
 
 class RejectedProductBase(BaseModel):
-    article: str
-    name: str
-    brand: str
-    internal_code: str
+    article: Optional[str] = None
+    name: Optional[str] = None
+    brand: Optional[str] = None
     description: Optional[str] = None
     is_new: bool = True
-    price: float
-    quantity: int
-    organization_id: str
-    storage_location_id: int
-    created_by: int
-    rejection_reason: str
+    price: Optional[float] = None
+    quantity: Optional[int] = None
+    storage_location_id: Optional[int] = None
     photos: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
     vehicle_ids: Optional[List[int]] = None
 
 

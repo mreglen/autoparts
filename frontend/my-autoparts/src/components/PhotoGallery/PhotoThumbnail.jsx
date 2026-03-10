@@ -60,24 +60,24 @@ const PhotoThumbnail = ({ photos = [], videos = [], onImageClick }) => {
   return (
     <div className="flex flex-wrap gap-2">
       {allMedia.map((media, index) => {
-        const mediaUrl = normalizeImageUrl(media.url);
+       const mediaUrl = normalizeImageUrl(media.url);
 
-        if (isVideoItem(media)) {
-          return (
-            <div key={index} className="relative">
+       if (isVideoItem(media)) {
+         return (
+            <div key={index} className="relative group cursor-pointer">
               <video
                 src={mediaUrl}
-                className="w-20 h-20 md:w-24 md:h-24 object-contain rounded-lg border shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={(e) => {
+                className="w-20 h-20 md:w-24 md:h-24 object-contain rounded-lg border shadow-sm transition-opacity duration-200 group-hover:opacity-90"
+               onClick={(e) => {
                   e.stopPropagation();
                   // Pass the original item instead of the wrapped media object
-                  onImageClick && onImageClick(allMedia.map(m => m.item), index);
+                 onImageClick && onImageClick(allMedia.map(m => m.item), index);
                 }}
-                controls={false}
+               controls={false}
                 muted
                 playsInline
               />
-              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg">
+              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg transition-opacity duration-200 group-hover:bg-opacity-20">
                 <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                 </svg>
