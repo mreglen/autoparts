@@ -197,8 +197,13 @@ const EditPart = () => {
       try {
         const formData = new FormData();
         formData.append('file', file);
-        console.log('Uploading photo:', file.name);
-        const result = await apiRequestFormData('/upload/photo', formData);
+        // Get organization_id from user context or product
+        const organizationId = product?.organization_id || user?.organization_id;
+        const uploadEndpoint = organizationId 
+          ? `/upload/photo?organization_id=${organizationId}`
+          : '/upload/photo';
+        console.log('Uploading photo:', file.name, 'Organization ID:', organizationId);
+        const result = await apiRequestFormData(uploadEndpoint, formData);
         console.log('Upload result:', result);
         
         if (result.path && result.filename) {
@@ -237,8 +242,13 @@ const EditPart = () => {
       try {
         const formData = new FormData();
         formData.append('file', file);
-        console.log('Uploading video:', file.name);
-        const result = await apiRequestFormData('/upload/video', formData);
+        // Get organization_id from user context or product
+        const organizationId = product?.organization_id || user?.organization_id;
+        const uploadEndpoint = organizationId 
+          ? `/upload/video?organization_id=${organizationId}`
+          : '/upload/video';
+        console.log('Uploading video:', file.name, 'Organization ID:', organizationId);
+        const result = await apiRequestFormData(uploadEndpoint, formData);
         console.log('Upload result:', result);
         
         if (result.path && result.filename) {
