@@ -104,6 +104,9 @@ export const apiRequestUnauth = async (endpoint, options = {}) => {
 
 export const apiRequestFormData = async (endpoint, formData, options = {}) => {
     const url = `${API_BASE}${endpoint}`;
+    const token = localStorage.getItem('token');
+    console.log('apiRequestFormData - Token exists:', !!token);
+    console.log('apiRequestFormData - Endpoint:', endpoint);
 
     const defaultOptions = {
         method: 'POST',
@@ -113,6 +116,8 @@ export const apiRequestFormData = async (endpoint, formData, options = {}) => {
         },
         ...options
     };
+    
+    console.log('apiRequestFormData - Headers:', defaultOptions.headers);
 
     const response = await fetch(url, {
         ...defaultOptions,
@@ -121,6 +126,7 @@ export const apiRequestFormData = async (endpoint, formData, options = {}) => {
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('apiRequestFormData - Error:', errorData);
         throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
     }
 

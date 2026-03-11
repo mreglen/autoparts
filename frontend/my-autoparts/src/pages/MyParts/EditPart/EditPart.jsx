@@ -197,7 +197,9 @@ const EditPart = () => {
       try {
         const formData = new FormData();
         formData.append('file', file);
+        console.log('Uploading photo:', file.name);
         const result = await apiRequestFormData('/upload/photo', formData);
+        console.log('Upload result:', result);
         
         if (result.path && result.filename) {
           // Store the file with its final path and filename
@@ -206,6 +208,7 @@ const EditPart = () => {
             finalFilename: result.filename 
           });
           uploadedFiles.push(fileWithPath);
+          console.log('File added with path:', fileWithPath.finalPath);
         }
       } catch (error) {
         console.error('Failed to upload photo:', error);
@@ -214,6 +217,7 @@ const EditPart = () => {
     }
     
     setPhotos((prev) => [...prev, ...uploadedFiles]);
+    console.log('Photos state updated:', [...photos, ...uploadedFiles].length, 'files');
   };
 
   const handleVideoAdd = async (e) => {
@@ -233,7 +237,9 @@ const EditPart = () => {
       try {
         const formData = new FormData();
         formData.append('file', file);
+        console.log('Uploading video:', file.name);
         const result = await apiRequestFormData('/upload/video', formData);
+        console.log('Upload result:', result);
         
         if (result.path && result.filename) {
           // Store the file with its final path and filename
@@ -242,6 +248,7 @@ const EditPart = () => {
             finalFilename: result.filename 
           });
           uploadedFiles.push(fileWithPath);
+          console.log('File added with path:', fileWithPath.finalPath);
         }
       } catch (error) {
         console.error('Failed to upload video:', error);
@@ -250,6 +257,7 @@ const EditPart = () => {
     }
     
     setVideos((prev) => [...prev, ...uploadedFiles]);
+    console.log('Videos state updated:', [...videos, ...uploadedFiles].length, 'files');
   };
 
   const handlePhotoRemove = async (index) => {
