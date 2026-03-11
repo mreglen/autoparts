@@ -127,13 +127,18 @@ async def upload_photo(
         start_time = time.time()
         timeout = 30  # 30 seconds timeout
         
+        print(f"Waiting for Celery task {task.id} to complete...")
+        
         while not task.ready():
             if time.time() - start_time > timeout:
+                print(f"Timeout waiting for task {task.id}")
                 raise HTTPException(500, "Превышено время обработки фото")
             time.sleep(0.5)
         
         # Get result from Celery task
+        print(f"Getting result from task {task.id}...")
         result_data = task.get(timeout=5)
+        print(f"Task result: {result_data}")
         
         if result_data.get('status') == 'success':
             # Return the actual processed path from Celery
@@ -152,6 +157,8 @@ async def upload_photo(
         
     except Exception as e:
         print(f"Error processing photo: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         # Clean up temp file on error
         try:
             if os.path.exists(temp_path):
