@@ -6,7 +6,7 @@ import { createStockIn, clearStockInError } from '../../../redux/slices/StockInS
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { fetchStorageCells, createStorageCell } from '../../../redux/slices/StorageCellsSlice';
 import { createPendingProductStorageCellsBatch } from '../../../redux/slices/PendingProductStorageCellsSlice';
-import { normalizeImageUrl } from '../../../utils/apiClient';
+import { normalizeImageUrl, apiRequest, apiRequestFormData } from '../../../utils/apiClient';
 
 import VehicleModal from './VehicleModal';
 import ImageModal from '../../../components/ImageModal/ImageModal';
@@ -42,6 +42,8 @@ const AddPart = () => {
   const [newCellName, setNewCellName] = useState('');
   const [newCellValue, setNewCellValue] = useState('');
   const [showNewCellForm, setShowNewCellForm] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [uploadedTempFiles, setUploadedTempFiles] = useState([]); // Track uploaded temp filenames
   
   // Image modal state
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -108,21 +110,121 @@ const AddPart = () => {
     };
   }, [dispatch]);
 
-  const handlePhotoAdd = (e) => {
+  const handlePhotoAdd = async (e) => {
     const files = Array.from(e.target.files);
-    setPhotos((prev) => [...prev, ...files]);
+    // Upload photos immediately to temp storage
+    const uploadedFiles = [];
+    
+    // Check if we already have 5 photos
+    if (photos.length >= 5) {
+      alert('Максимум 5 фотографий');
+      return;
+    }
+    
+    // Limit to available slots
+    const availableSlots = 5 - photos.length;
+    const filesToUpload = files.slice(0, availableSlots);
+    
+    if (files.length > availableSlots) {
+      alert(`Можно добавить только ${availableSlots} фотографий (максимум 5)`);
+    }
+    
+    for (const file of filesToUpload) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const result = await apiRequestFormData('/upload/photo', formData);
+        
+        if (result.temp_filename) {
+          // Store the file with its temp filename for tracking
+          const fileWithTempName = Object.assign(file, { tempFilename: result.temp_filename });
+          uploadedFiles.push(fileWithTempName);
+          setUploadedTempFiles(prev => [...prev, result.temp_filename]);
+        }
+      } catch (error) {
+        console.error('Failed to upload photo:', error);
+        alert(`Ошибка загрузки фото: ${file.name}`);
+      }
+    }
+    
+    setPhotos((prev) => [...prev, ...uploadedFiles]);
   };
 
-  const handleVideoAdd = (e) => {
+  const handleVideoAdd = async (e) => {
     const files = Array.from(e.target.files);
-    setVideos((prev) => [...prev, ...files]);
+    // Upload videos immediately to temp storage
+    const uploadedFiles = [];
+    
+    // Check if we already have 1 video
+    if (videos.length >= 1) {
+      alert('Максимум 1 видео');
+      return;
+    }
+    
+    // Only allow 1 video
+    if (files.length > 0) {
+      const file = files[0];
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const result = await apiRequestFormData('/upload/media', formData);
+        
+        if (result.temp_filename) {
+          // Store the file with its temp filename for tracking
+          const fileWithTempName = Object.assign(file, { tempFilename: result.temp_filename });
+          uploadedFiles.push(fileWithTempName);
+          setUploadedTempFiles(prev => [...prev, result.temp_filename]);
+        }
+      } catch (error) {
+        console.error('Failed to upload video:', error);
+        alert(`Ошибка загрузки видео: ${file.name}`);
+      }
+    }
+    
+    setVideos((prev) => [...prev, ...uploadedFiles]);
   };
 
-  const handlePhotoRemove = (index) => {
+  const handlePhotoRemove = async (index) => {
+    const fileToRemove = photos[index];
+    
+    // If it's a File/Blob that was uploaded, delete from temp storage
+    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.tempFilename) {
+      try {
+        await apiRequest(`/upload/temp/${encodeURIComponent(fileToRemove.tempFilename)}`, {
+          method: 'DELETE'
+        }).catch(err => {
+          console.warn(`Failed to delete temp file ${fileToRemove.tempFilename}:`, err);
+        });
+        
+        // Remove from tracked temp files
+        setUploadedTempFiles(prev => prev.filter(f => f !== fileToRemove.tempFilename));
+      } catch (error) {
+        console.error('Error deleting temp file:', error);
+      }
+    }
+    
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleVideoRemove = (index) => {
+  const handleVideoRemove = async (index) => {
+    const fileToRemove = videos[index];
+    
+    // If it's a File/Blob that was uploaded, delete from temp storage
+    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.tempFilename) {
+      try {
+        await apiRequest(`/upload/temp/${encodeURIComponent(fileToRemove.tempFilename)}`, {
+          method: 'DELETE'
+        }).catch(err => {
+          console.warn(`Failed to delete temp file ${fileToRemove.tempFilename}:`, err);
+        });
+        
+        // Remove from tracked temp files
+        setUploadedTempFiles(prev => prev.filter(f => f !== fileToRemove.tempFilename));
+      } catch (error) {
+        console.error('Error deleting temp file:', error);
+      }
+    }
+    
     setVideos((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -203,6 +305,29 @@ const AddPart = () => {
       .reduce((sum, val) => sum + parseInt(val), 0);
   };
 
+  // Function to delete temp files when user cancels
+  const cleanupTempFiles = async () => {
+    if (uploadedTempFiles.length === 0) {
+      return;
+    }
+
+    try {
+      const deletePromises = uploadedTempFiles.map(filename => 
+        apiRequest(`/upload/temp/${encodeURIComponent(filename)}`, {
+          method: 'DELETE'
+        }).catch(err => {
+          console.warn(`Failed to delete temp file ${filename}:`, err);
+        })
+      );
+      
+      await Promise.all(deletePromises);
+      console.log('Temp files cleaned up successfully');
+      setUploadedTempFiles([]);
+    } catch (error) {
+      console.error('Error cleaning up temp files:', error);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -240,45 +365,63 @@ const AddPart = () => {
     let photoUrls = [];
     let videoUrls = [];
 
-    // Upload photos and videos separately
+    // Upload photos and videos separately - they're already uploaded to temp
     if (photos.length > 0) {
+      setIsUploadingMedia(true);
       try {
-        const uploadAction = await dispatch(uploadPhotos(photos));
-
-        if (uploadPhotos.rejected.match(uploadAction)) {
-          alert(`Ошибка загрузки фото: ${uploadAction.payload}`);
-          return;
-        }
-        photoUrls = uploadAction.payload;
-        if (!photoUrls || !Array.isArray(photoUrls)) {
-          alert('Ошибка: неправильный формат URL фото');
-          return;
-        }
+        // Photos are already uploaded, just get their URLs
+        const uploadPromises = photos.map(async file => {
+          if (file.tempFilename) {
+            // File was uploaded earlier, construct URL
+            const webpFilename = file.tempFilename.replace(/\.[^/.]+$/, '.webp');
+            return `/pictures/${user.organization_id}/${webpFilename}`;
+          }
+          return null;
+        });
+        
+        photoUrls = await Promise.all(uploadPromises);
+        photoUrls = photoUrls.filter(url => url !== null);
       } catch (error) {
-        console.error('Unexpected error during photo upload:', error);
-        alert(`Неожиданная ошибка при загрузке фото: ${error.message}`);
+        console.error('Error processing photos:', error);
+        alert(`Ошибка обработки фото: ${error.message}`);
+        setIsUploadingMedia(false);
         return;
       }
+      setIsUploadingMedia(false);
     }
     
     if (videos.length > 0) {
+      setIsUploadingMedia(true);
       try {
-        const uploadAction = await dispatch(uploadMedia(videos));
-
-        if (uploadMedia.rejected.match(uploadAction)) {
-          alert(`Ошибка загрузки видео: ${uploadAction.payload}`);
-          return;
-        }
-        videoUrls = uploadAction.payload;
-        if (!videoUrls || !Array.isArray(videoUrls)) {
-          alert('Ошибка: неправильный формат URL видео');
-          return;
-        }
+        // Videos are already uploaded, just get their URLs
+        const uploadPromises = videos.map(async file => {
+          if (file.tempFilename) {
+            // File was uploaded earlier, construct URL
+            const ext = file.name.split('.').pop();
+            const webpFilename = file.tempFilename.replace(/\.[^/.]+$/, '.webp');
+            // Check if it's a video based on original extension
+            if (['.mp4', '.avi', '.mov', '.wmv', '.flv', '.mkv', '.webm', '.m4v', '.3gp', '.mpeg', '.mpg'].includes('.' + ext.toLowerCase())) {
+              return `/videos/${user.organization_id}/${file.tempFilename}`;
+            }
+            return `/pictures/${user.organization_id}/${webpFilename}`;
+          }
+          return null;
+        });
+        
+        videoUrls = await Promise.all(uploadPromises);
+        videoUrls = videoUrls.filter(url => url !== null);
       } catch (error) {
-        console.error('Unexpected error during video upload:', error);
-        alert(`Неожиданная ошибка при загрузке видео: ${error.message}`);
+        console.error('Error processing videos:', error);
+        alert(`Ошибка обработки видео: ${error.message}`);
+        setIsUploadingMedia(false);
         return;
       }
+      setIsUploadingMedia(false);
+    }
+
+    // Clear temp files after successful submission
+    if (uploadedTempFiles.length > 0) {
+      setUploadedTempFiles([]);
     }
 
     const productData = {
@@ -404,28 +547,43 @@ const AddPart = () => {
         {/* Медиафайлы (фото и видео) */}
         <div>
           <label className="block text-sm font-medium">Фотографии и видео *</label>
-          <input
-            type="file"
-            multiple
-            accept="image/*,video/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2,.mp4,.avi,.mov,.wmv,.flv,.mkv,.webm,.m4v,.3gp,.mpeg,.mpg"
-            onChange={(e) => {
-              const files = Array.from(e.target.files);
-              const photosToAdd = [];
-              const videosToAdd = [];
-              
-              files.forEach(file => {
-                if (file.type.startsWith('image/')) {
-                  photosToAdd.push(file);
-                } else if (file.type.startsWith('video/')) {
-                  videosToAdd.push(file);
-                }
-              });
-              
-              setPhotos(prev => [...prev, ...photosToAdd]);
-              setVideos(prev => [...prev, ...videosToAdd]);
-            }}
-            className="mt-1"
-          />
+          <div className="mt-1 space-y-2">
+            {/* Photo upload button */}
+            <div>
+              <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                Добавить фото
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2"
+                  onChange={handlePhotoAdd}
+                  className="hidden"
+                  disabled={isUploadingMedia}
+                />
+              </label>
+            </div>
+            
+            {/* Video upload button */}
+            <div>
+              <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                Добавить видео
+                <input
+                  type="file"
+                  multiple
+                  accept="video/*,.mp4,.avi,.mov,.wmv,.flv,.mkv,.webm,.m4v,.3gp,.mpeg,.mpg"
+                  onChange={handleVideoAdd}
+                  className="hidden"
+                  disabled={isUploadingMedia}
+                />
+              </label>
+            </div>
+          </div>
           <div className="mt-2 flex flex-wrap gap-2">
             {photos.map((file, idx) => {
               // Handle both File objects (before upload) and URL strings (after upload)
@@ -440,6 +598,14 @@ const AddPart = () => {
               
               return (
                 <div key={`photo-${idx}`} className="relative">
+                  {isUploadingMedia && (file instanceof File || file instanceof Blob) && (
+                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center z-10">
+                      <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                  )}
                   <img
                     src={photoSrc}
                     alt={`photo-preview-${idx}`}
@@ -464,6 +630,14 @@ const AddPart = () => {
             })}
             {videos.map((file, idx) => (
               <div key={`video-${idx}`} className="relative">
+                {isUploadingMedia && (file instanceof File || file instanceof Blob) && (
+                  <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center z-10">
+                    <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                )}
                 <video
                   src={URL.createObjectURL(file)}
                   className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
@@ -674,17 +848,23 @@ const AddPart = () => {
         <div className="flex gap-3">
           <button
             type="submit"
-            disabled={productStatus}
-            className={`px-4 py-2 rounded-md ${productStatus
+            disabled={productStatus || isUploadingMedia}
+            className={`px-4 py-2 rounded-md ${(productStatus || isUploadingMedia)
               ? 'bg-indigo-400 cursor-not-allowed'
               : 'bg-indigo-600 hover:bg-indigo-700'
               } text-white`}
           >
-            {productStatus ? 'Создание...' : 'Создать запчасть'}
+            {productStatus || isUploadingMedia ? 'Создание...' : 'Создать запчасть'}
           </button>
           <button
             type="button"
-            onClick={() => navigate('/my-parts')}
+            onClick={async () => {
+              // Clean up uploaded media from temp storage
+              await cleanupTempFiles();
+              setPhotos([]);
+              setVideos([]);
+              navigate('/my-parts');
+            }}
             className="px-4 py-2 border border-gray-300 rounded-md"
           >
             Отмена

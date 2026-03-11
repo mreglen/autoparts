@@ -4,7 +4,8 @@ import ImageModal from '../ImageModal/ImageModal';
 
 const ProductModerationCard = ({ product, onApprove, onReject }) => {
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-    const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+    const [selectedMedia, setSelectedMedia] = useState([]);
+    const [initialMediaIndex, setInitialMediaIndex] = useState(0);
 
     const formatDate = (dateString) => {
         if (!dateString) return '—';
@@ -26,14 +27,22 @@ const ProductModerationCard = ({ product, onApprove, onReject }) => {
         }).format(price);
     };
 
-    const handleImageClick = (index) => {
-        setSelectedImageIndex(index);
+    const handleMediaClick = (index) => {
+        // Combine all photos and videos into one array
+        const allMedia = [
+            ...(product.photos || []).map(url => ({
+                url,
+                type: 'image'
+            })),
+            ...(product.videos || []).map(url => ({
+                url,
+                type: 'video'
+            }))
+        ];
+        
+        setSelectedMedia(allMedia);
+        setInitialMediaIndex(index);
         setIsImageModalOpen(true);
-    };
-
-    const handleCloseImageModal = () => {
-        setIsImageModalOpen(false);
-        setSelectedImageIndex(0);
     };
 
     return (
@@ -66,32 +75,53 @@ const ProductModerationCard = ({ product, onApprove, onReject }) => {
                         </div>
                     )}
 
-                    {/* Photos */}
-                    {product.photos && product.photos.length > 0 && (
+                    {/* Photos and Videos */}
+                    {(product.photos && product.photos.length > 0) || (product.videos && product.videos.length > 0) ? (
                         <div className="mb-4">
+                            <span className="text-xs font-medium text-gray-500 mb-2 block">Медиафайлы:</span>
                             <div className="flex flex-wrap gap-2">
-                                {product.photos.slice(0, 3).map((photo, index) => (
+                                {/* Display photos */}
+                                {product.photos && product.photos.slice(0, 2).map((photo, index) => (
                                     <img
-                                        key={index}
+                                        key={`photo-${index}`}
                                         src={normalizeImageUrl(photo)}
                                         alt={`Фото ${index + 1}`}
                                         className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handleImageClick(index);
+                                            handleMediaClick(index);
                                         }}
                                     />
                                 ))}
-                                {product.photos.length > 3 && (
+                                
+                                {/* Display first video if exists */}
+                                {product.videos && product.videos.length > 0 && (
+                                    <div
+                                        className="w-16 h-16 bg-gray-900 rounded border flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity relative"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleMediaClick(product.photos ? product.photos.length : 0);
+                                        }}
+                                    >
+                                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        <span className="absolute -bottom-4 text-xs text-gray-500">Видео</span>
+                                    </div>
+                                )}
+                                
+                                {/* Show more indicator */}
+                                {((product.photos && product.photos.length > 2) || (product.videos && product.videos.length > 1)) && (
                                     <div className="w-16 h-16 bg-gray-100 rounded border flex items-center justify-center">
                                         <span className="text-xs text-gray-500">
-                                            +{product.photos.length - 3}
+                                            +{(product.photos ? Math.max(0, product.photos.length - 2) : 0) + (product.videos ? product.videos.length - (product.photos && product.photos.length > 0 ? 1 : 0) : 0)}
                                         </span>
                                     </div>
                                 )}
                             </div>
                         </div>
-                    )}
+                    ) : null}
 
                     {/* Details Grid */}
                     <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
@@ -107,10 +137,10 @@ const ProductModerationCard = ({ product, onApprove, onReject }) => {
                                 {product.quantity} шт.
                             </div>
                         </div>
-                        <div>
-                            <span className="text-gray-500">Склад:</span>
+                        <div className="col-span-2">
+                            <span className="text-gray-500">Адрес склада:</span>
                             <div className="font-medium text-gray-900">
-                                {product.storage_location_address || `#${product.storage_location_id}`}
+                                {product.storage_location_address || `Склад #${product.storage_location_id}`}
                             </div>
                         </div>
                     </div>
@@ -166,10 +196,15 @@ const ProductModerationCard = ({ product, onApprove, onReject }) => {
             {/* Image Modal */}
             <ImageModal
                 isOpen={isImageModalOpen}
-                onClose={handleCloseImageModal}
-                photos={product.photos}
-                initialIndex={selectedImageIndex}
-                alt="Фото запчасти"
+                onClose={() => {
+                    setIsImageModalOpen(false);
+                    setSelectedMedia([]);
+                    setInitialMediaIndex(0);
+                }}
+                photos={(product.photos || []).map(url => ({ photo_url: url }))}
+                videos={(product.videos || []).map(url => ({ video_url: url }))}
+                initialIndex={initialMediaIndex}
+                alt="Медиафайлы запчасти"
             />
         </>
     );

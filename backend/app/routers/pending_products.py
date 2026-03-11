@@ -21,6 +21,21 @@ def create_pending_product(
 ):
     """Создать новую запчасть в статусе ожидания модерации"""
     
+    # Validate media limits
+    if product_data.photos:
+        if len(product_data.photos) > 5:
+            raise HTTPException(
+                status_code=400,
+                detail="Максимум 5 фотографий на запчасть"
+            )
+    
+    if product_data.videos:
+        if len(product_data.videos) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Максимум 1 видео на запчасть"
+            )
+    
     # Генерируем последовательный числовой внутренний код
     # Находим все существующие internal_code для организации
     existing_codes_result = db.query(PendingProductModel.internal_code).all()

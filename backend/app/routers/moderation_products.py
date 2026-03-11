@@ -63,6 +63,12 @@ def get_pending_products(
                 product_dict['vehicle_ids'] = []
         else:
             product_dict['vehicle_ids'] = []
+        
+        # Add storage location address
+        if product.storage_location:
+            product_dict['storage_location_address'] = product.storage_location.address
+        else:
+            product_dict['storage_location_address'] = None
 
         product_dict.pop('_sa_instance_state', None)
         result.append(product_dict)
@@ -361,6 +367,12 @@ def get_rejected_products(
                 product_dict['vehicle_ids'] = []
         else:
             product_dict['vehicle_ids'] = []
+        
+        # Add storage location address
+        if product.storage_location:
+            product_dict['storage_location_address'] = product.storage_location.address
+        else:
+            product_dict['storage_location_address'] = None
             
         # Удаляем SQLAlchemy состояние
         product_dict.pop('_sa_instance_state', None)

@@ -163,6 +163,21 @@ def update_product(
     if not db_product:
         raise HTTPException(status_code=404, detail="Продукт не найден или недоступен")
 
+    # Validate media limits
+    if product.photos is not None:
+        if len(product.photos) > 5:
+            raise HTTPException(
+                status_code=400,
+                detail="Максимум 5 фотографий на запчасть"
+            )
+    
+    if product.videos is not None:
+        if len(product.videos) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Максимум 1 видео на запчасть"
+            )
+
     # Проверяем уникальность internal_code (если он изменился)
     if product.internal_code != db_product.internal_code:
         existing_product = db.query(ProductModel).filter(

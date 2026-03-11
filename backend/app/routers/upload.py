@@ -17,6 +17,10 @@ MAX_PHOTO_SIZE = 50 * 1024 * 1024  # 50MB
 MAX_VIDEO_SIZE = 100 * 1024 * 1024  # 100MB
 MAX_VIDEO_DURATION_SEC = 60  # 1 minute
 
+# Limits for media files per product
+MAX_PHOTOS_PER_PRODUCT = 5
+MAX_VIDEOS_PER_PRODUCT = 1
+
 router = APIRouter(prefix="/upload", tags=["Upload"])
 
 
@@ -552,3 +556,37 @@ async def get_photo_upload_status(task_id: str):
             "task_id": task_id,
             "status": task_result.state.lower()
         }
+
+
+@router.delete("/temp/{filename}")
+async def delete_temp_file(
+    filename: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Delete a temporary file by filename.
+    Used to cleanup uploaded media when user cancels form submission.
+    """
+    print(f"=== DELETE TEMP FILE REQUEST ===")
+    print(f"Filename: {filename}")
+    
+    # Validate filename to prevent directory traversal attacks
+    if not filename or '..' in filename or '/' in filename or '\\' in filename:
+        raise HTTPException(400, "Недопустимое имя файла")
+    
+    temp_dir = os.path.abspath("uploads/temp")
+    temp_path = os.path.join(temp_dir, filename)
+    
+    # Check if file exists
+    if not os.path.exists(temp_path):
+        print(f"File not found: {temp_path}")
+        return {"success": True, "message": "File not found or already deleted"}
+    
+    try:
+        os.remove(temp_path)
+        print(f"Successfully deleted temp file: {temp_path}")
+        return {"success": True, "message": "File deleted successfully"}
+    except Exception as e:
+        print(f"Error deleting temp file: {str(e)}")
+        raise HTTPException(500, f"Ошибка при удалении временного файла: {str(e)}")
