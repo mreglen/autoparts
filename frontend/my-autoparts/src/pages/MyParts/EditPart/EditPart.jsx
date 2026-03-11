@@ -197,8 +197,8 @@ const EditPart = () => {
       try {
         const formData = new FormData();
         formData.append('file', file);
-        // Get organization_id from user context or product
-        const organizationId = product?.organization_id || user?.organization_id;
+        // Get organization_id from user context or currentProduct
+        const organizationId = currentProduct?.organization_id || user?.organization_id;
         const uploadEndpoint = organizationId 
           ? `/upload/photo?organization_id=${organizationId}`
           : '/upload/photo';
@@ -242,8 +242,8 @@ const EditPart = () => {
       try {
         const formData = new FormData();
         formData.append('file', file);
-        // Get organization_id from user context or product
-        const organizationId = product?.organization_id || user?.organization_id;
+        // Get organization_id from user context or currentProduct
+        const organizationId = currentProduct?.organization_id || user?.organization_id;
         const uploadEndpoint = organizationId 
           ? `/upload/video?organization_id=${organizationId}`
           : '/upload/video';
