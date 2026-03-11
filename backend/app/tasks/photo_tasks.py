@@ -116,7 +116,14 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
         # Generate final path with organization ID
         # Change extension to .webp
         base_name = os.path.splitext(original_filename)[0]
-        final_filename = f"{base_name}.webp"
+        
+        # Generate new filename with org_id + timestamp + original_base_name
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        # Create safe filename by removing special characters from original name
+        safe_original_name = "".join(c if c.isalnum() or c in ('-', '_', ' ') else '_' for c in base_name).strip()
+        safe_original_name = '_'.join(safe_original_name.split())  # Replace spaces with underscores
+        final_filename = f"{organization_id}_{timestamp}_{safe_original_name}.webp"
         
         upload_dir = os.path.join("uploads", "pictures", organization_id)
         final_path = os.path.join(upload_dir, final_filename)

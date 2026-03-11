@@ -122,25 +122,43 @@ async def upload_photo(
         
         print(f"Celery task queued: {task.id}")
         
-        # Return task info and predicted path (frontend will construct full URL)
-        # The Celery task will save the file with this naming pattern
-        predicted_path = f"/pictures/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.webp')}"
-        result = {
-            "task_id": task.id,
-            "status": "processing",
-            "temp_filename": unique_filename,
-            "organization_id": organization_id,
-            "path": predicted_path
-        }
+        # Wait for Celery task to complete (with timeout)
+        import time
+        start_time = time.time()
+        timeout = 30  # 30 seconds timeout
         
-        print(f"Predicted path: {predicted_path}")
-        print(f"Upload queued for processing: {result}")
+        while not task.ready():
+            if time.time() - start_time > timeout:
+                raise HTTPException(500, "Превышено время обработки фото")
+            time.sleep(0.5)
+        
+        # Get result from Celery task
+        result_data = task.get(timeout=5)
+        
+        if result_data.get('status') == 'success':
+            # Return the actual processed path from Celery
+            final_result = {
+                "status": "success",
+                "path": result_data['path'],  # Actual path from Celery
+                "filename": result_data['filename'],  # Actual filename from Celery
+                "organization_id": organization_id
+            }
+        else:
+            raise HTTPException(500, f"Ошибка обработки фото: {result_data.get('error', 'Неизвестная ошибка')}")
+        
+        print(f"Photo processed successfully: {final_result}")
         print("=== END PHOTO UPLOAD ===")
-        return result
+        return final_result
         
     except Exception as e:
-        print(f"Error queuing upload task: {str(e)}")
-        raise HTTPException(500, f"Ошибка при постановке задачи в очередь: {str(e)}")
+        print(f"Error processing photo: {str(e)}")
+        # Clean up temp file on error
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except:
+            pass
+        raise HTTPException(500, f"Ошибка при обработке фото: {str(e)}")
 
 
 @router.post("/photo-s3")
@@ -249,24 +267,44 @@ async def upload_video(
         
         print(f"Celery task queued: {task.id}")
         
-        # Return task info and predicted path (frontend will construct full URL)
-        predicted_path = f"/videos/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.mp4')}"
-        result = {
-            "task_id": task.id,
-            "status": "processing",
-            "temp_filename": unique_filename,
-            "organization_id": organization_id,
-            "path": predicted_path
-        }
+        # Wait for Celery task to complete (with timeout)
+        import time
+        start_time = time.time()
+        timeout = 60  # 60 seconds timeout for videos
         
-        print(f"Predicted path: {predicted_path}")
-        print(f"Video upload queued for processing: {result}")
+        while not task.ready():
+            if time.time() - start_time > timeout:
+                raise HTTPException(500, "Превышено время обработки видео")
+            time.sleep(0.5)
+        
+        # Get result from Celery task
+        result_data = task.get(timeout=10)
+        
+        if result_data.get('status') == 'success':
+            # Return the actual processed path from Celery
+            final_result = {
+                "status": "success",
+                "path": result_data['path'],  # Actual path from Celery
+                "filename": result_data['filename'],  # Actual filename from Celery
+                "organization_id": organization_id,
+                "duration": result_data.get('duration')
+            }
+        else:
+            raise HTTPException(500, f"Ошибка обработки видео: {result_data.get('error', 'Неизвестная ошибка')}")
+        
+        print(f"Video processed successfully: {final_result}")
         print("=== END VIDEO UPLOAD ===")
-        return result
+        return final_result
         
     except Exception as e:
-        print(f"Error queuing upload task: {str(e)}")
-        raise HTTPException(500, f"Ошибка при постановке задачи в очередь: {str(e)}")
+        print(f"Error processing video: {str(e)}")
+        # Clean up temp file on error
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except:
+            pass
+        raise HTTPException(500, f"Ошибка при обработке видео: {str(e)}")
 
 
 @router.post("/video-s3")

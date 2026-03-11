@@ -181,7 +181,9 @@ def approve_product(
             for photo_url in photos_list:
                 photo = ProductPhoto(
                     product_id=db_product.id,
-                    photo_url=photo_url
+                    photo_url=photo_url,
+                    organization_id=pending_product.organization_id,
+                    processing_status='completed'
                 )
                 db.add(photo)
         except Exception as e:

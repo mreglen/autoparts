@@ -199,11 +199,13 @@ const EditPart = () => {
         formData.append('file', file);
         const result = await apiRequestFormData('/upload/photo', formData);
         
-        if (result.temp_filename) {
-          // Store the file with its temp filename for tracking
-          const fileWithTempName = Object.assign(file, { tempFilename: result.temp_filename });
-          uploadedFiles.push(fileWithTempName);
-          setUploadedTempFiles(prev => [...prev, result.temp_filename]);
+        if (result.path && result.filename) {
+          // Store the file with its final path and filename
+          const fileWithPath = Object.assign(file, { 
+            finalPath: result.path,
+            finalFilename: result.filename 
+          });
+          uploadedFiles.push(fileWithPath);
         }
       } catch (error) {
         console.error('Failed to upload photo:', error);
@@ -231,13 +233,15 @@ const EditPart = () => {
       try {
         const formData = new FormData();
         formData.append('file', file);
-        const result = await apiRequestFormData('/upload/media', formData);
+        const result = await apiRequestFormData('/upload/video', formData);
         
-        if (result.temp_filename) {
-          // Store the file with its temp filename for tracking
-          const fileWithTempName = Object.assign(file, { tempFilename: result.temp_filename });
-          uploadedFiles.push(fileWithTempName);
-          setUploadedTempFiles(prev => [...prev, result.temp_filename]);
+        if (result.path && result.filename) {
+          // Store the file with its final path and filename
+          const fileWithPath = Object.assign(file, { 
+            finalPath: result.path,
+            finalFilename: result.filename 
+          });
+          uploadedFiles.push(fileWithPath);
         }
       } catch (error) {
         console.error('Failed to upload video:', error);
@@ -252,18 +256,18 @@ const EditPart = () => {
     const fileToRemove = photos[index];
     
     // If it's a File/Blob that was uploaded, delete from temp storage
-    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.tempFilename) {
+    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.finalFilename) {
       try {
-        await apiRequest(`/upload/temp/${encodeURIComponent(fileToRemove.tempFilename)}`, {
+        // Extract filename from path and delete
+        const pathParts = fileToRemove.finalPath.split('/');
+        const filename = pathParts[pathParts.length - 1];
+        await apiRequest(`/upload/temp/${encodeURIComponent(filename)}`, {
           method: 'DELETE'
         }).catch(err => {
-          console.warn(`Failed to delete temp file ${fileToRemove.tempFilename}:`, err);
+          console.warn(`Failed to delete file ${filename}:`, err);
         });
-        
-        // Remove from tracked temp files
-        setUploadedTempFiles(prev => prev.filter(f => f !== fileToRemove.tempFilename));
       } catch (error) {
-        console.error('Error deleting temp file:', error);
+        console.error('Error deleting file:', error);
       }
     }
     
@@ -274,18 +278,18 @@ const EditPart = () => {
     const fileToRemove = videos[index];
     
     // If it's a File/Blob that was uploaded, delete from temp storage
-    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.tempFilename) {
+    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.finalFilename) {
       try {
-        await apiRequest(`/upload/temp/${encodeURIComponent(fileToRemove.tempFilename)}`, {
+        // Extract filename from path and delete
+        const pathParts = fileToRemove.finalPath.split('/');
+        const filename = pathParts[pathParts.length - 1];
+        await apiRequest(`/upload/temp/${encodeURIComponent(filename)}`, {
           method: 'DELETE'
         }).catch(err => {
-          console.warn(`Failed to delete temp file ${fileToRemove.tempFilename}:`, err);
+          console.warn(`Failed to delete file ${filename}:`, err);
         });
-        
-        // Remove from tracked temp files
-        setUploadedTempFiles(prev => prev.filter(f => f !== fileToRemove.tempFilename));
       } catch (error) {
-        console.error('Error deleting temp file:', error);
+        console.error('Error deleting file:', error);
       }
     }
     
@@ -496,19 +500,10 @@ const EditPart = () => {
     if (photos.length > 0) {
       setIsUploadingMedia(true);
       try {
-        // Photos are already uploaded, just get their URLs
-        const uploadPromises = photos.map(async file => {
-          if (file.tempFilename) {
-            // File was uploaded earlier, construct URL
-            const ext = file.name.split('.').pop();
-            const webpFilename = file.tempFilename.replace(/\.[^/.]+$/, '.webp');
-            return `/pictures/${user.organization_id}/${webpFilename}`;
-          }
-          return null;
-        });
-        
-        photoUrls = await Promise.all(uploadPromises);
-        photoUrls = photoUrls.filter(url => url !== null);
+        // Photos are already uploaded with final paths, just use them
+        photoUrls = photos
+          .filter(file => file.finalPath)
+          .map(file => file.finalPath);
       } catch (error) {
         console.error('Error processing photos:', error);
         alert(`Ошибка обработки фото: ${error.message}`);
@@ -522,23 +517,10 @@ const EditPart = () => {
     if (videos.length > 0) {
       setIsUploadingMedia(true);
       try {
-        // Videos are already uploaded, just get their URLs
-        const uploadPromises = videos.map(async file => {
-          if (file.tempFilename) {
-            // File was uploaded earlier, construct URL
-            const ext = file.name.split('.').pop();
-            const webpFilename = file.tempFilename.replace(/\.[^/.]+$/, '.webp');
-            // Check if it's a video based on temp filename or original extension
-            if (['.mp4', '.avi', '.mov', '.wmv', '.flv', '.mkv', '.webm', '.m4v', '.3gp', '.mpeg', '.mpg'].includes('.' + ext.toLowerCase())) {
-              return `/videos/${user.organization_id}/${file.tempFilename}`;
-            }
-            return `/pictures/${user.organization_id}/${webpFilename}`;
-          }
-          return null;
-        });
-        
-        videoUrls = await Promise.all(uploadPromises);
-        videoUrls = videoUrls.filter(url => url !== null);
+        // Videos are already uploaded with final paths, just use them
+        videoUrls = videos
+          .filter(file => file.finalPath)
+          .map(file => file.finalPath);
       } catch (error) {
         console.error('Error processing videos:', error);
         alert(`Ошибка обработки видео: ${error.message}`);

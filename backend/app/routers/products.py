@@ -207,7 +207,7 @@ def update_product(
         db.query(ProductPhoto).filter(ProductPhoto.product_id == product_id).delete()
         # Добавляем новые
         for url in product.photos:
-            photo = ProductPhoto(product_id=product_id, photo_url=url)
+            photo = ProductPhoto(product_id=product_id, photo_url=url, organization_id=current_user.organization_id, processing_status='completed')
             db.add(photo)
     
     # Обновляем видео: удаляем старые, добавляем новые
@@ -216,7 +216,7 @@ def update_product(
         db.query(ProductVideo).filter(ProductVideo.product_id == product_id).delete()
         # Добавляем новые
         for url in product.videos:
-            video = ProductVideo(product_id=product_id, video_url=url)
+            video = ProductVideo(product_id=product_id, video_url=url, organization_id=current_user.organization_id, processing_status='completed')
             db.add(video)
 
     # Обновляем связи с автомобилями

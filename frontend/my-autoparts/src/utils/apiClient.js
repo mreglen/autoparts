@@ -27,24 +27,24 @@ export const getAuthHeaders = () => {
 export const normalizeImageUrl = (imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
 
-    // If already a full URL or blob/data URI, return as is
+   
     if (imageUrl.startsWith(BACKEND_BASE) ||
         imageUrl.startsWith('blob:') ||
         imageUrl.startsWith('data:')) {
         return imageUrl;
     }
 
-    // If path starts with /pictures/ or /videos/, just prepend the backend base URL
+   
     if (imageUrl.startsWith('/pictures/') || imageUrl.startsWith('/videos/')) {
         return `${BACKEND_BASE}${imageUrl}`;
     }
     
-    // If starts with /, prepend backend base URL
+ 
     if (imageUrl.startsWith('/')) {
         return `${BACKEND_BASE}${imageUrl}`;
     }
 
-    // Return as is for relative URLs
+   
     return imageUrl;
 };
 
