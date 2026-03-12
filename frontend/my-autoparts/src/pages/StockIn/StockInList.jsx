@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Navigate } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
-import ImageModal from '../../components/ImageModal/ImageModal';
+import MediaModal from '../../components/MediaModal/MediaModal';
+import { normalizeImageUrl } from '../../utils/apiClient';
 import { fetchStockIns } from '../../redux/slices/StockInSlice';
 import { Link } from 'react-router-dom';
 import VehicleModal from '../MyParts/AddPart/VehicleModal';
@@ -28,9 +29,13 @@ const StockInRow = ({ doc, onToggleExpand, isExpanded, onImageClick }) => (
       <tr className="bg-gray-50">
         <td colSpan="6" className="px-6 py-4 border-t">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Фото */}
+            {/* Фото и видео */}
             <div>
-              <PhotoThumbnail photos={doc.product?.photos || []} onImageClick={onImageClick} />
+              <PhotoThumbnail 
+                photos={doc.product?.photos || []} 
+                videos={doc.product?.videos || []}
+                onImageClick={onImageClick}
+              />
             </div>
 
             {/* Информация */}
@@ -145,8 +150,11 @@ const StockInList = () => {
   // Состояние для модального окна автомобилей
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [expandedDocId, setExpandedDocId] = useState(null);
-  const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
+  
+  // Состояние для медиа модалки
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [currentMediaItems, setCurrentMediaItems] = useState([]);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
 
   // Check if user has permission to view this page
   // Admin and sellers always have access
@@ -183,13 +191,32 @@ const StockInList = () => {
   if (!user) return <Navigate to="/auth" replace />;
   if (!hasPermission) return <Navigate to="/" replace />;
 
-  const handleImageClick = (photos, initialIndex) => {
-    setSelectedImages({ photos, initialIndex });
-    setImageModalOpen(true);
-  };
-
   const toggleExpand = (id) => {
     setExpandedDocId(expandedDocId === id ? null : id);
+  };
+
+  const handleOpenMediaModal = (mediaItems, initialIndex = 0) => {
+    console.log('Opening media modal with:', mediaItems, 'at index:', initialIndex);
+    
+    // Convert media items to format expected by MediaModal
+    const formattedMedia = mediaItems.map(item => {
+      const url = typeof item === 'string' ? item : (item.full_url || item.photo_url || item.video_url || '');
+      console.log('Processing item:', item, 'URL before normalize:', url);
+      // Normalize the URL to add backend base URL if needed
+      const normalizedUrl = normalizeImageUrl(url);
+      console.log('Normalized URL:', normalizedUrl);
+      // Determine if it's a video or photo based on URL extension or item type
+      const isVideo = normalizedUrl.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+      return {
+        type: isVideo ? 'video' : 'image',
+        src: normalizedUrl
+      };
+    });
+    
+    console.log('Formatted media:', formattedMedia);
+    setCurrentMediaItems(formattedMedia);
+    setCurrentMediaIndex(initialIndex);
+    setMediaModalOpen(true);
   };
 
   if (loading) {
@@ -293,7 +320,7 @@ const StockInList = () => {
                     doc={doc}
                     onToggleExpand={() => toggleExpand(doc.id)}
                     isExpanded={expandedDocId === doc.id}
-                    onImageClick={handleImageClick}
+                    onImageClick={handleOpenMediaModal}
                   />
                 ))}
               </tbody>
@@ -339,9 +366,12 @@ const StockInList = () => {
                 {expandedDocId === doc.id && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="grid grid-cols-1 gap-4">
-                      {/* Фото */}
+                      {/* Фото и видео */}
                       <div>
-                        <PhotoThumbnail photos={doc.product?.photos || []} onImageClick={handleImageClick} />
+                        <PhotoThumbnail 
+                          photos={doc.product?.photos || []} 
+                          videos={doc.product?.videos || []}
+                        />
                       </div>
 
                       {/* Информация */}
@@ -445,19 +475,17 @@ const StockInList = () => {
         </>
       )}
 
-      {/* Модальное окно автомобилей */}
-      <ImageModal
-        isOpen={imageModalOpen}
-        onClose={() => setImageModalOpen(false)}
-        photos={selectedImages.photos}
-        initialIndex={selectedImages.initialIndex}
-        alt="Фото товара"
-      />
-
       <VehicleModal
         isOpen={isVehicleModalOpen}
         onClose={() => setIsVehicleModalOpen(false)}
         onSelectVehicle={handleSelectVehicle}
+      />
+
+      <MediaModal
+        isOpen={mediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        mediaItems={currentMediaItems}
+        initialIndex={currentMediaIndex}
       />
     </div>
   );

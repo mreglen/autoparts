@@ -64,16 +64,19 @@ const PhotoThumbnail = ({ photos = [], videos = [], onImageClick }) => {
 
        if (isVideoItem(media)) {
          return (
-            <div key={index} className="relative group cursor-pointer">
+            <div 
+              key={index} 
+              className="relative group cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Pass the original item instead of the wrapped media object
+                onImageClick && onImageClick(allMedia.map(m => m.item), index);
+              }}
+            >
               <video
                 src={mediaUrl}
                 className="w-20 h-20 md:w-24 md:h-24 object-contain rounded-lg border shadow-sm transition-opacity duration-200 group-hover:opacity-90"
-               onClick={(e) => {
-                  e.stopPropagation();
-                  // Pass the original item instead of the wrapped media object
-                 onImageClick && onImageClick(allMedia.map(m => m.item), index);
-                }}
-               controls={false}
+                controls={false}
                 muted
                 playsInline
               />

@@ -7,8 +7,9 @@ import { fetchProducts } from '../../redux/slices/ProductSlice';
 import { fetchStockIns } from '../../redux/slices/StockInSlice';
 import { Navigate } from 'react-router-dom';
 import { StockOutRow } from './StockOutRow';
-import ImageModal from '../../components/ImageModal/ImageModal';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
+import MediaModal from '../../components/MediaModal/MediaModal';
+import { normalizeImageUrl } from '../../utils/apiClient';
 import ReturnModal from './ReturnModal';
 
 export const StockOutList = () => {
@@ -18,14 +19,17 @@ export const StockOutList = () => {
   const { storageLocations } = useSelector((state) => state.organization);
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const [expandedDocId, setExpandedDocId] = useState(null);
-  const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
   const [selectedItems, setSelectedItems] = useState([]);
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [itemsToReturn, setItemsToReturn] = useState([]);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  
+  // Состояние для медиа модалки
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [currentMediaItems, setCurrentMediaItems] = useState([]);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
 
   // Check if user has permission to view this page
   // Admin and sellers always have access
@@ -62,11 +66,6 @@ export const StockOutList = () => {
 
   if (!user) return <Navigate to="/auth" replace />;
   if (!hasPermission) return <Navigate to="/" replace />;
-
-  const handleImageClick = (photos, initialIndex) => {
-    setSelectedImages({ photos, initialIndex });
-    setImageModalOpen(true);
-  };
 
   const handleSelectItem = (itemId) => {
     setSelectedItems(prev =>
@@ -124,6 +123,30 @@ export const StockOutList = () => {
 
   const toggleExpand = (id) => {
     setExpandedDocId(expandedDocId === id ? null : id);
+  };
+
+  const handleOpenMediaModal = (mediaItems, initialIndex = 0) => {
+    console.log('Opening media modal with:', mediaItems, 'at index:', initialIndex);
+    
+    // Convert media items to format expected by MediaModal
+    const formattedMedia = mediaItems.map(item => {
+      const url = typeof item === 'string' ? item : (item.full_url || item.photo_url || item.video_url || '');
+      console.log('Processing item:', item, 'URL before normalize:', url);
+      // Normalize the URL to add backend base URL if needed
+      const normalizedUrl = normalizeImageUrl(url);
+      console.log('Normalized URL:', normalizedUrl);
+      // Determine if it's a video or photo based on URL extension or item type
+      const isVideo = normalizedUrl.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+      return {
+        type: isVideo ? 'video' : 'image',
+        src: normalizedUrl
+      };
+    });
+    
+    console.log('Formatted media:', formattedMedia);
+    setCurrentMediaItems(formattedMedia);
+    setCurrentMediaIndex(initialIndex);
+    setMediaModalOpen(true);
   };
 
   // Вспомогательная функция — как в MyParts
@@ -246,10 +269,10 @@ export const StockOutList = () => {
                     getStorageAddress={getStorageAddress}
                     onToggleExpand={() => toggleExpand(item.id)}
                     isExpanded={expandedDocId === item.id}
-                    onImageClick={handleImageClick}
                     isSelected={selectedItems.includes(item.id)}
                     onSelect={() => handleSelectItem(item.id)}
                     onReturn={() => handleReturnItem(item)}
+                    onImageClick={handleOpenMediaModal}
                   />
                 ))}
               </tbody>
@@ -402,9 +425,12 @@ export const StockOutList = () => {
                 {expandedDocId === item.id && (
                   <div className="mt-2 pt-2 border-t border-gray-200">
                     <div className="grid grid-cols-1 gap-4">
-                      {/* Фото */}
+                      {/* Фото и видео */}
                       <div>
-                        <PhotoThumbnail photos={item.product?.photos || []} onImageClick={handleImageClick} />
+                        <PhotoThumbnail 
+                          photos={item.product?.photos || []} 
+                          videos={item.product?.videos || []}
+                        />
                       </div>
 
                       {/* Информация */}
@@ -516,14 +542,6 @@ export const StockOutList = () => {
         </>
       )}
 
-      <ImageModal
-        isOpen={imageModalOpen}
-        onClose={() => setImageModalOpen(false)}
-        photos={selectedImages.photos}
-        initialIndex={selectedImages.initialIndex}
-        alt="Фото товара"
-      />
-
       <ReturnModal
         isOpen={returnModalOpen}
         onClose={() => {
@@ -533,6 +551,13 @@ export const StockOutList = () => {
         items={itemsToReturn}
         onConfirm={handleReturnConfirm}
         onRemoveItem={handleRemoveItemFromReturn}
+      />
+
+      <MediaModal
+        isOpen={mediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        mediaItems={currentMediaItems}
+        initialIndex={currentMediaIndex}
       />
     </div>
   );

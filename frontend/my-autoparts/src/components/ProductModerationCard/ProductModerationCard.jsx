@@ -1,12 +1,7 @@
 import React, { useState } from 'react';
 import { normalizeImageUrl } from '../../utils/apiClient';
-import ImageModal from '../ImageModal/ImageModal';
 
 const ProductModerationCard = ({ product, onApprove, onReject }) => {
-    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-    const [selectedMedia, setSelectedMedia] = useState([]);
-    const [initialMediaIndex, setInitialMediaIndex] = useState(0);
-
     const formatDate = (dateString) => {
         if (!dateString) return '—';
         const date = new Date(dateString);
@@ -25,24 +20,6 @@ const ProductModerationCard = ({ product, onApprove, onReject }) => {
             currency: 'RUB',
             minimumFractionDigits: 0
         }).format(price);
-    };
-
-    const handleMediaClick = (index) => {
-        // Combine all photos and videos into one array
-        const allMedia = [
-            ...(product.photos || []).map(url => ({
-                url,
-                type: 'image'
-            })),
-            ...(product.videos || []).map(url => ({
-                url,
-                type: 'video'
-            }))
-        ];
-        
-        setSelectedMedia(allMedia);
-        setInitialMediaIndex(index);
-        setIsImageModalOpen(true);
     };
 
     return (
@@ -87,10 +64,6 @@ const ProductModerationCard = ({ product, onApprove, onReject }) => {
                                         src={normalizeImageUrl(photo)}
                                         alt={`Фото ${index + 1}`}
                                         className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleMediaClick(index);
-                                        }}
                                     />
                                 ))}
                                 
@@ -98,10 +71,6 @@ const ProductModerationCard = ({ product, onApprove, onReject }) => {
                                 {product.videos && product.videos.length > 0 && (
                                     <div
                                         className="w-16 h-16 bg-gray-900 rounded border flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity relative"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleMediaClick(product.photos ? product.photos.length : 0);
-                                        }}
                                     >
                                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
@@ -192,20 +161,6 @@ const ProductModerationCard = ({ product, onApprove, onReject }) => {
                     </div>
                 </div>
             </div>
-
-            {/* Image Modal */}
-            <ImageModal
-                isOpen={isImageModalOpen}
-                onClose={() => {
-                    setIsImageModalOpen(false);
-                    setSelectedMedia([]);
-                    setInitialMediaIndex(0);
-                }}
-                photos={(product.photos || []).map(url => ({ photo_url: url }))}
-                videos={(product.videos || []).map(url => ({ video_url: url }))}
-                initialIndex={initialMediaIndex}
-                alt="Медиафайлы запчасти"
-            />
         </>
     );
 };

@@ -9,7 +9,6 @@ import { createPendingProductStorageCellsBatch } from '../../../redux/slices/Pen
 import { normalizeImageUrl, apiRequest, apiRequestFormData } from '../../../utils/apiClient';
 
 import VehicleModal from './VehicleModal';
-import ImageModal from '../../../components/ImageModal/ImageModal';
 
 const AddPart = () => {
   const navigate = useNavigate();
@@ -44,11 +43,6 @@ const AddPart = () => {
   const [showNewCellForm, setShowNewCellForm] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [uploadedTempFiles, setUploadedTempFiles] = useState([]); // Track uploaded temp filenames
-  
-  // Image modal state
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [selectedMedia, setSelectedMedia] = useState([]);
-  const [initialMediaIndex, setInitialMediaIndex] = useState(0);
 
   useEffect(() => {
     if (user?.organization_id) {
@@ -110,76 +104,88 @@ const AddPart = () => {
     };
   }, [dispatch]);
 
-  const handlePhotoAdd = async (e) => {
+  const handleFileAdd = async (e) => {
     const files = Array.from(e.target.files);
-    // Upload photos immediately to temp storage
-    const uploadedFiles = [];
+    const imageFiles = [];
+    const videoFiles = [];
     
-    // Check if we already have 5 photos
-    if (photos.length >= 5) {
-      alert('Максимум 5 фотографий');
-      return;
-    }
-    
-    // Limit to available slots
-    const availableSlots = 5 - photos.length;
-    const filesToUpload = files.slice(0, availableSlots);
-    
-    if (files.length > availableSlots) {
-      alert(`Можно добавить только ${availableSlots} фотографий (максимум 5)`);
-    }
-    
-    for (const file of filesToUpload) {
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        const result = await apiRequestFormData('/upload/photo', formData);
+    // Separate files by type
+    for (const file of files) {
+      if (file.type.startsWith('image/')) {
+        imageFiles.push(file);
+      } else if (file.type.startsWith('video/')) {
+        videoFiles.push(file);
+      } else {
+        // Try to detect by extension
+        const ext = file.name.split('.').pop().toLowerCase();
+        const imageExts = ['heic', 'heif', 'tiff', 'tif', 'bmp', 'svg', 'ico', 'raw', 'cr2', 'nef', 'arw', 'dng', 'orf', 'rw2'];
+        const videoExts = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv', 'webm', 'm4v', '3gp', 'mpeg', 'mpg'];
         
-        if (result.path) {
-          // Store the file with its final processed path
-          const fileWithPath = Object.assign(file, { finalPath: result.path });
-          uploadedFiles.push(fileWithPath);
+        if (imageExts.includes(ext)) {
+          imageFiles.push(file);
+        } else if (videoExts.includes(ext)) {
+          videoFiles.push(file);
         }
-      } catch (error) {
-        console.error('Failed to upload photo:', error);
-        alert(`Ошибка загрузки фото: ${file.name}`);
       }
     }
     
-    setPhotos((prev) => [...prev, ...uploadedFiles]);
-  };
-
-  const handleVideoAdd = async (e) => {
-    const files = Array.from(e.target.files);
-    // Upload videos immediately to temp storage
-    const uploadedFiles = [];
-    
-    // Check if we already have 1 video
-    if (videos.length >= 1) {
-      alert('Максимум 1 видео');
-      return;
-    }
-    
-    // Only allow 1 video
-    if (files.length > 0) {
-      const file = files[0];
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        const result = await apiRequestFormData('/upload/media', formData);
+    // Handle photos
+    if (imageFiles.length > 0) {
+      // Check if we already have 5 photos
+      if (photos.length >= 5) {
+        alert('Максимум 5 фотографий');
+      } else {
+        const availableSlots = 5 - photos.length;
+        const filesToUpload = imageFiles.slice(0, availableSlots);
         
-        if (result.path) {
-          // Store the file with its final processed path
-          const fileWithPath = Object.assign(file, { finalPath: result.path });
-          uploadedFiles.push(fileWithPath);
+        if (imageFiles.length > availableSlots) {
+          alert(`Можно добавить только ${availableSlots} фотографий (максимум 5)`);
         }
-      } catch (error) {
-        console.error('Failed to upload video:', error);
-        alert(`Ошибка загрузки видео: ${file.name}`);
+        
+        for (const file of filesToUpload) {
+          try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const result = await apiRequestFormData('/upload/photo', formData);
+            
+            if (result.path) {
+              const fileWithPath = Object.assign(file, { finalPath: result.path });
+              imageFiles[imageFiles.indexOf(file)] = fileWithPath;
+            }
+          } catch (error) {
+            console.error('Failed to upload photo:', error);
+            alert(`Ошибка загрузки фото: ${file.name}`);
+          }
+        }
+        
+        setPhotos((prev) => [...prev, ...imageFiles.filter(f => f.finalPath)]);
       }
     }
     
-    setVideos((prev) => [...prev, ...uploadedFiles]);
+    // Handle videos
+    if (videoFiles.length > 0) {
+      // Check if we already have 1 video
+      if (videos.length >= 1) {
+        alert('Максимум 1 видео');
+      } else {
+        const file = videoFiles[0];
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          const result = await apiRequestFormData('/upload/media', formData);
+          
+          if (result.path) {
+            const fileWithPath = Object.assign(file, { finalPath: result.path });
+            videoFiles[0] = fileWithPath;
+          }
+        } catch (error) {
+          console.error('Failed to upload video:', error);
+          alert(`Ошибка загрузки видео: ${file.name}`);
+        }
+        
+        setVideos((prev) => [...prev, ...videoFiles.filter(f => f.finalPath)]);
+      }
+    }
   };
 
   const handlePhotoRemove = async (index) => {
@@ -224,26 +230,6 @@ const AddPart = () => {
     }
     
     setVideos((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleMediaClick = (mediaIndex) => {
-    // Combine all photos and videos into one array for the lightbox
-   const allMedia = [
-      ...photos.map((file, idx) => ({
-        id: `photo-${idx}`,
-        url: file instanceof File || file instanceof Blob ? URL.createObjectURL(file) : normalizeImageUrl(file),
-        type: 'image'
-      })),
-      ...videos.map((file, idx) => ({
-        id: `video-${idx}`,
-        url: file instanceof File || file instanceof Blob ? URL.createObjectURL(file) : normalizeImageUrl(file),
-        type: 'video'
-      }))
-    ];
-    
-    setSelectedMedia(allMedia);
-    setInitialMediaIndex(mediaIndex);
-    setIsImageModalOpen(true);
   };
 
   const handleInputChange = (e) => {
@@ -531,36 +517,18 @@ const AddPart = () => {
         <div>
           <label className="block text-sm font-medium">Фотографии и видео *</label>
           <div className="mt-1 space-y-2">
-            {/* Photo upload button */}
+            {/* Combined file upload button */}
             <div>
               <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                 </svg>
-                Добавить фото
+                Добавить файл
                 <input
                   type="file"
                   multiple
-                  accept="image/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2"
-                  onChange={handlePhotoAdd}
-                  className="hidden"
-                  disabled={isUploadingMedia}
-                />
-              </label>
-            </div>
-            
-            {/* Video upload button */}
-            <div>
-              <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                </svg>
-                Добавить видео
-                <input
-                  type="file"
-                  multiple
-                  accept="video/*,.mp4,.avi,.mov,.wmv,.flv,.mkv,.webm,.m4v,.3gp,.mpeg,.mpg"
-                  onChange={handleVideoAdd}
+                  accept="image/*,.heic,.heif,.tiff,.tif,.bmp,.svg,.ico,.raw,.cr2,.nef,.arw,.dng,.orf,.rw2,video/*,.mp4,.avi,.mov,.wmv,.flv,.mkv,.webm,.m4v,.3gp,.mpeg,.mpg"
+                  onChange={handleFileAdd}
                   className="hidden"
                   disabled={isUploadingMedia}
                 />
@@ -593,7 +561,6 @@ const AddPart = () => {
                     src={photoSrc}
                     alt={`photo-preview-${idx}`}
                     className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => handleMediaClick(idx)}
                     onLoad={() => {
                       // Cleanup for blob URLs
                      if (file instanceof File || file instanceof Blob) {
@@ -625,7 +592,6 @@ const AddPart = () => {
                   src={URL.createObjectURL(file)}
                   className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
                  controls={false}
-                  onClick={() => handleMediaClick(idx + photos.length)}
                 />
                 <button
                   type="button"
@@ -860,14 +826,6 @@ const AddPart = () => {
         onClose={() => setIsVehicleModalOpen(false)}
         onSelectVehicle={setSelectedVehicle}
         selectedVehicle={selectedVehicle}
-      />
-      
-      <ImageModal
-        isOpen={isImageModalOpen}
-        onClose={() => setIsImageModalOpen(false)}
-        photos={selectedMedia}
-        initialIndex={initialMediaIndex}
-        alt="Preview"
       />
     </div>
   );

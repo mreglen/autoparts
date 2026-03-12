@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
-import ImageModal from '../../components/ImageModal/ImageModal';
+import MediaModal from '../../components/MediaModal/MediaModal';
+import { normalizeImageUrl } from '../../utils/apiClient';
 import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
@@ -146,7 +147,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
               <PhotoThumbnail 
                 photos={part.photos || []} 
                 videos={part.videos || []}
-                onImageClick={onImageClick} 
+                onImageClick={onImageClick}
               />
             </div>
 
@@ -263,13 +264,14 @@ function MyParts() {
   const [selectedPart, setSelectedPart] = useState(null);
   const [operationType, setOperationType] = useState(null);
   const [expandedPartId, setExpandedPartId] = useState(null);
-  const [imageModalOpen, setImageModalOpen] = useState(false);
-  const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
   const [selectedParts, setSelectedParts] = useState(new Set());
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || ''); // Поисковый запрос
   const [selectedStorageLocation, setSelectedStorageLocation] = useState(searchParams.get('storage') || ''); // Выбранный склад
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'in-stock'); // 'in-stock' or 'pending'
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [currentMediaItems, setCurrentMediaItems] = useState([]);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [formData, setFormData] = useState({
     quantity: '',
     price: '',
@@ -298,49 +300,34 @@ function MyParts() {
   const totalValue = displayParts.reduce((sum, part) => sum + (part.price * part.quantity), 0);
   const totalQuantity = displayParts.reduce((sum, part) => sum + part.quantity, 0);
 
-  const handleImageClick = (allMedia, initialIndex) => {
-   // Separate photos and videos from the combined media array
-  const photos = allMedia.filter(item => {
-    // Check if it's a photo by looking at the structure or file type
-  if (typeof item === 'string') {
-    return !item.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
-    }
-  if (item instanceof File) {
-    return item.type && item.type.startsWith('image/');
-   }
-  if (item?.photo_url || item?.full_url) {
-  const url = item.photo_url || item.full_url;
-    return !url.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
-   }
-   return true; // Default to photo
-   });
-   
-  const videos = allMedia.filter(item => {
-   // Check if it's a video
-  if (typeof item === 'string') {
-    return item.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
-   }
-  if (item instanceof File) {
-    return item.type && item.type.startsWith('video/');
-   }
-  if (item?.video_url || item?.full_url) {
-  const url = item.video_url || item.full_url;
-    return url.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
-   }
-  if (item?.photo_url) {
-    return item.photo_url.toLowerCase().match(/\.(mp4|avi|mov|wmv|flv|mkv|webm|m4v|3gp|mpeg|mpg)$/);
-   }
-   return false; // Default to not video
-   });
-   
-   setSelectedImages({ photos, videos, initialIndex });
-   setImageModalOpen(true);
-  };
-
   const handleOpenModal = (part, type) => {
     setSelectedPart(part);
     setOperationType(type);
     setModalOpen(true);
+  };
+
+  const handleOpenMediaModal = (mediaItems, initialIndex = 0) => {
+    console.log('Opening media modal with:', mediaItems, 'at index:', initialIndex);
+    
+    // Convert media items to format expected by MediaModal
+    const formattedMedia = mediaItems.map(item => {
+      const url = typeof item === 'string' ? item : (item.full_url || item.photo_url || item.video_url || '');
+      console.log('Processing item:', item, 'URL before normalize:', url);
+      // Normalize the URL to add backend base URL if needed
+      const normalizedUrl = normalizeImageUrl(url);
+      console.log('Normalized URL:', normalizedUrl);
+      // Determine if it's a video or photo based on URL extension or item type
+      const isVideo = normalizedUrl.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+      return {
+        type: isVideo ? 'video' : 'image',
+        src: normalizedUrl
+      };
+    });
+    
+    console.log('Formatted media:', formattedMedia);
+    setCurrentMediaItems(formattedMedia);
+    setCurrentMediaIndex(initialIndex);
+    setMediaModalOpen(true);
   };
 
   const toggleExpand = (id) => {
@@ -807,9 +794,9 @@ function MyParts() {
                     onWriteoff={(p) => handleOpenModal(p, 'writeoff')}
                     onToggleExpand={() => toggleExpand(part.id)}
                     isExpanded={expandedPartId === part.id}
-                    onImageClick={handleImageClick}
                     isSelected={selectedParts.has(part.id)}
                     onSelect={() => handlePartSelect(part.id)}
+                    onImageClick={handleOpenMediaModal}
                     productStorageCells={productStorageCells[part.id] || []}
                   />
                 ))}
@@ -971,7 +958,7 @@ function MyParts() {
                         <PhotoThumbnail 
                           photos={part.photos || []} 
                           videos={part.videos || []}
-                          onImageClick={handleImageClick} 
+                          onImageClick={handleOpenMediaModal}
                         />
                       </div>
 
@@ -1080,7 +1067,6 @@ function MyParts() {
           rejectedParts={rejectedItems || []}
           loading={loading}
           error={error}
-          onImageClick={handleImageClick}
           getStorageAddress={(id) => {
             const location = storageLocations.find(loc => loc.id === id);
             return location?.address || `Склад #${id}`;
@@ -1101,13 +1087,11 @@ function MyParts() {
         onConfirm={handleConfirm}
       />
 
-      <ImageModal
-        isOpen={imageModalOpen}
-       onClose={() => setImageModalOpen(false)}
-        photos={selectedImages.photos}
-        videos={selectedImages.videos || []}
-        initialIndex={selectedImages.initialIndex}
-        alt="Фото товара"
+      <MediaModal
+        isOpen={mediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        mediaItems={currentMediaItems}
+        initialIndex={currentMediaIndex}
       />
     </div>
   );

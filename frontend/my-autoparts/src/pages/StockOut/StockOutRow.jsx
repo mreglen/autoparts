@@ -130,9 +130,13 @@ export const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpande
       <tr className="bg-gray-50">
         <td colSpan="8" className="px-6 py-4 border-t">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Фото */}
+            {/* Фото и видео */}
             <div>
-              <PhotoThumbnail photos={item.product?.photos || []} onImageClick={onImageClick}/>
+              <PhotoThumbnail 
+                photos={item.product?.photos || []} 
+                videos={item.product?.videos || []}
+                onImageClick={onImageClick}
+              />
             </div>
 
             {/* Информация */}

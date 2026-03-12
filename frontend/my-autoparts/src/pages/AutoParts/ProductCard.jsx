@@ -58,11 +58,14 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
   
   // Combine photos and videos into a single media array
   const allMedia = React.useMemo(() => {
-    const photos = (part.photos || []).map(photo => ({
-      type: 'photo',
-      url: typeof photo === 'string' ? photo : (photo.full_url || photo.photo_url || photo.url || ''),
-      original: photo
-    }));
+    const photos = (part.photos || []).map(photo => {
+      const url = typeof photo === 'string' ? photo : (photo.full_url || photo.photo_url || photo.url || '');
+      return {
+        type: isVideo(photo) || isVideo(url) ? 'video' : 'photo',
+        url: url,
+        original: photo
+      };
+    });
     
     const videos = (part.videos || []).map(video => ({
       type: 'video',
@@ -147,28 +150,20 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
           onClick={handleTitleClick}
           onMouseEnter={() => {
             // Reset to first image on mouse enter
-            if (product.photos && Array.isArray(product.photos) && product.photos.length > 0) {
+            if (allMedia && allMedia.length > 0) {
               setCurrentImageIndex(0);
             }
           }}
         >
-            {product.image || (allMedia && allMedia.length > 0) ? (
+            {allMedia && allMedia.length > 0 ? (
             (() => {
-              // Determine the current media item to display
-              const currentMedia = product.image || 
-                (allMedia && allMedia.length > 0) ? 
-                  (() => {
-                    const currentIndex = Math.min(currentImageIndex, allMedia.length - 1);
-                    const currentMediaItem = allMedia[currentIndex];
-                    return currentMediaItem ? currentMediaItem.url : '';
-                  })() : 
-                product.image || 
-                null;
-
-              const normalizedMediaUrl = normalizeImageUrl(currentMedia);
+              // Get current media item from allMedia array
+              const currentIndex = Math.min(currentImageIndex, allMedia.length - 1);
+              const currentMediaItem = allMedia[currentIndex];
+              const currentMediaUrl = currentMediaItem ? currentMediaItem.url : '';
+              const normalizedMediaUrl = normalizeImageUrl(currentMediaUrl);
               
-              // Check if the current media is a video
-              const currentMediaItem = allMedia && allMedia.length > 0 ? allMedia[Math.min(currentImageIndex, allMedia.length - 1)] : null;
+              // Check if current media is video (use the type from allMedia)
               const currentMediaIsVideo = currentMediaItem && currentMediaItem.type === 'video';
               
               return (
@@ -212,14 +207,47 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
                   {currentMediaIsVideo ? (
                     <>
                       <video
+                        key={`product-video-${currentImageIndex}`}
                         src={normalizedMediaUrl}
                         className="max-h-full max-w-full object-contain"
                         controls={false}
                         muted
                         playsInline
+                        preload="metadata"
+                        onMouseMove={(e) => {
+                          if (allMedia && allMedia.length > 1) {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const x = e.clientX - rect.left;
+                            const width = rect.width;
+                            
+                            // Calculate which index based on horizontal position
+                            const percentage = x / width;
+                            
+                            // Adjust percentage to map to media indices properly
+                            const calculatedIndex = Math.floor(percentage * allMedia.length);
+                            
+                            // Ensure index is within bounds
+                            const newIndex = Math.max(0, Math.min(calculatedIndex, allMedia.length - 1));
+                            
+                            // Only update if the index has changed
+                            if (newIndex !== currentImageIndex) {
+                              setCurrentImageIndex(newIndex);
+                            }
+                            
+                            // Set hover side based on mouse position
+                            if (x < width * 0.3) {
+                              setHoverSide('left');
+                            } else if (x > width * 0.7) {
+                              setHoverSide('right');
+                            } else {
+                              setHoverSide(null);
+                            }
+                          }
+                        }}
                       />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
-                        <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      {/* Video play icon overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 pointer-events-none">
+                        <svg className="w-12 h-12 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                         </svg>
                       </div>
@@ -230,6 +258,7 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
                       src={normalizedMediaUrl}
                       alt={product.title} 
                       className="max-h-full max-w-full object-contain transition-opacity duration-300"
+                      loading="lazy"
                       onMouseMove={(e) => {
                         if (allMedia && allMedia.length > 1) {
                           const rect = e.currentTarget.getBoundingClientRect();

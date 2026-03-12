@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchWarehouseSales } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { useNavigate, Navigate } from 'react-router-dom';
-import ImageModal from '../../components/ImageModal/ImageModal';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 
 const WarehouseSalesPage = () => {
@@ -13,18 +12,9 @@ const WarehouseSalesPage = () => {
     const { storageLocations } = useSelector((state) => state.organization);
     const { user, permissionCodes } = useSelector((state) => state.auth);
     const [expandedDocId, setExpandedDocId] = useState(null);
-    const [imageModalOpen, setImageModalOpen] = useState(false);
-    const [selectedImages, setSelectedImages] = useState({ photos: [], initialIndex: 0 });
     const [searchQuery, setSearchQuery] = useState('');
     const [authChecked, setAuthChecked] = useState(false);
 
-    const handleImageClick = (photos, initialIndex) => {
-        setSelectedImages({ photos, initialIndex });
-        setImageModalOpen(true);
-    };
-
-    // Check if user has permission to view this page
-    // Admin and sellers always have access
     // Employees need 'warehouse-sales' permission code
     const hasPermission = user?.is_admin || user?.is_seller || 
         (user?.is_employee && permissionCodes && permissionCodes.includes('warehouse-sales'));
@@ -232,7 +222,7 @@ const WarehouseSalesPage = () => {
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         {/* Фото */}
                                                         <div>
-                                                            <PhotoThumbnail photos={sale.product?.photos || []} onImageClick={handleImageClick} />
+                                                            <PhotoThumbnail photos={sale.product?.photos || []} />
                                                         </div>
 
                                                         {/* Описание и информация */}
@@ -356,7 +346,7 @@ const WarehouseSalesPage = () => {
                                     <div className="mt-4 pt-4 border-t border-gray-200">
                                         <div className="grid grid-cols-1 gap-4">
                                             <div>
-                                                <PhotoThumbnail photos={sale.product?.photos || []} onImageClick={handleImageClick} />
+                                                <PhotoThumbnail photos={sale.product?.photos || []} />
                                             </div>
 
                                             <div className="space-y-4">
@@ -435,14 +425,6 @@ const WarehouseSalesPage = () => {
                     </div>
                 </>
             )}
-
-            <ImageModal
-                isOpen={imageModalOpen}
-                onClose={() => setImageModalOpen(false)}
-                photos={selectedImages.photos}
-                initialIndex={selectedImages.initialIndex}
-                alt="Фото товара"
-            />
         </div>
     );
 };
