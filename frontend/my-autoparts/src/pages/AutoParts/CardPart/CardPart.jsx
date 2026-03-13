@@ -96,10 +96,11 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
 
     const handleNavigateToDetail = (e) => {
         e.stopPropagation();
-        // Navigate to product detail page using brand and article
+        // Navigate to product detail page using unique ID with brand and article for readability
+        const productId = part.id || part.stock_id || 'unknown';
         const brand = encodeURIComponent(part.brand || 'unknown');
         const article = encodeURIComponent(part.partnumber || 'unknown');
-        navigate(`/part/${brand}/${article}`);
+        navigate(`/part/${productId}-${brand}-${article}`);
     };
 
     // Загрузка данных о складах при монтировании компонента больше не нужна

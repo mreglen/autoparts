@@ -8,7 +8,33 @@ import { normalizeImageUrl } from '../../utils/apiClient';
 import MediaModal from '../../components/MediaModal/MediaModal';
 
 const PartDetail = () => {
-  const { id, brand, article } = useParams();
+  // Parse the combined productId parameter
+  // Format: "123-BOSCH-ABC123" where 123 is product ID, BOSCH is brand, ABC123 is article
+  const { productId: combinedParam } = useParams();
+  
+  // Extract product ID, brand and article from the combined parameter
+  // The format is: id-brand-article (e.g., "123-BOSCH-ABC123")
+  let extractedProductId = null;
+  let extractedBrand = null;
+  let extractedArticle = null;
+  
+  if (combinedParam) {
+    const parts = combinedParam.split('-');
+    if (parts.length >= 3) {
+      // New format: id-brand-article
+      extractedProductId = parts[0];
+      extractedArticle = parts[parts.length - 1]; // Last part is article
+      // Brand is everything between ID and article (to handle brands with hyphens)
+      extractedBrand = parts.slice(1, parts.length - 1).join('-');
+    } else if (parts.length === 1) {
+      // Just ID provided (backward compatibility or old format)
+      extractedProductId = parts[0];
+    } else {
+      // Malformed - try to use as ID only
+      extractedProductId = combinedParam;
+    }
+  }
+  
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -24,24 +50,29 @@ const PartDetail = () => {
   const [initialMediaIndex, setInitialMediaIndex] = useState(0);
 
   useEffect(() => {
-    if (id) {
-      dispatch(fetchProduct(id));
-    } else if (brand && article) {
+    if (extractedProductId) {
+      // Use the extracted product ID to fetch directly
+      dispatch(fetchProduct(parseInt(extractedProductId, 10)));
+    } else if (extractedBrand && extractedArticle) {
       const fetchByBrandAndArticle = async () => {
         try {
-          const searchResponse = await dispatch(searchAllProducts(article));
+          // Decode brand and article in case they contain encoded characters
+          const decodedBrand = decodeURIComponent(extractedBrand);
+          const decodedArticle = decodeURIComponent(extractedArticle);
+          
+          const searchResponse = await dispatch(searchAllProducts(decodedArticle));
           const data = searchResponse.payload || [];
           
           const matchedProduct = data.find(p => 
-            p.brand?.toLowerCase() === brand.toLowerCase() && 
-            p.article?.toLowerCase() === article.toLowerCase()
+            p.brand?.toLowerCase() === decodedBrand.toLowerCase() && 
+            p.article?.toLowerCase() === decodedArticle.toLowerCase()
           );
           
           if (matchedProduct) {
             dispatch(fetchProduct(matchedProduct.id));
           } else {
             const articleMatch = data.find(p => 
-              p.article?.toLowerCase() === article.toLowerCase()
+              p.article?.toLowerCase() === decodedArticle.toLowerCase()
             );
             if (articleMatch) {
               dispatch(fetchProduct(articleMatch.id));
@@ -54,7 +85,7 @@ const PartDetail = () => {
       
       fetchByBrandAndArticle();
     }
-  }, [dispatch, id, brand, article]);
+  }, [dispatch, extractedProductId, extractedBrand, extractedArticle]);
 
   const getCartQuantity = (partId) => {
     if (!cart?.used_parts_items) return 0;

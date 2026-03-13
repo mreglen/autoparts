@@ -134,9 +134,10 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
   };
 
   const handleTitleClick = () => {
+    const productId = product.id || 'unknown';
     const brand = encodeURIComponent(product.brand || 'unknown');
     const article = encodeURIComponent(product.article || 'unknown');
-    navigate(`/part/${brand}/${article}`);
+    navigate(`/part/${productId}-${brand}-${article}`);
   };
 
   return (
@@ -210,10 +211,19 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
                         key={`product-video-${currentImageIndex}`}
                         src={normalizedMediaUrl}
                         className="max-h-full max-w-full object-contain"
-                        controls={false}
+                        controls
                         muted
                         playsInline
                         preload="metadata"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const video = e.currentTarget;
+                          if (video.paused) {
+                            video.play();
+                          } else {
+                            video.pause();
+                          }
+                        }}
                         onMouseMove={(e) => {
                           if (allMedia && allMedia.length > 1) {
                             const rect = e.currentTarget.getBoundingClientRect();
@@ -245,8 +255,27 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
                           }
                         }}
                       />
-                      {/* Video play icon overlay */}
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 pointer-events-none">
+                      {/* Video play icon overlay - only show when video is paused */}
+                      <div 
+                        className={`absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 pointer-events-none transition-opacity duration-200`}
+                        style={{ opacity: 'var(--video-overlay-opacity)' }}
+                        ref={(overlay) => {
+                          // Update overlay visibility based on video state
+                          const videoEl = overlay?.previousElementSibling;
+                          if (videoEl && videoEl.tagName === 'VIDEO') {
+                            const updateOverlay = () => {
+                              if (overlay) {
+                                overlay.style.setProperty('--video-overlay-opacity', videoEl.paused ? '1' : '0');
+                              }
+                            };
+                            videoEl.addEventListener('play', updateOverlay);
+                            videoEl.addEventListener('pause', updateOverlay);
+                            videoEl.addEventListener('loadeddata', updateOverlay);
+                            // Initial check
+                            setTimeout(updateOverlay, 100);
+                          }
+                        }}
+                      >
                         <svg className="w-12 h-12 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
                           <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                         </svg>
