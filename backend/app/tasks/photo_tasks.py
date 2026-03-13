@@ -72,7 +72,7 @@ def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: i
 
 
 @celery_app.task(bind=True, max_retries=3)
-def process_and_upload_photo(self, temp_file_path: str, original_filename: str, organization_id: str):
+def process_and_upload_photo(self, temp_file_path: str, original_filename: str, organization_id: str, subfolder: str = "pictures"):
     """
     Celery task to process photo: remove metadata, convert to WebP, compress, and move to final location.
     
@@ -80,7 +80,7 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
     1. Read image from temp folder
     2. Remove all EXIF/metadata (including geotags)
     3. Optimize and convert to WebP
-    4. Save to uploads/pictures/{organization_id}/
+    4. Save to uploads/{subfolder}/{organization_id}/
     5. Delete original from temp folder
     6. Return URL
     
@@ -89,6 +89,7 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
         temp_file_path: Path to temporary file
         original_filename: Original filename (for reference)
         organization_id: ID of the organization owning the media
+        subfolder: Subfolder name (default: "pictures", can be "logo_organizations" etc.)
     
     Returns:
         dict: {'url': str, 'status': str, 'filename': str}
@@ -125,7 +126,7 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
         safe_original_name = '_'.join(safe_original_name.split())  # Replace spaces with underscores
         final_filename = f"{organization_id}_{timestamp}_{safe_original_name}.webp"
         
-        upload_dir = os.path.join("uploads", "pictures", organization_id)
+        upload_dir = os.path.join("uploads", subfolder, organization_id)
         final_path = os.path.join(upload_dir, final_filename)
         
         print(f"Generated final filename: {final_filename}")
@@ -154,7 +155,11 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
             print(f"Warning: Could not delete temp file {temp_file_path}: {str(delete_error)}")
         
         # Construct relative path (without domain) - frontend will add backend base URL
-        media_path = f"/pictures/{organization_id}/{final_filename}"
+        # Add /uploads prefix only for logo_organizations subfolder
+        if subfolder == "logo_organizations":
+            media_path = f"/uploads/{subfolder}/{organization_id}/{final_filename}"
+        else:
+            media_path = f"/{subfolder}/{organization_id}/{final_filename}"
         
         print(f"✓ Photo saved successfully!")
         print(f"  Final path: {final_path}")

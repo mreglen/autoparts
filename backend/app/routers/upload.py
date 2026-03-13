@@ -487,12 +487,23 @@ async def upload_media_s3(
 
 
 @router.post("/organization-logo")
-async def upload_organization_logo(file: UploadFile = File(...)):
+async def upload_organization_logo(
+    file: UploadFile = File(...),
+    organization_id: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     print(f"=== ORGANIZATION LOGO UPLOAD REQUEST ===")
     print(f"Filename: {file.filename}")
     print(f"Content-Type: {file.content_type}")
-    print(f"Headers: {dict(file.headers) if hasattr(file, 'headers') else 'No headers'}")
-
+    
+    # Use user's organization_id if not provided
+    if not organization_id:
+        organization_id = current_user.organization_id
+    
+    if not organization_id:
+        raise HTTPException(400, "organization_id обязателен")
+    
     if not file.content_type or not file.content_type.startswith("image/"):
         print(f"Rejected: invalid content type {file.content_type}")
         print("=== END ORGANIZATION LOGO UPLOAD (REJECTED) ===")
@@ -537,26 +548,87 @@ async def upload_organization_logo(file: UploadFile = File(...)):
         if not ext:
             raise HTTPException(400, "Недопустимый тип файла")
 
-    filename = f"logos/{uuid.uuid4().hex}{ext}"
+    # Generate filename with organization ID and timestamp
+    filename = generate_photo_filename(organization_id, file.filename)
     
-    # Save to local storage
-    upload_path = os.path.join("uploads", filename)
-    os.makedirs(os.path.dirname(upload_path), exist_ok=True)
+    print(f"Generated filename: {filename}")
+    
+    # Generate UUID filename for temp storage
+    unique_filename = f"{uuid.uuid4().hex}{ext}"
+    temp_dir = os.path.abspath("uploads/temp")
+    temp_path = os.path.join(temp_dir, unique_filename)
+    
+    # Create temp directory if it doesn't exist
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Save original file to temp folder
+    try:
+        with open(temp_path, 'wb') as f:
+            f.write(file_content)
+        print(f"Saved original logo to temp: {temp_path}")
+        print(f"Absolute temp path: {os.path.abspath(temp_path)}")
+    except Exception as e:
+        print(f"Error saving temp file: {str(e)}")
+        raise HTTPException(500, f"Ошибка при сохранении временного файла: {str(e)}")
+    
+    print(f"Processing logo with Celery. Temp path: {temp_path}, Organization: {organization_id}")
+    print(f"Final filename will be: {filename}")
     
     try:
-        with open(upload_path, 'wb') as f:
-            f.write(file_content)
-        print(f"File uploaded successfully: {upload_path}")
+        # Queue Celery task for async processing
+        task = process_and_upload_photo.delay(
+            temp_path,
+            filename,  # Use generated filename with org ID and timestamp
+            organization_id,
+            "logo_organizations"  # Custom subfolder for organization logos
+        )
         
-        # Construct URL using BASE_URL
-        file_url = f"{settings.BASE_URL}{upload_path}"
-        result = {"url": file_url}
-        print(f"Upload successful: {result}")
+        print(f"Celery task queued: {task.id}")
+        
+        # Wait for Celery task to complete (with timeout)
+        import time
+        start_time = time.time()
+        timeout = 30  # 30 seconds timeout
+        
+        print(f"Waiting for Celery task {task.id} to complete...")
+        
+        while not task.ready():
+            if time.time() - start_time > timeout:
+                print(f"Timeout waiting for task {task.id}")
+                raise HTTPException(500, "Превышено время обработки фото")
+            time.sleep(0.5)
+        
+        # Get result from Celery task
+        print(f"Getting result from task {task.id}...")
+        result_data = task.get(timeout=5)
+        print(f"Task result: {result_data}")
+        
+        if result_data.get('status') == 'success':
+            # Return the actual processed path from Celery
+            final_result = {
+                "status": "success",
+                "path": result_data['path'],  # Actual path from Celery
+                "filename": result_data['filename'],  # Actual filename from Celery
+                "organization_id": organization_id
+            }
+        else:
+            raise HTTPException(500, f"Ошибка обработки фото: {result_data.get('error', 'Неизвестная ошибка')}")
+        
+        print(f"Logo processed successfully: {final_result}")
         print("=== END ORGANIZATION LOGO UPLOAD ===")
-        return result
+        return final_result
+        
     except Exception as e:
-        print(f"Error uploading file: {str(e)}")
-        raise HTTPException(500, f"Ошибка при загрузке файла в хранилище: {str(e)}")
+        print(f"Error processing logo: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        # Clean up temp file on error
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except:
+            pass
+        raise HTTPException(500, f"Ошибка при обработке фото: {str(e)}")
 
 
 @router.get("/photo-status/{task_id}")

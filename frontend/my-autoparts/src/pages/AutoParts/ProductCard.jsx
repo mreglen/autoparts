@@ -48,8 +48,6 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
   };
   const [isAdding, setIsAdding] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [touchStartX, setTouchStartX] = useState(0);
-  const [touchEndX, setTouchEndX] = useState(0);
   const [showCallModal, setShowCallModal] = useState(false);
   const [hoverSide, setHoverSide] = useState(null); // 'left' or 'right'
   const navigate = useNavigate();
@@ -147,7 +145,7 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
       >
         {/* Product Image - Large placeholder area */}
         <div 
-          className="bg-gray-200 aspect-[4/3] w-full flex items-center justify-center p-1 relative overflow-hidden cursor-pointer"
+          className="bg-gray-50 aspect-[4/3] w-full flex items-center justify-center relative overflow-hidden"
           onClick={handleTitleClick}
           onMouseEnter={() => {
             // Reset to first image on mouse enter
@@ -206,144 +204,22 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
     
                   
                   {currentMediaIsVideo ? (
-                    <>
-                      <video
-                        key={`product-video-${currentImageIndex}`}
-                        src={normalizedMediaUrl}
-                        className="max-h-full max-w-full object-contain"
-                        controls
-                        muted
-                        playsInline
-                        preload="metadata"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const video = e.currentTarget;
-                          if (video.paused) {
-                            video.play();
-                          } else {
-                            video.pause();
-                          }
-                        }}
-                        onMouseMove={(e) => {
-                          if (allMedia && allMedia.length > 1) {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const x = e.clientX - rect.left;
-                            const width = rect.width;
-                            
-                            // Calculate which index based on horizontal position
-                            const percentage = x / width;
-                            
-                            // Adjust percentage to map to media indices properly
-                            const calculatedIndex = Math.floor(percentage * allMedia.length);
-                            
-                            // Ensure index is within bounds
-                            const newIndex = Math.max(0, Math.min(calculatedIndex, allMedia.length - 1));
-                            
-                            // Only update if the index has changed
-                            if (newIndex !== currentImageIndex) {
-                              setCurrentImageIndex(newIndex);
-                            }
-                            
-                            // Set hover side based on mouse position
-                            if (x < width * 0.3) {
-                              setHoverSide('left');
-                            } else if (x > width * 0.7) {
-                              setHoverSide('right');
-                            } else {
-                              setHoverSide(null);
-                            }
-                          }
-                        }}
-                      />
-                      {/* Video play icon overlay - only show when video is paused */}
-                      <div 
-                        className={`absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 pointer-events-none transition-opacity duration-200`}
-                        style={{ opacity: 'var(--video-overlay-opacity)' }}
-                        ref={(overlay) => {
-                          // Update overlay visibility based on video state
-                          const videoEl = overlay?.previousElementSibling;
-                          if (videoEl && videoEl.tagName === 'VIDEO') {
-                            const updateOverlay = () => {
-                              if (overlay) {
-                                overlay.style.setProperty('--video-overlay-opacity', videoEl.paused ? '1' : '0');
-                              }
-                            };
-                            videoEl.addEventListener('play', updateOverlay);
-                            videoEl.addEventListener('pause', updateOverlay);
-                            videoEl.addEventListener('loadeddata', updateOverlay);
-                            // Initial check
-                            setTimeout(updateOverlay, 100);
-                          }
-                        }}
-                      >
-                        <svg className="w-12 h-12 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                        </svg>
-                      </div>
-                    </>
+                    <video
+                      key={`product-video-${currentImageIndex}`}
+                      src={normalizedMediaUrl}
+                      className="max-h-full max-w-full object-contain m-auto"
+                      controls
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
                   ) : (
                     <img 
                       key={`product-media-${currentImageIndex}`}
                       src={normalizedMediaUrl}
                       alt={product.title} 
-                      className="max-h-full max-w-full object-contain transition-opacity duration-300"
+                      className="max-h-full max-w-full object-contain m-auto"
                       loading="lazy"
-                      onMouseMove={(e) => {
-                        if (allMedia && allMedia.length > 1) {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          const x = e.clientX - rect.left;
-                          const width = rect.width;
-                          
-                          // Calculate which index based on horizontal position
-                          const percentage = x / width;
-                          
-                          // Adjust percentage to map to media indices properly
-                          const calculatedIndex = Math.floor(percentage * allMedia.length);
-                          
-                          // Ensure index is within bounds
-                          const newIndex = Math.max(0, Math.min(calculatedIndex, allMedia.length - 1));
-                          
-                          // Only update if the index has changed
-                         if (newIndex !== currentImageIndex) {
-                            setCurrentImageIndex(newIndex);
-                          }
-                          
-                          // Set hover side based on mouse position
-                         if (x < width * 0.3) {
-                            setHoverSide('left');
-                          } else if (x > width * 0.7) {
-                            setHoverSide('right');
-                          } else {
-                            setHoverSide(null);
-                          }
-                        }
-                      }}
-                      onTouchStart={(e) => {
-                        setTouchStartX(e.targetTouches[0].clientX);
-                      }}
-                      onTouchMove={(e) => {
-                        setTouchEndX(e.targetTouches[0].clientX);
-                      }}
-                      onTouchEnd={() => {
-                        if (allMedia && allMedia.length > 1) {
-                          const swipeThreshold = 50; // Minimum distance to trigger swipe
-                          const diffX = touchStartX - touchEndX;
-                          
-                          if (Math.abs(diffX) > swipeThreshold) {
-                            if (diffX > 0) {
-                              // Swipe left - go to next media
-                              setCurrentImageIndex(prev => 
-                                prev < allMedia.length - 1 ? prev + 1 : 0
-                              );
-                            } else {
-                              // Swipe right - go to previous media
-                              setCurrentImageIndex(prev => 
-                                prev > 0 ? prev - 1 : allMedia.length - 1
-                              );
-                            }
-                          }
-                        }
-                      }}
                     />
                   )}
                 </div>
@@ -357,23 +233,20 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
             </div>
           )}
           
-          {/* Thumbnail indicators for multiple media */}
+          {/* Simple dots indicator for multiple media */}
           {allMedia && allMedia.length > 1 && (
-            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1 bg-black bg-opacity-50 rounded-full p-1">
+            <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-2">
               {allMedia.map((media, index) => (
-                <div 
+                <button
                   key={index}
-                  className={`relative w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-white' : 'bg-gray-400'}`}
-                >
-                  {/* Video icon overlay for video thumbnails */}
-                  {media.type === 'video' && currentImageIndex === index && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    currentImageIndex === index ? 'bg-white w-4' : 'bg-white/50'
+                  }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentImageIndex(index);
+                  }}
+                />
               ))}
             </div>
           )}

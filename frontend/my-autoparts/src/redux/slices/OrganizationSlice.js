@@ -26,7 +26,8 @@ export const uploadOrganizationLogo = createAsyncThunk(
             formData.append('file', file);
             const res = await apiRequestFormData('/upload/organization-logo', formData);
             console.log('Organization logo upload response:', res);
-            return res.url;
+            // Use the path field from the response (relative URL)
+            return res.path || res.url;
         } catch (error) {
             console.error('Organization logo upload error:', error);
             return rejectWithValue(
