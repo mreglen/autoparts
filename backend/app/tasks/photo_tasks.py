@@ -1,7 +1,7 @@
 from celery import Task
 from app.celery_app import celery_app
 from app.core.config import settings
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 import os
 import exifread
@@ -32,7 +32,76 @@ def remove_exif_data(image: Image.Image) -> Image.Image:
     return clean_image
 
 
-def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: int = 85):
+def add_watermark(image: Image.Image, logo_path: str) -> Image.Image:
+    """
+    Add organization logo as watermark to the center of the image with transparency.
+    
+    Args:
+        image: PIL Image object (the product photo)
+        logo_path: Path to the organization logo file
+    
+    Returns:
+        PIL Image object with watermark applied
+    """
+    try:
+        # Open the logo
+        logo = Image.open(logo_path)
+        
+        # Convert both images to RGBA for transparency support
+        if image.mode != 'RGBA':
+            image = image.convert('RGBA')
+        if logo.mode != 'RGBA':
+            logo = logo.convert('RGBA')
+        
+        # Calculate logo size (max 160% of image width or height - 2x larger than before)
+        max_logo_width = int(image.width * 1.60)  # Было 0.80, стало 1.60 (в 2 раза больше)
+        max_logo_height = int(image.height * 1.60)  # Было 0.80, стало 1.60 (в 2 раза больше)
+        
+        # Resize logo while maintaining aspect ratio
+        logo.thumbnail((max_logo_width, max_logo_height), Image.Resampling.LANCZOS)
+        
+        # Make logo semi-transparent (50% opacity)
+        alpha = logo.split()[3]  # Get the alpha channel
+        # Reduce opacity to 50%
+        alpha = alpha.point(lambda i: i * 0.5)
+        logo.putalpha(alpha)
+        
+        # Create a transparent layer for the watermark
+        watermark_layer = Image.new('RGBA', image.size, (0, 0, 0, 0))
+        
+        # Position: EXACTLY center of the image
+        # Calculate center point of the image
+        center_x = image.width / 2
+        center_y = image.height / 2
+        
+        # Calculate top-left corner so that logo center aligns with image center
+        x = int(center_x - logo.width / 2)
+        y = int(center_y - logo.height / 2)
+        
+        print(f"  Image dimensions: {image.width}x{image.height}")
+        print(f"  Logo dimensions after resize: {logo.width}x{logo.height}")
+        print(f"  Calculated center position: x={x}, y={y}")
+        
+        # Paste logo onto watermark layer
+        watermark_layer.paste(logo, (x, y), logo)
+        
+        # Composite the watermark onto the original image
+        watermarked_image = Image.alpha_composite(image, watermark_layer)
+        
+        print(f"✓ Watermark applied successfully")
+        print(f"  Logo size: {logo.width}x{logo.height}")
+        print(f"  Image size: {image.width}x{image.height}")
+        print(f"  Position: ({x}, {y}) - Centered with 50% transparency")
+        
+        return watermarked_image
+        
+    except Exception as e:
+        print(f"⚠️ Warning: Could not apply watermark: {str(e)}")
+        # Return original image if watermark fails
+        return image
+
+
+def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: int = 85, watermark_logo_path: str = None):
     """
     Optimizes an image using Pillow, removes metadata, converts to WebP.
     Preserves original aspect ratio while reducing file size.
@@ -41,6 +110,7 @@ def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: i
         image_data: Raw image bytes
         max_size: Maximum dimensions (width, height) - image will fit within these bounds while preserving aspect ratio
         quality: WebP quality (1-100) - balanced for good quality and compression
+        watermark_logo_path: Optional path to logo file to use as watermark
     
     Returns:
         bytes: Optimized WebP image bytes
@@ -49,6 +119,10 @@ def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: i
     
     # Remove EXIF and all metadata
     img = remove_exif_data(img)
+    
+    # Apply watermark if provided (before resizing)
+    if watermark_logo_path and os.path.exists(watermark_logo_path):
+        img = add_watermark(img, watermark_logo_path)
     
     # Convert to RGB if necessary (WebP doesn't support all modes)
     if img.mode in ('RGBA', 'LA', 'P'):
@@ -72,17 +146,18 @@ def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: i
 
 
 @celery_app.task(bind=True, max_retries=3)
-def process_and_upload_photo(self, temp_file_path: str, original_filename: str, organization_id: str, subfolder: str = "pictures"):
+def process_and_upload_photo(self, temp_file_path: str, original_filename: str, organization_id: str, subfolder: str = "pictures", add_watermark: bool = False, logo_path: str = None):
     """
     Celery task to process photo: remove metadata, convert to WebP, compress, and move to final location.
     
     Steps:
     1. Read image from temp folder
     2. Remove all EXIF/metadata (including geotags)
-    3. Optimize and convert to WebP
-    4. Save to uploads/{subfolder}/{organization_id}/
-    5. Delete original from temp folder
-    6. Return URL
+    3. Apply watermark if requested and logo provided
+    4. Optimize and convert to WebP
+    5. Save to uploads/{subfolder}/{organization_id}/
+    6. Delete original from temp folder
+    7. Return URL
     
     Args:
         self: Task instance
@@ -90,6 +165,8 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
         original_filename: Original filename (for reference)
         organization_id: ID of the organization owning the media
         subfolder: Subfolder name (default: "pictures", can be "logo_organizations" etc.)
+        add_watermark: Whether to add watermark (default: False)
+        logo_path: Path to logo file for watermark (required if add_watermark=True)
     
     Returns:
         dict: {'url': str, 'status': str, 'filename': str}
@@ -112,7 +189,9 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
             image_data = f.read()
         
         # Process and optimize image (removes metadata, converts to WebP)
-        processed_bytes = optimize_image(image_data)
+        # Apply watermark if requested
+        watermark_path = logo_path if add_watermark else None
+        processed_bytes = optimize_image(image_data, watermark_logo_path=watermark_path)
         
         # Generate final path with organization ID
         # Change extension to .webp

@@ -41,6 +41,28 @@ async def upload_photo(
     
     if not organization_id:
         raise HTTPException(400, "organization_id обязателен")
+    
+    # Check if user is admin to determine if watermark should be added
+    from ..models.organization import Organization
+    org = db.query(Organization).filter(Organization.id == organization_id).first()
+    add_watermark_flag = current_user.is_admin and org and org.logo_organization
+    logo_file_path = None
+    
+    if add_watermark_flag:
+        # Construct the path to the organization logo (handle paths that may or may not start with /uploads/)
+        logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
+        
+        # If the path already starts with 'uploads', don't add it again
+        if not logo_path_value.lower().startswith("uploads"):
+            logo_file_path = os.path.join("uploads", logo_path_value)
+        else:
+            logo_file_path = logo_path_value
+        
+        print(f"✓ Watermark will be applied (user is admin)")
+        print(f"  Logo path from DB: {org.logo_organization}")
+        print(f"  Logo relative path: {logo_path_value}")
+        print(f"  Logo file path: {logo_file_path}")
+        print(f"  Logo exists: {os.path.exists(logo_file_path)}")
 
     if not file.content_type or not file.content_type.startswith("image/"):
         print(f"Rejected: invalid content type {file.content_type}")
@@ -117,7 +139,10 @@ async def upload_photo(
         task = process_and_upload_photo.delay(
             temp_path,
             filename,  # Use generated filename with org ID and timestamp
-            organization_id
+            organization_id,
+            subfolder="pictures",
+            add_watermark=add_watermark_flag,
+            logo_path=logo_file_path
         )
         
         print(f"Celery task queued: {task.id}")
@@ -342,6 +367,28 @@ async def upload_media(
     
     if not organization_id:
         raise HTTPException(400, "organization_id обязателен")
+    
+    # Check if user is admin to determine if watermark should be added (only for images)
+    from ..models.organization import Organization
+    org = db.query(Organization).filter(Organization.id == organization_id).first()
+    add_watermark_flag = current_user.is_admin and org and org.logo_organization
+    logo_file_path = None
+    
+    if add_watermark_flag:
+        # Construct the path to the organization logo (handle paths that may or may not start with /uploads/)
+        logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
+        
+        # If the path already starts with 'uploads', don't add it again
+        if not logo_path_value.lower().startswith("uploads"):
+            logo_file_path = os.path.join("uploads", logo_path_value)
+        else:
+            logo_file_path = logo_path_value
+        
+        print(f"✓ Watermark will be applied (user is admin)")
+        print(f"  Logo path from DB: {org.logo_organization}")
+        print(f"  Logo relative path: {logo_path_value}")
+        print(f"  Logo file path: {logo_file_path}")
+        print(f"  Logo exists: {os.path.exists(logo_file_path)}")
 
     # Check if file is an image or video
     is_image = file.content_type and file.content_type.startswith("image/")
@@ -441,7 +488,10 @@ async def upload_media(
             task = process_and_upload_photo.delay(
                 temp_path,
                 filename,  # Use generated filename
-                organization_id
+                organization_id,
+                subfolder=(subfolder if 'subfolder' in locals() else "pictures"),
+                add_watermark=add_watermark_flag,
+                logo_path=logo_file_path
             )
             # The Celery task will save the file with this naming pattern
             predicted_path = f"/pictures/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.webp')}"
@@ -504,6 +554,10 @@ async def upload_organization_logo(
     if not organization_id:
         raise HTTPException(400, "organization_id обязателен")
     
+    # Don't add watermark to logo itself
+    add_watermark_flag = False
+    logo_file_path = None
+    
     if not file.content_type or not file.content_type.startswith("image/"):
         print(f"Rejected: invalid content type {file.content_type}")
         print("=== END ORGANIZATION LOGO UPLOAD (REJECTED) ===")
@@ -548,6 +602,20 @@ async def upload_organization_logo(
         if not ext:
             raise HTTPException(400, "Недопустимый тип файла")
 
+    # Delete all existing logos in the organization's folder before uploading new one
+    logo_folder = os.path.join("uploads", "logo_organizations", organization_id)
+    if os.path.exists(logo_folder):
+        try:
+            print(f"Cleaning up old logos from: {logo_folder}")
+            for filename in os.listdir(logo_folder):
+                file_path = os.path.join(logo_folder, filename)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+                    print(f"✓ Deleted old logo: {file_path}")
+        except Exception as e:
+            print(f"⚠️ Warning: Could not delete old logos: {e}")
+            # Continue with upload even if cleanup fails
+
     # Generate filename with organization ID and timestamp
     filename = generate_photo_filename(organization_id, file.filename)
     
@@ -580,7 +648,9 @@ async def upload_organization_logo(
             temp_path,
             filename,  # Use generated filename with org ID and timestamp
             organization_id,
-            "logo_organizations"  # Custom subfolder for organization logos
+            subfolder="logo_organizations",
+            add_watermark=add_watermark_flag,
+            logo_path=logo_file_path
         )
         
         print(f"Celery task queued: {task.id}")

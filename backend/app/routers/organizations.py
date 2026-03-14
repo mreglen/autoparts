@@ -277,8 +277,34 @@ def update_organization(
     print(f"Current logo_organization value: {getattr(db_org, 'logo_organization', 'NOT_FOUND')}")
     print(f"Incoming update data: {org.dict(exclude_unset=True)}")
     
-    # Обновляем только переданные поля
+    # Check if logo_organization is being updated and delete old logo if needed
     update_data = org.dict(exclude_unset=True)
+    if 'logo_organization' in update_data and update_data['logo_organization']:
+        old_logo_path = db_org.logo_organization
+        new_logo_path = update_data['logo_organization']
+        
+        # Delete old logo file if it exists and is different from new one
+        if old_logo_path and old_logo_path != new_logo_path:
+            try:
+                # Remove leading slashes for path construction
+                old_logo_relative = old_logo_path.lstrip("/").lstrip("\\")
+                # Handle paths that may or may not start with 'uploads'
+                if not old_logo_relative.lower().startswith("uploads"):
+                    old_logo_file_path = os.path.join("uploads", old_logo_relative)
+                else:
+                    old_logo_file_path = old_logo_relative
+                
+                print(f"Attempting to delete old logo: {old_logo_file_path}")
+                if os.path.exists(old_logo_file_path):
+                    os.remove(old_logo_file_path)
+                    print(f"✓ Old logo deleted: {old_logo_file_path}")
+                else:
+                    print(f"⚠️ Old logo file not found: {old_logo_file_path}")
+            except Exception as e:
+                print(f"⚠️ Error deleting old logo: {e}")
+                # Don't fail the update if logo deletion fails
+    
+    # Обновляем только переданные поля
     for key, value in update_data.items():
         print(f"Setting {key} = {value}")
         setattr(db_org, key, value)
