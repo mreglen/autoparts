@@ -34,7 +34,7 @@ def remove_exif_data(image: Image.Image) -> Image.Image:
 
 def add_watermark(image: Image.Image, logo_path: str) -> Image.Image:
     """
-    Add organization logo as watermark to the center of the image with transparency.
+    Add organization logo as watermark to the bottom-right corner of the image with transparency.
     
     Args:
         image: PIL Image object (the product photo)
@@ -53,34 +53,30 @@ def add_watermark(image: Image.Image, logo_path: str) -> Image.Image:
         if logo.mode != 'RGBA':
             logo = logo.convert('RGBA')
         
-        # Calculate logo size (max 160% of image width or height - 2x larger than before)
-        max_logo_width = int(image.width * 1.60)  # Было 0.80, стало 1.60 (в 2 раза больше)
-        max_logo_height = int(image.height * 1.60)  # Было 0.80, стало 1.60 (в 2 раза больше)
+      
+        max_logo_width = int(image.width * 0.5)  
+        max_logo_height = int(image.height * 0.5)
         
         # Resize logo while maintaining aspect ratio
         logo.thumbnail((max_logo_width, max_logo_height), Image.Resampling.LANCZOS)
         
-        # Make logo semi-transparent (50% opacity)
+        # Make logo semi-transparent (70% opacity - less transparent than before)
         alpha = logo.split()[3]  # Get the alpha channel
-        # Reduce opacity to 50%
-        alpha = alpha.point(lambda i: i * 0.5)
+        # Reduce opacity to 70% (was 50%, now more visible)
+        alpha = alpha.point(lambda i: i * 0.7)
         logo.putalpha(alpha)
         
         # Create a transparent layer for the watermark
         watermark_layer = Image.new('RGBA', image.size, (0, 0, 0, 0))
         
-        # Position: EXACTLY center of the image
-        # Calculate center point of the image
-        center_x = image.width / 2
-        center_y = image.height / 2
-        
-        # Calculate top-left corner so that logo center aligns with image center
-        x = int(center_x - logo.width / 2)
-        y = int(center_y - logo.height / 2)
+        # Position: BOTTOM-RIGHT corner with small padding
+        padding = 20  # pixels from the edges
+        x = image.width - logo.width - padding
+        y = image.height - logo.height - padding
         
         print(f"  Image dimensions: {image.width}x{image.height}")
-        print(f"  Logo dimensions after resize: {logo.width}x{logo.height}")
-        print(f"  Calculated center position: x={x}, y={y}")
+        print(f"  Logo dimensions after resize (3x smaller): {logo.width}x{logo.height}")
+        print(f"  Calculated bottom-right position: x={x}, y={y}")
         
         # Paste logo onto watermark layer
         watermark_layer.paste(logo, (x, y), logo)
@@ -89,9 +85,9 @@ def add_watermark(image: Image.Image, logo_path: str) -> Image.Image:
         watermarked_image = Image.alpha_composite(image, watermark_layer)
         
         print(f"✓ Watermark applied successfully")
-        print(f"  Logo size: {logo.width}x{logo.height}")
+        print(f"  Logo size (3x smaller): {logo.width}x{logo.height}")
         print(f"  Image size: {image.width}x{image.height}")
-        print(f"  Position: ({x}, {y}) - Centered with 50% transparency")
+        print(f"  Position: ({x}, {y}) - Bottom-right corner with 70% opacity")
         
         return watermarked_image
         
