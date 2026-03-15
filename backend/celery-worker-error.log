@@ -1,0 +1,36 @@
+[2026-03-06 20:45:36,014: INFO/MainProcess] Connected to redis://:**@127.0.0.1:6379/0
+[2026-03-06 20:45:36,020: INFO/MainProcess] mingle: searching for neighbors
+[2026-03-06 20:45:37,030: INFO/MainProcess] mingle: all alone
+[2026-03-06 20:45:37,042: INFO/MainProcess] celery@vm2512296768 ready.
+[2026-03-06 20:45:37,046: INFO/MainProcess] Task app.tasks.photo_tasks.process_and_upload_photo[2a65511c-a39c-436b-8863-fa6ddfb331fb] received
+[2026-03-06 20:45:37,059: WARNING/ForkPoolWorker-2] === PHOTO PROCESSING TASK STARTED ===
+[2026-03-06 20:45:37,059: WARNING/ForkPoolWorker-2] Temp file path: uploads/temp/df84f449d225422fb285ddf167d5b7bc.png
+[2026-03-06 20:45:37,060: WARNING/ForkPoolWorker-2] Original filename: TVgpq7hgzd_20260306_203527_80015fac.png
+[2026-03-06 20:45:37,060: WARNING/ForkPoolWorker-2] Organization ID: TVgpq7hgzd
+[2026-03-06 20:45:37,060: WARNING/ForkPoolWorker-2] ✓ Temp file exists, size: 258856 bytes
+[2026-03-06 20:45:37,271: WARNING/ForkPoolWorker-2] Generated final filename: TVgpq7hgzd_20260306_203527_80015fac.webp
+[2026-03-06 20:45:37,271: WARNING/ForkPoolWorker-2] Upload directory: uploads/pictures/TVgpq7hgzd
+[2026-03-06 20:45:37,271: WARNING/ForkPoolWorker-2] Final path: uploads/pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_203527_80015fac.webp
+[2026-03-06 20:45:37,272: WARNING/ForkPoolWorker-2] Saving optimized image to: uploads/pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_203527_80015fac.webp
+[2026-03-06 20:45:37,272: WARNING/ForkPoolWorker-2] ✓ Successfully saved file: uploads/pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_203527_80015fac.webp
+[2026-03-06 20:45:37,272: WARNING/ForkPoolWorker-2] Deleted temp file: uploads/temp/df84f449d225422fb285ddf167d5b7bc.png
+[2026-03-06 20:45:37,272: WARNING/ForkPoolWorker-2] ✓ Photo saved successfully!
+[2026-03-06 20:45:37,272: WARNING/ForkPoolWorker-2]   Final path: uploads/pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_203527_80015fac.webp
+[2026-03-06 20:45:37,272: WARNING/ForkPoolWorker-2]   Media URL path: /pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_203527_80015fac.webp
+[2026-03-06 20:45:37,275: INFO/ForkPoolWorker-2] Task app.tasks.photo_tasks.process_and_upload_photo[2a65511c-a39c-436b-8863-fa6ddfb331fb] succeeded in 0.2264677479979582s: {'path': '/pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_203527_80015fac.webp', 'url': 'http://195.24.65.251//pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_203527_80015fac.webp', 'status': 'success', 'filename': 'TVgpq7hgzd_20260306_203527_80015fac.webp', 'organization_id': 'TVgpq7hgzd'}
+[2026-03-06 20:45:56,843: INFO/MainProcess] Task app.tasks.photo_tasks.process_and_upload_photo[b0548541-58f1-4bed-80bd-2fe722374b63] received
+[2026-03-06 20:45:56,852: WARNING/ForkPoolWorker-2] === PHOTO PROCESSING TASK STARTED ===
+[2026-03-06 20:45:56,852: WARNING/ForkPoolWorker-2] Temp file path: uploads/temp/d9a17e3856c44ad398e88b1fa4dc2bf4.png
+[2026-03-06 20:45:56,852: WARNING/ForkPoolWorker-2] Original filename: TVgpq7hgzd_20260306_204556_46a4a594.png
+[2026-03-06 20:45:56,852: WARNING/ForkPoolWorker-2] Organization ID: TVgpq7hgzd
+[2026-03-06 20:45:56,852: WARNING/ForkPoolWorker-2] ✓ Temp file exists, size: 258856 bytes
+[2026-03-06 20:45:56,965: WARNING/ForkPoolWorker-2] Generated final filename: TVgpq7hgzd_20260306_204556_46a4a594.webp
+[2026-03-06 20:45:56,966: WARNING/ForkPoolWorker-2] Upload directory: uploads/pictures/TVgpq7hgzd
+[2026-03-06 20:45:56,966: WARNING/ForkPoolWorker-2] Final path: uploads/pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_204556_46a4a594.webp
+[2026-03-06 20:45:56,966: WARNING/ForkPoolWorker-2] Saving optimized image to: uploads/pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_204556_46a4a594.webp
+[2026-03-06 20:45:56,966: WARNING/ForkPoolWorker-2] ✓ Successfully saved file: uploads/pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_204556_46a4a594.webp
+[2026-03-06 20:45:56,966: WARNING/ForkPoolWorker-2] Deleted temp file: uploads/temp/d9a17e3856c44ad398e88b1fa4dc2bf4.png
+[2026-03-06 20:45:56,966: WARNING/ForkPoolWorker-2] ✓ Photo saved successfully!
+[2026-03-06 20:45:56,966: WARNING/ForkPoolWorker-2]   Final path: uploads/pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_204556_46a4a594.webp
+[2026-03-06 20:45:56,966: WARNING/ForkPoolWorker-2]   Media URL path: /pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_204556_46a4a594.webp
+[2026-03-06 20:45:56,968: INFO/ForkPoolWorker-2] Task app.tasks.photo_tasks.process_and_upload_photo[b0548541-58f1-4bed-80bd-2fe722374b63] succeeded in 0.11742002097889781s: {'path': '/pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_204556_46a4a594.webp', 'url': 'http://195.24.65.251//pictures/TVgpq7hgzd/TVgpq7hgzd_20260306_204556_46a4a594.webp', 'status': 'success', 'filename': 'TVgpq7hgzd_20260306_204556_46a4a594.webp', 'organization_id': 'TVgpq7hgzd'}
