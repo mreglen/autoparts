@@ -278,6 +278,54 @@ export const deleteProductPhotos = createAsyncThunk(
     }
 );
 
+export const deleteProductVideos = createAsyncThunk(
+    'products/deleteProductVideos',
+    async ({ productId, videoIds }, { rejectWithValue }) => {
+        try {
+            console.log('=== DELETE VIDEOS REQUEST ===');
+            console.log('Product ID:', productId);
+            console.log('Video IDs to delete:', videoIds);
+            console.log('Endpoint:', `/products/${productId}/videos`);
+            
+            await apiAxios.delete(`/products/${productId}/videos`, {
+                data: { video_ids: videoIds }
+            });
+            
+            console.log('Videos deleted successfully from backend');
+            return { productId, videoIds };
+        } catch (error) {
+            console.error('Error deleting videos:', error);
+            console.error('Error response:', error.response?.data);
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка удаления видео'
+            );
+        }
+    }
+);
+
+export const deleteProductVideo = createAsyncThunk(
+    'products/deleteProductVideo',
+    async ({ productId, videoId }, { rejectWithValue }) => {
+        try {
+            console.log('=== DELETE SINGLE VIDEO REQUEST ===');
+            console.log('Product ID:', productId);
+            console.log('Video ID to delete:', videoId);
+            console.log('Endpoint:', `/products/${productId}/videos/${videoId}`);
+            
+            await apiAxios.delete(`/products/${productId}/videos/${videoId}`);
+            
+            console.log('Video deleted successfully from backend');
+            return { productId, videoId };
+        } catch (error) {
+            console.error('Error deleting single video:', error);
+            console.error('Error response:', error.response?.data);
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка удаления видео'
+            );
+        }
+    }
+);
+
 export const updateProductQuantityAPI = createAsyncThunk(
     'products/updateProductQuantityAPI',
     async ({ productId, newQuantity }, { rejectWithValue }) => {
@@ -748,6 +796,38 @@ const productSlice = createSlice({
                 }
             })
             .addCase(deleteProductPhotos.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            .addCase(deleteProductVideos.pending, (state) => {
+                state.loading = true;
+            })
+            .addCase(deleteProductVideos.fulfilled, (state, action) => {
+                state.loading = false;
+                // Удаляем видео из currentProduct, если оно загружено
+                if (state.currentProduct && state.currentProduct.id === action.payload.productId) {
+                    state.currentProduct.videos = state.currentProduct.videos.filter(
+                        video => !action.payload.videoIds.includes(video.id)
+                    );
+                }
+            })
+            .addCase(deleteProductVideos.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            .addCase(deleteProductVideo.pending, (state) => {
+                state.loading = true;
+            })
+            .addCase(deleteProductVideo.fulfilled, (state, action) => {
+                state.loading = false;
+                // Удаляем видео из currentProduct, если оно загружено
+                if (state.currentProduct && state.currentProduct.id === action.payload.productId) {
+                    state.currentProduct.videos = state.currentProduct.videos.filter(
+                        video => video.id !== action.payload.videoId
+                    );
+                }
+            })
+            .addCase(deleteProductVideo.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })

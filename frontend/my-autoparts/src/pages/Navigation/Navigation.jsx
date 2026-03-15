@@ -200,8 +200,8 @@ export default function Navigation() {
                     {/* Логотип + каталог */}
                     <div className="flex items-center gap-6">
                         <NavLink to="/" className="flex items-center gap-3">
-                            <img src="/img/orig-1.png" alt="Логотип" className="h-10 w-auto" />
-                            <div className="flex flex-col">
+                            <img src="/img/LogoWithoutBg.png" alt="Логотип" className="h-10 w-auto" />
+                            <div className="flex flex-col text-blue-900">
                                 <p className="font-bold">Свой</p>
                                 <p className="font-bold">гараж</p>
                             </div>

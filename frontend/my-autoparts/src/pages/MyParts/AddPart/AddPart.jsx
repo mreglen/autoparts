@@ -43,6 +43,7 @@ const AddPart = () => {
   const [showNewCellForm, setShowNewCellForm] = useState(false);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [uploadedTempFiles, setUploadedTempFiles] = useState([]); // Track uploaded temp filenames
+  const [uploadProgress, setUploadProgress] = useState({}); // Track upload status by file index
 
   useEffect(() => {
     if (user?.organization_id) {
@@ -142,6 +143,12 @@ const AddPart = () => {
           alert(`Можно добавить только ${availableSlots} фотографий (максимум 5)`);
         }
         
+        // Set uploading state for each file
+        const startIndex = photos.length;
+        filesToUpload.forEach((_, idx) => {
+          setUploadProgress(prev => ({ ...prev, [`photo-${startIndex + idx}`]: true }));
+        });
+        
         for (const file of filesToUpload) {
           try {
             const formData = new FormData();
@@ -151,12 +158,18 @@ const AddPart = () => {
             if (result.path) {
               const fileWithPath = Object.assign(file, { finalPath: result.path });
               imageFiles[imageFiles.indexOf(file)] = fileWithPath;
+              uploadedTempFiles.push(result.path.split('/').pop());
             }
           } catch (error) {
             console.error('Failed to upload photo:', error);
             alert(`Ошибка загрузки фото: ${file.name}`);
           }
         }
+        
+        // Clear uploading state after all uploads complete
+        filesToUpload.forEach((_, idx) => {
+          setUploadProgress(prev => ({ ...prev, [`photo-${startIndex + idx}`]: false }));
+        });
         
         setPhotos((prev) => [...prev, ...imageFiles.filter(f => f.finalPath)]);
       }
@@ -169,21 +182,41 @@ const AddPart = () => {
         alert('Максимум 1 видео');
       } else {
         const file = videoFiles[0];
+        const videoIndex = videos.length;
+        
+        // Add video to state immediately with uploading flag
+        const uploadingVideo = Object.assign(file, { isUploading: true });
+        setVideos((prev) => [...prev, uploadingVideo]);
+        
+        // Set uploading state
+        setUploadProgress(prev => ({ ...prev, [`video-${videoIndex}`]: true }));
+        
         try {
           const formData = new FormData();
           formData.append('file', file);
           const result = await apiRequestFormData('/upload/media', formData);
           
           if (result.path) {
-            const fileWithPath = Object.assign(file, { finalPath: result.path });
-            videoFiles[0] = fileWithPath;
+            const fileWithPath = Object.assign(file, { 
+              finalPath: result.path,
+              isUploading: false 
+            });
+            
+            // Update the video in state with the uploaded path
+            setVideos((prev) => prev.map((v, idx) => 
+              idx === videoIndex ? fileWithPath : v
+            ));
+            uploadedTempFiles.push(result.path.split('/').pop());
           }
         } catch (error) {
           console.error('Failed to upload video:', error);
           alert(`Ошибка загрузки видео: ${file.name}`);
+          // Remove failed video from state
+          setVideos((prev) => prev.filter((_, idx) => idx !== videoIndex));
         }
         
-        setVideos((prev) => [...prev, ...videoFiles.filter(f => f.finalPath)]);
+        // Clear uploading state
+        setUploadProgress(prev => ({ ...prev, [`video-${videoIndex}`]: false }));
       }
     }
   };
@@ -291,28 +324,44 @@ const AddPart = () => {
 
   // Function to delete files when user cancels
   const cleanupFiles = async () => {
-    const filesToDelete = [
-      ...photos.filter(f => f.finalPath),
-      ...videos.filter(f => f.finalPath)
-    ];
+    // Delete from both photos/videos arrays and uploadedTempFiles
+    const filesToDelete = new Set();
     
-    if (filesToDelete.length === 0) {
+    // Extract filenames from photos
+    photos.forEach(f => {
+      if (f.finalPath) {
+        const filename = f.finalPath.split('/').pop();
+        filesToDelete.add(filename);
+      }
+    });
+    
+    // Extract filenames from videos
+    videos.forEach(f => {
+      if (f.finalPath) {
+        const filename = f.finalPath.split('/').pop();
+        filesToDelete.add(filename);
+      }
+    });
+    
+    // Also include tracked temp files
+    uploadedTempFiles.forEach(filename => filesToDelete.add(filename));
+    
+    if (filesToDelete.size === 0) {
       return;
     }
 
     try {
-      const deletePromises = filesToDelete.map(file => {
-        const pathParts = file.finalPath.split('/');
-        const filename = pathParts[pathParts.length - 1];
-        return apiRequest(`/upload/temp/${encodeURIComponent(filename)}`, {
+      const deletePromises = Array.from(filesToDelete).map(filename => 
+        apiRequest(`/upload/temp/${encodeURIComponent(filename)}`, {
           method: 'DELETE'
         }).catch(err => {
           console.warn(`Failed to delete file ${filename}:`, err);
-        });
-      });
+        })
+      );
       
       await Promise.all(deletePromises);
       console.log('Files cleaned up successfully');
+      setUploadedTempFiles([]); // Clear tracked files
     } catch (error) {
       console.error('Error cleaning up files:', error);
     }
@@ -362,7 +411,10 @@ const AddPart = () => {
         // Photos are already uploaded with final paths, just use them
         photoUrls = photos
           .filter(file => file.finalPath)
-          .map(file => file.finalPath);
+          .map(file => {
+            // Ensure path starts with / for consistency
+            return file.finalPath.startsWith('/') ? file.finalPath : '/' + file.finalPath;
+          });
       } catch (error) {
         console.error('Error processing photos:', error);
         alert(`Ошибка обработки фото: ${error.message}`);
@@ -378,7 +430,10 @@ const AddPart = () => {
         // Videos are already uploaded with final paths, just use them
         videoUrls = videos
           .filter(file => file.finalPath)
-          .map(file => file.finalPath);
+          .map(file => {
+            // Ensure path starts with / for consistency
+            return file.finalPath.startsWith('/') ? file.finalPath : '/' + file.finalPath;
+          });
       } catch (error) {
         console.error('Error processing videos:', error);
         alert(`Ошибка обработки видео: ${error.message}`);
@@ -547,9 +602,11 @@ const AddPart = () => {
                 photoSrc = '';
               }
               
+              const isUploading = uploadProgress[`photo-${idx}`] === true;
+              
               return (
                 <div key={`photo-${idx}`} className="relative">
-                  {isUploadingMedia && (file instanceof File || file instanceof Blob) && (
+                  {isUploading && (
                     <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center z-10">
                       <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -571,37 +628,52 @@ const AddPart = () => {
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handlePhotoRemove(idx); }}
-                    className="absolute-top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                    disabled={isUploading}
                   >
                     <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
                   </button>
                 </div>
               );
             })}
-            {videos.map((file, idx) => (
-              <div key={`video-${idx}`} className="relative">
-                {isUploadingMedia && (file instanceof File || file instanceof Blob) && (
-                  <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center z-10">
-                    <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  </div>
-                )}
-                <video
-                  src={URL.createObjectURL(file)}
-                  className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
-                 controls={false}
-                />
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); handleVideoRemove(idx); }}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
-                >
-                  <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
-                </button>
-              </div>
-            ))}
+            {videos.map((file, idx) => {
+              const isUploading = uploadProgress[`video-${idx}`] === true || file.isUploading;
+              
+              return (
+                <div key={`video-${idx}`} className="relative">
+                  {isUploading && (
+                    <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center z-10">
+                      <div className="relative">
+                        {/* Circular spinner */}
+                        <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {/* Video icon in center */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <video
+                    src={file instanceof File || file instanceof Blob ? URL.createObjectURL(file) : (file.finalPath || '')}
+                    className="w-16 h-16 object-cover rounded border cursor-pointer hover:opacity-90 transition-opacity"
+                    controls={false}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleVideoRemove(idx); }}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                    disabled={isUploading}
+                  >
+                    <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
         </div>

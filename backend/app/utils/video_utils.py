@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 from app.core.config import settings
 
+
 # Paths to FFmpeg executables from environment variables
 FFPROBE_PATH = getattr(settings, 'FFPROBE_PATH', r"C:\ffmpeg\bin\ffprobe.exe")
 FFMPEG_PATH = getattr(settings, 'FFMPEG_PATH', r"C:\ffmpeg\bin\ffmpeg.exe")
@@ -119,13 +120,19 @@ def compress_video(
         
         print(f"Running FFmpeg command: {' '.join(cmd)}")
         
-        # Run FFmpeg
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        # Run FFmpeg with timeout
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=120  # 2 minute timeout for FFmpeg
+            )
+        except subprocess.TimeoutExpired as e:
+            error_message = f"FFmpeg timed out after 120 seconds"
+            print(error_message)
+            raise RuntimeError(error_message)
         
         print(f"✓ Video compressed successfully: {output_path}")
         print(f"  Original size: {os.path.getsize(input_path) / 1024 / 1024:.2f} MB")
@@ -140,6 +147,95 @@ def compress_video(
     except Exception as e:
         print(f"Error during video compression: {str(e)}")
         raise RuntimeError(f"Video compression failed: {str(e)}")
+
+
+def add_watermark_to_video(
+    input_path: str,
+    logo_path: str,
+    output_path: str = None,
+    opacity: float = 0.5,  # 50% opacity for balanced visibility
+    padding: int = 20
+) -> str:
+    """
+    Add organization logo as watermark to the bottom-right corner of the video.
+    
+    Args:
+        input_path: Path to input video file
+        logo_path: Path to the logo image file
+        output_path: Path for output video (optional, will use temp file if not provided)
+        opacity: Watermark opacity (0.0 to 1.0, default: 0.5 for 50% opacity)
+        padding: Padding from edges in pixels (default: 20)
+    
+    Returns:
+        str: Path to video with watermark applied
+    
+    Raises:
+        ValueError: If logo file not found
+        RuntimeError: If watermark application fails
+    """
+    if not os.path.exists(logo_path):
+        raise ValueError(f"Logo file not found: {logo_path}")
+    
+    # Generate output path if not provided
+    if not output_path:
+        temp_dir = tempfile.gettempdir()
+        base_name = os.path.splitext(os.path.basename(input_path))[0]
+        output_path = os.path.join(temp_dir, f"{base_name}_watermarked.mp4")
+    
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    try:
+        # Build FFmpeg filter complex for watermark with bottom-right positioning
+        # The watermark will be automatically resized by FFmpeg to fit within 50% of video width/height
+        filter_complex = f"[1:v]scale=iw*0.5:-1[wm];[0:v][wm]overlay=W-w-{padding}:H-h-{padding}:format=auto" # Bottom-right corner
+        
+        # Build FFmpeg command
+        cmd = [
+            FFMPEG_PATH,
+            '-i', input_path,
+            '-i', logo_path,
+            '-filter_complex', filter_complex,
+            '-c:v', 'libx264',
+            '-c:a', 'aac',
+            '-preset', 'medium',
+            '-crf', '28',
+            '-y',  # Overwrite output file
+            output_path
+        ]
+        
+        print(f"Running FFmpeg watermark command: {' '.join(cmd)}")
+        
+        # Run FFmpeg with timeout
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=120  # 2 minute timeout
+            )
+        except subprocess.TimeoutExpired as e:
+            error_message = f"FFmpeg watermark timed out after 120 seconds"
+            print(error_message)
+            raise RuntimeError(error_message)
+        
+        print(f"✓ Watermark applied to video successfully: {output_path}")
+        print(f"  Input video: {input_path}")
+        print(f"  Logo: {logo_path}")
+        print(f"  Output: {output_path}")
+        print(f"  Opacity: {opacity*100}%")
+        print(f"  Position: Bottom-right with {padding}px padding")
+        
+        return output_path
+        
+    except subprocess.CalledProcessError as e:
+        error_message = f"FFmpeg watermark error: {e.stderr if e.stderr else str(e)}"
+        print(error_message)
+        raise RuntimeError(f"Video watermark application failed: {error_message}")
+    except Exception as e:
+        print(f"Error during video watermark application: {str(e)}")
+        raise RuntimeError(f"Video watermark application failed: {str(e)}")
 
 
 def validate_video_file(video_path: str, max_size_mb: int = 100, max_duration_sec: int = 60) -> dict:

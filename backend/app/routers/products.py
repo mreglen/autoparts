@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -281,6 +282,86 @@ def delete_product(
     db.commit()
     return
 
+# Bulk delete endpoints MUST come before single delete endpoints for proper routing
+@router.delete("/{product_id}/photos", status_code=204)
+def delete_product_photos(
+    product_id: int,
+    request: DeletePhotosRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    print(f"DEBUG: Attempting to delete photos from product {product_id}")
+    print(f"DEBUG: User organization: {current_user.organization_id}, is_seller: {current_user.is_seller}")
+    print(f"DEBUG: Photo IDs to delete: {request.photo_ids}")
+    
+    # Проверяем, что продукт принадлежит организации пользователя
+    product = db.query(ProductModel).filter(
+        ProductModel.id == product_id,
+        ProductModel.organization_id == current_user.organization_id
+    ).first()
+    if not product:
+        print(f"DEBUG: Product {product_id} not found or not accessible")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Продукт не найден или недоступен"
+        )
+
+    # Проверяем, что пользователь является продавцом
+    if not current_user.is_seller:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Только продавцы могут удалять фото товаров"
+        )
+
+    # Находим все фото для удаления
+    photos = db.query(ProductPhoto).filter(
+        ProductPhoto.id.in_(request.photo_ids),
+        ProductPhoto.product_id == product_id
+    ).all()
+
+    if len(photos) != len(request.photo_ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Некоторые фото не найдены"
+        )
+
+    # Удаляем физические файлы фото
+    base_dir = Path(__file__).parent.parent.parent
+    for photo in photos:
+        try:
+            # Build the file path from photo_url
+            # photo_url is stored as /pictures/{org_id}/{filename}.webp
+            # Physical file is at uploads/pictures/{org_id}/{filename}.webp
+            photo_path = photo.photo_url
+            
+            # Remove leading slash if present
+            if photo_path.startswith('/'):
+                photo_path = photo_path[1:]
+            
+            # Build absolute path: base_dir/uploads/pictures/{org_id}/{filename}.webp
+            abs_photo_path = base_dir / "uploads" / photo_path
+            
+            print(f"Attempting to delete photo file: {abs_photo_path}")
+            print(f"Photo URL from DB: {photo.photo_url}")
+            print(f"Constructed path: {abs_photo_path}")
+            
+            # Delete file if it exists
+            if os.path.exists(abs_photo_path):
+                os.remove(abs_photo_path)
+                print(f"✓ Deleted photo file: {abs_photo_path}")
+            else:
+                print(f"⚠️ Photo file not found: {abs_photo_path}")
+        except Exception as e:
+            print(f"Error deleting photo file: {str(e)}")
+            # Continue with DB deletion even if file deletion fails
+        
+        # Удаляем запись из базы данных
+        db.delete(photo)
+
+    db.commit()
+
+    return
+
 @router.delete("/{product_id}/photos/{photo_id}", status_code=204)
 def delete_product_photo(
     product_id: int,
@@ -317,8 +398,34 @@ def delete_product_photo(
             detail="Фото не найдено"
         )
 
-    # Delete photo records from database
-    # (No local file deletion needed - files remain in storage)
+    # Удаляем физический файл фото
+    try:
+        # Build the file path from photo_url
+        # photo_url is stored as /pictures/{org_id}/{filename}.webp
+        # Physical file is at uploads/pictures/{org_id}/{filename}.webp
+        photo_path = photo.photo_url
+        
+        # Remove leading slash if present
+        if photo_path.startswith('/'):
+            photo_path = photo_path[1:]
+        
+        # Build absolute path: base_dir/uploads/pictures/{org_id}/{filename}.webp
+        base_dir = Path(__file__).parent.parent.parent
+        abs_photo_path = base_dir / "uploads" / photo_path
+        
+        print(f"Attempting to delete photo file: {abs_photo_path}")
+        print(f"Photo URL from DB: {photo.photo_url}")
+        print(f"Constructed path: {abs_photo_path}")
+        
+        # Delete file if it exists
+        if os.path.exists(abs_photo_path):
+            os.remove(abs_photo_path)
+            print(f"✓ Deleted photo file: {abs_photo_path}")
+        else:
+            print(f"⚠️ Photo file not found: {abs_photo_path}")
+    except Exception as e:
+        print(f"Error deleting photo file: {str(e)}")
+        # Continue with DB deletion even if file deletion fails
 
     # Удаляем запись из базы данных
     db.delete(photo)
@@ -326,19 +433,26 @@ def delete_product_photo(
 
     return
 
-@router.delete("/{product_id}/photos", status_code=204)
-def delete_product_photos(
+
+# Bulk video delete MUST come before single video delete for proper routing
+@router.delete("/{product_id}/videos", status_code=204)
+def delete_product_videos(
     product_id: int,
-    request: DeletePhotosRequest,
+    request: DeleteVideosRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    print(f"DEBUG: Attempting to delete videos from product {product_id}")
+    print(f"DEBUG: User organization: {current_user.organization_id}, is_seller: {current_user.is_seller}")
+    print(f"DEBUG: Video IDs to delete: {request.video_ids}")
+    
     # Проверяем, что продукт принадлежит организации пользователя
     product = db.query(ProductModel).filter(
         ProductModel.id == product_id,
         ProductModel.organization_id == current_user.organization_id
     ).first()
     if not product:
+        print(f"DEBUG: Product {product_id} not found or not accessible")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Продукт не найден или недоступен"
@@ -348,28 +462,53 @@ def delete_product_photos(
     if not current_user.is_seller:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Только продавцы могут удалять фото товаров"
+            detail="Только продавцы могут удалять видео товаров"
         )
 
-    # Находим все фото для удаления
-    photos = db.query(ProductPhoto).filter(
-        ProductPhoto.id.in_(request.photo_ids),
-        ProductPhoto.product_id == product_id
+    # Находим все видео для удаления
+    videos = db.query(ProductVideo).filter(
+        ProductVideo.id.in_(request.video_ids),
+        ProductVideo.product_id == product_id
     ).all()
 
-    if len(photos) != len(request.photo_ids):
+    if len(videos) != len(request.video_ids):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Некоторые фото не найдены"
+            detail="Некоторые видео не найдены"
         )
 
-    # Skipping local file deletion as we're using S3 storage
-    for photo in photos:
-        # Old local file deletion code removed
-        pass
-
+    # Удаляем физические файлы видео
+    base_dir = Path(__file__).parent.parent.parent
+    for video in videos:
+        try:
+            # Build the file path from video_url
+            # video_url is stored as /videos/{org_id}/{filename}.mp4
+            # Physical file is at uploads/videos/{org_id}/{filename}.mp4
+            video_path = video.video_url
+            
+            # Remove leading slash if present
+            if video_path.startswith('/'):
+                video_path = video_path[1:]
+            
+            # Build absolute path: base_dir/uploads/videos/{org_id}/{filename}.mp4
+            abs_video_path = base_dir / "uploads" / video_path
+            
+            print(f"Attempting to delete video file: {abs_video_path}")
+            print(f"Video URL from DB: {video.video_url}")
+            print(f"Constructed path: {abs_video_path}")
+            
+            # Delete file if it exists
+            if os.path.exists(abs_video_path):
+                os.remove(abs_video_path)
+                print(f"✓ Deleted video file: {abs_video_path}")
+            else:
+                print(f"⚠️ Video file not found: {abs_video_path}")
+        except Exception as e:
+            print(f"Error deleting video file: {str(e)}")
+            # Continue with DB deletion even if file deletion fails
+        
         # Удаляем запись из базы данных
-        db.delete(photo)
+        db.delete(video)
 
     db.commit()
 
@@ -412,54 +551,37 @@ def delete_product_video(
             detail="Видео не найдено"
         )
 
+    # Удаляем физический файл видео
+    try:
+        # Build the file path from video_url
+        # video_url is stored as /videos/{org_id}/{filename}.mp4
+        # Physical file is at uploads/videos/{org_id}/{filename}.mp4
+        video_path = video.video_url
+        
+        # Remove leading slash if present
+        if video_path.startswith('/'):
+            video_path = video_path[1:]
+        
+        # Build absolute path: base_dir/uploads/videos/{org_id}/{filename}.mp4
+        base_dir = Path(__file__).parent.parent.parent
+        abs_video_path = base_dir / "uploads" / video_path
+        
+        print(f"Attempting to delete video file: {abs_video_path}")
+        print(f"Video URL from DB: {video.video_url}")
+        print(f"Constructed path: {abs_video_path}")
+        
+        # Delete file if it exists
+        if os.path.exists(abs_video_path):
+            os.remove(abs_video_path)
+            print(f"✓ Deleted video file: {abs_video_path}")
+        else:
+            print(f"⚠️ Video file not found: {abs_video_path}")
+    except Exception as e:
+        print(f"Error deleting video file: {str(e)}")
+        # Continue with DB deletion even if file deletion fails
+
     # Удаляем запись из базы данных
     db.delete(video)
-    db.commit()
-
-    return
-
-
-@router.delete("/{product_id}/videos", status_code=204)
-def delete_product_videos(
-    product_id: int,
-    request: DeleteVideosRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    # Проверяем, что продукт принадлежит организации пользователя
-    product = db.query(ProductModel).filter(
-        ProductModel.id == product_id,
-        ProductModel.organization_id == current_user.organization_id
-    ).first()
-    if not product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Продукт не найден или недоступен"
-        )
-
-    # Проверяем, что пользователь является продавцом
-    if not current_user.is_seller:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Только продавцы могут удалять видео товаров"
-        )
-
-    # Находим все видео для удаления
-    videos = db.query(ProductVideo).filter(
-        ProductVideo.id.in_(request.video_ids),
-        ProductVideo.product_id == product_id
-    ).all()
-
-    if len(videos) != len(request.video_ids):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Некоторые видео не найдены"
-        )
-
-    # Удаляем записи из базы данных
-    for video in videos:
-        db.delete(video)
-
     db.commit()
 
     return

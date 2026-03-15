@@ -60,10 +60,10 @@ def add_watermark(image: Image.Image, logo_path: str) -> Image.Image:
         # Resize logo while maintaining aspect ratio
         logo.thumbnail((max_logo_width, max_logo_height), Image.Resampling.LANCZOS)
         
-        # Make logo semi-transparent (70% opacity - less transparent than before)
+        # Make logo semi-transparent (50% opacity - balanced visibility)
         alpha = logo.split()[3]  # Get the alpha channel
-        # Reduce opacity to 70% (was 50%, now more visible)
-        alpha = alpha.point(lambda i: i * 0.7)
+        # Apply 50% opacity for good balance between subtlety and visibility
+        alpha = alpha.point(lambda i: i * 0.5)
         logo.putalpha(alpha)
         
         # Create a transparent layer for the watermark
@@ -87,7 +87,7 @@ def add_watermark(image: Image.Image, logo_path: str) -> Image.Image:
         print(f"✓ Watermark applied successfully")
         print(f"  Logo size (3x smaller): {logo.width}x{logo.height}")
         print(f"  Image size: {image.width}x{image.height}")
-        print(f"  Position: ({x}, {y}) - Bottom-right corner with 70% opacity")
+        print(f"  Position: ({x}, {y}) - Bottom-right corner with 50% opacity")
         
         return watermarked_image
         
@@ -120,14 +120,26 @@ def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: i
     if watermark_logo_path and os.path.exists(watermark_logo_path):
         img = add_watermark(img, watermark_logo_path)
     
+    # Check if image has transparency (RGBA or LA mode) or if it's a PNG/WebP that might have transparency
+    original_has_transparency = img.mode in ('RGBA', 'LA', 'P') or (img.mode == 'P' and 'transparency' in img.info)
+    
     # Convert to RGB if necessary (WebP doesn't support all modes)
+    # BUT preserve transparency if the original image had it
     if img.mode in ('RGBA', 'LA', 'P'):
-        # Create white background for transparent images
-        background = Image.new('RGB', img.size, (255, 255, 255))
-        if img.mode == 'P':
-            img = img.convert('RGBA')
-        background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-        img = background
+        if original_has_transparency:
+            # Keep transparency - convert to RGBA for WebP
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            elif img.mode == 'LA':
+                img = img.convert('RGBA')
+            # Don't add white background - preserve transparency
+        else:
+            # No transparency - create white background
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = background
     elif img.mode != 'RGB':
         img = img.convert('RGB')
     

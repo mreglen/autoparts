@@ -43,6 +43,10 @@ const PhotoGallery = ({ photos = [], onImageClick, selectedPhotos = [], onPhotoS
     }
     return false;
   };
+  
+  // Separate photos and videos
+  const photoItems = photos.filter(photo => !isVideo(photo));
+  const videoItems = photos.filter(photo => isVideo(photo));
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [objectUrls, setObjectUrls] = useState(new Map());
 
@@ -76,11 +80,50 @@ const PhotoGallery = ({ photos = [], onImageClick, selectedPhotos = [], onPhotoS
     };
   }, [objectUrls]);
 
-  if (!photos || photos.length === 0) {
+  // Use photoItems instead of photos for main display
+  if (!photoItems || photoItems.length === 0) {
+    // If there are only videos, don't show empty state
+    if (videoItems.length > 0) {
+      // Show first video as main content
+      const firstVideo = videoItems[0];
+      let videoUrl;
+      
+      if (typeof firstVideo === 'string') {
+        videoUrl = normalizeImageUrl(firstVideo);
+      } else if (firstVideo?.full_url) {
+        videoUrl = normalizeImageUrl(firstVideo.full_url);
+      } else if (firstVideo?.photo_url) {
+        videoUrl = normalizeImageUrl(firstVideo.photo_url);
+      } else if (firstVideo instanceof File) {
+        videoUrl = URL.createObjectURL(firstVideo);
+      } else {
+        videoUrl = '';
+      }
+      
+      return (
+        <div className="space-y-3">
+          <div className="relative w-full max-w-md h-56 flex items-center justify-center rounded-lg border shadow-sm cursor-pointer hover:opacity-95 transition-opacity overflow-hidden"
+            onClick={() => onImageClick && onImageClick(videoUrl, 'Видео 1')}>
+            <video
+              src={videoUrl}
+              className="max-h-full max-w-full object-contain"
+              controls={false}
+              muted
+              playsInline
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+              <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return <div className="text-gray-500 italic">Нет фото</div>;
   }
 
-  const currentPhoto = photos[currentPhotoIndex];
+  const currentPhoto = photoItems[currentPhotoIndex];
   let photoUrl;
   let isCurrentPhotoVideo = false;
 
@@ -131,12 +174,12 @@ const PhotoGallery = ({ photos = [], onImageClick, selectedPhotos = [], onPhotoS
         )}
 
         {/* Кнопка удаления для одиночного фото */}
-        {onDeletePhoto && photos.length === 1 && (
+        {onDeletePhoto && photoItems.length === 1 && (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              const photoId = photos[0]?.id || 0;
+              const photoId = photoItems[0]?.id || 0;
               onDeletePhoto(photoId);
             }}
             className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors"
@@ -149,13 +192,13 @@ const PhotoGallery = ({ photos = [], onImageClick, selectedPhotos = [], onPhotoS
         )}
 
         {/* Индикаторы для переключения (если фото > 1) */}
-        {photos.length > 1 && (
+        {photoItems.length > 1 && (
           <>
             {/* Кнопки навигации */}
             <button
               type="button"
               onClick={() => setCurrentPhotoIndex(prev =>
-                prev === 0 ? photos.length - 1 : prev - 1
+                prev === 0 ? photoItems.length - 1 : prev - 1
               )}
               className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-opacity-75 transition"
             >
@@ -164,7 +207,7 @@ const PhotoGallery = ({ photos = [], onImageClick, selectedPhotos = [], onPhotoS
             <button
               type="button"
               onClick={() => setCurrentPhotoIndex(prev =>
-                prev === photos.length - 1 ? 0 : prev + 1
+                prev === photoItems.length - 1 ? 0 : prev + 1
               )}
               className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-opacity-75 transition"
             >
@@ -173,16 +216,16 @@ const PhotoGallery = ({ photos = [], onImageClick, selectedPhotos = [], onPhotoS
 
             {/* Индикатор текущего фото */}
             <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
-              {currentPhotoIndex + 1} / {photos.length}
+              {currentPhotoIndex + 1} / {photoItems.length}
             </div>
           </>
         )}
       </div>
 
       {/* Миниатюры (если фото > 1) */}
-      {photos.length > 1 && (
+      {photoItems.length > 1 && (
         <div className="flex flex-wrap gap-2">
-          {photos.map((photo, index) => {
+          {photoItems.map((photo, index) => {
             let thumbUrl;
             const isThumbVideo = isVideo(photo);
 
@@ -236,11 +279,11 @@ const PhotoGallery = ({ photos = [], onImageClick, selectedPhotos = [], onPhotoS
                   <div className="absolute -top-1 -right-1">
                     <input
                       type="checkbox"
-                      checked={selectedPhotos.includes(photos[index]?.id || index)}
+                      checked={selectedPhotos.includes(photoItems[index]?.id || index)}
                       onChange={(e) => {
                         e.stopPropagation();
                         // Если фото - объект с ID, передаем ID, иначе индекс
-                        const photoId = photos[index]?.id || index;
+                        const photoId = photoItems[index]?.id || index;
                         onPhotoSelect(photoId);
                       }}
                       className="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"

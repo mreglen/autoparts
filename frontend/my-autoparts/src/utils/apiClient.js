@@ -1,11 +1,11 @@
 import axios from 'axios';
 
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000/api';
-const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'http://127.0.0.1:8000';
+// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000/api';
+// const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'http://127.0.0.1:8000';
 
-// const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://svoygarage.ru/server/api';
-// const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygarage.ru/server';
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 'https://svoygarage.ru/server/api';
+const BACKEND_BASE = process.env.REACT_APP_BACKEND_BASE_URL || 'https://svoygarage.ru/server';
 
 
 console.log('REACT_APP_API_BASE_URL', process.env.REACT_APP_API_BASE_URL);
@@ -26,24 +26,29 @@ export const getAuthHeaders = () => {
 export const normalizeImageUrl = (imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
 
-   
+    // Don't modify full URLs with backend base or blob/data URLs
     if (imageUrl.startsWith(BACKEND_BASE) ||
         imageUrl.startsWith('blob:') ||
         imageUrl.startsWith('data:')) {
         return imageUrl;
     }
 
-   
+    // If path starts with /pictures/ or /videos/, add /uploads prefix if missing
     if (imageUrl.startsWith('/pictures/') || imageUrl.startsWith('/videos/')) {
-        return `${BACKEND_BASE}${imageUrl}`;
+        return `${BACKEND_BASE}/uploads${imageUrl}`;
     }
     
- 
+    // If path already starts with /uploads/, just add backend base
+    if (imageUrl.startsWith('/uploads/')) {
+        return `${BACKEND_BASE}${imageUrl}`;
+    }
+
+    // For other paths starting with /, just add backend base
     if (imageUrl.startsWith('/')) {
         return `${BACKEND_BASE}${imageUrl}`;
     }
 
-   
+    // Return as-is for relative URLs or other formats
     return imageUrl;
 };
 

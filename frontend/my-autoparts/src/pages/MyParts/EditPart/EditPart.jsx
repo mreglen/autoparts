@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { updateProduct, uploadPhotos, uploadMedia, clearProductError, resetProducts, fetchProduct, deleteProductPhotos } from '../../../redux/slices/ProductSlice';
+import { updateProduct, uploadPhotos, uploadMedia, clearProductError, resetProducts, fetchProduct, deleteProductPhotos, deleteProductVideos, deleteProductVideo } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { fetchStorageCells, fetchProductStorageCells, linkProductToCell, deleteProductCellLink } from '../../../redux/slices/StorageCellsSlice';
 import VehicleModal from '../AddPart/VehicleModal';
@@ -75,6 +75,7 @@ const EditPart = () => {
   const [selectedVideosForRemoval, setSelectedVideosForRemoval] = useState([]);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [uploadedTempFiles, setUploadedTempFiles] = useState([]); // Track uploaded temp filenames
+  const [uploadProgress, setUploadProgress] = useState({}); // Track upload status by file index
   
   // Состояние для медиа модалки
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
@@ -97,14 +98,14 @@ const EditPart = () => {
 
       // Сохраняем полные объекты ProductPhoto для доступа к ID
       const photos = (currentProduct.photos || []).filter(photo =>
-        photo && (photo.photo_url || typeof photo === 'string')
+        photo && (photo.photo_url || photo.full_url || typeof photo === 'string')
       );
 
       setExistingPhotos(photos);
       
       // Загружаем существующие видео
       const videos = (currentProduct.videos || []).filter(video =>
-        video && (video.video_url || typeof video === 'string')
+        video && (video.video_url || video.full_url || typeof video === 'string')
       );
       setExistingVideos(videos);
       
@@ -215,6 +216,12 @@ const EditPart = () => {
           alert(`Можно добавить только ${availableSlots} фотографий (максимум 5)`);
         }
         
+        // Set uploading state for each file
+        const startIndex = photos.length;
+        filesToUpload.forEach((_, idx) => {
+          setUploadProgress(prev => ({ ...prev, [`photo-${startIndex + idx}`]: true }));
+        });
+        
         for (const file of filesToUpload) {
           try {
             const formData = new FormData();
@@ -233,12 +240,18 @@ const EditPart = () => {
                 finalFilename: result.filename 
               });
               imageFiles[imageFiles.indexOf(file)] = fileWithPath;
+              uploadedTempFiles.push(result.filename);
             }
           } catch (error) {
             console.error('Failed to upload photo:', error);
             alert(`Ошибка загрузки фото: ${file.name}`);
           }
         }
+        
+        // Clear uploading state after all uploads complete
+        filesToUpload.forEach((_, idx) => {
+          setUploadProgress(prev => ({ ...prev, [`photo-${startIndex + idx}`]: false }));
+        });
         
         setPhotos((prev) => [...prev, ...imageFiles.filter(f => f.finalPath)]);
       }
@@ -251,6 +264,15 @@ const EditPart = () => {
         alert('Максимум 1 видео');
       } else {
         const file = videoFiles[0];
+        const videoIndex = videos.length;
+        
+        // Add video to state immediately with uploading flag
+        const uploadingVideo = Object.assign(file, { isUploading: true });
+        setVideos((prev) => [...prev, uploadingVideo]);
+        
+        // Set uploading state
+        setUploadProgress(prev => ({ ...prev, [`video-${videoIndex}`]: true }));
+        
         try {
           const formData = new FormData();
           formData.append('file', file);
@@ -260,21 +282,37 @@ const EditPart = () => {
             : '/upload/video';
           console.log('Uploading video:', file.name, 'Organization ID:', organizationId);
           const result = await apiRequestFormData(uploadEndpoint, formData);
-          console.log('Upload result:', result);
+          console.log('Video upload result:', result);
           
           if (result.path && result.filename) {
             const fileWithPath = Object.assign(file, { 
               finalPath: result.path,
-              finalFilename: result.filename 
+              finalFilename: result.filename,
+              isUploading: false 
             });
-            videoFiles[0] = fileWithPath;
+            
+            // Update the video in state with the uploaded path
+            setVideos((prev) => prev.map((v, idx) => 
+              idx === videoIndex ? fileWithPath : v
+            ));
+            uploadedTempFiles.push(result.filename);
+            console.log('Video successfully uploaded with path:', result.path);
+          } else {
+            console.error('Video upload response missing path or filename:', result);
+            alert('Ошибка: сервер не вернул путь к видео');
+            // Remove failed video from state
+            setVideos((prev) => prev.filter((_, idx) => idx !== videoIndex));
           }
         } catch (error) {
           console.error('Failed to upload video:', error);
-          alert(`Ошибка загрузки видео: ${file.name}`);
+          console.error('Error details:', error.response?.data);
+          alert(`Ошибка загрузки видео: ${file.name}. ${error.response?.data?.detail || error.message}`);
+          // Remove failed video from state
+          setVideos((prev) => prev.filter((_, idx) => idx !== videoIndex));
         }
         
-        setVideos((prev) => [...prev, ...videoFiles.filter(f => f.finalPath)]);
+        // Clear uploading state
+        setUploadProgress(prev => ({ ...prev, [`video-${videoIndex}`]: false }));
       }
     }
   };
@@ -393,13 +431,84 @@ const EditPart = () => {
     }
   };
 
+  const handleRemoveSelectedVideos = async () => {
+    if (selectedVideosForRemoval.length === 0) {
+      return;
+    }
+
+    console.log('=== HANDLE REMOVE SELECTED VIDEOS ===');
+    console.log('Product ID:', parseInt(id, 10));
+    console.log('Video IDs to delete:', selectedVideosForRemoval);
+    console.log('Calling deleteProductVideos action...');
+
+    try {
+      // Use the batch video deletion endpoint via Redux
+      const result = await dispatch(deleteProductVideos({
+        productId: parseInt(id, 10),
+        videoIds: selectedVideosForRemoval
+      }));
+      
+      console.log('Delete result:', result);
+
+      // Локально обновляем состояние
+      setExistingVideos((prev) => prev.filter((video) => {
+        if (typeof video === 'object' && video.id) {
+          return !selectedVideosForRemoval.includes(video.id);
+        }
+        return true; // Для строковых URL оставляем как есть
+      }));
+
+      setSelectedVideosForRemoval([]);
+    } catch (error) {
+      console.error('Ошибка при удалении видео:', error);
+      alert(`Ошибка удаления видео: ${error.message || error}`);
+    }
+  };
+
+  const handleVideoSelectionToggle = (videoId) => {
+    setSelectedVideosForRemoval((prev) =>
+      prev.includes(videoId)
+        ? prev.filter((id) => id !== videoId)
+        : [...prev, videoId]
+    );
+  };
+
+  const handleDeleteSingleVideo = async (videoId) => {
+    console.log('=== HANDLE DELETE SINGLE VIDEO ===');
+    console.log('Product ID:', parseInt(id, 10));
+    console.log('Video ID to delete:', videoId);
+    console.log('Calling deleteProductVideo action...');
+    
+    try {
+      // Use the dedicated single video deletion endpoint via Redux
+      const result = await dispatch(deleteProductVideo({
+        productId: parseInt(id, 10),
+        videoId: videoId
+      }));
+      
+      console.log('Delete result:', result);
+
+      // Локально обновляем состояние
+      setExistingVideos((prev) => prev.filter((video) => {
+        if (typeof video === 'object' && video.id) {
+          return video.id !== videoId;
+        }
+        return true;
+      }));
+      
+    } catch (error) {
+      console.error('Ошибка при удалении видео:', error);
+      alert(`Ошибка удаления видео: ${error.message || error}`);
+    }
+  };
+
   const handleOpenMediaModal = (clickedItem, label) => {
     console.log('Opening media modal with:', clickedItem, 'label:', label);
     
     // Convert all existing photos and videos to format expected by MediaModal
     const allMedia = [
       ...existingPhotos.map(photo => {
-        const url = typeof photo === 'string' ? photo : (photo.photo_url || photo.full_url || '');
+        const url = typeof photo === 'string' ? photo : (photo.full_url || photo.photo_url || '');
         const normalizedUrl = normalizeImageUrl(url);
         const isVideo = normalizedUrl.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
         return {
@@ -408,7 +517,7 @@ const EditPart = () => {
         };
       }),
       ...existingVideos.map(video => {
-        const url = typeof video === 'string' ? video : (video.video_url || video.full_url || '');
+        const url = typeof video === 'string' ? video : (video.full_url || video.video_url || '');
         const normalizedUrl = normalizeImageUrl(url);
         const isVideo = normalizedUrl.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
         return {
@@ -434,22 +543,42 @@ const EditPart = () => {
 
   // Function to delete temp files when user cancels
   const cleanupTempFiles = async () => {
-    if (uploadedTempFiles.length === 0) {
+    // Collect all filenames to delete from both uploadedTempFiles and photos/videos arrays
+    const filesToDelete = new Set();
+    
+    // Extract filenames from photos
+    photos.forEach(f => {
+      if (f.finalFilename) {
+        filesToDelete.add(f.finalFilename);
+      }
+    });
+    
+    // Extract filenames from videos
+    videos.forEach(f => {
+      if (f.finalFilename) {
+        filesToDelete.add(f.finalFilename);
+      }
+    });
+    
+    // Also include tracked temp files
+    uploadedTempFiles.forEach(filename => filesToDelete.add(filename));
+    
+    if (filesToDelete.size === 0) {
       return;
     }
 
     try {
-      const deletePromises = uploadedTempFiles.map(filename => 
+      const deletePromises = Array.from(filesToDelete).map(filename => 
         apiRequest(`/upload/temp/${encodeURIComponent(filename)}`, {
           method: 'DELETE'
         }).catch(err => {
-          console.warn(`Failed to delete temp file ${filename}:`, err);
+          console.warn(`Failed to delete file ${filename}:`, err);
         })
       );
       
       await Promise.all(deletePromises);
       console.log('Temp files cleaned up successfully');
-      setUploadedTempFiles([]);
+      setUploadedTempFiles([]); // Clear tracked files
     } catch (error) {
       console.error('Error cleaning up temp files:', error);
     }
@@ -575,7 +704,11 @@ const EditPart = () => {
           return null;
         })
         .filter(url => url !== null),
-      ...photoUrls
+      // Добавляем новые загруженные фото из их finalPath
+      ...photoUrls.map(path => {
+        // Ensure path starts with / for consistency
+        return path.startsWith('/') ? path : '/' + path;
+      })
     ];
     
     // Комбинируем существующие и новые видео
@@ -591,7 +724,11 @@ const EditPart = () => {
           return null;
         })
         .filter(url => url !== null),
-      ...videoUrls
+      // Добавляем новые загруженные видео из их finalPath
+      ...videoUrls.map(path => {
+        // Ensure path starts with / for consistency
+        return path.startsWith('/') ? path : '/' + path;
+      })
     ];
 
     const productData = {
@@ -749,31 +886,22 @@ const EditPart = () => {
         <div>
           <label className="block text-sm font-medium">Медиа *</label>
 
-          {/* Существующие медиа (фото и видео) */}
-          {(existingPhotos.length > 0 || existingVideos.length > 0) && (
+          {/* Существующие фото */}
+          {existingPhotos.length > 0 && (
             <div className="mt-2 mb-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Фотографии</h3>
               <PhotoGallery
-                photos={[
-                  ...existingPhotos.map(photo => {
+                photos={existingPhotos.map(photo => {
                   const url = typeof photo === 'string' ? photo : photo.photo_url;
-                    return {
-                      id: typeof photo === 'object' ? photo.id : `photo-${photo}`,
-                      photo_url: url,
-                      full_url: url
-                    };
-                  }),
-                  ...existingVideos.map((video, idx) => {
-                  const url = typeof video === 'string' ? video : video.video_url;
-                    return {
-                      id: typeof video === 'object' ? video.id : `video-${idx}`,
-                      photo_url: url,
-                      full_url: url
-                    };
-                  })
-                ]}
+                  return {
+                    id: typeof photo === 'object' ? photo.id : `photo-${photo}`,
+                    photo_url: url,
+                    full_url: url
+                  };
+                })}
                 selectedPhotos={selectedPhotosForRemoval}
                 onPhotoSelect={handlePhotoSelectionToggle}
-                onDeletePhoto={existingPhotos.length + existingVideos.length === 1 ? handleDeleteSinglePhoto : null}
+                onDeletePhoto={existingPhotos.length === 1 ? handleDeleteSinglePhoto : null}
                 onImageClick={handleOpenMediaModal}
               />
               {selectedPhotosForRemoval.length > 0 && (
@@ -784,6 +912,92 @@ const EditPart = () => {
                     className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors"
                   >
                     Удалить выбранные ({selectedPhotosForRemoval.length})
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Существующие видео */}
+          {existingVideos.length > 0 && (
+            <div className="mt-2 mb-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Видео</h3>
+              
+              {/* Video thumbnails in gallery style */}
+              <div className="flex flex-wrap gap-2">
+                {existingVideos.map((video, idx) => {
+                  const url = typeof video === 'string' ? video : (video.video_url || video.full_url || '');
+                  const normalizedUrl = normalizeImageUrl(url);
+                  const videoId = typeof video === 'object' ? video.id : `video-${idx}`;
+                  const isSelected = selectedVideosForRemoval.includes(videoId);
+                  
+                  return (
+                    <div key={`existing-video-${idx}`} className="relative">
+                      {/* Video thumbnail */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenMediaModal(normalizedUrl, `Видео ${idx + 1}`)}
+                        className={`relative rounded border-2 transition cursor-pointer ${
+                          isSelected
+                            ? 'border-red-500 shadow-md'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        <div className="relative">
+                          <video
+                            src={normalizedUrl}
+                            className="w-12 h-12 object-cover rounded"
+                            controls={false}
+                            muted
+                            playsInline
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                            </svg>
+                          </div>
+                        </div>
+                      </button>
+                      
+                      {/* Checkbox for selection */}
+                      <div className="absolute -top-1 -right-1">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleVideoSelectionToggle(videoId)}
+                          className="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
+                          title="Выбрать для удаления"
+                        />
+                      </div>
+                      
+                      {/* Single delete button */}
+                      {typeof video === 'object' && video.id && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSingleVideo(video.id);
+                          }}
+                          className="absolute -bottom-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow hover:bg-red-600 transition-colors"
+                          title="Удалить видео"
+                        >
+                          <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Bulk delete button for videos */}
+              {selectedVideosForRemoval.length > 0 && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={handleRemoveSelectedVideos}
+                    className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors"
+                  >
+                    Удалить выбранные видео ({selectedVideosForRemoval.length})
                   </button>
                 </div>
               )}
@@ -826,9 +1040,11 @@ const EditPart = () => {
                     photoSrc = '';
                   }
                   
+                  const isUploading = uploadProgress[`photo-${idx}`] === true;
+                  
                   return (
                     <div key={`photo-${idx}`} className="relative">
-                      {isUploadingMedia && (file instanceof File || file instanceof Blob) && (
+                      {isUploading && (
                         <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center z-10">
                           <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -845,6 +1061,7 @@ const EditPart = () => {
                         type="button"
                         onClick={() => handlePhotoRemove(idx)}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                        disabled={isUploading}
                       >
                         <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
                       </button>
@@ -860,30 +1077,44 @@ const EditPart = () => {
             <div className="mt-2">
               <p className="text-sm text-gray-600 mb-2">Новые видео:</p>
               <div className="flex flex-wrap gap-2">
-                {videos.map((file, idx) => (
-                  <div key={`video-${idx}`} className="relative">
-                    {isUploadingMedia && (file instanceof File || file instanceof Blob) && (
-                      <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center z-10">
-                        <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                    )}
-                    <video
-                      src={URL.createObjectURL(file)}
-                      className="w-16 h-16 object-cover rounded border"
-                      controls={false}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleVideoRemove(idx)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
-                    >
-                      <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
-                    </button>
-                  </div>
-                ))}
+                {videos.map((file, idx) => {
+                  const isUploading = uploadProgress[`video-${idx}`] === true || file.isUploading;
+                  
+                  return (
+                    <div key={`video-${idx}`} className="relative">
+                      {isUploading && (
+                        <div className="absolute inset-0 bg-black bg-opacity-50 rounded flex items-center justify-center z-10">
+                          <div className="relative">
+                            {/* Circular spinner */}
+                            <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            {/* Video icon in center */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <video
+                        src={file instanceof File || file instanceof Blob ? URL.createObjectURL(file) : (file.finalPath || '')}
+                        className="w-16 h-16 object-cover rounded border"
+                        controls={false}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleVideoRemove(idx)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                        disabled={isUploading}
+                      >
+                        <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

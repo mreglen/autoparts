@@ -221,6 +221,28 @@ async def upload_video(
     
     if not organization_id:
         raise HTTPException(400, "organization_id обязателен")
+    
+    # Check if user is admin to determine if watermark should be added
+    from ..models.organization import Organization
+    org = db.query(Organization).filter(Organization.id == organization_id).first()
+    add_watermark_flag = current_user.is_admin and org and org.logo_organization
+    logo_file_path = None
+    
+    if add_watermark_flag:
+        # Construct the path to the organization logo (handle paths that may or may not start with /uploads/)
+        logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
+        
+        # If the path already starts with 'uploads', don't add it again
+        if not logo_path_value.lower().startswith("uploads"):
+            logo_file_path = os.path.join("uploads", logo_path_value)
+        else:
+            logo_file_path = logo_path_value
+        
+        print(f"✓ Watermark will be applied (user is admin)")
+        print(f"  Logo path from DB: {org.logo_organization}")
+        print(f"  Logo relative path: {logo_path_value}")
+        print(f"  Logo file path: {logo_file_path}")
+        print(f"  Logo exists: {os.path.exists(logo_file_path)}")
 
     # Check if file is a video
     if not file.content_type or not file.content_type.startswith("video/"):
@@ -294,7 +316,9 @@ async def upload_video(
         task = process_and_upload_video.delay(
             temp_path,
             filename,  # Use generated filename
-            organization_id
+            organization_id,
+            add_watermark=add_watermark_flag,  # Pass watermark flag
+            logo_path=logo_file_path  # Pass logo path
         )
         
         print(f"Celery task queued: {task.id}")
@@ -302,12 +326,25 @@ async def upload_video(
         # Wait for Celery task to complete (with timeout)
         import time
         start_time = time.time()
-        timeout = 60  # 60 seconds timeout for videos
+        timeout = 120  # 120 seconds timeout for videos (increased from 60)
         
+        print(f"Waiting for Celery task {task.id} to complete...")
+        
+        # Check if task actually started executing
+        task_started = False
         while not task.ready():
+            # Check if task has started (moved from PENDING to STARTED)
+            if not task_started and task.state in ['STARTED', 'PROGRESS']:
+                task_started = True
+                print(f"Task {task.id} has started processing...")
+            
             if time.time() - start_time > timeout:
+                print(f"Timeout waiting for task {task.id} after {timeout}s")
+                print(f"Task state: {task.state}")
                 raise HTTPException(500, "Превышено время обработки видео")
             time.sleep(0.5)
+        
+        print(f"Task {task.id} completed with state: {task.state}")
         
         # Get result from Celery task
         result_data = task.get(timeout=10)
@@ -499,7 +536,9 @@ async def upload_media(
             task = process_and_upload_video.delay(
                 temp_path,
                 filename,  # Use generated filename
-                organization_id
+                organization_id,
+                add_watermark=add_watermark_flag,  # Pass watermark flag for videos
+                logo_path=logo_file_path  # Pass logo path for videos
             )
             # The Celery task will save the file with this naming pattern
             predicted_path = f"/videos/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.mp4')}"

@@ -56,7 +56,9 @@ class ProductPhoto(Base):
         if self.photo_url.startswith('http://') or self.photo_url.startswith('https://'):
             return self.photo_url
         else:
-            # Return as is (local storage path)
+            # Add /uploads prefix for local storage paths
+            if not self.photo_url.startswith('/uploads/'):
+                return f"/uploads{self.photo_url}"
             return self.photo_url
 
 
@@ -78,5 +80,7 @@ class ProductVideo(Base):
         if self.video_url.startswith('http://') or self.video_url.startswith('https://'):
             return self.video_url
         else:
-            # Return as is (local storage path)
+            # Add /uploads prefix for local storage paths
+            if not self.video_url.startswith('/uploads/'):
+                return f"/uploads{self.video_url}"
             return self.video_url

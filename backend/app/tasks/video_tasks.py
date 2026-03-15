@@ -7,7 +7,7 @@ import shutil
 
 
 @celery_app.task(bind=True, max_retries=3)
-def process_and_upload_video(self, temp_file_path: str, original_filename: str, organization_id: str):
+def process_and_upload_video(self, temp_file_path: str, original_filename: str, organization_id: str, add_watermark: bool = False, logo_path: str = None):
     """
     Celery task to process video: validate, compress, and move to final location.
     
@@ -24,6 +24,8 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         temp_file_path: Path to temporary file
         original_filename: Original filename (for reference)
         organization_id: ID of the organization owning the media
+        add_watermark: Whether to add watermark to video (default: False)
+        logo_path: Path to logo file for watermark (optional)
     
     Returns:
         dict: {'url': str, 'status': str, 'filename': str, 'path': str}
@@ -31,10 +33,12 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
     try:
         # Check if temp file exists
         print(f"=== VIDEO PROCESSING TASK STARTED ===")
+        print(f"Task ID: {self.request.id}")
         print(f"Temp file path: {temp_file_path}")
         print(f"Absolute temp path: {os.path.abspath(temp_file_path)}")
         print(f"Original filename: {original_filename}")
         print(f"Organization ID: {organization_id}")
+        print(f"Current working directory: {os.getcwd()}")
         
         if not os.path.exists(temp_file_path):
             print(f"ERROR: Temp file not found at: {temp_file_path}")
@@ -122,11 +126,50 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
             # Retry logic
             raise self.retry(exc=compress_error, countdown=60)
         
-        # If compression created a different file, move it to final location
-        if compressed_path != final_path:
+        # Apply watermark if requested and logo is available
+        final_media_path = compressed_path
+        if add_watermark and logo_path and os.path.exists(logo_path):
             try:
-                shutil.move(compressed_path, final_path)
-                print(f"Moved compressed file to: {final_path}")
+                print(f"Applying watermark to video...")
+                print(f"  Logo path: {logo_path}")
+                print(f"  Logo exists: {os.path.exists(logo_path)}")
+                
+                from app.utils.video_utils import add_watermark_to_video
+                watermarked_path = add_watermark_to_video(
+                    compressed_path,
+                    logo_path,
+                    output_path=None,  # Will generate temp file
+                    opacity=0.5,  # 50% opacity (same as photos)
+                    padding=20  # 20px padding (same as photos)
+                )
+                
+                # Move watermarked file to final location
+                if watermarked_path != final_path:
+                    shutil.move(watermarked_path, final_path)
+                    print(f"Moved watermarked video to: {final_path}")
+                
+                final_media_path = final_path
+                print(f"✓ Watermark applied successfully")
+                
+                # Delete the intermediate compressed file if it's different
+                if compressed_path != final_path and os.path.exists(compressed_path):
+                    try:
+                        os.remove(compressed_path)
+                        print(f"Deleted intermediate compressed file: {compressed_path}")
+                    except:
+                        pass
+                        
+            except Exception as watermark_error:
+                print(f"⚠️ Warning: Could not apply watermark to video: {str(watermark_error)}")
+                print(f"  Continuing without watermark...")
+                # Continue without watermark - don't fail the entire task
+                final_media_path = compressed_path
+        
+        # If compression/watermarking created a different file, move it to final location
+        if final_media_path != final_path:
+            try:
+                shutil.move(final_media_path, final_path)
+                print(f"Moved final video to: {final_path}")
             except Exception as move_error:
                 print(f"Error moving file: {move_error}")
                 raise self.retry(exc=move_error, countdown=60)
@@ -156,11 +199,15 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         
     except Exception as exc:
         print(f"Error processing video: {str(exc)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         # Final failure after retries
         if self.request.retries >= self.max_retries:
+            print(f"Task failed permanently after {self.max_retries} retries")
             return {
                 'url': None,
                 'status': 'failed',
                 'error': str(exc)
             }
+        print(f"Retrying task (attempt {self.request.retries + 1}/{self.max_retries})...")
         raise self.retry(exc=exc, countdown=60)
