@@ -140,7 +140,7 @@ async def upload_photo(
             temp_path,
             filename,  # Use generated filename with org ID and timestamp
             organization_id,
-            subfolder="pictures",
+            "pictures",  # subfolder
             add_watermark=add_watermark_flag,
             logo_path=logo_file_path
         )
@@ -526,7 +526,7 @@ async def upload_media(
                 temp_path,
                 filename,  # Use generated filename
                 organization_id,
-                subfolder=(subfolder if 'subfolder' in locals() else "pictures"),
+                "pictures",  # subfolder
                 add_watermark=add_watermark_flag,
                 logo_path=logo_file_path
             )
@@ -687,7 +687,7 @@ async def upload_organization_logo(
             temp_path,
             filename,  # Use generated filename with org ID and timestamp
             organization_id,
-            subfolder="logo_organizations",
+            "logo_organizations",  # subfolder
             add_watermark=add_watermark_flag,
             logo_path=logo_file_path
         )

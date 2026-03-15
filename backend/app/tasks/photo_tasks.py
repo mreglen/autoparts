@@ -154,7 +154,7 @@ def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: i
 
 
 @celery_app.task(bind=True, max_retries=3)
-def process_and_upload_photo(self, temp_file_path: str, original_filename: str, organization_id: str, subfolder: str = "pictures", add_watermark: bool = False, logo_path: str = None):
+def process_and_upload_photo(self, temp_file_path: str, original_filename: str, organization_id: str, subfolder: str, add_watermark: bool = False, logo_path: str = None):
     """
     Celery task to process photo: remove metadata, convert to WebP, compress, and move to final location.
     
@@ -172,7 +172,7 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
         temp_file_path: Path to temporary file
         original_filename: Original filename (for reference)
         organization_id: ID of the organization owning the media
-        subfolder: Subfolder name (default: "pictures", can be "logo_organizations" etc.)
+        subfolder: Subfolder name ("pictures", "logo_organizations" etc.)
         add_watermark: Whether to add watermark (default: False)
         logo_path: Path to logo file for watermark (required if add_watermark=True)
     
