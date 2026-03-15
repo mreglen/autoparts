@@ -1,4 +1,13 @@
-node_modules/
-uploads/
+# Python
 __pycache__/
+*.py[cod]
+venv/
 .env
+
+# Frontend
+node_modules/
+build/
+dist/
+
+# OS
+.DS_Store

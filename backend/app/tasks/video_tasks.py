@@ -96,22 +96,25 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         safe_original_name = '_'.join(safe_original_name.split())  # Replace spaces with underscores
         final_filename = f"{organization_id}_{timestamp}_{safe_original_name}.mp4"
         
-        upload_dir = os.path.join("uploads", "videos", organization_id)
-        final_path = os.path.join(upload_dir, final_filename)
+        # Use pathlib for cross-platform path handling
+        from pathlib import Path
+        upload_dir = Path("uploads") / "videos" / organization_id
+        final_path = upload_dir / final_filename
         
         print(f"Generated final filename: {final_filename}")
         print(f"Upload directory: {upload_dir}")
         print(f"Final path: {final_path}")
+        print(f"Final path (string): {str(final_path)}")
         
         # Create directory if it doesn't exist
-        os.makedirs(upload_dir, exist_ok=True)
+        upload_dir.mkdir(parents=True, exist_ok=True)
         
         # Compress video with optimized settings for speed (same as your working command)
         try:
             print(f"Compressing video...")
             compressed_path = compress_video(
                 temp_file_path,
-                output_path=final_path,
+                output_path=str(final_path),  # Convert Path to string for cross-platform compatibility
                 max_duration_seconds=60,
                 video_bitrate="1500k",
                 audio_bitrate="128k",

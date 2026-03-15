@@ -115,11 +115,13 @@ async def upload_photo(
     
     # Generate UUID filename for temp storage
     unique_filename = f"{uuid.uuid4().hex}{ext}"
-    temp_dir = os.path.abspath("uploads/temp")
-    temp_path = os.path.join(temp_dir, unique_filename)
+    # Use pathlib for cross-platform path handling
+    from pathlib import Path
+    temp_dir = Path("uploads") / "temp"
+    temp_path = temp_dir / unique_filename
     
     # Create temp directory if it doesn't exist
-    os.makedirs(temp_dir, exist_ok=True)
+    temp_dir.mkdir(parents=True, exist_ok=True)
     
     # Save original file to temp folder
     try:
@@ -137,7 +139,7 @@ async def upload_photo(
     try:
         # Queue Celery task for async processing
         task = process_and_upload_photo.delay(
-            temp_path,
+            str(temp_path),  # Convert Path to string for JSON serialization
             filename,  # Use generated filename with org ID and timestamp
             organization_id,
             subfolder="pictures",
@@ -293,11 +295,13 @@ async def upload_video(
     
     # Generate UUID filename for temp storage
     unique_filename = f"{uuid.uuid4().hex}{ext}"
-    temp_dir = os.path.abspath("uploads/temp")
-    temp_path = os.path.join(temp_dir, unique_filename)
+    # Use pathlib for cross-platform path handling
+    from pathlib import Path
+    temp_dir = Path("uploads") / "temp"
+    temp_path = temp_dir / unique_filename
     
     # Create temp directory if it doesn't exist
-    os.makedirs(temp_dir, exist_ok=True)
+    temp_dir.mkdir(parents=True, exist_ok=True)
     
     # Save original file to temp folder
     try:
@@ -313,12 +317,13 @@ async def upload_video(
     
     try:
         # Queue Celery task for async processing
+        # Pass all parameters as positional arguments to avoid serialization issues
         task = process_and_upload_video.delay(
-            temp_path,
-            filename,  # Use generated filename
-            organization_id,
-            add_watermark=add_watermark_flag,  # Pass watermark flag
-            logo_path=logo_file_path  # Pass logo path
+            str(temp_path),  # temp_file_path
+            filename,  # original_filename
+            organization_id,  # organization_id
+            add_watermark_flag,  # add_watermark
+            logo_file_path  # logo_path
         )
         
         print(f"Celery task queued: {task.id}")
@@ -662,11 +667,13 @@ async def upload_organization_logo(
     
     # Generate UUID filename for temp storage
     unique_filename = f"{uuid.uuid4().hex}{ext}"
-    temp_dir = os.path.abspath("uploads/temp")
-    temp_path = os.path.join(temp_dir, unique_filename)
+    # Use pathlib for cross-platform path handling
+    from pathlib import Path
+    temp_dir = Path("uploads") / "temp"
+    temp_path = temp_dir / unique_filename
     
     # Create temp directory if it doesn't exist
-    os.makedirs(temp_dir, exist_ok=True)
+    temp_dir.mkdir(parents=True, exist_ok=True)
     
     # Save original file to temp folder
     try:
@@ -684,7 +691,7 @@ async def upload_organization_logo(
     try:
         # Queue Celery task for async processing
         task = process_and_upload_photo.delay(
-            temp_path,
+            str(temp_path),  # Convert Path to string for JSON serialization
             filename,  # Use generated filename with org ID and timestamp
             organization_id,
             subfolder="logo_organizations",

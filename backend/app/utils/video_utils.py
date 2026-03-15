@@ -102,6 +102,9 @@ def compress_video(
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     try:
+        # Convert output_path to string for cross-platform compatibility
+        output_path_str = str(output_path)
+        
         # Build FFmpeg command directly
         cmd = [
             FFMPEG_PATH,
@@ -115,10 +118,10 @@ def compress_video(
             '-movflags', '+faststart',
             '-pix_fmt', 'yuv420p',
             '-y',  # Overwrite output file
-            output_path
+            output_path_str
         ]
         
-        print(f"Running FFmpeg command: {' '.join(cmd)}")
+        print(f"Running FFmpeg command: {' '.join(str(x) for x in cmd)}")
         
         # Run FFmpeg with timeout
         try:
@@ -186,6 +189,11 @@ def add_watermark_to_video(
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     try:
+        # Convert paths to strings for cross-platform compatibility
+        input_path_str = str(input_path)
+        logo_path_str = str(logo_path)
+        output_path_str = str(output_path)
+        
         # Build FFmpeg filter complex for watermark with bottom-right positioning
         # The watermark will be automatically resized by FFmpeg to fit within 50% of video width/height
         filter_complex = f"[1:v]scale=iw*0.5:-1[wm];[0:v][wm]overlay=W-w-{padding}:H-h-{padding}:format=auto" # Bottom-right corner
@@ -193,18 +201,18 @@ def add_watermark_to_video(
         # Build FFmpeg command
         cmd = [
             FFMPEG_PATH,
-            '-i', input_path,
-            '-i', logo_path,
+            '-i', input_path_str,
+            '-i', logo_path_str,
             '-filter_complex', filter_complex,
             '-c:v', 'libx264',
             '-c:a', 'aac',
             '-preset', 'medium',
             '-crf', '28',
             '-y',  # Overwrite output file
-            output_path
+            output_path_str
         ]
         
-        print(f"Running FFmpeg watermark command: {' '.join(cmd)}")
+        print(f"Running FFmpeg watermark command: {' '.join(str(x) for x in cmd)}")
         
         # Run FFmpeg with timeout
         try:
