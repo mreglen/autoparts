@@ -141,8 +141,8 @@ async def upload_photo(
             filename,  # Use generated filename with org ID and timestamp
             organization_id,
             "pictures",  # subfolder
-            add_watermark=add_watermark_flag,
-            logo_path=logo_file_path
+            add_watermark_flag,  # add_watermark
+            logo_file_path  # logo_path
         )
         
         print(f"Celery task queued: {task.id}")
@@ -317,8 +317,8 @@ async def upload_video(
             temp_path,
             filename,  # Use generated filename
             organization_id,
-            add_watermark=add_watermark_flag,  # Pass watermark flag
-            logo_path=logo_file_path  # Pass logo path
+            add_watermark_flag,  # add_watermark
+            logo_file_path  # logo_path
         )
         
         print(f"Celery task queued: {task.id}")
@@ -527,8 +527,8 @@ async def upload_media(
                 filename,  # Use generated filename
                 organization_id,
                 "pictures",  # subfolder
-                add_watermark=add_watermark_flag,
-                logo_path=logo_file_path
+                add_watermark_flag,  # add_watermark
+                logo_file_path  # logo_path
             )
             # The Celery task will save the file with this naming pattern
             predicted_path = f"/pictures/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.webp')}"
@@ -537,8 +537,8 @@ async def upload_media(
                 temp_path,
                 filename,  # Use generated filename
                 organization_id,
-                add_watermark=add_watermark_flag,  # Pass watermark flag for videos
-                logo_path=logo_file_path  # Pass logo path for videos
+                add_watermark_flag,  # add_watermark
+                logo_file_path  # logo_path
             )
             # The Celery task will save the file with this naming pattern
             predicted_path = f"/videos/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.mp4')}"
@@ -688,8 +688,8 @@ async def upload_organization_logo(
             filename,  # Use generated filename with org ID and timestamp
             organization_id,
             "logo_organizations",  # subfolder
-            add_watermark=add_watermark_flag,
-            logo_path=logo_file_path
+            add_watermark_flag,  # add_watermark
+            logo_file_path  # logo_path
         )
         
         print(f"Celery task queued: {task.id}")
