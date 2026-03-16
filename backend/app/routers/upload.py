@@ -353,24 +353,36 @@ async def upload_video(
     
     print(f"Processing video with Celery. Temp path: {temp_path}, Organization: {organization_id}")
     
-    # ВАЖНО: НЕ запускаем Celery task сразу!
-    # Просто сохраняем информацию о загруженном файле
-    # Celery task будет запущен позже, при создании/обновлении запчасти
+    # 🚀 ЗАПУСКАЕМ CELERY ЗАДАЧУ СРАЗУ!
+    # Пользователь не должен ждать обработку видео
+    # Задача обработается в фоне
     
     try:
-        # Возвращаем temp_path и другие данные для фронтенда
-        # Фронтенд сохранит это и использует для превью
+        # Queue Celery task for async processing
+        task = process_and_upload_video.delay(
+            temp_path,
+            file.filename,  # Original filename
+            organization_id,
+            add_watermark_flag,  # add_watermark
+            logo_file_path  # logo_path
+        )
+        
+        print(f"✅ Celery task queued: {task.id}")
+        
+        # Возвращаем temp_path и task_id для фронтенда
         result = {
+            "task_id": task.id,  # Для отслеживания статуса
             "temp_path": temp_video_path,  # Immediate temp path for playback
             "path": temp_video_path,  # ← Важно! Возвращаем path для совместимости с фронтендом
             "temp_filename": unique_filename,
             "filename": unique_filename,  # ← Важно! Для совместимости
             "organization_id": organization_id,
-            "message": "Video uploaded to temp folder. Processing will start when product is created/updated.",
+            "status": "processing",  # Пока обрабатывается
+            "message": "Video uploaded to temp folder. Processing in background.",
             "is_temp": True  # Флаг что это временный файл
         }
         
-        print(f"Video saved to temp: {result}")
+        print(f"Video upload queued for processing: {result}")
         print("=== END VIDEO UPLOAD ===")
         return result
         
