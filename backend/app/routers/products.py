@@ -73,16 +73,44 @@ def create_product(
             db.add(photo)
     
     # Сохраняем видео
+    video_ids = []
     if product.videos:
         for url in product.videos:
             video = ProductVideo(
                 product_id=db_product.id, 
                 video_url=url,
                 organization_id=current_user.organization_id,
-                processing_status='completed'
+                processing_status='pending'  # Сначала pending - обработка начнется позже
             )
             db.add(video)
+            db.flush()  # Чтобы получить ID
+            video_ids.append(video.id)
     db.commit()
+    
+    # ЗАПУСКАЕМ ОБРАБОТКУ ВИДЕО после создания записи в БД
+    # Видео попадает в очередь Celery и ждет обработки
+    if video_ids:
+        try:
+            import requests
+            from app.core.config import settings
+            base_url = settings.BASE_URL.rstrip('/')
+            
+            for video_id in video_ids:
+                # Отправляем запрос на постановку в очередь обработки
+                # Задача НЕ начинается сразу, а ждет в очереди Celery
+                try:
+                    response = requests.post(
+                        f"{base_url}/api/upload/start-video-processing/{video_id}",
+                        headers={"Authorization": f"Bearer {current_user.access_token}"},
+                        timeout=5  # Не ждем ответа долго
+                    )
+                    print(f"✅ Video {video_id} added to Celery queue (waiting for processing): {response.status_code}")
+                except Exception as e:
+                    print(f"⚠️ Warning: Could not add video to processing queue: {e}")
+                    # Это не критично - фронтенд может запустить сам
+        except Exception as e:
+            print(f"⚠️ Warning: Error adding videos to queue: {e}")
+            # Не прерываем создание продукта из-за этого
 
     # Связываем с автомобилями
     if product.vehicle_ids:
@@ -216,9 +244,32 @@ def update_product(
         # Удаляем все предыдущие видео
         db.query(ProductVideo).filter(ProductVideo.product_id == product_id).delete()
         # Добавляем новые
+        video_ids = []
         for url in product.videos:
-            video = ProductVideo(product_id=product_id, video_url=url, organization_id=current_user.organization_id, processing_status='completed')
+            video = ProductVideo(product_id=product_id, video_url=url, organization_id=current_user.organization_id, processing_status='pending')
             db.add(video)
+            db.flush()
+            video_ids.append(video.id)
+        
+        # ЗАПУСКАЕМ ОБРАБОТКУ ВИДЕО после обновления
+        if video_ids:
+            try:
+                import requests
+                from app.core.config import settings
+                base_url = settings.BASE_URL.rstrip('/')
+                
+                for video_id in video_ids:
+                    try:
+                        response = requests.post(
+                            f"{base_url}/api/upload/start-video-processing/{video_id}",
+                            headers={"Authorization": f"Bearer {current_user.access_token}"},
+                            timeout=5
+                        )
+                        print(f"✅ Started processing for updated video {video_id}: {response.status_code}")
+                    except Exception as e:
+                        print(f"⚠️ Warning: Could not start video processing: {e}")
+            except Exception as e:
+                print(f"⚠️ Warning: Error starting video processing: {e}")
 
     # Обновляем связи с автомобилями
     if product.vehicle_ids is not None:

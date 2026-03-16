@@ -339,30 +339,20 @@ async def upload_video(
     
     print(f"Processing video with Celery. Temp path: {temp_path}, Organization: {organization_id}")
     
+    # ВАЖНО: НЕ запускаем Celery task сразу!
+    # Просто сохраняем информацию о загруженном файле
+    # Celery task будет запущен позже, при создании/обновлении запчасти
+    
     try:
-        # Queue Celery task for async processing
-        task = process_and_upload_video.delay(
-            temp_path,
-            filename,  # Use generated filename
-            organization_id,
-            add_watermark_flag,  # add_watermark
-            logo_file_path  # logo_path
-        )
-        
-        print(f"Celery task queued: {task.id}")
-        
-        # Return immediately with task ID and temp path - frontend can use temp video right away
+        # Возвращаем только temp_path - фронтенд сохранит его в ProductVideo
         result = {
-            "task_id": task.id,
-            "status": "processing",
+            "temp_path": temp_video_path,  # Immediate temp path for playback
             "temp_filename": unique_filename,
             "organization_id": organization_id,
-            "temp_path": temp_video_path,  # Immediate temp path for playback
-            "final_path": f"/videos/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.mp4')}",  # Will be available after processing
-            "message": "Video uploaded successfully and is being processed. Available at temp_path now."
+            "message": "Video uploaded to temp folder. Processing will start when product is created/updated."
         }
         
-        print(f"Video upload queued for processing: {result}")
+        print(f"Video saved to temp: {result}")
         print("=== END VIDEO UPLOAD ===")
         return result
         
@@ -1024,3 +1014,116 @@ async def get_video_status(
             "status": "failed",
             "error": str(e)
         }
+
+
+@router.post("/start-video-processing/{product_video_id}")
+async def start_video_processing(
+    product_video_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Start video processing AFTER product creation/update.
+    This endpoint triggers the Celery task for background processing.
+    """
+    print(f"=== START VIDEO PROCESSING REQUEST ===")
+    print(f"Product Video ID: {product_video_id}")
+    
+    try:
+        # Get video record from database
+        from ..models.product import ProductVideo
+        video_record = db.query(ProductVideo).filter(
+            ProductVideo.id == product_video_id,
+            ProductVideo.organization_id == current_user.organization_id
+        ).first()
+        
+        if not video_record:
+            raise HTTPException(404, f"Video record {product_video_id} not found")
+        
+        # Extract temp filename from video_url
+        # video_url format: /temp/{org_id}/{filename}.mp4
+        temp_video_path = video_record.video_url
+        if not temp_video_path.startswith('/temp/'):
+            raise HTTPException(400, f"Invalid temp video path: {temp_video_path}")
+        
+        # Parse the path to get organization_id and filename
+        parts = temp_video_path.strip('/').split('/')
+        if len(parts) != 3 or parts[0] != 'temp':
+            raise HTTPException(400, f"Cannot parse temp path: {temp_video_path}")
+        
+        organization_id = parts[1]
+        temp_filename = parts[2]
+        
+        # Build absolute path to temp file
+        temp_dir = os.path.abspath(os.path.join("uploads", "temp", organization_id))
+        temp_file_path = os.path.join(temp_dir, temp_filename)
+        
+        print(f"Temp file path: {temp_file_path}")
+        print(f"Organization ID: {organization_id}")
+        
+        # Check if temp file exists
+        if not os.path.exists(temp_file_path):
+            raise HTTPException(404, f"Temp video file not found at: {temp_file_path}")
+        
+        # Get watermark settings
+        from ..models.organization import Organization
+        org = db.query(Organization).filter(Organization.id == organization_id).first()
+        
+        add_watermark_flag = False
+        logo_file_path = None
+        
+        if org and org.watermark is not None:
+            if org.watermark == 1:
+                admin_user = db.query(User).filter(User.is_admin == True).first()
+                if admin_user and admin_user.organization_id:
+                    admin_org = db.query(Organization).filter(Organization.id == admin_user.organization_id).first()
+                    if admin_org and admin_org.logo_organization:
+                        add_watermark_flag = True
+                        logo_path_value = admin_org.logo_organization.lstrip("/").lstrip("\\")
+                        if not logo_path_value.lower().startswith("uploads"):
+                            logo_file_path = os.path.join("uploads", logo_path_value)
+                        else:
+                            logo_file_path = logo_path_value
+            elif org.watermark == 2:
+                if org.logo_organization:
+                    add_watermark_flag = True
+                    logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
+                    if not logo_path_value.lower().startswith("uploads"):
+                        logo_file_path = os.path.join("uploads", logo_path_value)
+                    else:
+                        logo_file_path = logo_path_value
+        
+        # Generate final filename
+        from ..utils.photo_naming import generate_photo_filename
+        final_filename = generate_photo_filename(organization_id, temp_filename)
+        
+        # Queue Celery task for async processing
+        task = process_and_upload_video.delay(
+            temp_file_path,
+            final_filename,
+            organization_id,
+            add_watermark_flag,
+            logo_file_path
+        )
+        
+        print(f"✅ Celery task queued: {task.id}")
+        
+        # Update processing status in database
+        video_record.processing_status = 'processing'
+        db.commit()
+        
+        return {
+            "success": True,
+            "task_id": task.id,
+            "product_video_id": product_video_id,
+            "status": "processing",
+            "message": "Video processing started. Poll /api/upload/video-status/{task_id}?product_video_id={product_video_id} for updates."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error starting video processing: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(500, f"Ошибка при запуске обработки видео: {str(e)}")
