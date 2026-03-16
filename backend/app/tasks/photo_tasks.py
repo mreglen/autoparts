@@ -34,14 +34,7 @@ def remove_exif_data(image: Image.Image) -> Image.Image:
 
 def add_watermark(image: Image.Image, logo_path: str) -> Image.Image:
     """
-    Add organization logo as watermark to the bottom-right corner of the image with transparency.
-    
-    Args:
-        image: PIL Image object (the product photo)
-        logo_path: Path to the organization logo file
-    
-    Returns:
-        PIL Image object with watermark applied
+    фото таск обновлён
     """
     try:
         # Open the logo

@@ -9,7 +9,7 @@ import shutil
 @celery_app.task(bind=True, max_retries=3)
 def process_and_upload_video(self, temp_file_path: str, original_filename: str, organization_id: str, add_watermark: bool, logo_path: str = None):
     """
-    Файл обновлён
+    видео таскс обновлён
     """
     try:
         # Check if temp file exists
