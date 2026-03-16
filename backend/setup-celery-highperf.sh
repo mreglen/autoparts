@@ -29,10 +29,19 @@ ABS_BACKEND_DIR=$(realpath "$BACKEND_DIR")
 echo -e "${COLOR_YELLOW}📁 Backend directory: $ABS_BACKEND_DIR${COLOR_NC}"
 echo ""
 
-# Determine Python path
-if [ -d "venv/bin" ]; then
+# Check and create virtual environment if not exists
+if [ ! -d "venv" ] && [ ! -d ".venv" ]; then
+    echo -e "${COLOR_YELLOW}⚠️  Virtual environment not found. Creating...${COLOR_NC}"
+    python3 -m venv venv
+    echo -e "${COLOR_GREEN}✅ Virtual environment created${COLOR_NC}"
+else
+    echo -e "${COLOR_GREEN}✅ Virtual environment exists${COLOR_NC}"
+fi
+
+# Determine Python path in venv
+if [ -d "venv" ]; then
     VENV_BIN="$ABS_BACKEND_DIR/venv/bin"
-elif [ -d ".venv/bin" ]; then
+elif [ -d ".venv" ]; then
     VENV_BIN="$ABS_BACKEND_DIR/.venv/bin"
 else
     echo -e "${COLOR_RED}❌ Virtual environment not found!${COLOR_NC}"

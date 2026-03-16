@@ -44,20 +44,35 @@ else
     echo -e "${COLOR_GREEN}✅ Redis активен${COLOR_NC}"
 fi
 
-# 3. Проверка Python зависимостей
-echo -e ""
-echo -e "${COLOR_YELLOW}[3/6] Проверка Python зависимостей...${COLOR_NC}"
-if [ ! -f "requirements.txt" ]; then
-    echo -e "${COLOR_RED}❌ requirements.txt не найден!${COLOR_NC}"
+# 3. Проверка и создание Python virtual environment
+if [ ! -d "venv" ] && [ ! -d ".venv" ]; then
+    echo -e "${COLOR_YELLOW}⚠️  Virtual environment not found. Creating...${COLOR_NC}"
+    python3 -m venv venv
+    echo -e "${COLOR_GREEN}✅ Virtual environment created${COLOR_NC}"
+else
+    echo -e "${COLOR_GREEN}✅ Virtual environment exists${COLOR_NC}"
+fi
+
+# Определение пути к pip в venv
+if [ -d "venv" ]; then
+    VENV_PIP="$(pwd)/venv/bin/pip"
+elif [ -d ".venv" ]; then
+    VENV_PIP="$(pwd)/.venv/bin/pip"
+else
+    echo -e "${COLOR_RED}❌ Virtual environment not found!${COLOR_NC}"
     exit 1
 fi
 
-pip3 install -r requirements.txt --upgrade
+# 4. Установка Python зависимостей в venv
+echo -e ""
+echo -e "${COLOR_YELLOW}[4/7] Установка Python зависимостей...${COLOR_NC}"
+$VENV_PIP install --upgrade pip
+$VENV_PIP install -r requirements.txt
 echo -e "${COLOR_GREEN}✅ Зависимости установлены${COLOR_NC}"
 
 # 4. Создание пользователя www-data если не существует
 echo -e ""
-echo -e "${COLOR_YELLOW}[4/6] Проверка пользователя www-data...${COLOR_NC}"
+echo -e "${COLOR_YELLOW}[5/7] Проверка пользователя www-data...${COLOR_NC}"
 if ! id -u www-data > /dev/null 2>&1; then
     echo -e "${COLOR_YELLOW}⚠️  Пользователь www-data не найден. Создание...${COLOR_NC}"
     useradd -r -s /bin/false www-data
@@ -67,7 +82,7 @@ fi
 
 # 5. Настройка прав доступа
 echo -e ""
-echo -e "${COLOR_YELLOW}[5/6] Настройка прав доступа...${COLOR_NC}"
+echo -e "${COLOR_YELLOW}[6/7] Настройка прав доступа...${COLOR_NC}"
 BACKEND_DIR="$(cd "$(dirname "$0")" && pwd)"
 chown -R www-data:www-data "$BACKEND_DIR"
 chmod -R 755 "$BACKEND_DIR"
@@ -76,7 +91,7 @@ echo -e "${COLOR_GREEN}✅ Права настроены${COLOR_NC}"
 
 # 6. Установка systemd службы
 echo -e ""
-echo -e "${COLOR_YELLOW}[6/6] Установка systemd службы...${COLOR_NC}"
+echo -e "${COLOR_YELLOW}[7/7] Установка systemd службы...${COLOR_NC}"
 
 # Получение абсолютного пути к backend директории
 ABS_BACKEND_DIR=$(realpath "$BACKEND_DIR")
@@ -89,9 +104,8 @@ elif [ -d ".venv/bin" ]; then
     PYTHON_BIN="$ABS_BACKEND_DIR/.venv/bin/python"
     CELERY_BIN="$ABS_BACKEND_DIR/.venv/bin/celery"
 else
-    echo -e "${COLOR_YELLOW}⚠️  Venv не найден. Используем системный Python...${COLOR_NC}"
-    PYTHON_BIN=$(which python3)
-    CELERY_BIN=$(which celery)
+    echo -e "${COLOR_RED}❌ Virtual environment not found!${COLOR_NC}"
+    exit 1
 fi
 
 echo -e "${COLOR_YELLOW}Backend directory: $ABS_BACKEND_DIR${COLOR_NC}"
