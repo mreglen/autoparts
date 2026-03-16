@@ -254,67 +254,30 @@ const AddPart = () => {
           formData.append('file', file);
           const result = await apiRequestFormData('/upload/media', formData);
           
-          // Check if we got a task_id (async processing)
-          if (result.task_id) {
-            currentTaskId = result.task_id; // Save task ID for cancellation
-            console.log('Video upload initiated with task_id:', currentTaskId);
+          // 🚀 НОВАЯ ЛОГИКА: Видео загружено в temp папку, обработка отложена
+          // Не ждем завершения обработки - она начнется при сохранении продукта
+          if (result.temp_path) {
+            console.log('✅ Video uploaded to temp (processing deferred):', result.temp_path);
             
-            // Poll for completion
-            const maxAttempts = 90;
-            let completed = false;
-            let finalResult = null;
-            
-            for (let attempt = 0; attempt < maxAttempts; attempt++) {
-              // Check if cancelled
-              if (isCancelled) {
-                console.log('⚠️ Upload was cancelled, stopping polling');
-                return;
-              }
-              
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              
-              const statusResponse = await apiRequest(`/upload/photo-status/${currentTaskId}`);
-              console.log(`📡 Polling attempt ${attempt + 1}/${maxAttempts}:`, statusResponse.status);
-              
-              if (statusResponse.status === 'completed') {
-                completed = true;
-                finalResult = statusResponse;
-                console.log('✅ Video processing complete!');
-                break;
-              } else if (statusResponse.status === 'failed') {
-                throw new Error(statusResponse.error || 'Video processing failed');
-              }
-            }
-            
-            if (!completed) {
-              throw new Error(`Timeout: Video processing took too long`);
-            }
-            
-            // Use the final result
-            if (finalResult && finalResult.path && finalResult.filename) {
-              const fileWithPath = Object.assign(file, { 
-                finalPath: finalResult.path,
-                finalFilename: finalResult.filename,
-                isUploading: false 
-              });
-              
-              setVideos((prev) => prev.map((v, idx) => 
-                idx === videoIndex ? fileWithPath : v
-              ));
-              uploadedTempFiles.push(finalResult.filename);
-              console.log('✅ Video successfully uploaded with path:', finalResult.path);
-            }
-          } else if (result.path) {
-            // Synchronous response (old behavior)
             const fileWithPath = Object.assign(file, { 
-              finalPath: result.path,
-              isUploading: false 
+              finalPath: result.path,  // Используем path для совместимости
+              tempPath: result.temp_path,
+              filename: result.filename || result.temp_filename,
+              isUploading: false,
+              requiresProcessing: result.requires_processing || true,
+              organizationId: result.organization_id
             });
             
             setVideos((prev) => prev.map((v, idx) => 
               idx === videoIndex ? fileWithPath : v
             ));
-            uploadedTempFiles.push(result.path.split('/').pop());
+            
+            // Track temp file for cleanup
+            if (result.temp_filename) {
+              uploadedTempFiles.push(result.temp_filename);
+            }
+            
+            console.log('📹 Video saved to temp folder - will process on product save');
           }
         } catch (error) {
           console.error('Failed to upload video:', error);
@@ -535,13 +498,19 @@ const AddPart = () => {
     if (videos.length > 0) {
       setIsUploadingMedia(true);
       try {
-        // Videos are already uploaded with final paths, just use them
+        // 🚀 НОВАЯ ЛОГИКА: Запускаем обработку видео ПЕРЕД отправкой продукта
+        // Видео уже загружено в temp папку, теперь нужно запустить обработку
+        console.log('🎬 Starting video processing before product submission...');
+        
+        // Просто используем temp пути - бэкенд сам запустит обработку после создания продукта
         videoUrls = videos
           .filter(file => file.finalPath)
           .map(file => {
             // Ensure path starts with / for consistency
             return file.finalPath.startsWith('/') ? file.finalPath : '/' + file.finalPath;
           });
+        
+        console.log('✅ Video URLs prepared:', videoUrls);
       } catch (error) {
         console.error('Error processing videos:', error);
         alert(`Ошибка обработки видео: ${error.message}`);

@@ -388,79 +388,30 @@ const EditPart = () => {
             : '/upload/video';
           console.log('Uploading video:', file.name, 'Organization ID:', organizationId);
           
-          // Step 1: Upload file and get task_id
+          // 🚀 НОВАЯ ЛОГИКА: Видео загружается в temp папку без обработки
+          // Обработка будет запущена при сохранении продукта
           const uploadResult = await apiRequestFormData(uploadEndpoint, formData);
-          console.log('Video upload initiated:', uploadResult);
+          console.log('Video uploaded to temp:', uploadResult);
           
-          // Check if we got a task_id (async processing)
-          if (uploadResult.task_id) {
-            currentTaskId = uploadResult.task_id; // Save task ID for cancellation
-            console.log('Waiting for video processing... Task ID:', currentTaskId);
+          // Check if we got temp_path (deferred processing)
+          if (uploadResult.temp_path) {
+            console.log('✅ Video saved to temp (processing deferred):', uploadResult.temp_path);
             
-            // Step 2: Poll for completion
-            const maxAttempts = 90; // 90 attempts * 2 seconds = 3 minutes max (increased from 60)
-            let completed = false;
-            let finalResult = null;
+            const fileWithPath = Object.assign(file, { 
+              finalPath: uploadResult.path,
+              tempPath: uploadResult.temp_path,
+              finalFilename: uploadResult.filename || uploadResult.temp_filename,
+              isUploading: false,
+              requiresProcessing: uploadResult.requires_processing || true,
+              organizationId: uploadResult.organization_id
+            });
             
-            console.log('🕐 Starting polling with maxAttempts:', maxAttempts, '(~', maxAttempts * 2 / 60, 'minutes)');
-            
-            for (let attempt = 0; attempt < maxAttempts; attempt++) {
-              // Check if cancelled
-              if (isCancelled) {
-                console.log('⚠️ Upload was cancelled, stopping polling');
-                return; // Exit early
-              }
-              
-              // Wait 2 seconds before checking status
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              
-              // Check status
-              const statusResponse = await apiRequest(`/upload/photo-status/${currentTaskId}`);
-              console.log(`📡 Polling attempt ${attempt + 1}/${maxAttempts}:`, statusResponse.status);
-              
-              if (statusResponse.status === 'completed') {
-                // Success!
-                completed = true;
-                finalResult = statusResponse;
-                console.log('✅ Video processing complete!');
-                console.log('   URL:', finalResult.url);
-                console.log('   Path:', finalResult.path);
-                console.log('   Filename:', finalResult.filename);
-                break;
-              } else if (statusResponse.status === 'failed') {
-                // Failed
-                console.error('❌ Video processing failed:', statusResponse.error);
-                throw new Error(statusResponse.error || 'Video processing failed');
-              }
-              // else: still processing, continue polling
-            }
-            
-            if (!completed) {
-              console.error('❌ TIMEOUT: Video processing took too long (> ' + (maxAttempts * 2 / 60).toFixed(1) + ' minutes)');
-              console.error('   Last status check:', finalResult);
-              throw new Error(`Timeout: Video processing took too long (> ${(maxAttempts * 2 / 60).toFixed(1)} min)`);
-            }
-            
-            // Use the final result from polling
-            if (finalResult && finalResult.path && finalResult.filename) {
-              const fileWithPath = Object.assign(file, { 
-                finalPath: finalResult.path,
-                finalFilename: finalResult.filename,
-                isUploading: false 
-              });
-              
-              // Update the video in state with the uploaded path
-              setVideos((prev) => prev.map((v, idx) => 
-                idx === videoIndex ? fileWithPath : v
-              ));
-              uploadedTempFiles.push(finalResult.filename);
-              console.log('✅ Video successfully uploaded with path:', finalResult.path);
-            } else {
-              console.error('Video upload result missing path or filename:', finalResult);
-              alert('Ошибка: результат обработки видео не содержит путь');
-              // Remove failed video from state
-              setVideos((prev) => prev.filter((_, idx) => idx !== videoIndex));
-            }
+            // Update the video in state with the uploaded path
+            setVideos((prev) => prev.map((v, idx) => 
+              idx === videoIndex ? fileWithPath : v
+            ));
+            uploadedTempFiles.push(uploadResult.temp_filename || uploadResult.filename);
+            console.log('📹 Video saved to temp folder - will process on product save');
           } else if (uploadResult.path && uploadResult.filename) {
             // Synchronous response (old behavior, kept for backwards compatibility)
             const fileWithPath = Object.assign(file, { 

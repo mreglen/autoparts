@@ -351,38 +351,28 @@ async def upload_video(
             pass
         raise HTTPException(500, f"Ошибка при сохранении временного файла: {str(e)}")
     
-    print(f"Processing video with Celery. Temp path: {temp_path}, Organization: {organization_id}")
+    print(f"Video uploaded to temp folder: {temp_path}")
     
-    # 🚀 ЗАПУСКАЕМ CELERY ЗАДАЧУ СРАЗУ!
-    # Пользователь не должен ждать обработку видео
-    # Задача обработается в фоне
+    # 🚀 НОВАЯ ЛОГИКА: Не запускаем обработку сразу!
+    # Видео сохраняется в temp папке в "сыром" виде
+    # Обработка будет запущена позже при сохранении продукта (/products/ или /products/{id})
+    # Это позволяет пользователю пересматривать видео перед финальной обработкой
     
     try:
-        # Queue Celery task for async processing
-        task = process_and_upload_video.delay(
-            temp_path,
-            file.filename,  # Original filename
-            organization_id,
-            add_watermark_flag,  # add_watermark
-            logo_file_path  # logo_path
-        )
-        
-        print(f"✅ Celery task queued: {task.id}")
-        
-        # Возвращаем temp_path и task_id для фронтенда
+        # Возвращаем temp_path для немедленного воспроизведения
         result = {
-            "task_id": task.id,  # Для отслеживания статуса
             "temp_path": temp_video_path,  # Immediate temp path for playback
             "path": temp_video_path,  # ← Важно! Возвращаем path для совместимости с фронтендом
             "temp_filename": unique_filename,
             "filename": unique_filename,  # ← Важно! Для совместимости
             "organization_id": organization_id,
-            "status": "processing",  # Пока обрабатывается
-            "message": "Video uploaded to temp folder. Processing in background.",
-            "is_temp": True  # Флаг что это временный файл
+            "status": "pending",  # Пока не обрабатывается
+            "message": "Video uploaded to temp folder. Processing will start when product is saved.",
+            "is_temp": True,  # Флаг что это временный файл
+            "requires_processing": True  # Флаг что нужна обработка
         }
         
-        print(f"Video upload queued for processing: {result}")
+        print(f"✅ Video saved to temp (processing deferred): {result}")
         print("=== END VIDEO UPLOAD ===")
         return result
         
