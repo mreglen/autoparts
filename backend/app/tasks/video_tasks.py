@@ -9,26 +9,7 @@ import shutil
 @celery_app.task(bind=True, max_retries=3)
 def process_and_upload_video(self, temp_file_path: str, original_filename: str, organization_id: str, add_watermark: bool, logo_path: str = None):
     """
-    Celery task to process video: validate, compress, and move to final location.
-    
-    Steps:
-    1. Read video from temp folder
-    2. Validate duration (max 60 seconds)
-    3. Compress video with H.264 codec
-    4. Save to uploads/videos/{organization_id}/
-    5. Delete original from temp folder
-    6. Return URL
-    
-    Args:
-        self: Task instance
-        temp_file_path: Path to temporary file
-        original_filename: Original filename (for reference)
-        organization_id: ID of the organization owning the media
-        add_watermark: Whether to add watermark to video (required)
-        logo_path: Path to logo file for watermark (optional, required if add_watermark=True)
-    
-    Returns:
-        dict: {'url': str, 'status': str, 'filename': str, 'path': str}
+    Файл обновлён
     """
     try:
         # Check if temp file exists
