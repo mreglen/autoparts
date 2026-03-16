@@ -7,7 +7,7 @@ import shutil
 
 
 @celery_app.task(bind=True, max_retries=3)
-def process_and_upload_video(self, temp_file_path: str, original_filename: str, organization_id: str, add_watermark: bool = False, logo_path: str = None):
+def process_and_upload_video(self, temp_file_path: str, original_filename: str, organization_id: str, add_watermark: bool, logo_path: str = None):
     """
     Celery task to process video: validate, compress, and move to final location.
     
@@ -24,8 +24,8 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         temp_file_path: Path to temporary file
         original_filename: Original filename (for reference)
         organization_id: ID of the organization owning the media
-        add_watermark: Whether to add watermark to video (default: False)
-        logo_path: Path to logo file for watermark (optional)
+        add_watermark: Whether to add watermark to video (required)
+        logo_path: Path to logo file for watermark (optional, required if add_watermark=True)
     
     Returns:
         dict: {'url': str, 'status': str, 'filename': str, 'path': str}

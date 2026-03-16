@@ -243,8 +243,10 @@ const EditPart = () => {
               console.log('Waiting for photo processing... Task ID:', uploadResult.task_id);
               
               // Poll for completion
-              const maxAttempts = 30; // 30 attempts * 2 seconds = 1 minute max for photos
+              const maxAttempts = 45; // 45 attempts * 2 seconds = 1.5 minutes max (increased from 30)
               let completed = false;
+              
+              console.log('🕐 Photo polling with maxAttempts:', maxAttempts, '(~', maxAttempts * 2 / 60, 'minutes)');
               
               for (let attempt = 0; attempt < maxAttempts; attempt++) {
                 // Wait 2 seconds before checking status
@@ -337,9 +339,11 @@ const EditPart = () => {
             console.log('Waiting for video processing... Task ID:', uploadResult.task_id);
             
             // Step 2: Poll for completion
-            const maxAttempts = 60; // 60 attempts * 2 seconds = 2 minutes max
+            const maxAttempts = 90; // 90 attempts * 2 seconds = 3 minutes max (increased from 60)
             let completed = false;
             let finalResult = null;
+            
+            console.log('🕐 Starting polling with maxAttempts:', maxAttempts, '(~', maxAttempts * 2 / 60, 'minutes)');
             
             for (let attempt = 0; attempt < maxAttempts; attempt++) {
               // Wait 2 seconds before checking status
@@ -347,13 +351,16 @@ const EditPart = () => {
               
               // Check status
               const statusResponse = await apiRequest(`/upload/photo-status/${uploadResult.task_id}`);
-              console.log(`Polling attempt ${attempt + 1}/${maxAttempts}:`, statusResponse);
+              console.log(`📡 Polling attempt ${attempt + 1}/${maxAttempts}:`, statusResponse.status);
               
               if (statusResponse.status === 'completed') {
                 // Success!
                 completed = true;
                 finalResult = statusResponse;
-                console.log('✅ Video processing complete:', finalResult);
+                console.log('✅ Video processing complete!');
+                console.log('   URL:', finalResult.url);
+                console.log('   Path:', finalResult.path);
+                console.log('   Filename:', finalResult.filename);
                 break;
               } else if (statusResponse.status === 'failed') {
                 // Failed
@@ -364,7 +371,9 @@ const EditPart = () => {
             }
             
             if (!completed) {
-              throw new Error('Timeout: Video processing took too long');
+              console.error('❌ TIMEOUT: Video processing took too long (> ' + (maxAttempts * 2 / 60).toFixed(1) + ' minutes)');
+              console.error('   Last status check:', finalResult);
+              throw new Error(`Timeout: Video processing took too long (> ${(maxAttempts * 2 / 60).toFixed(1)} min)`);
             }
             
             // Use the final result from polling
