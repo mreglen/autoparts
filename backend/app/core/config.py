@@ -21,7 +21,8 @@ class Settings(BaseSettings):
     GET_DELIVERY_DETAILS: str
     GET_SETTLEMETNS: str
     GET_BROKEN_WAVE: str
-    BASE_URL: str
+    BASE_URL: str  # Для внутренних API вызовов (localhost)
+    PUBLIC_BASE_URL: str  # Для фронтенда и внешних ссылок
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"

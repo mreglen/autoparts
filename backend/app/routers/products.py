@@ -241,6 +241,9 @@ def update_product(
     
     # Обновляем видео: удаляем старые, добавляем новые
     if product.videos is not None:
+        print(f"\n=== UPDATING VIDEOS FOR PRODUCT {product_id} ===")
+        print(f"Received videos: {product.videos}")
+        
         # Удаляем все предыдущие видео
         db.query(ProductVideo).filter(ProductVideo.product_id == product_id).delete()
         # Добавляем новые
@@ -250,9 +253,13 @@ def update_product(
             db.add(video)
             db.flush()
             video_ids.append(video.id)
+            print(f"Created video record ID {video.id} with URL: {url}")
         
-        # ЗАПУСКАЕМ ОБРАБОТКУ ВИДЕО после обновления
+        print(f"Total video IDs to process: {video_ids}")
+        
+        # 🚀 ЗАПУСКАЕМ ОБРАБОТКУ ВИДЕО после обновления
         if video_ids:
+            print(f"Starting video processing for {len(video_ids)} video(s)...")
             try:
                 import requests
                 from app.core.config import settings
@@ -260,16 +267,24 @@ def update_product(
                 
                 for video_id in video_ids:
                     try:
+                        print(f"Calling: {base_url}/api/upload/start-video-processing/{video_id}")
                         response = requests.post(
                             f"{base_url}/api/upload/start-video-processing/{video_id}",
                             headers={"Authorization": f"Bearer {current_user.access_token}"},
                             timeout=5
                         )
-                        print(f"✅ Started processing for updated video {video_id}: {response.status_code}")
+                        print(f"✅ Started processing for updated video {video_id}: Status {response.status_code}")
+                        print(f"Response: {response.json()}")
                     except Exception as e:
-                        print(f"⚠️ Warning: Could not start video processing: {e}")
+                        print(f"⚠️ Warning: Could not start video processing for video {video_id}: {e}")
+                        import traceback
+                        print(f"Full error: {traceback.format_exc()}")
             except Exception as e:
                 print(f"⚠️ Warning: Error starting video processing: {e}")
+                import traceback
+                print(f"Full error: {traceback.format_exc()}")
+        else:
+            print("⚠️ No video IDs to process!")
 
     # Обновляем связи с автомобилями
     if product.vehicle_ids is not None:
