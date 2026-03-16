@@ -886,6 +886,26 @@ const EditPart = () => {
         return;
       }
 
+      console.log('✅ Product updated successfully, fetching fresh data...');
+      
+      // 🚀 НОВАЯ ЛОГИКА: После обновления продукта получаем свежие данные
+      // Это нужно, чтобы получить финальные пути к видео после обработки
+      setTimeout(async () => {
+        try {
+          const freshProduct = await dispatch(fetchProduct(parseInt(id, 10))).unwrap();
+          console.log('📥 Fresh product data received:', freshProduct);
+          
+          // Обновляем существующие видео с финальными путями
+          if (freshProduct.videos && freshProduct.videos.length > 0) {
+            setExistingVideos(freshProduct.videos);
+            console.log('✅ Updated existing videos with final paths');
+          }
+        } catch (error) {
+          console.error('⚠️ Error fetching fresh product data:', error);
+          // Не прерываем работу, просто показываем старые данные
+        }
+      }, 2000); // Ждём 2 секунды чтобы Celery успел начать обработку
+
       // Handle storage cell links update
       const productId = parseInt(id, 10);
       
