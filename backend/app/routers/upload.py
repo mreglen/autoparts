@@ -317,6 +317,7 @@ async def upload_video(
     
     # Generate UUID filename for temp storage
     unique_filename = f"{uuid.uuid4().hex}{ext}"
+    # ИСПОЛЬЗУЕМ POSIX-совместимые пути (критично для Linux!)
     temp_dir = os.path.abspath(os.path.join("uploads", "temp", organization_id))
     temp_path = os.path.join(temp_dir, unique_filename)
     

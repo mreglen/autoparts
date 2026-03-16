@@ -98,16 +98,42 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
                         'temp_path': temp_file_path
                     }
             
+            # Определяем количество CPU ядер для оптимизации потоков
+            import multiprocessing
+            import time
+            cpu_count = multiprocessing.cpu_count()
+            # Используем половину ядер, но не больше 4 для ultrafast preset
+            encoding_threads = min(max(1, cpu_count // 2), 4)
+            print(f"CPU cores: {cpu_count}, Using threads: {encoding_threads}")
+            
+            # Логируем время начала сжатия
+            compression_start = time.time()
+            
+            # ВАЖНО: На Linux/Ubuntu используем совместимый способ указания потоков
+            # threads=0 может не работать корректно, поэтому явно указываем число
             compressed_path = compress_video(
                 temp_file_path,
                 output_path=final_path,
                 max_duration_seconds=30,
-                video_bitrate="1200k",      # Сильное сжатие (было 2500k)
-                audio_bitrate="96k",        # Уменьшен битрейт аудио (было 192k)
-                preset="medium",            # Более медленный preset для лучшего сжатия (было ultrafast)
-                crf=28,                     # Максимальное сжатие в рамках качества H.264 (было 20)
-                threads=0                   # Использовать ВСЕ ядра CPU
+                video_bitrate="800k",       # Минимальный битрейт для быстрой загрузки
+                audio_bitrate="64k",        # Минимальный битрейт аудио
+                preset="ultrafast",         # Самый быстрый preset для скорости
+                crf=28,                     # Максимальное сжатие
+                threads=encoding_threads    # Явно указываем количество потоков (критично для Linux!)
             )
+            
+            # Логируем время завершения и статистику
+            compression_end = time.time()
+            compression_time = compression_end - compression_start
+            original_size = os.path.getsize(temp_file_path) / 1024 / 1024
+            compressed_size = os.path.getsize(compressed_path) / 1024 / 1024
+            compression_ratio = (1 - compressed_size / original_size) * 100
+            
+            print(f"⏱ Compression completed in: {compression_time:.2f} seconds")
+            print(f"📊 Original size: {original_size:.2f} MB")
+            print(f"📊 Compressed size: {compressed_size:.2f} MB")
+            print(f"📊 Compression ratio: {compression_ratio:.1f}%")
+            print(f"📈 Speed: {original_size / compression_time:.2f} MB/sec")
             print(f"✓ Video compressed successfully")
             print(f"  Compressed file: {compressed_path}")
             print(f"  Size: {os.path.getsize(compressed_path) / 1024 / 1024:.2f} MB")
