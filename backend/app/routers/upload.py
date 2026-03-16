@@ -147,50 +147,30 @@ async def upload_photo(
         
         print(f"Celery task queued: {task.id}")
         
-        # Wait for Celery task to complete (with timeout)
-        import time
-        start_time = time.time()
-        timeout = 30  # 30 seconds timeout
+        # Return immediately with task ID - frontend will poll for status
+        # This prevents timeout issues with long-running processing
+        result = {
+            "task_id": task.id,
+            "status": "processing",
+            "temp_filename": unique_filename,
+            "organization_id": organization_id,
+            "path": f"/pictures/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.webp')}",
+            "message": "Photo is being processed. Poll /api/upload/photo-status/{task_id} for updates."
+        }
         
-        print(f"Waiting for Celery task {task.id} to complete...")
-        
-        while not task.ready():
-            if time.time() - start_time > timeout:
-                print(f"Timeout waiting for task {task.id}")
-                raise HTTPException(500, "Превышено время обработки фото")
-            time.sleep(0.5)
-        
-        # Get result from Celery task
-        print(f"Getting result from task {task.id}...")
-        result_data = task.get(timeout=5)
-        print(f"Task result: {result_data}")
-        
-        if result_data.get('status') == 'success':
-            # Return the actual processed path from Celery
-            final_result = {
-                "status": "success",
-                "path": result_data['path'],  # Actual path from Celery
-                "filename": result_data['filename'],  # Actual filename from Celery
-                "organization_id": organization_id
-            }
-        else:
-            raise HTTPException(500, f"Ошибка обработки фото: {result_data.get('error', 'Неизвестная ошибка')}")
-        
-        print(f"Photo processed successfully: {final_result}")
+        print(f"Photo upload queued for processing: {result}")
         print("=== END PHOTO UPLOAD ===")
-        return final_result
+        return result
         
     except Exception as e:
-        print(f"Error processing photo: {str(e)}")
-        import traceback
-        print(f"Full traceback: {traceback.format_exc()}")
+        print(f"Error queuing photo upload: {str(e)}")
         # Clean up temp file on error
         try:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
         except:
             pass
-        raise HTTPException(500, f"Ошибка при обработке фото: {str(e)}")
+        raise HTTPException(500, f"Ошибка при постановке фото в очередь: {str(e)}")
 
 
 @router.post("/photo-s3")
@@ -323,57 +303,30 @@ async def upload_video(
         
         print(f"Celery task queued: {task.id}")
         
-        # Wait for Celery task to complete (with timeout)
-        import time
-        start_time = time.time()
-        timeout = 120  # 120 seconds timeout for videos (increased from 60)
+        # Return immediately with task ID - frontend will poll for status
+        # This prevents timeout issues with long-running video processing
+        result = {
+            "task_id": task.id,
+            "status": "processing",
+            "temp_filename": unique_filename,
+            "organization_id": organization_id,
+            "path": f"/videos/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.mp4')}",
+            "message": "Video is being processed. Poll /api/upload/photo-status/{task_id} for updates."
+        }
         
-        print(f"Waiting for Celery task {task.id} to complete...")
-        
-        # Check if task actually started executing
-        task_started = False
-        while not task.ready():
-            # Check if task has started (moved from PENDING to STARTED)
-            if not task_started and task.state in ['STARTED', 'PROGRESS']:
-                task_started = True
-                print(f"Task {task.id} has started processing...")
-            
-            if time.time() - start_time > timeout:
-                print(f"Timeout waiting for task {task.id} after {timeout}s")
-                print(f"Task state: {task.state}")
-                raise HTTPException(500, "Превышено время обработки видео")
-            time.sleep(0.5)
-        
-        print(f"Task {task.id} completed with state: {task.state}")
-        
-        # Get result from Celery task
-        result_data = task.get(timeout=10)
-        
-        if result_data.get('status') == 'success':
-            # Return the actual processed path from Celery
-            final_result = {
-                "status": "success",
-                "path": result_data['path'],  # Actual path from Celery
-                "filename": result_data['filename'],  # Actual filename from Celery
-                "organization_id": organization_id,
-                "duration": result_data.get('duration')
-            }
-        else:
-            raise HTTPException(500, f"Ошибка обработки видео: {result_data.get('error', 'Неизвестная ошибка')}")
-        
-        print(f"Video processed successfully: {final_result}")
+        print(f"Video upload queued for processing: {result}")
         print("=== END VIDEO UPLOAD ===")
-        return final_result
+        return result
         
     except Exception as e:
-        print(f"Error processing video: {str(e)}")
+        print(f"Error queuing video upload: {str(e)}")
         # Clean up temp file on error
         try:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
         except:
             pass
-        raise HTTPException(500, f"Ошибка при обработке видео: {str(e)}")
+        raise HTTPException(500, f"Ошибка при постановке видео в очередь: {str(e)}")
 
 
 @router.post("/video-s3")
@@ -694,93 +647,104 @@ async def upload_organization_logo(
         
         print(f"Celery task queued: {task.id}")
         
-        # Wait for Celery task to complete (with timeout)
-        import time
-        start_time = time.time()
-        timeout = 30  # 30 seconds timeout
+        # Return immediately with task ID - frontend will poll for status
+        # This prevents timeout issues with long-running processing
+        result = {
+            "task_id": task.id,
+            "status": "processing",
+            "temp_filename": unique_filename,
+            "organization_id": organization_id,
+            "path": f"/uploads/logo_organizations/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.webp')}",
+            "message": "Logo is being processed. Poll /api/upload/photo-status/{task_id} for updates."
+        }
         
-        print(f"Waiting for Celery task {task.id} to complete...")
-        
-        while not task.ready():
-            if time.time() - start_time > timeout:
-                print(f"Timeout waiting for task {task.id}")
-                raise HTTPException(500, "Превышено время обработки фото")
-            time.sleep(0.5)
-        
-        # Get result from Celery task
-        print(f"Getting result from task {task.id}...")
-        result_data = task.get(timeout=5)
-        print(f"Task result: {result_data}")
-        
-        if result_data.get('status') == 'success':
-            # Return the actual processed path from Celery
-            final_result = {
-                "status": "success",
-                "path": result_data['path'],  # Actual path from Celery
-                "filename": result_data['filename'],  # Actual filename from Celery
-                "organization_id": organization_id
-            }
-        else:
-            raise HTTPException(500, f"Ошибка обработки фото: {result_data.get('error', 'Неизвестная ошибка')}")
-        
-        print(f"Logo processed successfully: {final_result}")
+        print(f"Logo upload queued for processing: {result}")
         print("=== END ORGANIZATION LOGO UPLOAD ===")
-        return final_result
+        return result
         
     except Exception as e:
-        print(f"Error processing logo: {str(e)}")
-        import traceback
-        print(f"Full traceback: {traceback.format_exc()}")
+        print(f"Error queuing logo upload: {str(e)}")
         # Clean up temp file on error
         try:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
         except:
             pass
-        raise HTTPException(500, f"Ошибка при обработке фото: {str(e)}")
+        raise HTTPException(500, f"Ошибка при постановке задачи обработки лого: {str(e)}")
 
 
 @router.get("/photo-status/{task_id}")
 async def get_photo_upload_status(task_id: str):
     """
-    Get the status of a photo processing task.
+    Get the status of a Celery photo/video processing task.
+    Works for both process_and_upload_photo and process_and_upload_video tasks.
     
     Returns:
-        dict: Task status and result
+        dict: Task status and result with full details
     """
     from celery.result import AsyncResult
     
+    # Try to get result from photo task first
     task_result = AsyncResult(task_id, app=process_and_upload_photo.app)
     
     if task_result.state == 'PENDING':
         return {
             "task_id": task_id,
             "status": "pending",
-            "message": "Task is waiting to be processed"
+            "message": "Task is waiting to be processed by Celery worker"
         }
     elif task_result.state == 'STARTED':
         return {
             "task_id": task_id,
             "status": "processing",
-            "message": "Task is being processed"
+            "message": "Task is being processed by Celery worker"
+        }
+    elif task_result.state == 'PROGRESS':
+        return {
+            "task_id": task_id,
+            "status": "processing",
+            "progress": task_result.info.get('progress', 0) if isinstance(task_result.info, dict) else 0,
+            "message": "Task is in progress"
         }
     elif task_result.state == 'SUCCESS':
         result = task_result.result
+        print(f"Task {task_id} completed successfully: {result}")
         return {
             "task_id": task_id,
             "status": "completed",
-            "result": result
+            "result": result,
+            "path": result.get('path') if isinstance(result, dict) else None,
+            "url": result.get('url') if isinstance(result, dict) else None,
+            "filename": result.get('filename') if isinstance(result, dict) else None,
+            "organization_id": result.get('organization_id') if isinstance(result, dict) else None,
+            "duration": result.get('duration') if isinstance(result, dict) else None  # For videos
         }
     elif task_result.state == 'FAILURE':
+        error_msg = str(task_result.result)
+        print(f"Task {task_id} failed: {error_msg}")
         return {
             "task_id": task_id,
             "status": "failed",
-            "error": str(task_result.result)
+            "error": error_msg,
+            "traceback": str(task_result.traceback) if task_result.traceback else None
+        }
+    elif task_result.state == 'RETRY':
+        return {
+            "task_id": task_id,
+            "status": "retrying",
+            "message": "Task is being retried due to temporary error"
+        }
+    elif task_result.state == 'REVOKED':
+        return {
+            "task_id": task_id,
+            "status": "cancelled",
+            "message": "Task was cancelled"
         }
     else:
         return {
             "task_id": task_id,
-            "status": task_result.state.lower()
+            "status": task_result.state.lower(),
+            "message": f"Task is in {task_result.state} state"
         }
 
 

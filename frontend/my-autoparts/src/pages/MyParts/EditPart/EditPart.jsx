@@ -231,16 +231,62 @@ const EditPart = () => {
               ? `/upload/photo?organization_id=${organizationId}`
               : '/upload/photo';
             console.log('Uploading photo:', file.name, 'Organization ID:', organizationId);
-            const result = await apiRequestFormData(uploadEndpoint, formData);
-            console.log('Upload result:', result);
             
-            if (result.path && result.filename) {
+            // Step 1: Upload file and get task_id
+            const uploadResult = await apiRequestFormData(uploadEndpoint, formData);
+            console.log('Photo upload initiated:', uploadResult);
+            
+            let finalResult = null;
+            
+            // Step 2: Check if async processing (task_id) or immediate result
+            if (uploadResult.task_id) {
+              console.log('Waiting for photo processing... Task ID:', uploadResult.task_id);
+              
+              // Poll for completion
+              const maxAttempts = 30; // 30 attempts * 2 seconds = 1 minute max for photos
+              let completed = false;
+              
+              for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                // Wait 2 seconds before checking status
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Check status
+                const statusResponse = await apiRequest(`/upload/photo-status/${uploadResult.task_id}`);
+                console.log(`Polling attempt ${attempt + 1}/${maxAttempts}:`, statusResponse);
+                
+                if (statusResponse.status === 'completed') {
+                  // Success!
+                  completed = true;
+                  finalResult = statusResponse;
+                  console.log('✅ Photo processing complete:', finalResult);
+                  break;
+                } else if (statusResponse.status === 'failed') {
+                  // Failed
+                  console.error('❌ Photo processing failed:', statusResponse.error);
+                  throw new Error(statusResponse.error || 'Photo processing failed');
+                }
+                // else: still processing, continue polling
+              }
+              
+              if (!completed) {
+                throw new Error('Timeout: Photo processing took too long');
+              }
+            } else if (uploadResult.path && uploadResult.filename) {
+              // Synchronous response (old behavior, kept for backwards compatibility)
+              finalResult = uploadResult;
+            }
+            
+            // Use the final result
+            if (finalResult && finalResult.path && finalResult.filename) {
               const fileWithPath = Object.assign(file, { 
-                finalPath: result.path,
-                finalFilename: result.filename 
+                finalPath: finalResult.path,
+                finalFilename: finalResult.filename 
               });
               imageFiles[imageFiles.indexOf(file)] = fileWithPath;
-              uploadedTempFiles.push(result.filename);
+              uploadedTempFiles.push(finalResult.filename);
+            } else {
+              console.error('Photo upload result missing path or filename:', finalResult);
+              throw new Error('Photo upload failed');
             }
           } catch (error) {
             console.error('Failed to upload photo:', error);
@@ -281,13 +327,71 @@ const EditPart = () => {
             ? `/upload/video?organization_id=${organizationId}`
             : '/upload/video';
           console.log('Uploading video:', file.name, 'Organization ID:', organizationId);
-          const result = await apiRequestFormData(uploadEndpoint, formData);
-          console.log('Video upload result:', result);
           
-          if (result.path && result.filename) {
+          // Step 1: Upload file and get task_id
+          const uploadResult = await apiRequestFormData(uploadEndpoint, formData);
+          console.log('Video upload initiated:', uploadResult);
+          
+          // Check if we got a task_id (async processing)
+          if (uploadResult.task_id) {
+            console.log('Waiting for video processing... Task ID:', uploadResult.task_id);
+            
+            // Step 2: Poll for completion
+            const maxAttempts = 60; // 60 attempts * 2 seconds = 2 minutes max
+            let completed = false;
+            let finalResult = null;
+            
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+              // Wait 2 seconds before checking status
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              
+              // Check status
+              const statusResponse = await apiRequest(`/upload/photo-status/${uploadResult.task_id}`);
+              console.log(`Polling attempt ${attempt + 1}/${maxAttempts}:`, statusResponse);
+              
+              if (statusResponse.status === 'completed') {
+                // Success!
+                completed = true;
+                finalResult = statusResponse;
+                console.log('✅ Video processing complete:', finalResult);
+                break;
+              } else if (statusResponse.status === 'failed') {
+                // Failed
+                console.error('❌ Video processing failed:', statusResponse.error);
+                throw new Error(statusResponse.error || 'Video processing failed');
+              }
+              // else: still processing, continue polling
+            }
+            
+            if (!completed) {
+              throw new Error('Timeout: Video processing took too long');
+            }
+            
+            // Use the final result from polling
+            if (finalResult && finalResult.path && finalResult.filename) {
+              const fileWithPath = Object.assign(file, { 
+                finalPath: finalResult.path,
+                finalFilename: finalResult.filename,
+                isUploading: false 
+              });
+              
+              // Update the video in state with the uploaded path
+              setVideos((prev) => prev.map((v, idx) => 
+                idx === videoIndex ? fileWithPath : v
+              ));
+              uploadedTempFiles.push(finalResult.filename);
+              console.log('✅ Video successfully uploaded with path:', finalResult.path);
+            } else {
+              console.error('Video upload result missing path or filename:', finalResult);
+              alert('Ошибка: результат обработки видео не содержит путь');
+              // Remove failed video from state
+              setVideos((prev) => prev.filter((_, idx) => idx !== videoIndex));
+            }
+          } else if (uploadResult.path && uploadResult.filename) {
+            // Synchronous response (old behavior, kept for backwards compatibility)
             const fileWithPath = Object.assign(file, { 
-              finalPath: result.path,
-              finalFilename: result.filename,
+              finalPath: uploadResult.path,
+              finalFilename: uploadResult.filename,
               isUploading: false 
             });
             
@@ -295,10 +399,10 @@ const EditPart = () => {
             setVideos((prev) => prev.map((v, idx) => 
               idx === videoIndex ? fileWithPath : v
             ));
-            uploadedTempFiles.push(result.filename);
-            console.log('Video successfully uploaded with path:', result.path);
+            uploadedTempFiles.push(uploadResult.filename);
+            console.log('Video successfully uploaded with path:', uploadResult.path);
           } else {
-            console.error('Video upload response missing path or filename:', result);
+            console.error('Video upload response missing path or filename:', uploadResult);
             alert('Ошибка: сервер не вернул путь к видео');
             // Remove failed video from state
             setVideos((prev) => prev.filter((_, idx) => idx !== videoIndex));

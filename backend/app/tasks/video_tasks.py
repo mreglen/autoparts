@@ -188,9 +188,12 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         print(f"  Final path: {final_path}")
         print(f"  Media URL path: {media_path}")
         
+        # Remove trailing slash from BASE_URL if present to avoid double slashes
+        base_url = settings.BASE_URL.rstrip('/')
+        
         return {
             'path': media_path,  # Relative path for database storage
-            'url': f"{settings.BASE_URL}{media_path}",  # Full URL for immediate use
+            'url': f"{base_url}{media_path}",  # Full URL for immediate use
             'status': 'success',
             'filename': final_filename,
             'organization_id': organization_id,
