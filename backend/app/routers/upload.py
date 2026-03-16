@@ -273,68 +273,82 @@ async def upload_video(
         print(f"Rejected: invalid content type {file.content_type}")
         print("=== END VIDEO UPLOAD (REJECTED) ===")
         raise HTTPException(400, "Разрешены только видео")
-
-    # Check file size before upload
-    file_content = await file.read()
-    file_size = len(file_content)
-
-    if file_size > MAX_VIDEO_SIZE:
-        raise HTTPException(
-            413,
-            f"Файл слишком большой. Размер: {file_size/1024/1024:.1f}MB. Максимальный размер: {MAX_VIDEO_SIZE/1024/1024}MB"
-        )
-
-    # Return file pointer to the beginning for re-reading
-    await file.seek(0)
-
+        
     # Get file extension
     ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
-
+        
     # Allowed video extensions
     allowed_extensions = (
         ".mp4", ".avi", ".mov", ".wmv", ".flv", ".mkv", ".webm", ".m4v", ".3gp", ".mpeg", ".mpg"
     )
-    
+        
     # Validate extension
     if ext and ext not in allowed_extensions:
         raise HTTPException(400, "Недопустимый формат видео")
-    
+        
     # Validate MIME type
     allowed_mime_types = (
         "video/mp4", "video/quicktime", "video/x-msvideo", "video/x-ms-wmv",
         "video/x-flv", "video/x-matroska", "video/webm", "video/3gpp",
         "video/mpeg"
     )
-    
+        
     if file.content_type not in allowed_mime_types:
         if not ext:
             raise HTTPException(400, "Недопустимый тип файла")
-    
+        
     # Generate filename with organization ID
     filename = generate_photo_filename(organization_id, file.filename)
-    
+        
     print(f"Generated filename: {filename}")
-    
+        
     # Generate UUID filename for temp storage
     unique_filename = f"{uuid.uuid4().hex}{ext}"
     # ИСПОЛЬЗУЕМ POSIX-совместимые пути (критично для Linux!)
     temp_dir = os.path.abspath(os.path.join("uploads", "temp", organization_id))
     temp_path = os.path.join(temp_dir, unique_filename)
-    
+        
     # Create temp directory if it doesn't exist
     os.makedirs(temp_dir, exist_ok=True)
-    
-    # Save original file to temp folder immediately
-    try:
-        with open(temp_path, 'wb') as f:
-            f.write(file_content)
-        print(f"Saved original video to temp: {temp_path}")
-        print(f"Absolute temp path: {os.path.abspath(temp_path)}")
         
+    # 🚀 БЫСТРАЯ ЗАГРУЗКА: Потоковая запись напрямую на диск!
+    # НЕ читаем файл в память, а сразу пишем на диск
+    try:
+        # Открываем файл для записи
+        with open(temp_path, 'wb') as buffer:
+            # Читаем и пишем порциями по 8KB
+            while chunk := await file.read(8192):
+                buffer.write(chunk)
+            
+        # Проверяем размер загруженного файла
+        file_size = os.path.getsize(temp_path)
+            
+        # Проверяем размер после загрузки (а не до!)
+        if file_size > MAX_VIDEO_SIZE:
+            # Файл слишком большой - удаляем
+            os.remove(temp_path)
+            raise HTTPException(
+                413,
+                f"Файл слишком большой. Размер: {file_size/1024/1024:.1f}MB. Максимальный размер: {MAX_VIDEO_SIZE/1024/1024}MB"
+            )
+            
+        print(f"✅ Saved original video to temp: {temp_path}")
+        print(f"📊 File size: {file_size/1024/1024:.2f} MB")
+        print(f"📍 Absolute path: {os.path.abspath(temp_path)}")
+            
         # Construct temp video URL that can be used immediately
         temp_video_path = f"/temp/{organization_id}/{unique_filename}"
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error saving temp file: {str(e)}")
+        print(f"❌ Error saving temp file: {str(e)}")
+        # Удаляем частичный файл если он создался
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except:
+            pass
         raise HTTPException(500, f"Ошибка при сохранении временного файла: {str(e)}")
     
     print(f"Processing video with Celery. Temp path: {temp_path}, Organization: {organization_id}")
