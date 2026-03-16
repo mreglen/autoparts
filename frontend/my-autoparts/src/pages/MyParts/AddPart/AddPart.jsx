@@ -182,6 +182,42 @@ const AddPart = () => {
         alert('Максимум 1 видео');
       } else {
         const file = videoFiles[0];
+        
+        // Validate video size (max 50MB)
+        const maxSizeMB = 50;
+        const maxSizeBytes = maxSizeMB * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
+          alert(`Файл слишком большой. Размер: ${(file.size / 1024 / 1024).toFixed(1)}MB. Максимальный размер: ${maxSizeMB}MB`);
+          return;
+        }
+        
+        // Validate video duration (max 30 seconds)
+        try {
+          console.log('Checking video duration...');
+          const duration = await new Promise((resolve, reject) => {
+            const video = document.createElement('video');
+            video.preload = 'metadata';
+            video.onloadedmetadata = () => {
+              window.URL.revokeObjectURL(video.src);
+              resolve(video.duration);
+            };
+            video.onerror = () => {
+              reject(new Error('Failed to load video metadata'));
+            };
+            video.src = URL.createObjectURL(file);
+          });
+          
+          console.log('Video duration:', duration, 'seconds');
+          
+          if (duration > 30) {
+            alert(`Видео слишком длинное. Длительность: ${duration.toFixed(1)} сек. Максимальная длительность: 30 сек.`);
+            return;
+          }
+        } catch (error) {
+          console.error('Error checking video duration:', error);
+          // Continue with upload if can't check duration
+        }
+        
         const videoIndex = videos.length;
         
         // Add video to state immediately with uploading flag

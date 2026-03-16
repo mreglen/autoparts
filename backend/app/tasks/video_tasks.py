@@ -28,6 +28,44 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         
         print(f"✓ Temp file exists, size: {os.path.getsize(temp_file_path):,} bytes")
         
+        # SKIP compression for small files (< 5MB) - save time!
+        file_size_mb = os.path.getsize(temp_file_path) / 1024 / 1024
+        if file_size_mb < 5:
+            print(f"⚡ File is small ({file_size_mb:.1f}MB), skipping compression to save time!")
+            # Just copy file without processing
+            final_path_temp = final_path + ".temp"
+            shutil.copy(temp_file_path, final_path_temp)
+            os.rename(final_path_temp, final_path)
+            
+            # Get duration anyway
+            try:
+                duration = get_video_duration(temp_file_path)
+            except:
+                duration = 0
+            
+            print(f"✅ File copied directly (no compression)")
+            print(f"  Saved path: {final_path}")
+            
+            # Delete temp file
+            try:
+                os.remove(temp_file_path)
+                print(f"Deleted temp file: {temp_file_path}")
+            except:
+                pass
+            
+            # Return result
+            media_path = f"/videos/{organization_id}/{final_filename}"
+            base_url = settings.BASE_URL.rstrip('/')
+            
+            return {
+                'path': media_path,
+                'url': f"{base_url}{media_path}",
+                'status': 'success',
+                'filename': final_filename,
+                'organization_id': organization_id,
+                'duration': duration
+            }
+        
         # Try to open and read first few bytes to verify accessibility
         try:
             with open(temp_file_path, 'rb') as f:
@@ -42,11 +80,11 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
             duration = get_video_duration(temp_file_path)
             print(f"Video duration: {duration:.2f} seconds")
             
-            # Validate duration (max 60 seconds)
-            if duration > 60:
+            # Validate duration (max 30 seconds)
+            if duration > 30:
                 raise ValueError(
                     f"Видео слишком длинное. Длительность: {duration:.1f} сек. "
-                    f"Максимальная длительность: 60 сек."
+                    f"Максимальная длительность: 30 сек."
                 )
         except ValueError as ve:
             print(f"Validation error: {str(ve)}")
@@ -87,17 +125,18 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         # Create directory if it doesn't exist
         os.makedirs(upload_dir, exist_ok=True)
         
-        # Compress video with optimized settings for speed (same as your working command)
+        # Compress video with MAXIMUM SPEED settings (30 sec max limit)
         try:
-            print(f"Compressing video...")
+            print(f"⚡ Compressing video (MAXIMUM SPEED)...")
             compressed_path = compress_video(
                 temp_file_path,
                 output_path=final_path,
-                max_duration_seconds=60,
-                video_bitrate="1500k",
-                audio_bitrate="128k",
-                preset="medium",
-                crf=28
+                max_duration_seconds=30,
+                video_bitrate="2500k",      # Ещё выше битрейт
+                audio_bitrate="192k",       # Лучше звук
+                preset="ultrafast",         # Самый быстрый preset
+                crf=20,                     # Ещё меньше CRF = ещё быстрее
+                threads=0                   # Использовать ВСЕ ядра CPU
             )
             print(f"✓ Video compressed successfully")
             print(f"  Compressed file: {compressed_path}")

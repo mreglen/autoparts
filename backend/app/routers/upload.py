@@ -12,10 +12,10 @@ from ..tasks.video_tasks import process_and_upload_video
 from ..utils.photo_naming import generate_photo_filename
 from ..core.config import settings
 
-# Максимальный размер файла в байтах (50MB для фото, 100MB для видео)
+# Максимальный размер файла в байтах (50MB для фото, 50MB для видео)
 MAX_PHOTO_SIZE = 50 * 1024 * 1024  # 50MB
-MAX_VIDEO_SIZE = 100 * 1024 * 1024  # 100MB
-MAX_VIDEO_DURATION_SEC = 60  # 1 minute
+MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50MB (ограничение)
+MAX_VIDEO_DURATION_SEC = 30  # 30 секунд (ограничение)
 
 # Limits for media files per product
 MAX_PHOTOS_PER_PRODUCT = 5

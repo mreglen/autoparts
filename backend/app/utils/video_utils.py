@@ -63,7 +63,8 @@ def compress_video(
     video_bitrate: str = "1500k",
     audio_bitrate: str = "128k",
     preset: str = "medium",
-    crf: int = 28
+    crf: int = 28,
+    threads: int = 0  # 0 = использовать все доступные ядра
 ) -> str:
     """
     Compress and optimize a video file using FFmpeg directly.
@@ -102,7 +103,7 @@ def compress_video(
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     try:
-        # Build FFmpeg command directly
+        # Build FFmpeg command with threading optimization
         cmd = [
             FFMPEG_PATH,
             '-i', input_path,
@@ -114,6 +115,8 @@ def compress_video(
             '-crf', str(crf),
             '-movflags', '+faststart',
             '-pix_fmt', 'yuv420p',
+            '-threads', str(threads),  # Использовать все ядра CPU
+            '-tune', 'zerolatency',    # Оптимизация для низкой задержки
             '-y',  # Overwrite output file
             output_path
         ]
@@ -127,10 +130,10 @@ def compress_video(
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=120  # 2 minute timeout for FFmpeg
+                timeout=180  # 3 minute timeout for FFmpeg (increased from 120)
             )
         except subprocess.TimeoutExpired as e:
-            error_message = f"FFmpeg timed out after 120 seconds"
+            error_message = f"FFmpeg timed out after 180 seconds"
             print(error_message)
             raise RuntimeError(error_message)
         
@@ -213,10 +216,10 @@ def add_watermark_to_video(
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=120  # 2 minute timeout
+                timeout=180  # 3 minute timeout for watermark (increased from 120)
             )
         except subprocess.TimeoutExpired as e:
-            error_message = f"FFmpeg watermark timed out after 120 seconds"
+            error_message = f"FFmpeg watermark timed out after 180 seconds"
             print(error_message)
             raise RuntimeError(error_message)
         
