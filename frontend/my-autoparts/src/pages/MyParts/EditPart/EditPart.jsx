@@ -350,8 +350,30 @@ const EditPart = () => {
         
         const videoIndex = videos.length;
         
-        // Add video to state immediately with uploading flag
-        const uploadingVideo = Object.assign(file, { isUploading: true });
+        // Track current upload task ID for cancellation
+        let currentTaskId = null;
+        let isCancelled = false;
+        
+        // Add video to state immediately with uploading flag and cancel function
+        const uploadingVideo = Object.assign(file, { 
+          isUploading: true,
+          cancelUpload: () => {
+            if (currentTaskId && !isCancelled) {
+              console.log('🛑 Cancelling video upload:', currentTaskId);
+              isCancelled = true;
+              apiRequest(`/upload/cancel/${currentTaskId}`, { method: 'POST' })
+                .then(result => {
+                  console.log('✅ Upload cancelled:', result);
+                  // Remove video from state
+                  setVideos((prev) => prev.filter((_, idx) => idx !== videoIndex));
+                  setUploadProgress(prev => ({ ...prev, [`video-${videoIndex}`]: false }));
+                })
+                .catch(error => {
+                  console.error('❌ Error cancelling upload:', error);
+                });
+            }
+          }
+        });
         setVideos((prev) => [...prev, uploadingVideo]);
         
         // Set uploading state
@@ -372,7 +394,8 @@ const EditPart = () => {
           
           // Check if we got a task_id (async processing)
           if (uploadResult.task_id) {
-            console.log('Waiting for video processing... Task ID:', uploadResult.task_id);
+            currentTaskId = uploadResult.task_id; // Save task ID for cancellation
+            console.log('Waiting for video processing... Task ID:', currentTaskId);
             
             // Step 2: Poll for completion
             const maxAttempts = 90; // 90 attempts * 2 seconds = 3 minutes max (increased from 60)
@@ -382,11 +405,17 @@ const EditPart = () => {
             console.log('🕐 Starting polling with maxAttempts:', maxAttempts, '(~', maxAttempts * 2 / 60, 'minutes)');
             
             for (let attempt = 0; attempt < maxAttempts; attempt++) {
+              // Check if cancelled
+              if (isCancelled) {
+                console.log('⚠️ Upload was cancelled, stopping polling');
+                return; // Exit early
+              }
+              
               // Wait 2 seconds before checking status
               await new Promise(resolve => setTimeout(resolve, 2000));
               
               // Check status
-              const statusResponse = await apiRequest(`/upload/photo-status/${uploadResult.task_id}`);
+              const statusResponse = await apiRequest(`/upload/photo-status/${currentTaskId}`);
               console.log(`📡 Polling attempt ${attempt + 1}/${maxAttempts}:`, statusResponse.status);
               
               if (statusResponse.status === 'completed') {
@@ -1253,14 +1282,29 @@ const EditPart = () => {
                         className="w-16 h-16 object-cover rounded border"
                         controls={false}
                       />
-                      <button
-                        type="button"
-                        onClick={() => handleVideoRemove(idx)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
-                        disabled={isUploading}
-                      >
-                        <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
-                      </button>
+                      {isUploading && file.cancelUpload ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            console.log('🛑 User clicked cancel for video', idx);
+                            file.cancelUpload();
+                          }}
+                          className="absolute -top-2 -left-2 bg-yellow-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow hover:bg-yellow-600 z-20"
+                          title="Отменить загрузку"
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      ) : (!isUploading && (
+                        <button
+                          type="button"
+                          onClick={() => handleVideoRemove(idx)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow"
+                        >
+                          <img src="/img/close_sm.svg" alt="Удалить" className="w-2.5 h-2.5" />
+                        </button>
+                      ))}
                     </div>
                   );
                 })}

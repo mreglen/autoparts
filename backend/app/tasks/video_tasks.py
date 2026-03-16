@@ -128,6 +128,25 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         # Compress video with MAXIMUM SPEED settings (30 sec max limit)
         try:
             print(f"⚡ Compressing video (MAXIMUM SPEED)...")
+            
+            # Check if task was cancelled before starting compression
+            if self.request.id:
+                from celery.result import AsyncResult
+                task_result = AsyncResult(self.request.id, app=self.app)
+                if task_result.state == 'REVOKED':
+                    print(f"⚠️ Task was revoked, skipping compression")
+                    # Cleanup temp file
+                    try:
+                        os.remove(temp_file_path)
+                        print(f"Cleaned up temp file after revoke: {temp_file_path}")
+                    except:
+                        pass
+                    return {
+                        'url': None,
+                        'status': 'cancelled',
+                        'error': 'Загрузка отменена пользователем'
+                    }
+            
             compressed_path = compress_video(
                 temp_file_path,
                 output_path=final_path,

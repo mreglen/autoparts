@@ -1,13 +1,73 @@
-import { useSelector } from 'react-redux';
-import { normalizeImageUrl } from '../../utils/apiClient';
+import { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { updateOrganization } from '../../redux/slices/OrganizationSlice';
 
 const WatermarksSection = ({ org }) => {
+  const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
+  
+  // Get current watermark value from organization
+  const currentWatermark = org?.watermark || 0;
+  
+  // Local state for checkboxes
+  const [watermarks, setWatermarks] = useState({
+    ownGarage: false,  // "Свой Гараж" logo - watermark = 1
+    companyLogo: false // Company logo - watermark = 2
+  });
+  
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // Placeholder checkboxes - frontend only for now
-  const watermarks = {
-    ownGarage: false,  // "Свой Гараж" logo
-    companyLogo: false // Company logo
+  // Update checkboxes based on organization watermark value
+  useEffect(() => {
+    if (org && org.watermark !== undefined) {
+      setWatermarks({
+        ownGarage: org.watermark === 1,
+        companyLogo: org.watermark === 2
+      });
+    }
+  }, [org]);
+
+  // Handle checkbox changes
+  const handleWatermarkChange = async (type) => {
+    if (isUpdating || !user?.organization_id) return;
+    
+    setIsUpdating(true);
+    
+    let newWatermarkValue;
+    
+    if (type === 'ownGarage') {
+      // If clicking already checked checkbox, uncheck it (set to 0)
+      // If clicking unchecked checkbox, set to 1 and uncheck companyLogo
+      newWatermarkValue = watermarks.ownGarage ? 0 : 1;
+    } else if (type === 'companyLogo') {
+      // If clicking already checked checkbox, uncheck it (set to 0)
+      // If clicking unchecked checkbox, set to 2 and uncheck ownGarage
+      newWatermarkValue = watermarks.companyLogo ? 0 : 2;
+    }
+    
+    // Optimistic UI update
+    const newWatermarks = {
+      ownGarage: newWatermarkValue === 1,
+      companyLogo: newWatermarkValue === 2
+    };
+    setWatermarks(newWatermarks);
+    
+    try {
+      // Update organization with new watermark value
+      await dispatch(updateOrganization({
+        id: user.organization_id,
+        watermark: newWatermarkValue
+      })).unwrap();
+    } catch (error) {
+      console.error('Error updating watermark:', error);
+      // Revert back on error
+      setWatermarks({
+        ownGarage: currentWatermark === 1,
+        companyLogo: currentWatermark === 2
+      });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   return (
@@ -20,6 +80,9 @@ const WatermarksSection = ({ org }) => {
           </svg>
           Водяные знаки
         </h3>
+        {isUpdating && (
+          <span className="text-xs text-gray-500">Сохранение...</span>
+        )}
       </div>
       
       <div className="space-y-4">
@@ -35,8 +98,9 @@ const WatermarksSection = ({ org }) => {
               <input
                 type="checkbox"
                 checked={watermarks.ownGarage}
-                readOnly
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                onChange={() => handleWatermarkChange('ownGarage')}
+                disabled={isUpdating}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <span className="text-sm font-medium text-gray-700">Логотип "Свой Гараж"</span>
             </label>
@@ -55,8 +119,9 @@ const WatermarksSection = ({ org }) => {
               <input
                 type="checkbox"
                 checked={watermarks.companyLogo}
-                readOnly
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                onChange={() => handleWatermarkChange('companyLogo')}
+                disabled={isUpdating}
+                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <span className="text-sm font-medium text-gray-700">Логотип компании</span>
             </label>

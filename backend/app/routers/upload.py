@@ -11,6 +11,7 @@ from ..tasks.photo_tasks import process_and_upload_photo
 from ..tasks.video_tasks import process_and_upload_video
 from ..utils.photo_naming import generate_photo_filename
 from ..core.config import settings
+from celery.result import AsyncResult
 
 # Максимальный размер файла в байтах (50MB для фото, 50MB для видео)
 MAX_PHOTO_SIZE = 50 * 1024 * 1024  # 50MB
@@ -42,27 +43,49 @@ async def upload_photo(
     if not organization_id:
         raise HTTPException(400, "organization_id обязателен")
     
-    # Check if user is admin to determine if watermark should be added
+    # Check organization's watermark setting to determine if watermark should be added
     from ..models.organization import Organization
     org = db.query(Organization).filter(Organization.id == organization_id).first()
-    add_watermark_flag = current_user.is_admin and org and org.logo_organization
+    
+    # Determine watermark settings based on organization.watermark value:
+    # 0 = no watermark
+    # 1 = admin's organization logo (current behavior for backward compatibility)
+    # 2 = this organization's own logo
+    add_watermark_flag = False
     logo_file_path = None
     
-    if add_watermark_flag:
-        # Construct the path to the organization logo (handle paths that may or may not start with /uploads/)
-        logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
-        
-        # If the path already starts with 'uploads', don't add it again
-        if not logo_path_value.lower().startswith("uploads"):
-            logo_file_path = os.path.join("uploads", logo_path_value)
+    if org and org.watermark is not None:
+        if org.watermark == 1:
+            # Use admin's organization logo as watermark
+            # Find admin user and get their organization logo
+            admin_user = db.query(User).filter(User.is_admin == True).first()
+            if admin_user and admin_user.organization_id:
+                admin_org = db.query(Organization).filter(Organization.id == admin_user.organization_id).first()
+                if admin_org and admin_org.logo_organization:
+                    add_watermark_flag = True
+                    logo_path_value = admin_org.logo_organization.lstrip("/").lstrip("\\")
+                    if not logo_path_value.lower().startswith("uploads"):
+                        logo_file_path = os.path.join("uploads", logo_path_value)
+                    else:
+                        logo_file_path = logo_path_value
+                    print(f"✓ Watermark will be applied (admin's org logo)")
+                    print(f"  Admin org logo path: {logo_file_path}")
+                    print(f"  Logo exists: {os.path.exists(logo_file_path)}")
+        elif org.watermark == 2:
+            # Use this organization's own logo
+            if org.logo_organization:
+                add_watermark_flag = True
+                logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
+                if not logo_path_value.lower().startswith("uploads"):
+                    logo_file_path = os.path.join("uploads", logo_path_value)
+                else:
+                    logo_file_path = logo_path_value
+                print(f"✓ Watermark will be applied (this org's logo)")
+                print(f"  Org logo path: {logo_file_path}")
+                print(f"  Logo exists: {os.path.exists(logo_file_path)}")
         else:
-            logo_file_path = logo_path_value
-        
-        print(f"✓ Watermark will be applied (user is admin)")
-        print(f"  Logo path from DB: {org.logo_organization}")
-        print(f"  Logo relative path: {logo_path_value}")
-        print(f"  Logo file path: {logo_file_path}")
-        print(f"  Logo exists: {os.path.exists(logo_file_path)}")
+            # watermark == 0: No watermark
+            print(f"ℹ️ No watermark will be applied (watermark=0)")
 
     if not file.content_type or not file.content_type.startswith("image/"):
         print(f"Rejected: invalid content type {file.content_type}")
@@ -202,27 +225,48 @@ async def upload_video(
     if not organization_id:
         raise HTTPException(400, "organization_id обязателен")
     
-    # Check if user is admin to determine if watermark should be added
+    # Check organization's watermark setting to determine if watermark should be added
     from ..models.organization import Organization
     org = db.query(Organization).filter(Organization.id == organization_id).first()
-    add_watermark_flag = current_user.is_admin and org and org.logo_organization
+    
+    # Determine watermark settings based on organization.watermark value:
+    # 0 = no watermark
+    # 1 = admin's organization logo
+    # 2 = this organization's own logo
+    add_watermark_flag = False
     logo_file_path = None
     
-    if add_watermark_flag:
-        # Construct the path to the organization logo (handle paths that may or may not start with /uploads/)
-        logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
-        
-        # If the path already starts with 'uploads', don't add it again
-        if not logo_path_value.lower().startswith("uploads"):
-            logo_file_path = os.path.join("uploads", logo_path_value)
+    if org and org.watermark is not None:
+        if org.watermark == 1:
+            # Use admin's organization logo as watermark
+            admin_user = db.query(User).filter(User.is_admin == True).first()
+            if admin_user and admin_user.organization_id:
+                admin_org = db.query(Organization).filter(Organization.id == admin_user.organization_id).first()
+                if admin_org and admin_org.logo_organization:
+                    add_watermark_flag = True
+                    logo_path_value = admin_org.logo_organization.lstrip("/").lstrip("\\")
+                    if not logo_path_value.lower().startswith("uploads"):
+                        logo_file_path = os.path.join("uploads", logo_path_value)
+                    else:
+                        logo_file_path = logo_path_value
+                    print(f"✓ Watermark will be applied (admin's org logo)")
+                    print(f"  Admin org logo path: {logo_file_path}")
+                    print(f"  Logo exists: {os.path.exists(logo_file_path)}")
+        elif org.watermark == 2:
+            # Use this organization's own logo
+            if org.logo_organization:
+                add_watermark_flag = True
+                logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
+                if not logo_path_value.lower().startswith("uploads"):
+                    logo_file_path = os.path.join("uploads", logo_path_value)
+                else:
+                    logo_file_path = logo_path_value
+                print(f"✓ Watermark will be applied (this org's logo)")
+                print(f"  Org logo path: {logo_file_path}")
+                print(f"  Logo exists: {os.path.exists(logo_file_path)}")
         else:
-            logo_file_path = logo_path_value
-        
-        print(f"✓ Watermark will be applied (user is admin)")
-        print(f"  Logo path from DB: {org.logo_organization}")
-        print(f"  Logo relative path: {logo_path_value}")
-        print(f"  Logo file path: {logo_file_path}")
-        print(f"  Logo exists: {os.path.exists(logo_file_path)}")
+            # watermark == 0: No watermark
+            print(f"ℹ️ No watermark will be applied (watermark=0)")
 
     # Check if file is a video
     if not file.content_type or not file.content_type.startswith("video/"):
@@ -358,27 +402,48 @@ async def upload_media(
     if not organization_id:
         raise HTTPException(400, "organization_id обязателен")
     
-    # Check if user is admin to determine if watermark should be added (only for images)
+    # Check organization's watermark setting to determine if watermark should be added (only for images)
     from ..models.organization import Organization
     org = db.query(Organization).filter(Organization.id == organization_id).first()
-    add_watermark_flag = current_user.is_admin and org and org.logo_organization
+    
+    # Determine watermark settings based on organization.watermark value:
+    # 0 = no watermark
+    # 1 = admin's organization logo
+    # 2 = this organization's own logo
+    add_watermark_flag = False
     logo_file_path = None
     
-    if add_watermark_flag:
-        # Construct the path to the organization logo (handle paths that may or may not start with /uploads/)
-        logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
-        
-        # If the path already starts with 'uploads', don't add it again
-        if not logo_path_value.lower().startswith("uploads"):
-            logo_file_path = os.path.join("uploads", logo_path_value)
+    if org and org.watermark is not None:
+        if org.watermark == 1:
+            # Use admin's organization logo as watermark
+            admin_user = db.query(User).filter(User.is_admin == True).first()
+            if admin_user and admin_user.organization_id:
+                admin_org = db.query(Organization).filter(Organization.id == admin_user.organization_id).first()
+                if admin_org and admin_org.logo_organization:
+                    add_watermark_flag = True
+                    logo_path_value = admin_org.logo_organization.lstrip("/").lstrip("\\")
+                    if not logo_path_value.lower().startswith("uploads"):
+                        logo_file_path = os.path.join("uploads", logo_path_value)
+                    else:
+                        logo_file_path = logo_path_value
+                    print(f"✓ Watermark will be applied (admin's org logo)")
+                    print(f"  Admin org logo path: {logo_file_path}")
+                    print(f"  Logo exists: {os.path.exists(logo_file_path)}")
+        elif org.watermark == 2:
+            # Use this organization's own logo
+            if org.logo_organization:
+                add_watermark_flag = True
+                logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
+                if not logo_path_value.lower().startswith("uploads"):
+                    logo_file_path = os.path.join("uploads", logo_path_value)
+                else:
+                    logo_file_path = logo_path_value
+                print(f"✓ Watermark will be applied (this org's logo)")
+                print(f"  Org logo path: {logo_file_path}")
+                print(f"  Logo exists: {os.path.exists(logo_file_path)}")
         else:
-            logo_file_path = logo_path_value
-        
-        print(f"✓ Watermark will be applied (user is admin)")
-        print(f"  Logo path from DB: {org.logo_organization}")
-        print(f"  Logo relative path: {logo_path_value}")
-        print(f"  Logo file path: {logo_file_path}")
-        print(f"  Logo exists: {os.path.exists(logo_file_path)}")
+            # watermark == 0: No watermark
+            print(f"ℹ️ No watermark will be applied (watermark=0)")
 
     # Check if file is an image or video
     is_image = file.content_type and file.content_type.startswith("image/")
@@ -780,3 +845,92 @@ async def delete_temp_file(
     except Exception as e:
         print(f"Error deleting temp file: {str(e)}")
         raise HTTPException(500, f"Ошибка при удалении временного файла: {str(e)}")
+
+
+@router.post("/cancel/{task_id}")
+async def cancel_video_upload(
+    task_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Cancel a running video upload task.
+    Stops Celery task and cleans up temporary files.
+    """
+    print(f"=== CANCEL VIDEO UPLOAD REQUEST ===")
+    print(f"Task ID: {task_id}")
+    
+    try:
+        # Get task result
+        task_result = AsyncResult(task_id, app=process_and_upload_video.app)
+        
+        # Check task state
+        if task_result.state == 'PENDING' or task_result.state == 'STARTED':
+            # Try to revoke the task
+            from app.celery_app import celery_app
+            celery_app.control.revoke(task_id, terminate=True)
+            print(f"✅ Task {task_id} revoked successfully")
+            
+            # Try to cleanup temp file from task result
+            try:
+                result_data = task_result.result
+                if result_data and isinstance(result_data, dict):
+                    temp_filename = result_data.get('temp_filename')
+                    if temp_filename:
+                        temp_dir = os.path.abspath("uploads/temp")
+                        temp_path = os.path.join(temp_dir, temp_filename)
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
+                            print(f"✅ Cleaned up temp file: {temp_path}")
+            except Exception as cleanup_error:
+                print(f"⚠️ Warning: Could not cleanup temp file: {cleanup_error}")
+            
+            return {
+                "success": True,
+                "message": "Загрузка видео отменена",
+                "task_id": task_id,
+                "state": "CANCELLED"
+            }
+        elif task_result.state == 'SUCCESS':
+            # Task already completed - cleanup the uploaded file
+            print(f"⚠️ Task {task_id} already completed, cleaning up uploaded file")
+            try:
+                result_data = task_result.result
+                if result_data and isinstance(result_data, dict):
+                    # Delete the uploaded video file
+                    path = result_data.get('path')
+                    if path:
+                        # Convert relative path to absolute
+                        base_dir = os.path.abspath("uploads")
+                        absolute_path = os.path.join(base_dir, path.lstrip('/'))
+                        if os.path.exists(absolute_path):
+                            os.remove(absolute_path)
+                            print(f"✅ Cleaned up uploaded file: {absolute_path}")
+            except Exception as cleanup_error:
+                print(f"⚠️ Warning: Could not cleanup uploaded file: {cleanup_error}")
+            
+            return {
+                "success": True,
+                "message": "Видео уже загружено, файл удалён",
+                "task_id": task_id,
+                "state": "CLEANED_UP"
+            }
+        else:
+            # Task in other state (FAILURE, RETRY, etc.)
+            print(f"⚠️ Task {task_id} in state {task_result.state}, nothing to cancel")
+            return {
+                "success": True,
+                "message": f"Задача в состоянии {task_result.state}, отмена не требуется",
+                "task_id": task_id,
+                "state": task_result.state
+            }
+            
+    except Exception as e:
+        print(f"❌ Error cancelling task: {str(e)}")
+        # Still return success to allow frontend to proceed
+        return {
+            "success": True,
+            "message": "Ошибка при отмене задачи, но загрузка может быть остановлена",
+            "task_id": task_id,
+            "error": str(e)
+        }

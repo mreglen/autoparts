@@ -7,6 +7,7 @@ class OrganizationBase(BaseModel):
     phone: Optional[str] = None
     logo_organization: Optional[str] = None
     description: Optional[str] = None
+    watermark: Optional[int] = 1  # 1=my garage (default), 0=none, 2=my organization
 
 class OrganizationCreate(OrganizationBase):
     pass
@@ -17,6 +18,7 @@ class OrganizationUpdate(BaseModel):
     phone: Optional[str] = None
     logo_organization: Optional[str] = None
     description: Optional[str] = None
+    watermark: Optional[int] = None
 
 class Organization(OrganizationBase):
     id: str

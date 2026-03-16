@@ -2,11 +2,41 @@ import React, { useState, useEffect } from 'react';
 
 const MediaModal = ({ isOpen, onClose, mediaItems, initialIndex = 0 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
 
   // Sync currentIndex when initialIndex changes while modal is open
   useEffect(() => {
     setCurrentIndex(initialIndex);
   }, [initialIndex]);
+
+  // Touch/swipe handlers
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe && mediaItems.length > 1) {
+      handleNext();
+    }
+    
+    if (isRightSwipe && mediaItems.length > 1) {
+      handlePrevious();
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -30,6 +60,9 @@ const MediaModal = ({ isOpen, onClose, mediaItems, initialIndex = 0 }) => {
     <div
       className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center"
       onClick={handleBackdropClick}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
     >
       {/* Close button */}
       <button
@@ -58,7 +91,12 @@ const MediaModal = ({ isOpen, onClose, mediaItems, initialIndex = 0 }) => {
       )}
 
       {/* Media content */}
-      <div className="max-w-full max-h-full p-4">
+      <div 
+        className="max-w-full max-h-full p-4"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         {currentMedia?.type === 'image' ? (
           <img
             src={currentMedia.src}
