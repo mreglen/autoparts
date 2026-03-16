@@ -344,12 +344,16 @@ async def upload_video(
     # Celery task будет запущен позже, при создании/обновлении запчасти
     
     try:
-        # Возвращаем только temp_path - фронтенд сохранит его в ProductVideo
+        # Возвращаем temp_path и другие данные для фронтенда
+        # Фронтенд сохранит это и использует для превью
         result = {
             "temp_path": temp_video_path,  # Immediate temp path for playback
+            "path": temp_video_path,  # ← Важно! Возвращаем path для совместимости с фронтендом
             "temp_filename": unique_filename,
+            "filename": unique_filename,  # ← Важно! Для совместимости
             "organization_id": organization_id,
-            "message": "Video uploaded to temp folder. Processing will start when product is created/updated."
+            "message": "Video uploaded to temp folder. Processing will start when product is created/updated.",
+            "is_temp": True  # Флаг что это временный файл
         }
         
         print(f"Video saved to temp: {result}")
