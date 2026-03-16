@@ -317,18 +317,21 @@ async def upload_video(
     
     # Generate UUID filename for temp storage
     unique_filename = f"{uuid.uuid4().hex}{ext}"
-    temp_dir = os.path.abspath("uploads/temp")
+    temp_dir = os.path.abspath(os.path.join("uploads", "temp", organization_id))
     temp_path = os.path.join(temp_dir, unique_filename)
     
     # Create temp directory if it doesn't exist
     os.makedirs(temp_dir, exist_ok=True)
     
-    # Save original file to temp folder
+    # Save original file to temp folder immediately
     try:
         with open(temp_path, 'wb') as f:
             f.write(file_content)
         print(f"Saved original video to temp: {temp_path}")
         print(f"Absolute temp path: {os.path.abspath(temp_path)}")
+        
+        # Construct temp video URL that can be used immediately
+        temp_video_path = f"/temp/{organization_id}/{unique_filename}"
     except Exception as e:
         print(f"Error saving temp file: {str(e)}")
         raise HTTPException(500, f"Ошибка при сохранении временного файла: {str(e)}")
@@ -347,15 +350,15 @@ async def upload_video(
         
         print(f"Celery task queued: {task.id}")
         
-        # Return immediately with task ID - frontend will poll for status
-        # This prevents timeout issues with long-running video processing
+        # Return immediately with task ID and temp path - frontend can use temp video right away
         result = {
             "task_id": task.id,
             "status": "processing",
             "temp_filename": unique_filename,
             "organization_id": organization_id,
-            "path": f"/videos/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.mp4')}",
-            "message": "Video is being processed. Poll /api/upload/photo-status/{task_id} for updates."
+            "temp_path": temp_video_path,  # Immediate temp path for playback
+            "final_path": f"/videos/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.mp4')}",  # Will be available after processing
+            "message": "Video uploaded successfully and is being processed. Available at temp_path now."
         }
         
         print(f"Video upload queued for processing: {result}")
@@ -876,8 +879,9 @@ async def cancel_video_upload(
                 result_data = task_result.result
                 if result_data and isinstance(result_data, dict):
                     temp_filename = result_data.get('temp_filename')
-                    if temp_filename:
-                        temp_dir = os.path.abspath("uploads/temp")
+                    organization_id = result_data.get('organization_id')
+                    if temp_filename and organization_id:
+                        temp_dir = os.path.abspath(os.path.join("uploads", "temp", organization_id))
                         temp_path = os.path.join(temp_dir, temp_filename)
                         if os.path.exists(temp_path):
                             os.remove(temp_path)
@@ -932,5 +936,90 @@ async def cancel_video_upload(
             "success": True,
             "message": "Ошибка при отмене задачи, но загрузка может быть остановлена",
             "task_id": task_id,
+            "error": str(e)
+        }
+
+
+@router.get("/video-status/{task_id}")
+async def get_video_status(
+    task_id: str,
+    product_video_id: int = None,  # Optional: DB record ID to update
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get video processing status and optionally update database with final path.
+    Returns current status and paths (temp and final).
+    If processing is complete and product_video_id is provided, updates the database.
+    """
+    print(f"=== VIDEO STATUS CHECK REQUEST ===")
+    print(f"Task ID: {task_id}")
+    print(f"Product Video ID: {product_video_id}")
+    
+    try:
+        # Get task result
+        task_result = AsyncResult(task_id, app=process_and_upload_video.app)
+        
+        response = {
+            "task_id": task_id,
+            "state": task_result.state,
+            "status": "processing" if task_result.state in ['PENDING', 'STARTED', 'RETRY'] else task_result.state.lower()
+        }
+        
+        # If task is complete, get the result data
+        if task_result.state == 'SUCCESS':
+            result_data = task_result.result
+            if result_data and isinstance(result_data, dict):
+                response["temp_path"] = result_data.get('temp_path')
+                response["final_path"] = result_data.get('path')
+                response["url"] = result_data.get('url')
+                response["filename"] = result_data.get('filename')
+                response["duration"] = result_data.get('duration')
+                response["processing_complete"] = result_data.get('processing_complete', True)
+                
+                # If product_video_id is provided, update the database
+                if product_video_id and response.get('processing_complete'):
+                    from ..models.product import ProductVideo
+                    video_record = db.query(ProductVideo).filter(
+                        ProductVideo.id == product_video_id
+                    ).first()
+                    
+                    if video_record:
+                        # Update video URL from temp to final path
+                        old_url = video_record.video_url
+                        video_record.video_url = response['final_path']
+                        video_record.processing_status = 'completed'
+                        db.commit()
+                        
+                        print(f"✅ Updated video {product_video_id} from {old_url} to {response['final_path']}")
+                        response["database_updated"] = True
+                    else:
+                        print(f"⚠️ Video record {product_video_id} not found")
+                        response["database_updated"] = False
+                else:
+                    response["database_updated"] = False
+                    
+        elif task_result.state in ['PENDING', 'STARTED', 'RETRY']:
+            # Still processing - temp file should be available
+            # Try to get temp path from task info if available
+            response["status"] = "processing"
+            response["message"] = "Video is being processed. Temp file available for playback."
+            
+        elif task_result.state == 'FAILURE':
+            response["status"] = "failed"
+            if task_result.info and isinstance(task_result.info, dict):
+                response["error"] = task_result.info.get('error', 'Unknown error')
+                response["temp_path"] = task_result.info.get('temp_path')
+        
+        print(f"Video status: {response}")
+        print("=== END VIDEO STATUS CHECK ===")
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error checking video status: {str(e)}")
+        return {
+            "task_id": task_id,
+            "state": "FAILURE",
+            "status": "failed",
             "error": str(e)
         }

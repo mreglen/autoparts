@@ -172,6 +172,10 @@ async def get_media_file(path: str):
     elif path.startswith("videos/"):
         base_dir = Path(__file__).parent.parent / "uploads" / "videos"
         relative_path = path.replace("videos/", "")
+    elif path.startswith("temp/"):
+        # Serve temp videos for immediate playback
+        base_dir = Path(__file__).parent.parent / "uploads" / "temp"
+        relative_path = path.replace("temp/", "")
     else:
         return JSONResponse(status_code=404, content={"detail": "File not found"})
     
@@ -182,7 +186,7 @@ async def get_media_file(path: str):
         return JSONResponse(status_code=404, content={"detail": "File not found"})
     
     media_type = "image/webp"
-    if path.endswith(".mp4") or path.endswith(".avi") or path.endswith(".mov"):
+    if path.endswith(".mp4") or path.endswith(".avi") or path.endswith(".mov") or path.endswith(".webm"):
         media_type = "video/mp4"
     elif path.endswith(".jpg") or path.endswith(".jpeg"):
         media_type = "image/jpeg"

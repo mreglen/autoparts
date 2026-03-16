@@ -10,6 +10,8 @@ import shutil
 def process_and_upload_video(self, temp_file_path: str, original_filename: str, organization_id: str, add_watermark: bool, logo_path: str = None):
     """
     видео таскс обновлён
+    Process video: compress, format, apply watermark, and move to final location.
+    Temp file is kept available during processing for immediate playback.
     """
     try:
         # Check if temp file exists
@@ -28,53 +30,6 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         
         print(f"✓ Temp file exists, size: {os.path.getsize(temp_file_path):,} bytes")
         
-        # SKIP compression for small files (< 5MB) - save time!
-        file_size_mb = os.path.getsize(temp_file_path) / 1024 / 1024
-        if file_size_mb < 5:
-            print(f"⚡ File is small ({file_size_mb:.1f}MB), skipping compression to save time!")
-            # Just copy file without processing
-            final_path_temp = final_path + ".temp"
-            shutil.copy(temp_file_path, final_path_temp)
-            os.rename(final_path_temp, final_path)
-            
-            # Get duration anyway
-            try:
-                duration = get_video_duration(temp_file_path)
-            except:
-                duration = 0
-            
-            print(f"✅ File copied directly (no compression)")
-            print(f"  Saved path: {final_path}")
-            
-            # Delete temp file
-            try:
-                os.remove(temp_file_path)
-                print(f"Deleted temp file: {temp_file_path}")
-            except:
-                pass
-            
-            # Return result
-            media_path = f"/videos/{organization_id}/{final_filename}"
-            base_url = settings.BASE_URL.rstrip('/')
-            
-            return {
-                'path': media_path,
-                'url': f"{base_url}{media_path}",
-                'status': 'success',
-                'filename': final_filename,
-                'organization_id': organization_id,
-                'duration': duration
-            }
-        
-        # Try to open and read first few bytes to verify accessibility
-        try:
-            with open(temp_file_path, 'rb') as f:
-                f.read(1024)  # Read first KB
-            print(f"✓ File is accessible and readable")
-        except Exception as access_error:
-            print(f"ERROR: Cannot access file: {access_error}")
-            raise Exception(f"Cannot read temp file: {access_error}")
-        
         # Get video duration before processing
         try:
             duration = get_video_duration(temp_file_path)
@@ -88,16 +43,11 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
                 )
         except ValueError as ve:
             print(f"Validation error: {str(ve)}")
-            # Delete temp file
-            try:
-                os.remove(temp_file_path)
-                print(f"Deleted temp file: {temp_file_path}")
-            except:
-                pass
             return {
                 'url': None,
                 'status': 'failed',
-                'error': str(ve)
+                'error': str(ve),
+                'temp_path': temp_file_path  # Keep temp path even on failure
             }
         except Exception as e:
             print(f"Error getting video duration: {str(e)}")
@@ -144,17 +94,18 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
                     return {
                         'url': None,
                         'status': 'cancelled',
-                        'error': 'Загрузка отменена пользователем'
+                        'error': 'Загрузка отменена пользователем',
+                        'temp_path': temp_file_path
                     }
             
             compressed_path = compress_video(
                 temp_file_path,
                 output_path=final_path,
                 max_duration_seconds=30,
-                video_bitrate="2500k",      # Ещё выше битрейт
-                audio_bitrate="192k",       # Лучше звук
-                preset="ultrafast",         # Самый быстрый preset
-                crf=20,                     # Ещё меньше CRF = ещё быстрее
+                video_bitrate="1200k",      # Сильное сжатие (было 2500k)
+                audio_bitrate="96k",        # Уменьшен битрейт аудио (было 192k)
+                preset="medium",            # Более медленный preset для лучшего сжатия (было ultrafast)
+                crf=28,                     # Максимальное сжатие в рамках качества H.264 (было 20)
                 threads=0                   # Использовать ВСЕ ядра CPU
             )
             print(f"✓ Video compressed successfully")
@@ -213,14 +164,15 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
                 print(f"Error moving file: {move_error}")
                 raise self.retry(exc=move_error, countdown=60)
         
-        # Delete original temp file
-        try:
-            os.remove(temp_file_path)
-            print(f"Deleted temp file: {temp_file_path}")
-        except Exception as delete_error:
-            print(f"Warning: Could not delete temp file {temp_file_path}: {str(delete_error)}")
+        # Delete original temp file AFTER successful processing
+        # Temp file should remain available until frontend switches to final version
+        # For now, we keep it. Cleanup can be done by a separate cleanup task/job
+        print(f"Keeping temp file available for fallback: {temp_file_path}")
+        # Note: In production, you might want to delete this after some delay
+        # or have a cleanup job remove old temp files periodically
         
-        # Construct relative path (without domain) - frontend will add backend base URL
+        # Construct relative paths
+        temp_relative_path = f"/temp/{organization_id}/{os.path.basename(temp_file_path)}"
         media_path = f"/videos/{organization_id}/{final_filename}"
         
         print(f"✓ Video saved successfully!")
@@ -231,12 +183,14 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         base_url = settings.BASE_URL.rstrip('/')
         
         return {
-            'path': media_path,  # Relative path for database storage
+            'temp_path': temp_relative_path,  # Temp path for immediate playback
+            'path': media_path,  # Relative path for database storage (final)
             'url': f"{base_url}{media_path}",  # Full URL for immediate use
             'status': 'success',
             'filename': final_filename,
             'organization_id': organization_id,
-            'duration': duration
+            'duration': duration,
+            'processing_complete': True  # Flag to indicate processing is done
         }
         
     except Exception as exc:
@@ -246,10 +200,13 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         # Final failure after retries
         if self.request.retries >= self.max_retries:
             print(f"Task failed permanently after {self.max_retries} retries")
+            temp_relative_path = f"/temp/{organization_id}/{os.path.basename(temp_file_path)}"
             return {
+                'temp_path': temp_relative_path,  # Temp path still available
                 'url': None,
                 'status': 'failed',
-                'error': str(exc)
+                'error': str(exc),
+                'processing_complete': False
             }
         print(f"Retrying task (attempt {self.request.retries + 1}/{self.max_retries})...")
         raise self.retry(exc=exc, countdown=60)
