@@ -1,0 +1,79 @@
+# /etc/systemd/system/celery.service
+# 🚀 Optimized Celery Worker Service for AutoParts - High Performance Video Processing
+# Designed for fast parallel processing of large video volumes
+
+[Unit]
+Description=Celery Worker Service for AutoParts - Video Processing
+Documentation=https://docs.celeryq.dev/
+After=network.target redis.service postgresql.service
+Wants=redis.service postgresql.service
+
+[Service]
+Type=forking
+User=www-data
+Group=www-data
+
+# Working directory
+WorkingDirectory=/path/to/your/backend
+
+# Environment variables
+Environment="PATH=/path/to/your/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONDONTWRITEBYTECODE=1"
+EnvironmentFile=/path/to/your/backend/.env
+
+# 🔥 HIGH PERFORMANCE CELERY WORKER CONFIGURATION
+# --concurrency: Number of worker processes (set to CPU cores for maximum parallelism)
+# --pool: prefork pool for CPU-bound tasks (video processing)
+# --max-tasks-per-child: Recycle workers every 50 tasks to prevent memory leaks
+# --worker-send-task-events: Enable task events for monitoring
+# --loglevel: INFO for production use
+ExecStart=/path/to/your/venv/bin/celery -A app.celery_app worker \
+    --loglevel=INFO \
+    --concurrency=8 \
+    --pool=prefork \
+    --max-tasks-per-child=50 \
+    --worker-send-task-events \
+    --detach
+
+# Graceful shutdown
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Automatic restart on failure
+Restart=always
+RestartSec=5s
+
+# 🔥 RESOURCE LIMITS FOR HIGH PERFORMANCE
+# Increase file descriptor limit for handling many concurrent files
+LimitNOFILE=65536
+LimitNPROC=65536
+
+# Process priority (lower = higher priority, range: -20 to 19)
+Nice=-5
+
+# I/O scheduling for better disk performance
+IOSchedulingClass=realtime
+IOSchedulingPriority=0
+
+# Memory protection (prevent OOM killer from killing celery)
+OOMScoreAdjust=-500
+
+# Working directories must exist!
+RuntimeDirectory=celery
+RuntimeDirectoryMode=0755
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=celery-worker
+
+# Security hardening (optional but recommended)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/path/to/your/backend/uploads
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

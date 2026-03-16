@@ -21,10 +21,19 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=300, 
-    worker_prefetch_multiplier=1,
+    task_time_limit=600,  # Увеличено до 10 минут для обработки видео
+    worker_prefetch_multiplier=1,  # Брать по 1 задаче на воркер (важно для больших задач!)
     broker_transport_options={'visibility_timeout': 3600},
     broker_connection_retry_on_startup=True,
+    # 🔥 HIGH PERFORMANCE OPTIMIZATIONS
+    worker_max_tasks_per_child=50,  # Перезапускать воркеры каждые 50 задач (предотвращает утечки памяти)
+    task_acks_late=True,  # Подтверждать задачи ПОСЛЕ выполнения (надежность)
+    task_reject_on_worker_lost=True,  # Повторять при падении воркера
+    worker_send_task_events=True,  # Отправлять события для мониторинга
+    # Оптимизация для параллельной обработки
+    task_compression='gzip',  # Сжимать данные задач (быстрее передача)
+    result_expires=3600,  # Истечение результатов через 1 час (экономия памяти)
+    broker_pool_limit=100,  # Увеличить пул соединений с брокером
 )
 
 

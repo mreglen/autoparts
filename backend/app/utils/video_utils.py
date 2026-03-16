@@ -64,7 +64,7 @@ def compress_video(
     audio_bitrate: str = "128k",
     preset: str = "medium",
     crf: int = 28,
-    threads: int = 0  # 0 = использовать все доступные ядра
+    threads: int = 1  # 1 = использовать аппаратное ускорение, 0 = все ядра (может быть медленно)
 ) -> str:
     """
     Compress and optimize a video file using FFmpeg directly.
