@@ -28,7 +28,8 @@ class PendingProduct(Base):
     organization = relationship("Organization")
     storage_location = relationship("StorageLocation")
     creator = relationship("User", foreign_keys=[created_by])
-    pending_product_storage_cells = relationship("PendingProductStorageCell", back_populates="pending_product", cascade="all, delete-orphan")
+    # Note: pending_product_storage_cells relationship is defined in pending_product_storage_cell.py
+    # to avoid circular import issues during SQLAlchemy initialization
 
 
     @property

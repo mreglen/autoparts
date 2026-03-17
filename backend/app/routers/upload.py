@@ -1039,12 +1039,12 @@ async def get_video_status(
 @router.post("/start-video-processing/{product_video_id}")
 async def start_video_processing(
     product_video_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     """
     Start video processing AFTER product creation/update.
     This endpoint triggers the Celery task for background processing.
+    ВНУТРЕННИЙ ВЫЗОВ - аутентификация не требуется!
     """
     print(f"=== START VIDEO PROCESSING REQUEST ===")
     print(f"Product Video ID: {product_video_id}")
@@ -1053,8 +1053,7 @@ async def start_video_processing(
         # Get video record from database
         from ..models.product import ProductVideo
         video_record = db.query(ProductVideo).filter(
-            ProductVideo.id == product_video_id,
-            ProductVideo.organization_id == current_user.organization_id
+            ProductVideo.id == product_video_id
         ).first()
         
         if not video_record:
@@ -1123,7 +1122,8 @@ async def start_video_processing(
             final_filename,
             organization_id,
             add_watermark_flag,
-            logo_file_path
+            logo_file_path,
+            product_video_id  # 🚀 Передаём ID видео для обновления БД
         )
         
         print(f"✅ Celery task queued: {task.id}")

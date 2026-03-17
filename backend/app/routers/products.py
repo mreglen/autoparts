@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.models.product import ProductPhoto, ProductVideo, Product as ProductModel
@@ -21,7 +21,8 @@ router = APIRouter(prefix="/products", tags=["Products"])
 def create_product(
     product: ProductCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    request: Request = None  # Добавляем Request
 ):
     if not current_user.is_seller or not current_user.organization_id:
         raise HTTPException(
@@ -85,7 +86,13 @@ def create_product(
             db.add(video)
             db.flush()  # Чтобы получить ID
             video_ids.append(video.id)
-    db.commit()
+        
+        # 🚀 ВАЖНО: Делаем commit ДО вызова endpoint!
+        # Иначе endpoint не увидит запись в БД
+        db.commit()
+        print(f"✅ Video records committed to database: {video_ids}")
+    else:
+        db.commit()
     
     # 🚀 НОВАЯ ЛОГИКА: Запускаем обработку видео только после создания продукта
     # Видео попадает в очередь Celery и ждет обработки
@@ -98,13 +105,14 @@ def create_product(
             for video_id in video_ids:
                 # Отправляем запрос на постановку в очередь обработки
                 # Задача НЕ начинается сразу, а ждет в очереди Celery
+                # ВНУТРЕННИЙ ВЫЗОВ - токен не нужен!
                 try:
                     response = requests.post(
                         f"{base_url}/api/upload/start-video-processing/{video_id}",
-                        headers={"Authorization": f"Bearer {current_user.access_token}"},
                         timeout=5  # Не ждем ответа долго
                     )
                     print(f"✅ Video {video_id} added to Celery queue (waiting for processing): {response.status_code}")
+                    print(f"Response: {response.json()}")
                 except Exception as e:
                     print(f"⚠️ Warning: Could not add video to processing queue: {e}")
                     # Это не критично - фронтенд может запустить сам
@@ -175,7 +183,7 @@ def read_public_product(
 @router.put("/{product_id}", response_model=ProductSchema)
 def update_product(
     product_id: int,
-    product: ProductUpdate,  # Changed from ProductCreate to ProductUpdate
+    product: ProductUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -255,6 +263,11 @@ def update_product(
             video_ids.append(video.id)
             print(f"Created video record ID {video.id} with URL: {url}")
         
+        # 🚀 ВАЖНО: Делаем commit ДО вызова endpoint!
+        # Иначе endpoint не увидит запись в БД
+        db.commit()
+        print(f"✅ Video records committed to database: {video_ids}")
+        
         print(f"Total video IDs to process: {video_ids}")
         
         # 🚀 ЗАПУСКАЕМ ОБРАБОТКУ ВИДЕО после обновления
@@ -268,10 +281,10 @@ def update_product(
                 for video_id in video_ids:
                     try:
                         print(f"Calling: {base_url}/api/upload/start-video-processing/{video_id}")
+                        # ВНУТРЕННИЙ ВЫЗОВ - токен не нужен!
                         response = requests.post(
                             f"{base_url}/api/upload/start-video-processing/{video_id}",
-                            headers={"Authorization": f"Bearer {current_user.access_token}"},
-                            timeout=5
+                            timeout=10  # Увеличенный таймаут
                         )
                         print(f"✅ Started processing for updated video {video_id}: Status {response.status_code}")
                         print(f"Response: {response.json()}")
@@ -285,6 +298,9 @@ def update_product(
                 print(f"Full error: {traceback.format_exc()}")
         else:
             print("⚠️ No video IDs to process!")
+    else:
+        # Если видео не было, тоже делаем commit
+        db.commit()
 
     # Обновляем связи с автомобилями
     if product.vehicle_ids is not None:
@@ -306,7 +322,10 @@ def update_product(
                 )
                 db.add(association)
 
-    db.commit()
+    # Финальный commit (если не было видео или после обновления связей)
+    if not product.videos:
+        db.commit()
+    
     db.refresh(db_product)
     return db_product
 

@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, Numeric, String, Text, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, Numeric, String, Text, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from ..db.database import Base
 from app.core.config import settings
 
@@ -70,6 +71,8 @@ class ProductVideo(Base):
     video_url = Column(Text, nullable=False)
     organization_id = Column(String, ForeignKey("organizations.id"), nullable=True, index=True)
     processing_status = Column(String(20), default='pending')  # pending, processing, completed, failed
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     
     product = relationship("Product", back_populates="videos")
     organization = relationship("Organization")
