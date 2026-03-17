@@ -25,7 +25,7 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,  # Брать по 1 задаче на воркер (важно для больших задач!)
     broker_transport_options={'visibility_timeout': 3600},
     broker_connection_retry_on_startup=True,
-    # 🔥 HIGH PERFORMANCE OPTIMIZATIONS
+    # HIGH PERFORMANCE OPTIMIZATIONS
     worker_max_tasks_per_child=50,  # Перезапускать воркеры каждые 50 задач (предотвращает утечки памяти)
     task_acks_late=True,  # Подтверждать задачи ПОСЛЕ выполнения (надежность)
     task_reject_on_worker_lost=True,  # Повторять при падении воркера
