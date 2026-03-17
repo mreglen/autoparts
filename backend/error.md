@@ -1,63 +1,153 @@
-[2026-03-17 19:29:10,883: INFO/MainProcess] Task app.tasks.video_tasks.process_and_upload_video[cabdb5c4-94d4-47dc-ae75-fe643c1d9262] received
-[2026-03-17 19:29:10,917: WARNING/MainProcess] === VIDEO PROCESSING TASK STARTED ===
-[2026-03-17 19:29:10,918: WARNING/MainProcess] Task ID: cabdb5c4-94d4-47dc-ae75-fe643c1d9262
-[2026-03-17 19:29:10,918: WARNING/MainProcess] Temp file path: C:\Users\khram\OneDrive\Рабочий стол\autoparts\backend\uploads\temp\qMHbBIoD51\5e1a776e129a430aa8362c7af5fd8290.mp4
-[2026-03-17 19:29:10,919: WARNING/MainProcess] Absolute temp path: C:\Users\khram\OneDrive\Рабочий стол\autoparts\backend\uploads\temp\qMHbBIoD51\5e1a776e129a430aa8362c7af5fd8290.mp4
-[2026-03-17 19:29:10,919: WARNING/MainProcess] Original filename: qMHbBIoD51_20260317_192908_2e349dc0.mp4
-[2026-03-17 19:29:10,920: WARNING/MainProcess] Organization ID: qMHbBIoD51
-[2026-03-17 19:29:10,920: WARNING/MainProcess] Current working directory: C:\Users\khram\OneDrive\Рабочий стол\autoparts\backend
-[2026-03-17 19:29:10,921: WARNING/MainProcess] ✓ Temp file exists, size: 51,293,790 bytes
-[2026-03-17 19:29:10,990: WARNING/MainProcess] Video duration: 28.78 seconds
-[2026-03-17 19:29:10,990: WARNING/MainProcess] Generated final filename: qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4
-[2026-03-17 19:29:10,990: WARNING/MainProcess] Upload directory: uploads\videos\qMHbBIoD51
-[2026-03-17 19:29:10,991: WARNING/MainProcess] Final path: uploads\videos\qMHbBIoD51\qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4
-[2026-03-17 19:29:10,991: WARNING/MainProcess] ⚡ Compressing video (MAXIMUM SPEED)...
-[2026-03-17 19:29:10,992: WARNING/MainProcess] CPU cores: 16, Using threads: 4        
-[2026-03-17 19:29:11,051: WARNING/MainProcess] Running FFmpeg command: C:\ffmpeg\bin\ffmpeg.exe -i C:\Users\khram\OneDrive\Рабочий стол\autoparts\backend\uploads\temp\qMHbBIoD51\5e1a776e129a430aa8362c7af5fd8290.mp4 -vcodec libx264 -acodec aac -b:v 800k -b:a 64k -preset ultrafast -crf 28 -movflags +faststart -pix_fmt yuv420p -threads 4 -tune zerolatency -y uploads\videos\qMHbBIoD51\qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4
-[2026-03-17 19:29:15,970: WARNING/MainProcess] ✓ Video compressed successfully: uploads\videos\qMHbBIoD51\qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4
-[2026-03-17 19:29:15,972: WARNING/MainProcess]   Original size: 48.92 MB
-[2026-03-17 19:29:15,973: WARNING/MainProcess]   Compressed size: 26.52 MB
-[2026-03-17 19:29:15,974: WARNING/MainProcess] ⏱ Compression completed in: 4.98 seconds
-[2026-03-17 19:29:15,976: WARNING/MainProcess] 📊 Original size: 48.92 MB
-[2026-03-17 19:29:15,976: WARNING/MainProcess] 📊 Compressed size: 26.52 MB
-[2026-03-17 19:29:15,977: WARNING/MainProcess] 📊 Compression ratio: 45.8%
-[2026-03-17 19:29:15,978: WARNING/MainProcess] 📈 Speed: 9.82 MB/sec
-[2026-03-17 19:29:15,980: WARNING/MainProcess] ✓ Video compressed successfully        
-[2026-03-17 19:29:15,981: WARNING/MainProcess]   Compressed file: uploads\videos\qMHbBIoD51\qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4
-[2026-03-17 19:29:15,983: WARNING/MainProcess]   Size: 26.52 MB
-[2026-03-17 19:29:15,984: WARNING/MainProcess] Applying watermark to video...
-[2026-03-17 19:29:15,985: WARNING/MainProcess]   Logo path: uploads/logo_organizations/qMHbBIoD51/qMHbBIoD51_20260316_205701_qMHbBIoD51_20260316_205655_2f975863.webp       
-[2026-03-17 19:29:15,986: WARNING/MainProcess]   Logo exists: True
-[2026-03-17 19:29:15,991: WARNING/MainProcess] Running FFmpeg watermark command: C:\ffmpeg\bin\ffmpeg.exe -i uploads\videos\qMHbBIoD51\qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4 -i uploads/logo_organizations/qMHbBIoD51/qMHbBIoD51_20260316_205701_qMHbBIoD51_20260316_205655_2f975863.webp -filter_complex [1:v]scale=iw*0.5:-1[wm];[0:v][wm]overlay=W-w-20:H-h-20:format=auto -c:v libx264 -c:a aac -preset medium -crf 28 -y C:\Users\khram\AppData\Local\Temp\qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0_watermarked.mp4
-[2026-03-17 19:29:28,356: WARNING/MainProcess] ✓ Watermark applied to video successfully: C:\Users\khram\AppData\Local\Temp\qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0_watermarked.mp4
-[2026-03-17 19:29:28,357: WARNING/MainProcess]   Input video: uploads\videos\qMHbBIoD51\qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4
-[2026-03-17 19:29:28,357: WARNING/MainProcess]   Logo: uploads/logo_organizations/qMHbBIoD51/qMHbBIoD51_20260316_205701_qMHbBIoD51_20260316_205655_2f975863.webp
-[2026-03-17 19:29:28,357: WARNING/MainProcess]   Output: C:\Users\khram\AppData\Local\Temp\qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0_watermarked.mp4
-[2026-03-17 19:29:28,357: WARNING/MainProcess]   Opacity: 50.0%
-[2026-03-17 19:29:28,357: WARNING/MainProcess]   Position: Bottom-right with 20px padding
-[2026-03-17 19:29:28,382: WARNING/MainProcess] Moved watermarked video to: uploads\videos\qMHbBIoD51\qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4
-[2026-03-17 19:29:28,383: WARNING/MainProcess] ✓ Watermark applied successfully
-[2026-03-17 19:29:28,383: WARNING/MainProcess] Keeping temp file available for fallback: C:\Users\khram\OneDrive\Рабочий стол\autoparts\backend\uploads\temp\qMHbBIoD51\5e1a776e129a430aa8362c7af5fd8290.mp4
-[2026-03-17 19:29:28,383: WARNING/MainProcess] ✓ Video saved successfully!
-[2026-03-17 19:29:28,383: WARNING/MainProcess]   Final path: uploads\videos\qMHbBIoD51\qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4
-[2026-03-17 19:29:28,383: WARNING/MainProcess]   Media URL path: /videos/qMHbBIoD51/qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4
-[2026-03-17 19:29:28,383: WARNING/MainProcess]
-🔄 Starting database update for video 37...
-[2026-03-17 19:29:28,384: WARNING/MainProcess]    Media path: /videos/qMHbBIoD51/qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4
-[2026-03-17 19:29:28,384: WARNING/MainProcess]    Status: completed
-[2026-03-17 19:29:28,533: WARNING/MainProcess]    Creating DB engine...
-[2026-03-17 19:29:28,533: WARNING/MainProcess]    DATABASE_URL: postgresql://postgres:root@localhost/autoparts...
-[2026-03-17 19:29:28,584: WARNING/MainProcess] 
-❌ FATAL: Error updating database: name 'sessionmaker' is not defined
-[2026-03-17 19:29:28,586: WARNING/MainProcess] Full DB error traceback:
-Traceback (most recent call last):
-  File "C:\Users\khram\OneDrive\Рабочий стол\autoparts\backend\app\tasks\video_tasks.py", line 219, in process_and_upload_video
-    SessionLocalDirect = sessionmaker(bind=engine, autocommit=False, autoflush=False) 
-                         ^^^^^^^^^^^^
-NameError: name 'sessionmaker' is not defined
-[2026-03-17 19:29:28,586: WARNING/MainProcess] ⚠️ Video file saved but database NOT uppdated - manual fix may be required!
-[2026-03-17 19:29:29,101: WARNING/MainProcess] ⚠️ Attempt 1/3 failed - file busy, retrrying in 1s...
-[2026-03-17 19:29:30,113: WARNING/MainProcess] ⚠️ Attempt 2/3 failed - file busy, retrrying in 1s...
-[2026-03-17 19:29:31,115: WARNING/MainProcess] ⚠️ Warning: Could not delete temp file  after 3 attempts: [WinError 32] Процесс не может получить доступ к файлу, так как этот файл занят другим процессом: 'C:\\Users\\khram\\OneDrive\\Рабочий стол\\autoparts\\backend\\uploads\\temp\\qMHbBIoD51\\5e1a776e129a430aa8362c7af5fd8290.mp4'
-[2026-03-17 19:29:31,116: WARNING/MainProcess]    File will be cleaned up by cleanup task later
-[2026-03-17 19:29:31,118: INFO/MainProcess] Task app.tasks.video_tasks.process_and_upload_video[cabdb5c4-94d4-47dc-ae75-fe643c1d9262] succeeded in 20.229257299972232s: {'temp_path': '/temp/qMHbBIoD51/5e1a776e129a430aa8362c7af5fd8290.mp4', 'path': '/videos/qMHbBIoD51/qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4', 'url': 'http://127.0.0.1:8000/videos/qMHbBIoD51/qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4', 'status': 'success', 'filename': 'qMHbBIoD51_20260317_192910_qMHbBIoD51_20260317_192908_2e349dc0.mp4', 'organization_id': 'qMHbBIoD51', 'duration': 28.784224, 'processing_complete': True}
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: INFO:     178.78.61.251:0 - "GET /api/products/ HTTP/1.0" 500 Internal Server Error
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: ERROR:    Exception in ASGI application
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: Traceback (most recent call last):
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     self.dialect.do_execute(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     cursor.execute(statement, parameters)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: psycopg2.errors.UndefinedColumn: column product_videos.created_at does not exist
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: LINE 1: ...ssing_status AS product_videos_processing_status, product_vi...
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:                                                              ^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: The above exception was the direct cause of the following exception:
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: Traceback (most recent call last):
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/uvicorn/protocols/http/h11_impl.py", line 403, in run_asgi
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     result = await app(  # type: ignore[func-returns-value]
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return await self.app(scope, receive, send)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/fastapi/applications.py", line 1134, in __call__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await super().__call__(scope, receive, send)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/applications.py", line 113, in __call__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await self.middleware_stack(scope, receive, send)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     raise exc
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await self.app(scope, receive, _send)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 191, in __call__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     with recv_stream, send_stream, collapse_excgroups():
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/usr/lib/python3.12/contextlib.py", line 158, in __exit__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     self.gen.throw(value)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     raise exc
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 193, in __call__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     response = await self.dispatch_func(request, call_next)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/app/main.py", line 55, in handle_large_files
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     raise e
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/app/main.py", line 47, in handle_large_files
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     response = await call_next(request)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:                ^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 168, in call_next
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     raise app_exc from app_exc.__cause__ or app_exc.__context__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 144, in coro
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await self.app(scope, receive_or_disconnect, send_no_error)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 85, in __call__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await self.app(scope, receive, send)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     raise exc
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await app(scope, receive, sender)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await self.app(scope, receive, send)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/routing.py", line 716, in __call__
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await self.middleware_stack(scope, receive, send)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/routing.py", line 736, in app
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await route.handle(scope, receive, send)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/routing.py", line 290, in handle
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await self.app(scope, receive, send)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/fastapi/routing.py", line 125, in app
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     raise exc
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     await app(scope, receive, sender)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/fastapi/routing.py", line 111, in app
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     response = await f(request)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:                ^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/fastapi/routing.py", line 391, in app
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     raw_response = await run_endpoint_function(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/fastapi/routing.py", line 292, in run_endpoint_function
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return await run_in_threadpool(dependant.call, **values)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/starlette/concurrency.py", line 38, in run_in_threadpool
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return await anyio.to_thread.run_sync(func)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/anyio/to_thread.py", line 56, in run_sync
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return await get_async_backend().run_sync_in_worker_thread(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 2485, in run_sync_in_worker_thread
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return await future
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py", line 976, in run
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     result = context.run(func, *args)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:              ^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/app/routers/products.py", line 701, in get_products
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     products = query.all()
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:                ^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 2704, in all
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return self._iter().all()  # type: ignore
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/result.py", line 1774, in all
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return self._allrows()
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/result.py", line 548, in _allrows
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     rows = self._fetchall_impl()
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/result.py", line 1681, in _fetchall_impl
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return self._real_result._fetchall_impl()
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/result.py", line 2275, in _fetchall_impl
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return list(self.iterator)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py", line 247, in chunks
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     post_load.invoke(context, path)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py", line 1564, in invoke
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     loader(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/strategies.py", line 3338, in _load_for_path
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     self._load_via_parent(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/strategies.py", line 3414, in _load_via_parent
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     context.session.execute(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return self._execute_internal(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2249, in _execute_internal
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     result: Result[Any] = compile_state_cls.orm_execute_statement(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     result = conn.execute(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:              ^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return meth(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return connection._execute_clauseelement(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     ret = self._execute_context(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:           ^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     return self._exec_single_context(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     self._handle_dbapi_exception(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     self.dialect.do_execute(
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:   File "/home/fast/autoparts/backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:     cursor.execute(statement, parameters)
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column product_videos.created_at does not exist
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: LINE 1: ...ssing_status AS product_videos_processing_status, product_vi...
+мар 17 18:16:40 vm2512296768 uvicorn[15969]:                                                              ^
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: [SQL: SELECT product_videos.product_id AS product_videos_product_id, product_videos.id AS product_videos_id, product_videos.video_url AS product_videos_video_url, product_videos.organization_id AS product_videos_organization_id, product_videos.processing_status AS product_videos_processing_status, product_videos.created_at AS product_videos_created_at, product_videos.updated_at AS product_videos_updated_at
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: FROM product_videos
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: WHERE product_videos.product_id IN (%(primary_keys_1)s, %(primary_keys_2)s, %(primary_keys_3)s, %(primary_keys_4)s, %(primary_keys_5)s, %(primary_keys_6)s, %(primary_keys_7)s, %(primary_keys_8)s, %(primary_keys_9)s, %(primary_keys_10)s, %(primary_keys_11)s, %(primary_keys_12)s, %(primary_keys_13)s, %(primary_keys_14)s)]
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: [parameters: {'primary_keys_1': 8, 'primary_keys_2': 9, 'primary_keys_3': 10, 'primary_keys_4': 11, 'primary_keys_5': 12, 'primary_keys_6': 13, 'primary_keys_7': 1, 'primary_keys_8': 3, 'primary_keys_9': 4, 'primary_keys_10': 5, 'primary_keys_11': 6, 'primary_keys_12': 7, 'primary_keys_13': 15, 'primary_keys_14': 25}]
+мар 17 18:16:40 vm2512296768 uvicorn[15969]: (Background on this error at: https://sqlalche.me/e/20/f405)
+
+
+
