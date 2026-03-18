@@ -232,62 +232,42 @@ const EditPart = () => {
               : '/upload/photo';
             console.log('Uploading photo:', file.name, 'Organization ID:', organizationId);
             
-            // Step 1: Upload file and get task_id
+            // 🚀 НОВАЯ ЛОГИКА: Фото загружается в temp папку без обработки
+            // Обработка будет запущена при сохранении продукта
             const uploadResult = await apiRequestFormData(uploadEndpoint, formData);
-            console.log('Photo upload initiated:', uploadResult);
+            console.log('Photo uploaded to temp:', uploadResult);
             
-            let finalResult = null;
-            
-            // Step 2: Check if async processing (task_id) or immediate result
-            if (uploadResult.task_id) {
-              console.log('Waiting for photo processing... Task ID:', uploadResult.task_id);
+            // Check if we got temp_path (deferred processing)
+            if (uploadResult.temp_path) {
+              console.log('✅ Photo saved to temp (processing deferred):', uploadResult.temp_path);
               
-              // Poll for completion
-              const maxAttempts = 45; // 45 attempts * 2 seconds = 1.5 minutes max (increased from 30)
-              let completed = false;
+              const fileWithPath = Object.assign(file, { 
+                finalPath: uploadResult.temp_path,
+                tempPath: uploadResult.temp_path,
+                filename: uploadResult.temp_filename,
+                isUploading: false,
+                requiresProcessing: uploadResult.requires_processing || true,
+                organizationId: uploadResult.organization_id,
+                addWatermark: uploadResult.add_watermark,
+                logoPath: uploadResult.logo_path
+              });
               
-              console.log('🕐 Photo polling with maxAttempts:', maxAttempts, '(~', maxAttempts * 2 / 60, 'minutes)');
-              
-              for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                // Wait 2 seconds before checking status
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                // Check status
-                const statusResponse = await apiRequest(`/upload/photo-status/${uploadResult.task_id}`);
-                console.log(`Polling attempt ${attempt + 1}/${maxAttempts}:`, statusResponse);
-                
-                if (statusResponse.status === 'completed') {
-                  // Success!
-                  completed = true;
-                  finalResult = statusResponse;
-                  console.log('✅ Photo processing complete:', finalResult);
-                  break;
-                } else if (statusResponse.status === 'failed') {
-                  // Failed
-                  console.error('❌ Photo processing failed:', statusResponse.error);
-                  throw new Error(statusResponse.error || 'Photo processing failed');
-                }
-                // else: still processing, continue polling
-              }
-              
-              if (!completed) {
-                throw new Error('Timeout: Photo processing took too long');
-              }
+              imageFiles[imageFiles.indexOf(file)] = fileWithPath;
+              uploadedTempFiles.push(uploadResult.temp_filename);
+              console.log('📸 Photo saved to temp folder - will process on product save');
             } else if (uploadResult.path && uploadResult.filename) {
               // Synchronous response (old behavior, kept for backwards compatibility)
-              finalResult = uploadResult;
-            }
-            
-            // Use the final result
-            if (finalResult && finalResult.path && finalResult.filename) {
               const fileWithPath = Object.assign(file, { 
-                finalPath: finalResult.path,
-                finalFilename: finalResult.filename 
+                finalPath: uploadResult.path,
+                finalFilename: uploadResult.filename,
+                isUploading: false 
               });
+              
               imageFiles[imageFiles.indexOf(file)] = fileWithPath;
-              uploadedTempFiles.push(finalResult.filename);
+              uploadedTempFiles.push(uploadResult.filename);
+              console.log('Video successfully uploaded with path:', uploadResult.path);
             } else {
-              console.error('Photo upload result missing path or filename:', finalResult);
+              console.error('Photo upload result missing:', uploadResult);
               throw new Error('Photo upload failed');
             }
           } catch (error) {

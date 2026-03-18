@@ -155,10 +155,30 @@ const AddPart = () => {
             formData.append('file', file);
             const result = await apiRequestFormData('/upload/photo', formData);
             
-            if (result.path) {
-              const fileWithPath = Object.assign(file, { finalPath: result.path });
-              imageFiles[imageFiles.indexOf(file)] = fileWithPath;
-              uploadedTempFiles.push(result.path.split('/').pop());
+            // 🚀 НОВАЯ ЛОГИКА: Фото загружено в temp папку, обработка отложена
+            // Не ждем завершения обработки - она начнется при сохранении продукта
+            if (result.temp_path) {
+              console.log('✅ Photo uploaded to temp (processing deferred):', result.temp_path);
+              
+              const fileWithPath = Object.assign(file, { 
+                finalPath: result.temp_path,  // Используем temp_path для совместимости
+                tempPath: result.temp_path,
+                filename: result.temp_filename,
+                isUploading: false,
+                requiresProcessing: result.requires_processing || true,
+                organizationId: result.organization_id,
+                addWatermark: result.add_watermark,
+                logoPath: result.logo_path
+              });
+              
+              setPhotos((prev) => [...prev, fileWithPath]);
+              
+              // Track temp file for cleanup
+              if (result.temp_filename) {
+                uploadedTempFiles.push(result.temp_filename);
+              }
+              
+              console.log('📸 Photo saved to temp folder - will process on product save');
             }
           } catch (error) {
             console.error('Failed to upload photo:', error);

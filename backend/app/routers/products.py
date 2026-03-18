@@ -63,15 +63,18 @@ def create_product(
     db.refresh(db_product)
 
     # Сохраняем фото
+    photo_ids = []
     if product.photos:
         for url in product.photos:
             photo = ProductPhoto(
                 product_id=db_product.id, 
                 photo_url=url,
                 organization_id=current_user.organization_id,
-                processing_status='completed'
+                processing_status='pending'  # Сначала pending - обработка начнется позже
             )
             db.add(photo)
+            db.flush()  # Чтобы получить ID
+            photo_ids.append(photo.id)
     
     # Сохраняем видео
     video_ids = []
@@ -118,6 +121,30 @@ def create_product(
                     # Это не критично - фронтенд может запустить сам
         except Exception as e:
             print(f"⚠️ Warning: Error adding videos to queue: {e}")
+            # Не прерываем создание продукта из-за этого
+    
+    # 🚀 НОВАЯ ЛОГИКА: Запускаем обработку фото после создания продукта
+    # Фото попадает в очередь Celery и ждет обработки
+    if photo_ids:
+        try:
+            import requests
+            from app.core.config import settings
+            base_url = settings.BASE_URL.rstrip('/')
+            
+            for photo_id in photo_ids:
+                # Отправляем запрос на постановку в очередь обработки
+                try:
+                    response = requests.post(
+                        f"{base_url}/api/upload/start-photo-processing/{photo_id}",
+                        timeout=5  # Не ждем ответа долго
+                    )
+                    print(f"✅ Photo {photo_id} added to Celery queue (waiting for processing): {response.status_code}")
+                    print(f"Response: {response.json()}")
+                except Exception as e:
+                    print(f"⚠️ Warning: Could not add photo to processing queue: {e}")
+                    # Это не критично - фронтенд может запустить сам
+        except Exception as e:
+            print(f"⚠️ Warning: Error adding photos to queue: {e}")
             # Не прерываем создание продукта из-за этого
 
     # Связываем с автомобилями
@@ -239,13 +266,16 @@ def update_product(
         setattr(db_product, key, value)
 
     # Обновляем фото: удаляем старые, добавляем новые
+    photo_ids = []
     if product.photos is not None:
         # Удаляем все предыдущие фото
         db.query(ProductPhoto).filter(ProductPhoto.product_id == product_id).delete()
         # Добавляем новые
         for url in product.photos:
-            photo = ProductPhoto(product_id=product_id, photo_url=url, organization_id=current_user.organization_id, processing_status='completed')
+            photo = ProductPhoto(product_id=product_id, photo_url=url, organization_id=current_user.organization_id, processing_status='pending')
             db.add(photo)
+            db.flush()
+            photo_ids.append(photo.id)
     
     # Обновляем видео: удаляем старые, добавляем новые
     if product.videos is not None:
@@ -301,6 +331,34 @@ def update_product(
     else:
         # Если видео не было, тоже делаем commit
         db.commit()
+    
+    # 🚀 НОВАЯ ЛОГИКА: Запускаем обработку фото после обновления продукта
+    if photo_ids:
+        print(f"\n=== STARTING PHOTO PROCESSING FOR UPDATED PRODUCT ===")
+        try:
+            import requests
+            from app.core.config import settings
+            base_url = settings.BASE_URL.rstrip('/')
+            
+            for photo_id in photo_ids:
+                try:
+                    print(f"Calling: {base_url}/api/upload/start-photo-processing/{photo_id}")
+                    response = requests.post(
+                        f"{base_url}/api/upload/start-photo-processing/{photo_id}",
+                        timeout=10  # Увеличенный таймаут
+                    )
+                    print(f"✅ Started processing for updated photo {photo_id}: Status {response.status_code}")
+                    print(f"Response: {response.json()}")
+                except Exception as e:
+                    print(f"⚠️ Warning: Could not start photo processing for photo {photo_id}: {e}")
+                    import traceback
+                    print(f"Full error: {traceback.format_exc()}")
+        except Exception as e:
+            print(f"⚠️ Warning: Error starting photo processing: {e}")
+            import traceback
+            print(f"Full error: {traceback.format_exc()}")
+    else:
+        print("⚠️ No photo IDs to process!")
 
     # Обновляем связи с автомобилями
     if product.vehicle_ids is not None:
@@ -323,7 +381,7 @@ def update_product(
                 db.add(association)
 
     # Финальный commit (если не было видео или после обновления связей)
-    if not product.videos:
+    if not product.videos and not photo_ids:
         db.commit()
     
     db.refresh(db_product)

@@ -136,64 +136,65 @@ async def upload_photo(
     
     print(f"Generated filename: {filename}")
     
-    # Generate UUID filename for temp storage
+    # 🚀 НОВАЯ ЛОГИКА: Генерируем UUID filename для temp storage (как в видео)
     unique_filename = f"{uuid.uuid4().hex}{ext}"
-    temp_dir = os.path.abspath("uploads/temp")
+    # ИСПОЛЬЗУЕМ POSIX-совместимые пути (критично для Linux!)
+    temp_dir = os.path.abspath(os.path.join("uploads", "temp", organization_id))
     temp_path = os.path.join(temp_dir, unique_filename)
     
     # Create temp directory if it doesn't exist
     os.makedirs(temp_dir, exist_ok=True)
     
-    # Save original file to temp folder
+    # 🚀 БЫСТРАЯ ЗАГРУЗКА: Потоковая запись напрямую на диск!
+    # НЕ читаем файл в память, а сразу пишем на диск
     try:
-        with open(temp_path, 'wb') as f:
-            f.write(file_content)
-        print(f"Saved original photo to temp: {temp_path}")
+        # Открываем файл для записи
+        with open(temp_path, 'wb') as buffer:
+            # Читаем и пишем порциями по 8KB
+            while chunk := await file.read(8192):
+                buffer.write(chunk)
+            
+        # Проверяем размер загруженного файла
+        file_size = os.path.getsize(temp_path)
+            
+        # Проверяем размер после загрузки (а не до!)
+        if file_size > MAX_PHOTO_SIZE:
+            # Файл слишком большой - удаляем
+            os.remove(temp_path)
+            raise HTTPException(
+                413,
+                f"Файл слишком большой. Размер: {file_size/1024/1024:.1f}MB. Максимальный размер: {MAX_PHOTO_SIZE/1024/1024}MB"
+            )
+
+        print(f"✅ Saved original photo to temp: {temp_path}")
         print(f"Absolute temp path: {os.path.abspath(temp_path)}")
+        print(f"File size: {file_size:,} bytes")
     except Exception as e:
         print(f"Error saving temp file: {str(e)}")
         raise HTTPException(500, f"Ошибка при сохранении временного файла: {str(e)}")
     
-    print(f"Processing photo with Celery. Temp path: {temp_path}, Organization: {organization_id}")
-    print(f"Final filename will be: {filename}")
+    # 🚀 НОВАЯ ЛОГИКА: НЕ обрабатываем фото сразу!
+    # Фото попадает в temp папку и ждет обработки при сохранении продукта
+    print(f"📸 Photo saved to temp folder - processing deferred until product save")
+    print(f"   Temp path: {temp_path}")
+    print(f"   Organization: {organization_id}")
+    print(f"   Watermark settings: add_watermark={add_watermark_flag}, logo={logo_file_path}")
     
-    try:
-        # Queue Celery task for async processing
-        task = process_and_upload_photo.delay(
-            temp_path,
-            filename,  # Use generated filename with org ID and timestamp
-            organization_id,
-            "pictures",  # subfolder
-            add_watermark_flag,  # add_watermark
-            logo_file_path  # logo_path
-        )
-        
-        print(f"Celery task queued: {task.id}")
-        
-        # Return immediately with task ID - frontend will poll for status
-        # This prevents timeout issues with long-running processing
-        result = {
-            "task_id": task.id,
-            "status": "processing",
-            "temp_filename": unique_filename,
-            "organization_id": organization_id,
-            "path": f"/pictures/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.webp')}",
-            "message": "Photo is being processed. Poll /api/upload/photo-status/{task_id} for updates."
-        }
-        
-        print(f"Photo upload queued for processing: {result}")
-        print("=== END PHOTO UPLOAD ===")
-        return result
-        
-    except Exception as e:
-        print(f"Error queuing photo upload: {str(e)}")
-        # Clean up temp file on error
-        try:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-        except:
-            pass
-        raise HTTPException(500, f"Ошибка при постановке фото в очередь: {str(e)}")
+    # Return immediately with temp path - processing will start on product save
+    result = {
+        "status": "uploaded",
+        "temp_filename": unique_filename,
+        "temp_path": f"/temp/{organization_id}/{unique_filename}",
+        "organization_id": organization_id,
+        "requires_processing": True,
+        "add_watermark": add_watermark_flag,
+        "logo_path": logo_file_path,
+        "message": "Photo uploaded to temp folder. Processing will start when you save the product."
+    }
+    
+    print(f"Photo upload completed (processing deferred): {result}")
+    print("=== END PHOTO UPLOAD ===")
+    return result
 
 
 @router.post("/photo-s3")
@@ -1147,3 +1148,128 @@ async def start_video_processing(
         import traceback
         print(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(500, f"Ошибка при запуске обработки видео: {str(e)}")
+
+
+@router.post("/start-photo-processing/{product_photo_id}")
+async def start_photo_processing(
+    product_photo_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Start processing of a photo that was uploaded to temp folder.
+    This endpoint triggers Celery task to compress and apply watermark.
+    Called when saving/editing a product with photos.
+    """
+    print(f"\n=== START PHOTO PROCESSING FOR PRODUCT PHOTO {product_photo_id} ===")
+    
+    try:
+        from app.models.product import ProductPhoto
+        from app.models.organization import Organization
+        
+        # Get the photo record from database
+        photo_record = db.query(ProductPhoto).filter(
+            ProductPhoto.id == product_photo_id
+        ).first()
+        
+        if not photo_record:
+            raise HTTPException(404, f"Photo record {product_photo_id} not found")
+        
+        print(f"Found photo record: ID={product_photo_id}, URL={photo_record.photo_url}")
+        
+        # Extract temp path from photo_url
+        # photo_url format: /temp/{org_id}/{filename}
+        temp_url = photo_record.photo_url
+        if not temp_url.startswith('/temp/'):
+            print(f"⚠️ Warning: Photo URL doesn't look like a temp path: {temp_url}")
+            # Continue anyway - might already be processed
+        
+        # Build absolute file path
+        # URL: /temp/{org_id}/{filename}
+        # File: uploads/temp/{org_id}/{filename}
+        temp_path_parts = temp_url.lstrip('/').split('/')
+        if len(temp_path_parts) >= 3:
+            organization_id = temp_path_parts[1]
+            temp_filename = '/'.join(temp_path_parts[2:])  # In case filename has slashes
+        else:
+            raise HTTPException(400, f"Invalid temp path format: {temp_url}")
+        
+        temp_file_path = os.path.join("uploads", "temp", organization_id, temp_filename)
+        abs_temp_file_path = os.path.abspath(temp_file_path)
+        
+        print(f"Temp file path: {abs_temp_file_path}")
+        print(f"Organization ID: {organization_id}")
+        
+        # Check if temp file exists
+        if not os.path.exists(abs_temp_file_path):
+            print(f"⚠️ Warning: Temp file not found at: {abs_temp_file_path}")
+            # Photo might already be processed or deleted - continue anyway
+            print(f"Assuming photo is already processed or using fallback")
+        
+        # Get organization's watermark settings
+        org = db.query(Organization).filter(Organization.id == organization_id).first()
+        
+        # Determine watermark settings
+        add_watermark_flag = False
+        logo_file_path = None
+        
+        if org and org.watermark is not None:
+            if org.watermark == 1:
+                # Use admin's organization logo
+                admin_user = db.query(User).filter(User.is_admin == True).first()
+                if admin_user and admin_user.organization_id:
+                    admin_org = db.query(Organization).filter(Organization.id == admin_user.organization_id).first()
+                    if admin_org and admin_org.logo_organization:
+                        add_watermark_flag = True
+                        logo_path_value = admin_org.logo_organization.lstrip("/").lstrip("\\")
+                        if not logo_path_value.lower().startswith("uploads"):
+                            logo_file_path = os.path.join("uploads", logo_path_value)
+                        else:
+                            logo_file_path = logo_path_value
+            elif org.watermark == 2:
+                # Use this organization's own logo
+                if org.logo_organization:
+                    add_watermark_flag = True
+                    logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
+                    if not logo_path_value.lower().startswith("uploads"):
+                        logo_file_path = os.path.join("uploads", logo_path_value)
+                    else:
+                        logo_file_path = logo_path_value
+        
+        # Generate final filename
+        final_filename = generate_photo_filename(organization_id, temp_filename)
+        
+        print(f"Generated final filename: {final_filename}")
+        print(f"Watermark settings: add_watermark={add_watermark_flag}, logo={logo_file_path}")
+        
+        # Queue Celery task for async processing
+        task = process_and_upload_photo.delay(
+            abs_temp_file_path,
+            final_filename,
+            organization_id,
+            "pictures",  # subfolder
+            add_watermark_flag,  # add_watermark
+            logo_file_path  # logo_path
+        )
+        
+        print(f"✅ Celery task queued: {task.id}")
+        
+        # Update processing status in database
+        photo_record.processing_status = 'processing'
+        db.commit()
+        
+        return {
+            "success": True,
+            "task_id": task.id,
+            "product_photo_id": product_photo_id,
+            "status": "processing",
+            "message": "Photo processing started. Poll /api/upload/photo-status/{task_id} for updates."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error starting photo processing: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(500, f"Ошибка при запуске обработки фото: {str(e)}")
