@@ -87,11 +87,15 @@ async def upload_photo(
             # watermark == 0: No watermark
             print(f"ℹ️ No watermark will be applied (watermark=0)")
 
-    if not file.content_type or not file.content_type.startswith("image/"):
-        print(f"Rejected: invalid content type {file.content_type}")
-        print("=== END PHOTO UPLOAD (REJECTED) ===")
-        raise HTTPException(400, "Разрешены только изображения")
-
+    # Проверяем Content-Type
+    # 🚀 ДЛЯ МОБИЛЬНЫХ: Некоторые телефоны могут отправлять file/octet-stream или другие типы
+    if not file.content_type:
+        print(f"⚠️ Warning: No Content-Type provided")
+        # Продолжаем если есть расширение файла
+    elif not file.content_type.startswith("image/") and file.content_type != "application/octet-stream":
+        print(f"⚠️ Warning: Unusual content type: {file.content_type}")
+        # Не отвергаем сразу - проверяем расширение
+    
     # Проверяем размер файла перед загрузкой
     file_content = await file.read()
     file_size = len(file_content)
@@ -107,6 +111,9 @@ async def upload_photo(
 
     # Получаем расширение файла
     ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
+    
+    print(f"File extension: {ext}")
+    print(f"Content-Type: {file.content_type}")
 
     # Список поддерживаемых форматов изображений
     allowed_extensions = (
@@ -117,19 +124,29 @@ async def upload_photo(
 
     # Проверяем расширение файла
     if ext and ext not in allowed_extensions:
-        raise HTTPException(400, "Недопустимый формат изображения")
+        # 🚀 ДЛЯ МОБИЛЬНЫХ: Проверяем по MIME типу если расширение неизвестно
+        if file.content_type and file.content_type.startswith("image/"):
+            print(f"✓ Allowing unknown extension based on MIME type: {file.content_type}")
+            # Разрешаем если MIME тип указывает на изображение
+        else:
+            print(f"❌ Rejected: unsupported extension '{ext}'")
+            raise HTTPException(400, f"Недопустимый формат изображения. Расширение '{ext}' не поддерживается")
 
     # Дополнительная проверка по MIME типу для распространенных форматов
     allowed_mime_types = (
         "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
-        "image/bmp", "image/tiff", "image/x-icon", "image/heic", "image/heif"
+        "image/bmp", "image/tiff", "image/x-icon", "image/heic", "image/heif",
+        "application/octet-stream"  # 🚀 ДЛЯ МОБИЛЬНЫХ
     )
 
-    if file.content_type not in allowed_mime_types:
+    if file.content_type and file.content_type not in allowed_mime_types:
         # Для неизвестных MIME типов, но с правильным расширением - позволяем
         # (например, некоторые форматы могут иметь специфические MIME типы)
-        if not ext:
+        if not ext or ext not in allowed_extensions:
+            print(f"❌ Rejected: unsupported MIME type '{file.content_type}' and no valid extension")
             raise HTTPException(400, "Недопустимый тип файла")
+        else:
+            print(f"✓ Allowing unusual MIME type based on valid extension: {ext}")
 
     # Generate filename with organization ID and timestamp
     filename = generate_photo_filename(organization_id, file.filename)
