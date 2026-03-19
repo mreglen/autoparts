@@ -1153,13 +1153,13 @@ async def start_video_processing(
 @router.post("/start-photo-processing/{product_photo_id}")
 async def start_photo_processing(
     product_photo_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     """
     Start processing of a photo that was uploaded to temp folder.
     This endpoint triggers Celery task to compress and apply watermark.
     Called when saving/editing a product with photos.
+    ВНУТРЕННИЙ ВЫЗОВ - аутентификация не требуется!
     """
     print(f"\n=== START PHOTO PROCESSING FOR PRODUCT PHOTO {product_photo_id} ===")
     

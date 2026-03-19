@@ -274,10 +274,12 @@ def update_product(
         for url in product.photos:
             photo = ProductPhoto(product_id=product_id, photo_url=url, organization_id=current_user.organization_id, processing_status='pending')
             db.add(photo)
-            db.flush()
+            db.flush()  # Чтобы получить ID но не коммитить!
             photo_ids.append(photo.id)
+        print(f"Created {len(photo_ids)} photo record(s) with IDs: {photo_ids}")
     
     # Обновляем видео: удаляем старые, добавляем новые
+    video_ids = []
     if product.videos is not None:
         print(f"\n=== UPDATING VIDEOS FOR PRODUCT {product_id} ===")
         print(f"Received videos: {product.videos}")
@@ -285,56 +287,50 @@ def update_product(
         # Удаляем все предыдущие видео
         db.query(ProductVideo).filter(ProductVideo.product_id == product_id).delete()
         # Добавляем новые
-        video_ids = []
         for url in product.videos:
             video = ProductVideo(product_id=product_id, video_url=url, organization_id=current_user.organization_id, processing_status='pending')
             db.add(video)
-            db.flush()
+            db.flush()  # Чтобы получить ID но не коммитить!
             video_ids.append(video.id)
             print(f"Created video record ID {video.id} with URL: {url}")
-        
-        # 🚀 ВАЖНО: Делаем commit ДО вызова endpoint!
-        # Иначе endpoint не увидит запись в БД
-        db.commit()
-        print(f"✅ Video records committed to database: {video_ids}")
-        
-        print(f"Total video IDs to process: {video_ids}")
-        
-        # 🚀 ЗАПУСКАЕМ ОБРАБОТКУ ВИДЕО после обновления
-        if video_ids:
-            print(f"Starting video processing for {len(video_ids)} video(s)...")
-            try:
-                import requests
-                from app.core.config import settings
-                base_url = settings.BASE_URL.rstrip('/')
-                
-                for video_id in video_ids:
-                    try:
-                        print(f"Calling: {base_url}/api/upload/start-video-processing/{video_id}")
-                        # ВНУТРЕННИЙ ВЫЗОВ - токен не нужен!
-                        response = requests.post(
-                            f"{base_url}/api/upload/start-video-processing/{video_id}",
-                            timeout=10  # Увеличенный таймаут
-                        )
-                        print(f"✅ Started processing for updated video {video_id}: Status {response.status_code}")
-                        print(f"Response: {response.json()}")
-                    except Exception as e:
-                        print(f"⚠️ Warning: Could not start video processing for video {video_id}: {e}")
-                        import traceback
-                        print(f"Full error: {traceback.format_exc()}")
-            except Exception as e:
-                print(f"⚠️ Warning: Error starting video processing: {e}")
-                import traceback
-                print(f"Full error: {traceback.format_exc()}")
-        else:
-            print("⚠️ No video IDs to process!")
+    
+    # 🚀 ВАЖНО: Делаем commit ПОСЛЕ добавления и фото, и видео!
+    # Иначе endpoint не увидит записи в БД
+    db.commit()
+    print(f"✅ All records committed to database: {len(photo_ids)} photos, {len(video_ids)} videos")
+    
+    # 🚀 ЗАПУСКАЕМ ОБРАБОТКУ ВИДЕО после обновления
+    if video_ids:
+        print(f"\n🎬 Starting video processing for {len(video_ids)} video(s)...")
+        try:
+            import requests
+            from app.core.config import settings
+            base_url = settings.BASE_URL.rstrip('/')
+            
+            for video_id in video_ids:
+                try:
+                    print(f"Calling: {base_url}/api/upload/start-video-processing/{video_id}")
+                    # ВНУТРЕННИЙ ВЫЗОВ - токен не нужен!
+                    response = requests.post(
+                        f"{base_url}/api/upload/start-video-processing/{video_id}",
+                        timeout=10  # Увеличенный таймаут
+                    )
+                    print(f"✅ Started processing for updated video {video_id}: Status {response.status_code}")
+                    print(f"Response: {response.json()}")
+                except Exception as e:
+                    print(f"⚠️ Warning: Could not start video processing for video {video_id}: {e}")
+                    import traceback
+                    print(f"Full error: {traceback.format_exc()}")
+        except Exception as e:
+            print(f"⚠️ Warning: Error starting video processing: {e}")
+            import traceback
+            print(f"Full error: {traceback.format_exc()}")
     else:
-        # Если видео не было, тоже делаем commit
-        db.commit()
+        print("ℹ️ No videos to process")
     
     # 🚀 НОВАЯ ЛОГИКА: Запускаем обработку фото после обновления продукта
     if photo_ids:
-        print(f"\n=== STARTING PHOTO PROCESSING FOR UPDATED PRODUCT ===")
+        print(f"\n📸 Starting photo processing for {len(photo_ids)} photo(s)...")
         try:
             import requests
             from app.core.config import settings
@@ -358,7 +354,7 @@ def update_product(
             import traceback
             print(f"Full error: {traceback.format_exc()}")
     else:
-        print("⚠️ No photo IDs to process!")
+        print("ℹ️ No photos to process")
 
     # Обновляем связи с автомобилями
     if product.vehicle_ids is not None:
