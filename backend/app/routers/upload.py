@@ -1057,12 +1057,13 @@ async def get_video_status(
 @router.post("/start-video-processing/{product_video_id}")
 async def start_video_processing(
     product_video_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Start video processing AFTER product creation/update.
     This endpoint triggers the Celery task for background processing.
-    ВНУТРЕННИЙ ВЫЗОВ - аутентификация не требуется!
+    Requires authentication - user must own the product/video.
     """
     print(f"=== START VIDEO PROCESSING REQUEST ===")
     print(f"Product Video ID: {product_video_id}")
@@ -1076,6 +1077,21 @@ async def start_video_processing(
         
         if not video_record:
             raise HTTPException(404, f"Video record {product_video_id} not found")
+        
+        # 🔒 AUTHORIZATION CHECK: Ensure user owns this video
+        # Get the product that owns this video
+        from ..models.product import Product
+        product = db.query(Product).filter(Product.id == video_record.product_id).first()
+        
+        if not product:
+            raise HTTPException(404, f"Product not found for video {product_video_id}")
+        
+        # Check if user belongs to the organization that owns the product
+        if product.organization_id != current_user.organization_id and not current_user.is_admin:
+            raise HTTPException(
+                403, 
+                f"Доступ запрещён: вы не владеете этим видео (organization_id: {product.organization_id}, your organization_id: {current_user.organization_id})"
+            )
         
         # Extract temp filename from video_url
         # video_url format: /temp/{org_id}/{filename}.mp4
@@ -1170,13 +1186,14 @@ async def start_video_processing(
 @router.post("/start-photo-processing/{product_photo_id}")
 async def start_photo_processing(
     product_photo_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Start processing of a photo that was uploaded to temp folder.
     This endpoint triggers Celery task to compress and apply watermark.
     Called when saving/editing a product with photos.
-    ВНУТРЕННИЙ ВЫЗОВ - аутентификация не требуется!
+    Requires authentication - user must own the product/photo.
     """
     print(f"\n=== START PHOTO PROCESSING FOR PRODUCT PHOTO {product_photo_id} ===")
     
@@ -1193,6 +1210,21 @@ async def start_photo_processing(
             raise HTTPException(404, f"Photo record {product_photo_id} not found")
         
         print(f"Found photo record: ID={product_photo_id}, URL={photo_record.photo_url}")
+        
+        # 🔒 AUTHORIZATION CHECK: Ensure user owns this photo
+        # Get the product that owns this photo
+        from ..models.product import Product
+        product = db.query(Product).filter(Product.id == photo_record.product_id).first()
+        
+        if not product:
+            raise HTTPException(404, f"Product not found for photo {product_photo_id}")
+        
+        # Check if user belongs to the organization that owns the product
+        if product.organization_id != current_user.organization_id and not current_user.is_admin:
+            raise HTTPException(
+                403, 
+                f"Доступ запрещён: вы не владеете этим фото (organization_id: {product.organization_id}, your organization_id: {current_user.organization_id})"
+            )
         
         # Extract temp path from photo_url
         # photo_url format: /temp/{org_id}/{filename}

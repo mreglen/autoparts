@@ -11,6 +11,7 @@ import {
 } from '../../../redux/slices/ProductSlice';
 import { selectSearchQuery } from '../../../redux/slices/RosskoSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
+import { normalizeImageUrl } from '../../../utils/apiClient';
 
 // Селекторы для б/у запчастей
 const selectUsedPartsData = (state) => state.products.usedPartsData;
@@ -111,6 +112,116 @@ const UsedPartsList = ({ viewMode = 'grid' }) => {
     }
   };
 
+  // Component for displaying media with navigation
+  const MediaDisplay = ({ part }) => {
+    const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+    const [hoverSide, setHoverSide] = useState(null);
+
+    // Combine photos and videos
+    const allMedia = React.useMemo(() => {
+      const photos = (part.photos || []).map(photo => ({
+        type: 'photo',
+        url: normalizeImageUrl(photo.full_url || photo.photo_url || photo)
+      }));
+      const videos = (part.videos || []).map(video => ({
+        type: 'video',
+        url: normalizeImageUrl(video.full_url || video.video_url || video)
+      }));
+      return [...photos, ...videos];
+    }, [part.photos, part.videos]);
+
+    if (!allMedia || allMedia.length === 0) {
+      return (
+        <div className="w-full h-full flex items-center justify-center">
+          <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      );
+    }
+
+    const currentMedia = allMedia[currentMediaIndex];
+    const isVideo = currentMedia.type === 'video';
+
+    const goToPrevious = () => {
+      setCurrentMediaIndex(prev => prev > 0 ? prev - 1 : allMedia.length - 1);
+    };
+
+    const goToNext = () => {
+      setCurrentMediaIndex(prev => prev < allMedia.length - 1 ? prev + 1 : 0);
+    };
+
+    return (
+      <div className="relative w-full h-full group">
+        {/* Navigation arrows */}
+        {allMedia.length > 1 && (
+          <>
+            {/* Left arrow */}
+            <button
+              className={`absolute left-0 top-1/2 transform -translate-y-1/2 z-20 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-r-md transition-opacity duration-200 ${hoverSide === 'left' ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                goToPrevious();
+              }}
+              onMouseEnter={() => setHoverSide('left')}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            {/* Right arrow */}
+            <button
+              className={`absolute right-0 top-1/2 transform -translate-y-1/2 z-20 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-l-md transition-opacity duration-200 ${hoverSide === 'right' ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                goToNext();
+              }}
+              onMouseEnter={() => setHoverSide('right')}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </>
+        )}
+
+        {/* Media content */}
+        {isVideo ? (
+          <video
+            src={currentMedia.url}
+            className="w-full h-full object-cover rounded-lg"
+            muted
+            playsInline
+          />
+        ) : (
+          <img
+            src={currentMedia.url}
+            alt={part.name || part.article}
+            className="w-full h-full object-cover rounded-lg"
+          />
+        )}
+
+        {/* Video indicator overlay */}
+        {isVideo && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg pointer-events-none">
+            <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+            </svg>
+          </div>
+        )}
+
+        {/* Media counter */}
+        {allMedia.length > 1 && (
+          <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
+            {currentMediaIndex + 1} / {allMedia.length}
+          </div>
+        )}
+      </div>
+    );
+  };
+
 
 
 
@@ -204,21 +315,9 @@ const UsedPartsList = ({ viewMode = 'grid' }) => {
                   >
                     <div className="p-4">
                       <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Photo */}
-                        <div className="w-full sm:w-48 h-48 flex-shrink-0">
-                          {(part.photos && part.photos.length > 0) ? (
-                            <img
-                              src={part.photos[0].full_url || part.photos[0].photo_url || part.photos[0]}
-                              alt={part.name || part.article}
-                              className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
-                              <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                            </div>
-                          )}
+                        {/* Photo/Video with navigation */}
+                        <div className="w-full sm:w-48 h-48 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                          <MediaDisplay part={part} />
                         </div>
                         
                         {/* Info */}
@@ -292,13 +391,13 @@ const UsedPartsList = ({ viewMode = 'grid' }) => {
                         </div>
                         
                         {/* Seller Info - Right Side */}
-                        <div className="flex-shrink-0 w-full sm:w-auto">
+                        <div className="flex-shrink-0 w-full sm:w-80">
                           <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-3 border border-gray-200">
                             <div className="flex items-center gap-3 mb-2">
                               <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                                 {(sellerOrg?.name || 'Продавец').substring(0, 2).toUpperCase()}
                               </div>
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <p className="text-sm font-semibold text-gray-900 truncate">{sellerOrg?.name || 'Продавец'}</p>
                                 {sellerOrg?.contact_person && (
                                   <p className="text-xs text-gray-600 truncate">{sellerOrg.contact_person}</p>
@@ -388,21 +487,9 @@ const UsedPartsList = ({ viewMode = 'grid' }) => {
                   >
                     <div className="p-4">
                       <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Photo */}
-                        <div className="w-full sm:w-48 h-48 flex-shrink-0">
-                          {(part.photos && part.photos.length > 0) ? (
-                            <img
-                              src={part.photos[0].full_url || part.photos[0].photo_url || part.photos[0]}
-                              alt={part.name || part.article}
-                              className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
-                              <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                            </div>
-                          )}
+                        {/* Photo/Video with navigation */}
+                        <div className="w-full sm:w-48 h-48 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                          <MediaDisplay part={part} />
                         </div>
                         
                         {/* Info */}
@@ -476,13 +563,13 @@ const UsedPartsList = ({ viewMode = 'grid' }) => {
                         </div>
                         
                         {/* Seller Info - Right Side */}
-                        <div className="flex-shrink-0 w-full sm:w-auto">
+                        <div className="flex-shrink-0 w-full sm:w-80">
                           <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-3 border border-gray-200">
                             <div className="flex items-center gap-3 mb-2">
                               <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                                 {(sellerOrg?.name || 'Продавец').substring(0, 2).toUpperCase()}
                               </div>
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <p className="text-sm font-semibold text-gray-900 truncate">{sellerOrg?.name || 'Продавец'}</p>
                                 {sellerOrg?.contact_person && (
                                   <p className="text-xs text-gray-600 truncate">{sellerOrg.contact_person}</p>

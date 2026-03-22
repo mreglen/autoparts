@@ -105,13 +105,22 @@ def create_product(
             from app.core.config import settings
             base_url = settings.BASE_URL.rstrip('/')
             
+            # 🔒 Получаем токен из заголовка запроса для внутренних вызовов
+            from fastapi import Request
+            token = None
+            if request and hasattr(request, 'headers'):
+                auth_header = request.headers.get('Authorization', '')
+                if auth_header.startswith('Bearer '):
+                    token = auth_header[7:]  # Remove 'Bearer ' prefix
+            
             for video_id in video_ids:
                 # Отправляем запрос на постановку в очередь обработки
                 # Задача НЕ начинается сразу, а ждет в очереди Celery
-                # ВНУТРЕННИЙ ВЫЗОВ - токен не нужен!
                 try:
+                    headers = {'Authorization': f'Bearer {token}'} if token else {}
                     response = requests.post(
                         f"{base_url}/api/upload/start-video-processing/{video_id}",
+                        headers=headers,
                         timeout=5  # Не ждем ответа долго
                     )
                     print(f"✅ Video {video_id} added to Celery queue (waiting for processing): {response.status_code}")
@@ -131,11 +140,21 @@ def create_product(
             from app.core.config import settings
             base_url = settings.BASE_URL.rstrip('/')
             
+            # 🔒 Получаем токен из заголовка запроса для внутренних вызовов
+            from fastapi import Request
+            token = None
+            if request and hasattr(request, 'headers'):
+                auth_header = request.headers.get('Authorization', '')
+                if auth_header.startswith('Bearer '):
+                    token = auth_header[7:]  # Remove 'Bearer ' prefix
+            
             for photo_id in photo_ids:
                 # Отправляем запрос на постановку в очередь обработки
                 try:
+                    headers = {'Authorization': f'Bearer {token}'} if token else {}
                     response = requests.post(
                         f"{base_url}/api/upload/start-photo-processing/{photo_id}",
+                        headers=headers,
                         timeout=5  # Не ждем ответа долго
                     )
                     print(f"✅ Photo {photo_id} added to Celery queue (waiting for processing): {response.status_code}")
@@ -212,7 +231,8 @@ def update_product(
     product_id: int,
     product: ProductUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    request: Request = None  # 🔒 Добавляем Request для получения токена
 ):
     db_product = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
@@ -307,12 +327,20 @@ def update_product(
             from app.core.config import settings
             base_url = settings.BASE_URL.rstrip('/')
             
+            # 🔒 Получаем токен из заголовка запроса для внутренних вызовов
+            token = None
+            if request and hasattr(request, 'headers'):
+                auth_header = request.headers.get('Authorization', '')
+                if auth_header.startswith('Bearer '):
+                    token = auth_header[7:]  # Remove 'Bearer ' prefix
+            
             for video_id in video_ids:
                 try:
                     print(f"Calling: {base_url}/api/upload/start-video-processing/{video_id}")
-                    # ВНУТРЕННИЙ ВЫЗОВ - токен не нужен!
+                    headers = {'Authorization': f'Bearer {token}'} if token else {}
                     response = requests.post(
                         f"{base_url}/api/upload/start-video-processing/{video_id}",
+                        headers=headers,
                         timeout=10  # Увеличенный таймаут
                     )
                     print(f"✅ Started processing for updated video {video_id}: Status {response.status_code}")
@@ -336,11 +364,20 @@ def update_product(
             from app.core.config import settings
             base_url = settings.BASE_URL.rstrip('/')
             
+            # 🔒 Получаем токен из заголовка запроса для внутренних вызовов
+            token = None
+            if request and hasattr(request, 'headers'):
+                auth_header = request.headers.get('Authorization', '')
+                if auth_header.startswith('Bearer '):
+                    token = auth_header[7:]  # Remove 'Bearer ' prefix
+            
             for photo_id in photo_ids:
                 try:
                     print(f"Calling: {base_url}/api/upload/start-photo-processing/{photo_id}")
+                    headers = {'Authorization': f'Bearer {token}'} if token else {}
                     response = requests.post(
                         f"{base_url}/api/upload/start-photo-processing/{photo_id}",
+                        headers=headers,
                         timeout=10  # Увеличенный таймаут
                     )
                     print(f"✅ Started processing for updated photo {photo_id}: Status {response.status_code}")
