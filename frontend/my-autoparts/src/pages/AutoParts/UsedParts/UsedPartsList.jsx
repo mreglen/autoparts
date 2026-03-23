@@ -48,7 +48,7 @@ const formatPhoneNumber = (phone) => {
   return formatted;
 };
 
-const UsedPartsList = ({ viewMode = 'grid' }) => {
+const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -66,6 +66,39 @@ const UsedPartsList = ({ viewMode = 'grid' }) => {
   const analogParts = usedPartsData?.analog_parts || [];
 
   const [expandedPartId, setExpandedPartId] = useState(null);
+  
+  // Sort parts based on selected option
+  const sortedAvailableParts = React.useMemo(() => {
+    let sorted = [...availableParts];
+    
+    if (sortBy === 'price_asc') {
+      sorted.sort((a, b) => (a.price || 0) - (b.price || 0));
+    } else if (sortBy === 'price_desc') {
+      sorted.sort((a, b) => (b.price || 0) - (a.price || 0));
+    } else if (sortBy === 'date') {
+      // Sort by date (ascending - oldest first)
+      sorted.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    }
+    
+    return sorted;
+  }, [availableParts, sortBy]);
+  
+  // Sort analog parts
+  const sortedAnalogParts = React.useMemo(() => {
+    let sorted = [...analogParts];
+    
+    if (sortBy === 'price_asc') {
+      sorted.sort((a, b) => (a.price || 0) - (b.price || 0));
+    } else if (sortBy === 'price_desc') {
+      sorted.sort((a, b) => (b.price || 0) - (a.price || 0));
+    } else if (sortBy === 'date') {
+      // Sort by date (ascending - oldest first)
+      sorted.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    }
+    
+    return sorted;
+  }, [analogParts, sortBy]);
+  
   useEffect(() => {
     // Загружаем информацию об организации только для авторизованных продавцов и сотрудников
     if ((user?.is_seller || user?.is_employee) && user.organization_id) {
@@ -235,8 +268,8 @@ const UsedPartsList = ({ viewMode = 'grid' }) => {
 
 
 
-  const hasAvailableParts = availableParts.length > 0;
-  const hasAnalogParts = analogParts.length > 0;
+  const hasAvailableParts = sortedAvailableParts.length > 0;
+  const hasAnalogParts = sortedAnalogParts.length > 0;
 
   if (!hasAvailableParts && !hasAnalogParts) {
     return (
@@ -266,7 +299,7 @@ const UsedPartsList = ({ viewMode = 'grid' }) => {
           {/* Grid view - карточки */}
           {viewMode === 'grid' && (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {availableParts.map((part) => (
+              {sortedAvailableParts.map((part) => (
                 <ProductCard 
                   key={part.id}
                   part={{
@@ -303,7 +336,7 @@ const UsedPartsList = ({ viewMode = 'grid' }) => {
           {/* List view - список */}
           {viewMode === 'list' && (
             <div className="space-y-3">
-              {availableParts.map((part) => {
+              {sortedAvailableParts.map((part) => {
                 const cartQuantity = getCartQuantity(part.id);
                 const availableQty = part.quantity || part.available_count || 0;
                 const sellerOrg = part.organization || organization;
@@ -438,7 +471,7 @@ const UsedPartsList = ({ viewMode = 'grid' }) => {
           {/* Grid view - карточки */}
           {viewMode === 'grid' && (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {analogParts.map((part) => (
+              {sortedAnalogParts.map((part) => (
                 <ProductCard 
                   key={`analog-${part.id}`}
                   part={{
@@ -475,7 +508,7 @@ const UsedPartsList = ({ viewMode = 'grid' }) => {
           {/* List view - список */}
           {viewMode === 'list' && (
             <div className="space-y-3">
-              {analogParts.map((part) => {
+              {sortedAnalogParts.map((part) => {
                 const cartQuantity = getCartQuantity(part.id);
                 const availableQty = part.quantity || part.available_count || 0;
                 const sellerOrg = part.organization || organization;

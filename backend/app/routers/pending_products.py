@@ -2,9 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 import json
+import requests
+import threading
 
 from app.db.database import get_db
 from app.models.pending_product import PendingProduct as PendingProductModel
+from app.models.product import ProductPhoto, ProductVideo
 from app.models.user import User
 from app.schemas.pending_product import PendingProductCreate, PendingProduct, PendingProductUpdate
 from app.core.auth import get_current_user
@@ -79,36 +82,66 @@ def create_pending_product(
     db.commit()
     db.refresh(db_product)
     
-    # Преобразуем JSON строки обратно в списки для ответа
-    product_dict = db_product.__dict__.copy()
-    if product_dict.get('photos'):
-        try:
-            product_dict['photos'] = json.loads(product_dict['photos'])
-        except:
-            product_dict['photos'] = []
-    else:
-        product_dict['photos'] = []
+    # Create ProductPhoto and ProductVideo records and trigger processing
+    base_url = "http://localhost:8000"
     
-    if product_dict.get('videos'):
+    # Helper function to trigger processing in background
+    def trigger_processing(endpoint):
         try:
-            product_dict['videos'] = json.loads(product_dict['videos'])
-        except:
-            product_dict['videos'] = []
-    else:
-        product_dict['videos'] = []
-        
-    if product_dict.get('vehicle_ids'):
-        try:
-            product_dict['vehicle_ids'] = json.loads(product_dict['vehicle_ids'])
-        except:
-            product_dict['vehicle_ids'] = []
-    else:
-        product_dict['vehicle_ids'] = []
-        
-    # Удаляем SQLAlchemy состояние
-    product_dict.pop('_sa_instance_state', None)
+            requests.post(f"{base_url}{endpoint}", timeout=5.0)
+        except Exception as e:
+            print(f"⚠️ Warning: Could not trigger processing {endpoint}: {e}")
     
-    return product_dict
+    # Process photos
+    if product_data.photos:
+        for photo_url in product_data.photos:
+            try:
+                # Create ProductPhoto record
+                photo = ProductPhoto(
+                    product_id=db_product.id,
+                    photo_url=photo_url,
+                    organization_id=current_user.organization_id,
+                    processing_status='pending'
+                )
+                db.add(photo)
+                db.commit()
+                db.refresh(photo)
+                
+                # Trigger processing in background thread
+                thread = threading.Thread(
+                    target=trigger_processing,
+                    args=(f"/api/upload/start-photo-processing/{photo.id}",)
+                )
+                thread.start()
+            except Exception as e:
+                print(f"Error creating ProductPhoto record: {e}")
+    
+    # Process videos
+    if product_data.videos:
+        for video_url in product_data.videos:
+            try:
+                # Create ProductVideo record
+                video = ProductVideo(
+                    product_id=db_product.id,
+                    video_url=video_url,
+                    organization_id=current_user.organization_id,
+                    processing_status='pending'
+                )
+                db.add(video)
+                db.commit()
+                db.refresh(video)
+                
+                # Trigger processing in background thread
+                thread = threading.Thread(
+                    target=trigger_processing,
+                    args=(f"/api/upload/start-video-processing/{video.id}",)
+                )
+                thread.start()
+            except Exception as e:
+                print(f"Error creating ProductVideo record: {e}")
+    
+    # Return the created product using Pydantic from_attributes
+    return db_product
 
 
 @router.get("/", response_model=List[PendingProduct])

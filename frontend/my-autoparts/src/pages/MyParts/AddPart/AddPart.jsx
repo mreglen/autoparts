@@ -190,8 +190,6 @@ const AddPart = () => {
         filesToUpload.forEach((_, idx) => {
           setUploadProgress(prev => ({ ...prev, [`photo-${startIndex + idx}`]: false }));
         });
-        
-        setPhotos((prev) => [...prev, ...imageFiles.filter(f => f.finalPath)]);
       }
     }
     
