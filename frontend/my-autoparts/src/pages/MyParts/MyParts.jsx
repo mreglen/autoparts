@@ -3,15 +3,16 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
-import { normalizeImageUrl } from '../../utils/apiClient';
+import { normalizeImageUrl, API_BASE, getAuthHeaders } from '../../utils/apiClient';
 import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchProductStorageCells, fetchStorageCells } from '../../redux/slices/StorageCellsSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
 import PendingParts from './PendingParts/PendingParts';
+import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
 
-const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [] }) => {
+const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onPrint, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [] }) => {
   const [showActions, setShowActions] = useState(false);
 
   
@@ -111,6 +112,12 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
           {showActions && (
             <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
               <div className="py-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onPrint(part); setShowActions(false); }}
+                  className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                >
+                  Печать
+                </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); onSale(part); setShowActions(false); }}
                   className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
@@ -272,6 +279,7 @@ function MyParts() {
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [currentMediaItems, setCurrentMediaItems] = useState([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     quantity: '',
     price: '',
@@ -304,6 +312,11 @@ function MyParts() {
     setSelectedPart(part);
     setOperationType(type);
     setModalOpen(true);
+  };
+
+  const handleOpenPrintModal = (part) => {
+    setSelectedPart(part);
+    setPrintModalOpen(true);
   };
 
   const handleOpenMediaModal = (mediaItems, initialIndex = 0) => {
@@ -792,6 +805,7 @@ function MyParts() {
                     getCellName={getCellName}
                     onSale={(p) => handleOpenModal(p, 'sale')}
                     onWriteoff={(p) => handleOpenModal(p, 'writeoff')}
+                    onPrint={(p) => handleOpenPrintModal(p)}
                     onToggleExpand={() => toggleExpand(part.id)}
                     isExpanded={expandedPartId === part.id}
                     isSelected={selectedParts.has(part.id)}
@@ -908,6 +922,15 @@ function MyParts() {
                     {mobileActionsOpen === part.id && (
                       <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 mobile-actions-dropdown w-32 mx-auto">
                         <div className="py-1">
+                          <button
+                            onClick={() => {
+                              handleOpenPrintModal(part);
+                              setMobileActionsOpen(null);
+                            }}
+                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50"
+                          >
+                            Печать
+                          </button>
                           <button
                             onClick={() => {
                               handleOpenModal(part, 'sale');
@@ -1092,6 +1115,13 @@ function MyParts() {
         onClose={() => setMediaModalOpen(false)}
         mediaItems={currentMediaItems}
         initialIndex={currentMediaIndex}
+      />
+
+      <PrintReceiptModal
+        isOpen={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        selectedPart={selectedPart}
+        productStorageCells={selectedPart ? (productStorageCells[selectedPart.id] || []) : []}
       />
     </div>
   );

@@ -12,7 +12,7 @@ class Organization(Base):
     phone = Column(String(20))
     logo_organization = Column(Text)
     description = Column(Text)
-    watermark = Column(Integer, default=1)  # 1=my garage (default), 0=none, 2=my organization
+    watermark = Column(Integer, default=1) 
     users = relationship("User", back_populates="organization")
     products = relationship("Product", back_populates="organization")
     acquired_products = relationship("AcquiredProduct", back_populates="organization")

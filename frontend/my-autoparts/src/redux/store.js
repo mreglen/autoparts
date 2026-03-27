@@ -11,6 +11,7 @@ import cartReducer from './slices/CartSlice';
 import clientReducer from './slices/ClientSlice';
 import storageCellsReducer from './slices/StorageCellsSlice';
 import pendingProductStorageCellsReducer from './slices/PendingProductStorageCellsSlice';
+import printerReducer from './slices/PrinterSlice';
 
 import moderationReducer from './slices/ModerationSlice';
 import moderationProductsReducer from './slices/ModerationProductsSlice';
@@ -31,6 +32,7 @@ export const store = configureStore({
     clients: clientReducer,
     storageCells: storageCellsReducer,
     pendingProductStorageCells: pendingProductStorageCellsReducer,
+    printers: printerReducer,
 
     moderation: moderationReducer,
     moderationProducts: moderationProductsReducer,

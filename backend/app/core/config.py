@@ -31,6 +31,6 @@ class Settings(BaseSettings):
     FFPROBE_PATH: Optional[str] = r"C:\ffmpeg\bin\ffprobe.exe"
     FFMPEG_PATH: Optional[str] = r"C:\ffmpeg\bin\ffmpeg.exe"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
 
 settings = Settings()
