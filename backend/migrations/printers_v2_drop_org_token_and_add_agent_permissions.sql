@@ -1,12 +1,4 @@
--- Printers v2:
--- 1) Удаляем organizations.printer_token
--- 2) Создаем:
---    - printer_agents (ПК <-> агент, токен для WebSocket)
---    - printer_agent_printers (список принтеров, перечисленных агентом на конкретном ПК)
---    - printer_permissions (кто имеет право печатать на принтере)
 
-ALTER TABLE organizations
-DROP COLUMN IF EXISTS printer_token;
 
 CREATE TABLE IF NOT EXISTS printer_agents (
     id SERIAL PRIMARY KEY,
