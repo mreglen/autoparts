@@ -292,9 +292,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
       {/* В наличии */}
       {hasAvailableParts && (
         <>
-          <div className="font-medium text-xl sm:text-xl my-6 sm:my-10 px-4 sm:px-0">
-            <h2 className="border-b-4 border-blue-500 pb-2 inline-block">В наличии</h2>
-          </div>
 
           {/* Grid view - карточки */}
           {viewMode === 'grid' && (

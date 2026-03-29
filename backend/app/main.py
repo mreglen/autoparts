@@ -13,10 +13,19 @@ from app.db.database import get_db
 from app.core.auth import cleanup_expired_sessions
 import logging
 import os
+import sys
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Fix for Windows: ensure subprocess support in asyncio event loop (needed for Playwright).
+if sys.platform.startswith("win"):
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except Exception:
+        pass
 
 # Create tables only if they don't exist
 # Using create_all() ensures foreign key constraints are handled correctly

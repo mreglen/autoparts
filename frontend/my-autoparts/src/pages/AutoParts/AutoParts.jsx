@@ -144,10 +144,6 @@ function AutoParts() {
 
   return (
     <div className="mt-4 sm:mt-5 px-0 w-full">
-      <h1 className="font-bold text-2xl sm:text-2xl my-4 sm:my-5 px-4 sm:px-0">
-        {/* {searchQuery || 'Результаты поиска'} */}
-        Автозапчасти
-      </h1>
 
       {/* Переключатель вкладок */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
@@ -288,9 +284,6 @@ function AutoParts() {
 
           {hasRosskoResults ? (
             <>
-              <div className="font-medium text-xl sm:text-xl my-6 sm:my-10 px-4 sm:px-0">
-                <h2 className="border-b-4 border-blue-500 pb-2 inline-block">В наличии</h2>
-              </div>
 
               {/* Десктопная версия - таблица */}
               <div className="hidden md:block">

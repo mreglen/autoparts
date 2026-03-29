@@ -10,7 +10,7 @@ from queue import Queue, Empty
 from datetime import datetime
 from pathlib import Path
 
-from printer_agent import PrinterAgent
+from .printer_agent import PrinterAgent
 
 
 def _safe_str(x):

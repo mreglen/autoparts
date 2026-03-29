@@ -2,6 +2,11 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, De
 from typing import Dict, List
 from datetime import datetime, timedelta
 import json
+import base64
+from pathlib import Path
+import tempfile
+import subprocess
+import sys
 from app.core.auth import get_current_user
 from app.models.user import User
 from app.models.organization import Organization
@@ -13,6 +18,7 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 import asyncio
 import secrets
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 router = APIRouter(prefix="/printers", tags=["printers"])
 
@@ -23,6 +29,36 @@ active_connections: Dict[int, dict] = {}
 # Store print jobs in memory (for demo purposes)
 print_jobs: Dict[int, dict] = {}
 job_counter = 0
+
+_templates_env = Environment(
+    loader=FileSystemLoader(str(Path(__file__).resolve().parents[1] / "templates" / "printing")),
+    autoescape=select_autoescape(["html", "xml"]),
+)
+
+
+def _html_to_pdf_bytes(html: str, width_mm: int, height_mm: int) -> bytes:
+    renderer_script = Path(__file__).resolve().parents[1] / "utils" / "render_label_pdf.py"
+    with tempfile.TemporaryDirectory(prefix="label_pdf_") as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        html_path = tmp_path / "label.html"
+        pdf_path = tmp_path / "label.pdf"
+        html_path.write_text(html, encoding="utf-8")
+
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(renderer_script),
+                str(html_path),
+                str(pdf_path),
+                str(int(width_mm)),
+                str(int(height_mm)),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"PDF renderer failed: {proc.stderr or proc.stdout or 'unknown error'}")
+        return pdf_path.read_bytes()
 
 
 def generate_printer_token() -> str:
@@ -293,6 +329,100 @@ async def print_to_printer(
         raise HTTPException(status_code=500, detail=f"Failed to send print command: {str(e)}")
 
 
+@router.post("/id/{printer_id}/print-test-label")
+async def print_test_label(
+    printer_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Печать пробной этикетки по HTML-шаблону label_print.html, как PDF.
+    """
+    global job_counter
+    try:
+        printer_id_int = int(printer_id)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid printer id")
+
+    p: PrinterAgentPrinter | None = db.query(PrinterAgentPrinter).filter(PrinterAgentPrinter.id == printer_id_int).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Printer not found")
+
+    agent = db.query(PrinterAgent).filter(PrinterAgent.id == p.agent_id).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    if not current_user.is_admin and current_user.organization_id != agent.organization_id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    perm = (
+        db.query(PrinterPermission)
+        .filter(
+            PrinterPermission.user_id == current_user.id,
+            PrinterPermission.printer_id == p.id,
+        )
+        .first()
+    )
+    if not perm and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not enough permissions for this printer")
+
+    websocket_data = active_connections.get(p.agent_id)
+    if not websocket_data or not websocket_data.get("websocket"):
+        raise HTTPException(status_code=400, detail="Printer agent is not connected. Please ensure the agent is running.")
+
+    width_mm = int(getattr(perm, "label_width_mm", 58) if perm else 58)
+    height_mm = int(getattr(perm, "label_height_mm", 38) if perm else 38)
+
+    tmpl = _templates_env.get_template("label_print.html")
+    html = tmpl.render(
+        label_width_mm=width_mm,
+        label_height_mm=height_mm,
+        brand="BOSCH",
+        article="0 986 479 123",
+        storage_address="A-01-02-03",
+        name="Тормозные колодки передние",
+        internal_code="INT-0000123",
+        price="1 250 ₽",
+    )
+
+    pdf_bytes = _html_to_pdf_bytes(html, width_mm=width_mm, height_mm=height_mm)
+    pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
+
+    job_counter += 1
+    job_id = job_counter
+    print_jobs[job_id] = {
+        "id": job_id,
+        "printer_id": printer_id_int,
+        "printer_name": p.printer_name,
+        "status": "pending",
+        "created_at": datetime.utcnow().isoformat(),
+        "started_at": None,
+        "completed_at": None,
+        "error_message": None,
+        "type": "pdf",
+    }
+
+    print_command = {
+        "type": "print_pdf",
+        "data": {
+            "printer_name": p.printer_name,
+            "pdf_base64": pdf_b64,
+            "copies": 1,
+            "job_id": job_id,
+        },
+    }
+
+    try:
+        await websocket_data["websocket"].send_json(print_command)
+        print_jobs[job_id]["status"] = "printing"
+        print_jobs[job_id]["started_at"] = datetime.utcnow().isoformat()
+        return {"status": "success", "message": "Test label sent", "job_id": job_id}
+    except Exception as e:
+        print_jobs[job_id]["status"] = "failed"
+        print_jobs[job_id]["error_message"] = str(e)
+        raise HTTPException(status_code=500, detail=f"Failed to send print command: {str(e)}")
+
+
 @router.get("/jobs")
 async def get_print_jobs(
     limit: int = 50,
@@ -463,6 +593,9 @@ async def get_my_printer_permissions(
             {
                 "printer_id": perm.printer_id,
                 "name": perm.printer.printer_name if perm.printer else None,
+                "is_current": bool(getattr(perm, "is_current", False)),
+                "label_width_mm": getattr(perm, "label_width_mm", None),
+                "label_height_mm": getattr(perm, "label_height_mm", None),
             }
         )
     return out
@@ -498,14 +631,75 @@ async def grant_printer_permission(
     if not active_connections.get(p.agent_id):
         raise HTTPException(status_code=400, detail="Printer agent is not connected")
 
-    # На данном этапе делаем “один принтер на пользователя”
-    db.query(PrinterPermission).filter(PrinterPermission.user_id == current_user.id).delete()
+    # Один текущий принтер, но сохраняем остальные разрешения и их настройки.
+    db.query(PrinterPermission).filter(PrinterPermission.user_id == current_user.id).update(
+        {"is_current": False}
+    )
 
-    perm = PrinterPermission(user_id=current_user.id, printer_id=p.id)
-    db.add(perm)
+    perm = (
+        db.query(PrinterPermission)
+        .filter(
+            PrinterPermission.user_id == current_user.id,
+            PrinterPermission.printer_id == p.id,
+        )
+        .first()
+    )
+    if not perm:
+        perm = PrinterPermission(user_id=current_user.id, printer_id=p.id, is_current=True)
+        db.add(perm)
+    else:
+        perm.is_current = True
     db.commit()
 
     return {"status": "success", "message": "Printer permission updated", "printer_id": p.id}
+
+
+@router.put("/id/{printer_id}/label-settings")
+async def update_label_settings_for_printer(
+    printer_id: str,
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Обновить персональные настройки этикетки для выбранного принтера (user, printer).
+    """
+    try:
+        printer_id_int = int(printer_id)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid printer id")
+
+    perm = (
+        db.query(PrinterPermission)
+        .filter(
+            PrinterPermission.user_id == current_user.id,
+            PrinterPermission.printer_id == printer_id_int,
+        )
+        .first()
+    )
+    if not perm:
+        raise HTTPException(status_code=404, detail="No permission for this printer")
+
+    w = payload.get("label_width_mm")
+    h = payload.get("label_height_mm")
+    try:
+        w_int = int(w)
+        h_int = int(h)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid label size")
+
+    if w_int <= 0 or h_int <= 0:
+        raise HTTPException(status_code=422, detail="Label size must be positive")
+
+    perm.label_width_mm = w_int
+    perm.label_height_mm = h_int
+    db.commit()
+
+    return {
+        "printer_id": perm.printer_id,
+        "label_width_mm": perm.label_width_mm,
+        "label_height_mm": perm.label_height_mm,
+    }
 
 
 @router.websocket("/ws")

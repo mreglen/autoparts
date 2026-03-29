@@ -7,11 +7,16 @@ import win32ui
 import win32con
 from datetime import datetime
 import sys
+import base64
+
+import fitz
+from PIL import Image, ImageWin
 
 class PrinterAgent:
     def __init__(
         self,
-        server_uri="ws://127.0.0.1:8000/api/printers/ws",
+        server_uri="ws://svoygarage.ru/server/api/printers/ws",
+        # server_uri="ws://127.0.0.1:8000/api/printers/ws",
         auth_token=None,
         organization_id=None,
         on_printers_updated=None,
@@ -500,6 +505,157 @@ class PrinterAgent:
                     "message": str(e),
                     "timestamp": datetime.now().isoformat()
                 })
+
+    async def handle_print_pdf_command(self, data):
+        """Handle PDF print command from server (base64-encoded PDF)."""
+        try:
+            printer_name = data.get("printer_name")
+            pdf_b64 = data.get("pdf_base64") or ""
+            copies = int(data.get("copies", 1))
+
+            job_id = data.get("job_id")
+            try:
+                job_id_int = int(job_id) if job_id is not None else None
+            except Exception:
+                job_id_int = None
+
+            if not printer_name:
+                printer_name = win32print.GetDefaultPrinter()
+
+            if self.on_job_updated:
+                self.on_job_updated({
+                    "type": "job_update",
+                    "job_id": job_id_int,
+                    "printer_name": printer_name,
+                    "copies": copies,
+                    "status": "printing",
+                    "message": "Printing PDF...",
+                    "timestamp": datetime.now().isoformat()
+                })
+
+            pdf_bytes = base64.b64decode(pdf_b64)
+            # Save PDF to temporary file and open it
+            import tempfile
+            import os
+            
+            temp_fd, temp_path = tempfile.mkstemp(suffix='.pdf')
+            try:
+                with os.fdopen(temp_fd, 'wb') as f:
+                    f.write(pdf_bytes)
+                
+                doc = fitz.open(temp_path)
+                if doc.page_count < 1:
+                    raise RuntimeError("Empty PDF")
+
+                page = doc.load_page(0)
+                # 203 DPI is common for label printers
+                pix = page.get_pixmap(dpi=203, alpha=False)
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                doc.close()
+            finally:
+                # Clean up temp file
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
+
+            def _print_image_via_gdi(target_printer: str, pil_img: Image.Image, copies_count: int = 1) -> None:
+                """
+                Print image with correct paper size settings for label printers.
+                Configures printer device context to match label dimensions (58x38mm).
+                Uses landscape orientation (rotated 90 degrees).
+                """
+                for _ in range(max(1, int(copies_count or 1))):
+                    dc = win32ui.CreateDC()
+                    dc.CreatePrinterDC(target_printer)
+
+                    # Get printer capabilities
+                    page_w = dc.GetDeviceCaps(win32con.HORZRES)
+                    page_h = dc.GetDeviceCaps(win32con.VERTRES)
+                    
+                    # For label printers, we need to ensure correct scaling
+                    # Image should fill entire printable area without distortion
+                    img_width, img_height = pil_img.size
+                    
+                    # Rotate image 90 degrees for landscape orientation
+                    img_rotated = pil_img.transpose(Image.ROTATE_90)
+                    img_width, img_height = img_rotated.size
+                    
+                    # Calculate aspect ratios
+                    page_aspect = page_w / page_h
+                    img_aspect = img_width / img_height
+                    
+                    # Fit image while preserving aspect ratio - SCALE TO FILL
+                    # This matches "Fit to area" behavior from Ctrl+P
+                    if img_aspect > page_aspect:
+                        # Image is wider - fit to height instead
+                        draw_h = page_h
+                        draw_w = int(page_h * img_aspect)
+                        x_offset = (page_w - draw_w) // 2
+                        y_offset = 0
+                    else:
+                        # Image is taller - fit to width
+                        draw_w = page_w
+                        draw_h = int(page_w / img_aspect)
+                        y_offset = (page_h - draw_h) // 2
+                        x_offset = 0
+
+                    dc.StartDoc("AutoParts Label (PDF)")
+                    dc.StartPage()
+
+                    # Draw image centered and scaled to fill
+                    dib = ImageWin.Dib(img_rotated.convert("RGB"))
+                    dib.draw(dc.GetHandleOutput(), (x_offset, y_offset, x_offset + draw_w, y_offset + draw_h))
+
+                    dc.EndPage()
+                    dc.EndDoc()
+                    dc.DeleteDC()
+
+            _print_image_via_gdi(printer_name, img, copies)
+
+            # Send confirmation back
+            if self.websocket:
+                await self.websocket.send(json.dumps({
+                    "type": "print_status",
+                    "data": {
+                        "job_id": job_id_int,
+                        "status": "success",
+                        "message": f"PDF printed to {printer_name}",
+                        "timestamp": datetime.now().isoformat()
+                    }
+                }))
+
+            if self.on_job_updated:
+                self.on_job_updated({
+                    "type": "job_update",
+                    "job_id": job_id_int,
+                    "printer_name": printer_name,
+                    "copies": copies,
+                    "status": "success",
+                    "message": f"Printed PDF x{copies}",
+                    "timestamp": datetime.now().isoformat()
+                })
+        except Exception as e:
+            if self.websocket:
+                await self.websocket.send(json.dumps({
+                    "type": "print_status",
+                    "data": {
+                        "job_id": job_id_int if 'job_id_int' in locals() else None,
+                        "status": "error",
+                        "message": str(e),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                }))
+            if self.on_job_updated:
+                self.on_job_updated({
+                    "type": "job_update",
+                    "job_id": job_id_int if 'job_id_int' in locals() else None,
+                    "printer_name": data.get("printer_name"),
+                    "copies": int(data.get("copies", 1)),
+                    "status": "error",
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat()
+                })
     
     async def listen(self):
         """Listen for incoming messages from server"""
@@ -518,6 +674,8 @@ class PrinterAgent:
                     elif msg_type == "print":
                         # Server sending print command
                         await self.handle_print_command(data.get("data", {}))
+                    elif msg_type == "print_pdf":
+                        await self.handle_print_pdf_command(data.get("data", {}))
                         
                     elif msg_type == "ping":
                         # Heartbeat

@@ -35,8 +35,9 @@ export default function PrinterTokenSection({ orgId }) {
 
       setConnectedPrinters(connected);
       const connectedIds = new Set((connected || []).map((p) => String(p.id)));
-      // На данном этапе предполагаем 1 текущий принтер на пользователя
-      const myId = myPerms?.[0]?.printer_id ?? '';
+      // Один текущий принтер на пользователя (помечен is_current)
+      const current = (myPerms || []).find((p) => p?.is_current) || myPerms?.[0];
+      const myId = current?.printer_id ?? '';
       setSelectedPrinterId(connectedIds.has(String(myId)) ? String(myId) : '');
     } catch (e) {
       setPrintersError(e?.response?.data?.detail || 'Ошибка при загрузке принтеров');
