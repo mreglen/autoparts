@@ -30,6 +30,18 @@ export const sendPrintJob = createAsyncThunk(
   }
 );
 
+export const printLabel = createAsyncThunk(
+  'printers/printLabel',
+  async ({ printerId, productData }, { rejectWithValue }) => {
+    try {
+      const response = await apiAxios.post(`/printers/id/${printerId}/print-label`, productData);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.detail || 'Failed to print label');
+    }
+  }
+);
+
 export const fetchAllPrinters = createAsyncThunk(
   'printers/fetchAllPrinters',
   async (_, { rejectWithValue }) => {
@@ -136,6 +148,19 @@ const printerSlice = createSlice({
         // Optionally add job to local list
       })
       .addCase(sendPrintJob.rejected, (state, action) => {
+        state.sendingPrint = false;
+        state.error = action.payload;
+      })
+
+      // Print label
+      .addCase(printLabel.pending, (state) => {
+        state.sendingPrint = true;
+        state.error = null;
+      })
+      .addCase(printLabel.fulfilled, (state, action) => {
+        state.sendingPrint = false;
+      })
+      .addCase(printLabel.rejected, (state, action) => {
         state.sendingPrint = false;
         state.error = action.payload;
       })

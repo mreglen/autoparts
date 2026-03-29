@@ -7,6 +7,7 @@ import { fetchStorageCells, fetchProductStorageCells, linkProductToCell, deleteP
 import VehicleModal from '../AddPart/VehicleModal';
 import PhotoGallery from '../../../components/PhotoGallery/PhotoGallery';
 import MediaModal from '../../../components/MediaModal/MediaModal';
+import PrintReceiptModal from '../PrintReceiptModal/PrintReceiptModal';
 import { normalizeImageUrl, apiRequest, apiRequestFormData } from '../../../utils/apiClient';
 
 const EditPart = () => {
@@ -21,6 +22,7 @@ const EditPart = () => {
   const { storageCells, productStorageCells, lastModified } = useSelector((state) => state.storageCells);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   
   // Storage cells state
   const [locationCells, setLocationCells] = useState([]);
@@ -947,7 +949,20 @@ const EditPart = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Редактировать запчасть</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Редактировать запчасть</h1>
+        <button
+          type="button"
+          onClick={() => setIsPrintModalOpen(true)}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md flex items-center gap-2 transition-colors"
+          title="Распечатать этикетку"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          Печать
+        </button>
+      </div>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Артикул */}
         <div>
@@ -1491,6 +1506,27 @@ const EditPart = () => {
         onClose={() => setMediaModalOpen(false)}
         mediaItems={currentMediaItems}
         initialIndex={currentMediaIndex}
+      />
+
+      <PrintReceiptModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        selectedPart={{
+          ...currentProduct,
+          brand: formData.brand,
+          article: formData.article,
+          name: formData.name,
+          price: formData.sale_price,
+          internal_code: currentProduct?.internal_code,
+          storage_location: formData.storage_location_id
+            ? (storageLocations?.find(loc => loc.id === parseInt(formData.storage_location_id)) || {})
+            : null
+        }}
+        productStorageCells={existingLinks.map(link => ({
+          id: link.storage_cell_id,
+          value: link.value || '',
+          name: locationCells.find(cell => cell.id === link.storage_cell_id)?.name || ''
+        }))}
       />
     </div>
   );

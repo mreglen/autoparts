@@ -423,6 +423,112 @@ async def print_test_label(
         raise HTTPException(status_code=500, detail=f"Failed to send print command: {str(e)}")
 
 
+@router.post("/id/{printer_id}/print-label")
+async def print_product_label(
+    printer_id: str,
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Печать этикетки товара по HTML-шаблону label_print.html, как PDF.
+    """
+    global job_counter
+    try:
+        printer_id_int = int(printer_id)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid printer id")
+
+    p: PrinterAgentPrinter | None = db.query(PrinterAgentPrinter).filter(PrinterAgentPrinter.id == printer_id_int).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Printer not found")
+
+    agent = db.query(PrinterAgent).filter(PrinterAgent.id == p.agent_id).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    if not current_user.is_admin and current_user.organization_id != agent.organization_id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    perm = (
+        db.query(PrinterPermission)
+        .filter(
+            PrinterPermission.user_id == current_user.id,
+            PrinterPermission.printer_id == p.id,
+        )
+        .first()
+    )
+    if not perm and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not enough permissions for this printer")
+
+    websocket_data = active_connections.get(p.agent_id)
+    if not websocket_data or not websocket_data.get("websocket"):
+        raise HTTPException(status_code=400, detail="Printer agent is not connected. Please ensure the agent is running.")
+
+    # Get label settings from permission or use defaults
+    width_mm = int(getattr(perm, "label_width_mm", payload.get("width_mm", 58)))
+    height_mm = int(getattr(perm, "label_height_mm", payload.get("height_mm", 38)))
+
+    # Extract product data from payload
+    brand = payload.get("brand", "—")
+    article = payload.get("article", "—")
+    storage_address = payload.get("storage_address", "—")
+    name = payload.get("name", "—")
+    internal_code = payload.get("internal_code", "—")
+    price = payload.get("price", "—")
+
+    tmpl = _templates_env.get_template("label_print.html")
+    html = tmpl.render(
+        label_width_mm=width_mm,
+        label_height_mm=height_mm,
+        brand=brand,
+        article=article,
+        storage_address=storage_address,
+        name=name,
+        internal_code=internal_code,
+        price=price,
+    )
+
+    pdf_bytes = _html_to_pdf_bytes(html, width_mm=width_mm, height_mm=height_mm)
+    pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
+
+    copies = int(payload.get("copies", 1))
+
+    job_counter += 1
+    job_id = job_counter
+    print_jobs[job_id] = {
+        "id": job_id,
+        "printer_id": printer_id_int,
+        "printer_name": p.printer_name,
+        "status": "pending",
+        "created_at": datetime.utcnow().isoformat(),
+        "started_at": None,
+        "completed_at": None,
+        "error_message": None,
+        "type": "pdf",
+    }
+
+    print_command = {
+        "type": "print_pdf",
+        "data": {
+            "printer_name": p.printer_name,
+            "pdf_base64": pdf_b64,
+            "copies": copies,
+            "job_id": job_id,
+        },
+    }
+
+    try:
+        await websocket_data["websocket"].send_json(print_command)
+        print_jobs[job_id]["status"] = "printing"
+        print_jobs[job_id]["started_at"] = datetime.utcnow().isoformat()
+        return {"status": "success", "message": "Label sent to printer", "job_id": job_id}
+    except Exception as e:
+        print_jobs[job_id]["status"] = "failed"
+        print_jobs[job_id]["error_message"] = str(e)
+        raise HTTPException(status_code=500, detail=f"Failed to send print command: {str(e)}")
+
+
 @router.get("/jobs")
 async def get_print_jobs(
     limit: int = 50,

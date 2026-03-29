@@ -1,14 +1,145 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   fetchAvailablePrinters, 
-  sendPrintJob, 
+  printLabel,
   selectAvailablePrinters, 
   selectFetchingPrinters, 
   selectSendingPrint, 
   selectPrintersError,
   clearError 
 } from '../../../redux/slices/PrinterSlice';
+
+const MM_TO_PX = 96 / 25.4;
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function useElementSize(ref) {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setSize({ width: rect.width, height: rect.height });
+    };
+
+    update();
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return size;
+}
+
+function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) {
+  const frameRef = useRef(null);
+  const frameSize = useElementSize(frameRef);
+
+  const framePadding = 12; // px (p-3)
+  const designMm = useMemo(() => ({ w: 58, h: 38 }), []);
+
+  const basePx = useMemo(() => {
+    const w = Math.max(1, Number(widthMm) || 0) * MM_TO_PX;
+    const h = Math.max(1, Number(heightMm) || 0) * MM_TO_PX;
+    return { w, h };
+  }, [widthMm, heightMm]);
+
+  const contentScale = useMemo(() => {
+    const w = Math.max(1, Number(widthMm) || 0);
+    const h = Math.max(1, Number(heightMm) || 0);
+    return clamp(Math.min(w / designMm.w, h / designMm.h), 0.05, 10);
+  }, [widthMm, heightMm, designMm.h, designMm.w]);
+
+  const scale = useMemo(() => {
+    if (!frameSize.width || !frameSize.height) return 1;
+    const availableW = Math.max(1, frameSize.width - framePadding * 2);
+    const availableH = Math.max(1, frameSize.height - framePadding * 2);
+    const k = Math.min(availableW / basePx.w, availableH / basePx.h);
+    return clamp(k, 0.05, 10);
+  }, [frameSize.width, frameSize.height, basePx.w, basePx.h]);
+
+  // Get cell values
+  const cellsText = useMemo(() => {
+    if (!productStorageCells || productStorageCells.length === 0) return '';
+    return productStorageCells
+      .map(cell => cell.value || cell.id || '')
+      .filter(value => value)
+      .join(';');
+  }, [productStorageCells]);
+
+  return (
+    <div
+      ref={frameRef}
+      className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-auto"
+      style={{ height: 260 }}
+    >
+      <div
+        className="bg-white border border-black box-border"
+        style={{
+          width: basePx.w,
+          height: basePx.h,
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Масштабируем контент под указанные размеры */}
+        <div
+          style={{
+            width: `${designMm.w * MM_TO_PX}px`,
+            height: `${designMm.h * MM_TO_PX}px`,
+            transform: `scale(${contentScale})`,
+            transformOrigin: 'top left',
+            padding: 8,
+            boxSizing: 'border-box',
+          }}
+        >
+          <div className="flex items-start gap-3 h-full">
+            <div className="flex-1 min-w-0 text-black">
+              <div className="mb-1.5">
+                <div className="text-[8px] font-bold leading-tight">Бренд</div>
+                <div className="text-[11px] leading-tight break-words">{selectedPart?.brand || '—'}</div>
+              </div>
+              <div className="mb-1.5">
+                <div className="text-[8px] font-bold leading-tight">Артикул</div>
+                <div className="text-[11px] leading-tight break-words">{selectedPart?.article || '—'}</div>
+              </div>
+              <div className="mb-1.5">
+                <div className="text-[8px] font-bold leading-tight">Адресное хранение</div>
+                <div className="text-[9px] leading-tight break-words">{cellsText || '—'}</div>
+              </div>
+              <div className="mb-1.5">
+                <div className="text-[8px] font-bold leading-tight">Наименование</div>
+                <div className="text-[9px] leading-tight break-words">{selectedPart?.name || '—'}</div>
+              </div>
+            </div>
+
+            <div className="shrink-0 flex flex-col items-center">
+              <div className="w-[56px] h-[56px] bg-black" aria-label="QR placeholder" />
+              <div className="mt-1 text-[9px] leading-tight text-black text-center whitespace-nowrap">
+                Цена: {selectedPart?.price != null ? `${parseFloat(selectedPart.price).toFixed(0)} ₽` : '—'}
+              </div>
+              <div className="mt-0.5 text-[8px] leading-tight text-black text-center whitespace-nowrap">
+                Код: {selectedPart?.internal_code 
+                  ? (typeof selectedPart.internal_code === 'object' 
+                    ? (selectedPart.internal_code.code || selectedPart.internal_code.id || '—') 
+                    : selectedPart.internal_code) 
+                  : '—'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const PrintReceiptModal = ({ 
   isOpen, 
@@ -24,11 +155,10 @@ const PrintReceiptModal = ({
   
   const [printerSettings, setPrinterSettings] = useState({
     printer: '',
-    height: '30',  // По умолчанию 30mm
-    width: '38',   // По умолчанию 38mm
+    height: '38',  // По умолчанию 38mm
+    width: '58',   // По умолчанию 58mm
     copies: '1'
   });
-  const [showPreview, setShowPreview] = useState(false);
 
   // Fetch available printers when modal opens
   useEffect(() => {
@@ -42,6 +172,19 @@ const PrintReceiptModal = ({
     };
   }, [isOpen, dispatch]);
 
+  // Set default printer when printers are loaded
+  useEffect(() => {
+    if (printers && printers.length > 0 && !printerSettings.printer) {
+      const defaultPrinter = printers.find(p => p.is_default);
+      if (defaultPrinter) {
+        setPrinterSettings(prev => ({ ...prev, printer: defaultPrinter.id }));
+      } else if (printers.length === 1) {
+        // If only one printer, select it
+        setPrinterSettings(prev => ({ ...prev, printer: printers[0].id }));
+      }
+    }
+  }, [printers, printerSettings.printer]);
+
   if (!isOpen) return null;
 
   const handleSettingChange = (field, value) => {
@@ -54,18 +197,34 @@ const PrintReceiptModal = ({
       return;
     }
 
-    // Generate receipt content
-    const receiptContent = generateReceiptContent();
+    // Prepare product data for label printing
+    const productData = {
+      brand: selectedPart?.brand || '—',
+      article: selectedPart?.article || '—',
+      storage_address: productStorageCells && productStorageCells.length > 0
+        ? productStorageCells
+            .map(cell => cell.value || cell.id || '')
+            .filter(value => value)
+            .join(';')
+        : '—',
+      name: selectedPart?.name || '—',
+      internal_code: selectedPart?.internal_code
+        ? (typeof selectedPart.internal_code === 'object'
+          ? (selectedPart.internal_code.code || selectedPart.internal_code.id || '—')
+          : selectedPart.internal_code)
+        : '—',
+      price: selectedPart?.price != null
+        ? `${parseFloat(selectedPart.price).toFixed(0)} ₽`
+        : '—',
+      width_mm: parseInt(printerSettings.width),
+      height_mm: parseInt(printerSettings.height),
+      copies: parseInt(printerSettings.copies)
+    };
     
-    // Dispatch the print job action
-    const result = await dispatch(sendPrintJob({
+    // Dispatch the print label action
+    const result = await dispatch(printLabel({
       printerId: printerSettings.printer,
-      content: receiptContent,
-      copies: parseInt(printerSettings.copies),
-      settings: {
-        height: printerSettings.height,
-        width: printerSettings.width
-      }
+      productData
     })).unwrap();
     
     if (result) {
@@ -140,50 +299,39 @@ const PrintReceiptModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl">
-        <div className="p-6">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 relative">
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Закрыть"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
           <h2 className="text-lg font-bold text-gray-800 mb-4">
-            Печать чека
+            Печать этикетки
           </h2>
 
-          {selectedPart && (
-            <div className="text-sm text-gray-600 mb-4">
-              <div><strong>Бренд:</strong> {selectedPart.brand || '—'}</div>
-              <div><strong>Артикул:</strong> {selectedPart.article || '—'}</div>
-              <div><strong>Наименование:</strong> {selectedPart.name || '—'}</div>
-              {selectedPart.storage_location && (
-                <div><strong>Хранение:</strong> 
-                  {typeof selectedPart.storage_location === 'object' 
-                    ? (selectedPart.storage_location.address || selectedPart.storage_location.id || '—') 
-                    : selectedPart.storage_location}
-                </div>
-              )}
-              {selectedPart.internal_code && (
-                <div><strong>Код:</strong> 
-                  {typeof selectedPart.internal_code === 'object' 
-                    ? (selectedPart.internal_code.code || selectedPart.internal_code.id || '—') 
-                    : selectedPart.internal_code}
-                </div>
-              )}
-              <div><strong>Цена:</strong> {selectedPart.price != null ? `${parseFloat(selectedPart.price).toFixed(2)} ₽` : '—'}</div>
-            </div>
-          )}
+          
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left column - Settings */}
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Выбор принтера
+                  Принтер
                 </label>
                 {loading ? (
-                  <div className="text-sm text-gray-500">Загрузка списка принтеров...</div>
+                  <div className="text-sm text-gray-500">Загрузка...</div>
                 ) : error ? (
                   <div className="text-sm text-red-600">{error}</div>
                 ) : printers.length === 0 ? (
                   <div className="text-sm text-orange-600">
-                    Принтеры не найдены или у вас нет доступа.
-                    Выберите принтер в настройках организации и убедитесь, что агент запущен.
+                    Принтеры не найдены. Выберите принтер в разделе "Печать" или убедитесь, что агент запущен.
                     <button 
                       onClick={() => dispatch(fetchAvailablePrinters())}
                       className="ml-2 text-indigo-600 underline hover:text-indigo-800"
@@ -206,33 +354,36 @@ const PrintReceiptModal = ({
                   </select>
                 )}
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Высота чека (мм)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={printerSettings.height}
-                  onChange={(e) => handleSettingChange('height', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
+          
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ширина (мм)
+                  </label>
+                  <input
+                    type="number"
+                    min={10}
+                    step={1}
+                    value={printerSettings.width}
+                    onChange={(e) => handleSettingChange('width', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Высота (мм)
+                  </label>
+                  <input
+                    type="number"
+                    min={10}
+                    step={1}
+                    value={printerSettings.height}
+                    onChange={(e) => handleSettingChange('height', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ширина чека (мм)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={printerSettings.width}
-                  onChange={(e) => handleSettingChange('width', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-
+          
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Количество копий
@@ -246,12 +397,12 @@ const PrintReceiptModal = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
-
+          
               <div className="pt-4">
                 <button
                   onClick={handlePrint}
                   disabled={!printerSettings.printer || printing}
-                  className={`w-full px-4 py-2 rounded-md font-medium transition ${
+                  className={`w-full px-4 py-2 rounded-lg font-medium transition ${
                     !printerSettings.printer || printing
                       ? 'bg-indigo-400 cursor-not-allowed'
                       : 'bg-indigo-600 hover:bg-indigo-700 text-white'
@@ -261,146 +412,23 @@ const PrintReceiptModal = ({
                 </button>
               </div>
             </div>
-
+          
             {/* Right column - Preview */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Предпросмотр чека
-              </label>
-              <div className="border border-gray-300 rounded-md p-4 bg-white">
-                <div 
-                  className="mx-auto bg-white overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
-                  style={{ 
-                    width: `${printerSettings.width}mm`,
-                    minHeight: `${printerSettings.height}mm`,
-                    maxWidth: '100%'
-                  }}
-                  onClick={() => setShowPreview(true)}
-                >
-                  {/* Receipt Preview Content - Ultra Compact */}
-                  <div className="text-[9px] leading-tight space-y-0 p-1">
-                    {selectedPart?.brand && (
-                      <div className="font-semibold text-[10px] leading-none mb-0.5">{selectedPart.brand}</div>
-                    )}
-                    {selectedPart?.article && (
-                      <div className="text-[9px] leading-none mb-0.5">{selectedPart.article}</div>
-                    )}
-                    {selectedPart?.name && (
-                      <div className="text-[9px] truncate leading-none mb-0.5">{selectedPart.name}</div>
-                    )}
-                    {productStorageCells && productStorageCells.length > 0 && (
-                      <div className="text-[9px] text-gray-600 truncate leading-none mb-0.5">
-                        {productStorageCells
-                          .map(cell => cell.value || cell.id || '')
-                          .filter(value => value)
-                          .join(';')}
-                      </div>
-                    )}
-                    {selectedPart?.internal_code && (
-                      <div className="text-[9px] text-gray-600 leading-none mb-0.5">
-                        {typeof selectedPart.internal_code === 'object' 
-                          ? (selectedPart.internal_code.code || selectedPart.internal_code.id || '') 
-                          : selectedPart.internal_code}
-                      </div>
-                    )}
-                    {selectedPart?.price != null && (
-                      <div className="font-bold text-[10px] leading-none mt-0.5">
-                        {parseFloat(selectedPart.price).toFixed(2)}₽
-                      </div>
-                    )}
-                  </div>
-                </div>
+              <div className="text-sm font-medium text-gray-700 mb-2">
+                Предпросмотр ({printerSettings.width}×{printerSettings.height}mm)
               </div>
-              
-              <p className="text-xs text-gray-500 mt-2">
-                * Размеры и вид предпросмотра являются приблизительными
-              </p>
-              <p className="text-xs text-indigo-600 mt-1 cursor-pointer hover:text-indigo-800" onClick={() => setShowPreview(true)}>
-                ↗ Нажмите для увеличения
-              </p>
+              <LabelPreview 
+                widthMm={printerSettings.width} 
+                heightMm={printerSettings.height}
+                selectedPart={selectedPart}
+                productStorageCells={productStorageCells}
+              />
             </div>
-          </div>
-
-          <div className="flex justify-end mt-6">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800"
-            >
-              Закрыть
-            </button>
           </div>
         </div>
       </div>
 
-      {/* Full-screen Preview Modal - Similar to MediaModal */}
-      {showPreview && selectedPart && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center"
-          onClick={() => setShowPreview(false)}
-        >
-          {/* Close button */}
-          <button
-            onClick={() => setShowPreview(false)}
-            className="absolute top-4 right-4 text-white text-4xl hover:text-gray-300 z-10"
-          >
-            ×
-          </button>
-
-          {/* Enlarged Preview Content */}
-          <div 
-            className="max-w-full max-h-full p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div 
-              className="bg-white mx-auto overflow-hidden shadow-2xl rounded-lg"
-              style={{ 
-                width: `${printerSettings.width}mm`,
-                minHeight: `${printerSettings.height}mm`,
-                transform: 'scale(2)',
-                transformOrigin: 'center center'
-              }}
-            >
-              {/* Receipt Preview Content - Ultra Compact (Enlarged) */}
-              <div className="text-[9px] leading-tight space-y-0 p-1">
-                {selectedPart?.brand && (
-                  <div className="font-semibold text-[10px] leading-none mb-0.5">{selectedPart.brand}</div>
-                )}
-                {selectedPart?.article && (
-                  <div className="text-[9px] leading-none mb-0.5">{selectedPart.article}</div>
-                )}
-                {selectedPart?.name && (
-                  <div className="text-[9px] truncate leading-none mb-0.5">{selectedPart.name}</div>
-                )}
-                {productStorageCells && productStorageCells.length > 0 && (
-                  <div className="text-[9px] text-gray-600 truncate leading-none mb-0.5">
-                    {productStorageCells
-                      .map(cell => cell.value || cell.id || '')
-                      .filter(value => value)
-                      .join(';')}
-                  </div>
-                )}
-                {selectedPart?.internal_code && (
-                  <div className="text-[9px] text-gray-600 leading-none mb-0.5">
-                    {typeof selectedPart.internal_code === 'object' 
-                      ? (selectedPart.internal_code.code || selectedPart.internal_code.id || '') 
-                      : selectedPart.internal_code}
-                  </div>
-                )}
-                {selectedPart?.price != null && (
-                  <div className="font-bold text-[10px] leading-none mt-0.5">
-                    {parseFloat(selectedPart.price).toFixed(2)}₽
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Info text */}
-            <div className="text-white text-center mt-4 text-lg">
-              Предпросмотр печати (масштаб 2x)
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
