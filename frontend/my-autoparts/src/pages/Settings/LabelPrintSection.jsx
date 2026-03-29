@@ -244,7 +244,7 @@ export default function LabelPrintSection() {
                 : 'bg-gray-200 text-gray-500 cursor-not-allowed'
             }`}
           >
-            {printingTest ? 'Печатаю…' : 'Печать пробной этикетки'}
+            {printingTest ? 'Печатаю…' : 'Пробная печать'}
           </button>
 
           <button

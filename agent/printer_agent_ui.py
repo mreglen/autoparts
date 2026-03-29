@@ -38,6 +38,7 @@ class PrinterAgentUI:
         self._auth_store_path = self._get_auth_store_path()
         self._saved_token = ""
         self._saved_org_id = ""
+        self._token_visible = False  # Track if token is visible
 
         self.style = ttk.Style(self.root)
         self._apply_theme()
@@ -86,6 +87,42 @@ class PrinterAgentUI:
                 ensure_ascii=False,
             )
 
+    def _toggle_show_token(self):
+        """Toggle between showing and hiding the token (now always visible)"""
+        # Since token field is now plain text by default (like organization_id),
+        # this toggle can switch to masked view if needed
+        if self._token_visible:
+            # Switch to masked view
+            self.token_entry.configure(show="*")
+            self.show_token_btn.configure(text="👁️", fg_color="#e5e7eb", hover_color="#d1d5db")
+        else:
+            # Switch to visible view (default)
+            self.token_entry.configure(show="")
+            self.show_token_btn.configure(text="🙈", fg_color="#fee2e2", hover_color="#fecaca", text_color="#991b1b")
+        self._token_visible = not self._token_visible
+    
+    def _clear_token(self):
+        """Clear the saved token"""
+        if messagebox.askyesno("Clear Token", "Are you sure you want to clear the saved printer token?"):
+            self.token_var.set("")
+            try:
+                # Clear from storage
+                self._save_auth("", self._saved_org_id)
+                self._saved_token = ""
+            except Exception as e:
+                messagebox.showwarning("Warning", f"Failed to clear token: {e}")
+    
+    def _clear_org_id(self):
+        """Clear the saved organization ID"""
+        if messagebox.askyesno("Clear Organization ID", "Are you sure you want to clear the saved organization ID?"):
+            self.org_var.set("")
+            try:
+                # Clear from storage
+                self._save_auth(self._saved_token, "")
+                self._saved_org_id = ""
+            except Exception as e:
+                messagebox.showwarning("Warning", f"Failed to clear organization ID: {e}")
+
     def _apply_theme(self):
         ctk.set_appearance_mode("light")
         try:
@@ -120,14 +157,40 @@ class PrinterAgentUI:
         token_title = ctk.CTkLabel(top, text="Printer token:", anchor="w", text_color=self.TEXT)
         token_title.grid(row=0, column=0, sticky="w", padx=(2, 6))
         self.token_var = tk.StringVar()
-        token_entry = ctk.CTkEntry(top, textvariable=self.token_var, show="*", width=420)
-        token_entry.grid(row=0, column=1, sticky="w", padx=(0, 10))
+        self.token_entry = ctk.CTkEntry(top, textvariable=self.token_var, width=420)
+        self.token_entry.grid(row=0, column=1, sticky="w", padx=(0, 5))
+        
+        # Clear token button
+        self.clear_token_btn = ctk.CTkButton(
+            top,
+            text="🗑️",
+            command=self._clear_token,
+            width=40,
+            height=32,
+            fg_color="#fee2e2",
+            hover_color="#fecaca",
+            text_color="#991b1b",
+        )
+        self.clear_token_btn.grid(row=0, column=2, sticky="w", padx=(0, 10))
 
         org_title = ctk.CTkLabel(top, text="Organization ID:", anchor="w", text_color=self.TEXT)
-        org_title.grid(row=0, column=2, sticky="w", padx=(2, 6))
+        org_title.grid(row=0, column=3, sticky="w", padx=(2, 6))
         self.org_var = tk.StringVar()
         org_entry = ctk.CTkEntry(top, textvariable=self.org_var, width=280)
-        org_entry.grid(row=0, column=3, sticky="w")
+        org_entry.grid(row=0, column=4, sticky="w", padx=(0, 5))
+        
+        # Clear org ID button
+        self.clear_org_btn = ctk.CTkButton(
+            top,
+            text="🗑️",
+            command=self._clear_org_id,
+            width=40,
+            height=32,
+            fg_color="#fee2e2",
+            hover_color="#fecaca",
+            text_color="#991b1b",
+        )
+        self.clear_org_btn.grid(row=0, column=5, sticky="w", padx=(0, 10))
 
         self.connect_btn = ctk.CTkButton(
             top,
@@ -136,7 +199,7 @@ class PrinterAgentUI:
             fg_color=self.ACCENT_DARK,
             hover_color="#1d4ed8",
         )
-        self.connect_btn.grid(row=0, column=4, sticky="e", padx=(12, 10))
+        self.connect_btn.grid(row=0, column=6, sticky="e", padx=(12, 10))
 
         self.disconnect_btn = ctk.CTkButton(
             top,
@@ -146,7 +209,7 @@ class PrinterAgentUI:
             fg_color="#94a3b8",
             hover_color="#64748b",
         )
-        self.disconnect_btn.grid(row=0, column=5, sticky="e", padx=(6, 2))
+        self.disconnect_btn.grid(row=0, column=7, sticky="e", padx=(6, 2))
 
         self.status_var = tk.StringVar(value="Не подключен")
         self.status_badge = ctk.CTkLabel(
