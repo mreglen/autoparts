@@ -37,6 +37,8 @@ export default function ProfileWithMenuLayout() {
             '/stock-out': 'expenses',
             '/settings/storage-addresses': 'settings-storage-addresses',
             '/settings/organization': 'settings-organization',
+            '/settings/printers': 'settings-printers',
+            '/settings/label': 'settings-label',
             '/settings/employees': 'settings-employees',
             '/moderation/products': 'product-moderation',
             '/moderation/pending-sellers': 'pending-sellers'
@@ -62,6 +64,8 @@ export default function ProfileWithMenuLayout() {
                 '/stock-out': 'expenses',
                 '/settings/storage-addresses': 'settings-storage-addresses',
                 '/settings/organization': 'settings-organization',
+                '/settings/printers': 'settings-printers',
+                '/settings/label': 'settings-label',
                 '/settings/employees': 'settings-employees',
                 '/moderation/products': 'product-moderation',
                 '/moderation/pending-sellers': 'pending-sellers'
@@ -265,13 +269,18 @@ export default function ProfileWithMenuLayout() {
                 settingsSubmenu.push({ id: 'settings-storage-addresses', label: 'Адресное хранение' });
             }
             
+            // Печать - для сотрудников с организацией
+            if (user?.organization_id) {
+                settingsSubmenu.push({ id: 'settings-printers', label: 'Печать' });
+            }
+            
             baseTabs.push({
                 id: 'settings',
                 label: 'Настройки',
                 submenu: settingsSubmenu
             });
         }
-        // Для директора добавляем Настройки с Профилем, Сотрудниками и Адресным хранением
+        // Для директора добавляем Настройки с Профилем, Сотрудниками, Адресным хранением и Печатью
         else if (user?.is_director) {
             baseTabs.push({
                 id: 'settings',
@@ -280,11 +289,12 @@ export default function ProfileWithMenuLayout() {
                     { id: 'profile', label: 'Профиль' },
                     { id: 'settings-employees', label: 'Сотрудники' },
                     { id: 'settings-storage-addresses', label: 'Адресное хранение' },
-                    { id: 'settings-organization', label: 'Организация' }
+                    { id: 'settings-organization', label: 'Организация' },
+                    { id: 'settings-printers', label: 'Печать' }
                 ]
             });
         }
-        // For sellers, add Settings with Profile and Organization
+        // For sellers, add Settings with Profile, Organization and Print
         else if (user?.is_seller) {
             const settingsSubmenu = [
                 { id: 'profile', label: 'Профиль' }
@@ -293,6 +303,7 @@ export default function ProfileWithMenuLayout() {
             // Add organization if user has organization
             if (user?.organization_id) {
                 settingsSubmenu.push({ id: 'settings-organization', label: 'Организация' });
+                settingsSubmenu.push({ id: 'settings-printers', label: 'Печать' });
             }
             
             baseTabs.push({
@@ -354,6 +365,8 @@ export default function ProfileWithMenuLayout() {
             'expenses': '/stock-out',
             'settings-storage-addresses': '/settings/storage-addresses',
             'settings-organization': '/settings/organization',
+            'settings-printers': '/settings/printers',
+            'settings-label': '/settings/label',
             'clients': '/clients',
             'sellers': '/sellers',
             'settings-employees': '/settings/employees',

@@ -22,7 +22,6 @@
         width: {{label_width_mm|default(58)}}mm;
         height: {{label_height_mm|default(38)}}mm;
         box-sizing: border-box;
-        border: 1px solid #000;
         overflow: hidden;
         position: relative;
       }
@@ -31,64 +30,69 @@
         width: {{label_width_mm|default(58)}}mm;
         height: {{label_height_mm|default(38)}}mm;
         box-sizing: border-box;
-        padding: 3mm 2.5mm;
-        transform-origin: top left;
+        padding: 2mm 2.5mm;
       }
 
       .content {
         display: flex;
-        align-items: flex-start;
-        gap: 4mm;
+        align-items: center;
+        gap: 3mm;
+        height: 100%;
       }
 
       .left {
         flex: 1 1 auto;
         min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 1.2mm;
       }
 
       .qr {
         flex: 0 0 auto;
-        width: 20mm;
-        height: 20mm;
+        width: 16mm;
+        height: 16mm;
         background: #000;
       }
 
       .right {
         flex: 0 0 auto;
-        width: 22mm;
+        width: 17mm;
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
+        gap: 1mm;
       }
 
       .right-meta {
-        margin-top: 2mm;
         width: 100%;
         text-align: center;
-        font-size: 8pt;
+        font-size: 6.5pt;
         line-height: 1.1;
         white-space: nowrap;
       }
 
       .row {
-        margin-bottom: 1.5mm;
+        line-height: 1.2;
       }
 
       .title {
-        font-size: 7pt;
+        font-size: 5.5pt;
         font-weight: 700;
-        line-height: 1.1;
+        opacity: 0.8;
       }
 
       .value {
-        font-size: 9pt;
-        font-weight: 400;
-        line-height: 1.1;
+        font-size: 7.5pt;
+        font-weight: 600;
+        line-height: 1.2;
         word-break: break-word;
       }
 
       .value.small {
-        font-size: 8pt;
+        font-size: 6.5pt;
       }
     </style>
   </head>
@@ -133,16 +137,25 @@
           var design = document.getElementById("design");
           if (!label || !design) return;
           
-          var lw = label.clientWidth;
-          var lh = label.clientHeight;
-          var dw = design.offsetWidth;
-          var dh = design.offsetHeight;
-          if (!lw || !lh || !dw || !dh) return;
+          // Базовые размеры дизайна 58x38mm
+          var baseW = 58;
+          var baseH = 38;
           
-          // Масштабируем дизайн под фактический размер этикетки
-          var k = Math.min(lw / dw, lh / dh);
-          if (!isFinite(k) || k <= 0) return;
-          design.style.transform = "scale(" + k + ")";
+          // Фактические размеры label в пикселях
+          var actualW = label.clientWidth;
+          var actualH = label.clientHeight;
+          
+          // Вычисляем коэффициент масштабирования
+          // Отношение фактических размеров к базовым
+          var scaleX = actualW / (baseW * 3.78); // 1mm ≈ 3.78px при 96 DPI
+          var scaleY = actualH / (baseH * 3.78);
+          var k = Math.min(scaleX, scaleY);
+          
+          if (!isFinite(k) || k <= 0 || k > 1.5) return;
+          
+          // Применяем масштабирование с центрированием
+          design.style.transformOrigin = "center center";
+          design.style.transform = "scale(" + k.toFixed(4) + ")";
         } catch (e) {}
       })();
     </script>

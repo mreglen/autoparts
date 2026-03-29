@@ -5,8 +5,6 @@ import DeliveryMethodsSection from './DeliveryMethodsSection';
 import StorageLocationsSection from './StorageLocationsSection';
 import OrganizationInfoSection from './OrganizationInfoSection';
 import WatermarksSection from './WatermarksSection';
-import PrinterTokenSection from './PrinterTokenSection';
-import LabelPrintSection from './LabelPrintSection';
 
 // Organization Form Component
 const OrganizationForm = ({ org, onUpdate, isEditing, setIsEditing, onCancel }) => {
@@ -314,16 +312,6 @@ export default function Organization() {
       {/* Watermarks Section */}
       <div className="mb-6">
         <WatermarksSection org={org} />
-      </div>
-
-      {/* Printer Token Section */}
-      <div className="mb-6">
-        <PrinterTokenSection orgId={user.organization_id} />
-      </div>
-
-      {/* Label print settings */}
-      <div className="mb-6">
-        <LabelPrintSection org={org} />
       </div>
 
       {/* Storage Locations and Delivery Methods side by side */}

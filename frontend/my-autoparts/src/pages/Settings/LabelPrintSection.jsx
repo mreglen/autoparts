@@ -35,7 +35,7 @@ function LabelPreview({ widthMm, heightMm }) {
   const frameSize = useElementSize(frameRef);
 
   const framePadding = 12; // px (p-3)
-  const designMm = useMemo(() => ({ w: 80, h: 45 }), []);
+  const designMm = useMemo(() => ({ w: 58, h: 38 }), []);
 
   const basePx = useMemo(() => {
     const w = Math.max(1, Number(widthMm) || 0) * MM_TO_PX;
@@ -75,42 +75,42 @@ function LabelPreview({ widthMm, heightMm }) {
           overflow: 'hidden',
         }}
       >
-        {/* Масштабируем контент, чтобы он всегда помещался в этикетку любого размера */}
+        {/* Масштабируем контент под указанные размеры */}
         <div
           style={{
             width: `${designMm.w * MM_TO_PX}px`,
             height: `${designMm.h * MM_TO_PX}px`,
             transform: `scale(${contentScale})`,
             transformOrigin: 'top left',
-            padding: 12,
+            padding: 8,
             boxSizing: 'border-box',
           }}
         >
           <div className="flex items-start gap-3 h-full">
             <div className="flex-1 min-w-0 text-black">
-              <div className="mb-2">
-                <div className="text-[10px] font-bold leading-tight">Бренд</div>
-                <div className="text-[13px] leading-tight break-words">BOSCH</div>
+              <div className="mb-1.5">
+                <div className="text-[8px] font-bold leading-tight">Бренд</div>
+                <div className="text-[11px] leading-tight break-words">BOSCH</div>
               </div>
-              <div className="mb-2">
-                <div className="text-[10px] font-bold leading-tight">Артикул</div>
-                <div className="text-[13px] leading-tight break-words">0 986 479 123</div>
+              <div className="mb-1.5">
+                <div className="text-[8px] font-bold leading-tight">Артикул</div>
+                <div className="text-[11px] leading-tight break-words">0 986 479 123</div>
               </div>
-              <div className="mb-2">
-                <div className="text-[10px] font-bold leading-tight">Адресное хранение</div>
-                <div className="text-[11px] leading-tight break-words">A-01-02-03</div>
+              <div className="mb-1.5">
+                <div className="text-[8px] font-bold leading-tight">Адресное хранение</div>
+                <div className="text-[9px] leading-tight break-words">A-01-02-03</div>
               </div>
-              <div className="mb-2">
-                <div className="text-[10px] font-bold leading-tight">Наименование</div>
-                <div className="text-[11px] leading-tight break-words">Тормозные колодки передние</div>
+              <div className="mb-1.5">
+                <div className="text-[8px] font-bold leading-tight">Наименование</div>
+                <div className="text-[9px] leading-tight break-words">Тормозные колодки передние</div>
               </div>
             </div>
 
-            <div className="shrink-0 flex flex-col items-center">
-              <div className="w-[72px] h-[72px] bg-black" aria-label="QR placeholder" />
-              <div className="mt-2 text-[11px] leading-tight text-black text-center whitespace-nowrap">Цена: 1 250 ₽</div>
-              <div className="mt-1 text-[10px] leading-tight text-black text-center whitespace-nowrap">Код: INT-0000123</div>
-            </div>
+              <div className="shrink-0 flex flex-col items-center">
+                <div className="w-[56px] h-[56px] bg-black" aria-label="QR placeholder" />
+                <div className="mt-1 text-[9px] leading-tight text-black text-center whitespace-nowrap">Цена: 1 250 ₽</div>
+                <div className="mt-0.5 text-[8px] leading-tight text-black text-center whitespace-nowrap">Код: INT-0000123</div>
+              </div>
           </div>
         </div>
       </div>
@@ -118,11 +118,11 @@ function LabelPreview({ widthMm, heightMm }) {
   );
 }
 
-export default function LabelPrintSection({ org }) {
+export default function LabelPrintSection() {
   const user = useSelector((state) => state.auth.user);
   const isDirector = Boolean(user?.is_director);
 
-  const defaults = useMemo(() => ({ w: 80, h: 45 }), []);
+  const defaults = useMemo(() => ({ w: 58, h: 38 }), []);
 
   const [widthMm, setWidthMm] = useState(defaults.w);
   const [heightMm, setHeightMm] = useState(defaults.h);
@@ -223,8 +223,8 @@ export default function LabelPrintSection({ org }) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-      <div className="flex items-center justify-between gap-3 mb-4">
+    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
           <div className="bg-indigo-50 text-indigo-600 rounded-full p-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -234,11 +234,11 @@ export default function LabelPrintSection({ org }) {
           <h3 className="text-lg font-semibold text-gray-800">Печать (Этикетка)</h3>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <button
             onClick={handlePrintTestLabel}
             disabled={!selectedPrinterId || printingTest}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg font-medium transition-colors ${
               selectedPrinterId && !printingTest
                 ? 'bg-white border border-gray-300 text-gray-800 hover:bg-gray-50'
                 : 'bg-gray-200 text-gray-500 cursor-not-allowed'
@@ -250,7 +250,7 @@ export default function LabelPrintSection({ org }) {
           <button
             onClick={handleSave}
             disabled={!canSave}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg font-medium transition-colors ${
               canSave ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
             }`}
           >
@@ -265,7 +265,7 @@ export default function LabelPrintSection({ org }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Принтер</label>
@@ -283,10 +283,10 @@ export default function LabelPrintSection({ org }) {
               ))}
             </select>
             {!selectedPrinterId && (
-              <div className="text-xs text-gray-500 mt-1">Выберите принтер в разделе “Печать (Принтеры)” или здесь.</div>
+              <div className="text-xs text-gray-500 mt-1">Выберите принтер в разделе "Печать (Принтеры)" или здесь.</div>
             )}
           </div>
-
+      
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ширина (мм)</label>
@@ -314,9 +314,9 @@ export default function LabelPrintSection({ org }) {
             </div>
           </div>
         </div>
-
+      
         <div>
-          <div className="text-sm font-medium text-gray-700 mb-2">Предпросмотр</div>
+          <div className="text-sm font-medium text-gray-700 mb-2">Предпросмотр ({widthMm}×{heightMm}mm)</div>
           <LabelPreview widthMm={widthMm} heightMm={heightMm} />
         </div>
       </div>

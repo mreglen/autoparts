@@ -22,13 +22,16 @@ def main() -> int:
         browser = p.chromium.launch()
         page = browser.new_page()
         page.set_content(html, wait_until="load")
+        # Generate PDF with landscape orientation for label printing
+        # Width and height are swapped to rotate content 90 degrees
         page.pdf(
             path=str(output_pdf),
-            width=f"{width_mm}mm",
-            height=f"{height_mm}mm",
+            width=f"{height_mm}mm",
+            height=f"{width_mm}mm",
             print_background=True,
             margin={"top": "0mm", "right": "0mm", "bottom": "0mm", "left": "0mm"},
             prefer_css_page_size=True,
+            landscape=True,
         )
         browser.close()
 

@@ -33,6 +33,7 @@ import PendingSellersPage from './pages/Moderation/PendingSellersPage';
 import ProductModeration from './pages/Moderation/ProductModeration/ProductModeration';
 import SellersPage from './pages/Profile/SellersPage';
 import Organization from './pages/Settings/Organization';
+import PrintSettings from './pages/Settings/PrintSettings';
 import NotFound from './pages/NotFound/NotFound';
 import PartDetail from './pages/PartDetail/PartDetail';
 
@@ -111,6 +112,7 @@ function App() {
           <Route path="/settings/employees" element={<EmployeesPage />} />
           <Route path="/settings/storage-addresses" element={<StorageAddressesPage />} />
           <Route path="/settings/organization" element={<Organization />} />
+          <Route path="/settings/printers" element={<PrintSettings />} />
           <Route path="/moderation/pending-sellers" element={<PendingSellersPage />} />
           <Route path="/moderation/products" element={<ProductModeration />} />
           <Route path="/sellers" element={<SellersPage />} />

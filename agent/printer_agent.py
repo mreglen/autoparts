@@ -561,50 +561,52 @@ class PrinterAgent:
 
             def _print_image_via_gdi(target_printer: str, pil_img: Image.Image, copies_count: int = 1) -> None:
                 """
-                Print image with correct paper size settings for label printers.
-                Configures printer device context to match label dimensions (58x38mm).
-                Uses landscape orientation (rotated 90 degrees).
+                Print image with correct scaling to fit the printable area.
+                PDF is already in landscape orientation from the generator.
+                Accounts for printer margins and physical printable area.
                 """
                 for _ in range(max(1, int(copies_count or 1))):
                     dc = win32ui.CreateDC()
                     dc.CreatePrinterDC(target_printer)
 
-                    # Get printer capabilities
-                    page_w = dc.GetDeviceCaps(win32con.HORZRES)
-                    page_h = dc.GetDeviceCaps(win32con.VERTRES)
+                    # Get physical device dimensions
+                    page_w = dc.GetDeviceCaps(win32con.HORZRES)  # Printable width
+                    page_h = dc.GetDeviceCaps(win32con.VERTRES)  # Printable height
                     
-                    # For label printers, we need to ensure correct scaling
-                    # Image should fill entire printable area without distortion
+                    # Get physical offset (margins)
+                    phys_offset_x = dc.GetDeviceCaps(win32con.PHYSICALOFFSETX)
+                    phys_offset_y = dc.GetDeviceCaps(win32con.PHYSICALOFFSETY)
+                    
+                    # Image dimensions
                     img_width, img_height = pil_img.size
                     
-                    # Rotate image 90 degrees for landscape orientation
-                    img_rotated = pil_img.transpose(Image.ROTATE_90)
-                    img_width, img_height = img_rotated.size
+                    # PDF is already in landscape orientation, no need to rotate
+                    img_to_print = pil_img
                     
                     # Calculate aspect ratios
                     page_aspect = page_w / page_h
                     img_aspect = img_width / img_height
                     
-                    # Fit image while preserving aspect ratio - SCALE TO FILL
-                    # This matches "Fit to area" behavior from Ctrl+P
+                    # Fit image while preserving aspect ratio - SCALE TO FIT PRINTABLE AREA
+                    # Ensure the entire label fits within the printable area with margins
                     if img_aspect > page_aspect:
-                        # Image is wider - fit to height instead
-                        draw_h = page_h
-                        draw_w = int(page_h * img_aspect)
-                        x_offset = (page_w - draw_w) // 2
-                        y_offset = 0
-                    else:
-                        # Image is taller - fit to width
+                        # Image is wider - fit to width
                         draw_w = page_w
                         draw_h = int(page_w / img_aspect)
-                        y_offset = (page_h - draw_h) // 2
-                        x_offset = 0
+                        x_offset = phys_offset_x
+                        y_offset = phys_offset_y + (page_h - draw_h) // 2
+                    else:
+                        # Image is taller - fit to height
+                        draw_h = page_h
+                        draw_w = int(page_h * img_aspect)
+                        x_offset = phys_offset_x + (page_w - draw_w) // 2
+                        y_offset = phys_offset_y
 
                     dc.StartDoc("AutoParts Label (PDF)")
                     dc.StartPage()
 
-                    # Draw image centered and scaled to fill
-                    dib = ImageWin.Dib(img_rotated.convert("RGB"))
+                    # Draw image centered in printable area
+                    dib = ImageWin.Dib(img_to_print.convert("RGB"))
                     dib.draw(dc.GetHandleOutput(), (x_offset, y_offset, x_offset + draw_w, y_offset + draw_h))
 
                     dc.EndPage()

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 
-export default function PrinterTokenSection({ orgId }) {
+export default function PrinterTokenSection() {
   const user = useSelector((state) => state.auth.user);
   const isDirector = Boolean(user?.is_director);
 
@@ -18,7 +18,7 @@ export default function PrinterTokenSection({ orgId }) {
   const [selectedPrinterId, setSelectedPrinterId] = useState('');
   const [savingPermission, setSavingPermission] = useState(false);
 
-  const effectiveOrgId = useMemo(() => user?.organization_id || orgId, [user?.organization_id, orgId]);
+  const effectiveOrgId = useMemo(() => user?.organization_id, [user?.organization_id]);
 
   const loadPrinters = async () => {
     if (!user?.organization_id) return;
@@ -105,7 +105,7 @@ export default function PrinterTokenSection({ orgId }) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-4">
         <div className="bg-indigo-50 text-indigo-600 rounded-full p-2">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -141,11 +141,11 @@ export default function PrinterTokenSection({ orgId }) {
           </div>
 
           <div className="bg-white border border-green-300 rounded p-3 mb-3">
-            <div className="flex items-center justify-between gap-3 mb-1">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 mb-1">
               <p className="text-xs text-gray-600">Токен:</p>
               <button
                 onClick={handleCopyToken}
-                className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
+                className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors whitespace-nowrap"
               >
                 Скопировать
               </button>
@@ -156,11 +156,11 @@ export default function PrinterTokenSection({ orgId }) {
           </div>
 
           <div className="bg-white border border-green-300 rounded p-3">
-            <div className="flex items-center justify-between gap-3 mb-1">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 mb-1">
               <p className="text-xs text-gray-600">ID организации:</p>
               <button
                 onClick={handleCopyOrgId}
-                className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
+                className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors whitespace-nowrap"
               >
                 Скопировать
               </button>
