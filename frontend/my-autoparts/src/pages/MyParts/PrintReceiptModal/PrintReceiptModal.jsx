@@ -76,7 +76,7 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
   return (
     <div
       ref={frameRef}
-      className="w-full flex justify-center"
+      className="w-full h-[450px] flex justify-center items-center"
     >
       <div
         className="bg-white border border-gray-300 box-border w-full"
@@ -279,16 +279,16 @@ const PrintReceiptModal = ({
             </div>
 
             {/* Предпросмотр */}
-
-
-            <div className='flex justify-center items-center w-full '>
-            
-              <LabelPreview
-                widthMm="58"
-                heightMm="38"
-                selectedPart={selectedPart}
-                productStorageCells={productStorageCells}
-              />
+            <div>
+    
+              <div className='flex justify-center items-center w-full'>
+                <LabelPreview
+                  widthMm="58"
+                  heightMm="38"
+                  selectedPart={selectedPart}
+                  productStorageCells={productStorageCells}
+                />
+              </div>
             </div>
 
 
