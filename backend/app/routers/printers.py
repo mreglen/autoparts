@@ -3,13 +3,17 @@ from typing import Dict, List
 from datetime import datetime, timedelta
 import json
 import base64
+import io
 from pathlib import Path
 import tempfile
 import subprocess
 import sys
+import qrcode
 from app.core.auth import get_current_user
+from app.core.config import settings
 from app.models.user import User
 from app.models.organization import Organization
+from app.models.product import Product as ProductModel
 from app.models.printer_agent import PrinterAgent
 from app.models.printer_agent_printer import PrinterAgentPrinter
 from app.models.printer_permission import PrinterPermission
@@ -34,6 +38,23 @@ _templates_env = Environment(
     loader=FileSystemLoader(str(Path(__file__).resolve().parents[1] / "templates" / "printing")),
     autoescape=select_autoescape(["html", "xml"]),
 )
+
+
+def _build_qr_data_uri(url: str, size_px: int = 220) -> str:
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=2,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+    img = img.resize((size_px, size_px))
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
 
 
 def _html_to_pdf_bytes(html: str, width_mm: int, height_mm: int) -> bytes:
@@ -469,6 +490,22 @@ async def print_product_label(
     width_mm = int(getattr(perm, "label_width_mm", payload.get("width_mm", 58)))
     height_mm = int(getattr(perm, "label_height_mm", payload.get("height_mm", 38)))
 
+    try:
+        product_id = int(payload.get("product_id"))
+    except Exception:
+        raise HTTPException(status_code=422, detail="product_id is required")
+
+    product = (
+        db.query(ProductModel)
+        .filter(
+            ProductModel.id == product_id,
+            ProductModel.organization_id == current_user.organization_id,
+        )
+        .first()
+    )
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
     # Extract product data from payload
     brand = payload.get("brand", "—")
     article = payload.get("article", "—")
@@ -476,6 +513,9 @@ async def print_product_label(
     name = payload.get("name", "—")
     internal_code = payload.get("internal_code", "—")
     price = payload.get("price", "—")
+    base_url = (settings.PUBLIC_BASE_URL or "").rstrip("/")
+    qr_url = f"{base_url}/seller/part-card/{product_id}" if base_url else f"/seller/part-card/{product_id}"
+    qr_data_uri = _build_qr_data_uri(qr_url)
 
     tmpl = _templates_env.get_template("label_print.html")
     html = tmpl.render(
@@ -487,6 +527,7 @@ async def print_product_label(
         name=name,
         internal_code=internal_code,
         price=price,
+        qr_data_uri=qr_data_uri,
     )
 
     pdf_bytes = _html_to_pdf_bytes(html, width_mm=width_mm, height_mm=height_mm)

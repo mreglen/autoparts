@@ -15,8 +15,8 @@ from PIL import Image, ImageWin
 class PrinterAgent:
     def __init__(
         self,
-        server_uri="wss://svoygarage.ru/server/api/printers/ws",
-        # server_uri="ws://127.0.0.1:8000/api/printers/ws",
+        # server_uri="wss://svoygarage.ru/server/api/printers/ws",
+        server_uri="ws://127.0.0.1:8000/api/printers/ws",
         auth_token=None,
         organization_id=None,
         on_printers_updated=None,

@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.models.product import ProductPhoto, ProductVideo, Product as ProductModel
+from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
 from app.models.product_vehicle import ProductVehicleAssociation
-from app.schemas.product import Product as ProductSchema, ProductCreate, ProductUpdate, ProductQuantityUpdate, Vehicle, DeletePhotosRequest, DeleteVideosRequest
+from app.schemas.product import Product as ProductSchema, ProductCreate, ProductUpdate, ProductQuantityUpdate, Vehicle, DeletePhotosRequest, DeleteVideosRequest, QrPartCardResponse
 from app.models.vehicle import Vehicle as VehicleModel
 from app.db.database import get_db
 from app.core.auth import get_current_user
@@ -225,6 +226,46 @@ def read_public_product(
     if not product:
         raise HTTPException(status_code=404, detail="Продукт не найден или недоступен")
     return product
+
+
+@router.get("/qr-card/{product_id}", response_model=QrPartCardResponse)
+def read_qr_part_card(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Security requirement: always return 404 for any denied scenario.
+    if not current_user or not current_user.is_seller or not current_user.organization_id:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    product = db.query(ProductModel).options(
+        selectinload(ProductModel.photos),
+        selectinload(ProductModel.videos),
+        selectinload(ProductModel.storage_location),
+        selectinload(ProductModel.product_storage_cells).selectinload(ProductStorageCellModel.storage_cell),
+    ).filter(
+        ProductModel.id == product_id,
+        ProductModel.organization_id == current_user.organization_id,
+    ).first()
+
+    if not product:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    storage_addresses = [link.value for link in (product.product_storage_cells or []) if link.value]
+
+    return QrPartCardResponse(
+        id=product.id,
+        name=product.name,
+        brand=product.brand,
+        article=product.article,
+        quantity=product.quantity,
+        internal_code=product.internal_code,
+        price=float(product.price) if product.price is not None else None,
+        storage_location_name=(product.storage_location.address if product.storage_location else None),
+        storage_addresses=storage_addresses,
+        photos=product.photos or [],
+        videos=product.videos or [],
+    )
 
 @router.put("/{product_id}", response_model=ProductSchema)
 def update_product(

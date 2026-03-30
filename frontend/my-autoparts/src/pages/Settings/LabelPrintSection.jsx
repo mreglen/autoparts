@@ -231,7 +231,7 @@ export default function LabelPrintSection() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17h10M7 13h10M7 9h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-800">Печать (Этикетка)</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Этикетка</h3>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
@@ -283,7 +283,7 @@ export default function LabelPrintSection() {
               ))}
             </select>
             {!selectedPrinterId && (
-              <div className="text-xs text-gray-500 mt-1">Выберите принтер в разделе "Печать (Принтеры)" или здесь.</div>
+              <div className="text-xs text-gray-500 mt-1">Сначала выберите подключенный принтер для настройки этикетки.</div>
             )}
           </div>
       

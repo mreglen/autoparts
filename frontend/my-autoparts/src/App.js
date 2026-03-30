@@ -36,6 +36,7 @@ import Organization from './pages/Settings/Organization';
 import PrintSettings from './pages/Settings/PrintSettings';
 import NotFound from './pages/NotFound/NotFound';
 import PartDetail from './pages/PartDetail/PartDetail';
+import SellerPartCardPage from './pages/SellerPartCard/SellerPartCardPage';
 
 
 
@@ -94,6 +95,7 @@ function App() {
           <Route path="/my-parts/add" element={<AddPart />} />
           <Route path="/my-parts/edit/:id" element={<EditPart />} />
           <Route path="/part/:productId" element={<PartDetail />} />
+          <Route path="/seller/part-card/:id" element={<SellerPartCardPage />} />
 
           <Route path="*" element={<NotFound />} />
         </Route>

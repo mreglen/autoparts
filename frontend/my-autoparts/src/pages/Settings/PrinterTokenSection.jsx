@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 
@@ -11,46 +11,7 @@ export default function PrinterTokenSection() {
   const [tokenError, setTokenError] = useState(null);
   const [showToken, setShowToken] = useState(false);
 
-  const [connectedPrinters, setConnectedPrinters] = useState([]);
-  const [printersLoading, setPrintersLoading] = useState(false);
-  const [printersError, setPrintersError] = useState(null);
-
-  const [selectedPrinterId, setSelectedPrinterId] = useState('');
-  const [savingPermission, setSavingPermission] = useState(false);
-
   const effectiveOrgId = useMemo(() => user?.organization_id, [user?.organization_id]);
-
-  const loadPrinters = async () => {
-    if (!user?.organization_id) return;
-    setPrintersLoading(true);
-    setPrintersError(null);
-    try {
-      const [connectedRes, myRes] = await Promise.all([
-        apiAxios.get('/printers/connected'),
-        apiAxios.get('/printers/me/permissions'),
-      ]);
-
-      const connected = connectedRes.data || [];
-      const myPerms = myRes.data || [];
-
-      setConnectedPrinters(connected);
-      const connectedIds = new Set((connected || []).map((p) => String(p.id)));
-      // Один текущий принтер на пользователя (помечен is_current)
-      const current = (myPerms || []).find((p) => p?.is_current) || myPerms?.[0];
-      const myId = current?.printer_id ?? '';
-      setSelectedPrinterId(connectedIds.has(String(myId)) ? String(myId) : '');
-    } catch (e) {
-      setPrintersError(e?.response?.data?.detail || 'Ошибка при загрузке принтеров');
-    } finally {
-      setPrintersLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!user?.organization_id) return;
-    loadPrinters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.organization_id]);
 
   const handleGenerateToken = async () => {
     if (!window.confirm('Вы уверены? Новый токен заменит старый и потребует обновления в программе агента.')) {
@@ -90,20 +51,6 @@ export default function PrinterTokenSection() {
     }
   };
 
-  const handleGrantPermission = async (printerId) => {
-    if (!printerId) return;
-    setSavingPermission(true);
-    setPrintersError(null);
-    try {
-      await apiAxios.post(`/printers/id/${printerId}/grant`);
-      await loadPrinters();
-    } catch (e) {
-      setPrintersError(e?.response?.data?.detail || 'Ошибка при сохранении выбора принтера');
-    } finally {
-      setSavingPermission(false);
-    }
-  };
-
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-4">
@@ -112,7 +59,7 @@ export default function PrinterTokenSection() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-gray-800">Печать (Принтеры)</h3>
+        <h3 className="text-lg font-semibold text-gray-800">Программа агента для печати</h3>
       </div>
 
       {isDirector && tokenError && (
@@ -200,38 +147,8 @@ export default function PrinterTokenSection() {
         </button>
       )}
 
-      <div className="mt-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Выбор подключенного принтера
-        </label>
-
-        {printersLoading ? (
-          <div className="text-sm text-gray-500">Загрузка...</div>
-        ) : connectedPrinters.length === 0 ? (
-          <div className="text-sm text-orange-600">
-            Принтеры не найдены. Убедитесь, что агент подключен и перечислил принтеры.
-          </div>
-        ) : (
-          <select
-            value={selectedPrinterId}
-            onChange={(e) => {
-              const v = e.target.value;
-              setSelectedPrinterId(v);
-              handleGrantPermission(v);
-            }}
-            disabled={savingPermission}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="">Выберите принтер</option>
-            {connectedPrinters.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} {p.is_default ? '(По умолчанию)' : ''}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {savingPermission && <div className="text-xs text-gray-500 mt-1">Сохраняю...</div>}
+      <div className="mt-4 text-sm text-gray-600">
+        Выбор подключенного принтера перенесен в блок «Этикетка».
       </div>
     </div>
   );

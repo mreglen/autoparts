@@ -116,3 +116,20 @@ class DeletePhotosRequest(BaseModel):
 
 class DeleteVideosRequest(BaseModel):
     video_ids: List[int]  
+
+
+class QrPartCardResponse(BaseModel):
+    id: int
+    name: str
+    brand: str
+    article: str
+    quantity: int
+    internal_code: Optional[str] = None
+    price: Optional[float] = None
+    storage_location_name: Optional[str] = None
+    storage_addresses: List[str] = []
+    photos: List[ProductPhoto] = []
+    videos: List[ProductVideo] = []
+
+    class Config:
+        from_attributes = True

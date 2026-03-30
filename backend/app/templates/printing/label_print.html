@@ -53,7 +53,8 @@
         flex: 0 0 auto;
         width: 16mm;
         height: 16mm;
-        background: #000;
+        display: block;
+        object-fit: contain;
       }
 
       .right {
@@ -123,7 +124,7 @@
           </div>
 
           <div class="right">
-            <div class="qr" aria-label="QR placeholder"></div>
+            <img class="qr" src="{{qr_data_uri}}" alt="QR code" />
             <div class="right-meta">Цена: {{price|default("—")}}</div>
             <div class="right-meta">Код: {{internal_code|default("—")}}</div>
           </div>

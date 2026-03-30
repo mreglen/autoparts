@@ -73,13 +73,26 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
       .join(';');
   }, [productStorageCells]);
 
+  const qrTargetUrl = useMemo(() => {
+    const productId = selectedPart?.id;
+    if (!productId) return '';
+    const base = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : '';
+    return `${base}/seller/part-card/${productId}`;
+  }, [selectedPart?.id]);
+
+  // Preview QR with the same target link as printed label.
+  const qrPreviewSrc = useMemo(() => {
+    if (!qrTargetUrl) return '';
+    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrTargetUrl)}`;
+  }, [qrTargetUrl]);
+
   return (
     <div
       ref={frameRef}
-      className="w-full h-[450px] flex justify-center items-center"
+      className="w-full h-[250px] flex justify-center items-center bg-gradient-to-b from-gray-50 to-gray-100 rounded-xl"
     >
       <div
-        className="bg-white border border-gray-300 box-border w-full"
+        className="bg-white border border-gray-300 box-border shadow-sm"
         style={{
           width: `${designMm.w * MM_TO_PX}px`,
           height: basePx.h,
@@ -120,7 +133,16 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
             </div>
 
             <div className="shrink-0 flex flex-col items-center gap-1">
-              <div className="w-[56px] h-[56px] bg-black" aria-label="QR placeholder" />
+              <div className="w-[56px] h-[56px] border border-black overflow-hidden bg-white">
+                {qrPreviewSrc ? (
+                  <img
+                    src={qrPreviewSrc}
+                    alt="QR code preview"
+                    className="w-full h-full object-contain"
+                    loading="lazy"
+                  />
+                ) : null}
+              </div>
               <div className="text-[9px] leading-tight text-black text-center whitespace-nowrap">
                 Цена: {selectedPart?.price != null ? `${parseFloat(selectedPart.price).toFixed(0)} ₽` : '—'}
               </div>
@@ -188,6 +210,7 @@ const PrintReceiptModal = ({
     }
 
     const productData = {
+      product_id: selectedPart?.id,
       brand: selectedPart?.brand || '—',
       article: selectedPart?.article || '—',
       storage_address: productStorageCells && productStorageCells.length > 0
@@ -222,16 +245,16 @@ const PrintReceiptModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/55 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
       <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-gray-100"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6 relative">
+        <div className="p-6 sm:p-7 relative">
           {/* Кнопка закрытия */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10 rounded-full p-1.5 hover:bg-gray-100"
             aria-label="Закрыть"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -239,18 +262,21 @@ const PrintReceiptModal = ({
             </svg>
           </button>
 
-          <h2 className="text-xl font-bold text-gray-800 mb-6 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-1 text-center">
             Печать этикетки
           </h2>
+          <p className="text-sm text-gray-500 text-center mb-6">
+            Проверьте параметры перед отправкой на принтер
+          </p>
 
-          <div className="space-y-6 flex flex-col justify-start">
+          <div className="space-y-5 flex flex-col justify-start">
             {/* Выбор принтера */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/70">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Принтер
               </label>
               {loading ? (
-                <div className="text-sm text-gray-500">Загрузка...</div>
+                <div className="text-sm text-gray-500">Загрузка списка принтеров...</div>
               ) : error ? (
                 <div className="text-sm text-red-600">{error}</div>
               ) : printers.length === 0 ? (
@@ -267,7 +293,7 @@ const PrintReceiptModal = ({
                 <select
                   value={printerSettings.printer}
                   onChange={(e) => handleSettingChange('printer', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="">Выберите принтер</option>
                   {printers.map((printer) => (
@@ -280,8 +306,8 @@ const PrintReceiptModal = ({
             </div>
 
             {/* Предпросмотр */}
-            <div>
-    
+            <div className="p-3 rounded-xl bg-white border border-gray-200">
+              
               <div className='flex justify-center items-center w-full'>
                 <LabelPreview
                   widthMm="58"
@@ -294,12 +320,12 @@ const PrintReceiptModal = ({
 
 
             {/* Кнопка печати */}
-            <div className="pt-2">
+            <div className="pt-1">
               <button
                 onClick={handlePrint}
                 disabled={!printerSettings.printer || printing}
-                className={`w-full px-4 py-2.5 rounded-lg font-medium transition ${!printerSettings.printer || printing
-                  ? 'bg-indigo-400 cursor-not-allowed'
+                className={`w-full px-4 py-3 rounded-lg font-semibold transition-colors ${!printerSettings.printer || printing
+                  ? 'bg-indigo-400 text-white cursor-not-allowed'
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                   }`}
               >
