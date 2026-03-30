@@ -9,6 +9,7 @@ import {
   selectPrintersError,
   clearError
 } from '../../../redux/slices/PrinterSlice';
+import { apiAxios } from '../../../utils/apiClient';
 
 const MM_TO_PX = 96 / 25.4;
 
@@ -80,10 +81,30 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
     return `${base}/seller/part-card/${productId}`;
   }, [selectedPart?.id]);
 
-  // Preview QR with the same target link as printed label.
-  const qrPreviewSrc = useMemo(() => {
-    if (!qrTargetUrl) return '';
-    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrTargetUrl)}`;
+  const [qrPreviewSrc, setQrPreviewSrc] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadQr = async () => {
+      if (!qrTargetUrl) {
+        setQrPreviewSrc('');
+        return;
+      }
+      try {
+        const res = await apiAxios.get('/printers/qr-preview', { params: { url: qrTargetUrl } });
+        if (!cancelled) {
+          setQrPreviewSrc(res.data?.data_uri || '');
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setQrPreviewSrc('');
+        }
+      }
+    };
+    loadQr();
+    return () => {
+      cancelled = true;
+    };
   }, [qrTargetUrl]);
 
   return (

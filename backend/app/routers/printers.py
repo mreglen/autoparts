@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import subprocess
 import sys
+from urllib.parse import urlsplit, urlunsplit
 import qrcode
 from app.core.auth import get_current_user
 from app.core.config import settings
@@ -55,6 +56,22 @@ def _build_qr_data_uri(url: str, size_px: int = 220) -> str:
     img.save(buffer, format="PNG")
     encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
     return f"data:image/png;base64,{encoded}"
+
+
+def _normalize_public_base_url(raw_url: str) -> str:
+    if not raw_url:
+        return ""
+    clean = raw_url.strip().strip("'").strip('"').rstrip("/")
+    try:
+        parsed = urlsplit(clean)
+        path = (parsed.path or "").rstrip("/")
+        # Deployment can serve API under /server, but QR link must point to frontend root.
+        if path.endswith("/server"):
+            path = path[: -len("/server")]
+        normalized = urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+        return normalized.rstrip("/")
+    except Exception:
+        return clean
 
 
 def _html_to_pdf_bytes(html: str, width_mm: int, height_mm: int) -> bytes:
@@ -513,7 +530,7 @@ async def print_product_label(
     name = payload.get("name", "—")
     internal_code = payload.get("internal_code", "—")
     price = payload.get("price", "—")
-    base_url = (settings.PUBLIC_BASE_URL or "").rstrip("/")
+    base_url = _normalize_public_base_url(settings.PUBLIC_BASE_URL or "")
     qr_url = f"{base_url}/seller/part-card/{product_id}" if base_url else f"/seller/part-card/{product_id}"
     qr_data_uri = _build_qr_data_uri(qr_url)
 
@@ -599,6 +616,16 @@ async def get_print_job(job_id: int, current_user: User = Depends(get_current_us
         raise HTTPException(status_code=404, detail="Print job not found")
     
     return job
+
+
+@router.get("/qr-preview")
+async def get_qr_preview(
+    url: str,
+    current_user: User = Depends(get_current_user),
+):
+    if not url:
+        raise HTTPException(status_code=422, detail="url is required")
+    return {"data_uri": _build_qr_data_uri(url)}
 
 
 @router.post("/printer-token/generate")
