@@ -177,7 +177,7 @@ export default function Navigation() {
                     <nav className="flex flex-wrap justify-center gap-4">
                         {/* Всегда видимые пункты */}
                         <NavLink
-                            to="/autoparts"
+                            to="/autoparts/new"
                             className={({ isActive }) =>
                                 `text-lg transition-colors ease-in-out ${isActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
                                 }`}

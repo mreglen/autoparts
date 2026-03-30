@@ -1,5 +1,5 @@
 // src/App.jsx
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect } from 'react';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
@@ -85,7 +85,9 @@ function App() {
         {/* Основной layout — страницы без бокового меню */}
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Main />} />
-          <Route path="/autoparts" element={<AutoParts />} />
+          <Route path="/autoparts" element={<Navigate to="/autoparts/new" replace />} />
+          <Route path="/autoparts/new" element={<AutoParts />} />
+          <Route path="/autoparts/used" element={<AutoParts />} />
           <Route path="/autoservice" element={<Home />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/order-reg" element={<OrderRegistration />} />

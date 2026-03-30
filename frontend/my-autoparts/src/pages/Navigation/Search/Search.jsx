@@ -34,7 +34,7 @@ function Search() {
       setSearchTerm(trimmedTerm);
     }).finally(() => {
       setIsSearching(false);
-      navigate(`/autoparts?q=${encodeURIComponent(trimmedTerm)}`);
+      navigate(`/autoparts/new?q=${encodeURIComponent(trimmedTerm)}`);
     });
   };
 

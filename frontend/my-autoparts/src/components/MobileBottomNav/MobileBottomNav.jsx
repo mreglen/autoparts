@@ -49,7 +49,7 @@ export default function MobileBottomNav() {
                 {/* Автозапчасти */}
                 <div className="flex flex-col items-center justify-center py-2">
                     <NavLink 
-                        to="/autoparts"
+                        to="/autoparts/new"
                         className={({ isActive }) => 
                             `flex flex-col items-center justify-center w-full h-full ${
                                 isActive ? 'text-indigo-600' : 'text-gray-700 hover:text-indigo-600'

@@ -27,7 +27,7 @@ function Home() {
                             
                             <div className="flex flex-col sm:flex-row gap-4">
                                 <Link 
-                                    to="/autoparts" 
+                                    to="/autoparts/new" 
                                     className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 text-center"
                                 >
                                     Найти запчасти
@@ -127,7 +127,7 @@ function Home() {
                         ].map((category, index) => (
                             <Link 
                                 key={index}
-                                to="/autoparts"
+                                to="/autoparts/new"
                                 className="bg-white rounded-xl p-6 text-center hover:shadow-lg transition-shadow duration-300 border border-gray-100 hover:border-blue-200 group"
                             >
                                 <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">
@@ -153,7 +153,7 @@ function Home() {
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <Link 
-                            to="/autoparts"
+                            to="/autoparts/new"
                             className="px-8 py-4 bg-white text-blue-600 font-semibold rounded-lg hover:bg-gray-100 transition-colors duration-300 text-center"
                         >
                             Начать поиск

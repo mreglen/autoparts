@@ -84,7 +84,8 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
           width: `${designMm.w * MM_TO_PX}px`,
           height: basePx.h,
           transform: `scale(${scale})`,
-          transformOrigin: 'top left',
+          // Center scaling so the preview stays visually centered
+          transformOrigin: 'center center',
           overflow: 'hidden'
         }}
       >
@@ -93,7 +94,7 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
             width: `${designMm.w * MM_TO_PX}px`,
             height: `${designMm.h * MM_TO_PX}px`,
             transform: `scale(${contentScale})`,
-            transformOrigin: 'top left',
+            transformOrigin: 'center center',
             padding: 8,
             boxSizing: 'border-box'
           }}

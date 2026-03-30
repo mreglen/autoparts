@@ -27,7 +27,7 @@ export default function NotFoundPage() {
             <h3 className="text-sm font-medium text-gray-900 mb-4">Попробуйте посетить:</h3>
             <div className="flex flex-col sm:flex-row gap-2 justify-center">
               <Link
-                to="/autoparts"
+                to="/autoparts/new"
                 className="px-4 py-2 text-indigo-600 hover:text-indigo-800 font-medium text-sm rounded-lg hover:bg-indigo-50 transition-colors"
               >
                 Автозапчасти

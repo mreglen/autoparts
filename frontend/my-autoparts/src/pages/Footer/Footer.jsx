@@ -27,7 +27,7 @@ function Footer() {
                     </NavLink>
                     <NavLink
                         exact
-                        to='/autoparts'
+                        to='/autoparts/new'
                         className='hover:text-blue_primary-light transition-colors ease-in-out'
                     >
                         Автозапчасти
