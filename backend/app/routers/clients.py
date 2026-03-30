@@ -11,7 +11,7 @@ from app.utils.phone import normalize_to_storage_format
 
 router = APIRouter(prefix="/clients", tags=["Clients"])
 
-@router.get("/", response_model=List[ClientResponse])
+@router.get("", response_model=List[ClientResponse])
 def get_clients(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -30,7 +30,7 @@ def get_clients(
     
     return result
 
-@router.post("/", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
 def create_client(
     client: ClientCreate,
     db: Session = Depends(get_db),
