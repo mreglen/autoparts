@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { login as loginThunk } from '../../../redux/slices/AuthSlice';
+import { fetchCart } from '../../../redux/slices/CartSlice';
 
 export default function Login() {
     const [loginValue, setLoginValue] = useState('');
@@ -17,6 +18,7 @@ export default function Login() {
         dispatch(loginThunk({ login: loginValue, password }))
             .unwrap()
             .then(() => {
+                dispatch(fetchCart());
                 navigate('/');
             })
             .catch(() => { });

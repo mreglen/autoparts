@@ -15,6 +15,7 @@ import secrets
 
 settings = Settings()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None, db: Session = None, user: User = None, device_info: str = None, ip_address: str = None) -> str:
     to_encode = data.copy()
@@ -107,6 +108,18 @@ def get_current_user(
         db.commit()
 
     return user
+
+
+def get_current_user_optional(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    if not token:
+        return None
+    try:
+        return get_current_user(token=token, db=db)
+    except Exception:
+        return None
 
 def get_current_admin_user(
     current_user: User = Depends(get_current_user)

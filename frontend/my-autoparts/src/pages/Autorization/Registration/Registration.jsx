@@ -14,6 +14,7 @@ import {
     resetEmailVerificationError,
     setAddressError,
 } from '../../../redux/slices/AuthSlice';
+import { fetchCart } from '../../../redux/slices/CartSlice';
 import { useNavigate } from 'react-router-dom';
 
 export default function Registration() {
@@ -240,6 +241,7 @@ export default function Registration() {
             }))
                 .unwrap()
                 .then(() => {
+                    dispatch(fetchCart());
                     navigate('/');
                 })
                 .catch(() => { });

@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from app.db.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
-from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, orders
+from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, orders, carts
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 import uvicorn
@@ -11,6 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from app.db.database import get_db
 from app.core.auth import cleanup_expired_sessions
+from app.utils.guest_cart import cleanup_expired_guest_carts
 import logging
 import os
 import sys
@@ -43,7 +44,10 @@ app = FastAPI(title="Автозапчасти")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -75,6 +79,13 @@ async def startup_event():
         trigger=IntervalTrigger(hours=1),
         id='cleanup_expired_sessions',
         name='Clean up expired user sessions every hour',
+        replace_existing=True
+    )
+    scheduler.add_job(
+        func=run_cleanup_expired_guest_carts,
+        trigger=IntervalTrigger(hours=1),
+        id='cleanup_expired_guest_carts',
+        name='Clean up expired guest carts every hour',
         replace_existing=True
     )
     
@@ -145,6 +156,19 @@ async def run_cleanup_expired_sessions():
             db.close()
     except Exception as e:
         logger.error(f"Ошибка при очистке сессий пользователей: {str(e)}")
+
+
+async def run_cleanup_expired_guest_carts():
+    try:
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            deleted_count = cleanup_expired_guest_carts(db)
+            logger.info(f"Удалено {deleted_count} гостевых корзин с истекшим сроком действия")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Ошибка при очистке гостевых корзин: {str(e)}")
 
 
 app.include_router(api_router)

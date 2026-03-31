@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   selectCart,
   selectCartLoading,
@@ -13,9 +14,11 @@ import {
 
 export default function CartPage() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const cart = useSelector(selectCart);
   const loading = useSelector(selectCartLoading);
   const error = useSelector(selectCartError);
+  const isAuthorized = useSelector((state) => Boolean(state.auth.token));
 
   // Состояние для выбранных товаров
   const [selectedItems, setSelectedItems] = useState(new Set());
@@ -192,6 +195,10 @@ export default function CartPage() {
   };
 
   const handleCheckout = (seller) => {
+    if (!isAuthorized) {
+      navigate('/auth');
+      return;
+    }
     // Оформление заказа для всех товаров продавца
     const sellerItems = groupedItems[seller] || [];
 
@@ -204,10 +211,14 @@ export default function CartPage() {
     localStorage.setItem('orderData', JSON.stringify(orderData));
 
     // Переходим на страницу оформления заказа
-    window.location.href = '/order-reg';
+    navigate('/order-reg');
   };
 
   const handleCheckoutSelected = (seller) => {
+    if (!isAuthorized) {
+      navigate('/auth');
+      return;
+    }
     // Оформление выбранных товаров продавца
     const selectedFromSeller = groupedItems[seller]?.filter(item => selectedItems.has(item.id)) || [];
 
@@ -220,7 +231,7 @@ export default function CartPage() {
     localStorage.setItem('orderData', JSON.stringify(orderData));
 
     // Переходим на страницу оформления заказа
-    window.location.href = '/order-reg';
+    navigate('/order-reg');
   };
 
   const handleItemSelect = (itemId) => {
@@ -647,7 +658,7 @@ export default function CartPage() {
                             className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                           >
                             <img src="/img/cart.svg" alt="" className="w-3 h-3 mr-1 filter brightness-0" />
-                            Оформить выбранное
+                            {isAuthorized ? 'Оформить выбранное' : 'Авторизироваться'}
                           </button>
                         </>
                       )}
@@ -672,7 +683,7 @@ export default function CartPage() {
                         onClick={() => handleCheckout(seller)}
                         className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
-                        Оформить заказ
+                        {isAuthorized ? 'Оформить заказ' : 'Авторизироваться'}
                       </button>
                     </div>
                   </div>
@@ -760,7 +771,7 @@ export default function CartPage() {
                             onClick={() => handleCheckoutSelected(seller)}
                             className="flex-1 px-3 py-2 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 min-w-[100px]"
                           >
-                            Оформить выбранное
+                            {isAuthorized ? 'Оформить выбранное' : 'Авторизироваться'}
                           </button>
                         </>
                       )}
@@ -777,7 +788,7 @@ export default function CartPage() {
                         onClick={() => handleCheckout(seller)}
                         className="flex-1 px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 min-w-[120px]"
                       >
-                        Оформить заказ
+                        {isAuthorized ? 'Оформить заказ' : 'Авторизироваться'}
                       </button>
                     </div>
                   </div>

@@ -40,7 +40,6 @@ const PartDetail = () => {
   const dispatch = useDispatch();
   
   const { currentProduct, loading, error } = useSelector((state) => state.products);
-  const user = useSelector((state) => state.auth.user);
   const { organization } = useSelector((state) => state.organization);
   const cart = useSelector(selectCart);
 
@@ -107,9 +106,6 @@ const PartDetail = () => {
   };
 
   const handleAddToCart = async (part) => {
-    if (!user) {
-      return;
-    }
     setAddingToCartId(part.id);
     try {
       const currentCartQuantity = getCartQuantity(part.id);

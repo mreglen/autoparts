@@ -36,7 +36,7 @@ class CartItemResponse(BaseModel):
 
 class CartResponse(BaseModel):
     id: int
-    user_id: int
+    user_id: Optional[int] = None
     new_parts_items: list[CartItemResponse]
     used_parts_items: list[CartItemResponse]
 

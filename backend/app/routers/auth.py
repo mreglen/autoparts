@@ -1,5 +1,5 @@
 # app/routers/auth.py
-from fastapi import APIRouter, Depends, Form, HTTPException, status, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session, joinedload
 from app.models.organization import Organization
 from app.models.password_reset_token import PasswordResetToken
@@ -29,6 +29,7 @@ from app.utils.email import generate_verification_code, send_verification_email,
 from app.utils.event_logger import log_event
 from app.utils.id_generator import random_id
 from app.utils.phone import normalize_to_storage_format  
+from app.utils.guest_cart import merge_guest_cart_from_request
 import logging
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,7 @@ def register_start(data: RegisterStep1, db: Session = Depends(get_db)):
 
 
 @router.post("/register/confirm")
-def register_confirm(data: VerifyCode, db: Session = Depends(get_db)):
+def register_confirm(data: VerifyCode, request: Request, response: Response, db: Session = Depends(get_db)):
     pending = db.query(PendingUser).filter(PendingUser.email == data.email).first()
     if not pending:
         raise HTTPException(status_code=400, detail="Нет данных для этого email")
@@ -192,7 +193,7 @@ def register_confirm(data: VerifyCode, db: Session = Depends(get_db)):
     )
     
     # Clean up old sessions for this user (IP is None during registration)
-    # We can't clean up by IP here since IP is not available during registration
+    merge_guest_cart_from_request(db, request, response, user.id)
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -203,7 +204,8 @@ def login(
     user_agent: str = Form(None, description="User agent браузера"),
     device_info: str = Form(None, description="Информация об устройстве"),
     db: Session = Depends(get_db),
-    request: Request = None
+    request: Request = None,
+    response: Response = None
 ):
     user = authenticate_user(db, username, password)
     if not user:
@@ -253,7 +255,9 @@ def login(
     # Clean up old sessions for this user from the same IP
     if ip_address:
         cleanup_old_user_sessions(db, user.id, ip_address)
-        
+
+    if request is not None and response is not None:
+        merge_guest_cart_from_request(db, request, response, user.id)
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/profile", response_model=UserResponse)
@@ -321,7 +325,7 @@ def verify_code(data: VerifyCode, db: Session = Depends(get_db)):
 
 
 @router.post("/register/complete")
-def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), request: Request = None):
+def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), request: Request = None, response: Response = None):
     pending = db.query(PendingUser).filter(PendingUser.email == data.email).first()
     if not pending or not pending.is_verified:
         raise HTTPException(status_code=400, detail="Email не подтверждён")
@@ -412,7 +416,9 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
         ip_address = request.client.host if request else None
         if ip_address:
             cleanup_old_user_sessions(db, user.id, ip_address)
-            
+
+        if request is not None and response is not None:
+            merge_guest_cart_from_request(db, request, response, user.id)
         return {"access_token": access_token, "token_type": "bearer"}
 
     except Exception as e:

@@ -123,10 +123,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
 
   // Функция добавления в корзину
   const handleAddToCart = async (part) => {
-    if (!user) {
-      // Можно добавить редирект на логин или уведомление
-      return;
-    }
     setAddingToCartId(part.id);
     try {
       const currentCartQuantity = getCartQuantity(part.id);

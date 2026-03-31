@@ -53,6 +53,7 @@ export const normalizeImageUrl = (imageUrl) => {
 export const apiRequest = async (endpoint, options = {}) => {
     const url = `${API_BASE}${endpoint}`;
     const defaultOptions = {
+        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders(),
@@ -80,6 +81,7 @@ export const apiRequest = async (endpoint, options = {}) => {
 export const apiRequestUnauth = async (endpoint, options = {}) => {
     const url = `${API_BASE}${endpoint}`;
     const defaultOptions = {
+        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
             ...options.headers
@@ -137,6 +139,7 @@ export const apiRequestFormData = async (endpoint, formData, options = {}) => {
 
 export const apiAxios = axios.create({
     baseURL: API_BASE,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -154,6 +157,7 @@ apiAxios.interceptors.request.use((config) => {
 
 export const apiAxiosUnauth = axios.create({
     baseURL: API_BASE,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     },
