@@ -286,6 +286,10 @@ function MyParts() {
     reason: '',
   });
 
+  // Сортировка: по умолчанию сначала новые
+  const [sortOrder, setSortOrder] = useState('date_desc'); // 'date_desc', 'date_asc', 'name_asc', 'name_desc'
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+
   // Calculate displayParts BEFORE the useEffect that uses it
   const displayParts = products.filter(part => {
     // Если выбран склад, сначала проверяем принадлежность к складу
@@ -303,6 +307,29 @@ function MyParts() {
       (part.name && part.name.toLowerCase().includes(query))
     );
   });
+
+  // Применяем сортировку к отфильтрованным запчастям
+  const sortedDisplayParts = React.useMemo(() => {
+    const items = [...displayParts];
+
+    if (sortOrder === 'date_desc') {
+      // Сначала новые
+      items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    } else if (sortOrder === 'date_asc') {
+      // Сначала старые
+      items.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    } else if (sortOrder === 'name_asc' || sortOrder === 'name_desc') {
+      items.sort((a, b) => {
+        const aName = (a.name || a.brand || a.article || '').toString().toLowerCase();
+        const bName = (b.name || b.brand || b.article || '').toString().toLowerCase();
+        if (aName < bName) return sortOrder === 'name_asc' ? -1 : 1;
+        if (aName > bName) return sortOrder === 'name_asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return items;
+  }, [displayParts, sortOrder]);
 
   // Расчет общей суммы и количества
   const totalValue = displayParts.reduce((sum, part) => sum + (part.price * part.quantity), 0);
@@ -587,8 +614,8 @@ function MyParts() {
         </div>
       </div>
 
-      {/* Фильтр по складу и поисковое поле */}
-      <div className="mb-6 flex flex-col md:flex-row gap-4">
+      {/* Фильтр по складу, поиск и сортировка */}
+      <div className="mb-6 flex flex-col md:flex-row gap-4 md:items-end">
         {/* Фильтр по складу */}
         <div className="md:w-64">
           <label className="block text-sm font-medium text-gray-700 mb-1">Склад</label>
@@ -637,6 +664,85 @@ function MyParts() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Сортировка */}
+        <div className="md:w-64 relative">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Сортировка
+          </label>
+          <button
+            onClick={() => setShowSortDropdown(!showSortDropdown)}
+            className="w-full px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-between gap-2 bg-gray-200 text-gray-700 hover:bg-gray-300 min-h-[40px]"
+            title="Сортировка"
+          >
+            <span className="flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+              </svg>
+              <span>Выбор порядка</span>
+            </span>
+            <svg className={`w-4 h-4 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showSortDropdown && (
+            <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-30">
+              <button
+                onClick={() => { setSortOrder('date_desc'); setShowSortDropdown(false); }}
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'date_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span>Сначала новые</span>
+                  {sortOrder === 'date_desc' && (
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={() => { setSortOrder('date_asc'); setShowSortDropdown(false); }}
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'date_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span>Сначала старые</span>
+                  {sortOrder === 'date_asc' && (
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={() => { setSortOrder('name_asc'); setShowSortDropdown(false); }}
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'name_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span>По алфавиту (А–Я)</span>
+                  {sortOrder === 'name_asc' && (
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={() => { setSortOrder('name_desc'); setShowSortDropdown(false); }}
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'name_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span>По алфавиту (Я–А)</span>
+                  {sortOrder === 'name_desc' && (
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -797,7 +903,7 @@ function MyParts() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {displayParts.map((part) => (
+                {sortedDisplayParts.map((part) => (
                   <CardPart
                     key={part.id}
                     part={part}
@@ -867,7 +973,7 @@ function MyParts() {
               </div>
             )}
 
-            {displayParts.map((part) => (
+            {sortedDisplayParts.map((part) => (
               <div key={part.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
                 {/* Заголовок и чекбокс */}
                 <div className="flex items-start justify-between mb-4">

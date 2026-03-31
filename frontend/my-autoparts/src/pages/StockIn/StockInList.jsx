@@ -156,6 +156,10 @@ const StockInList = () => {
   const [currentMediaItems, setCurrentMediaItems] = useState([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
 
+  // Сортировка: по умолчанию сначала новые
+  const [sortOrder, setSortOrder] = useState('date_desc'); // 'date_desc', 'date_asc', 'name_asc', 'name_desc'
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+
   // Check if user has permission to view this page
   // Admin and sellers always have access
   // Employees need 'stock-in' permission code
@@ -178,6 +182,28 @@ const StockInList = () => {
     setAuthChecked(true);
     if (!hasPermission) navigate('/', { replace: true });
   }, [user, permissionCodes, hasPermission, navigate]);
+
+  // Отсортированный список документов поступления
+  // Важно: хук должен вызываться до любых ранних return.
+  const sortedStockIns = React.useMemo(() => {
+    const items = Array.isArray(stockIns) ? [...stockIns] : [];
+    if (sortOrder === 'date_desc') {
+      // Сначала новые
+      items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    } else if (sortOrder === 'date_asc') {
+      // Сначала старые
+      items.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    } else if (sortOrder === 'name_asc' || sortOrder === 'name_desc') {
+      items.sort((a, b) => {
+        const aName = (a.product?.name || a.product?.brand || a.product?.article || '').toString().toLowerCase();
+        const bName = (b.product?.name || b.product?.brand || b.product?.article || '').toString().toLowerCase();
+        if (aName < bName) return sortOrder === 'name_asc' ? -1 : 1;
+        if (aName > bName) return sortOrder === 'name_asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return items;
+  }, [stockIns, sortOrder]);
 
   // Show loading while auth data is loading
   if (!authChecked) {
@@ -268,7 +294,81 @@ const StockInList = () => {
     <div className="mt-4 sm:mt-5 px-4 sm:px-0">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
         <h1 className="text-2xl sm:text-2xl font-bold text-gray-800">Документы поступления</h1>
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+          {/* Кнопка сортировки как в /autoparts/used */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSortDropdown(!showSortDropdown)}
+              className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-gray-200 text-gray-700 hover:bg-gray-300 min-h-[40px]"
+              title="Сортировка"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+              </svg>
+              <span className="hidden sm:inline">Сортировка</span>
+              <svg className={`w-4 h-4 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showSortDropdown && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-30">
+                <button
+                  onClick={() => { setSortOrder('date_desc'); setShowSortDropdown(false); }}
+                  className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'date_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>Сначала новые</span>
+                    {sortOrder === 'date_desc' && (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setSortOrder('date_asc'); setShowSortDropdown(false); }}
+                  className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'date_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>Сначала старые</span>
+                    {sortOrder === 'date_asc' && (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setSortOrder('name_asc'); setShowSortDropdown(false); }}
+                  className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'name_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>По алфавиту (А–Я)</span>
+                    {sortOrder === 'name_asc' && (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setSortOrder('name_desc'); setShowSortDropdown(false); }}
+                  className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'name_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>По алфавиту (Я–А)</span>
+                    {sortOrder === 'name_desc' && (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => setIsVehicleModalOpen(true)}
             className="px-6 py-3 sm:px-4 sm:py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition text-base font-medium min-h-[48px] sm:min-h-0"
@@ -288,7 +388,7 @@ const StockInList = () => {
         <h2 className="border-b-4 border-blue-500 pb-2 inline-block">Список поступлений</h2>
       </div>
 
-      {stockIns.length === 0 ? (
+      {sortedStockIns.length === 0 ? (
         <div className="mt-12 text-center py-16 px-6">
           <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
             <svg className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -314,7 +414,7 @@ const StockInList = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {stockIns.map((doc) => (
+                {sortedStockIns.map((doc) => (
                   <StockInRow
                     key={doc.id}
                     doc={doc}
@@ -329,7 +429,7 @@ const StockInList = () => {
 
           {/* Мобильная версия - карточки */}
           <div className="md:hidden space-y-5">
-            {stockIns.map((doc) => (
+            {sortedStockIns.map((doc) => (
               <div key={doc.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
                 {/* Заголовок карточки */}
                 <div className="flex justify-between items-start mb-4">

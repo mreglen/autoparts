@@ -39,13 +39,14 @@ const SellerPartCardPage = () => {
         const response = await apiAxios.get(`/products/qr-card/${id}`);
         setPart(response.data);
       } catch (error) {
-        setNotFound(true);
+        // For non-seller/unauthorized users open public product card instead of local 404.
+        navigate(`/part/${id}`, { replace: true });
       } finally {
         setLoading(false);
       }
     };
     fetchCard();
-  }, [id]);
+  }, [id, navigate]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -65,6 +66,24 @@ const SellerPartCardPage = () => {
     const videos = (part.videos || []).map((v) => ({ type: 'video', src: normalizeImageUrl(v.full_url || v.video_url || '') }));
     return [...photos, ...videos].filter((x) => x.src);
   }, [part]);
+
+  const isSellerFromProductOrganization = useMemo(() => {
+    if (!part) return false;
+    if (!user?.is_seller) return false;
+
+    const userOrgId = user?.organization_id;
+    const partOrgId = part?.organization_id ?? part?.organization?.id ?? null;
+
+    if (userOrgId == null || partOrgId == null) return false;
+    return String(userOrgId) === String(partOrgId);
+  }, [part, user]);
+
+  useEffect(() => {
+    if (loading || !part) return;
+    if (!isSellerFromProductOrganization) {
+      navigate(`/part/${part.id || id}`, { replace: true });
+    }
+  }, [loading, part, isSellerFromProductOrganization, navigate, id]);
 
   const handleOpenMedia = (idx = 0) => {
     setCurrentMediaItems(mediaItems);
@@ -117,6 +136,9 @@ const SellerPartCardPage = () => {
   }
   if (notFound || !part) {
     return <div className="p-8 text-center text-gray-700 text-lg">404: Страница не найдена</div>;
+  }
+  if (!isSellerFromProductOrganization) {
+    return null;
   }
 
   const previewMedia = mediaItems[0];
