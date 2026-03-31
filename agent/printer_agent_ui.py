@@ -12,9 +12,16 @@ from datetime import datetime
 from pathlib import Path
 
 try:
-    from .printer_agent import PrinterAgent
-except ImportError:
-    from printer_agent import PrinterAgent
+    # When running from a PyInstaller-built exe, modules are typically imported by
+    # their package path (e.g. agent.printer_agent).
+    from agent.printer_agent import PrinterAgent
+except Exception:
+    try:
+        # When running as a package (python -m agent.printer_agent_ui)
+        from .printer_agent import PrinterAgent
+    except Exception:
+        # When running as a plain script from the same folder
+        from printer_agent import PrinterAgent
 
 
 def _safe_str(x):
@@ -99,6 +106,13 @@ class PrinterAgentUI:
         self._auth_store_path = self._get_auth_store_path()
         self._saved_token = ""
         self._saved_org_id = ""
+        self._saved_server_uri = ""
+
+        self.SERVER_URIS = {
+            "svoygarage.ru": "wss://svoygarage.ru/server/api/printers/ws",
+            "127.0.0.1:8000": "ws://127.0.0.1:8000/api/printers/ws",
+        }
+        self.DEFAULT_SERVER_URI = self.SERVER_URIS["svoygarage.ru"]
 
         self.style = ttk.Style(self.root)
         self._apply_theme()
@@ -109,14 +123,20 @@ class PrinterAgentUI:
             saved = self._load_saved_auth()
             self._saved_token = saved.get("printer_token", "") or ""
             self._saved_org_id = saved.get("organization_id", "") or ""
+            self._saved_server_uri = saved.get("server_uri", "") or ""
         except Exception:
             self._saved_token = ""
             self._saved_org_id = ""
+            self._saved_server_uri = ""
 
         if self._saved_token:
             self.token_var.set(self._saved_token)
         if self._saved_org_id:
             self.org_var.set(self._saved_org_id)
+        if self._saved_server_uri:
+            self.server_uri_var.set(self._saved_server_uri)
+        else:
+            self.server_uri_var.set(self.DEFAULT_SERVER_URI)
 
         self.root.after(200, self._poll_events)
 
@@ -131,7 +151,7 @@ class PrinterAgentUI:
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
 
-    def _save_auth(self, printer_token: str, organization_id: str) -> None:
+    def _save_auth(self, printer_token: str, organization_id: str, server_uri: str) -> None:
         path = self._auth_store_path
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8") as f:
@@ -139,6 +159,7 @@ class PrinterAgentUI:
                 {
                     "printer_token": printer_token,
                     "organization_id": organization_id,
+                    "server_uri": server_uri,
                 },
                 f,
                 ensure_ascii=False,
@@ -151,7 +172,7 @@ class PrinterAgentUI:
         ):
             self.token_var.set("")
             try:
-                self._save_auth("", self.org_var.get().strip())
+                self._save_auth("", self.org_var.get().strip(), self.server_uri_var.get().strip())
                 self._saved_token = ""
             except Exception as e:
                 messagebox.showwarning("Внимание", f"Не удалось сохранить: {e}")
@@ -163,7 +184,7 @@ class PrinterAgentUI:
         ):
             self.org_var.set("")
             try:
-                self._save_auth(self.token_var.get().strip(), "")
+                self._save_auth(self.token_var.get().strip(), "", self.server_uri_var.get().strip())
                 self._saved_org_id = ""
             except Exception as e:
                 messagebox.showwarning("Внимание", f"Не удалось сохранить: {e}")
@@ -244,8 +265,30 @@ class PrinterAgentUI:
         )
         self.clear_org_btn.grid(row=0, column=1)
 
+        ctk.CTkLabel(top, text="Сервер", anchor="w", text_color=self.TEXT).grid(
+            row=2, column=0, sticky="nw", padx=(4, 10), pady=(8, 2)
+        )
+        server_row = ctk.CTkFrame(top, fg_color="transparent")
+        server_row.grid(row=2, column=1, sticky="ew", pady=(8, 2))
+        server_row.grid_columnconfigure(0, weight=1)
+
+        self.server_uri_var = tk.StringVar()
+        self.server_uri_menu_var = tk.StringVar(value="svoygarage.ru")
+
+        self.server_uri_menu = ctk.CTkOptionMenu(
+            server_row,
+            values=list(self.SERVER_URIS.keys()),
+            variable=self.server_uri_menu_var,
+            command=self._on_server_choice,
+            height=34,
+        )
+        self.server_uri_menu.grid(row=0, column=0, sticky="w", padx=(0, 10))
+
+        self.server_uri_entry = ctk.CTkEntry(server_row, textvariable=self.server_uri_var, height=34)
+        self.server_uri_entry.grid(row=0, column=1, sticky="ew")
+
         btn_row = ctk.CTkFrame(top, fg_color="transparent")
-        btn_row.grid(row=2, column=1, sticky="w", pady=(12, 4))
+        btn_row.grid(row=3, column=1, sticky="w", pady=(12, 4))
 
         self.connect_btn = ctk.CTkButton(
             btn_row,
@@ -279,7 +322,7 @@ class PrinterAgentUI:
             wraplength=900,
             justify="left",
         )
-        hint.grid(row=3, column=0, columnspan=2, sticky="w", padx=(4, 8), pady=(4, 0))
+        hint.grid(row=4, column=0, columnspan=2, sticky="w", padx=(4, 8), pady=(4, 0))
 
         self.status_var = tk.StringVar(value="Не подключено")
         self.status_badge = ctk.CTkLabel(
@@ -384,12 +427,20 @@ class PrinterAgentUI:
     def _on_connect(self):
         token = self.token_var.get().strip()
         org_id = self.org_var.get().strip()
+        server_uri = self.server_uri_var.get().strip()
 
         if not token or not org_id:
             messagebox.showwarning(
                 "Нет данных",
                 "Введите токен принтера и ID организации.",
             )
+            return
+
+        if not server_uri:
+            messagebox.showwarning("Нет данных", "Выберите или введите адрес сервера (ws:// или wss://).")
+            return
+        if not (server_uri.startswith("ws://") or server_uri.startswith("wss://")):
+            messagebox.showwarning("Неверный адрес", "Адрес сервера должен начинаться с ws:// или wss://")
             return
 
         if self.agent_thread and self.agent_thread.is_alive():
@@ -403,11 +454,12 @@ class PrinterAgentUI:
             self.events_q.put(("job", ev))
 
         try:
-            self._save_auth(token, org_id)
+            self._save_auth(token, org_id, server_uri)
         except Exception as e:
             messagebox.showwarning("Внимание", f"Не удалось сохранить настройки: {e}")
 
         self.agent = PrinterAgent(
+            server_uri=server_uri,
             auth_token=token,
             organization_id=org_id,
             on_connection_updated=connection_cb,
@@ -440,6 +492,11 @@ class PrinterAgentUI:
         self.disconnect_btn.configure(state="disabled")
         self.status_var.set("Остановлено")
         self.status_badge.configure(fg_color="#eef2ff", text_color="#1f2937")
+
+    def _on_server_choice(self, choice_label: str):
+        uri = self.SERVER_URIS.get(choice_label)
+        if uri:
+            self.server_uri_var.set(uri)
 
     def _format_connection_line(self, payload: dict) -> str:
         status = payload.get("status", "")

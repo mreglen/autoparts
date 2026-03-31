@@ -5,6 +5,8 @@ import { apiAxios } from '../../utils/apiClient';
 export default function PrinterTokenSection() {
   const user = useSelector((state) => state.auth.user);
   const isDirector = Boolean(user?.is_director);
+  const agentInstallerHref = '/downloads/AutoParts_PrinterAgent_Setup.exe';
+  const xprinterDriverHref = '/downloads/Xprinter_2021.3.exe';
 
   const [tokenData, setTokenData] = useState(null);
   const [tokenLoading, setTokenLoading] = useState(false);
@@ -59,7 +61,25 @@ export default function PrinterTokenSection() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-gray-800">Программа агента для печати</h3>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800">Программа агента для печати</h3>
+          <div className="mt-1 flex flex-col gap-1">
+            <a
+              href={agentInstallerHref}
+              download
+              className="text-sm text-indigo-600 underline underline-offset-2 hover:text-indigo-800 w-fit"
+            >
+              Скачать программу агент
+            </a>
+            <a
+              href={xprinterDriverHref}
+              download
+              className="text-sm text-indigo-600 underline underline-offset-2 hover:text-indigo-800 w-fit"
+            >
+              Скачать драйвера (Xprinter XP-365B)
+            </a>
+          </div>
+        </div>
       </div>
 
       {isDirector && tokenError && (
@@ -147,9 +167,7 @@ export default function PrinterTokenSection() {
         </button>
       )}
 
-      <div className="mt-4 text-sm text-gray-600">
-        Выбор подключенного принтера перенесен в блок «Этикетка».
-      </div>
+
     </div>
   );
 }
