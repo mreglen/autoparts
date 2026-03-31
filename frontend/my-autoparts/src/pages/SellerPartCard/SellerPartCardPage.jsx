@@ -74,7 +74,10 @@ const SellerPartCardPage = () => {
     const userOrgId = user?.organization_id;
     const partOrgId = part?.organization_id ?? part?.organization?.id ?? null;
 
-    if (userOrgId == null || partOrgId == null) return false;
+    // /products/qr-card is already protected on backend by organization check.
+    // If org id is not present in payload, trust successful access response.
+    if (partOrgId == null) return true;
+    if (userOrgId == null) return false;
     return String(userOrgId) === String(partOrgId);
   }, [part, user]);
 

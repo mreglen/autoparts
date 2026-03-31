@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 import json
@@ -11,6 +11,7 @@ from app.models.product import ProductPhoto, ProductVideo
 from app.models.user import User
 from app.schemas.pending_product import PendingProductCreate, PendingProduct, PendingProductUpdate
 from app.core.auth import get_current_user
+from app.core.config import settings
 # Sequential code generation is handled inline
 
 router = APIRouter(prefix="/pending-products", tags=["Pending Products"])
@@ -20,7 +21,8 @@ router = APIRouter(prefix="/pending-products", tags=["Pending Products"])
 def create_pending_product(
     product_data: PendingProductCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    request: Request = None
 ):
     """Создать новую запчасть в статусе ожидания модерации"""
     
@@ -83,12 +85,18 @@ def create_pending_product(
     db.refresh(db_product)
     
     # Create ProductPhoto and ProductVideo records and trigger processing
-    base_url = "http://localhost:8000"
+    base_url = settings.BASE_URL.rstrip('/')
+    token = None
+    if request and hasattr(request, 'headers'):
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]
     
     # Helper function to trigger processing in background
     def trigger_processing(endpoint):
         try:
-            requests.post(f"{base_url}{endpoint}", timeout=5.0)
+            headers = {'Authorization': f'Bearer {token}'} if token else {}
+            requests.post(f"{base_url}{endpoint}", headers=headers, timeout=5.0)
         except Exception as e:
             print(f"⚠️ Warning: Could not trigger processing {endpoint}: {e}")
     

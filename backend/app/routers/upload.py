@@ -862,17 +862,28 @@ async def delete_temp_file(
     if not filename or '..' in filename or '/' in filename or '\\' in filename:
         raise HTTPException(400, "Недопустимое имя файла")
     
-    temp_dir = os.path.abspath("uploads/temp")
-    temp_path = os.path.join(temp_dir, filename)
+    # New upload flow stores temp media in uploads/temp/{organization_id}/{filename}
+    # Keep backward compatibility with legacy uploads/temp/{filename}.
+    org_id = str(current_user.organization_id) if current_user and current_user.organization_id is not None else None
+    candidate_paths = []
+
+    if org_id:
+        candidate_paths.append(
+            os.path.join(os.path.abspath("uploads/temp"), org_id, filename)
+        )
+    candidate_paths.append(
+        os.path.join(os.path.abspath("uploads/temp"), filename)
+    )
     
     # Check if file exists
-    if not os.path.exists(temp_path):
-        print(f"File not found: {temp_path}")
+    existing_path = next((p for p in candidate_paths if os.path.exists(p)), None)
+    if not existing_path:
+        print(f"File not found in candidates: {candidate_paths}")
         return {"success": True, "message": "File not found or already deleted"}
     
     try:
-        os.remove(temp_path)
-        print(f"Successfully deleted temp file: {temp_path}")
+        os.remove(existing_path)
+        print(f"Successfully deleted temp file: {existing_path}")
         return {"success": True, "message": "File deleted successfully"}
     except Exception as e:
         print(f"Error deleting temp file: {str(e)}")

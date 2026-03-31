@@ -189,9 +189,16 @@ def add_watermark_to_video(
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     try:
-        # Build FFmpeg filter complex for watermark with bottom-right positioning
-        # The watermark will be automatically resized by FFmpeg to fit within 50% of video width/height
-        filter_complex = f"[1:v]scale=iw*0.5:-1[wm];[0:v][wm]overlay=W-w-{padding}:H-h-{padding}:format=auto" # Bottom-right corner
+        # Build filter graph:
+        # 1) scale watermark relative to main video width (50% max),
+        # 2) apply requested opacity,
+        # 3) place in bottom-right corner with padding.
+        # Using scale2ref keeps dimensions tied to the actual video frame.
+        filter_complex = (
+            f"[1:v][0:v]scale2ref=w=main_w*0.5:h=ow/mdar[wm][base];"
+            f"[wm]format=rgba,colorchannelmixer=aa={opacity}[wm_a];"
+            f"[base][wm_a]overlay=W-w-{padding}:H-h-{padding}:format=auto"
+        )
         
         # Build FFmpeg command
         cmd = [

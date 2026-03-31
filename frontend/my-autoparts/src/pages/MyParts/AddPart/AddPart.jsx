@@ -270,7 +270,8 @@ const AddPart = () => {
         try {
           const formData = new FormData();
           formData.append('file', file);
-          const result = await apiRequestFormData('/upload/media', formData);
+          // Use dedicated deferred video endpoint (stores in /temp/{org}/...)
+          const result = await apiRequestFormData('/upload/video', formData);
           
           // 🚀 НОВАЯ ЛОГИКА: Видео загружено в temp папку, обработка отложена
           // Не ждем завершения обработки - она начнется при сохранении продукта
