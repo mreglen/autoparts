@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Request, Response
@@ -10,12 +10,13 @@ from app.models.carts import Cart, NewPartsCart, UsedPartsCart, GuestCart, Guest
 from app.models.product import Product
 
 
-GUEST_CART_COOKIE_NAME = "guest_cart_token"
+GUEST_CART_HEADER_NAME = "X-Guest-Cart-Token"
 GUEST_CART_TTL_HOURS = 24
 
 
 def _utcnow() -> datetime:
-    return datetime.utcnow()
+    # Use timezone-aware UTC to match TIMESTAMPTZ from Postgres.
+    return datetime.now(timezone.utc)
 
 
 def _expires_at() -> datetime:
@@ -26,23 +27,12 @@ def hash_guest_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
-def set_guest_cart_cookie(response: Response, raw_token: str) -> None:
-    response.set_cookie(
-        key=GUEST_CART_COOKIE_NAME,
-        value=raw_token,
-        max_age=GUEST_CART_TTL_HOURS * 60 * 60,
-        httponly=True,
-        samesite="lax",
-        secure=False,
-    )
-
-
-def clear_guest_cart_cookie(response: Response) -> None:
-    response.delete_cookie(key=GUEST_CART_COOKIE_NAME)
-
-
 def get_guest_token_from_request(request: Request) -> Optional[str]:
-    return request.cookies.get(GUEST_CART_COOKIE_NAME)
+    # Берём токен гостевой корзины только из заголовка, не из cookie.
+    token = request.headers.get(GUEST_CART_HEADER_NAME)
+    if token:
+        return token.strip()
+    return None
 
 
 def get_guest_cart_by_token(db: Session, raw_token: str) -> Optional[GuestCart]:
@@ -68,7 +58,8 @@ def get_or_create_guest_cart(db: Session, request: Request, response: Response) 
     db.add(guest_cart)
     db.commit()
     db.refresh(guest_cart)
-    set_guest_cart_cookie(response, raw_token)
+    # Сообщаем фронту идентификатор гостевой корзины только через заголовок.
+    response.headers[GUEST_CART_HEADER_NAME] = raw_token
     return guest_cart
 
 
@@ -156,10 +147,8 @@ def merge_guest_cart_from_request(db: Session, request: Request, response: Respo
         return False
     guest_cart = get_guest_cart_by_token(db, raw_token)
     if not guest_cart:
-        clear_guest_cart_cookie(response)
         return False
     merge_guest_cart_to_user(db, guest_cart, user_id)
-    clear_guest_cart_cookie(response)
     return True
 
 

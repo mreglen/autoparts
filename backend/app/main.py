@@ -6,6 +6,7 @@ from app.routers import api_router
 from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, orders, carts
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
+from app.core.config import settings
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -41,16 +42,32 @@ if len(existing_tables) < len(Base.metadata.tables):
 
 app = FastAPI(title="Автозапчасти")
 
+# Best-effort proxy header support. In production, also run uvicorn with proxy headers enabled.
+try:
+    from starlette.middleware.proxy_headers import ProxyHeadersMiddleware  # type: ignore
+
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+except Exception:
+    pass
+
+
+def _cors_origins() -> list[str]:
+    if settings.CORS_ALLOW_ORIGINS:
+        return [o.strip() for o in settings.CORS_ALLOW_ORIGINS.split(",") if o.strip()]
+    # dev defaults
+    return [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Guest-Cart-Token"],
 )
 
 

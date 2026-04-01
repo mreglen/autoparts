@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+from typing import Optional, List
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     GET_BROKEN_WAVE: str
     BASE_URL: str  # Для внутренних API вызовов (localhost)
     PUBLIC_BASE_URL: str  # Для фронтенда и внешних ссылок
+    # Comma-separated list of allowed CORS origins.
+    # Example: "https://app.example.com,https://www.example.com"
+    CORS_ALLOW_ORIGINS: Optional[str] = None
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
