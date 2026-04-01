@@ -1,7 +1,24 @@
 import PrinterTokenSection from './PrinterTokenSection';
 import LabelPrintSection from './LabelPrintSection';
+import { useSelector } from 'react-redux';
+import { Navigate } from 'react-router-dom';
 
 export default function PrintSettings() {
+  const user = useSelector((state) => state.auth.user);
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+
+  const hasPermission = (code) => permissionCodes && permissionCodes.includes(code);
+
+  const canAccess =
+    user?.is_admin ||
+    user?.is_director ||
+    user?.is_seller ||
+    (user?.is_employee && hasPermission('settings.printers'));
+
+  if (!canAccess) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List
 
 from app.core.auth import get_current_user
@@ -18,6 +19,37 @@ from app.schemas.employee import (
 from app.db.database import get_db
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
+
+def _ensure_default_permissions(db: Session) -> None:
+    # Keep Postgres sequence in sync with existing IDs to avoid duplicate PK on INSERT.
+    db.execute(
+        text(
+            """
+            SELECT setval(
+                pg_get_serial_sequence('permissions', 'id'),
+                COALESCE((SELECT MAX(id) FROM permissions), 1),
+                true
+            )
+            """
+        )
+    )
+
+    # Backward compatibility: migrate old print permission code if present.
+    legacy_print_perm = db.query(Permission).filter(Permission.code == "printers").first()
+    if legacy_print_perm:
+        legacy_print_perm.code = "settings.printers"
+        if not legacy_print_perm.name:
+            legacy_print_perm.name = "Печать"
+
+    defaults = [
+        {"code": "sellers", "name": "Продавцы"},
+        {"code": "settings.printers", "name": "Печать"},
+    ]
+    for perm in defaults:
+        existing = db.query(Permission).filter(Permission.code == perm["code"]).first()
+        if not existing:
+            db.add(Permission(code=perm["code"], name=perm["name"]))
+    db.commit()
 
 
 @router.get("/organization/{org_id}", response_model=List[EmployeeResponse])
@@ -164,6 +196,7 @@ def get_all_permissions(
     db: Session = Depends(get_db)
 ):
     """Get all available permissions"""
+    _ensure_default_permissions(db)
     permissions = db.query(Permission).all()
     return permissions
 
@@ -180,25 +213,12 @@ def init_permissions(
             detail="Только директор может инициализировать права"
         )
     
-    # Create default permissions if they don't exist
-    default_permissions = [
-        {"id": 1, "code": "sellers", "name": "Продавцы"},
-    ]
-    
-    created = []
-    for perm_data in default_permissions:
-        existing = db.query(Permission).filter(Permission.id == perm_data["id"]).first()
-        if not existing:
-            permission = Permission(
-                id=perm_data["id"],
-                code=perm_data["code"],
-                name=perm_data["name"]
-            )
-            db.add(permission)
-            created.append(perm_data)
-    
-    db.commit()
-    return {"message": "Permissions initialized", "created": created}
+    # Idempotent init (also used by GET /permissions/all)
+    before = {p.code for p in db.query(Permission.code).all()}
+    _ensure_default_permissions(db)
+    after = {p.code for p in db.query(Permission.code).all()}
+    created_codes = sorted(list(after - before))
+    return {"message": "Permissions initialized", "created": created_codes}
 
 
 @router.get("/{employee_id}/permissions", response_model=List[int])

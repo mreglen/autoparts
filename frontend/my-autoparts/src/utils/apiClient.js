@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const normalizeBaseUrl = (url) => {
     if (!url) return url;
-    // trim whitespace + trailing slash
+  
     return String(url).trim().replace(/\/+$/, '');
 };
 

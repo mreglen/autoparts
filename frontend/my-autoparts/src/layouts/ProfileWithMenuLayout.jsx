@@ -270,7 +270,7 @@ export default function ProfileWithMenuLayout() {
             }
             
             // Печать - для сотрудников с организацией
-            if (user?.organization_id) {
+            if (user?.organization_id && hasPermission('settings.printers')) {
                 settingsSubmenu.push({ id: 'settings-printers', label: 'Печать' });
             }
             
