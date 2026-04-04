@@ -38,8 +38,17 @@ export const normalizeImageUrl = (imageUrl) => {
         return imageUrl;
     }
 
-    // If path starts with /pictures/ or /videos/, add /uploads prefix if missing
-    if (imageUrl.startsWith('/pictures/') || imageUrl.startsWith('/videos/')) {
+    // Temp uploads live under uploads/temp (API returns /temp/org/file)
+    if (imageUrl.startsWith('/temp/')) {
+        return `${BACKEND_BASE}/uploads${imageUrl}`;
+    }
+
+    // If path starts with /pictures/, /videos/, or /vehicle_pictures/, add /uploads prefix if missing
+    if (
+        imageUrl.startsWith('/pictures/') ||
+        imageUrl.startsWith('/videos/') ||
+        imageUrl.startsWith('/vehicle_pictures/')
+    ) {
         return `${BACKEND_BASE}/uploads${imageUrl}`;
     }
     

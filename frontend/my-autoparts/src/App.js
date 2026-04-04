@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect } from 'react';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
+import { fetchCart } from './redux/slices/CartSlice';
 
 // Pages
 import Authorization from './pages/Autorization/Authorization';
@@ -42,7 +43,7 @@ import SellerPartCardPage from './pages/SellerPartCard/SellerPartCardPage';
 
 function App() {
   const dispatch = useDispatch();
-  const { token } = useSelector((state) => state.auth);
+  const { token, user } = useSelector((state) => state.auth);
 
   // Check auth status on app load
   useEffect(() => {
@@ -75,6 +76,14 @@ function App() {
         });
     }
   }, [dispatch, token]);
+
+  // Корзина в шапке и в мобильной нижней панели опирается на Redux; без этого
+  // после входа по сохранённому токену счётчик появлялся только после захода на /cart.
+  useEffect(() => {
+    if (token && user) {
+      dispatch(fetchCart());
+    }
+  }, [dispatch, token, user?.id]);
 
   return (
     <BrowserRouter>

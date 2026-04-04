@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from app.models.stock_in import StockIn as StockInModel
 from app.schemas.stock_in import StockIn as StockInSchema, StockInCreate
 from app.db.database import get_db
 from app.core.auth import get_current_user
 from app.models.user import User
 from app.models.product import Product as ProductModel
+from app.models.vehicle import Vehicle as VehicleModel
 
 router = APIRouter(prefix="/stock-ins", tags=["Stock In"])
 
@@ -21,9 +22,14 @@ def get_stock_ins(
     stock_ins = (
         db.query(StockInModel)
         .options(
-            joinedload(StockInModel.product),
+            joinedload(StockInModel.product).options(
+                selectinload(ProductModel.compatible_vehicles).options(
+                    selectinload(VehicleModel.vin_row),
+                    selectinload(VehicleModel.mileage_row),
+                ),
+            ),
             joinedload(StockInModel.storage_location),
-            joinedload(StockInModel.creator) 
+            joinedload(StockInModel.creator),
         )
         .filter(StockInModel.organization_id == current_user.organization_id)
         .all()

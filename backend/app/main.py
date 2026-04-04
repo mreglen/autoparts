@@ -211,6 +211,12 @@ if videos_dir.exists():
 else:
     logger.error(f"Каталог видео не найден: {videos_dir}")
 
+vehicle_pictures_dir = Path(__file__).parent.parent / "uploads" / "vehicle_pictures"
+if vehicle_pictures_dir.exists():
+    app.mount("/vehicle_pictures", StaticFiles(directory=str(vehicle_pictures_dir)), name="vehicle_pictures")
+else:
+    logger.error(f"Каталог vehicle_pictures не найден: {vehicle_pictures_dir}")
+
 
 
 @app.get("/media/{path:path}")
@@ -222,6 +228,9 @@ async def get_media_file(path: str):
     elif path.startswith("videos/"):
         base_dir = Path(__file__).parent.parent / "uploads" / "videos"
         relative_path = path.replace("videos/", "")
+    elif path.startswith("vehicle_pictures/"):
+        base_dir = Path(__file__).parent.parent / "uploads" / "vehicle_pictures"
+        relative_path = path.replace("vehicle_pictures/", "")
     elif path.startswith("temp/"):
         # Serve temp videos for immediate playback
         base_dir = Path(__file__).parent.parent / "uploads" / "temp"

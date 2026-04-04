@@ -48,7 +48,10 @@ def search_local_products_query(db: Session, q: str, is_new: bool = None):
 
     query = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
-        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.compatible_vehicles).options(
+            selectinload(VehicleModel.vin_row),
+            selectinload(VehicleModel.mileage_row),
+        ),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
     ).filter(or_(*conditions), ProductModel.quantity > 0)
@@ -114,7 +117,10 @@ async def search_combined(q: str, db: Session = Depends(get_db)):
     # Ищем в базе: по нормализованному запросу ИЛИ по артикулам из ROSSKO
     db_products = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
-        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.compatible_vehicles).options(
+            selectinload(VehicleModel.vin_row),
+            selectinload(VehicleModel.mileage_row),
+        ),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
     ).filter(
@@ -203,7 +209,10 @@ async def search_used_parts(
                 # Ищем б/у аналоги в нашей базе (показываем всё наличие, подходящее под аналоги)
                 db_analogs = db.query(ProductModel).options(
                     selectinload(ProductModel.photos),
-                    selectinload(ProductModel.compatible_vehicles),
+                    selectinload(ProductModel.compatible_vehicles).options(
+            selectinload(VehicleModel.vin_row),
+            selectinload(VehicleModel.mileage_row),
+        ),
                     selectinload(ProductModel.storage_location),
                     selectinload(ProductModel.organization)
                 ).filter(

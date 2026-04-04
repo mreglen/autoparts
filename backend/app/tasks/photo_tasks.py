@@ -147,7 +147,16 @@ def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: i
 
 
 @celery_app.task(bind=True, max_retries=3)
-def process_and_upload_photo(self, temp_file_path: str, original_filename: str, organization_id: str, subfolder: str, add_watermark: bool = False, logo_path: str = None):
+def process_and_upload_photo(
+    self,
+    temp_file_path: str,
+    original_filename: str,
+    organization_id: str,
+    subfolder: str,
+    add_watermark: bool = False,
+    logo_path: str = None,
+    vehicle_photo_id: int | None = None,
+):
     """
     Celery task to process photo: remove metadata, convert to WebP, compress, and move to final location.
     
@@ -227,14 +236,11 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
             print(f"ERROR saving file: {save_error}")
             # Retry logic
             raise self.retry(exc=save_error, countdown=60)
-        
-        # Delete original temp file
-        try:
-            os.remove(temp_file_path)
-            print(f"Deleted temp file: {temp_file_path}")
-        except Exception as delete_error:
-            print(f"Warning: Could not delete temp file {temp_file_path}: {str(delete_error)}")
-        
+
+        # Убедиться, что файл на диске виден и не пустой — до обновления БД temp не трогаем
+        if not os.path.isfile(final_path) or os.path.getsize(final_path) == 0:
+            raise Exception(f"Final file missing or empty after write: {final_path}")
+
         # Construct relative path (without domain) - frontend will add backend base URL
         # Add /uploads prefix only for logo_organizations subfolder
         if subfolder == "logo_organizations":
@@ -266,90 +272,111 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
             print(f"   DB session created, executing SQL...")
             
             try:
-                # Извлекаем basename из temp_file_path для поиска
-                temp_basename = os.path.basename(temp_file_path)
-                print(f"   Searching for photo with basename: {temp_basename}")
-                
-                # Сначала пытаемся найти через ORM по basename
-                from app.models.product import ProductPhoto
-                photo_record = db.query(ProductPhoto).filter(
-                    ProductPhoto.photo_url.like(f"%{temp_basename}%")
-                ).first()
-                
-                if photo_record:
-                    print(f"   ✅ Found photo record: ID={photo_record.id}")
-                    print(f"   Old URL: {photo_record.photo_url}")
-                    print(f"   Processing status: {photo_record.processing_status}")
-                    
-                    # Прямой SQL запрос для обновления (чтобы избежать проблем с ORM)
-                    update_query = text("""
-                        UPDATE product_photos
-                        SET photo_url = :photo_url, 
-                            processing_status = :status,
-                            updated_at = NOW()
-                        WHERE id = :photo_id
-                    """)
-                    
-                    print(f"   Executing SQL UPDATE...")
-                    result = db.execute(
-                        update_query,
-                        {
-                            "photo_url": media_path,
-                            "status": "completed",
-                            "photo_id": photo_record.id
-                        }
-                    )
-                    
-                    rows_updated = result.rowcount
-                    print(f"   Rows affected: {rows_updated}")
-                    
-                    db.commit()
-                    print(f"   ✅ Transaction committed!")
-                    
-                    # Проверяем что действительно обновилось
-                    verify_query = text("SELECT photo_url, processing_status FROM product_photos WHERE id = :id")
-                    verify_result = db.execute(verify_query, {"id": photo_record.id}).first()
-                    
-                    if verify_result:
-                        print(f"   ✅ Verification: photo_url='{verify_result.photo_url}', status='{verify_result.processing_status}'")
-                        if verify_result.photo_url == media_path and verify_result.processing_status == 'completed':
-                            print(f"✅ Database updated successfully via SQL! Photo {photo_record.id} now points to: {media_path}")
+                if vehicle_photo_id is not None:
+                    from app.models.vehicle_photo import VehiclePhoto
+
+                    # Повторная проверка перед записью в БД: финальный файл уже на месте
+                    if not os.path.isfile(final_path) or os.path.getsize(final_path) == 0:
+                        raise Exception(f"Refuse DB update: final file not ready: {final_path}")
+
+                    vp = db.query(VehiclePhoto).filter(VehiclePhoto.id == vehicle_photo_id).first()
+                    if vp:
+                        vp.photo_path = media_path
+                        vp.processing_status = "completed"
+                        db.commit()
+                        db.refresh(vp)
+                        if vp.photo_path == media_path and vp.processing_status == "completed":
+                            print(f"✅ vehicle_photos id={vehicle_photo_id} updated to {media_path}")
                             db_updated = True
-                        else:
-                            print(f"⚠️ Warning: Update succeeded but values don't match!")
-                            print(f"   Expected: photo_url='{media_path}', status='completed'")
-                            print(f"   Got: photo_url='{verify_result.photo_url}', status='{verify_result.processing_status}'")
                     else:
-                        print(f"⚠️ Warning: Could not verify update - record {photo_record.id} not found")
+                        print(f"⚠️ VehiclePhoto id={vehicle_photo_id} not found")
                 else:
-                    print(f"⚠️ Warning: Photo record not found for basename: {temp_basename}")
-                    print(f"   This might mean the photo was already updated or deleted")
-                    
+                    # Извлекаем basename из temp_file_path для поиска
+                    temp_basename = os.path.basename(temp_file_path)
+                    print(f"   Searching for photo with basename: {temp_basename}")
+
+                    # Сначала пытаемся найти через ORM по basename
+                    from app.models.product import ProductPhoto
+                    photo_record = db.query(ProductPhoto).filter(
+                        ProductPhoto.photo_url.like(f"%{temp_basename}%")
+                    ).first()
+
+                    if photo_record:
+                        print(f"   ✅ Found photo record: ID={photo_record.id}")
+                        print(f"   Old URL: {photo_record.photo_url}")
+                        print(f"   Processing status: {photo_record.processing_status}")
+
+                        # Прямой SQL запрос для обновления (чтобы избежать проблем с ORM)
+                        update_query = text("""
+                            UPDATE product_photos
+                            SET photo_url = :photo_url,
+                                processing_status = :status,
+                                updated_at = NOW()
+                            WHERE id = :photo_id
+                        """)
+
+                        print(f"   Executing SQL UPDATE...")
+                        result = db.execute(
+                            update_query,
+                            {
+                                "photo_url": media_path,
+                                "status": "completed",
+                                "photo_id": photo_record.id
+                            }
+                        )
+
+                        rows_updated = result.rowcount
+                        print(f"   Rows affected: {rows_updated}")
+
+                        db.commit()
+                        print(f"   ✅ Transaction committed!")
+
+                        # Проверяем что действительно обновилось
+                        verify_query = text("SELECT photo_url, processing_status FROM product_photos WHERE id = :id")
+                        verify_result = db.execute(verify_query, {"id": photo_record.id}).first()
+
+                        if verify_result:
+                            print(f"   ✅ Verification: photo_url='{verify_result.photo_url}', status='{verify_result.processing_status}'")
+                            if verify_result.photo_url == media_path and verify_result.processing_status == 'completed':
+                                print(f"✅ Database updated successfully via SQL! Photo {photo_record.id} now points to: {media_path}")
+                                db_updated = True
+                            else:
+                                print(f"⚠️ Warning: Update succeeded but values don't match!")
+                                print(f"   Expected: photo_url='{media_path}', status='completed'")
+                                print(f"   Got: photo_url='{verify_result.photo_url}', status='{verify_result.processing_status}'")
+                        else:
+                            print(f"⚠️ Warning: Could not verify update - record {photo_record.id} not found")
+                    else:
+                        print(f"⚠️ Warning: Photo record not found for basename: {temp_basename}")
+                        print(f"   This might mean the photo was already updated or deleted")
+
             except Exception as sql_error:
                 print(f"   ⚠️ SQL execution failed: {sql_error}")
                 print(f"   Rolling back transaction...")
                 db.rollback()
+                if vehicle_photo_id is not None:
+                    raise sql_error
+
                 print("   Falling back to ORM method...")
-                
-                # Пытаемся через ORM если SQL не сработал
+
+                # Пытаемся через ORM если SQL не сработал (только для product photos)
                 try:
                     from app.models.product import ProductPhoto
                     # Try to find by basename
                     photo_records = db.query(ProductPhoto).filter(
                         ProductPhoto.photo_url.like(f"%{temp_basename}%")
                     ).all()
-                    
+
                     if photo_records and len(photo_records) > 0:
                         photo_record = photo_records[0]
-                        old_url = photo_record.photo_url
                         photo_record.photo_url = media_path
                         photo_record.processing_status = 'completed'
                         db.commit()
-                        
+
                         # Verify ORM update
                         db.refresh(photo_record)
                         print(f"   ✅ ORM verification: photo_url='{photo_record.photo_url}', status='{photo_record.processing_status}'")
-                        
+
                         if photo_record.photo_url == media_path:
                             print(f"✅ Database updated via ORM! Photo {photo_record.id} now points to: {media_path}")
                             db_updated = True
@@ -361,9 +388,12 @@ def process_and_upload_photo(self, temp_file_path: str, original_filename: str, 
                     print(f"   ⚠️ ORM method also failed: {orm_error}")
                     db.rollback()
                     raise
-                finally:
+            finally:
+                try:
                     db.close()
-                    
+                except Exception:
+                    pass
+
         except Exception as db_error:
             print(f"\n❌ FATAL: Error updating database: {db_error}")
             import traceback

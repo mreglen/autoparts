@@ -1,6 +1,9 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, ForeignKey, Integer, Numeric, String
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 from ..db.database import Base
+
 
 class Vehicle(Base):
     __tablename__ = "vehicles"
@@ -8,16 +11,60 @@ class Vehicle(Base):
     id = Column(Integer, primary_key=True, index=True)
     brand = Column(String(50), nullable=False)
     model = Column(String(100), nullable=False)
-    generation = Column(String(50))  
-    engine = Column(String(50))     
-    transmission = Column(String(30)) 
-    vin = Column(String(17))
-    mileage = Column(Integer)  # Пробег в километрах
+    generation = Column(String(50))
+    engine = Column(String(50))
+    transmission = Column(String(30))
     organization_id = Column(String, ForeignKey("organizations.id"))
+
+    tecdoc_manufacturer_id = Column(Integer, nullable=True)
+    tecdoc_model_id = Column(Integer, nullable=True)
+    tecdoc_passengercar_id = Column(Integer, nullable=True)
+    tecdoc_engine_id = Column(Integer, nullable=True)
+
+    price = Column(Numeric(12, 2), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    tecdoc_manufacturer_json = Column(JSONB, nullable=True)
+    tecdoc_model_json = Column(JSONB, nullable=True)
+    tecdoc_passengercar_json = Column(JSONB, nullable=True)
+    tecdoc_engine_json = Column(JSONB, nullable=True)
+    tecdoc_transmission_json = Column(JSONB, nullable=True)
+
     organization = relationship("Organization")
+    creator = relationship("User", foreign_keys=[created_by])
+
+    photos = relationship(
+        "VehiclePhoto",
+        back_populates="vehicle",
+        cascade="all, delete-orphan",
+        order_by="VehiclePhoto.sort_order",
+    )
 
     compatible_products = relationship(
         "Product",
         secondary="product_vehicle_association",
-        back_populates="compatible_vehicles"
+        back_populates="compatible_vehicles",
     )
+
+    vin_row = relationship(
+        "VehicleVin",
+        back_populates="vehicle",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    mileage_row = relationship(
+        "VehicleMileage",
+        back_populates="vehicle",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    @hybrid_property
+    def vin(self):
+        vr = self.vin_row
+        return vr.vin if vr else None
+
+    @hybrid_property
+    def mileage(self):
+        mr = self.mileage_row
+        return mr.mileage if mr else None

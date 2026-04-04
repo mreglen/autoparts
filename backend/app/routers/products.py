@@ -196,7 +196,10 @@ def read_product(
     product = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
         selectinload(ProductModel.videos),
-        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.compatible_vehicles).options(
+            selectinload(VehicleModel.vin_row),
+            selectinload(VehicleModel.mileage_row),
+        ),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
     ).filter(
@@ -216,7 +219,10 @@ def read_public_product(
     product = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
         selectinload(ProductModel.videos),
-        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.compatible_vehicles).options(
+            selectinload(VehicleModel.vin_row),
+            selectinload(VehicleModel.mileage_row),
+        ),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
     ).filter(
@@ -278,7 +284,10 @@ def update_product(
     db_product = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
         selectinload(ProductModel.videos),
-        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.compatible_vehicles).options(
+            selectinload(VehicleModel.vin_row),
+            selectinload(VehicleModel.mileage_row),
+        ),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
     ).filter(
@@ -817,7 +826,10 @@ def get_products(
     query = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
         selectinload(ProductModel.videos),
-        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.compatible_vehicles).options(
+            selectinload(VehicleModel.vin_row),
+            selectinload(VehicleModel.mileage_row),
+        ),
         selectinload(ProductModel.creator),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
@@ -843,7 +855,10 @@ def get_public_products(
     query = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
         selectinload(ProductModel.videos),
-        selectinload(ProductModel.compatible_vehicles),
+        selectinload(ProductModel.compatible_vehicles).options(
+            selectinload(VehicleModel.vin_row),
+            selectinload(VehicleModel.mileage_row),
+        ),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
     ).filter(

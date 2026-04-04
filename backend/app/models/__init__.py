@@ -17,6 +17,16 @@ from app.models.client import Client
 from app.models.permission import Permission
 from app.models.user_permission import UserPermission
 from app.models.vehicle import Vehicle
+from app.models.vehicle_photo import VehiclePhoto
+from app.models.vehicle_vin import VehicleVin
+from app.models.vehicle_mileage import VehicleMileage
+from app.models.tecdoc import (
+    TecdocManufacturer,
+    TecdocModel,
+    TecdocEngine,
+    TecdocPassengercar,
+    TecdocPassengercarLinkEngine,
+)
 from app.models.product_vehicle import ProductVehicleAssociation
 from app.models.delivery_method import DeliveryMethod, organization_delivery_methods
 

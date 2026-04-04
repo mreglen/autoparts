@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from datetime import date
 from app.core.auth import get_current_user
 from app.models.product import Product
+from app.models.vehicle import Vehicle as VehicleModel
 from app.models.stock_out import StockOut as StockOutModel
 from app.models.user import User
 from app.schemas.stock_out import StockOut as StockOutSchema, StockOutCreate, ReturnCreate
@@ -56,7 +57,12 @@ def get_warehouse_sales(
     sales = (
         db.query(StockOutModel)
         .options(
-            joinedload(StockOutModel.product).joinedload(Product.compatible_vehicles),
+            joinedload(StockOutModel.product).options(
+                selectinload(Product.compatible_vehicles).options(
+                    selectinload(VehicleModel.vin_row),
+                    selectinload(VehicleModel.mileage_row),
+                ),
+            ),
             joinedload(StockOutModel.storage_location),
             joinedload(StockOutModel.user)
         )

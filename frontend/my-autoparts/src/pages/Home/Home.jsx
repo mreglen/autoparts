@@ -1,7 +1,43 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchPublicSellers } from '../../redux/slices/SellerSlice';
+import { normalizeImageUrl } from '../../utils/apiClient';
 
 function Home() {
+    const dispatch = useDispatch();
+    const { sellers } = useSelector((state) => state.sellers);
+    const sliderRef = useRef(null);
+
+    useEffect(() => {
+        dispatch(fetchPublicSellers());
+    }, [dispatch]);
+
+    const organizations = useMemo(() => {
+        const seen = new Set();
+        const orgs = [];
+        for (const seller of sellers || []) {
+            const key = seller.organization_id || seller.organization_name;
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            orgs.push({
+                id: key,
+                name: seller.organization_name || 'Организация',
+                logo: seller.logo_organization ? normalizeImageUrl(seller.logo_organization) : null,
+            });
+        }
+        return orgs;
+    }, [sellers]);
+
+    const scrollOrganizations = (direction) => {
+        if (!sliderRef.current) return;
+        const amount = Math.round(sliderRef.current.clientWidth * 0.85);
+        sliderRef.current.scrollBy({
+            left: direction === 'left' ? -amount : amount,
+            behavior: 'smooth',
+        });
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
             {/* Hero Section */}
@@ -53,6 +89,62 @@ function Home() {
                             </div>
                         </div>
                     </div>
+                </div>
+            </section>
+
+            {/* Organizations slider */}
+            <section className="py-14 bg-gray-50 border-y border-gray-100">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
+                            Наши организации-партнеры
+                        </h2>
+                        <div className="hidden sm:flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => scrollOrganizations('left')}
+                                className="w-10 h-10 rounded-full bg-white border border-gray-200 hover:border-blue-400 text-gray-600 hover:text-blue-600"
+                            >
+                                ←
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => scrollOrganizations('right')}
+                                className="w-10 h-10 rounded-full bg-white border border-gray-200 hover:border-blue-400 text-gray-600 hover:text-blue-600"
+                            >
+                                →
+                            </button>
+                        </div>
+                    </div>
+
+                    {organizations.length > 0 ? (
+                        <div
+                            ref={sliderRef}
+                            className="flex gap-4 overflow-x-auto pb-2 scroll-smooth snap-x snap-mandatory"
+                        >
+                            {organizations.map((org) => (
+                                <div
+                                    key={org.id}
+                                    className="snap-start min-w-[240px] sm:min-w-[280px] bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow"
+                                >
+                                    <div className="h-16 flex items-center justify-center mb-4 bg-gray-50 rounded-lg overflow-hidden">
+                                        {org.logo ? (
+                                            <img
+                                                src={org.logo}
+                                                alt={org.name}
+                                                className="h-12 max-w-[160px] object-contain"
+                                            />
+                                        ) : (
+                                            <span className="text-gray-400 text-sm">Логотип отсутствует</span>
+                                        )}
+                                    </div>
+                                    <p className="text-center text-gray-900 font-medium line-clamp-2">{org.name}</p>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-gray-500">Организации скоро появятся</div>
+                    )}
                 </div>
             </section>
 

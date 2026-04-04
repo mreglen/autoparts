@@ -1,40 +1,362 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.models.vehicle import Vehicle as VehicleModel
-from app.schemas.vehicle import Vehicle as VehicleSchema, VehicleCreate
+import re
+import requests
+from decimal import Decimal
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.orm import Session, joinedload
+
+from app.core.config import settings
 from app.db.database import get_db
 from app.core.auth import get_current_user
 from app.models.user import User
+from app.models.vehicle import Vehicle as VehicleModel
+from app.models.vehicle_photo import VehiclePhoto
+from app.models.vehicle_vin import VehicleVin
+from app.models.vehicle_mileage import VehicleMileage
+from app.models.tecdoc import (
+    TecdocManufacturer,
+    TecdocModel,
+    TecdocPassengercar,
+    TecdocEngine,
+)
+from app.schemas.vehicle import Vehicle as VehicleSchema, VehicleCreate, VehicleUpdate
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
+
+MAX_VEHICLE_PHOTOS = 10
+# Разумный верхний предел пробега, км (защита от опечаток; в БД — BIGINT)
+MAX_MILEAGE_KM = 9_999_999
+_TEMP_PATH_RE = re.compile(r"^/temp/[^/]+/.+")
+
+
+def _truncate(value: str | None, max_len: int) -> str | None:
+    if value is None:
+        return None
+    return value[:max_len]
+
+
+def _tecdoc_row_to_dict(row) -> dict | None:
+    if row is None:
+        return None
+    out = {}
+    for col in row.__table__.columns:
+        v = getattr(row, col.key)
+        if hasattr(v, "isoformat"):
+            v = v.isoformat()
+        out[col.key] = v
+    return out
+
+
+def _apply_tecdoc_labels(db: Session, data: dict) -> None:
+    """Fill display strings from TecDoc rows when ids are set (in-place)."""
+    mid = data.get("tecdoc_manufacturer_id")
+    if mid is not None:
+        m = db.get(TecdocManufacturer, mid)
+        if m and m.Description:
+            data["brand"] = _truncate(m.Description, 50)
+
+    mob_id = data.get("tecdoc_model_id")
+    if mob_id is not None:
+        mo = db.get(TecdocModel, mob_id)
+        if mo and mo.Description:
+            data["model"] = _truncate(mo.Description, 100)
+
+    pc_id = data.get("tecdoc_passengercar_id")
+    if pc_id is not None:
+        pc = db.get(TecdocPassengercar, pc_id)
+        if pc:
+            gen = pc.FullDescription or pc.Description or data.get("generation")
+            data["generation"] = _truncate(gen, 50)
+
+    eid = data.get("tecdoc_engine_id")
+    if eid is not None:
+        eng = db.get(TecdocEngine, eid)
+        if eng:
+            desc = eng.SalesDescription or eng.Description or data.get("engine")
+            data["engine"] = _truncate(desc, 50)
+
 
 @router.get("/", response_model=list[VehicleSchema])
 def get_vehicles(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     if not current_user.organization_id:
         raise HTTPException(status_code=403, detail="Организация не указана")
-    vehicles = db.query(VehicleModel).filter(
-        VehicleModel.organization_id == current_user.organization_id
-    ).all()
+    vehicles = (
+        db.query(VehicleModel)
+        .options(
+            joinedload(VehicleModel.vin_row),
+            joinedload(VehicleModel.mileage_row),
+            joinedload(VehicleModel.photos),
+        )
+        .filter(VehicleModel.organization_id == current_user.organization_id)
+        .all()
+    )
     return vehicles
+
+
+@router.patch("/{vehicle_id}", response_model=VehicleSchema)
+def update_vehicle(
+    vehicle_id: int,
+    body: VehicleUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Организация не указана")
+
+    db_vehicle = (
+        db.query(VehicleModel)
+        .options(
+            joinedload(VehicleModel.vin_row),
+            joinedload(VehicleModel.mileage_row),
+            joinedload(VehicleModel.photos),
+        )
+        .filter(
+            VehicleModel.id == vehicle_id,
+            VehicleModel.organization_id == current_user.organization_id,
+        )
+        .first()
+    )
+    if not db_vehicle:
+        raise HTTPException(status_code=404, detail="Автомобиль не найден")
+
+    data = body.model_dump(exclude_unset=True)
+
+    if "brand" in data and data["brand"] is not None:
+        trimmed = data["brand"].strip()
+        if trimmed:
+            db_vehicle.brand = _truncate(trimmed, 50)
+    if "model" in data and data["model"] is not None:
+        trimmed = data["model"].strip()
+        if trimmed:
+            db_vehicle.model = _truncate(trimmed, 100)
+    if "generation" in data:
+        g = data.get("generation")
+        db_vehicle.generation = _truncate(g.strip(), 50) if g and str(g).strip() else None
+    if "engine" in data:
+        e = data.get("engine")
+        db_vehicle.engine = _truncate(e.strip(), 50) if e and str(e).strip() else None
+    if "transmission" in data:
+        t = data.get("transmission")
+        db_vehicle.transmission = _truncate(t.strip(), 30) if t and str(t).strip() else None
+    if "price" in data:
+        pv = data.get("price")
+        if pv is None:
+            db_vehicle.price = None
+        else:
+            db_vehicle.price = Decimal(str(pv)) if not isinstance(pv, Decimal) else pv
+
+    if "vin" in data:
+        vin_raw = data.get("vin")
+        norm_vin = vin_raw.strip().upper() if vin_raw and str(vin_raw).strip() else None
+        if norm_vin and len(norm_vin) != 17:
+            raise HTTPException(status_code=400, detail="VIN должен содержать ровно 17 символов")
+        if norm_vin:
+            dup = (
+                db.query(VehicleModel.id)
+                .join(VehicleVin, VehicleVin.vehicle_id == VehicleModel.id)
+                .filter(
+                    VehicleModel.organization_id == current_user.organization_id,
+                    VehicleVin.vin == norm_vin,
+                    VehicleModel.id != vehicle_id,
+                )
+                .first()
+            )
+            if dup:
+                raise HTTPException(status_code=400, detail="Автомобиль с таким VIN уже существует")
+        if db_vehicle.vin_row:
+            if norm_vin:
+                db_vehicle.vin_row.vin = norm_vin
+            else:
+                db.delete(db_vehicle.vin_row)
+        elif norm_vin:
+            db.add(VehicleVin(vehicle_id=db_vehicle.id, vin=norm_vin))
+
+    if "mileage" in data:
+        mileage_raw = data.get("mileage")
+        if mileage_raw is None:
+            if db_vehicle.mileage_row:
+                db.delete(db_vehicle.mileage_row)
+        else:
+            try:
+                mileage_int = int(mileage_raw)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Некорректный пробег")
+            if mileage_int < 0:
+                raise HTTPException(status_code=400, detail="Пробег не может быть отрицательным")
+            if mileage_int > MAX_MILEAGE_KM:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Пробег слишком большой (максимум {MAX_MILEAGE_KM:,} км)".replace(",", " "),
+                )
+            if db_vehicle.mileage_row:
+                db_vehicle.mileage_row.mileage = mileage_int
+            else:
+                db.add(VehicleMileage(vehicle_id=db_vehicle.id, mileage=mileage_int))
+
+    db.commit()
+
+    db_vehicle = (
+        db.query(VehicleModel)
+        .options(
+            joinedload(VehicleModel.vin_row),
+            joinedload(VehicleModel.mileage_row),
+            joinedload(VehicleModel.photos),
+        )
+        .filter(VehicleModel.id == vehicle_id)
+        .one()
+    )
+    return db_vehicle
 
 
 @router.post("/", response_model=VehicleSchema)
 def create_vehicle(
+    request: Request,
     vehicle: VehicleCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     if not current_user.organization_id:
         raise HTTPException(status_code=403, detail="Организация не указана")
-    
+
+    payload = vehicle.model_dump()
+    vin_raw = payload.pop("vin", None)
+    mileage_raw = payload.pop("mileage", None)
+    photo_paths = payload.pop("photos") or []
+    if len(photo_paths) > MAX_VEHICLE_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"Максимум {MAX_VEHICLE_PHOTOS} фотографий")
+
+    for p in photo_paths:
+        if not isinstance(p, str) or not _TEMP_PATH_RE.match(p.strip()):
+            raise HTTPException(
+                status_code=400,
+                detail="Каждое фото должно быть temp-путём вида /temp/{organization_id}/filename",
+            )
+
+    price_val = payload.pop("price", None)
+    if price_val is not None and not isinstance(price_val, Decimal):
+        price_val = Decimal(str(price_val))
+
+    _apply_tecdoc_labels(db, payload)
+
+    payload["brand"] = _truncate(payload.get("brand"), 50) or ""
+    payload["model"] = _truncate(payload.get("model"), 100) or ""
+    payload["generation"] = _truncate(payload.get("generation"), 50)
+    payload["engine"] = _truncate(payload.get("engine"), 50)
+    payload["transmission"] = _truncate(payload.get("transmission"), 30)
+
+    mid = payload.get("tecdoc_manufacturer_id")
+    mob_id = payload.get("tecdoc_model_id")
+    pc_id = payload.get("tecdoc_passengercar_id")
+    eid = payload.get("tecdoc_engine_id")
+
+    tecdoc_manufacturer_json = _tecdoc_row_to_dict(db.get(TecdocManufacturer, mid) if mid else None)
+    tecdoc_model_json = _tecdoc_row_to_dict(db.get(TecdocModel, mob_id) if mob_id else None)
+    tecdoc_passengercar_json = _tecdoc_row_to_dict(db.get(TecdocPassengercar, pc_id) if pc_id else None)
+    tecdoc_engine_json = _tecdoc_row_to_dict(db.get(TecdocEngine, eid) if eid else None)
+
+    norm_vin = vin_raw.strip().upper() if vin_raw and str(vin_raw).strip() else None
+    if norm_vin and len(norm_vin) != 17:
+        raise HTTPException(status_code=400, detail="VIN должен содержать ровно 17 символов")
+
+    if norm_vin:
+        dup = (
+            db.query(VehicleModel.id)
+            .join(VehicleVin, VehicleVin.vehicle_id == VehicleModel.id)
+            .filter(
+                VehicleModel.organization_id == current_user.organization_id,
+                VehicleVin.vin == norm_vin,
+            )
+            .first()
+        )
+        if dup:
+            raise HTTPException(status_code=400, detail="Автомобиль с таким VIN уже существует")
+
+    mileage_int: int | None = None
+    if mileage_raw is not None and mileage_raw != "":
+        try:
+            mileage_int = int(mileage_raw)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Некорректный пробег")
+        if mileage_int < 0:
+            raise HTTPException(status_code=400, detail="Пробег не может быть отрицательным")
+        if mileage_int > MAX_MILEAGE_KM:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Пробег слишком большой (максимум {MAX_MILEAGE_KM:,} км)".replace(",", " "),
+            )
+
     db_vehicle = VehicleModel(
-        **vehicle.model_dump(),  # Pydantic v2; если v1 — vehicle.dict()
-        organization_id=current_user.organization_id
+        brand=payload["brand"],
+        model=payload["model"],
+        generation=payload.get("generation"),
+        engine=payload.get("engine"),
+        transmission=payload.get("transmission"),
+        tecdoc_manufacturer_id=payload.get("tecdoc_manufacturer_id"),
+        tecdoc_model_id=payload.get("tecdoc_model_id"),
+        tecdoc_passengercar_id=payload.get("tecdoc_passengercar_id"),
+        tecdoc_engine_id=payload.get("tecdoc_engine_id"),
+        organization_id=current_user.organization_id,
+        price=price_val,
+        created_by=current_user.id,
+        tecdoc_manufacturer_json=tecdoc_manufacturer_json,
+        tecdoc_model_json=tecdoc_model_json,
+        tecdoc_passengercar_json=tecdoc_passengercar_json,
+        tecdoc_engine_json=tecdoc_engine_json,
+        tecdoc_transmission_json=payload.get("tecdoc_transmission_json"),
     )
     db.add(db_vehicle)
+    db.flush()
+
+    if norm_vin:
+        db.add(VehicleVin(vehicle_id=db_vehicle.id, vin=norm_vin))
+    if mileage_int is not None:
+        db.add(VehicleMileage(vehicle_id=db_vehicle.id, mileage=mileage_int))
+
+    vehicle_photo_ids: list[int] = []
+    for idx, path in enumerate(photo_paths):
+        path = path.strip()
+        vp = VehiclePhoto(
+            vehicle_id=db_vehicle.id,
+            organization_id=current_user.organization_id,
+            photo_path=path,
+            processing_status="pending",
+            sort_order=idx,
+        )
+        db.add(vp)
+        db.flush()
+        vehicle_photo_ids.append(vp.id)
+
     db.commit()
-    db.refresh(db_vehicle)
+
+    # Celery только после сохранения авто: в БД пока пути /temp/...; задача пишет файл в vehicle_pictures,
+    # затем атомарно меняет photo_path и только после успешного commit удаляет temp.
+    base_url = settings.BASE_URL.rstrip("/")
+    token = None
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+
+    for vid in vehicle_photo_ids:
+        try:
+            headers = {"Authorization": f"Bearer {token}"} if token else {}
+            requests.post(
+                f"{base_url}/api/upload/start-vehicle-photo-processing/{vid}",
+                headers=headers,
+                timeout=10,
+            )
+        except Exception:
+            pass
+
+    db_vehicle = (
+        db.query(VehicleModel)
+        .options(
+            joinedload(VehicleModel.vin_row),
+            joinedload(VehicleModel.mileage_row),
+            joinedload(VehicleModel.photos),
+        )
+        .filter(VehicleModel.id == db_vehicle.id)
+        .one()
+    )
     return db_vehicle

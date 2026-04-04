@@ -378,8 +378,106 @@ export const createVehicle = createAsyncThunk(
             );
             return response.data;
         } catch (error) {
+            const d = error.response?.data?.detail;
+            const msg = Array.isArray(d)
+                ? d.map((x) => (typeof x === 'string' ? x : x.msg || 'Ошибка')).join(', ')
+                : (d || 'Ошибка создания автомобиля');
+            return rejectWithValue(msg);
+        }
+    }
+);
+
+export const updateVehicle = createAsyncThunk(
+    'vehicles/updateVehicle',
+    async ({ id, ...patch }, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.patch(`/vehicles/${id}`, patch);
+            return response.data;
+        } catch (error) {
+            const d = error.response?.data?.detail;
+            const msg = Array.isArray(d)
+                ? d.map((x) => (typeof x === 'string' ? x : x.msg || 'Ошибка')).join(', ')
+                : (d || 'Ошибка сохранения автомобиля');
+            return rejectWithValue(msg);
+        }
+    }
+);
+
+export const fetchVehicleCatalogManufacturers = createAsyncThunk(
+    'vehicles/catalogManufacturers',
+    async ({ q = '', limit = 80 } = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get('/vehicle-catalog/manufacturers', {
+                params: { q, limit },
+            });
+            return response.data;
+        } catch (error) {
             return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка создания автомобиля'
+                error.response?.data?.detail || 'Ошибка загрузки марок'
+            );
+        }
+    }
+);
+
+export const fetchVehicleCatalogModels = createAsyncThunk(
+    'vehicles/catalogModels',
+    async (manufacturerId, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get(
+                `/vehicle-catalog/manufacturers/${manufacturerId}/models`
+            );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки моделей'
+            );
+        }
+    }
+);
+
+export const fetchVehicleCatalogPassengercars = createAsyncThunk(
+    'vehicles/catalogPassengercars',
+    async (modelId, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get(
+                `/vehicle-catalog/models/${modelId}/passengercars`
+            );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки поколений'
+            );
+        }
+    }
+);
+
+export const fetchVehicleCatalogEngines = createAsyncThunk(
+    'vehicles/catalogEngines',
+    async (passengercarId, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get(
+                `/vehicle-catalog/passengercars/${passengercarId}/engines`
+            );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки двигателей'
+            );
+        }
+    }
+);
+
+export const fetchVehicleCatalogTransmissions = createAsyncThunk(
+    'vehicles/catalogTransmissions',
+    async (passengercarId, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get(
+                `/vehicle-catalog/passengercars/${passengercarId}/transmissions`
+            );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки КПП'
             );
         }
     }
@@ -676,6 +774,14 @@ const productSlice = createSlice({
             })
             .addCase(createVehicle.rejected, (state, action) => {
                 state.vehiclesLoading = false;
+                state.error = action.payload;
+            })
+            .addCase(updateVehicle.fulfilled, (state, action) => {
+                const v = action.payload;
+                const idx = state.vehicles.findIndex((x) => x.id === v.id);
+                if (idx >= 0) state.vehicles[idx] = v;
+            })
+            .addCase(updateVehicle.rejected, (state, action) => {
                 state.error = action.payload;
             })
             .addCase(fetchVehicles.pending, (state) => {

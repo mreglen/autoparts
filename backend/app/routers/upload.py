@@ -578,7 +578,8 @@ async def upload_media(
                 organization_id,
                 "pictures",  # subfolder
                 add_watermark_flag,  # add_watermark
-                logo_file_path  # logo_path
+                logo_file_path,  # logo_path
+                None,  # vehicle_photo_id
             )
             # The Celery task will save the file with this naming pattern
             predicted_path = f"/pictures/{organization_id}/{filename.replace(os.path.splitext(filename)[1], '.webp')}"
@@ -739,7 +740,8 @@ async def upload_organization_logo(
             organization_id,
             "logo_organizations",  # subfolder
             add_watermark_flag,  # add_watermark
-            logo_file_path  # logo_path
+            logo_file_path,  # logo_path
+            None,  # vehicle_photo_id
         )
         
         print(f"Celery task queued: {task.id}")
@@ -1309,27 +1311,125 @@ async def start_photo_processing(
             organization_id,
             "pictures",  # subfolder
             add_watermark_flag,  # add_watermark
-            logo_file_path  # logo_path
+            logo_file_path,  # logo_path
+            None,  # vehicle_photo_id
         )
-        
+
         print(f"✅ Celery task queued: {task.id}")
-        
+
         # Update processing status in database
         photo_record.processing_status = 'processing'
         db.commit()
-        
+
         return {
             "success": True,
             "task_id": task.id,
             "product_photo_id": product_photo_id,
             "status": "processing",
-            "message": "Photo processing started. Poll /api/upload/photo-status/{task_id} for updates."
+            "message": "Photo processing started. Poll /api/upload/photo-status/{task_id} for updates.",
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         print(f"❌ Error starting photo processing: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        raise HTTPException(500, f"Ошибка при запуске обработки фото: {str(e)}")
+
+
+@router.post("/start-vehicle-photo-processing/{vehicle_photo_id}")
+async def start_vehicle_photo_processing(
+    vehicle_photo_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Queue Celery to move vehicle photo from temp to vehicle_pictures and update DB."""
+    from app.models.vehicle_photo import VehiclePhoto as VehiclePhotoModel
+    from app.models.vehicle import Vehicle as VehicleModel
+    from app.models.organization import Organization
+
+    print(f"\n=== START VEHICLE PHOTO PROCESSING {vehicle_photo_id} ===")
+
+    try:
+        photo_record = db.query(VehiclePhotoModel).filter(
+            VehiclePhotoModel.id == vehicle_photo_id
+        ).first()
+        if not photo_record:
+            raise HTTPException(404, f"Vehicle photo {vehicle_photo_id} not found")
+
+        vehicle = db.query(VehicleModel).filter(VehicleModel.id == photo_record.vehicle_id).first()
+        if not vehicle:
+            raise HTTPException(404, "Vehicle not found for this photo")
+
+        if vehicle.organization_id != current_user.organization_id and not current_user.is_admin:
+            raise HTTPException(403, "Доступ запрещён")
+
+        temp_url = photo_record.photo_path
+        if not temp_url.startswith("/temp/"):
+            print(f"⚠️ Vehicle photo URL is not temp: {temp_url}")
+
+        temp_path_parts = temp_url.lstrip("/").split("/")
+        if len(temp_path_parts) >= 3:
+            organization_id = temp_path_parts[1]
+            temp_filename = "/".join(temp_path_parts[2:])
+        else:
+            raise HTTPException(400, f"Invalid temp path format: {temp_url}")
+
+        temp_file_path = os.path.join("uploads", "temp", organization_id, temp_filename)
+        abs_temp_file_path = os.path.abspath(temp_file_path)
+
+        org = db.query(Organization).filter(Organization.id == organization_id).first()
+
+        add_watermark_flag = False
+        logo_file_path = None
+        if org and org.watermark is not None:
+            if org.watermark == 1:
+                admin_user = db.query(User).filter(User.is_admin == True).first()
+                if admin_user and admin_user.organization_id:
+                    admin_org = db.query(Organization).filter(Organization.id == admin_user.organization_id).first()
+                    if admin_org and admin_org.logo_organization:
+                        add_watermark_flag = True
+                        logo_path_value = admin_org.logo_organization.lstrip("/").lstrip("\\")
+                        if not logo_path_value.lower().startswith("uploads"):
+                            logo_file_path = os.path.join("uploads", logo_path_value)
+                        else:
+                            logo_file_path = logo_path_value
+            elif org.watermark == 2:
+                if org.logo_organization:
+                    add_watermark_flag = True
+                    logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
+                    if not logo_path_value.lower().startswith("uploads"):
+                        logo_file_path = os.path.join("uploads", logo_path_value)
+                    else:
+                        logo_file_path = logo_path_value
+
+        final_filename = generate_photo_filename(organization_id, temp_filename)
+
+        task = process_and_upload_photo.delay(
+            abs_temp_file_path,
+            final_filename,
+            organization_id,
+            "vehicle_pictures",
+            add_watermark_flag,
+            logo_file_path,
+            vehicle_photo_id,
+        )
+
+        photo_record.processing_status = "processing"
+        db.commit()
+
+        return {
+            "success": True,
+            "task_id": task.id,
+            "vehicle_photo_id": vehicle_photo_id,
+            "status": "processing",
+            "message": "Vehicle photo processing started.",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error starting vehicle photo processing: {str(e)}")
         import traceback
         print(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(500, f"Ошибка при запуске обработки фото: {str(e)}")

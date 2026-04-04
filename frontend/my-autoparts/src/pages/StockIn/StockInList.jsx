@@ -384,10 +384,6 @@ const StockInList = () => {
         </div>
       </div>
 
-      <div className="font-medium text-lg sm:text-base mb-4 px-0">
-        <h2 className="border-b-4 border-blue-500 pb-2 inline-block">Список поступлений</h2>
-      </div>
-
       {sortedStockIns.length === 0 ? (
         <div className="mt-12 text-center py-16 px-6">
           <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
@@ -579,6 +575,7 @@ const StockInList = () => {
         isOpen={isVehicleModalOpen}
         onClose={() => setIsVehicleModalOpen(false)}
         onSelectVehicle={handleSelectVehicle}
+        stockInVehicleModal
       />
 
       <MediaModal

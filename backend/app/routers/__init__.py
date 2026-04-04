@@ -16,6 +16,7 @@ from app.routers.auth import router as auth_router
 from app.routers.admin import router as admin_router
 from app.routers.rossko_api.rossko_api import router as rossko_router
 from app.routers.vehicles import router as vehicles_router
+from app.routers.vehicle_catalog import router as vehicle_catalog_router
 from app.routers.upload import router as upload_router
 from app.routers.search_products import router as search_products_router
 from app.routers.carts import router as carts_router
@@ -36,6 +37,7 @@ api_router.include_router(search_products_router)
 api_router.include_router(rossko_router)
 api_router.include_router(upload_router)
 api_router.include_router(vehicles_router)
+api_router.include_router(vehicle_catalog_router)
 
 api_router.include_router(admin_router)
 api_router.include_router(auth_router)
