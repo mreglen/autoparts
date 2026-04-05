@@ -14,6 +14,61 @@ import { apiRequestFormData, normalizeImageUrl } from '../../../utils/apiClient'
 
 const MAX_VEHICLE_PHOTOS = 10;
 
+const normCatalogQ = (q) => (q || '').trim().toLowerCase();
+
+const filterManufacturersByInput = (rows, brandInput) => {
+  const nq = normCatalogQ(brandInput);
+  if (!nq) return rows || [];
+  return (rows || []).filter((m) => {
+    const d = (m.description || '').toLowerCase();
+    const c = (m.matchcode || '').toLowerCase();
+    return d.includes(nq) || c.includes(nq);
+  });
+};
+
+const modelOptionLabel = (m) =>
+  m.description || [m.from_year, m.to_year].filter(Boolean).join('–') || String(m.id);
+
+const filterModelsByInput = (rows, query) => {
+  const nq = normCatalogQ(query);
+  if (!nq) return rows || [];
+  return (rows || []).filter((m) => modelOptionLabel(m).toLowerCase().includes(nq));
+};
+
+const pcOptionLabel = (p) => p.full_description || p.description || String(p.id);
+
+const filterPcByInput = (rows, query) => {
+  const nq = normCatalogQ(query);
+  if (!nq) return rows || [];
+  return (rows || []).filter((p) => pcOptionLabel(p).toLowerCase().includes(nq));
+};
+
+const engineOptionLabel = (en) =>
+  en.sales_description || en.description || String(en.id);
+
+const filterEnginesByInput = (rows, query) => {
+  const nq = normCatalogQ(query);
+  if (!nq) return rows || [];
+  return (rows || []).filter((e) => engineOptionLabel(e).toLowerCase().includes(nq));
+};
+
+const transmissionOptionKey = (tx, idx) =>
+  `${tx.title || ''}\t${tx.value}`.trim() || `tx-${idx}`;
+
+const transmissionDisplay = (tx) =>
+  tx.title ? `${tx.title}: ${tx.value}` : tx.value;
+
+const filterTransmissionsByInput = (rows, query) => {
+  const nq = normCatalogQ(query);
+  if (!nq) return rows || [];
+  return (rows || []).filter((tx) => {
+    const disp = transmissionDisplay(tx).toLowerCase();
+    const val = (tx.value || '').toLowerCase();
+    const tit = (tx.title || '').toLowerCase();
+    return disp.includes(nq) || val.includes(nq) || tit.includes(nq);
+  });
+};
+
 const emptyCreate = () => ({
   catalogManufacturerId: null,
   catalogModelId: null,
@@ -357,12 +412,14 @@ const VehicleModal = ({
     else setDetailEdit(patch);
   };
 
-  const onCatalogModelChange = (e, target) => {
-    const id = parseInt(e.target.value, 10);
+  const pickCatalogModel = (m, target) => {
+    const id = m?.id;
     if (!id) return;
+    const label = modelOptionLabel(m);
     const patch = (prev) => ({
       ...prev,
       catalogModelId: id,
+      modelInput: label,
       catalogPassengercarId: null,
       catalogEngineId: null,
       catalogTransmissionKey: '',
@@ -391,12 +448,34 @@ const VehicleModal = ({
       .finally(() => setChildLoading(false));
   };
 
-  const onPassengercarChange = (e, target) => {
-    const id = parseInt(e.target.value, 10);
+  const onCatalogModelInputChange = (e, target) => {
+    const val = e.target.value;
+    const patch = (prev) => ({
+      ...prev,
+      modelInput: val,
+      catalogModelId: null,
+      catalogPassengercarId: null,
+      catalogEngineId: null,
+      catalogTransmissionKey: '',
+      generationInput: '',
+      engineText: '',
+      transmissionText: '',
+      pcOptions: [],
+      engineOptions: [],
+      transmissionOptions: [],
+    });
+    if (target === 'create') setCreate(patch);
+    else setDetailEdit(patch);
+  };
+
+  const pickPassengercar = (p, target) => {
+    const id = p?.id;
     if (!id) return;
+    const label = pcOptionLabel(p);
     const patch = (prev) => ({
       ...prev,
       catalogPassengercarId: id,
+      generationInput: label,
       catalogEngineId: null,
       catalogTransmissionKey: '',
       engineText: '',
@@ -425,6 +504,69 @@ const VehicleModal = ({
         else setDetailEdit(setEngTx);
       })
       .finally(() => setChildLoading(false));
+  };
+
+  const onPassengercarInputChange = (e, target) => {
+    const val = e.target.value;
+    const patch = (prev) => ({
+      ...prev,
+      generationInput: val,
+      catalogPassengercarId: null,
+      catalogEngineId: null,
+      catalogTransmissionKey: '',
+      engineText: '',
+      transmissionText: '',
+      engineOptions: [],
+      transmissionOptions: [],
+    });
+    if (target === 'create') setCreate(patch);
+    else setDetailEdit(patch);
+  };
+
+  const pickCatalogEngine = (en, target) => {
+    if (!en?.id) return;
+    const label = engineOptionLabel(en);
+    const patch = (prev) => ({
+      ...prev,
+      catalogEngineId: en.id,
+      engineText: label,
+    });
+    if (target === 'create') setCreate(patch);
+    else setDetailEdit(patch);
+  };
+
+  const onCatalogEngineInputChange = (e, target) => {
+    const val = e.target.value;
+    const patch = (prev) => ({
+      ...prev,
+      engineText: val,
+      catalogEngineId: null,
+    });
+    if (target === 'create') setCreate(patch);
+    else setDetailEdit(patch);
+  };
+
+  const pickCatalogTransmission = (tx, idx, target) => {
+    const key = transmissionOptionKey(tx, idx);
+    const label = transmissionDisplay(tx);
+    const patch = (prev) => ({
+      ...prev,
+      catalogTransmissionKey: key,
+      transmissionText: label,
+    });
+    if (target === 'create') setCreate(patch);
+    else setDetailEdit(patch);
+  };
+
+  const onCatalogTransmissionInputChange = (e, target) => {
+    const val = e.target.value;
+    const patch = (prev) => ({
+      ...prev,
+      transmissionText: val,
+      catalogTransmissionKey: '',
+    });
+    if (target === 'create') setCreate(patch);
+    else setDetailEdit(patch);
   };
 
   const modelEnabled = create.brandInput.trim().length > 0;
@@ -875,41 +1017,73 @@ const VehicleModal = ({
                       {brandSearchLoading && (
                         <div className="text-xs text-gray-500 mt-1">Поиск марок…</div>
                       )}
-                      {detailEdit.manufacturerOptions.length > 0 && (
-                        <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
-                          {detailEdit.manufacturerOptions.map((m) => (
-                            <li key={m.id}>
-                              <button
-                                type="button"
-                                className="w-full text-left px-3 py-2 hover:bg-indigo-50"
-                                onClick={() => pickManufacturer(m, 'detail')}
-                              >
-                                {m.description || m.matchcode || m.id}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
+                      {detailEdit.manufacturerOptions.length > 0 &&
+                        detailEdit.catalogManufacturerId == null && (
+                        <>
+                          {filterManufacturersByInput(
+                            detailEdit.manufacturerOptions,
+                            detailEdit.brandInput
+                          ).length > 0 ? (
+                            <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                              {filterManufacturersByInput(
+                                detailEdit.manufacturerOptions,
+                                detailEdit.brandInput
+                              ).map((m) => (
+                                <li key={m.id}>
+                                  <button
+                                    type="button"
+                                    className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                    onClick={() => pickManufacturer(m, 'detail')}
+                                  >
+                                    {m.description || m.matchcode || m.id}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
+                          )}
+                        </>
                       )}
                     </div>
 
                     {detailUsingManufacturerCatalog ? (
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Модель *</label>
-                        <select
-                          className="w-full px-3 py-2 border rounded-md"
+                        <input
+                          type="text"
+                          value={detailEdit.modelInput}
+                          onChange={(e) => onCatalogModelInputChange(e, 'detail')}
                           disabled={!detailModelEnabled || childLoading}
-                          value={detailEdit.catalogModelId || ''}
-                          onChange={(e) => onCatalogModelChange(e, 'detail')}
-                        >
-                          <option value="">— выберите модель —</option>
-                          {detailEdit.modelOptions.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.description ||
-                                [m.from_year, m.to_year].filter(Boolean).join('–') ||
-                                m.id}
-                            </option>
-                          ))}
-                        </select>
+                          className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                          placeholder="Начните вводить или выберите из списка"
+                          autoComplete="off"
+                        />
+                        {detailEdit.modelOptions.length > 0 && detailEdit.catalogModelId == null && (
+                          <>
+                            {filterModelsByInput(detailEdit.modelOptions, detailEdit.modelInput).length >
+                            0 ? (
+                              <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                                {filterModelsByInput(
+                                  detailEdit.modelOptions,
+                                  detailEdit.modelInput
+                                ).map((m) => (
+                                  <li key={m.id}>
+                                    <button
+                                      type="button"
+                                      className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                      onClick={() => pickCatalogModel(m, 'detail')}
+                                    >
+                                      {modelOptionLabel(m)}
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
+                            )}
+                          </>
+                        )}
                       </div>
                     ) : (
                       <div className="md:col-span-2">
@@ -930,19 +1104,41 @@ const VehicleModal = ({
                     {detailUsingManufacturerCatalog ? (
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Поколение *</label>
-                        <select
-                          className="w-full px-3 py-2 border rounded-md"
+                        <input
+                          type="text"
+                          value={detailEdit.generationInput}
+                          onChange={(e) => onPassengercarInputChange(e, 'detail')}
                           disabled={!detailGenerationEnabled || childLoading}
-                          value={detailEdit.catalogPassengercarId || ''}
-                          onChange={(e) => onPassengercarChange(e, 'detail')}
-                        >
-                          <option value="">— выберите поколение —</option>
-                          {detailEdit.pcOptions.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.full_description || p.description || p.id}
-                            </option>
-                          ))}
-                        </select>
+                          className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                          placeholder="Начните вводить или выберите из списка"
+                          autoComplete="off"
+                        />
+                        {detailEdit.pcOptions.length > 0 &&
+                          detailEdit.catalogPassengercarId == null && (
+                          <>
+                            {filterPcByInput(detailEdit.pcOptions, detailEdit.generationInput).length >
+                            0 ? (
+                              <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                                {filterPcByInput(
+                                  detailEdit.pcOptions,
+                                  detailEdit.generationInput
+                                ).map((p) => (
+                                  <li key={p.id}>
+                                    <button
+                                      type="button"
+                                      className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                      onClick={() => pickPassengercar(p, 'detail')}
+                                    >
+                                      {pcOptionLabel(p)}
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
+                            )}
+                          </>
+                        )}
                       </div>
                     ) : (
                       <div className="md:col-span-2">
@@ -962,25 +1158,44 @@ const VehicleModal = ({
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Двигатель</label>
                       {detailUsingManufacturerCatalog && detailEdit.catalogPassengercarId ? (
-                        <select
-                          className="w-full px-3 py-2 border rounded-md"
-                          disabled={!detailEngineTxEnabled || childLoading}
-                          value={detailEdit.catalogEngineId || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setDetailEdit((prev) => ({
-                              ...prev,
-                              catalogEngineId: val ? parseInt(val, 10) : null,
-                            }));
-                          }}
-                        >
-                          <option value="">— из каталога —</option>
-                          {detailEdit.engineOptions.map((en) => (
-                            <option key={en.id} value={en.id}>
-                              {en.sales_description || en.description || en.id}
-                            </option>
-                          ))}
-                        </select>
+                        <>
+                          <input
+                            type="text"
+                            value={detailEdit.engineText}
+                            onChange={(e) => onCatalogEngineInputChange(e, 'detail')}
+                            disabled={!detailEngineTxEnabled || childLoading}
+                            className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                            placeholder="Начните вводить или выберите из списка"
+                            autoComplete="off"
+                          />
+                          {detailEdit.engineOptions.length > 0 && detailEdit.catalogEngineId == null && (
+                            <>
+                              {filterEnginesByInput(
+                                detailEdit.engineOptions,
+                                detailEdit.engineText
+                              ).length > 0 ? (
+                                <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                                  {filterEnginesByInput(
+                                    detailEdit.engineOptions,
+                                    detailEdit.engineText
+                                  ).map((en) => (
+                                    <li key={en.id}>
+                                      <button
+                                        type="button"
+                                        className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                        onClick={() => pickCatalogEngine(en, 'detail')}
+                                      >
+                                        {engineOptionLabel(en)}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
+                              )}
+                            </>
+                          )}
+                        </>
                       ) : (
                         <input
                           type="text"
@@ -997,27 +1212,45 @@ const VehicleModal = ({
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Коробка передач</label>
                       {detailUsingManufacturerCatalog && detailEdit.catalogPassengercarId ? (
-                        <select
-                          className="w-full px-3 py-2 border rounded-md"
-                          disabled={!detailEngineTxEnabled || childLoading}
-                          value={detailEdit.catalogTransmissionKey}
-                          onChange={(e) =>
-                            setDetailEdit((prev) => ({
-                              ...prev,
-                              catalogTransmissionKey: e.target.value,
-                            }))
-                          }
-                        >
-                          <option value="">— из каталога —</option>
-                          {detailEdit.transmissionOptions.map((tx, idx) => {
-                            const key = `${tx.title || ''}\t${tx.value}`.trim() || `tx-${idx}`;
-                            return (
-                              <option key={key} value={key}>
-                                {tx.title ? `${tx.title}: ${tx.value}` : tx.value}
-                              </option>
-                            );
-                          })}
-                        </select>
+                        <>
+                          <input
+                            type="text"
+                            value={detailEdit.transmissionText}
+                            onChange={(e) => onCatalogTransmissionInputChange(e, 'detail')}
+                            disabled={!detailEngineTxEnabled || childLoading}
+                            className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                            placeholder="Начните вводить или выберите из списка"
+                            autoComplete="off"
+                          />
+                          {detailEdit.transmissionOptions.length > 0 &&
+                            !detailEdit.catalogTransmissionKey && (
+                            <>
+                              {filterTransmissionsByInput(
+                                detailEdit.transmissionOptions,
+                                detailEdit.transmissionText
+                              ).length > 0 ? (
+                                <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                                  {filterTransmissionsByInput(
+                                    detailEdit.transmissionOptions,
+                                    detailEdit.transmissionText
+                                  ).map((tx, idx) => (
+                                    <li key={transmissionOptionKey(tx, idx)}>
+                                      <button
+                                        type="button"
+                                        className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                        onClick={() => pickCatalogTransmission(tx, idx, 'detail')}
+                                      >
+                                        {transmissionDisplay(tx)}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
+                              )}
+                            </>
+                          )}
+                        </>
                       ) : (
                         <input
                           type="text"
@@ -1151,42 +1384,68 @@ const VehicleModal = ({
                   {brandSearchLoading && (
                     <div className="text-xs text-gray-500 mt-1">Поиск марок…</div>
                   )}
-                  {create.manufacturerOptions.length > 0 && (
-                    <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
-                      {create.manufacturerOptions.map((m) => (
-                        <li key={m.id}>
-                          <button
-                            type="button"
-                            className="w-full text-left px-3 py-2 hover:bg-indigo-50"
-                            onClick={() => pickManufacturer(m, 'create')}
-                          >
-                            {m.description || m.matchcode || m.id}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                  {create.manufacturerOptions.length > 0 &&
+                    create.catalogManufacturerId == null && (
+                    <>
+                      {filterManufacturersByInput(create.manufacturerOptions, create.brandInput).length >
+                        0 ? (
+                        <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                          {filterManufacturersByInput(
+                            create.manufacturerOptions,
+                            create.brandInput
+                          ).map((m) => (
+                            <li key={m.id}>
+                              <button
+                                type="button"
+                                className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                onClick={() => pickManufacturer(m, 'create')}
+                              >
+                                {m.description || m.matchcode || m.id}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
+                      )}
+                    </>
                   )}
                 </div>
 
                 {usingManufacturerCatalog ? (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Модель *</label>
-                    <select
-                      className="w-full px-3 py-2 border rounded-md"
+                    <input
+                      type="text"
+                      value={create.modelInput}
+                      onChange={(e) => onCatalogModelInputChange(e, 'create')}
                       disabled={!modelEnabled || childLoading}
-                      value={create.catalogModelId || ''}
-                      onChange={(e) => onCatalogModelChange(e, 'create')}
                       required
-                    >
-                      <option value="">— выберите модель —</option>
-                      {create.modelOptions.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.description ||
-                            [m.from_year, m.to_year].filter(Boolean).join('–') ||
-                            m.id}
-                        </option>
-                      ))}
-                    </select>
+                      className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                      placeholder="Начните вводить или выберите из списка"
+                      autoComplete="off"
+                    />
+                    {create.modelOptions.length > 0 && create.catalogModelId == null && (
+                      <>
+                        {filterModelsByInput(create.modelOptions, create.modelInput).length > 0 ? (
+                          <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                            {filterModelsByInput(create.modelOptions, create.modelInput).map((m) => (
+                              <li key={m.id}>
+                                <button
+                                  type="button"
+                                  className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                  onClick={() => pickCatalogModel(m, 'create')}
+                                >
+                                  {modelOptionLabel(m)}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
+                        )}
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="md:col-span-2">
@@ -1208,20 +1467,37 @@ const VehicleModal = ({
                 {usingManufacturerCatalog ? (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Поколение *</label>
-                    <select
-                      className="w-full px-3 py-2 border rounded-md"
+                    <input
+                      type="text"
+                      value={create.generationInput}
+                      onChange={(e) => onPassengercarInputChange(e, 'create')}
                       disabled={!generationEnabled || childLoading}
-                      value={create.catalogPassengercarId || ''}
-                      onChange={(e) => onPassengercarChange(e, 'create')}
                       required
-                    >
-                      <option value="">— выберите поколение —</option>
-                      {create.pcOptions.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.full_description || p.description || p.id}
-                        </option>
-                      ))}
-                    </select>
+                      className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                      placeholder="Начните вводить или выберите из списка"
+                      autoComplete="off"
+                    />
+                    {create.pcOptions.length > 0 && create.catalogPassengercarId == null && (
+                      <>
+                        {filterPcByInput(create.pcOptions, create.generationInput).length > 0 ? (
+                          <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                            {filterPcByInput(create.pcOptions, create.generationInput).map((p) => (
+                              <li key={p.id}>
+                                <button
+                                  type="button"
+                                  className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                  onClick={() => pickPassengercar(p, 'create')}
+                                >
+                                  {pcOptionLabel(p)}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
+                        )}
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="md:col-span-2">
@@ -1242,25 +1518,41 @@ const VehicleModal = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Двигатель</label>
                   {usingManufacturerCatalog && create.catalogPassengercarId ? (
-                    <select
-                      className="w-full px-3 py-2 border rounded-md"
-                      disabled={!engineTxEnabled || childLoading}
-                      value={create.catalogEngineId || ''}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setCreate((prev) => ({
-                          ...prev,
-                          catalogEngineId: v ? parseInt(v, 10) : null,
-                        }));
-                      }}
-                    >
-                      <option value="">— из каталога —</option>
-                      {create.engineOptions.map((en) => (
-                        <option key={en.id} value={en.id}>
-                          {en.sales_description || en.description || en.id}
-                        </option>
-                      ))}
-                    </select>
+                    <>
+                      <input
+                        type="text"
+                        value={create.engineText}
+                        onChange={(e) => onCatalogEngineInputChange(e, 'create')}
+                        disabled={!engineTxEnabled || childLoading}
+                        className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                        placeholder="Начните вводить или выберите из списка"
+                        autoComplete="off"
+                      />
+                      {create.engineOptions.length > 0 && create.catalogEngineId == null && (
+                        <>
+                          {filterEnginesByInput(create.engineOptions, create.engineText).length >
+                          0 ? (
+                            <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                              {filterEnginesByInput(create.engineOptions, create.engineText).map(
+                                (en) => (
+                                  <li key={en.id}>
+                                    <button
+                                      type="button"
+                                      className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                      onClick={() => pickCatalogEngine(en, 'create')}
+                                    >
+                                      {engineOptionLabel(en)}
+                                    </button>
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          ) : (
+                            <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
+                          )}
+                        </>
+                      )}
+                    </>
                   ) : (
                     <input
                       type="text"
@@ -1277,27 +1569,44 @@ const VehicleModal = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Коробка передач</label>
                   {usingManufacturerCatalog && create.catalogPassengercarId ? (
-                    <select
-                      className="w-full px-3 py-2 border rounded-md"
-                      disabled={!engineTxEnabled || childLoading}
-                      value={create.catalogTransmissionKey}
-                      onChange={(e) =>
-                        setCreate((prev) => ({
-                          ...prev,
-                          catalogTransmissionKey: e.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">— из каталога —</option>
-                      {create.transmissionOptions.map((tx, idx) => {
-                        const key = `${tx.title || ''}\t${tx.value}`.trim() || `tx-${idx}`;
-                        return (
-                          <option key={key} value={key}>
-                            {tx.title ? `${tx.title}: ${tx.value}` : tx.value}
-                          </option>
-                        );
-                      })}
-                    </select>
+                    <>
+                      <input
+                        type="text"
+                        value={create.transmissionText}
+                        onChange={(e) => onCatalogTransmissionInputChange(e, 'create')}
+                        disabled={!engineTxEnabled || childLoading}
+                        className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                        placeholder="Начните вводить или выберите из списка"
+                        autoComplete="off"
+                      />
+                      {create.transmissionOptions.length > 0 && !create.catalogTransmissionKey && (
+                        <>
+                          {filterTransmissionsByInput(
+                            create.transmissionOptions,
+                            create.transmissionText
+                          ).length > 0 ? (
+                            <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                              {filterTransmissionsByInput(
+                                create.transmissionOptions,
+                                create.transmissionText
+                              ).map((tx, idx) => (
+                                <li key={transmissionOptionKey(tx, idx)}>
+                                  <button
+                                    type="button"
+                                    className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                    onClick={() => pickCatalogTransmission(tx, idx, 'create')}
+                                  >
+                                    {transmissionDisplay(tx)}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
+                          )}
+                        </>
+                      )}
+                    </>
                   ) : (
                     <input
                       type="text"
