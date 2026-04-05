@@ -46,6 +46,17 @@ def _tecdoc_row_to_dict(row) -> dict | None:
     return out
 
 
+def _refresh_tecdoc_json_columns(db: Session, v: VehicleModel) -> None:
+    mid = v.tecdoc_manufacturer_id
+    mob_id = v.tecdoc_model_id
+    pc_id = v.tecdoc_passengercar_id
+    eid = v.tecdoc_engine_id
+    v.tecdoc_manufacturer_json = _tecdoc_row_to_dict(db.get(TecdocManufacturer, mid) if mid else None)
+    v.tecdoc_model_json = _tecdoc_row_to_dict(db.get(TecdocModel, mob_id) if mob_id else None)
+    v.tecdoc_passengercar_json = _tecdoc_row_to_dict(db.get(TecdocPassengercar, pc_id) if pc_id else None)
+    v.tecdoc_engine_json = _tecdoc_row_to_dict(db.get(TecdocEngine, eid) if eid else None)
+
+
 def _apply_tecdoc_labels(db: Session, data: dict) -> None:
     """Fill display strings from TecDoc rows when ids are set (in-place)."""
     mid = data.get("tecdoc_manufacturer_id")
@@ -123,20 +134,68 @@ def update_vehicle(
 
     data = body.model_dump(exclude_unset=True)
 
-    if "brand" in data and data["brand"] is not None:
-        trimmed = data["brand"].strip()
-        if trimmed:
-            db_vehicle.brand = _truncate(trimmed, 50)
-    if "model" in data and data["model"] is not None:
-        trimmed = data["model"].strip()
-        if trimmed:
-            db_vehicle.model = _truncate(trimmed, 100)
-    if "generation" in data:
-        g = data.get("generation")
+    tecdoc_patch_keys = (
+        "tecdoc_manufacturer_id",
+        "tecdoc_model_id",
+        "tecdoc_passengercar_id",
+        "tecdoc_engine_id",
+        "tecdoc_transmission_json",
+    )
+    has_tecdoc_patch = any(k in data for k in tecdoc_patch_keys)
+
+    if has_tecdoc_patch:
+        for k in tecdoc_patch_keys:
+            if k in data:
+                setattr(db_vehicle, k, data[k])
+        _refresh_tecdoc_json_columns(db, db_vehicle)
+
+        label = {
+            "brand": db_vehicle.brand,
+            "model": db_vehicle.model,
+            "generation": db_vehicle.generation,
+            "engine": db_vehicle.engine,
+            "tecdoc_manufacturer_id": db_vehicle.tecdoc_manufacturer_id,
+            "tecdoc_model_id": db_vehicle.tecdoc_model_id,
+            "tecdoc_passengercar_id": db_vehicle.tecdoc_passengercar_id,
+            "tecdoc_engine_id": db_vehicle.tecdoc_engine_id,
+        }
+        if "brand" in data and data["brand"] is not None:
+            label["brand"] = data["brand"]
+        if "model" in data and data["model"] is not None:
+            label["model"] = data["model"]
+        if "generation" in data:
+            label["generation"] = data.get("generation")
+        if "engine" in data:
+            label["engine"] = data.get("engine")
+
+        _apply_tecdoc_labels(db, label)
+
+        nb = _truncate((label.get("brand") or "").strip(), 50)
+        if nb:
+            db_vehicle.brand = nb
+        nm = _truncate((label.get("model") or "").strip(), 100)
+        if nm:
+            db_vehicle.model = nm
+        g = label.get("generation")
         db_vehicle.generation = _truncate(g.strip(), 50) if g and str(g).strip() else None
-    if "engine" in data:
-        e = data.get("engine")
+        e = label.get("engine")
         db_vehicle.engine = _truncate(e.strip(), 50) if e and str(e).strip() else None
+    else:
+        if "brand" in data and data["brand"] is not None:
+            trimmed = data["brand"].strip()
+            if trimmed:
+                db_vehicle.brand = _truncate(trimmed, 50)
+        if "model" in data and data["model"] is not None:
+            trimmed = data["model"].strip()
+            if trimmed:
+                db_vehicle.model = _truncate(trimmed, 100)
+        if "generation" in data:
+            g = data.get("generation")
+            db_vehicle.generation = _truncate(g.strip(), 50) if g and str(g).strip() else None
+        if "engine" in data:
+            e = data.get("engine")
+            db_vehicle.engine = _truncate(e.strip(), 50) if e and str(e).strip() else None
+
     if "transmission" in data:
         t = data.get("transmission")
         db_vehicle.transmission = _truncate(t.strip(), 30) if t and str(t).strip() else None

@@ -36,30 +36,170 @@ const emptyCreate = () => ({
   transmissionOptions: [],
 });
 
-const vehicleToDetailForm = (v) => ({
-  brand: v?.brand || '',
-  model: v?.model || '',
-  generation: v?.generation || '',
-  engine: v?.engine || '',
-  transmission: v?.transmission || '',
-  vin: (v?.vin || '').toUpperCase(),
-  mileage: v?.mileage != null && v?.mileage !== '' ? String(v.mileage) : '',
-  price:
-    v?.price != null && v?.price !== ''
-      ? String(v.price).replace('.', ',')
-      : '',
+const emptyDetailEdit = () => ({
+  ...emptyCreate(),
+  vin: '',
+  mileage: '',
+  price: '',
 });
 
-const normalizeDetailForCompare = (f) => ({
-  brand: (f.brand || '').trim(),
-  model: (f.model || '').trim(),
-  generation: (f.generation || '').trim(),
-  engine: (f.engine || '').trim(),
-  transmission: (f.transmission || '').trim(),
-  vin: (f.vin || '').trim().toUpperCase(),
-  mileage: (f.mileage || '').trim(),
-  price: (f.price || '').trim().replace(',', '.'),
-});
+const vehicleToDetailEditSyncPart = (v) => {
+  const tj = v?.tecdoc_transmission_json;
+  let catalogTransmissionKey = '';
+  if (tj && typeof tj === 'object') {
+    const title = tj.title != null ? String(tj.title) : '';
+    const val = tj.value != null ? String(tj.value) : '';
+    catalogTransmissionKey = title || val ? `${title}\t${val}` : '';
+  }
+  return {
+    catalogManufacturerId: v?.tecdoc_manufacturer_id ?? null,
+    catalogModelId: v?.tecdoc_model_id ?? null,
+    catalogPassengercarId: v?.tecdoc_passengercar_id ?? null,
+    catalogEngineId: v?.tecdoc_engine_id ?? null,
+    catalogTransmissionKey,
+    brandInput: v?.brand || '',
+    modelInput: v?.model || '',
+    generationInput: v?.generation || '',
+    engineText: v?.engine || '',
+    transmissionText: v?.transmission || '',
+    vin: (v?.vin || '').toUpperCase(),
+    mileage: v?.mileage != null && v?.mileage !== '' ? String(v.mileage) : '',
+    price:
+      v?.price != null && v?.price !== ''
+        ? String(v.price).replace('.', ',')
+        : '',
+    manufacturerOptions: [],
+    modelOptions: [],
+    pcOptions: [],
+    engineOptions: [],
+    transmissionOptions: [],
+    vehiclePhotos: [],
+  };
+};
+
+const buildUpdatePayloadFromDraft = (draft) => {
+  const usingManufacturerCatalog = draft.catalogManufacturerId != null;
+
+  let modelVal = draft.modelInput.trim();
+  if (usingManufacturerCatalog && draft.catalogModelId) {
+    const mo = draft.modelOptions.find((m) => m.id === draft.catalogModelId);
+    modelVal = (mo && (mo.description || '')) || modelVal;
+  }
+
+  let generationVal = draft.generationInput.trim();
+  if (usingManufacturerCatalog && draft.catalogPassengercarId) {
+    const pc = draft.pcOptions.find((p) => p.id === draft.catalogPassengercarId);
+    generationVal =
+      (pc && (pc.full_description || pc.description || '')) || generationVal;
+  }
+
+  let engineVal = (draft.engineText || '').trim();
+  if (draft.catalogEngineId) {
+    const en = draft.engineOptions.find((x) => x.id === draft.catalogEngineId);
+    engineVal = (en && (en.sales_description || en.description || '')) || engineVal;
+  }
+
+  let transmissionVal = (draft.transmissionText || '').trim();
+  if (draft.catalogTransmissionKey) {
+    const tab = draft.catalogTransmissionKey.indexOf('\t');
+    const title = tab >= 0 ? draft.catalogTransmissionKey.slice(0, tab) : '';
+    const value = tab >= 0 ? draft.catalogTransmissionKey.slice(tab + 1) : draft.catalogTransmissionKey;
+    transmissionVal = (value || title || transmissionVal).trim();
+  }
+
+  let tecdocTransmissionJson = null;
+  if (draft.catalogTransmissionKey) {
+    const k = draft.catalogTransmissionKey;
+    const tab = k.indexOf('\t');
+    tecdocTransmissionJson =
+      tab >= 0
+        ? { title: k.slice(0, tab) || null, value: k.slice(tab + 1) || null }
+        : { title: null, value: k };
+  }
+
+  const mileageStr = String(draft.mileage ?? '').trim();
+  let mileage = null;
+  if (mileageStr !== '') {
+    const n = parseInt(mileageStr, 10);
+    if (!Number.isNaN(n)) mileage = n;
+  }
+
+  const priceRaw = String(draft.price || '').trim().replace(',', '.');
+  let price = null;
+  if (priceRaw !== '') {
+    const n = parseFloat(priceRaw);
+    if (!Number.isNaN(n)) price = n;
+  }
+
+  const vinVal = draft.vin.trim();
+
+  return {
+    brand: draft.brandInput.trim(),
+    model: modelVal,
+    generation: generationVal || null,
+    engine: engineVal || null,
+    transmission: transmissionVal || null,
+    vin: vinVal ? vinVal : null,
+    mileage: mileageStr === '' ? null : mileage,
+    price,
+    tecdoc_manufacturer_id: draft.catalogManufacturerId,
+    tecdoc_model_id: usingManufacturerCatalog ? draft.catalogModelId : null,
+    tecdoc_passengercar_id: usingManufacturerCatalog ? draft.catalogPassengercarId : null,
+    tecdoc_engine_id: draft.catalogEngineId || null,
+    tecdoc_transmission_json: tecdocTransmissionJson,
+  };
+};
+
+const serializeUpdatePayload = (draft) => {
+  const p = buildUpdatePayloadFromDraft(draft);
+  return JSON.stringify(p);
+};
+
+async function hydrateDetailCatalogForVehicle(dispatch, v) {
+  const sync = vehicleToDetailEditSyncPart(v);
+  let modelOptions = [];
+  let pcOptions = [];
+  let engineOptions = [];
+  let transmissionOptions = [];
+  if (v.tecdoc_manufacturer_id) {
+    try {
+      modelOptions = await dispatch(
+        fetchVehicleCatalogModels(v.tecdoc_manufacturer_id)
+      ).unwrap();
+    } catch {
+      modelOptions = [];
+    }
+  }
+  if (v.tecdoc_model_id) {
+    try {
+      pcOptions = await dispatch(
+        fetchVehicleCatalogPassengercars(v.tecdoc_model_id)
+      ).unwrap();
+    } catch {
+      pcOptions = [];
+    }
+  }
+  if (v.tecdoc_passengercar_id) {
+    try {
+      const [er, tr] = await Promise.allSettled([
+        dispatch(fetchVehicleCatalogEngines(v.tecdoc_passengercar_id)).unwrap(),
+        dispatch(fetchVehicleCatalogTransmissions(v.tecdoc_passengercar_id)).unwrap(),
+      ]);
+      engineOptions = er.status === 'fulfilled' ? er.value || [] : [];
+      transmissionOptions = tr.status === 'fulfilled' ? tr.value || [] : [];
+    } catch {
+      engineOptions = [];
+      transmissionOptions = [];
+    }
+  }
+  return {
+    ...sync,
+    modelOptions,
+    pcOptions,
+    engineOptions,
+    transmissionOptions,
+  };
+}
 
 const VehicleModal = ({
   isOpen,
@@ -76,8 +216,8 @@ const VehicleModal = ({
   const [create, setCreate] = useState(emptyCreate);
   const [brandSearchLoading, setBrandSearchLoading] = useState(false);
   const [childLoading, setChildLoading] = useState(false);
-  const [detailEditForm, setDetailEditForm] = useState(() => vehicleToDetailForm({}));
-  const [detailEditBaseline, setDetailEditBaseline] = useState(() => vehicleToDetailForm({}));
+  const [detailEdit, setDetailEdit] = useState(emptyDetailEdit);
+  const [detailBaselinePayload, setDetailBaselinePayload] = useState('');
   const [detailSaveLoading, setDetailSaveLoading] = useState(false);
 
   useEffect(() => {
@@ -99,10 +239,18 @@ const VehicleModal = ({
 
   useEffect(() => {
     if (!isOpen || !stockInVehicleModal || mode !== 'detail' || !detailVehicle?.id) return;
-    const f = vehicleToDetailForm(detailVehicle);
-    setDetailEditForm(f);
-    setDetailEditBaseline({ ...f });
-  }, [isOpen, stockInVehicleModal, mode, detailVehicle?.id]);
+    const v = detailVehicle;
+    let cancelled = false;
+    (async () => {
+      const merged = await hydrateDetailCatalogForVehicle(dispatch, v);
+      if (cancelled) return;
+      setDetailEdit(merged);
+      setDetailBaselinePayload(serializeUpdatePayload(merged));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, stockInVehicleModal, mode, detailVehicle?.id, dispatch]);
 
   useEffect(() => {
     if (isOpen && mode === 'create') {
@@ -111,10 +259,13 @@ const VehicleModal = ({
   }, [isOpen, mode]);
 
   const runBrandSearch = useCallback(
-    async (q) => {
+    async (q, target) => {
       const term = (q || '').trim();
+      const clearOpts = (prev) => ({ ...prev, manufacturerOptions: [] });
+      const setOpts = (rows) => (prev) => ({ ...prev, manufacturerOptions: rows || [] });
       if (!term) {
-        setCreate((prev) => ({ ...prev, manufacturerOptions: [] }));
+        if (target === 'create') setCreate(clearOpts);
+        else setDetailEdit(clearOpts);
         return;
       }
       setBrandSearchLoading(true);
@@ -122,9 +273,11 @@ const VehicleModal = ({
         const rows = await dispatch(
           fetchVehicleCatalogManufacturers({ q: term, limit: 80 })
         ).unwrap();
-        setCreate((prev) => ({ ...prev, manufacturerOptions: rows || [] }));
+        if (target === 'create') setCreate(setOpts(rows));
+        else setDetailEdit(setOpts(rows));
       } catch {
-        setCreate((prev) => ({ ...prev, manufacturerOptions: [] }));
+        if (target === 'create') setCreate(clearOpts);
+        else setDetailEdit(clearOpts);
       } finally {
         setBrandSearchLoading(false);
       }
@@ -133,13 +286,19 @@ const VehicleModal = ({
   );
 
   useEffect(() => {
-    if (mode !== 'create') return;
-    const t = setTimeout(() => runBrandSearch(create.brandInput), 320);
-    return () => clearTimeout(t);
-  }, [create.brandInput, mode, runBrandSearch]);
+    if (mode === 'create') {
+      const t = setTimeout(() => runBrandSearch(create.brandInput, 'create'), 320);
+      return () => clearTimeout(t);
+    }
+    if (mode === 'detail' && stockInVehicleModal) {
+      const t = setTimeout(() => runBrandSearch(detailEdit.brandInput, 'detail'), 320);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [create.brandInput, detailEdit.brandInput, mode, stockInVehicleModal, runBrandSearch]);
 
-  const pickManufacturer = (row) => {
-    setCreate((prev) => ({
+  const pickManufacturer = (row, target) => {
+    const patch = (prev) => ({
       ...prev,
       catalogManufacturerId: row.id,
       brandInput: row.description || row.matchcode || '',
@@ -156,24 +315,30 @@ const VehicleModal = ({
       pcOptions: [],
       engineOptions: [],
       transmissionOptions: [],
-    }));
+    });
+    if (target === 'create') setCreate(patch);
+    else setDetailEdit(patch);
     setChildLoading(true);
     dispatch(fetchVehicleCatalogModels(row.id))
       .unwrap()
       .then((rows) => {
-        setCreate((prev) => ({ ...prev, modelOptions: rows || [] }));
+        const setModels = (prev) => ({ ...prev, modelOptions: rows || [] });
+        if (target === 'create') setCreate(setModels);
+        else setDetailEdit(setModels);
       })
-      .catch(() =>
-        setCreate((prev) => ({ ...prev, modelOptions: [] }))
-      )
+      .catch(() => {
+        const empty = (prev) => ({ ...prev, modelOptions: [] });
+        if (target === 'create') setCreate(empty);
+        else setDetailEdit(empty);
+      })
       .finally(() => setChildLoading(false));
   };
 
-  const onBrandInputChange = (e) => {
-    const v = e.target.value;
-    setCreate((prev) => ({
+  const onBrandInputChange = (e, target) => {
+    const val = e.target.value;
+    const patch = (prev) => ({
       ...prev,
-      brandInput: v,
+      brandInput: val,
       catalogManufacturerId: null,
       catalogModelId: null,
       catalogPassengercarId: null,
@@ -187,13 +352,15 @@ const VehicleModal = ({
       pcOptions: [],
       engineOptions: [],
       transmissionOptions: [],
-    }));
+    });
+    if (target === 'create') setCreate(patch);
+    else setDetailEdit(patch);
   };
 
-  const onCatalogModelChange = (e) => {
+  const onCatalogModelChange = (e, target) => {
     const id = parseInt(e.target.value, 10);
     if (!id) return;
-    setCreate((prev) => ({
+    const patch = (prev) => ({
       ...prev,
       catalogModelId: id,
       catalogPassengercarId: null,
@@ -205,19 +372,29 @@ const VehicleModal = ({
       pcOptions: [],
       engineOptions: [],
       transmissionOptions: [],
-    }));
+    });
+    if (target === 'create') setCreate(patch);
+    else setDetailEdit(patch);
     setChildLoading(true);
     dispatch(fetchVehicleCatalogPassengercars(id))
       .unwrap()
-      .then((rows) => setCreate((prev) => ({ ...prev, pcOptions: rows || [] })))
-      .catch(() => setCreate((prev) => ({ ...prev, pcOptions: [] })))
+      .then((rows) => {
+        const setPc = (prev) => ({ ...prev, pcOptions: rows || [] });
+        if (target === 'create') setCreate(setPc);
+        else setDetailEdit(setPc);
+      })
+      .catch(() => {
+        const empty = (prev) => ({ ...prev, pcOptions: [] });
+        if (target === 'create') setCreate(empty);
+        else setDetailEdit(empty);
+      })
       .finally(() => setChildLoading(false));
   };
 
-  const onPassengercarChange = (e) => {
+  const onPassengercarChange = (e, target) => {
     const id = parseInt(e.target.value, 10);
     if (!id) return;
-    setCreate((prev) => ({
+    const patch = (prev) => ({
       ...prev,
       catalogPassengercarId: id,
       catalogEngineId: null,
@@ -226,7 +403,9 @@ const VehicleModal = ({
       transmissionText: '',
       engineOptions: [],
       transmissionOptions: [],
-    }));
+    });
+    if (target === 'create') setCreate(patch);
+    else setDetailEdit(patch);
     setChildLoading(true);
     Promise.allSettled([
       dispatch(fetchVehicleCatalogEngines(id)).unwrap(),
@@ -237,11 +416,13 @@ const VehicleModal = ({
           results[0].status === 'fulfilled' ? results[0].value || [] : [];
         const txRows =
           results[1].status === 'fulfilled' ? results[1].value || [] : [];
-        setCreate((prev) => ({
+        const setEngTx = (prev) => ({
           ...prev,
           engineOptions: engRows,
           transmissionOptions: txRows,
-        }));
+        });
+        if (target === 'create') setCreate(setEngTx);
+        else setDetailEdit(setEngTx);
       })
       .finally(() => setChildLoading(false));
   };
@@ -398,65 +579,94 @@ const VehicleModal = ({
 
   const isStockInDetailDirty = useMemo(() => {
     if (!stockInVehicleModal || mode !== 'detail' || !detailVehicle?.id) return false;
-    return (
-      JSON.stringify(normalizeDetailForCompare(detailEditForm)) !==
-      JSON.stringify(normalizeDetailForCompare(detailEditBaseline))
-    );
-  }, [stockInVehicleModal, mode, detailVehicle?.id, detailEditForm, detailEditBaseline]);
+    if (!detailBaselinePayload) return false;
+    try {
+      return serializeUpdatePayload(detailEdit) !== detailBaselinePayload;
+    } catch {
+      return false;
+    }
+  }, [stockInVehicleModal, mode, detailVehicle?.id, detailEdit, detailBaselinePayload]);
 
   const handleStockInSaveDetail = async () => {
     if (!detailVehicle?.id) return;
-    if (!detailEditForm.brand.trim() || !detailEditForm.model.trim()) {
-      alert('Укажите марку и модель');
+    if (!detailEdit.brandInput.trim()) {
+      alert('Укажите марку');
       return;
     }
-    const vinVal = detailEditForm.vin.trim();
-    if (vinVal && vinVal.length !== 17) {
+
+    const usingManufacturerCatalog = detailEdit.catalogManufacturerId != null;
+    let modelVal = detailEdit.modelInput.trim();
+    if (usingManufacturerCatalog && detailEdit.catalogModelId) {
+      const mo = detailEdit.modelOptions.find((m) => m.id === detailEdit.catalogModelId);
+      modelVal = (mo && (mo.description || '')) || modelVal;
+    }
+    if (!modelVal) {
+      alert('Укажите модель');
+      return;
+    }
+
+    let generationVal = detailEdit.generationInput.trim();
+    if (usingManufacturerCatalog && detailEdit.catalogPassengercarId) {
+      const pc = detailEdit.pcOptions.find((p) => p.id === detailEdit.catalogPassengercarId);
+      generationVal =
+        (pc && (pc.full_description || pc.description || '')) || generationVal;
+    }
+    if (!generationVal) {
+      alert('Укажите поколение');
+      return;
+    }
+
+    if (detailEdit.vin && detailEdit.vin.length !== 17) {
       alert('VIN должен содержать ровно 17 символов');
       return;
     }
-    const mileageStr = detailEditForm.mileage.trim();
-    let mileage = null;
+
+    const mileageStr = String(detailEdit.mileage ?? '').trim();
     if (mileageStr !== '') {
       const n = parseInt(mileageStr, 10);
       if (Number.isNaN(n)) {
         alert('Некорректный пробег');
         return;
       }
-      mileage = n;
     }
-    const priceStr = detailEditForm.price.trim().replace(',', '.');
-    let price = null;
+
+    const priceStr = detailEdit.price.trim().replace(',', '.');
     if (priceStr !== '') {
       const n = parseFloat(priceStr);
       if (Number.isNaN(n)) {
         alert('Некорректная цена');
         return;
       }
-      price = n;
     }
+
+    const patch = buildUpdatePayloadFromDraft(detailEdit);
 
     setDetailSaveLoading(true);
     try {
       const result = await dispatch(
         updateVehicle({
           id: detailVehicle.id,
-          brand: detailEditForm.brand.trim(),
-          model: detailEditForm.model.trim(),
-          generation: detailEditForm.generation.trim() || null,
-          engine: detailEditForm.engine.trim() || null,
-          transmission: detailEditForm.transmission.trim() || null,
-          vin: vinVal ? vinVal : null,
-          mileage: mileageStr === '' ? null : mileage,
-          price,
+          brand: patch.brand,
+          model: patch.model,
+          generation: patch.generation,
+          engine: patch.engine,
+          transmission: patch.transmission,
+          vin: patch.vin,
+          mileage: patch.mileage,
+          price: patch.price,
+          tecdoc_manufacturer_id: patch.tecdoc_manufacturer_id,
+          tecdoc_model_id: patch.tecdoc_model_id,
+          tecdoc_passengercar_id: patch.tecdoc_passengercar_id,
+          tecdoc_engine_id: patch.tecdoc_engine_id,
+          tecdoc_transmission_json: patch.tecdoc_transmission_json,
         })
       );
       if (updateVehicle.fulfilled.match(result)) {
         const updated = result.payload;
         setDetailVehicle(updated);
-        const f = vehicleToDetailForm(updated);
-        setDetailEditForm(f);
-        setDetailEditBaseline({ ...f });
+        const merged = await hydrateDetailCatalogForVehicle(dispatch, updated);
+        setDetailEdit(merged);
+        setDetailBaselinePayload(serializeUpdatePayload(merged));
       } else {
         alert(result.payload || 'Не удалось сохранить');
       }
@@ -508,6 +718,16 @@ const VehicleModal = ({
   };
 
   if (!isOpen) return null;
+
+  const detailUsingManufacturerCatalog =
+    stockInVehicleModal && mode === 'detail' && detailEdit.catalogManufacturerId != null;
+  const detailModelEnabled = detailEdit.brandInput.trim().length > 0;
+  const detailGenerationEnabled = detailUsingManufacturerCatalog
+    ? detailEdit.catalogModelId != null
+    : detailModelEnabled && detailEdit.modelInput.trim().length > 0;
+  const detailEngineTxEnabled = detailUsingManufacturerCatalog
+    ? detailEdit.catalogPassengercarId != null
+    : detailGenerationEnabled && detailEdit.generationInput.trim().length > 0;
 
   const modalTitle =
     mode === 'select' ? 'Выберите автомобиль' : mode === 'detail' ? 'Автомобиль' : 'Добавить автомобиль';
@@ -638,101 +858,218 @@ const VehicleModal = ({
             <div>
               {stockInVehicleModal ? (
                 <div className="space-y-4">
+                  <p className="text-sm text-gray-600">
+                    Марку и комплектацию можно выбрать из каталога или ввести вручную (как при создании).
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">Марка</label>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Марка *</label>
                       <input
                         type="text"
-                        value={detailEditForm.brand}
-                        onChange={(e) =>
-                          setDetailEditForm((prev) => ({ ...prev, brand: e.target.value }))
-                        }
-                        className="w-full px-3 py-2 border rounded-md text-sm font-medium"
+                        value={detailEdit.brandInput}
+                        onChange={(e) => onBrandInputChange(e, 'detail')}
+                        className="w-full px-3 py-2 border rounded-md"
+                        placeholder="Начните вводить или выберите из списка"
+                        autoComplete="off"
                       />
+                      {brandSearchLoading && (
+                        <div className="text-xs text-gray-500 mt-1">Поиск марок…</div>
+                      )}
+                      {detailEdit.manufacturerOptions.length > 0 && (
+                        <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                          {detailEdit.manufacturerOptions.map((m) => (
+                            <li key={m.id}>
+                              <button
+                                type="button"
+                                className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                onClick={() => pickManufacturer(m, 'detail')}
+                              >
+                                {m.description || m.matchcode || m.id}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
+
+                    {detailUsingManufacturerCatalog ? (
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Модель *</label>
+                        <select
+                          className="w-full px-3 py-2 border rounded-md"
+                          disabled={!detailModelEnabled || childLoading}
+                          value={detailEdit.catalogModelId || ''}
+                          onChange={(e) => onCatalogModelChange(e, 'detail')}
+                        >
+                          <option value="">— выберите модель —</option>
+                          {detailEdit.modelOptions.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.description ||
+                                [m.from_year, m.to_year].filter(Boolean).join('–') ||
+                                m.id}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Модель *</label>
+                        <input
+                          type="text"
+                          value={detailEdit.modelInput}
+                          onChange={(e) =>
+                            setDetailEdit((prev) => ({ ...prev, modelInput: e.target.value }))
+                          }
+                          disabled={!detailModelEnabled}
+                          className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                          placeholder="После ввода марки вне справочника"
+                        />
+                      </div>
+                    )}
+
+                    {detailUsingManufacturerCatalog ? (
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Поколение *</label>
+                        <select
+                          className="w-full px-3 py-2 border rounded-md"
+                          disabled={!detailGenerationEnabled || childLoading}
+                          value={detailEdit.catalogPassengercarId || ''}
+                          onChange={(e) => onPassengercarChange(e, 'detail')}
+                        >
+                          <option value="">— выберите поколение —</option>
+                          {detailEdit.pcOptions.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.full_description || p.description || p.id}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Поколение *</label>
+                        <input
+                          type="text"
+                          value={detailEdit.generationInput}
+                          onChange={(e) =>
+                            setDetailEdit((prev) => ({ ...prev, generationInput: e.target.value }))
+                          }
+                          disabled={!detailGenerationEnabled}
+                          className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                        />
+                      </div>
+                    )}
+
                     <div>
-                      <label className="text-xs text-gray-500 block mb-1">Модель</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Двигатель</label>
+                      {detailUsingManufacturerCatalog && detailEdit.catalogPassengercarId ? (
+                        <select
+                          className="w-full px-3 py-2 border rounded-md"
+                          disabled={!detailEngineTxEnabled || childLoading}
+                          value={detailEdit.catalogEngineId || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDetailEdit((prev) => ({
+                              ...prev,
+                              catalogEngineId: val ? parseInt(val, 10) : null,
+                            }));
+                          }}
+                        >
+                          <option value="">— из каталога —</option>
+                          {detailEdit.engineOptions.map((en) => (
+                            <option key={en.id} value={en.id}>
+                              {en.sales_description || en.description || en.id}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={detailEdit.engineText}
+                          onChange={(e) =>
+                            setDetailEdit((prev) => ({ ...prev, engineText: e.target.value }))
+                          }
+                          disabled={!detailEngineTxEnabled}
+                          className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                        />
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Коробка передач</label>
+                      {detailUsingManufacturerCatalog && detailEdit.catalogPassengercarId ? (
+                        <select
+                          className="w-full px-3 py-2 border rounded-md"
+                          disabled={!detailEngineTxEnabled || childLoading}
+                          value={detailEdit.catalogTransmissionKey}
+                          onChange={(e) =>
+                            setDetailEdit((prev) => ({
+                              ...prev,
+                              catalogTransmissionKey: e.target.value,
+                            }))
+                          }
+                        >
+                          <option value="">— из каталога —</option>
+                          {detailEdit.transmissionOptions.map((tx, idx) => {
+                            const key = `${tx.title || ''}\t${tx.value}`.trim() || `tx-${idx}`;
+                            return (
+                              <option key={key} value={key}>
+                                {tx.title ? `${tx.title}: ${tx.value}` : tx.value}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={detailEdit.transmissionText}
+                          onChange={(e) =>
+                            setDetailEdit((prev) => ({ ...prev, transmissionText: e.target.value }))
+                          }
+                          disabled={!detailEngineTxEnabled}
+                          className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                        />
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">VIN</label>
                       <input
                         type="text"
-                        value={detailEditForm.model}
+                        value={detailEdit.vin}
                         onChange={(e) =>
-                          setDetailEditForm((prev) => ({ ...prev, model: e.target.value }))
-                        }
-                        className="w-full px-3 py-2 border rounded-md text-sm font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">Поколение</label>
-                      <input
-                        type="text"
-                        value={detailEditForm.generation}
-                        onChange={(e) =>
-                          setDetailEditForm((prev) => ({ ...prev, generation: e.target.value }))
-                        }
-                        className="w-full px-3 py-2 border rounded-md text-sm font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">Двигатель</label>
-                      <input
-                        type="text"
-                        value={detailEditForm.engine}
-                        onChange={(e) =>
-                          setDetailEditForm((prev) => ({ ...prev, engine: e.target.value }))
-                        }
-                        className="w-full px-3 py-2 border rounded-md text-sm font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">КПП</label>
-                      <input
-                        type="text"
-                        value={detailEditForm.transmission}
-                        onChange={(e) =>
-                          setDetailEditForm((prev) => ({ ...prev, transmission: e.target.value }))
-                        }
-                        className="w-full px-3 py-2 border rounded-md text-sm font-medium"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">VIN</label>
-                      <input
-                        type="text"
-                        value={detailEditForm.vin}
-                        onChange={(e) =>
-                          setDetailEditForm((prev) => ({
+                          setDetailEdit((prev) => ({
                             ...prev,
                             vin: e.target.value.toUpperCase(),
                           }))
                         }
-                        className="w-full px-3 py-2 border rounded-md text-sm font-medium uppercase"
+                        className="w-full px-3 py-2 border rounded-md uppercase"
                         maxLength={17}
                         placeholder="17 символов"
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500 block mb-1">Пробег (км)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Пробег (км)</label>
                       <input
                         type="number"
-                        value={detailEditForm.mileage}
+                        value={detailEdit.mileage}
                         onChange={(e) =>
-                          setDetailEditForm((prev) => ({ ...prev, mileage: e.target.value }))
+                          setDetailEdit((prev) => ({ ...prev, mileage: e.target.value }))
                         }
-                        className="w-full px-3 py-2 border rounded-md text-sm font-medium"
+                        className="w-full px-3 py-2 border rounded-md"
                         min="0"
                       />
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">Цена</label>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Цена автомобиля</label>
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={detailEditForm.price}
+                        value={detailEdit.price}
                         onChange={(e) =>
-                          setDetailEditForm((prev) => ({ ...prev, price: e.target.value }))
+                          setDetailEdit((prev) => ({ ...prev, price: e.target.value }))
                         }
-                        className="w-full px-3 py-2 border rounded-md text-sm font-medium"
-                        placeholder="₽"
+                        className="w-full px-3 py-2 border rounded-md"
+                        placeholder="Необязательно"
                       />
                     </div>
                   </div>
@@ -805,7 +1142,7 @@ const VehicleModal = ({
                   <input
                     type="text"
                     value={create.brandInput}
-                    onChange={onBrandInputChange}
+                    onChange={(e) => onBrandInputChange(e, 'create')}
                     required
                     className="w-full px-3 py-2 border rounded-md"
                     placeholder="Начните вводить или выберите из списка"
@@ -821,7 +1158,7 @@ const VehicleModal = ({
                           <button
                             type="button"
                             className="w-full text-left px-3 py-2 hover:bg-indigo-50"
-                            onClick={() => pickManufacturer(m)}
+                            onClick={() => pickManufacturer(m, 'create')}
                           >
                             {m.description || m.matchcode || m.id}
                           </button>
@@ -838,7 +1175,7 @@ const VehicleModal = ({
                       className="w-full px-3 py-2 border rounded-md"
                       disabled={!modelEnabled || childLoading}
                       value={create.catalogModelId || ''}
-                      onChange={onCatalogModelChange}
+                      onChange={(e) => onCatalogModelChange(e, 'create')}
                       required
                     >
                       <option value="">— выберите модель —</option>
@@ -875,7 +1212,7 @@ const VehicleModal = ({
                       className="w-full px-3 py-2 border rounded-md"
                       disabled={!generationEnabled || childLoading}
                       value={create.catalogPassengercarId || ''}
-                      onChange={onPassengercarChange}
+                      onChange={(e) => onPassengercarChange(e, 'create')}
                       required
                     >
                       <option value="">— выберите поколение —</option>

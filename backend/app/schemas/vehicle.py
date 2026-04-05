@@ -24,6 +24,11 @@ class VehicleUpdate(BaseModel):
     vin: Optional[str] = None
     mileage: Optional[int] = None
     price: Optional[Decimal] = None
+    tecdoc_manufacturer_id: Optional[int] = None
+    tecdoc_model_id: Optional[int] = None
+    tecdoc_passengercar_id: Optional[int] = None
+    tecdoc_engine_id: Optional[int] = None
+    tecdoc_transmission_json: Optional[dict[str, Any]] = None
 
 
 class VehicleCreate(BaseModel):
