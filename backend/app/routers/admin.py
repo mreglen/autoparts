@@ -8,6 +8,7 @@ from app.models.pending_seller import PendingSeller
 from app.models.product import Product
 from app.models.stock_out import StockOut
 from app.db.database import get_db
+from app.utils.site_settings_db import get_or_create_site_settings
 from app.schemas.event_log import EventLogResponse
 from app.schemas.user import UserResponse, UserUpdate
 from app.schemas.organization import Organization as OrganizationSchema, OrganizationCreate, OrganizationUpdate
@@ -23,6 +24,36 @@ import string
 from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+
+class SiteSettingsPayload(BaseModel):
+    show_new_autoparts: bool
+
+
+class SiteSettingsResponse(BaseModel):
+    show_new_autoparts: bool
+
+@router.get("/site-settings", response_model=SiteSettingsResponse)
+def get_site_settings_admin(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = get_or_create_site_settings(db)
+    return SiteSettingsResponse(show_new_autoparts=row.show_new_autoparts)
+
+
+@router.patch("/site-settings", response_model=SiteSettingsResponse)
+def patch_site_settings_admin(
+    payload: SiteSettingsPayload,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = get_or_create_site_settings(db)
+    row.show_new_autoparts = payload.show_new_autoparts
+    db.commit()
+    db.refresh(row)
+    return SiteSettingsResponse(show_new_autoparts=row.show_new_autoparts)
+
 
 @router.get("/users", response_model=List[UserResponse])
 def get_all_users(

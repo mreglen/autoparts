@@ -112,13 +112,16 @@ function VehiclesList() {
   const [selectedStorageLocation, setSelectedStorageLocation] = useState(
     () => searchParams.get('storage') || ''
   );
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
 
   const hasPermission =
     user?.is_admin ||
     user?.is_seller ||
     (user?.is_employee &&
       permissionCodes &&
-      (permissionCodes.includes('my-parts') || permissionCodes.includes('stock-in')));
+      (permissionCodes.includes('vehicles') ||
+        permissionCodes.includes('my-parts') ||
+        permissionCodes.includes('stock-in')));
 
   useEffect(() => {
     if (authChecked && hasPermission) {
@@ -140,8 +143,12 @@ function VehiclesList() {
     if (selectedStorageLocation) {
       next.set('storage', selectedStorageLocation);
     }
+    const q = searchQuery.trim();
+    if (q) {
+      next.set('q', q);
+    }
     setSearchParams(next);
-  }, [selectedStorageLocation, setSearchParams]);
+  }, [selectedStorageLocation, searchQuery, setSearchParams]);
 
   useEffect(() => {
     if (user === undefined || user === null) {
@@ -162,6 +169,15 @@ function VehiclesList() {
     });
     return list;
   }, [vehicles, sortOrder]);
+
+  const displayVehicles = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return sortedVehicles;
+    return sortedVehicles.filter((v) => {
+      const hay = `${v.brand || ''} ${v.model || ''} ${v.generation || ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [sortedVehicles, searchQuery]);
 
   const getStorageLabel = (id) => {
     if (id == null || id === '') return null;
@@ -310,26 +326,39 @@ function VehiclesList() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-6 gap-4">
-        <div className="sm:w-64">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Склад</label>
-          <select
-            value={selectedStorageLocation}
-            onChange={(e) => setSelectedStorageLocation(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          >
-            <option value="">Все склады</option>
-            {storageLocations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.address}
-              </option>
-            ))}
-          </select>
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-4 flex-1">
+          <div className="sm:w-64">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Склад</label>
+            <select
+              value={selectedStorageLocation}
+              onChange={(e) => setSelectedStorageLocation(e.target.value)}
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            >
+              <option value="">Все склады</option>
+              {storageLocations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.address}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[200px] max-w-md">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Поиск</label>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Марка, модель, поколение…"
+              autoComplete="off"
+              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            />
+          </div>
         </div>
         <button
           type="button"
           onClick={() => navigate('/vehicles/add')}
-          className="px-6 py-3 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base font-medium min-h-[48px] sm:min-h-0 sm:self-center"
+          className="px-6 py-3 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base font-medium min-h-[48px] sm:min-h-0 lg:self-center shrink-0"
         >
           Добавить автомобиль
         </button>
@@ -349,6 +378,14 @@ function VehiclesList() {
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Автомобилей пока нет</h2>
           <p className="text-gray-600 text-base mb-6">Добавьте первый автомобиль по кнопке выше</p>
+        </div>
+      ) : displayVehicles.length === 0 ? (
+        <div className="mt-12 text-center py-16 px-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Ничего не найдено</h2>
+          <p className="text-gray-600 text-base">
+            По запросу «{searchQuery.trim()}» среди марки, модели и поколения совпадений нет. Попробуйте
+            другой текст или сбросьте фильтр склада.
+          </p>
         </div>
       ) : (
         <>
@@ -374,7 +411,7 @@ function VehiclesList() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedVehicles.map((v) => (
+                {displayVehicles.map((v) => (
                   <VehicleTableRow
                     key={v.id}
                     vehicle={v}
@@ -388,7 +425,7 @@ function VehiclesList() {
           </div>
 
           <div className="md:hidden space-y-5">
-            {sortedVehicles.map((v) => (
+            {displayVehicles.map((v) => (
               <div key={v.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
                 <div className="flex justify-between items-start mb-3 gap-2">
                   <div className="flex-1 min-w-0">

@@ -1,8 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Search from '../Navigation/Search/Search';
+import { useAutopartsLandingPath } from '../../utils/autopartsPublic';
 
 function Main() {
+  const autopartsPath = useAutopartsLandingPath();
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
@@ -40,7 +42,7 @@ function Main() {
               
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link 
-                  to="/autoparts/new" 
+                  to={autopartsPath} 
                   className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 text-center shadow-lg"
                 >
                   Найти запчасти
@@ -146,7 +148,7 @@ function Main() {
             ].map((category, index) => (
               <Link 
                 key={index}
-                to="/autoparts/new"
+                to={autopartsPath}
                 className="bg-white rounded-xl p-6 text-center hover:shadow-lg transition-all duration-300 border border-gray-100 hover:border-blue-200 group"
               >
                 <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-50 transition-colors duration-300">
@@ -198,7 +200,7 @@ function Main() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link 
-              to="/autoparts/new"
+              to={autopartsPath}
               className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 text-center"
             >
               Начать поиск

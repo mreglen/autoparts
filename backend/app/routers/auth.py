@@ -30,6 +30,7 @@ from app.utils.event_logger import log_event
 from app.utils.id_generator import random_id
 from app.utils.phone import normalize_to_storage_format  
 from app.utils.guest_cart import merge_guest_cart_from_request
+from app.utils.site_settings_db import get_or_create_site_settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -584,4 +585,23 @@ def get_admin_organization_phone(db: Session = Depends(get_db)):
     return {
         "organization_name": organization.name,
         "organization_phone": organization.phone
+    }
+
+
+@router.get("/public-site-config")
+def get_public_site_config(db: Session = Depends(get_db)):
+    """Публичная конфигурация: телефон админ-организации (если есть) и флаг «новые запчасти». Всегда 200."""
+    settings_row = get_or_create_site_settings(db)
+    org_name = None
+    org_phone = None
+    admin_user = db.query(User).filter(User.is_admin == True).first()
+    if admin_user and admin_user.organization_id:
+        organization = db.query(Organization).filter(Organization.id == admin_user.organization_id).first()
+        if organization:
+            org_name = organization.name
+            org_phone = organization.phone
+    return {
+        "organization_name": org_name,
+        "organization_phone": org_phone,
+        "show_new_autoparts": settings_row.show_new_autoparts,
     }

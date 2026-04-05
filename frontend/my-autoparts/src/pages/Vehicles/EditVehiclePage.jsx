@@ -19,7 +19,9 @@ function EditVehiclePage() {
     user?.is_seller ||
     (user?.is_employee &&
       permissionCodes &&
-      (permissionCodes.includes('my-parts') || permissionCodes.includes('stock-in')));
+      (permissionCodes.includes('vehicles') ||
+        permissionCodes.includes('my-parts') ||
+        permissionCodes.includes('stock-in')));
 
   useEffect(() => {
     if (user === undefined || user === null) {

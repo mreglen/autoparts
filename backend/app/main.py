@@ -4,6 +4,7 @@ from app.db.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
 from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, orders, carts
+import app.models.site_settings  # noqa: F401 — site_settings в metadata
 import app.models.transmission  # noqa: F401 — transmissions, vehicle_transmissions в metadata
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse

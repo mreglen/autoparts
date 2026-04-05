@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect } from 'react';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
+import { fetchPublicSiteConfig } from './redux/slices/PublicInfoSlice';
 
 // Pages
 import Authorization from './pages/Autorization/Authorization';
@@ -29,6 +30,7 @@ import PurchasesOrdersPage from './pages/Sales/PurchasesOrdersPage';
 import PurchasesReturnsPage from './pages/Sales/PurchasesReturnsPage';
 import WarehouseSalesPage from './pages/Sales/WarehouseSalesPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
+import AdminPanelPage from './pages/Admin/AdminPanelPage';
 import EmployeesPage from './pages/Profile/EmployeesPage';
 import ClientsPage from './pages/Profile/ClientsPage';
 import StorageAddressesPage from './pages/Profile/StorageAddressesPage';
@@ -40,11 +42,18 @@ import PrintSettings from './pages/Settings/PrintSettings';
 import NotFound from './pages/NotFound/NotFound';
 import PartDetail from './pages/PartDetail/PartDetail';
 
-
+function AutopartsIndexRedirect() {
+  const showNew = useSelector((s) => s.publicInfo.showNewAutoparts !== false);
+  return <Navigate to={showNew ? '/autoparts/new' : '/autoparts/used'} replace />;
+}
 
 function App() {
   const dispatch = useDispatch();
   const { token } = useSelector((state) => state.auth);
+
+  useEffect(() => {
+    dispatch(fetchPublicSiteConfig());
+  }, [dispatch]);
 
   // Check auth status on app load
   useEffect(() => {
@@ -88,7 +97,7 @@ function App() {
         {/* Основной layout — страницы без бокового меню */}
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Main />} />
-          <Route path="/autoparts" element={<Navigate to="/autoparts/new" replace />} />
+          <Route path="/autoparts" element={<AutopartsIndexRedirect />} />
           <Route path="/autoparts/new" element={<AutoParts />} />
           <Route path="/autoparts/used" element={<AutoParts />} />
           <Route path="/autoservice" element={<Home />} />
@@ -106,6 +115,7 @@ function App() {
         {/* Layout с боковым меню для страниц профиля */}
         <Route path="/" element={<ProfileWithMenuLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/admin" element={<AdminPanelPage />} />
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-parts" element={<MyParts />} />

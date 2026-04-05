@@ -26,6 +26,7 @@ export default function ProfileWithMenuLayout() {
         if (path.startsWith('/vehicles/edit')) return 'vehicles';
         const pathMap = {
             '/dashboard': 'dashboard',
+            '/admin': 'admin-panel',
             '/clients': 'clients',
             '/sellers': 'sellers',
             '/profile': 'profile',
@@ -56,6 +57,7 @@ export default function ProfileWithMenuLayout() {
             if (path.startsWith('/vehicles/edit')) return 'vehicles';
             const pathMap = {
                 '/dashboard': 'dashboard',
+                '/admin': 'admin-panel',
                 '/clients': 'clients',
                 '/sellers': 'sellers',
                 '/profile': 'profile',
@@ -177,7 +179,13 @@ export default function ProfileWithMenuLayout() {
                 warehouseSubmenu.push({ id: 'parts', label: 'Мои запчасти' });
             }
 
-            if (user?.is_seller || user?.is_admin || hasPermission('my-parts') || hasPermission('stock-in')) {
+            if (
+                user?.is_seller ||
+                user?.is_admin ||
+                hasPermission('vehicles') ||
+                hasPermission('my-parts') ||
+                hasPermission('stock-in')
+            ) {
                 warehouseSubmenu.push({ id: 'vehicles', label: 'Автомобили' });
             }
             
@@ -251,7 +259,11 @@ export default function ProfileWithMenuLayout() {
                 warehouseSubmenu.push({ id: 'parts', label: 'Мои запчасти' });
             }
 
-            if (hasPermission('my-parts') || hasPermission('stock-in')) {
+            if (
+                hasPermission('vehicles') ||
+                hasPermission('my-parts') ||
+                hasPermission('stock-in')
+            ) {
                 warehouseSubmenu.push({ id: 'vehicles', label: 'Автомобили' });
             }
             
@@ -338,15 +350,16 @@ export default function ProfileWithMenuLayout() {
             });
         }
 
-        // Для админов добавляем вкладку Модерация
+        // Для админов: «Админка» (модерация + настройки /admin)
         if (user?.is_admin) {
             baseTabs.push({
-                id: 'moderation',
-                label: 'Модерация',
+                id: 'administration',
+                label: 'Админка',
                 submenu: [
                     { id: 'pending-sellers', label: 'Регистрация продавцов' },
-                    { id: 'product-moderation', label: 'Проверка запчастей' }
-                ]
+                    { id: 'product-moderation', label: 'Проверка запчастей' },
+                    { id: 'admin-panel', label: 'Настройки' },
+                ],
             });
         }
 
@@ -369,6 +382,7 @@ export default function ProfileWithMenuLayout() {
         // Маппинг id вкладок на пути
         const tabPathMap = {
             'dashboard': '/dashboard',
+            'admin-panel': '/admin',
             'profile': '/profile',
             'purchases-orders': '/purchases/orders',
             'purchases-returns': '/purchases/returns',
@@ -411,7 +425,7 @@ export default function ProfileWithMenuLayout() {
                             badgeCounts={{
                                 'product-moderation': moderationProducts?.pendingProducts?.length || 0,
                                 'pending-sellers': moderation?.pendingSellers?.length || 0,
-                                'moderation': ((moderationProducts?.pendingProducts?.length || 0) + (moderation?.pendingSellers?.length || 0))
+                                'administration': ((moderationProducts?.pendingProducts?.length || 0) + (moderation?.pendingSellers?.length || 0))
                             }}
                         />
                     </div>

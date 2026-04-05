@@ -1,20 +1,21 @@
 // src/components/Search.js
-import React, { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import React, { useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchSearchResults, setSearchQuery as setGlobalSearchQuery } from '../../../redux/slices/RosskoSlice';
 import {
   searchAllProducts,
   searchUsedParts
 } from '../../../redux/slices/ProductSlice';
+import { getAutopartsLandingPath } from '../../../utils/autopartsPublic';
 
 function Search() {
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [isSearching, setIsSearching] = useState(false);
-  const [lastSearchTerm, setLastSearchTerm] = useState('');
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const showNewAutoparts = useSelector((s) => s.publicInfo.showNewAutoparts !== false);
 
   const handleSearch = () => {
     const trimmedTerm = searchTerm.trim();
@@ -23,19 +24,30 @@ function Search() {
     setIsSearching(true);
     dispatch(setGlobalSearchQuery(trimmedTerm));
 
-    // Выполняем все поиски параллельно
-    Promise.all([
-      dispatch(searchAllProducts(trimmedTerm)),
-      dispatch(searchUsedParts(trimmedTerm)),
-      dispatch(fetchSearchResults({ text: trimmedTerm }))
-    ]).then(() => {
-      setLastSearchTerm(trimmedTerm);
-      // Сохраняем поисковый запрос в строке поиска вместо очистки
+    const autopartsPath = getAutopartsLandingPath(showNewAutoparts);
+    const afterSearch = () => {
       setSearchTerm(trimmedTerm);
-    }).finally(() => {
-      setIsSearching(false);
-      navigate(`/autoparts/new?q=${encodeURIComponent(trimmedTerm)}`);
-    });
+    };
+
+    if (showNewAutoparts) {
+      Promise.all([
+        dispatch(searchAllProducts(trimmedTerm)),
+        dispatch(searchUsedParts(trimmedTerm)),
+        dispatch(fetchSearchResults({ text: trimmedTerm }))
+      ])
+        .then(afterSearch)
+        .finally(() => {
+          setIsSearching(false);
+          navigate(`${autopartsPath}?q=${encodeURIComponent(trimmedTerm)}`);
+        });
+    } else {
+      dispatch(searchUsedParts(trimmedTerm))
+        .then(afterSearch)
+        .finally(() => {
+          setIsSearching(false);
+          navigate(`${autopartsPath}?q=${encodeURIComponent(trimmedTerm)}`);
+        });
+    }
   };
 
   const handleInputChange = (e) => {

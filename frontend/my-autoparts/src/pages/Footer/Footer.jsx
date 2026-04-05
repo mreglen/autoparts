@@ -1,8 +1,10 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import ButtonPrimary from '../UI/ButtonPrimary';
+import { useAutopartsLandingPath } from '../../utils/autopartsPublic';
 
 function Footer() {
+    const autopartsPath = useAutopartsLandingPath();
     return (
         <footer className='2xl:px-80 xl:px-40 lg:px-20 md:px-10 sm:px-5 px-4 bg-gray_primary-dark mt-40 py-14'>
             {/* Верхняя часть футера */}
@@ -26,8 +28,7 @@ function Footer() {
                         Главная
                     </NavLink>
                     <NavLink
-                        exact
-                        to='/autoparts/new'
+                        to={autopartsPath}
                         className='hover:text-blue_primary-light transition-colors ease-in-out'
                     >
                         Автозапчасти

@@ -1,7 +1,7 @@
 // src/components/AutoParts.js
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import {
   selectRosskoItems,
   selectRosskoStatus,
@@ -18,6 +18,7 @@ import { searchAllProducts, searchUsedParts, fetchAllProducts } from '../../redu
 import { fetchCart } from '../../redux/slices/CartSlice';
 import CardPart from './CardPart/CardPart';
 import UsedPartsList from './UsedParts/UsedPartsList';
+import { useShowNewAutoparts } from '../../utils/autopartsPublic';
 
 const EmptySearchState = ({ query }) => (
   <div className="mt-12 sm:mt-16 flex flex-col items-center text-center max-w-2xl mx-auto px-4">
@@ -53,20 +54,28 @@ function AutoParts() {
   const status = useSelector(selectRosskoStatus);
   const error = useSelector(selectRosskoError);
   const searchQuery = useSelector(selectSearchQuery);
-  
+  const showNewAutoparts = useShowNewAutoparts();
+
   // Determine active tab from URL path
   const isUsedTab = location.pathname.includes('/autoparts/used');
   const [activeTab, setActiveTab] = useState(isUsedTab ? 'my' : 'rossko');
-  
-  // Update URL when tab changes
+
   useEffect(() => {
+    if (!showNewAutoparts) {
+      setActiveTab('my');
+    }
+  }, [showNewAutoparts]);
+
+  // Update URL when tab changes (только если доступны «новые»)
+  useEffect(() => {
+    if (!showNewAutoparts) return;
     const urlQuery = searchParams.get('q');
     if (activeTab === 'rossko') {
       navigate('/autoparts/new' + (urlQuery ? `?q=${urlQuery}` : ''), { replace: true });
     } else {
       navigate('/autoparts/used' + (urlQuery ? `?q=${urlQuery}` : ''), { replace: true });
     }
-  }, [activeTab, searchParams, navigate]);
+  }, [activeTab, searchParams, navigate, showNewAutoparts]);
   
   // Состояние для переключения вида карточек в б/у запчастях
   const [usedPartsView, setUsedPartsView] = useState('grid'); // 'grid' or 'list'
@@ -141,7 +150,7 @@ function AutoParts() {
     }
   });
 
-  if (status === 'loading' && activeTab === 'rossko') {
+  if (showNewAutoparts && status === 'loading' && activeTab === 'rossko') {
     return (
       <div className="mt-5 text-center py-10 px-4">
         <p className="text-base sm:text-lg text-gray-600">Загрузка данных...</p>
@@ -149,7 +158,7 @@ function AutoParts() {
     );
   }
 
-  if (status === 'failed' && activeTab === 'rossko') {
+  if (showNewAutoparts && status === 'failed' && activeTab === 'rossko') {
     return (
       <div className="mt-5 text-center py-10 px-4">
         <p className="text-base sm:text-lg text-red-600">Ошибка загрузки данных</p>
@@ -159,41 +168,48 @@ function AutoParts() {
   }
 
   const hasRosskoResults = allParts.length > 0 || allCrossParts.length > 0;
+  const showUsedContent = !showNewAutoparts || activeTab === 'my';
+
+  if (!showNewAutoparts && location.pathname.includes('/autoparts/new')) {
+    return <Navigate to={`/autoparts/used${location.search}`} replace />;
+  }
 
   return (
     <div className="mt-4 sm:mt-5 px-0 w-full">
 
       {/* Переключатель вкладок */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
-        <button
-          onClick={() => setActiveTab('rossko')}
-          className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${activeTab === 'rossko'
-              ? 'bg-indigo-500 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-        >
-          Новые запчасти
-        </button>
-        <button
-          onClick={() => {
-            if (searchQuery) {
-              dispatch(searchUsedParts(searchQuery));
-            } else {
-              // Для б/у запчастей без поискового запроса показываем все б/у запчасти
-              dispatch(fetchAllProducts());
-            }
-            setActiveTab('my');
-          }}
-          className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${activeTab === 'my'
-              ? 'bg-indigo-500 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-        >
-          Б/У запчасти
-        </button>
-        
-        {/* View toggle buttons - only show when on Used Parts tab */}
-        {activeTab === 'my' && (
+        {showNewAutoparts && (
+          <>
+            <button
+              onClick={() => setActiveTab('rossko')}
+              className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${activeTab === 'rossko'
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+            >
+              Новые запчасти
+            </button>
+            <button
+              onClick={() => {
+                if (searchQuery) {
+                  dispatch(searchUsedParts(searchQuery));
+                } else {
+                  dispatch(fetchAllProducts());
+                }
+                setActiveTab('my');
+              }}
+              className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${activeTab === 'my'
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+            >
+              Б/У запчасти
+            </button>
+          </>
+        )}
+
+        {showUsedContent && (
           <div className="flex gap-2 ml-auto items-center">
             {/* Sort dropdown */}
             <div className="relative">
@@ -295,7 +311,7 @@ function AutoParts() {
       </div>
 
       {/* Отображение контента в зависимости от вкладки */}
-      {activeTab === 'my' ? (
+      {showUsedContent ? (
         <UsedPartsList viewMode={usedPartsView} sortBy={usedPartsSort} />
       ) : (
         <>
