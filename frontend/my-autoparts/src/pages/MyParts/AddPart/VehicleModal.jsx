@@ -1,5 +1,5 @@
 import { useDispatch, useSelector } from 'react-redux';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchVehicles,
   createVehicle,
@@ -26,6 +26,14 @@ const SUGGEST_LIST =
 const SUGGEST_ITEM =
   'w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none';
 const FORM_CARD = 'p-4 bg-gray-50 rounded-lg border border-gray-200/80';
+
+/** Как на странице /my-parts/add */
+const ADD_PART_LABEL = 'block text-sm font-medium';
+const ADD_PART_INPUT =
+  'mt-1 block w-full px-3 py-2 border rounded-md disabled:bg-gray-100 disabled:cursor-not-allowed';
+const ADD_PART_TEXTAREA = `${ADD_PART_INPUT} resize-y`;
+const ADD_PART_FILE =
+  'mt-1 block w-full cursor-pointer text-sm border border-gray-300 rounded-md bg-white px-3 py-2 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm';
 
 /** Подсказки только внутри полей (placeholder), не под полями */
 const PLH = {
@@ -251,7 +259,17 @@ const VehicleModal = ({
   onSelectVehicle,
   selectedVehicle: selectedVehicleProp = null,
   stockInVehicleModal = false,
+  variant = 'modal',
+  /** Для variant="page": объект авто — режим редактирования на /vehicles/edit/:id */
+  pageEditVehicle = null,
 }) => {
+  const isPage = variant === 'page';
+  const isPageEditMode = Boolean(isPage && pageEditVehicle?.id);
+  const showDetailEditor = stockInVehicleModal || isPageEditMode;
+  const createLabel = isPage ? ADD_PART_LABEL : FIELD_LABEL;
+  const createInput = isPage ? ADD_PART_INPUT : FIELD_BASE;
+  const createTextarea = isPage ? ADD_PART_TEXTAREA : FIELD_TEXTAREA;
+  const createFile = isPage ? ADD_PART_FILE : FIELD_FILE;
   const dispatch = useDispatch();
   const { vehicles, vehiclesLoading } = useSelector((state) => state.products);
 
@@ -267,10 +285,10 @@ const VehicleModal = ({
   referenceTransmissionTypesRef.current = referenceTransmissionTypes;
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !isPage) {
       dispatch(fetchVehicles());
     }
-  }, [isOpen, dispatch]);
+  }, [isOpen, isPage, dispatch]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -280,8 +298,19 @@ const VehicleModal = ({
       .catch(() => setReferenceTransmissionTypes([]));
   }, [isOpen, dispatch]);
 
+  useLayoutEffect(() => {
+    if (!isOpen || !isPage) return;
+    if (pageEditVehicle?.id) {
+      setMode('detail');
+      setDetailVehicle(pageEditVehicle);
+      return;
+    }
+    setMode('create');
+    setDetailVehicle(null);
+  }, [isOpen, isPage, pageEditVehicle?.id]);
+
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isPage) return;
     if (selectedVehicleProp?.id) {
       setMode('detail');
       setDetailVehicle(selectedVehicleProp);
@@ -289,10 +318,10 @@ const VehicleModal = ({
       setMode('select');
       setDetailVehicle(null);
     }
-  }, [isOpen, selectedVehicleProp?.id]);
+  }, [isOpen, isPage, selectedVehicleProp?.id]);
 
   useEffect(() => {
-    if (!isOpen || !stockInVehicleModal || mode !== 'detail' || !detailVehicle?.id) return;
+    if (!isOpen || !showDetailEditor || mode !== 'detail' || !detailVehicle?.id) return;
     const v = detailVehicle;
     let cancelled = false;
     (async () => {
@@ -306,7 +335,7 @@ const VehicleModal = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, stockInVehicleModal, mode, detailVehicle?.id, dispatch]);
+  }, [isOpen, showDetailEditor, mode, detailVehicle?.id, dispatch]);
 
   useEffect(() => {
     if (isOpen && mode === 'create') {
@@ -343,12 +372,12 @@ const VehicleModal = ({
       const t = setTimeout(() => runBrandSearch(create.brandInput, 'create'), 320);
       return () => clearTimeout(t);
     }
-    if (mode === 'detail' && stockInVehicleModal) {
+    if (mode === 'detail' && showDetailEditor) {
       const t = setTimeout(() => runBrandSearch(detailEdit.brandInput, 'detail'), 320);
       return () => clearTimeout(t);
     }
     return undefined;
-  }, [create.brandInput, detailEdit.brandInput, mode, stockInVehicleModal, runBrandSearch]);
+  }, [create.brandInput, detailEdit.brandInput, mode, showDetailEditor, runBrandSearch]);
 
   const pickManufacturer = (row, target) => {
     const patch = (prev) => ({
@@ -666,7 +695,7 @@ const VehicleModal = ({
   };
 
   const isStockInDetailDirty = useMemo(() => {
-    if (!stockInVehicleModal || mode !== 'detail' || !detailVehicle?.id) return false;
+    if (!showDetailEditor || mode !== 'detail' || !detailVehicle?.id) return false;
     if (!detailBaselinePayload) return false;
     try {
       return (
@@ -676,7 +705,7 @@ const VehicleModal = ({
       return false;
     }
   }, [
-    stockInVehicleModal,
+    showDetailEditor,
     mode,
     detailVehicle?.id,
     detailEdit,
@@ -773,6 +802,9 @@ const VehicleModal = ({
         setDetailBaselinePayload(
           serializeUpdatePayload(merged, referenceTransmissionTypesRef.current)
         );
+        if (isPageEditMode) {
+          onClose();
+        }
       } else {
         alert(result.payload || 'Не удалось сохранить');
       }
@@ -826,7 +858,7 @@ const VehicleModal = ({
   if (!isOpen) return null;
 
   const detailUsingManufacturerCatalog =
-    stockInVehicleModal && mode === 'detail' && detailEdit.catalogManufacturerId != null;
+    showDetailEditor && mode === 'detail' && detailEdit.catalogManufacturerId != null;
   const detailModelEnabled = detailEdit.brandInput.trim().length > 0;
   const detailGenerationEnabled = detailUsingManufacturerCatalog
     ? detailEdit.catalogModelId != null
@@ -836,7 +868,18 @@ const VehicleModal = ({
     : detailGenerationEnabled && detailEdit.generationInput.trim().length > 0;
 
   const modalTitle =
-    mode === 'select' ? 'Выберите автомобиль' : mode === 'detail' ? 'Автомобиль' : 'Добавить автомобиль';
+    mode === 'select'
+      ? 'Выберите автомобиль'
+      : mode === 'detail'
+        ? 'Автомобиль'
+        : 'Добавить автомобиль';
+
+  const outerShellClass = isPage
+    ? 'w-full'
+    : 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50';
+  const innerShellClass = isPage
+    ? 'w-full overflow-visible'
+    : 'bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto';
 
   const renderVehicleDetailCard = (v) => {
     if (!v) return null;
@@ -914,17 +957,31 @@ const VehicleModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-xl font-bold">{modalTitle}</h2>
-          <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">
-            &times;
-          </button>
-        </div>
+    <div
+      className={outerShellClass}
+      onClick={isPage ? undefined : onClose}
+      role={isPage ? undefined : 'presentation'}
+    >
+      <div
+        className={innerShellClass}
+        onClick={isPage ? undefined : (e) => e.stopPropagation()}
+        role={isPage ? undefined : 'dialog'}
+        aria-modal={isPage ? undefined : 'true'}
+        aria-labelledby={isPage ? undefined : 'vehicle-modal-title'}
+      >
+        {!isPage && (
+          <div className="p-4 border-b flex justify-between items-center">
+            <h2 id="vehicle-modal-title" className="text-xl font-bold">
+              {modalTitle}
+            </h2>
+            <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">
+              &times;
+            </button>
+          </div>
+        )}
 
-        <div className="p-4">
-          {mode === 'select' ? (
+        <div className={isPage ? '' : 'p-4'}>
+          {mode === 'select' && !isPage ? (
             <div>
               <div className="flex justify-end mb-4">
                 <button
@@ -970,11 +1027,13 @@ const VehicleModal = ({
             </div>
           ) : mode === 'detail' ? (
             <div>
-              {stockInVehicleModal ? (
+              {showDetailEditor ? (
                 <div className="space-y-4">
-                  <p className="text-sm text-gray-600">
-                    Марку и комплектацию можно выбрать из каталога или ввести вручную (как при создании).
-                  </p>
+                  {!isPageEditMode && (
+                    <p className="text-sm text-gray-600">
+                      Марку и комплектацию можно выбрать из каталога или ввести вручную (как при создании).
+                    </p>
+                  )}
                   <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${FORM_CARD}`}>
                     <div className="md:col-span-2">
                       <div className={FIELD_LABEL}>Марка *</div>
@@ -1288,55 +1347,87 @@ const VehicleModal = ({
                 renderVehicleDetailCard(detailVehicle)
               )}
               <div className="mt-6 flex flex-wrap items-center gap-3 justify-between">
-                <button
-                  type="button"
-                  onClick={goBackToVehicleList}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-200 rounded-md"
-                >
-                  Назад к списку
-                </button>
-                {!stockInVehicleModal && (
-                  <div className="flex flex-wrap gap-2">
+                {isPageEditMode ? (
+                  <div className="flex w-full flex-wrap items-center justify-end gap-3">
+                    {isStockInDetailDirty && (
+                      <button
+                        type="button"
+                        onClick={handleStockInSaveDetail}
+                        disabled={detailSaveLoading}
+                        className={`px-4 py-2 rounded-md text-white ${
+                          detailSaveLoading
+                            ? 'bg-indigo-400 cursor-not-allowed'
+                            : 'bg-indigo-600 hover:bg-indigo-700'
+                        }`}
+                      >
+                        {detailSaveLoading ? 'Сохранение…' : 'Сохранить изменения'}
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => setMode('create')}
-                      className="px-4 py-2 text-indigo-600 border border-indigo-200 rounded-md hover:bg-indigo-50"
+                      onClick={onClose}
+                      className="px-4 py-2 border border-gray-300 rounded-md"
                     >
-                      Добавить новый
-                    </button>
-                    <button
-                      type="button"
-                      onClick={confirmVehicleSelection}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                    >
-                      Выбрать этот автомобиль
+                      Отмена
                     </button>
                   </div>
-                )}
-                {stockInVehicleModal && isStockInDetailDirty && (
-                  <button
-                    type="button"
-                    onClick={handleStockInSaveDetail}
-                    disabled={detailSaveLoading}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
-                  >
-                    {detailSaveLoading ? 'Сохранение…' : 'Сохранить изменения'}
-                  </button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={goBackToVehicleList}
+                      className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-200 rounded-md"
+                    >
+                      Назад к списку
+                    </button>
+                    {!stockInVehicleModal && (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setMode('create')}
+                          className="px-4 py-2 text-indigo-600 border border-indigo-200 rounded-md hover:bg-indigo-50"
+                        >
+                          Добавить новый
+                        </button>
+                        <button
+                          type="button"
+                          onClick={confirmVehicleSelection}
+                          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                        >
+                          Выбрать этот автомобиль
+                        </button>
+                      </div>
+                    )}
+                    {stockInVehicleModal && isStockInDetailDirty && (
+                      <button
+                        type="button"
+                        onClick={handleStockInSaveDetail}
+                        disabled={detailSaveLoading}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        {detailSaveLoading ? 'Сохранение…' : 'Сохранить изменения'}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
           ) : (
-            <form onSubmit={handleCreate}>
-              <div className={FORM_CARD}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form onSubmit={handleCreate} className={isPage ? 'space-y-6' : undefined}>
+              <div className={isPage ? '' : FORM_CARD}>
+              <div
+                className={
+                  isPage ? 'flex flex-col gap-6' : 'grid grid-cols-1 md:grid-cols-2 gap-4'
+                }
+              >
                 <div className="md:col-span-2">
-                  <div className={FIELD_LABEL}>Марка *</div>
+                  <div className={createLabel}>Марка *</div>
                   <input
                     type="text"
                     value={create.brandInput}
                     onChange={(e) => onBrandInputChange(e, 'create')}
                     required
-                    className={FIELD_BASE}
+                    className={createInput}
                     placeholder={PLH.brand}
                     autoComplete="off"
                   />
@@ -1365,14 +1456,14 @@ const VehicleModal = ({
 
                 {usingManufacturerCatalog ? (
                   <div className="md:col-span-2">
-                    <div className={FIELD_LABEL}>Модель *</div>
+                    <div className={createLabel}>Модель *</div>
                     <input
                       type="text"
                       value={create.modelInput}
                       onChange={(e) => onCatalogModelInputChange(e, 'create')}
                       disabled={!modelEnabled || childLoading}
                       required
-                      className={FIELD_BASE}
+                      className={createInput}
                       placeholder={PLH.model}
                       autoComplete="off"
                     />
@@ -1396,7 +1487,7 @@ const VehicleModal = ({
                   </div>
                 ) : (
                   <div className="md:col-span-2">
-                    <div className={FIELD_LABEL}>Модель *</div>
+                    <div className={createLabel}>Модель *</div>
                     <input
                       type="text"
                       value={create.modelInput}
@@ -1405,7 +1496,7 @@ const VehicleModal = ({
                       }
                       disabled={!modelEnabled}
                       required
-                      className={FIELD_BASE}
+                      className={createInput}
                       placeholder={PLH.modelManual}
                     />
                   </div>
@@ -1413,14 +1504,14 @@ const VehicleModal = ({
 
                 {usingManufacturerCatalog ? (
                   <div className="md:col-span-2">
-                    <div className={FIELD_LABEL}>Поколение *</div>
+                    <div className={createLabel}>Поколение *</div>
                     <input
                       type="text"
                       value={create.generationInput}
                       onChange={(e) => onPassengercarInputChange(e, 'create')}
                       disabled={!generationEnabled || childLoading}
                       required
-                      className={FIELD_BASE}
+                      className={createInput}
                       placeholder={PLH.generation}
                       autoComplete="off"
                     />
@@ -1444,7 +1535,7 @@ const VehicleModal = ({
                   </div>
                 ) : (
                   <div className="md:col-span-2">
-                    <div className={FIELD_LABEL}>Поколение *</div>
+                    <div className={createLabel}>Поколение *</div>
                     <input
                       type="text"
                       value={create.generationInput}
@@ -1453,15 +1544,21 @@ const VehicleModal = ({
                       }
                       disabled={!generationEnabled}
                       required
-                      className={FIELD_BASE}
+                      className={createInput}
                       placeholder={PLH.generationManual}
                     />
                   </div>
                 )}
 
-                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div
+                  className={
+                    isPage
+                      ? 'flex flex-col gap-6'
+                      : 'md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4'
+                  }
+                >
                   <div>
-                    <div className={FIELD_LABEL}>Двигатель</div>
+                    <div className={createLabel}>Двигатель</div>
                     {usingManufacturerCatalog && create.catalogPassengercarId ? (
                       <>
                         <input
@@ -1469,7 +1566,7 @@ const VehicleModal = ({
                           value={create.engineText}
                           onChange={(e) => onCatalogEngineInputChange(e, 'create')}
                           disabled={!engineTxEnabled || childLoading}
-                          className={FIELD_BASE}
+                          className={createInput}
                           placeholder={PLH.engine}
                           autoComplete="off"
                         />
@@ -1502,14 +1599,14 @@ const VehicleModal = ({
                           setCreate((prev) => ({ ...prev, engineText: e.target.value }))
                         }
                         disabled={!engineTxEnabled}
-                        className={FIELD_BASE}
+                        className={createInput}
                         placeholder={PLH.engineManual}
                       />
                     )}
                   </div>
 
                   <div>
-                    <div className={FIELD_LABEL}>Коробка передач *</div>
+                    <div className={createLabel}>Коробка передач *</div>
                     <select
                       value={
                         referenceTransmissionTypes.length > 0 &&
@@ -1533,7 +1630,7 @@ const VehicleModal = ({
                       disabled={
                         !engineTxEnabled || childLoading || referenceTransmissionTypes.length === 0
                       }
-                      className={FIELD_BASE}
+                      className={createInput}
                     >
                       <option value="">
                         {referenceTransmissionTypes.length === 0
@@ -1550,7 +1647,7 @@ const VehicleModal = ({
                 </div>
 
                 <div>
-                  <div className={FIELD_LABEL}>VIN</div>
+                  <div className={createLabel}>VIN</div>
                   <input
                     type="text"
                     value={create.vin}
@@ -1562,7 +1659,7 @@ const VehicleModal = ({
                       }))
                     }
                     disabled={!vinEnabled}
-                    className={FIELD_BASE}
+                    className={createInput}
                     maxLength={17}
                     placeholder={PLH.vin}
                     spellCheck={false}
@@ -1570,7 +1667,7 @@ const VehicleModal = ({
                 </div>
 
                 <div>
-                  <div className={FIELD_LABEL}>Пробег (км)</div>
+                  <div className={createLabel}>Пробег (км)</div>
                   <input
                     type="number"
                     value={create.mileage}
@@ -1578,32 +1675,32 @@ const VehicleModal = ({
                       setCreate((prev) => ({ ...prev, mileage: e.target.value }))
                     }
                     disabled={!vinEnabled}
-                    className={FIELD_BASE}
+                    className={createInput}
                     placeholder={PLH.mileage}
                     min="0"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <div className={FIELD_LABEL}>Цена автомобиля</div>
+                  <div className={createLabel}>Цена автомобиля</div>
                   <input
                     type="text"
                     inputMode="decimal"
                     value={create.price}
                     onChange={(e) => setCreate((prev) => ({ ...prev, price: e.target.value }))}
-                    className={FIELD_BASE}
+                    className={createInput}
                     placeholder={PLH.price}
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <div className={FIELD_LABEL}>Фото (до {MAX_VEHICLE_PHOTOS})</div>
+                  <div className={createLabel}>Фото (до {MAX_VEHICLE_PHOTOS})</div>
                   <input
                     type="file"
                     accept="image/*"
                     multiple
                     onChange={handleVehiclePhotosAdd}
-                    className={FIELD_FILE}
+                    className={createFile}
                   />
                   {(create.vehiclePhotos?.length || 0) > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -1630,7 +1727,7 @@ const VehicleModal = ({
                   )}
                 </div>
                 <div className="md:col-span-2">
-                  <div className={FIELD_LABEL}>Описание</div>
+                  <div className={createLabel}>Описание</div>
                   <textarea
                     value={create.description}
                     onChange={(e) =>
@@ -1638,28 +1735,53 @@ const VehicleModal = ({
                     }
                     rows={4}
                     maxLength={8000}
-                    className={FIELD_TEXTAREA}
+                    className={createTextarea}
                     placeholder={PLH.description}
                   />
                 </div>
               </div>
               </div>
 
-              <div className="mt-6 flex justify-between">
-                <button
-                  type="button"
-                  onClick={() => setMode('select')}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                >
-                  Назад к выбору
-                </button>
-                <button
-                  type="submit"
-                  disabled={!vinEnabled}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  Добавить автомобиль
-                </button>
+              <div className={isPage ? 'mt-6 flex flex-wrap gap-3' : 'mt-6 flex justify-between'}>
+                {isPage ? (
+                  <>
+                    <button
+                      type="submit"
+                      disabled={!vinEnabled}
+                      className={`px-4 py-2 rounded-md text-white ${
+                        !vinEnabled
+                          ? 'bg-indigo-400 cursor-not-allowed'
+                          : 'bg-indigo-600 hover:bg-indigo-700'
+                      }`}
+                    >
+                      Добавить автомобиль
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-4 py-2 border border-gray-300 rounded-md"
+                    >
+                      Отмена
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setMode('select')}
+                      className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                    >
+                      Назад к выбору
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!vinEnabled}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      Добавить автомобиль
+                    </button>
+                  </>
+                )}
               </div>
             </form>
           )}

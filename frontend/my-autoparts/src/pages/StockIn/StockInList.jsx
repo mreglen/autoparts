@@ -1,12 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import { fetchStockIns } from '../../redux/slices/StockInSlice';
-import { Link } from 'react-router-dom';
-import VehicleModal from '../MyParts/AddPart/VehicleModal';
 
 const StockInRow = ({ doc, onToggleExpand, isExpanded, onImageClick }) => (
   <React.Fragment>
@@ -84,54 +82,6 @@ const StockInRow = ({ doc, onToggleExpand, isExpanded, onImageClick }) => (
                   </div>
                 </div>
               </div>
-
-              {/* Автомобиль(и) */}
-              {doc.product?.compatible_vehicles && doc.product.compatible_vehicles.length > 0 && (
-                <div>
-                  <span className="text-xs text-gray-500">Автомобиль</span>
-                  <div className="mt-2 space-y-3">
-                    {doc.product.compatible_vehicles.map((vehicle) => (
-                      <div
-                        key={vehicle.id}
-                        className="grid grid-cols-1 md:grid-cols-2 gap-2 p-3 bg-white rounded border"
-                      >
-                        <div>
-                          <span className="text-xs text-gray-500">Марка</span>
-                          <div className="font-medium">{vehicle.brand}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Модель</span>
-                          <div className="font-medium">{vehicle.model}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Поколение</span>
-                          <div className="font-medium">{vehicle.generation || '—'}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Двигатель</span>
-                          <div className="font-medium">{vehicle.engine || '—'}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">КПП</span>
-                          <div className="font-medium">{vehicle.transmission || '—'}</div>
-                        </div>
-                        {vehicle.vin && (
-                          <div>
-                            <span className="text-xs text-gray-500">VIN</span>
-                            <div className="font-medium">{vehicle.vin}</div>
-                          </div>
-                        )}
-                        {vehicle.mileage && (
-                          <div>
-                            <span className="text-xs text-gray-500">Пробег</span>
-                            <div className="font-medium">{vehicle.mileage.toLocaleString()} км</div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </td>
@@ -147,8 +97,6 @@ const StockInList = () => {
   const { items: stockIns, loading, error } = useSelector((state) => state.stockIn);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // Состояние для модального окна автомобилей
-  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [expandedDocId, setExpandedDocId] = useState(null);
   
   // Состояние для медиа модалки
@@ -284,12 +232,6 @@ const StockInList = () => {
     );
   }
 
-  // Обработчик выбора автомобиля (можно оставить пустым, если не нужен)
-  const handleSelectVehicle = (vehicle) => {
-    console.log('Выбран автомобиль:', vehicle);
-    // Здесь можно, например, привязать к документу — если потребуется позже
-  };
-
   return (
     <div className="mt-4 sm:mt-5 px-4 sm:px-0">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
@@ -369,12 +311,6 @@ const StockInList = () => {
             )}
           </div>
 
-          <button
-            onClick={() => setIsVehicleModalOpen(true)}
-            className="px-6 py-3 sm:px-4 sm:py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition text-base font-medium min-h-[48px] sm:min-h-0"
-          >
-            Автомобили
-          </button>
           <Link
             to="/my-parts"
             className="px-6 py-3 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base font-medium min-h-[48px] sm:min-h-0 text-center"
@@ -513,54 +449,6 @@ const StockInList = () => {
                             </div>
                           </div>
                         </div>
-
-                        {/* Автомобиль(и) */}
-                        {doc.product?.compatible_vehicles && doc.product.compatible_vehicles.length > 0 && (
-                          <div>
-                            <span className="text-sm text-gray-500 block mb-2">Автомобиль</span>
-                            <div className="space-y-3">
-                              {doc.product.compatible_vehicles.map((vehicle) => (
-                                <div
-                                  key={vehicle.id}
-                                  className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded border text-sm"
-                                >
-                                  <div>
-                                    <span className="text-gray-500">Марка:</span>
-                                    <div className="font-medium">{vehicle.brand}</div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Модель:</span>
-                                    <div className="font-medium">{vehicle.model}</div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Поколение:</span>
-                                    <div className="font-medium">{vehicle.generation || '—'}</div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Двигатель:</span>
-                                    <div className="font-medium">{vehicle.engine || '—'}</div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">КПП:</span>
-                                    <div className="font-medium">{vehicle.transmission || '—'}</div>
-                                  </div>
-                                  {vehicle.vin && (
-                                    <div className="col-span-2">
-                                      <span className="text-gray-500">VIN:</span>
-                                      <div className="font-medium">{vehicle.vin}</div>
-                                    </div>
-                                  )}
-                                  {vehicle.mileage && (
-                                    <div className="col-span-2">
-                                      <span className="text-gray-500">Пробег:</span>
-                                      <div className="font-medium">{vehicle.mileage.toLocaleString()} км</div>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -570,13 +458,6 @@ const StockInList = () => {
           </div>
         </>
       )}
-
-      <VehicleModal
-        isOpen={isVehicleModalOpen}
-        onClose={() => setIsVehicleModalOpen(false)}
-        onSelectVehicle={handleSelectVehicle}
-        stockInVehicleModal
-      />
 
       <MediaModal
         isOpen={mediaModalOpen}

@@ -7,6 +7,7 @@ Disallow: /dashboard
 Disallow: /profile
 Disallow: /clients
 Disallow: /my-parts
+Disallow: /vehicles
 Disallow: /purchases/
 Disallow: /sales/
 Disallow: /stock-in

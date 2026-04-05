@@ -17,6 +17,9 @@ import MyParts from './pages/MyParts/MyParts';
 import AddPart from './pages/MyParts/AddPart/AddPart';
 import EditPart from './pages/MyParts/EditPart/EditPart';
 import StockInList from './pages/StockIn/StockInList';
+import VehiclesList from './pages/Vehicles/VehiclesList';
+import AddVehiclePage from './pages/Vehicles/AddVehiclePage';
+import EditVehiclePage from './pages/Vehicles/EditVehiclePage';
 import { StockOutList } from './pages/StockOut';
 import CartPage from './pages/Cart/CartPage';
 import OrderRegistration from './pages/Cart/OrderRegistration';
@@ -92,6 +95,8 @@ function App() {
           <Route path="/cart" element={<CartPage />} />
           <Route path="/order-reg" element={<OrderRegistration />} />
           <Route path="/my-parts/add" element={<AddPart />} />
+          <Route path="/vehicles/add" element={<AddVehiclePage />} />
+          <Route path="/vehicles/edit/:id" element={<EditVehiclePage />} />
           <Route path="/my-parts/edit/:id" element={<EditPart />} />
           <Route path="/part/:productId" element={<PartDetail />} />
 
@@ -104,6 +109,7 @@ function App() {
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-parts" element={<MyParts />} />
+          <Route path="/vehicles" element={<VehiclesList />} />
           <Route path="/purchases/orders" element={<PurchasesOrdersPage />} />
           <Route path="/purchases/returns" element={<PurchasesReturnsPage />} />
           <Route path="/sales/orders" element={<SalesOrdersPage />} />

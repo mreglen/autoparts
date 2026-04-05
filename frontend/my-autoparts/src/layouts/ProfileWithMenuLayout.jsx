@@ -22,6 +22,8 @@ export default function ProfileWithMenuLayout() {
     };
 
     const [activeTab, setActiveTab] = useState(() => {
+        const path = location.pathname;
+        if (path.startsWith('/vehicles/edit')) return 'vehicles';
         const pathMap = {
             '/dashboard': 'dashboard',
             '/clients': 'clients',
@@ -33,6 +35,8 @@ export default function ProfileWithMenuLayout() {
             '/sales/returns': 'sales-returns',
             '/warehouse-sales': 'warehouse-sales',
             '/my-parts': 'parts',
+            '/vehicles': 'vehicles',
+            '/vehicles/add': 'vehicles',
             '/stock-in': 'receipts',
             '/stock-out': 'expenses',
             '/settings/storage-addresses': 'settings-storage-addresses',
@@ -43,12 +47,13 @@ export default function ProfileWithMenuLayout() {
             '/moderation/products': 'product-moderation',
             '/moderation/pending-sellers': 'pending-sellers'
         };
-        return pathMap[location.pathname] || (user?.is_seller ? 'dashboard' : 'profile');
+        return pathMap[path] || (user?.is_seller ? 'dashboard' : 'profile');
     });
 
     // Обновляем активную вкладку при изменении пути
     useEffect(() => {
         const getActiveTabFromPath = (path) => {
+            if (path.startsWith('/vehicles/edit')) return 'vehicles';
             const pathMap = {
                 '/dashboard': 'dashboard',
                 '/clients': 'clients',
@@ -60,6 +65,8 @@ export default function ProfileWithMenuLayout() {
                 '/sales/returns': 'sales-returns',
                 '/warehouse-sales': 'warehouse-sales',
                 '/my-parts': 'parts',
+                '/vehicles': 'vehicles',
+                '/vehicles/add': 'vehicles',
                 '/stock-in': 'receipts',
                 '/stock-out': 'expenses',
                 '/settings/storage-addresses': 'settings-storage-addresses',
@@ -169,6 +176,10 @@ export default function ProfileWithMenuLayout() {
             if (user?.is_seller || user?.is_admin || hasPermission('my-parts')) {
                 warehouseSubmenu.push({ id: 'parts', label: 'Мои запчасти' });
             }
+
+            if (user?.is_seller || user?.is_admin || hasPermission('my-parts') || hasPermission('stock-in')) {
+                warehouseSubmenu.push({ id: 'vehicles', label: 'Автомобили' });
+            }
             
             // Поступление - только для продавцов, админов или сотрудников с правом stock-in
             if (user?.is_seller || user?.is_admin || hasPermission('stock-in')) {
@@ -238,6 +249,10 @@ export default function ProfileWithMenuLayout() {
             // Мои запчасти - только для сотрудников с правом my-parts
             if (hasPermission('my-parts')) {
                 warehouseSubmenu.push({ id: 'parts', label: 'Мои запчасти' });
+            }
+
+            if (hasPermission('my-parts') || hasPermission('stock-in')) {
+                warehouseSubmenu.push({ id: 'vehicles', label: 'Автомобили' });
             }
             
             // Поступление - только для сотрудников с правом stock-in
@@ -361,6 +376,7 @@ export default function ProfileWithMenuLayout() {
             'sales-returns': '/sales/returns',
             'warehouse-sales': '/warehouse-sales',
             'parts': '/my-parts',
+            'vehicles': '/vehicles',
             'receipts': '/stock-in',
             'expenses': '/stock-out',
             'settings-storage-addresses': '/settings/storage-addresses',
