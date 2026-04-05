@@ -58,6 +58,17 @@ class Vehicle(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    transmission_assignment = relationship(
+        "VehicleTransmission",
+        back_populates="vehicle",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def transmission_id(self):
+        link = self.transmission_assignment
+        return link.transmission_id if link is not None else None
 
     @hybrid_property
     def vin(self):

@@ -21,6 +21,7 @@ class VehicleUpdate(BaseModel):
     generation: Optional[str] = None
     engine: Optional[str] = None
     transmission: Optional[str] = None
+    transmission_id: Optional[int] = None
     vin: Optional[str] = None
     mileage: Optional[int] = None
     price: Optional[Decimal] = None
@@ -37,6 +38,7 @@ class VehicleCreate(BaseModel):
     generation: Optional[str] = None
     engine: Optional[str] = None
     transmission: Optional[str] = None
+    transmission_id: Optional[int] = None
     vin: Optional[str] = None
     mileage: Optional[int] = None
     tecdoc_manufacturer_id: Optional[int] = None
@@ -69,6 +71,7 @@ class Vehicle(BaseModel):
     generation: Optional[str] = None
     engine: Optional[str] = None
     transmission: Optional[str] = None
+    transmission_id: Optional[int] = None
     vin: Optional[str] = None
     mileage: Optional[int] = None
     tecdoc_manufacturer_id: Optional[int] = None

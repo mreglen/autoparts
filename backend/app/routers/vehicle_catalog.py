@@ -116,6 +116,44 @@ def list_engines_for_passengercar(
     return [TecdocEngineOut.from_row(r) for r in rows]
 
 
+def _uniq_positive_ints(*values: int | None) -> list[int]:
+    seen: set[int] = set()
+    out: list[int] = []
+    for v in values:
+        if v is None:
+            continue
+        try:
+            iv = int(v)
+        except (TypeError, ValueError):
+            continue
+        if iv not in seen:
+            seen.add(iv)
+            out.append(iv)
+    return out
+
+
+def _item_ids_for_transmission_attributes(db: Session, pc: TecdocPassengercar) -> list[int]:
+    """Ids used to match rows in tecdoc_items_atributes (item_id / ParentLinkitem).
+
+    Includes passengercar, its InternalID/Model, and linked engines (often КПП is on engine items).
+    """
+    ids = _uniq_positive_ints(pc.id, pc.InternalID, pc.Model)
+    engines = (
+        db.query(TecdocEngine)
+        .join(
+            TecdocPassengercarLinkEngine,
+            TecdocPassengercarLinkEngine.engine_id == TecdocEngine.id,
+        )
+        .filter(TecdocPassengercarLinkEngine.car_id == pc.id)
+        .all()
+    )
+    for eng in engines:
+        ids.extend(_uniq_positive_ints(eng.id, eng.InternalID))
+    # preserve first occurrence order, dedupe again
+    return _uniq_positive_ints(*ids)
+
+
+# Transmission-related rows in tecdoc_items_atributes: ILIKE works for Latin and Cyrillic case folding.
 _TRANSMISSION_SQL = text(
     """
     SELECT DISTINCT
@@ -125,26 +163,46 @@ _TRANSMISSION_SQL = text(
     WHERE (item_id IN :ids OR "ParentLinkitem" IN :ids)
       AND COALESCE(TRIM(COALESCE("DisplayValue", '')), '') <> ''
       AND (
-        LOWER(COALESCE("AttributeGroup", '')) LIKE '%trans%'
-        OR LOWER(COALESCE("AttributeGroup", '')) LIKE '%gear%'
-        OR LOWER(COALESCE("AttributeGroup", '')) LIKE '%getrieb%'
-        OR LOWER(COALESCE("AttributeType", '')) LIKE '%trans%'
-        OR LOWER(COALESCE("AttributeType", '')) LIKE '%gear%'
-        OR LOWER(COALESCE("AttributeType", '')) LIKE '%getrieb%'
-        OR LOWER(COALESCE("DisplayTitle", '')) LIKE '%короб%'
-        OR LOWER(COALESCE("DisplayTitle", '')) LIKE '%кпп%'
-        OR LOWER(COALESCE("DisplayTitle", '')) LIKE '%gear%'
-        OR LOWER(COALESCE("DisplayTitle", '')) LIKE '%trans%'
-        OR LOWER(COALESCE("DisplayTitle", '')) LIKE '%getrieb%'
-        OR LOWER(COALESCE("DisplayTitle", '')) LIKE '%schalt%'
-        OR LOWER(COALESCE("DisplayValue", '')) LIKE '%akpp%'
-        OR LOWER(COALESCE("DisplayValue", '')) LIKE '%мкпп%'
-        OR LOWER(COALESCE("DisplayValue", '')) LIKE '%вариатор%'
-        OR LOWER(COALESCE("DisplayValue", '')) LIKE '%cvt%'
-        OR LOWER(COALESCE("DisplayValue", '')) LIKE '%dsg%'
-        OR LOWER(COALESCE("LinkitemType", '')) LIKE '%trans%'
-        OR LOWER(COALESCE("LinkitemType", '')) LIKE '%gear%'
-        OR LOWER(COALESCE("LinkitemType", '')) LIKE '%getrieb%'
+        COALESCE("AttributeGroup", '') ILIKE '%trans%'
+        OR COALESCE("AttributeGroup", '') ILIKE '%gear%'
+        OR COALESCE("AttributeGroup", '') ILIKE '%getrieb%'
+        OR COALESCE("AttributeType", '') ILIKE '%trans%'
+        OR COALESCE("AttributeType", '') ILIKE '%gear%'
+        OR COALESCE("AttributeType", '') ILIKE '%getrieb%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%короб%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%кпп%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%акпп%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%мкпп%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%gear%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%trans%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%getrieb%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%schalt%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%tiptron%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%powershift%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%multitron%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%stronic%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%dct%'
+        OR COALESCE("DisplayTitle", '') ILIKE '%cvt%'
+        OR COALESCE("DisplayValue", '') ILIKE '%akpp%'
+        OR COALESCE("DisplayValue", '') ILIKE '%акпп%'
+        OR COALESCE("DisplayValue", '') ILIKE '%мкпп%'
+        OR COALESCE("DisplayValue", '') ILIKE '%кпп%'
+        OR COALESCE("DisplayValue", '') ILIKE '%вариатор%'
+        OR COALESCE("DisplayValue", '') ILIKE '%cvt%'
+        OR COALESCE("DisplayValue", '') ILIKE '%dsg%'
+        OR COALESCE("DisplayValue", '') ILIKE '%dct%'
+        OR COALESCE("DisplayValue", '') ILIKE '%amt%'
+        OR COALESCE("DisplayValue", '') ILIKE '%автомат%'
+        OR COALESCE("DisplayValue", '') ILIKE '%механ%'
+        OR COALESCE("DisplayValue", '') ILIKE '%robot%'
+        OR COALESCE("DisplayValue", '') ILIKE '%tiptron%'
+        OR COALESCE("DisplayValue", '') ILIKE '%powershift%'
+        OR COALESCE("DisplayValue", '') ILIKE '%manual%'
+        OR COALESCE("DisplayValue", '') ILIKE '%automatic%'
+        OR COALESCE("DisplayValue", '') ILIKE '%ступен%'
+        OR COALESCE("LinkitemType", '') ILIKE '%trans%'
+        OR COALESCE("LinkitemType", '') ILIKE '%gear%'
+        OR COALESCE("LinkitemType", '') ILIKE '%getrieb%'
       )
     ORDER BY title, val
     """
@@ -161,11 +219,6 @@ def list_transmissions_for_passengercar(
     if not pc:
         raise HTTPException(status_code=404, detail="Поколение не найдено")
 
-    ids: list[int] = [passengercar_id]
-    if pc.InternalID is not None and pc.InternalID not in ids:
-        ids.append(pc.InternalID)
-    if pc.Model is not None and pc.Model not in ids:
-        ids.append(pc.Model)
-
+    ids = _item_ids_for_transmission_attributes(db, pc)
     rows = db.execute(_TRANSMISSION_SQL, {"ids": ids}).mappings().all()
     return [TecdocTransmissionOut(title=r["title"] or None, value=r["val"]) for r in rows]

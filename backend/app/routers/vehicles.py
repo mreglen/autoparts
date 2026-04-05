@@ -12,6 +12,7 @@ from app.models.vehicle import Vehicle as VehicleModel
 from app.models.vehicle_photo import VehiclePhoto
 from app.models.vehicle_vin import VehicleVin
 from app.models.vehicle_mileage import VehicleMileage
+from app.models.transmission import Transmission, VehicleTransmission
 from app.models.tecdoc import (
     TecdocManufacturer,
     TecdocModel,
@@ -57,6 +58,33 @@ def _refresh_tecdoc_json_columns(db: Session, v: VehicleModel) -> None:
     v.tecdoc_engine_json = _tecdoc_row_to_dict(db.get(TecdocEngine, eid) if eid else None)
 
 
+def _apply_reference_transmission(
+    db: Session,
+    db_vehicle: VehicleModel,
+    transmission_id: int | None,
+) -> None:
+    """Связь vehicle_transmissions + дублирование названия в vehicles.transmission."""
+    if transmission_id is None:
+        if db_vehicle.transmission_assignment is not None:
+            db.delete(db_vehicle.transmission_assignment)
+        return
+    tx = db.get(Transmission, transmission_id)
+    if not tx:
+        raise HTTPException(status_code=400, detail="Тип КПП не найден")
+    db_vehicle.transmission = _truncate((tx.name or "").strip(), 30) or None
+    db_vehicle.tecdoc_transmission_json = None
+    link = db_vehicle.transmission_assignment
+    if link is not None:
+        link.transmission_id = transmission_id
+    else:
+        db.add(
+            VehicleTransmission(
+                vehicle_id=db_vehicle.id,
+                transmission_id=transmission_id,
+            )
+        )
+
+
 def _apply_tecdoc_labels(db: Session, data: dict) -> None:
     """Fill display strings from TecDoc rows when ids are set (in-place)."""
     mid = data.get("tecdoc_manufacturer_id")
@@ -99,6 +127,7 @@ def get_vehicles(
             joinedload(VehicleModel.vin_row),
             joinedload(VehicleModel.mileage_row),
             joinedload(VehicleModel.photos),
+            joinedload(VehicleModel.transmission_assignment),
         )
         .filter(VehicleModel.organization_id == current_user.organization_id)
         .all()
@@ -122,6 +151,7 @@ def update_vehicle(
             joinedload(VehicleModel.vin_row),
             joinedload(VehicleModel.mileage_row),
             joinedload(VehicleModel.photos),
+            joinedload(VehicleModel.transmission_assignment),
         )
         .filter(
             VehicleModel.id == vehicle_id,
@@ -196,7 +226,9 @@ def update_vehicle(
             e = data.get("engine")
             db_vehicle.engine = _truncate(e.strip(), 50) if e and str(e).strip() else None
 
-    if "transmission" in data:
+    if "transmission_id" in data:
+        _apply_reference_transmission(db, db_vehicle, data.get("transmission_id"))
+    elif "transmission" in data:
         t = data.get("transmission")
         db_vehicle.transmission = _truncate(t.strip(), 30) if t and str(t).strip() else None
     if "price" in data:
@@ -262,6 +294,7 @@ def update_vehicle(
             joinedload(VehicleModel.vin_row),
             joinedload(VehicleModel.mileage_row),
             joinedload(VehicleModel.photos),
+            joinedload(VehicleModel.transmission_assignment),
         )
         .filter(VehicleModel.id == vehicle_id)
         .one()
@@ -280,6 +313,7 @@ def create_vehicle(
         raise HTTPException(status_code=403, detail="Организация не указана")
 
     payload = vehicle.model_dump()
+    transmission_id = payload.pop("transmission_id", None)
     vin_raw = payload.pop("vin", None)
     mileage_raw = payload.pop("mileage", None)
     photo_paths = payload.pop("photos") or []
@@ -303,7 +337,14 @@ def create_vehicle(
     payload["model"] = _truncate(payload.get("model"), 100) or ""
     payload["generation"] = _truncate(payload.get("generation"), 50)
     payload["engine"] = _truncate(payload.get("engine"), 50)
-    payload["transmission"] = _truncate(payload.get("transmission"), 30)
+    if transmission_id is not None:
+        tx = db.get(Transmission, transmission_id)
+        if not tx:
+            raise HTTPException(status_code=400, detail="Тип КПП не найден")
+        payload["transmission"] = _truncate((tx.name or "").strip(), 30)
+        payload["tecdoc_transmission_json"] = None
+    else:
+        payload["transmission"] = _truncate(payload.get("transmission"), 30)
 
     mid = payload.get("tecdoc_manufacturer_id")
     mob_id = payload.get("tecdoc_model_id")
@@ -368,6 +409,14 @@ def create_vehicle(
     db.add(db_vehicle)
     db.flush()
 
+    if transmission_id is not None:
+        db.add(
+            VehicleTransmission(
+                vehicle_id=db_vehicle.id,
+                transmission_id=transmission_id,
+            )
+        )
+
     if norm_vin:
         db.add(VehicleVin(vehicle_id=db_vehicle.id, vin=norm_vin))
     if mileage_int is not None:
@@ -414,6 +463,7 @@ def create_vehicle(
             joinedload(VehicleModel.vin_row),
             joinedload(VehicleModel.mileage_row),
             joinedload(VehicleModel.photos),
+            joinedload(VehicleModel.transmission_assignment),
         )
         .filter(VehicleModel.id == db_vehicle.id)
         .one()

@@ -352,6 +352,20 @@ export const updateProductQuantityAPI = createAsyncThunk(
     }
 );
 
+export const fetchReferenceTransmissions = createAsyncThunk(
+    'vehicles/referenceTransmissions',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get('/transmissions/');
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки типов КПП'
+            );
+        }
+    }
+);
+
 export const fetchVehicles = createAsyncThunk(
     'vehicles/fetchVehicles',
     async (_, { rejectWithValue }) => {
