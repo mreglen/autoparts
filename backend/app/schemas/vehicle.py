@@ -30,6 +30,7 @@ class VehicleUpdate(BaseModel):
     tecdoc_passengercar_id: Optional[int] = None
     tecdoc_engine_id: Optional[int] = None
     tecdoc_transmission_json: Optional[dict[str, Any]] = None
+    description: Optional[str] = Field(None, max_length=8000)
 
 
 class VehicleCreate(BaseModel):
@@ -46,6 +47,7 @@ class VehicleCreate(BaseModel):
     tecdoc_passengercar_id: Optional[int] = None
     tecdoc_engine_id: Optional[int] = None
     price: Optional[Decimal] = None
+    description: Optional[str] = Field(None, max_length=8000)
     photos: list[str] = Field(
         default_factory=list,
         description="Temp paths from POST /upload/photo, e.g. /temp/{org_id}/{file}",
@@ -79,6 +81,7 @@ class Vehicle(BaseModel):
     tecdoc_passengercar_id: Optional[int] = None
     tecdoc_engine_id: Optional[int] = None
     price: Optional[Decimal] = None
+    description: Optional[str] = None
     tecdoc_manufacturer_json: Optional[dict[str, Any]] = None
     tecdoc_model_json: Optional[dict[str, Any]] = None
     tecdoc_passengercar_json: Optional[dict[str, Any]] = None

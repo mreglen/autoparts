@@ -35,6 +35,13 @@ def _truncate(value: str | None, max_len: int) -> str | None:
     return value[:max_len]
 
 
+def _norm_vehicle_description(raw) -> str | None:
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    return s or None
+
+
 def _tecdoc_row_to_dict(row) -> dict | None:
     if row is None:
         return None
@@ -264,6 +271,9 @@ def update_vehicle(
         elif norm_vin:
             db.add(VehicleVin(vehicle_id=db_vehicle.id, vin=norm_vin))
 
+    if "description" in data:
+        db_vehicle.description = _norm_vehicle_description(data.get("description"))
+
     if "mileage" in data:
         mileage_raw = data.get("mileage")
         if mileage_raw is None:
@@ -331,6 +341,8 @@ def create_vehicle(
     if price_val is not None and not isinstance(price_val, Decimal):
         price_val = Decimal(str(price_val))
 
+    description_val = _norm_vehicle_description(payload.pop("description", None))
+
     _apply_tecdoc_labels(db, payload)
 
     payload["brand"] = _truncate(payload.get("brand"), 50) or ""
@@ -393,6 +405,7 @@ def create_vehicle(
         generation=payload.get("generation"),
         engine=payload.get("engine"),
         transmission=payload.get("transmission"),
+        description=description_val,
         tecdoc_manufacturer_id=payload.get("tecdoc_manufacturer_id"),
         tecdoc_model_id=payload.get("tecdoc_model_id"),
         tecdoc_passengercar_id=payload.get("tecdoc_passengercar_id"),

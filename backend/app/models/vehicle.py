@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Column, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
@@ -14,6 +14,7 @@ class Vehicle(Base):
     generation = Column(String(50))
     engine = Column(String(50))
     transmission = Column(String(30))
+    description = Column(Text, nullable=True)
     organization_id = Column(String, ForeignKey("organizations.id"))
 
     tecdoc_manufacturer_id = Column(Integer, nullable=True)

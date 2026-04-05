@@ -14,6 +14,34 @@ import { apiRequestFormData, normalizeImageUrl } from '../../../utils/apiClient'
 
 const MAX_VEHICLE_PHOTOS = 10;
 
+/** Единый вид подписей и полей ввода в модалке автомобиля */
+const FIELD_LABEL = 'block text-sm font-medium text-gray-700 mb-1';
+const FIELD_BASE =
+  'block w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-300 rounded-md shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed';
+const FIELD_TEXTAREA = `${FIELD_BASE} resize-y min-h-[96px]`;
+const FIELD_FILE =
+  'block w-full cursor-pointer text-sm text-gray-900 border border-gray-300 rounded-md bg-white px-3 py-2 shadow-sm file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-800 hover:file:bg-indigo-50 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-500/40 focus-within:border-indigo-500';
+const SUGGEST_LIST =
+  'mt-1 max-h-40 overflow-y-auto rounded-md border border-gray-300 bg-white text-sm text-gray-900 shadow-sm';
+const SUGGEST_ITEM =
+  'w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none';
+const FORM_CARD = 'p-4 bg-gray-50 rounded-lg border border-gray-200/80';
+
+/** Подсказки только внутри полей (placeholder), не под полями */
+const PLH = {
+  brand: 'Начните вводить или выберите из списка',
+  model: 'Начните вводить или выберите из списка',
+  modelManual: 'Введите модель',
+  generation: 'Начните вводить или выберите из списка',
+  generationManual: 'Введите поколение',
+  engine: 'Начните вводить или выберите из списка',
+  engineManual: 'Например, 2.0 TDI',
+  vin: '17 символов',
+  mileage: 'Например, 85000',
+  price: 'Необязательно',
+  description: 'Комплектация, замечания по кузову…',
+};
+
 const normCatalogQ = (q) => (q || '').trim().toLowerCase();
 
 const filterManufacturersByInput = (rows, brandInput) => {
@@ -66,6 +94,7 @@ const emptyCreate = () => ({
   vin: '',
   mileage: '',
   price: '',
+  description: '',
   vehiclePhotos: [],
   manufacturerOptions: [],
   modelOptions: [],
@@ -91,12 +120,13 @@ const vehicleToDetailEditSyncPart = (v) => ({
   generationInput: v?.generation || '',
   engineText: v?.engine || '',
   transmissionText: v?.transmission || '',
-  vin: (v?.vin || '').toUpperCase(),
+  vin: v?.vin || '',
   mileage: v?.mileage != null && v?.mileage !== '' ? String(v.mileage) : '',
   price:
     v?.price != null && v?.price !== ''
       ? String(v.price).replace('.', ',')
       : '',
+  description: v?.description ?? '',
   manufacturerOptions: [],
   modelOptions: [],
   pcOptions: [],
@@ -146,7 +176,9 @@ const buildUpdatePayloadFromDraft = (draft, referenceTransmissionTypes = []) => 
     if (!Number.isNaN(n)) price = n;
   }
 
-  const vinVal = draft.vin.trim();
+  const vinRaw = draft.vin.trim();
+  const vinVal = vinRaw ? vinRaw.toUpperCase() : '';
+  const descTrim = (draft.description || '').trim();
 
   return {
     brand: draft.brandInput.trim(),
@@ -154,7 +186,8 @@ const buildUpdatePayloadFromDraft = (draft, referenceTransmissionTypes = []) => 
     generation: generationVal || null,
     engine: engineVal || null,
     transmission: transmissionVal || null,
-    vin: vinVal ? vinVal : null,
+    description: descTrim === '' ? null : descTrim,
+    vin: vinVal || null,
     mileage: mileageStr === '' ? null : mileage,
     price,
     tecdoc_manufacturer_id: draft.catalogManufacturerId,
@@ -225,7 +258,6 @@ const VehicleModal = ({
   const [mode, setMode] = useState('select');
   const [detailVehicle, setDetailVehicle] = useState(null);
   const [create, setCreate] = useState(emptyCreate);
-  const [brandSearchLoading, setBrandSearchLoading] = useState(false);
   const [childLoading, setChildLoading] = useState(false);
   const [detailEdit, setDetailEdit] = useState(emptyDetailEdit);
   const [detailBaselinePayload, setDetailBaselinePayload] = useState('');
@@ -292,7 +324,6 @@ const VehicleModal = ({
         else setDetailEdit(clearOpts);
         return;
       }
-      setBrandSearchLoading(true);
       try {
         const rows = await dispatch(
           fetchVehicleCatalogManufacturers({ q: term, limit: 80 })
@@ -302,8 +333,6 @@ const VehicleModal = ({
       } catch {
         if (target === 'create') setCreate(clearOpts);
         else setDetailEdit(clearOpts);
-      } finally {
-        setBrandSearchLoading(false);
       }
     },
     [dispatch]
@@ -589,6 +618,8 @@ const VehicleModal = ({
       price = n;
     }
 
+    const descTrim = (create.description || '').trim();
+
     const payload = {
       brand: create.brandInput.trim(),
       model: modelVal,
@@ -598,6 +629,7 @@ const VehicleModal = ({
       vin: create.vin ? create.vin.trim().toUpperCase() || null : null,
       mileage,
       price,
+      description: descTrim === '' ? null : descTrim,
       photos: (create.vehiclePhotos || []).map((p) => p.tempPath).filter(Boolean),
       tecdoc_transmission_json: create.referenceTransmissionId != null ? null : undefined,
       transmission_id: create.referenceTransmissionId ?? undefined,
@@ -725,6 +757,7 @@ const VehicleModal = ({
           vin: patch.vin,
           mileage: patch.mileage,
           price: patch.price,
+          description: patch.description,
           tecdoc_manufacturer_id: patch.tecdoc_manufacturer_id,
           tecdoc_model_id: patch.tecdoc_model_id,
           tecdoc_passengercar_id: patch.tecdoc_passengercar_id,
@@ -811,61 +844,69 @@ const VehicleModal = ({
     const showPrice = priceNum != null && !Number.isNaN(priceNum);
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${FORM_CARD}`}>
           <div>
-            <span className="text-xs text-gray-500">Марка</span>
-            <div className="font-medium">{v.brand}</div>
+            <div className={FIELD_LABEL}>Марка</div>
+            <div className="text-sm font-medium text-gray-900">{v.brand}</div>
           </div>
           <div>
-            <span className="text-xs text-gray-500">Модель</span>
-            <div className="font-medium">{v.model}</div>
+            <div className={FIELD_LABEL}>Модель</div>
+            <div className="text-sm font-medium text-gray-900">{v.model}</div>
           </div>
           <div>
-            <span className="text-xs text-gray-500">Поколение</span>
-            <div className="font-medium">{v.generation || '—'}</div>
+            <div className={FIELD_LABEL}>Поколение</div>
+            <div className="text-sm font-medium text-gray-900">{v.generation || '—'}</div>
           </div>
           <div>
-            <span className="text-xs text-gray-500">Двигатель</span>
-            <div className="font-medium">{v.engine || '—'}</div>
+            <div className={FIELD_LABEL}>Двигатель</div>
+            <div className="text-sm font-medium text-gray-900">{v.engine || '—'}</div>
           </div>
           <div>
-            <span className="text-xs text-gray-500">КПП</span>
-            <div className="font-medium">{v.transmission || '—'}</div>
+            <div className={FIELD_LABEL}>КПП</div>
+            <div className="text-sm font-medium text-gray-900">{v.transmission || '—'}</div>
           </div>
           {v.vin && (
             <div>
-              <span className="text-xs text-gray-500">VIN</span>
-              <div className="font-medium">{v.vin}</div>
+              <div className={FIELD_LABEL}>VIN</div>
+              <div className="text-sm font-medium text-gray-900">{v.vin}</div>
             </div>
           )}
           {v.mileage != null && v.mileage !== '' && (
             <div>
-              <span className="text-xs text-gray-500">Пробег</span>
-              <div className="font-medium">{Number(v.mileage).toLocaleString()} км</div>
+              <div className={FIELD_LABEL}>Пробег</div>
+              <div className="text-sm font-medium text-gray-900">
+                {Number(v.mileage).toLocaleString()} км
+              </div>
             </div>
           )}
           {showPrice && (
             <div>
-              <span className="text-xs text-gray-500">Цена</span>
-              <div className="font-medium">
+              <div className={FIELD_LABEL}>Цена</div>
+              <div className="text-sm font-medium text-gray-900">
                 {priceNum.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₽
               </div>
             </div>
           )}
         </div>
         {Array.isArray(v.photos) && v.photos.length > 0 && (
-          <div>
-            <span className="text-xs text-gray-500 block mb-2">Фото</span>
+          <div className={FORM_CARD}>
+            <div className={FIELD_LABEL}>Фото</div>
             <div className="flex flex-wrap gap-2">
               {v.photos.map((ph) => (
                 <img
                   key={ph.id ?? ph.photo_path}
                   src={normalizeImageUrl(ph.photo_path)}
                   alt=""
-                  className="w-24 h-24 object-cover rounded-lg border"
+                  className="w-24 h-24 object-cover rounded-md border border-gray-300 shadow-sm"
                 />
               ))}
             </div>
+          </div>
+        )}
+        {v.description && String(v.description).trim() !== '' && (
+          <div className={FORM_CARD}>
+            <div className={FIELD_LABEL}>Описание</div>
+            <p className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed">{v.description}</p>
           </div>
         )}
       </div>
@@ -934,91 +975,79 @@ const VehicleModal = ({
                   <p className="text-sm text-gray-600">
                     Марку и комплектацию можно выбрать из каталога или ввести вручную (как при создании).
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${FORM_CARD}`}>
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Марка *</label>
+                      <div className={FIELD_LABEL}>Марка *</div>
                       <input
                         type="text"
                         value={detailEdit.brandInput}
                         onChange={(e) => onBrandInputChange(e, 'detail')}
-                        className="w-full px-3 py-2 border rounded-md"
-                        placeholder="Начните вводить или выберите из списка"
+                        className={FIELD_BASE}
+                        placeholder={PLH.brand}
                         autoComplete="off"
                       />
-                      {brandSearchLoading && (
-                        <div className="text-xs text-gray-500 mt-1">Поиск марок…</div>
-                      )}
                       {detailEdit.manufacturerOptions.length > 0 &&
-                        detailEdit.catalogManufacturerId == null && (
-                        <>
-                          {filterManufacturersByInput(
-                            detailEdit.manufacturerOptions,
-                            detailEdit.brandInput
-                          ).length > 0 ? (
-                            <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
-                              {filterManufacturersByInput(
-                                detailEdit.manufacturerOptions,
-                                detailEdit.brandInput
-                              ).map((m) => (
-                                <li key={m.id}>
-                                  <button
-                                    type="button"
-                                    className="w-full text-left px-3 py-2 hover:bg-indigo-50"
-                                    onClick={() => pickManufacturer(m, 'detail')}
-                                  >
-                                    {m.description || m.matchcode || m.id}
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
-                          )}
-                        </>
-                      )}
+                        detailEdit.catalogManufacturerId == null &&
+                        filterManufacturersByInput(
+                          detailEdit.manufacturerOptions,
+                          detailEdit.brandInput
+                        ).length > 0 && (
+                          <ul className={SUGGEST_LIST}>
+                            {filterManufacturersByInput(
+                              detailEdit.manufacturerOptions,
+                              detailEdit.brandInput
+                            ).map((m) => (
+                              <li key={m.id}>
+                                <button
+                                  type="button"
+                                  className={SUGGEST_ITEM}
+                                  onClick={() => pickManufacturer(m, 'detail')}
+                                >
+                                  {m.description || m.matchcode || m.id}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                     </div>
 
                     {detailUsingManufacturerCatalog ? (
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Модель *</label>
+                        <div className={FIELD_LABEL}>Модель *</div>
                         <input
                           type="text"
                           value={detailEdit.modelInput}
                           onChange={(e) => onCatalogModelInputChange(e, 'detail')}
                           disabled={!detailModelEnabled || childLoading}
-                          className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
-                          placeholder="Начните вводить или выберите из списка"
+                          className={FIELD_BASE}
+                          placeholder={PLH.model}
                           autoComplete="off"
                         />
-                        {detailEdit.modelOptions.length > 0 && detailEdit.catalogModelId == null && (
-                          <>
-                            {filterModelsByInput(detailEdit.modelOptions, detailEdit.modelInput).length >
-                            0 ? (
-                              <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
-                                {filterModelsByInput(
-                                  detailEdit.modelOptions,
-                                  detailEdit.modelInput
-                                ).map((m) => (
-                                  <li key={m.id}>
-                                    <button
-                                      type="button"
-                                      className="w-full text-left px-3 py-2 hover:bg-indigo-50"
-                                      onClick={() => pickCatalogModel(m, 'detail')}
-                                    >
-                                      {modelOptionLabel(m)}
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
-                            )}
-                          </>
-                        )}
+                        {detailEdit.modelOptions.length > 0 &&
+                          detailEdit.catalogModelId == null &&
+                          filterModelsByInput(detailEdit.modelOptions, detailEdit.modelInput).length >
+                            0 && (
+                            <ul className={SUGGEST_LIST}>
+                              {filterModelsByInput(
+                                detailEdit.modelOptions,
+                                detailEdit.modelInput
+                              ).map((m) => (
+                                <li key={m.id}>
+                                  <button
+                                    type="button"
+                                    className={SUGGEST_ITEM}
+                                    onClick={() => pickCatalogModel(m, 'detail')}
+                                  >
+                                    {modelOptionLabel(m)}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                       </div>
                     ) : (
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Модель *</label>
+                        <div className={FIELD_LABEL}>Модель *</div>
                         <input
                           type="text"
                           value={detailEdit.modelInput}
@@ -1026,54 +1055,49 @@ const VehicleModal = ({
                             setDetailEdit((prev) => ({ ...prev, modelInput: e.target.value }))
                           }
                           disabled={!detailModelEnabled}
-                          className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
-                          placeholder="После ввода марки вне справочника"
+                          className={FIELD_BASE}
+                          placeholder={PLH.modelManual}
                         />
                       </div>
                     )}
 
                     {detailUsingManufacturerCatalog ? (
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Поколение *</label>
+                        <div className={FIELD_LABEL}>Поколение *</div>
                         <input
                           type="text"
                           value={detailEdit.generationInput}
                           onChange={(e) => onPassengercarInputChange(e, 'detail')}
                           disabled={!detailGenerationEnabled || childLoading}
-                          className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
-                          placeholder="Начните вводить или выберите из списка"
+                          className={FIELD_BASE}
+                          placeholder={PLH.generation}
                           autoComplete="off"
                         />
                         {detailEdit.pcOptions.length > 0 &&
-                          detailEdit.catalogPassengercarId == null && (
-                          <>
-                            {filterPcByInput(detailEdit.pcOptions, detailEdit.generationInput).length >
-                            0 ? (
-                              <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
-                                {filterPcByInput(
-                                  detailEdit.pcOptions,
-                                  detailEdit.generationInput
-                                ).map((p) => (
-                                  <li key={p.id}>
-                                    <button
-                                      type="button"
-                                      className="w-full text-left px-3 py-2 hover:bg-indigo-50"
-                                      onClick={() => pickPassengercar(p, 'detail')}
-                                    >
-                                      {pcOptionLabel(p)}
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
-                            )}
-                          </>
-                        )}
+                          detailEdit.catalogPassengercarId == null &&
+                          filterPcByInput(detailEdit.pcOptions, detailEdit.generationInput).length >
+                            0 && (
+                            <ul className={SUGGEST_LIST}>
+                              {filterPcByInput(
+                                detailEdit.pcOptions,
+                                detailEdit.generationInput
+                              ).map((p) => (
+                                <li key={p.id}>
+                                  <button
+                                    type="button"
+                                    className={SUGGEST_ITEM}
+                                    onClick={() => pickPassengercar(p, 'detail')}
+                                  >
+                                    {pcOptionLabel(p)}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                       </div>
                     ) : (
                       <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Поколение *</label>
+                        <div className={FIELD_LABEL}>Поколение *</div>
                         <input
                           type="text"
                           value={detailEdit.generationInput}
@@ -1081,31 +1105,33 @@ const VehicleModal = ({
                             setDetailEdit((prev) => ({ ...prev, generationInput: e.target.value }))
                           }
                           disabled={!detailGenerationEnabled}
-                          className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                          className={FIELD_BASE}
+                          placeholder={PLH.generationManual}
                         />
                       </div>
                     )}
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Двигатель</label>
-                      {detailUsingManufacturerCatalog && detailEdit.catalogPassengercarId ? (
-                        <>
-                          <input
-                            type="text"
-                            value={detailEdit.engineText}
-                            onChange={(e) => onCatalogEngineInputChange(e, 'detail')}
-                            disabled={!detailEngineTxEnabled || childLoading}
-                            className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
-                            placeholder="Начните вводить или выберите из списка"
-                            autoComplete="off"
-                          />
-                          {detailEdit.engineOptions.length > 0 && detailEdit.catalogEngineId == null && (
-                            <>
-                              {filterEnginesByInput(
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className={FIELD_LABEL}>Двигатель</div>
+                        {detailUsingManufacturerCatalog && detailEdit.catalogPassengercarId ? (
+                          <>
+                            <input
+                              type="text"
+                              value={detailEdit.engineText}
+                              onChange={(e) => onCatalogEngineInputChange(e, 'detail')}
+                              disabled={!detailEngineTxEnabled || childLoading}
+                              className={FIELD_BASE}
+                              placeholder={PLH.engine}
+                              autoComplete="off"
+                            />
+                            {detailEdit.engineOptions.length > 0 &&
+                              detailEdit.catalogEngineId == null &&
+                              filterEnginesByInput(
                                 detailEdit.engineOptions,
                                 detailEdit.engineText
-                              ).length > 0 ? (
-                                <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                              ).length > 0 && (
+                                <ul className={SUGGEST_LIST}>
                                   {filterEnginesByInput(
                                     detailEdit.engineOptions,
                                     detailEdit.engineText
@@ -1113,7 +1139,7 @@ const VehicleModal = ({
                                     <li key={en.id}>
                                       <button
                                         type="button"
-                                        className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                        className={SUGGEST_ITEM}
                                         onClick={() => pickCatalogEngine(en, 'detail')}
                                       >
                                         {engineOptionLabel(en)}
@@ -1121,82 +1147,102 @@ const VehicleModal = ({
                                     </li>
                                   ))}
                                 </ul>
-                              ) : (
-                                <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
                               )}
-                            </>
-                          )}
-                        </>
-                      ) : (
-                        <input
-                          type="text"
-                          value={detailEdit.engineText}
-                          onChange={(e) =>
-                            setDetailEdit((prev) => ({ ...prev, engineText: e.target.value }))
-                          }
-                          disabled={!detailEngineTxEnabled}
-                          className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
-                        />
-                      )}
-                    </div>
+                          </>
+                        ) : (
+                          <input
+                            type="text"
+                            value={detailEdit.engineText}
+                            onChange={(e) =>
+                              setDetailEdit((prev) => ({ ...prev, engineText: e.target.value }))
+                            }
+                            disabled={!detailEngineTxEnabled}
+                            className={FIELD_BASE}
+                            placeholder={PLH.engineManual}
+                          />
+                        )}
+                      </div>
 
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Коробка передач *
-                      </label>
-                      {referenceTransmissionTypes.length > 0 ? (
-                        <div className="flex flex-wrap gap-2 mt-1">
+                      <div>
+                        <div className={FIELD_LABEL}>Коробка передач *</div>
+                        <select
+                          value={
+                            referenceTransmissionTypes.length > 0 &&
+                            detailEdit.referenceTransmissionId != null
+                              ? String(detailEdit.referenceTransmissionId)
+                              : ''
+                          }
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (!v) {
+                              setDetailEdit((prev) => ({
+                                ...prev,
+                                referenceTransmissionId: null,
+                                transmissionText: '',
+                              }));
+                              return;
+                            }
+                            const row = referenceTransmissionTypes.find(
+                              (t) => String(t.id) === v
+                            );
+                            if (row) pickReferenceTransmission(row, 'detail');
+                          }}
+                          disabled={
+                            !detailEngineTxEnabled ||
+                            childLoading ||
+                            referenceTransmissionTypes.length === 0
+                          }
+                          className={FIELD_BASE}
+                        >
+                          <option value="">
+                            {referenceTransmissionTypes.length === 0
+                              ? 'Загрузка типов КПП…'
+                              : 'Выберите КПП'}
+                          </option>
                           {referenceTransmissionTypes.map((t) => (
-                            <button
-                              key={t.id}
-                              type="button"
-                              disabled={!detailEngineTxEnabled || childLoading}
-                              onClick={() => pickReferenceTransmission(t, 'detail')}
-                              className={`px-3 py-2 rounded-md border text-sm transition disabled:opacity-50 disabled:cursor-not-allowed ${
-                                detailEdit.referenceTransmissionId === t.id
-                                  ? 'bg-indigo-600 text-white border-indigo-600'
-                                  : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
-                              }`}
-                            >
+                            <option key={t.id} value={t.id}>
                               {t.name}
-                            </button>
+                            </option>
                           ))}
-                        </div>
-                      ) : (
-                        <p className="mt-1 text-xs text-gray-500">Загрузка типов КПП…</p>
-                      )}
+                        </select>
+                      </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">VIN</label>
+                      <div className={FIELD_LABEL}>VIN</div>
                       <input
                         type="text"
                         value={detailEdit.vin}
                         onChange={(e) =>
+                          setDetailEdit((prev) => ({ ...prev, vin: e.target.value }))
+                        }
+                        onBlur={() =>
                           setDetailEdit((prev) => ({
                             ...prev,
-                            vin: e.target.value.toUpperCase(),
+                            vin: prev.vin.trim().toUpperCase(),
                           }))
                         }
-                        className="w-full px-3 py-2 border rounded-md uppercase"
+                        className={FIELD_BASE}
                         maxLength={17}
-                        placeholder="17 символов"
+                        placeholder={PLH.vin}
+                        spellCheck={false}
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Пробег (км)</label>
+                      <div className={FIELD_LABEL}>Пробег (км)</div>
                       <input
                         type="number"
                         value={detailEdit.mileage}
                         onChange={(e) =>
                           setDetailEdit((prev) => ({ ...prev, mileage: e.target.value }))
                         }
-                        className="w-full px-3 py-2 border rounded-md"
+                        className={FIELD_BASE}
+                        placeholder={PLH.mileage}
                         min="0"
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Цена автомобиля</label>
+                      <div className={FIELD_LABEL}>Цена автомобиля</div>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -1204,26 +1250,39 @@ const VehicleModal = ({
                         onChange={(e) =>
                           setDetailEdit((prev) => ({ ...prev, price: e.target.value }))
                         }
-                        className="w-full px-3 py-2 border rounded-md"
-                        placeholder="Необязательно"
+                        className={FIELD_BASE}
+                        placeholder={PLH.price}
+                      />
+                    </div>
+                    {Array.isArray(detailVehicle?.photos) && detailVehicle.photos.length > 0 && (
+                      <div className="md:col-span-2">
+                        <div className={FIELD_LABEL}>Фото</div>
+                        <div className="flex flex-wrap gap-2">
+                          {detailVehicle.photos.map((ph) => (
+                            <img
+                              key={ph.id ?? ph.photo_path}
+                              src={normalizeImageUrl(ph.photo_path)}
+                              alt=""
+                              className="w-24 h-24 object-cover rounded-md border border-gray-300 shadow-sm"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="md:col-span-2">
+                      <div className={FIELD_LABEL}>Описание</div>
+                      <textarea
+                        value={detailEdit.description}
+                        onChange={(e) =>
+                          setDetailEdit((prev) => ({ ...prev, description: e.target.value }))
+                        }
+                        rows={4}
+                        maxLength={8000}
+                        className={FIELD_TEXTAREA}
+                        placeholder={PLH.description}
                       />
                     </div>
                   </div>
-                  {Array.isArray(detailVehicle?.photos) && detailVehicle.photos.length > 0 && (
-                    <div>
-                      <span className="text-xs text-gray-500 block mb-2">Фото</span>
-                      <div className="flex flex-wrap gap-2">
-                        {detailVehicle.photos.map((ph) => (
-                          <img
-                            key={ph.id ?? ph.photo_path}
-                            src={normalizeImageUrl(ph.photo_path)}
-                            alt=""
-                            className="w-24 h-24 object-cover rounded-lg border"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               ) : (
                 renderVehicleDetailCard(detailVehicle)
@@ -1268,87 +1327,76 @@ const VehicleModal = ({
             </div>
           ) : (
             <form onSubmit={handleCreate}>
+              <div className={FORM_CARD}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Марка *</label>
+                  <div className={FIELD_LABEL}>Марка *</div>
                   <input
                     type="text"
                     value={create.brandInput}
                     onChange={(e) => onBrandInputChange(e, 'create')}
                     required
-                    className="w-full px-3 py-2 border rounded-md"
-                    placeholder="Начните вводить или выберите из списка"
+                    className={FIELD_BASE}
+                    placeholder={PLH.brand}
                     autoComplete="off"
                   />
-                  {brandSearchLoading && (
-                    <div className="text-xs text-gray-500 mt-1">Поиск марок…</div>
-                  )}
                   {create.manufacturerOptions.length > 0 &&
-                    create.catalogManufacturerId == null && (
-                    <>
-                      {filterManufacturersByInput(create.manufacturerOptions, create.brandInput).length >
-                        0 ? (
-                        <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
-                          {filterManufacturersByInput(
-                            create.manufacturerOptions,
-                            create.brandInput
-                          ).map((m) => (
-                            <li key={m.id}>
-                              <button
-                                type="button"
-                                className="w-full text-left px-3 py-2 hover:bg-indigo-50"
-                                onClick={() => pickManufacturer(m, 'create')}
-                              >
-                                {m.description || m.matchcode || m.id}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
-                      )}
-                    </>
-                  )}
+                    create.catalogManufacturerId == null &&
+                    filterManufacturersByInput(create.manufacturerOptions, create.brandInput).length >
+                      0 && (
+                      <ul className={SUGGEST_LIST}>
+                        {filterManufacturersByInput(
+                          create.manufacturerOptions,
+                          create.brandInput
+                        ).map((m) => (
+                          <li key={m.id}>
+                            <button
+                              type="button"
+                              className={SUGGEST_ITEM}
+                              onClick={() => pickManufacturer(m, 'create')}
+                            >
+                              {m.description || m.matchcode || m.id}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                 </div>
 
                 {usingManufacturerCatalog ? (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Модель *</label>
+                    <div className={FIELD_LABEL}>Модель *</div>
                     <input
                       type="text"
                       value={create.modelInput}
                       onChange={(e) => onCatalogModelInputChange(e, 'create')}
                       disabled={!modelEnabled || childLoading}
                       required
-                      className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
-                      placeholder="Начните вводить или выберите из списка"
+                      className={FIELD_BASE}
+                      placeholder={PLH.model}
                       autoComplete="off"
                     />
-                    {create.modelOptions.length > 0 && create.catalogModelId == null && (
-                      <>
-                        {filterModelsByInput(create.modelOptions, create.modelInput).length > 0 ? (
-                          <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
-                            {filterModelsByInput(create.modelOptions, create.modelInput).map((m) => (
-                              <li key={m.id}>
-                                <button
-                                  type="button"
-                                  className="w-full text-left px-3 py-2 hover:bg-indigo-50"
-                                  onClick={() => pickCatalogModel(m, 'create')}
-                                >
-                                  {modelOptionLabel(m)}
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
-                        )}
-                      </>
-                    )}
+                    {create.modelOptions.length > 0 &&
+                      create.catalogModelId == null &&
+                      filterModelsByInput(create.modelOptions, create.modelInput).length > 0 && (
+                        <ul className={SUGGEST_LIST}>
+                          {filterModelsByInput(create.modelOptions, create.modelInput).map((m) => (
+                            <li key={m.id}>
+                              <button
+                                type="button"
+                                className={SUGGEST_ITEM}
+                                onClick={() => pickCatalogModel(m, 'create')}
+                              >
+                                {modelOptionLabel(m)}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                   </div>
                 ) : (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Модель *</label>
+                    <div className={FIELD_LABEL}>Модель *</div>
                     <input
                       type="text"
                       value={create.modelInput}
@@ -1357,50 +1405,46 @@ const VehicleModal = ({
                       }
                       disabled={!modelEnabled}
                       required
-                      className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
-                      placeholder="После ввода марки вне справочника"
+                      className={FIELD_BASE}
+                      placeholder={PLH.modelManual}
                     />
                   </div>
                 )}
 
                 {usingManufacturerCatalog ? (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Поколение *</label>
+                    <div className={FIELD_LABEL}>Поколение *</div>
                     <input
                       type="text"
                       value={create.generationInput}
                       onChange={(e) => onPassengercarInputChange(e, 'create')}
                       disabled={!generationEnabled || childLoading}
                       required
-                      className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
-                      placeholder="Начните вводить или выберите из списка"
+                      className={FIELD_BASE}
+                      placeholder={PLH.generation}
                       autoComplete="off"
                     />
-                    {create.pcOptions.length > 0 && create.catalogPassengercarId == null && (
-                      <>
-                        {filterPcByInput(create.pcOptions, create.generationInput).length > 0 ? (
-                          <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
-                            {filterPcByInput(create.pcOptions, create.generationInput).map((p) => (
-                              <li key={p.id}>
-                                <button
-                                  type="button"
-                                  className="w-full text-left px-3 py-2 hover:bg-indigo-50"
-                                  onClick={() => pickPassengercar(p, 'create')}
-                                >
-                                  {pcOptionLabel(p)}
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
-                        )}
-                      </>
-                    )}
+                    {create.pcOptions.length > 0 &&
+                      create.catalogPassengercarId == null &&
+                      filterPcByInput(create.pcOptions, create.generationInput).length > 0 && (
+                        <ul className={SUGGEST_LIST}>
+                          {filterPcByInput(create.pcOptions, create.generationInput).map((p) => (
+                            <li key={p.id}>
+                              <button
+                                type="button"
+                                className={SUGGEST_ITEM}
+                                onClick={() => pickPassengercar(p, 'create')}
+                              >
+                                {pcOptionLabel(p)}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                   </div>
                 ) : (
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Поколение *</label>
+                    <div className={FIELD_LABEL}>Поколение *</div>
                     <input
                       type="text"
                       value={create.generationInput}
@@ -1409,35 +1453,37 @@ const VehicleModal = ({
                       }
                       disabled={!generationEnabled}
                       required
-                      className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                      className={FIELD_BASE}
+                      placeholder={PLH.generationManual}
                     />
                   </div>
                 )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Двигатель</label>
-                  {usingManufacturerCatalog && create.catalogPassengercarId ? (
-                    <>
-                      <input
-                        type="text"
-                        value={create.engineText}
-                        onChange={(e) => onCatalogEngineInputChange(e, 'create')}
-                        disabled={!engineTxEnabled || childLoading}
-                        className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
-                        placeholder="Начните вводить или выберите из списка"
-                        autoComplete="off"
-                      />
-                      {create.engineOptions.length > 0 && create.catalogEngineId == null && (
-                        <>
-                          {filterEnginesByInput(create.engineOptions, create.engineText).length >
-                          0 ? (
-                            <ul className="mt-1 max-h-40 overflow-y-auto border rounded-md bg-gray-50 text-sm">
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div className={FIELD_LABEL}>Двигатель</div>
+                    {usingManufacturerCatalog && create.catalogPassengercarId ? (
+                      <>
+                        <input
+                          type="text"
+                          value={create.engineText}
+                          onChange={(e) => onCatalogEngineInputChange(e, 'create')}
+                          disabled={!engineTxEnabled || childLoading}
+                          className={FIELD_BASE}
+                          placeholder={PLH.engine}
+                          autoComplete="off"
+                        />
+                        {create.engineOptions.length > 0 &&
+                          create.catalogEngineId == null &&
+                          filterEnginesByInput(create.engineOptions, create.engineText).length >
+                            0 && (
+                            <ul className={SUGGEST_LIST}>
                               {filterEnginesByInput(create.engineOptions, create.engineText).map(
                                 (en) => (
                                   <li key={en.id}>
                                     <button
                                       type="button"
-                                      className="w-full text-left px-3 py-2 hover:bg-indigo-50"
+                                      className={SUGGEST_ITEM}
                                       onClick={() => pickCatalogEngine(en, 'create')}
                                     >
                                       {engineOptionLabel(en)}
@@ -1446,72 +1492,85 @@ const VehicleModal = ({
                                 )
                               )}
                             </ul>
-                          ) : (
-                            <p className="mt-1 text-xs text-gray-500">Нет совпадений в списке</p>
                           )}
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <input
-                      type="text"
-                      value={create.engineText}
-                      onChange={(e) =>
-                        setCreate((prev) => ({ ...prev, engineText: e.target.value }))
-                      }
-                      disabled={!engineTxEnabled}
-                      className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
-                    />
-                  )}
-                </div>
+                      </>
+                    ) : (
+                      <input
+                        type="text"
+                        value={create.engineText}
+                        onChange={(e) =>
+                          setCreate((prev) => ({ ...prev, engineText: e.target.value }))
+                        }
+                        disabled={!engineTxEnabled}
+                        className={FIELD_BASE}
+                        placeholder={PLH.engineManual}
+                      />
+                    )}
+                  </div>
 
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Коробка передач *
-                  </label>
-                  {referenceTransmissionTypes.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 mt-1">
+                  <div>
+                    <div className={FIELD_LABEL}>Коробка передач *</div>
+                    <select
+                      value={
+                        referenceTransmissionTypes.length > 0 &&
+                        create.referenceTransmissionId != null
+                          ? String(create.referenceTransmissionId)
+                          : ''
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) {
+                          setCreate((prev) => ({
+                            ...prev,
+                            referenceTransmissionId: null,
+                            transmissionText: '',
+                          }));
+                          return;
+                        }
+                        const row = referenceTransmissionTypes.find((t) => String(t.id) === v);
+                        if (row) pickReferenceTransmission(row, 'create');
+                      }}
+                      disabled={
+                        !engineTxEnabled || childLoading || referenceTransmissionTypes.length === 0
+                      }
+                      className={FIELD_BASE}
+                    >
+                      <option value="">
+                        {referenceTransmissionTypes.length === 0
+                          ? 'Загрузка типов КПП…'
+                          : 'Выберите КПП'}
+                      </option>
                       {referenceTransmissionTypes.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          disabled={!engineTxEnabled || childLoading}
-                          onClick={() => pickReferenceTransmission(t, 'create')}
-                          className={`px-3 py-2 rounded-md border text-sm transition disabled:opacity-50 disabled:cursor-not-allowed ${
-                            create.referenceTransmissionId === t.id
-                              ? 'bg-indigo-600 text-white border-indigo-600'
-                              : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
+                        <option key={t.id} value={t.id}>
                           {t.name}
-                        </button>
+                        </option>
                       ))}
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-xs text-gray-500">Загрузка типов КПП…</p>
-                  )}
+                    </select>
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">VIN</label>
+                  <div className={FIELD_LABEL}>VIN</div>
                   <input
                     type="text"
                     value={create.vin}
-                    onChange={(e) =>
+                    onChange={(e) => setCreate((prev) => ({ ...prev, vin: e.target.value }))}
+                    onBlur={() =>
                       setCreate((prev) => ({
                         ...prev,
-                        vin: e.target.value.toUpperCase(),
+                        vin: prev.vin.trim().toUpperCase(),
                       }))
                     }
                     disabled={!vinEnabled}
-                    className="w-full px-3 py-2 border rounded-md uppercase disabled:bg-gray-100"
-                    placeholder="17 символов"
+                    className={FIELD_BASE}
                     maxLength={17}
+                    placeholder={PLH.vin}
+                    spellCheck={false}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Пробег (км)</label>
+                  <div className={FIELD_LABEL}>Пробег (км)</div>
                   <input
                     type="number"
                     value={create.mileage}
@@ -1519,38 +1578,40 @@ const VehicleModal = ({
                       setCreate((prev) => ({ ...prev, mileage: e.target.value }))
                     }
                     disabled={!vinEnabled}
-                    className="w-full px-3 py-2 border rounded-md disabled:bg-gray-100"
+                    className={FIELD_BASE}
+                    placeholder={PLH.mileage}
                     min="0"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Цена автомобиля</label>
+                  <div className={FIELD_LABEL}>Цена автомобиля</div>
                   <input
                     type="text"
                     inputMode="decimal"
                     value={create.price}
                     onChange={(e) => setCreate((prev) => ({ ...prev, price: e.target.value }))}
-                    className="w-full px-3 py-2 border rounded-md"
-                    placeholder="Необязательно"
+                    className={FIELD_BASE}
+                    placeholder={PLH.price}
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Фото (до {MAX_VEHICLE_PHOTOS})
-                  </label>
+                  <div className={FIELD_LABEL}>Фото (до {MAX_VEHICLE_PHOTOS})</div>
                   <input
                     type="file"
                     accept="image/*"
                     multiple
                     onChange={handleVehiclePhotosAdd}
-                    className="block w-full text-sm text-gray-600"
+                    className={FIELD_FILE}
                   />
                   {(create.vehiclePhotos?.length || 0) > 0 && (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {create.vehiclePhotos.map((ph, idx) => (
-                        <div key={`${ph.tempPath}-${idx}`} className="relative w-20 h-20 border rounded overflow-hidden">
+                        <div
+                          key={`${ph.tempPath}-${idx}`}
+                          className="relative w-20 h-20 rounded-md border border-gray-300 shadow-sm overflow-hidden"
+                        >
                           <img
                             src={normalizeImageUrl(ph.tempPath)}
                             alt=""
@@ -1568,6 +1629,20 @@ const VehicleModal = ({
                     </div>
                   )}
                 </div>
+                <div className="md:col-span-2">
+                  <div className={FIELD_LABEL}>Описание</div>
+                  <textarea
+                    value={create.description}
+                    onChange={(e) =>
+                      setCreate((prev) => ({ ...prev, description: e.target.value }))
+                    }
+                    rows={4}
+                    maxLength={8000}
+                    className={FIELD_TEXTAREA}
+                    placeholder={PLH.description}
+                  />
+                </div>
+              </div>
               </div>
 
               <div className="mt-6 flex justify-between">
