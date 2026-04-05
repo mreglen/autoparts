@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.db.database import get_db
 from app.core.auth import get_current_user
 from app.models.user import User
+from app.models.storage_location import StorageLocation as StorageLocationModel
 from app.models.vehicle import Vehicle as VehicleModel
 from app.models.vehicle_photo import VehiclePhoto
 from app.models.vehicle_vin import VehicleVin
@@ -33,6 +34,26 @@ def _truncate(value: str | None, max_len: int) -> str | None:
     if value is None:
         return None
     return value[:max_len]
+
+
+def _assert_storage_location_for_org(
+    db: Session,
+    storage_location_id: int,
+    organization_id: str,
+) -> None:
+    loc = (
+        db.query(StorageLocationModel)
+        .filter(
+            StorageLocationModel.id == storage_location_id,
+            StorageLocationModel.organization_id == organization_id,
+        )
+        .first()
+    )
+    if not loc:
+        raise HTTPException(
+            status_code=400,
+            detail="Склад не найден или не принадлежит организации",
+        )
 
 
 def _norm_vehicle_description(raw) -> str | None:
@@ -123,12 +144,13 @@ def _apply_tecdoc_labels(db: Session, data: dict) -> None:
 
 @router.get("/", response_model=list[VehicleSchema])
 def get_vehicles(
+    storage_location_id: int | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not current_user.organization_id:
         raise HTTPException(status_code=403, detail="Организация не указана")
-    vehicles = (
+    q = (
         db.query(VehicleModel)
         .options(
             joinedload(VehicleModel.vin_row),
@@ -137,8 +159,10 @@ def get_vehicles(
             joinedload(VehicleModel.transmission_assignment),
         )
         .filter(VehicleModel.organization_id == current_user.organization_id)
-        .all()
     )
+    if storage_location_id is not None:
+        q = q.filter(VehicleModel.storage_location_id == storage_location_id)
+    vehicles = q.all()
     return vehicles
 
 
@@ -296,6 +320,14 @@ def update_vehicle(
             else:
                 db.add(VehicleMileage(vehicle_id=db_vehicle.id, mileage=mileage_int))
 
+    if "storage_location_id" in data:
+        sid = data.get("storage_location_id")
+        if sid is None:
+            db_vehicle.storage_location_id = None
+        else:
+            _assert_storage_location_for_org(db, int(sid), current_user.organization_id)
+            db_vehicle.storage_location_id = int(sid)
+
     db.commit()
 
     db_vehicle = (
@@ -323,6 +355,9 @@ def create_vehicle(
         raise HTTPException(status_code=403, detail="Организация не указана")
 
     payload = vehicle.model_dump()
+    storage_location_id = payload.pop("storage_location_id", None)
+    if storage_location_id is not None:
+        _assert_storage_location_for_org(db, storage_location_id, current_user.organization_id)
     transmission_id = payload.pop("transmission_id", None)
     vin_raw = payload.pop("vin", None)
     mileage_raw = payload.pop("mileage", None)
@@ -411,6 +446,7 @@ def create_vehicle(
         tecdoc_passengercar_id=payload.get("tecdoc_passengercar_id"),
         tecdoc_engine_id=payload.get("tecdoc_engine_id"),
         organization_id=current_user.organization_id,
+        storage_location_id=storage_location_id,
         price=price_val,
         created_by=current_user.id,
         tecdoc_manufacturer_json=tecdoc_manufacturer_json,

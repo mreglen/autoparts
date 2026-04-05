@@ -368,11 +368,11 @@ export const fetchReferenceTransmissions = createAsyncThunk(
 
 export const fetchVehicles = createAsyncThunk(
     'vehicles/fetchVehicles',
-    async (_, { rejectWithValue }) => {
+    async (params = {}, { rejectWithValue }) => {
         try {
-            const response = await apiAxios.get(
-                '/vehicles/',
-            );
+            const response = await apiAxios.get('/vehicles/', {
+                params: Object.keys(params || {}).length ? params : undefined,
+            });
             return response.data;
         } catch (error) {
             return rejectWithValue(

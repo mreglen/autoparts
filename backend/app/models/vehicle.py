@@ -16,6 +16,7 @@ class Vehicle(Base):
     transmission = Column(String(30))
     description = Column(Text, nullable=True)
     organization_id = Column(String, ForeignKey("organizations.id"))
+    storage_location_id = Column(Integer, ForeignKey("storage_locations.id"), nullable=True)
 
     tecdoc_manufacturer_id = Column(Integer, nullable=True)
     tecdoc_model_id = Column(Integer, nullable=True)
@@ -32,6 +33,7 @@ class Vehicle(Base):
     tecdoc_transmission_json = Column(JSONB, nullable=True)
 
     organization = relationship("Organization")
+    storage_location = relationship("StorageLocation")
     creator = relationship("User", foreign_keys=[created_by])
 
     photos = relationship(

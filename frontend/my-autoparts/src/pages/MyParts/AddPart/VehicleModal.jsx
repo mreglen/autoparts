@@ -10,6 +10,7 @@ import {
   fetchVehicleCatalogEngines,
   fetchReferenceTransmissions,
 } from '../../../redux/slices/ProductSlice';
+import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { apiRequestFormData, normalizeImageUrl } from '../../../utils/apiClient';
 
 const MAX_VEHICLE_PHOTOS = 10;
@@ -103,6 +104,7 @@ const emptyCreate = () => ({
   mileage: '',
   price: '',
   description: '',
+  storage_location_id: '',
   vehiclePhotos: [],
   manufacturerOptions: [],
   modelOptions: [],
@@ -135,6 +137,10 @@ const vehicleToDetailEditSyncPart = (v) => ({
       ? String(v.price).replace('.', ',')
       : '',
   description: v?.description ?? '',
+  storage_location_id:
+    v?.storage_location_id != null && v?.storage_location_id !== ''
+      ? String(v.storage_location_id)
+      : '',
   manufacturerOptions: [],
   modelOptions: [],
   pcOptions: [],
@@ -188,6 +194,13 @@ const buildUpdatePayloadFromDraft = (draft, referenceTransmissionTypes = []) => 
   const vinVal = vinRaw ? vinRaw.toUpperCase() : '';
   const descTrim = (draft.description || '').trim();
 
+  const storageRaw = String(draft.storage_location_id ?? '').trim();
+  let storage_location_id = null;
+  if (storageRaw !== '') {
+    const sn = parseInt(storageRaw, 10);
+    if (!Number.isNaN(sn)) storage_location_id = sn;
+  }
+
   return {
     brand: draft.brandInput.trim(),
     model: modelVal,
@@ -198,6 +211,7 @@ const buildUpdatePayloadFromDraft = (draft, referenceTransmissionTypes = []) => 
     vin: vinVal || null,
     mileage: mileageStr === '' ? null : mileage,
     price,
+    storage_location_id,
     tecdoc_manufacturer_id: draft.catalogManufacturerId,
     tecdoc_model_id: usingManufacturerCatalog ? draft.catalogModelId : null,
     tecdoc_passengercar_id: usingManufacturerCatalog ? draft.catalogPassengercarId : null,
@@ -272,6 +286,8 @@ const VehicleModal = ({
   const createFile = isPage ? ADD_PART_FILE : FIELD_FILE;
   const dispatch = useDispatch();
   const { vehicles, vehiclesLoading } = useSelector((state) => state.products);
+  const { storageLocations } = useSelector((state) => state.organization);
+  const user = useSelector((state) => state.auth.user);
 
   const [mode, setMode] = useState('select');
   const [detailVehicle, setDetailVehicle] = useState(null);
@@ -289,6 +305,12 @@ const VehicleModal = ({
       dispatch(fetchVehicles());
     }
   }, [isOpen, isPage, dispatch]);
+
+  useEffect(() => {
+    if (isOpen && isPage && user?.organization_id) {
+      dispatch(fetchStorageLocations(user.organization_id));
+    }
+  }, [isOpen, isPage, user?.organization_id, dispatch]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -649,6 +671,18 @@ const VehicleModal = ({
 
     const descTrim = (create.description || '').trim();
 
+    if (isPage) {
+      if (!create.storage_location_id) {
+        alert('Пожалуйста, выберите склад');
+        return;
+      }
+      const sid = parseInt(create.storage_location_id, 10);
+      if (Number.isNaN(sid)) {
+        alert('Некорректный склад');
+        return;
+      }
+    }
+
     const payload = {
       brand: create.brandInput.trim(),
       model: modelVal,
@@ -666,6 +700,9 @@ const VehicleModal = ({
       tecdoc_model_id: usingManufacturerCatalog ? create.catalogModelId : null,
       tecdoc_passengercar_id: usingManufacturerCatalog ? create.catalogPassengercarId : null,
       tecdoc_engine_id: create.catalogEngineId || null,
+      ...(isPage
+        ? { storage_location_id: parseInt(create.storage_location_id, 10) }
+        : {}),
     };
 
     const result = await dispatch(createVehicle(payload));
@@ -770,6 +807,18 @@ const VehicleModal = ({
       return;
     }
 
+    if (isPageEditMode) {
+      if (!detailEdit.storage_location_id) {
+        alert('Пожалуйста, выберите склад');
+        return;
+      }
+      const sid = parseInt(detailEdit.storage_location_id, 10);
+      if (Number.isNaN(sid)) {
+        alert('Некорректный склад');
+        return;
+      }
+    }
+
     const patch = buildUpdatePayloadFromDraft(detailEdit, referenceTransmissionTypes);
 
     setDetailSaveLoading(true);
@@ -787,6 +836,7 @@ const VehicleModal = ({
           mileage: patch.mileage,
           price: patch.price,
           description: patch.description,
+          storage_location_id: patch.storage_location_id,
           tecdoc_manufacturer_id: patch.tecdoc_manufacturer_id,
           tecdoc_model_id: patch.tecdoc_model_id,
           tecdoc_passengercar_id: patch.tecdoc_passengercar_id,
@@ -881,6 +931,11 @@ const VehicleModal = ({
     ? 'w-full overflow-visible'
     : 'bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto';
 
+  /** На /vehicles/edit те же отступы и поля, что на /vehicles/add */
+  const detailEditLabel = isPageEditMode ? createLabel : FIELD_LABEL;
+  const detailEditInput = isPageEditMode ? createInput : FIELD_BASE;
+  const detailEditTextarea = isPageEditMode ? createTextarea : FIELD_TEXTAREA;
+
   const renderVehicleDetailCard = (v) => {
     if (!v) return null;
     const priceNum = v.price != null && v.price !== '' ? Number(v.price) : null;
@@ -889,34 +944,34 @@ const VehicleModal = ({
       <div className="space-y-4">
         <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${FORM_CARD}`}>
           <div>
-            <div className={FIELD_LABEL}>Марка</div>
+            <div className={detailEditLabel}>Марка</div>
             <div className="text-sm font-medium text-gray-900">{v.brand}</div>
           </div>
           <div>
-            <div className={FIELD_LABEL}>Модель</div>
+            <div className={detailEditLabel}>Модель</div>
             <div className="text-sm font-medium text-gray-900">{v.model}</div>
           </div>
           <div>
-            <div className={FIELD_LABEL}>Поколение</div>
+            <div className={detailEditLabel}>Поколение</div>
             <div className="text-sm font-medium text-gray-900">{v.generation || '—'}</div>
           </div>
           <div>
-            <div className={FIELD_LABEL}>Двигатель</div>
+            <div className={detailEditLabel}>Двигатель</div>
             <div className="text-sm font-medium text-gray-900">{v.engine || '—'}</div>
           </div>
           <div>
-            <div className={FIELD_LABEL}>КПП</div>
+            <div className={detailEditLabel}>КПП</div>
             <div className="text-sm font-medium text-gray-900">{v.transmission || '—'}</div>
           </div>
           {v.vin && (
             <div>
-              <div className={FIELD_LABEL}>VIN</div>
+              <div className={detailEditLabel}>VIN</div>
               <div className="text-sm font-medium text-gray-900">{v.vin}</div>
             </div>
           )}
           {v.mileage != null && v.mileage !== '' && (
             <div>
-              <div className={FIELD_LABEL}>Пробег</div>
+              <div className={detailEditLabel}>Пробег</div>
               <div className="text-sm font-medium text-gray-900">
                 {Number(v.mileage).toLocaleString()} км
               </div>
@@ -924,7 +979,7 @@ const VehicleModal = ({
           )}
           {showPrice && (
             <div>
-              <div className={FIELD_LABEL}>Цена</div>
+              <div className={detailEditLabel}>Цена</div>
               <div className="text-sm font-medium text-gray-900">
                 {priceNum.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₽
               </div>
@@ -933,7 +988,7 @@ const VehicleModal = ({
         </div>
         {Array.isArray(v.photos) && v.photos.length > 0 && (
           <div className={FORM_CARD}>
-            <div className={FIELD_LABEL}>Фото</div>
+            <div className={detailEditLabel}>Фото</div>
             <div className="flex flex-wrap gap-2">
               {v.photos.map((ph) => (
                 <img
@@ -948,7 +1003,7 @@ const VehicleModal = ({
         )}
         {v.description && String(v.description).trim() !== '' && (
           <div className={FORM_CARD}>
-            <div className={FIELD_LABEL}>Описание</div>
+            <div className={detailEditLabel}>Описание</div>
             <p className="text-sm text-gray-900 whitespace-pre-wrap leading-relaxed">{v.description}</p>
           </div>
         )}
@@ -1028,20 +1083,48 @@ const VehicleModal = ({
           ) : mode === 'detail' ? (
             <div>
               {showDetailEditor ? (
-                <div className="space-y-4">
+                <div className={isPageEditMode ? 'space-y-6' : 'space-y-4'}>
                   {!isPageEditMode && (
                     <p className="text-sm text-gray-600">
                       Марку и комплектацию можно выбрать из каталога или ввести вручную (как при создании).
                     </p>
                   )}
-                  <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${FORM_CARD}`}>
+                  <div
+                    className={
+                      isPageEditMode
+                        ? 'flex flex-col gap-6'
+                        : `grid grid-cols-1 md:grid-cols-2 gap-4 ${FORM_CARD}`
+                    }
+                  >
+                    {isPage && (
+                      <div className={isPageEditMode ? '' : 'md:col-span-2'}>
+                        <div className={detailEditLabel}>Склад *</div>
+                        <select
+                          value={detailEdit.storage_location_id}
+                          onChange={(e) =>
+                            setDetailEdit((prev) => ({
+                              ...prev,
+                              storage_location_id: e.target.value,
+                            }))
+                          }
+                          className={detailEditInput}
+                        >
+                          <option value="">Выберите склад</option>
+                          {storageLocations.map((loc) => (
+                            <option key={loc.id} value={loc.id}>
+                              {loc.address || `Склад #${loc.id}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     <div className="md:col-span-2">
-                      <div className={FIELD_LABEL}>Марка *</div>
+                      <div className={detailEditLabel}>Марка *</div>
                       <input
                         type="text"
                         value={detailEdit.brandInput}
                         onChange={(e) => onBrandInputChange(e, 'detail')}
-                        className={FIELD_BASE}
+                        className={detailEditInput}
                         placeholder={PLH.brand}
                         autoComplete="off"
                       />
@@ -1072,13 +1155,13 @@ const VehicleModal = ({
 
                     {detailUsingManufacturerCatalog ? (
                       <div className="md:col-span-2">
-                        <div className={FIELD_LABEL}>Модель *</div>
+                        <div className={detailEditLabel}>Модель *</div>
                         <input
                           type="text"
                           value={detailEdit.modelInput}
                           onChange={(e) => onCatalogModelInputChange(e, 'detail')}
                           disabled={!detailModelEnabled || childLoading}
-                          className={FIELD_BASE}
+                          className={detailEditInput}
                           placeholder={PLH.model}
                           autoComplete="off"
                         />
@@ -1106,7 +1189,7 @@ const VehicleModal = ({
                       </div>
                     ) : (
                       <div className="md:col-span-2">
-                        <div className={FIELD_LABEL}>Модель *</div>
+                        <div className={detailEditLabel}>Модель *</div>
                         <input
                           type="text"
                           value={detailEdit.modelInput}
@@ -1114,7 +1197,7 @@ const VehicleModal = ({
                             setDetailEdit((prev) => ({ ...prev, modelInput: e.target.value }))
                           }
                           disabled={!detailModelEnabled}
-                          className={FIELD_BASE}
+                          className={detailEditInput}
                           placeholder={PLH.modelManual}
                         />
                       </div>
@@ -1122,13 +1205,13 @@ const VehicleModal = ({
 
                     {detailUsingManufacturerCatalog ? (
                       <div className="md:col-span-2">
-                        <div className={FIELD_LABEL}>Поколение *</div>
+                        <div className={detailEditLabel}>Поколение *</div>
                         <input
                           type="text"
                           value={detailEdit.generationInput}
                           onChange={(e) => onPassengercarInputChange(e, 'detail')}
                           disabled={!detailGenerationEnabled || childLoading}
-                          className={FIELD_BASE}
+                          className={detailEditInput}
                           placeholder={PLH.generation}
                           autoComplete="off"
                         />
@@ -1156,7 +1239,7 @@ const VehicleModal = ({
                       </div>
                     ) : (
                       <div className="md:col-span-2">
-                        <div className={FIELD_LABEL}>Поколение *</div>
+                        <div className={detailEditLabel}>Поколение *</div>
                         <input
                           type="text"
                           value={detailEdit.generationInput}
@@ -1164,15 +1247,21 @@ const VehicleModal = ({
                             setDetailEdit((prev) => ({ ...prev, generationInput: e.target.value }))
                           }
                           disabled={!detailGenerationEnabled}
-                          className={FIELD_BASE}
+                          className={detailEditInput}
                           placeholder={PLH.generationManual}
                         />
                       </div>
                     )}
 
-                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div
+                      className={
+                        isPageEditMode
+                          ? 'flex flex-col gap-6'
+                          : 'md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4'
+                      }
+                    >
                       <div>
-                        <div className={FIELD_LABEL}>Двигатель</div>
+                        <div className={detailEditLabel}>Двигатель</div>
                         {detailUsingManufacturerCatalog && detailEdit.catalogPassengercarId ? (
                           <>
                             <input
@@ -1180,7 +1269,7 @@ const VehicleModal = ({
                               value={detailEdit.engineText}
                               onChange={(e) => onCatalogEngineInputChange(e, 'detail')}
                               disabled={!detailEngineTxEnabled || childLoading}
-                              className={FIELD_BASE}
+                              className={detailEditInput}
                               placeholder={PLH.engine}
                               autoComplete="off"
                             />
@@ -1216,14 +1305,14 @@ const VehicleModal = ({
                               setDetailEdit((prev) => ({ ...prev, engineText: e.target.value }))
                             }
                             disabled={!detailEngineTxEnabled}
-                            className={FIELD_BASE}
+                            className={detailEditInput}
                             placeholder={PLH.engineManual}
                           />
                         )}
                       </div>
 
                       <div>
-                        <div className={FIELD_LABEL}>Коробка передач *</div>
+                        <div className={detailEditLabel}>Коробка передач *</div>
                         <select
                           value={
                             referenceTransmissionTypes.length > 0 &&
@@ -1251,7 +1340,7 @@ const VehicleModal = ({
                             childLoading ||
                             referenceTransmissionTypes.length === 0
                           }
-                          className={FIELD_BASE}
+                          className={detailEditInput}
                         >
                           <option value="">
                             {referenceTransmissionTypes.length === 0
@@ -1268,7 +1357,7 @@ const VehicleModal = ({
                     </div>
 
                     <div>
-                      <div className={FIELD_LABEL}>VIN</div>
+                      <div className={detailEditLabel}>VIN</div>
                       <input
                         type="text"
                         value={detailEdit.vin}
@@ -1281,27 +1370,27 @@ const VehicleModal = ({
                             vin: prev.vin.trim().toUpperCase(),
                           }))
                         }
-                        className={FIELD_BASE}
+                        className={detailEditInput}
                         maxLength={17}
                         placeholder={PLH.vin}
                         spellCheck={false}
                       />
                     </div>
                     <div>
-                      <div className={FIELD_LABEL}>Пробег (км)</div>
+                      <div className={detailEditLabel}>Пробег (км)</div>
                       <input
                         type="number"
                         value={detailEdit.mileage}
                         onChange={(e) =>
                           setDetailEdit((prev) => ({ ...prev, mileage: e.target.value }))
                         }
-                        className={FIELD_BASE}
+                        className={detailEditInput}
                         placeholder={PLH.mileage}
                         min="0"
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <div className={FIELD_LABEL}>Цена автомобиля</div>
+                      <div className={detailEditLabel}>Цена автомобиля</div>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -1309,13 +1398,13 @@ const VehicleModal = ({
                         onChange={(e) =>
                           setDetailEdit((prev) => ({ ...prev, price: e.target.value }))
                         }
-                        className={FIELD_BASE}
+                        className={detailEditInput}
                         placeholder={PLH.price}
                       />
                     </div>
                     {Array.isArray(detailVehicle?.photos) && detailVehicle.photos.length > 0 && (
                       <div className="md:col-span-2">
-                        <div className={FIELD_LABEL}>Фото</div>
+                        <div className={detailEditLabel}>Фото</div>
                         <div className="flex flex-wrap gap-2">
                           {detailVehicle.photos.map((ph) => (
                             <img
@@ -1329,7 +1418,7 @@ const VehicleModal = ({
                       </div>
                     )}
                     <div className="md:col-span-2">
-                      <div className={FIELD_LABEL}>Описание</div>
+                      <div className={detailEditLabel}>Описание</div>
                       <textarea
                         value={detailEdit.description}
                         onChange={(e) =>
@@ -1337,7 +1426,7 @@ const VehicleModal = ({
                         }
                         rows={4}
                         maxLength={8000}
-                        className={FIELD_TEXTAREA}
+                        className={detailEditTextarea}
                         placeholder={PLH.description}
                       />
                     </div>
@@ -1346,23 +1435,27 @@ const VehicleModal = ({
               ) : (
                 renderVehicleDetailCard(detailVehicle)
               )}
-              <div className="mt-6 flex flex-wrap items-center gap-3 justify-between">
+              <div
+                className={
+                  isPageEditMode
+                    ? 'mt-6 flex flex-wrap gap-3'
+                    : 'mt-6 flex flex-wrap items-center gap-3 justify-between'
+                }
+              >
                 {isPageEditMode ? (
-                  <div className="flex w-full flex-wrap items-center justify-end gap-3">
-                    {isStockInDetailDirty && (
-                      <button
-                        type="button"
-                        onClick={handleStockInSaveDetail}
-                        disabled={detailSaveLoading}
-                        className={`px-4 py-2 rounded-md text-white ${
-                          detailSaveLoading
-                            ? 'bg-indigo-400 cursor-not-allowed'
-                            : 'bg-indigo-600 hover:bg-indigo-700'
-                        }`}
-                      >
-                        {detailSaveLoading ? 'Сохранение…' : 'Сохранить изменения'}
-                      </button>
-                    )}
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleStockInSaveDetail}
+                      disabled={detailSaveLoading || !isStockInDetailDirty}
+                      className={`px-4 py-2 rounded-md text-white ${
+                        detailSaveLoading || !isStockInDetailDirty
+                          ? 'bg-indigo-400 cursor-not-allowed'
+                          : 'bg-indigo-600 hover:bg-indigo-700'
+                      }`}
+                    >
+                      {detailSaveLoading ? 'Сохранение…' : 'Сохранить изменения'}
+                    </button>
                     <button
                       type="button"
                       onClick={onClose}
@@ -1370,7 +1463,7 @@ const VehicleModal = ({
                     >
                       Отмена
                     </button>
-                  </div>
+                  </>
                 ) : (
                   <>
                     <button
@@ -1420,6 +1513,27 @@ const VehicleModal = ({
                   isPage ? 'flex flex-col gap-6' : 'grid grid-cols-1 md:grid-cols-2 gap-4'
                 }
               >
+                {isPage && (
+                  <div>
+                    <div className={createLabel}>Склад *</div>
+                    <select
+                      name="storage_location_id"
+                      value={create.storage_location_id}
+                      onChange={(e) =>
+                        setCreate((prev) => ({ ...prev, storage_location_id: e.target.value }))
+                      }
+                      required
+                      className={createInput}
+                    >
+                      <option value="">Выберите склад</option>
+                      {storageLocations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.address || `Склад #${loc.id}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="md:col-span-2">
                   <div className={createLabel}>Марка *</div>
                   <input

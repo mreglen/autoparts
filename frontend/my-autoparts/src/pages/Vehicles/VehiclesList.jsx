@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchVehicles } from '../../redux/slices/ProductSlice';
+import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 
-const VehicleTableRow = ({ vehicle, isExpanded, onToggleExpand }) => {
+const VehicleTableRow = ({ vehicle, storageLabel, isExpanded, onToggleExpand }) => {
   const [showActions, setShowActions] = useState(false);
 
   useEffect(() => {
@@ -38,6 +39,13 @@ const VehicleTableRow = ({ vehicle, isExpanded, onToggleExpand }) => {
           onClick={onToggleExpand}
         >
           {vehicle.generation || '—'}
+        </td>
+        <td
+          className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 cursor-pointer max-w-[12rem] truncate"
+          onClick={onToggleExpand}
+          title={storageLabel || '—'}
+        >
+          {storageLabel || '—'}
         </td>
         <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 text-right align-middle">
           <div className="relative actions-dropdown inline-flex justify-end w-full">
@@ -76,7 +84,7 @@ const VehicleTableRow = ({ vehicle, isExpanded, onToggleExpand }) => {
       </tr>
       {isExpanded && (
         <tr className="bg-gray-50">
-          <td colSpan="4" className="px-6 py-4 border-t">
+          <td colSpan="5" className="px-6 py-4 border-t">
             <div>
               <span className="text-xs text-gray-500">Описание</span>
               <div className="font-medium mt-1 whitespace-pre-wrap">
@@ -93,12 +101,17 @@ const VehicleTableRow = ({ vehicle, isExpanded, onToggleExpand }) => {
 function VehiclesList() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const { vehicles, vehiclesLoading, error } = useSelector((state) => state.products);
+  const { storageLocations } = useSelector((state) => state.organization);
   const [authChecked, setAuthChecked] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [sortOrder, setSortOrder] = useState('brand_asc');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [selectedStorageLocation, setSelectedStorageLocation] = useState(
+    () => searchParams.get('storage') || ''
+  );
 
   const hasPermission =
     user?.is_admin ||
@@ -109,9 +122,26 @@ function VehiclesList() {
 
   useEffect(() => {
     if (authChecked && hasPermission) {
-      dispatch(fetchVehicles());
+      const params = selectedStorageLocation
+        ? { storage_location_id: selectedStorageLocation }
+        : {};
+      dispatch(fetchVehicles(params));
     }
-  }, [dispatch, authChecked, hasPermission]);
+  }, [dispatch, authChecked, hasPermission, selectedStorageLocation]);
+
+  useEffect(() => {
+    if (authChecked && hasPermission && user?.organization_id) {
+      dispatch(fetchStorageLocations(user.organization_id));
+    }
+  }, [dispatch, authChecked, hasPermission, user?.organization_id]);
+
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (selectedStorageLocation) {
+      next.set('storage', selectedStorageLocation);
+    }
+    setSearchParams(next);
+  }, [selectedStorageLocation, setSearchParams]);
 
   useEffect(() => {
     if (user === undefined || user === null) {
@@ -132,6 +162,12 @@ function VehiclesList() {
     });
     return list;
   }, [vehicles, sortOrder]);
+
+  const getStorageLabel = (id) => {
+    if (id == null || id === '') return null;
+    const loc = storageLocations.find((l) => String(l.id) === String(id));
+    return loc?.address || `Склад #${id}`;
+  };
 
   if (!authChecked) {
     return (
@@ -194,7 +230,15 @@ function VehiclesList() {
           <p className="text-gray-500 mb-6 text-base">{error}</p>
           <button
             type="button"
-            onClick={() => dispatch(fetchVehicles())}
+            onClick={() =>
+              dispatch(
+                fetchVehicles(
+                  selectedStorageLocation
+                    ? { storage_location_id: selectedStorageLocation }
+                    : {}
+                )
+              )
+            }
             className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
           >
             Попробовать снова
@@ -266,11 +310,26 @@ function VehiclesList() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start mb-6 gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-6 gap-4">
+        <div className="sm:w-64">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Склад</label>
+          <select
+            value={selectedStorageLocation}
+            onChange={(e) => setSelectedStorageLocation(e.target.value)}
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          >
+            <option value="">Все склады</option>
+            {storageLocations.map((location) => (
+              <option key={location.id} value={location.id}>
+                {location.address}
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           type="button"
           onClick={() => navigate('/vehicles/add')}
-          className="px-6 py-3 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base font-medium min-h-[48px] sm:min-h-0"
+          className="px-6 py-3 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base font-medium min-h-[48px] sm:min-h-0 sm:self-center"
         >
           Добавить автомобиль
         </button>
@@ -306,6 +365,9 @@ function VehiclesList() {
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Поколение
                   </th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Склад
+                  </th>
                   <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Действия
                   </th>
@@ -316,6 +378,7 @@ function VehiclesList() {
                   <VehicleTableRow
                     key={v.id}
                     vehicle={v}
+                    storageLabel={getStorageLabel(v.storage_location_id)}
                     isExpanded={expandedId === v.id}
                     onToggleExpand={() => toggleExpand(v.id)}
                   />
@@ -332,6 +395,9 @@ function VehiclesList() {
                     <div className="text-base font-semibold text-gray-900">{v.brand || '—'}</div>
                     <div className="text-sm text-gray-600 mt-1">{v.model || '—'}</div>
                     <div className="text-sm text-gray-500 mt-1">Поколение: {v.generation || '—'}</div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      Склад: {getStorageLabel(v.storage_location_id) || '—'}
+                    </div>
                   </div>
                   <div className="relative actions-dropdown flex-shrink-0">
                     <MobileActionsButton vehicleId={v.id} />
