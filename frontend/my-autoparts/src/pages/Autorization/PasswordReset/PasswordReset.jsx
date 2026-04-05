@@ -55,7 +55,20 @@ export default function PasswordReset() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        if (name === 'code') {
+            const digits = value.replace(/\D/g, '').slice(0, 12);
+            setFormData((prev) => ({ ...prev, code: digits }));
+            return;
+        }
+        setFormData((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleCodePaste = (e) => {
+        const text = e.clipboardData?.getData('text') ?? '';
+        if (!/\d/.test(text)) return;
+        e.preventDefault();
+        const digits = text.replace(/\D/g, '').slice(0, 12);
+        setFormData((prev) => ({ ...prev, code: digits }));
     };
 
     const hasPasswordMismatch = formData.password !== formData.password_repeat;
@@ -111,8 +124,12 @@ export default function PasswordReset() {
                                     <input
                                         type="text"
                                         name="code"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        autoComplete="one-time-code"
                                         value={formData.code}
                                         onChange={handleChange}
+                                        onPaste={handleCodePaste}
                                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
                                         required
                                     />

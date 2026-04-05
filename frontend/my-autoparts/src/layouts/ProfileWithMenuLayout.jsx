@@ -27,6 +27,7 @@ export default function ProfileWithMenuLayout() {
         const pathMap = {
             '/dashboard': 'dashboard',
             '/admin': 'admin-panel',
+            '/admin-settings': 'admin-panel',
             '/clients': 'clients',
             '/sellers': 'sellers',
             '/profile': 'profile',
@@ -58,6 +59,7 @@ export default function ProfileWithMenuLayout() {
             const pathMap = {
                 '/dashboard': 'dashboard',
                 '/admin': 'admin-panel',
+                '/admin-settings': 'admin-panel',
                 '/clients': 'clients',
                 '/sellers': 'sellers',
                 '/profile': 'profile',
@@ -350,7 +352,7 @@ export default function ProfileWithMenuLayout() {
             });
         }
 
-        // Для админов: «Админка» (модерация + настройки /admin)
+        // Для админов: «Админка» (модерация + настройки /admin-settings)
         if (user?.is_admin) {
             baseTabs.push({
                 id: 'administration',
@@ -382,7 +384,7 @@ export default function ProfileWithMenuLayout() {
         // Маппинг id вкладок на пути
         const tabPathMap = {
             'dashboard': '/dashboard',
-            'admin-panel': '/admin',
+            'admin-panel': '/admin-settings',
             'profile': '/profile',
             'purchases-orders': '/purchases/orders',
             'purchases-returns': '/purchases/returns',

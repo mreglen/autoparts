@@ -590,7 +590,7 @@ def get_admin_organization_phone(db: Session = Depends(get_db)):
 
 @router.get("/public-site-config")
 def get_public_site_config(db: Session = Depends(get_db)):
-    """Публичная конфигурация: телефон админ-организации (если есть) и флаг «новые запчасти». Всегда 200."""
+    """Публичная конфигурация: телефон админ-организации (если есть), флаг «новые запчасти», наценка на новые %. Всегда 200."""
     settings_row = get_or_create_site_settings(db)
     org_name = None
     org_phone = None
@@ -604,4 +604,9 @@ def get_public_site_config(db: Session = Depends(get_db)):
         "organization_name": org_name,
         "organization_phone": org_phone,
         "show_new_autoparts": settings_row.show_new_autoparts,
+        "new_parts_markup_percent": (
+            float(m)
+            if (m := getattr(settings_row, "new_parts_markup_percent", None)) is not None
+            else 15.0
+        ),
     }

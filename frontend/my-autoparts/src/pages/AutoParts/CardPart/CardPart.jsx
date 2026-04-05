@@ -69,6 +69,9 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
     const navigate = useNavigate();
     const cartLoading = useSelector(selectCartLoading);
     const cart = useSelector(selectCart);
+    const newPartsMarkupPercent = useSelector(
+        (state) => state.publicInfo.newPartsMarkupPercent ?? 15
+    );
     // Используем только переданные данные складов
     const partStockData = stocksData ? { stocks: stocksData } : null;
 
@@ -163,11 +166,26 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
         return { isValid: true };
     };
 
+    const parseSupplierPrice = (price) => {
+        if (!price || price === '—' || price === null || price === undefined || price === '') return 0;
+        const numericPrice = parseFloat(price);
+        if (isNaN(numericPrice) || numericPrice <= 0) return 0;
+        return parseFloat(numericPrice.toFixed(2));
+    };
+
+    /** Цена с учётом наценки из настроек (/admin-settings), подгружается через public-site-config */
+    const priceWithMarkup = (price) => {
+        const base = parseSupplierPrice(price);
+        if (!base) return 0;
+        const mult = 1 + Number(newPartsMarkupPercent) / 100;
+        return parseFloat((base * mult).toFixed(2));
+    };
+
     // Подготовка объекта товара для корзины
     const prepareCartItem = (stock, quantityToAdd) => {
         // Build cart item object step by step to avoid sending null values
         const rawPrice = stock?.price;
-        const calculatedPrice = parseFloat(calculatePriceWithMarkup(rawPrice));
+        const calculatedPrice = priceWithMarkup(rawPrice);
         
         // Ensure stock_id is a valid string
         const stockId = stock?.stock_id?.toString();
@@ -393,14 +411,6 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
     };
 
 
-    // Функция для расчета цены с наценкой 15%
-    const calculatePriceWithMarkup = (price) => {
-        if (!price || price === '—' || price === null || price === undefined || price === '') return 0;
-        const numericPrice = parseFloat(price);
-        if (isNaN(numericPrice) || numericPrice <= 0) return 0;
-        return parseFloat((numericPrice * 1.15).toFixed(2));
-    };
-
     const renderMainRow = () => {
         
         if (!mainStock) {
@@ -477,7 +487,7 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                     </div>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 w-20">
-                    {calculatePriceWithMarkup(mainStock?.price)}
+                    {priceWithMarkup(mainStock?.price)}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 w-24">
                     {(() => {
@@ -579,7 +589,7 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                     </div>
                     <div className="text-right flex-shrink-0">
                         <div className="text-lg font-bold text-gray-900 mb-1">
-                            {calculatePriceWithMarkup(mainStock.price)} ₽
+                            {priceWithMarkup(mainStock.price)} ₽
                         </div>
                         <div className="text-sm text-gray-600">{mainStock.available_count} шт.</div>
                         {stocks.length > 1 && (
@@ -671,7 +681,7 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                                 </div>
                                 <div className="text-right">
                                     <div className="font-bold text-gray-900">
-                                        {calculatePriceWithMarkup(stock.price)} ₽
+                                        {priceWithMarkup(stock.price)} ₽
                                     </div>
                                     <div className="text-xs text-gray-500">{stock.available_count} шт.</div>
                                 </div>
@@ -752,7 +762,7 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                         {stock?.available_count ?? '—'} шт.
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 w-20">
-                        {calculatePriceWithMarkup(stock?.price)}
+                        {priceWithMarkup(stock?.price)}
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 w-24">
                         {(() => {

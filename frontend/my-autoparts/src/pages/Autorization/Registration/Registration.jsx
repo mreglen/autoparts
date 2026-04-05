@@ -256,6 +256,58 @@ export default function Registration() {
 
     const showCodeInput = emailVerification.status === 'sent' || emailVerification.status === 'error';
 
+    const VERIFICATION_CODE_LENGTH = 6;
+
+    const applyVerificationDigits = (raw) => {
+        const digits = String(raw).replace(/\D/g, '').slice(0, VERIFICATION_CODE_LENGTH);
+        dispatch(updateCode(digits));
+        requestAnimationFrame(() => {
+            const focusIndex =
+                digits.length >= VERIFICATION_CODE_LENGTH
+                    ? VERIFICATION_CODE_LENGTH - 1
+                    : digits.length;
+            document.getElementById(`code-input-${focusIndex}`)?.focus();
+        });
+    };
+
+    const handleCodeDigitChange = (index, e) => {
+        const raw = e.target.value.replace(/\D/g, '');
+        if (raw.length > 1) {
+            applyVerificationDigits(raw);
+            return;
+        }
+        const chars = Array.from(
+            { length: VERIFICATION_CODE_LENGTH },
+            (_, i) => code[i] || ''
+        );
+        chars[index] = raw;
+        dispatch(updateCode(chars.join('')));
+        if (raw && index < VERIFICATION_CODE_LENGTH - 1) {
+            document.getElementById(`code-input-${index + 1}`)?.focus();
+        }
+    };
+
+    const handleCodeDigitKeyDown = (index, e) => {
+        if (e.key === 'Backspace' && !(code[index] || '') && index > 0) {
+            e.preventDefault();
+            const chars = Array.from(
+                { length: VERIFICATION_CODE_LENGTH },
+                (_, i) => code[i] || ''
+            );
+            chars[index - 1] = '';
+            dispatch(updateCode(chars.join('')));
+            document.getElementById(`code-input-${index - 1}`)?.focus();
+        }
+    };
+
+    const handleVerificationCodePaste = (e) => {
+        const text = e.clipboardData?.getData('text') ?? '';
+        if (!/\d/.test(text)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        applyVerificationDigits(text);
+    };
+
     // Step navigation handlers
     const goToStep2 = () => {
         // Validate step 1 before proceeding
@@ -353,31 +405,21 @@ export default function Registration() {
             {/* Code input with 6 boxes */}
             <div className="space-y-4">
                 <div className="flex justify-center space-x-2">
-                    {Array.from({ length: 6 }, (_, index) => (
+                    {Array.from({ length: VERIFICATION_CODE_LENGTH }, (_, index) => (
                         <input
                             key={index}
                             type="text"
-                            maxLength="1"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                            maxLength={index === 0 ? VERIFICATION_CODE_LENGTH : 1}
                             value={code[index] || ''}
-                            onChange={(e) => {
-                                const newCode = code.split('');
-                                newCode[index] = e.target.value;
-                                dispatch(updateCode(newCode.join('')));
-                                
-                                // Move to next input automatically
-                                if (e.target.value && index < 5) {
-                                    const nextInput = document.getElementById(`code-input-${index + 1}`);
-                                    if (nextInput) nextInput.focus();
-                                }
-                            }}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Backspace' && !code[index] && index > 0) {
-                                    const prevInput = document.getElementById(`code-input-${index - 1}`);
-                                    if (prevInput) prevInput.focus();
-                                }
-                            }}
+                            onChange={(e) => handleCodeDigitChange(index, e)}
+                            onKeyDown={(e) => handleCodeDigitKeyDown(index, e)}
+                            onPaste={handleVerificationCodePaste}
                             id={`code-input-${index}`}
                             className="w-12 h-12 text-center text-xl border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                            aria-label={`Цифра ${index + 1} кода`}
                         />
                     ))}
                 </div>

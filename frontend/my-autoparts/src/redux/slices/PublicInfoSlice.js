@@ -2,7 +2,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiRequestUnauth } from '../../utils/apiClient';
 
-/** Публичный конфиг: телефон админ-орг. и флаг «новые запчасти» (всегда 200). */
+/** Публичный конфиг: телефон админ-орг., флаг «новые запчасти», наценка на новые (всегда 200). */
 export const fetchPublicSiteConfig = createAsyncThunk(
   'publicInfo/fetchPublicSiteConfig',
   async (_, { rejectWithValue }) => {
@@ -23,6 +23,7 @@ const publicInfoSlice = createSlice({
   initialState: {
     adminOrganizationPhone: null,
     showNewAutoparts: true,
+    newPartsMarkupPercent: 15,
     loading: false,
     error: null,
   },
@@ -30,10 +31,16 @@ const publicInfoSlice = createSlice({
     clearPublicInfo: (state) => {
       state.adminOrganizationPhone = null;
       state.showNewAutoparts = true;
+      state.newPartsMarkupPercent = 15;
       state.error = null;
     },
     setShowNewAutoparts: (state, action) => {
       state.showNewAutoparts = action.payload !== false;
+    },
+    setNewPartsMarkupPercent: (state, action) => {
+      const n = Number(action.payload);
+      state.newPartsMarkupPercent =
+        Number.isFinite(n) && n >= 0 ? n : 15;
     },
   },
   extraReducers: (builder) => {
@@ -46,6 +53,9 @@ const publicInfoSlice = createSlice({
         state.loading = false;
         const p = action.payload;
         state.showNewAutoparts = p?.show_new_autoparts !== false;
+        const m = Number(p?.new_parts_markup_percent);
+        state.newPartsMarkupPercent =
+          Number.isFinite(m) && m >= 0 ? m : 15;
         if (p?.organization_phone) {
           state.adminOrganizationPhone = {
             organization_name: p.organization_name ?? null,
@@ -59,9 +69,14 @@ const publicInfoSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
         state.showNewAutoparts = true;
+        state.newPartsMarkupPercent = 15;
       });
   },
 });
 
-export const { clearPublicInfo, setShowNewAutoparts } = publicInfoSlice.actions;
+export const {
+  clearPublicInfo,
+  setShowNewAutoparts,
+  setNewPartsMarkupPercent,
+} = publicInfoSlice.actions;
 export default publicInfoSlice.reducer;

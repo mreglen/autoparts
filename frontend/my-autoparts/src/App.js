@@ -115,7 +115,8 @@ function App() {
         {/* Layout с боковым меню для страниц профиля */}
         <Route path="/" element={<ProfileWithMenuLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/admin" element={<AdminPanelPage />} />
+          <Route path="/admin" element={<Navigate to="/admin-settings" replace />} />
+          <Route path="/admin-settings" element={<AdminPanelPage />} />
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-parts" element={<MyParts />} />

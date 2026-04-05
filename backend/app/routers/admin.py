@@ -13,7 +13,7 @@ from app.schemas.event_log import EventLogResponse
 from app.schemas.user import UserResponse, UserUpdate
 from app.schemas.organization import Organization as OrganizationSchema, OrganizationCreate, OrganizationUpdate
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.core.auth import get_current_admin_user
 from app.core.security import get_password_hash
 from app.utils.id_generator import random_id
@@ -26,12 +26,20 @@ from datetime import datetime, timedelta
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
-class SiteSettingsPayload(BaseModel):
-    show_new_autoparts: bool
+def _new_parts_markup_percent_value(row) -> float:
+    v = getattr(row, "new_parts_markup_percent", None)
+    return float(v) if v is not None else 15.0
 
 
 class SiteSettingsResponse(BaseModel):
     show_new_autoparts: bool
+    new_parts_markup_percent: float
+
+
+class SiteSettingsPatch(BaseModel):
+    show_new_autoparts: Optional[bool] = None
+    new_parts_markup_percent: Optional[float] = Field(None, ge=0, le=500)
+
 
 @router.get("/site-settings", response_model=SiteSettingsResponse)
 def get_site_settings_admin(
@@ -39,20 +47,35 @@ def get_site_settings_admin(
     db: Session = Depends(get_db),
 ):
     row = get_or_create_site_settings(db)
-    return SiteSettingsResponse(show_new_autoparts=row.show_new_autoparts)
+    return SiteSettingsResponse(
+        show_new_autoparts=row.show_new_autoparts,
+        new_parts_markup_percent=_new_parts_markup_percent_value(row),
+    )
 
 
 @router.patch("/site-settings", response_model=SiteSettingsResponse)
 def patch_site_settings_admin(
-    payload: SiteSettingsPayload,
+    payload: SiteSettingsPatch,
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
+    data = payload.dict(exclude_unset=True)
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нет полей для обновления",
+        )
     row = get_or_create_site_settings(db)
-    row.show_new_autoparts = payload.show_new_autoparts
+    if "show_new_autoparts" in data:
+        row.show_new_autoparts = data["show_new_autoparts"]
+    if "new_parts_markup_percent" in data:
+        row.new_parts_markup_percent = float(data["new_parts_markup_percent"])
     db.commit()
     db.refresh(row)
-    return SiteSettingsResponse(show_new_autoparts=row.show_new_autoparts)
+    return SiteSettingsResponse(
+        show_new_autoparts=row.show_new_autoparts,
+        new_parts_markup_percent=_new_parts_markup_percent_value(row),
+    )
 
 
 @router.get("/users", response_model=List[UserResponse])
