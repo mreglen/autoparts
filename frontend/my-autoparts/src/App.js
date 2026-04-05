@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect } from 'react';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
-import { fetchCart } from './redux/slices/CartSlice';
 
 // Pages
 import Authorization from './pages/Autorization/Authorization';
@@ -37,13 +36,12 @@ import Organization from './pages/Settings/Organization';
 import PrintSettings from './pages/Settings/PrintSettings';
 import NotFound from './pages/NotFound/NotFound';
 import PartDetail from './pages/PartDetail/PartDetail';
-import SellerPartCardPage from './pages/SellerPartCard/SellerPartCardPage';
 
 
 
 function App() {
   const dispatch = useDispatch();
-  const { token, user } = useSelector((state) => state.auth);
+  const { token } = useSelector((state) => state.auth);
 
   // Check auth status on app load
   useEffect(() => {
@@ -77,14 +75,6 @@ function App() {
     }
   }, [dispatch, token]);
 
-  // Корзина в шапке и в мобильной нижней панели опирается на Redux; без этого
-  // после входа по сохранённому токену счётчик появлялся только после захода на /cart.
-  useEffect(() => {
-    if (token && user) {
-      dispatch(fetchCart());
-    }
-  }, [dispatch, token, user?.id]);
-
   return (
     <BrowserRouter>
       <Routes>
@@ -104,7 +94,6 @@ function App() {
           <Route path="/my-parts/add" element={<AddPart />} />
           <Route path="/my-parts/edit/:id" element={<EditPart />} />
           <Route path="/part/:productId" element={<PartDetail />} />
-          <Route path="/seller/part-card/:id" element={<SellerPartCardPage />} />
 
           <Route path="*" element={<NotFound />} />
         </Route>

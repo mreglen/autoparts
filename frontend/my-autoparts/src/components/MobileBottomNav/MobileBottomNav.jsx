@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 
 export default function MobileBottomNav() {
     const { user, token } = useSelector((state) => state.auth);
-    const cart = useSelector((state) => state.cart.cart);
+    const cart = useSelector((state) => state.cart);
     const navigate = useNavigate();
 
     // Расчет данных корзины
