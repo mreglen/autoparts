@@ -10,6 +10,11 @@ import { normalizeImageUrl, apiRequest, apiRequestFormData } from '../../../util
 
 import VehicleModal from './VehicleModal';
 
+const SUGGEST_LIST =
+  'mt-1 max-h-44 overflow-y-auto rounded-md border border-gray-300 bg-white text-sm text-gray-900 shadow-sm';
+const SUGGEST_ITEM =
+  'w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none';
+
 const AddPart = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -33,6 +38,13 @@ const AddPart = () => {
     sale_price: '',
     storage_location_id: '',
   });
+
+  const [articleOptions, setArticleOptions] = useState([]);
+  const [brandOptions, setBrandOptions] = useState([]);
+  const [articleLoading, setArticleLoading] = useState(false);
+  const [brandLoading, setBrandLoading] = useState(false);
+  const [articleFocused, setArticleFocused] = useState(false);
+  const [brandFocused, setBrandFocused] = useState(false);
 
   const [photos, setPhotos] = useState([]);
   const [videos, setVideos] = useState([]);
@@ -360,6 +372,72 @@ const AddPart = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  useEffect(() => {
+    const q = (formData.article || '').trim();
+    if (!q) {
+      setArticleOptions([]);
+      setArticleLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setArticleLoading(true);
+    const t = setTimeout(() => {
+      apiRequest(`/tecdoc-parts/articles/suggest?q=${encodeURIComponent(q)}&limit=30`)
+        .then((rows) => {
+          if (cancelled) return;
+          setArticleOptions(Array.isArray(rows) ? rows : []);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setArticleOptions([]);
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setArticleLoading(false);
+        });
+    }, 320);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [formData.article]);
+
+  useEffect(() => {
+    const q = (formData.brand || '').trim();
+    const article = (formData.article || '').trim();
+    if (!q && !article) {
+      setBrandOptions([]);
+      setBrandLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setBrandLoading(true);
+    const t = setTimeout(() => {
+      const params = new URLSearchParams({
+        q,
+        article,
+        limit: '30',
+      });
+      apiRequest(`/tecdoc-parts/brands/suggest?${params.toString()}`)
+        .then((rows) => {
+          if (cancelled) return;
+          setBrandOptions(Array.isArray(rows) ? rows : []);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setBrandOptions([]);
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setBrandLoading(false);
+        });
+    }, 320);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [formData.brand, formData.article]);
+
   const handleCellQuantityChange = (cellId, value) => {
     setCellQuantities(prev => ({
       ...prev,
@@ -622,9 +700,34 @@ const AddPart = () => {
             name="article"
             value={formData.article}
             onChange={handleInputChange}
+            onFocus={() => setArticleFocused(true)}
+            onBlur={() => setTimeout(() => setArticleFocused(false), 120)}
             required
             className="mt-1 block w-full px-3 py-2 border rounded-md"
+            autoComplete="off"
           />
+          {articleFocused && (articleLoading || articleOptions.length > 0) && (
+            <ul className={SUGGEST_LIST}>
+              {articleLoading && (
+                <li className="px-3 py-2 text-gray-500">Поиск…</li>
+              )}
+              {articleOptions.map((opt) => (
+                <li key={opt}>
+                  <button
+                    type="button"
+                    className={SUGGEST_ITEM}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setFormData((prev) => ({ ...prev, article: opt }));
+                      setArticleOptions([]);
+                    }}
+                  >
+                    {opt}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Наименование */}
@@ -646,9 +749,34 @@ const AddPart = () => {
             name="brand"
             value={formData.brand}
             onChange={handleInputChange}
+            onFocus={() => setBrandFocused(true)}
+            onBlur={() => setTimeout(() => setBrandFocused(false), 120)}
             required
             className="mt-1 block w-full px-3 py-2 border rounded-md"
+            autoComplete="off"
           />
+          {brandFocused && (brandLoading || brandOptions.length > 0) && (
+            <ul className={SUGGEST_LIST}>
+              {brandLoading && (
+                <li className="px-3 py-2 text-gray-500">Поиск…</li>
+              )}
+              {brandOptions.map((opt) => (
+                <li key={opt}>
+                  <button
+                    type="button"
+                    className={SUGGEST_ITEM}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setFormData((prev) => ({ ...prev, brand: opt }));
+                      setBrandOptions([]);
+                    }}
+                  >
+                    {opt}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         
         {/* Описание */}
