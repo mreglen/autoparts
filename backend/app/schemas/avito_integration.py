@@ -58,7 +58,7 @@ class AvitoAutoloadImportRequest(BaseModel):
     quantity: int = Field(1, gt=0)
     use_file_price: bool = True
     sale_price: Optional[float] = Field(None, gt=0)
-    update_existing: bool = False
+    update_existing: bool = True
 
 
 class AvitoAutoloadImportResponse(BaseModel):
@@ -66,3 +66,24 @@ class AvitoAutoloadImportResponse(BaseModel):
     updated_products: int = 0
     created_stock_ins: int = 0
     skipped_rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AvitoAutoloadExportRequest(BaseModel):
+    product_ids: list[int] = Field(default_factory=list, min_length=1)
+
+
+class AvitoAutoloadExportResponse(BaseModel):
+    saved_path: str
+    items: list[dict[str, Any]]
+    local_validation_ok: bool
+    local_errors: list[dict[str, Any]]
+    sheets_parsed: list[str]
+    exported_count: int
+
+
+class AvitoAutoloadPublishResponse(BaseModel):
+    saved_path: str
+    avito_upload: Optional[dict[str, Any]] = None
+    avito_upload_status: Optional[int] = None
+    avito_report: Optional[dict[str, Any]] = None
+    avito_token_error: Optional[str] = None

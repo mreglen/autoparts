@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
-import { normalizeImageUrl, API_BASE, getAuthHeaders } from '../../utils/apiClient';
+import { normalizeImageUrl, apiRequest } from '../../utils/apiClient';
 import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
@@ -12,7 +12,7 @@ import StockOutModal from './StockOutModal/StockOutModal';
 import PendingParts from './PendingParts/PendingParts';
 import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
 
-const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onPrint, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [] }) => {
+const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onPrint, onExport, showExport, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [] }) => {
   const [showActions, setShowActions] = useState(false);
 
   
@@ -130,6 +130,14 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
                 >
                   Списать
                 </button>
+                {showExport && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onExport(part); setShowActions(false); }}
+                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                  >
+                    Экспорт
+                  </button>
+                )}
                 <Link
                   to={`/my-parts/edit/${part.id}`}
                   onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
@@ -280,6 +288,7 @@ function MyParts() {
   const [currentMediaItems, setCurrentMediaItems] = useState([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [avitoIntegrationReady, setAvitoIntegrationReady] = useState(false);
   const [formData, setFormData] = useState({
     quantity: '',
     price: '',
@@ -408,9 +417,27 @@ function MyParts() {
     };
   }, [mobileActionsOpen]);
 
-  const handleBulkAction = () => {
-    
-    console.log(`Выбрано ${selectedParts.size} запчастей`);
+  const handleExportPart = async (part) => {
+    if (!user?.organization_id || !part?.id) return;
+    try {
+      await apiRequest(`/organizations/${user.organization_id}/avito/autoload/export/${part.id}`, { method: 'POST' });
+      alert('Позиция экспортирована в файл Avito XLSX');
+    } catch (e) {
+      alert(`Не удалось экспортировать: ${e.message || 'ошибка'}`);
+    }
+  };
+
+  const handleBulkAction = async () => {
+    if (!user?.organization_id || selectedParts.size === 0) return;
+    try {
+      await apiRequest(`/organizations/${user.organization_id}/avito/autoload/export`, {
+        method: 'POST',
+        body: JSON.stringify({ product_ids: Array.from(selectedParts) }),
+      });
+      alert(`Экспортировано позиций: ${selectedParts.size}`);
+    } catch (e) {
+      alert(`Не удалось выполнить экспорт: ${e.message || 'ошибка'}`);
+    }
   };
 
   const handleConfirm = async () => {
@@ -508,6 +535,27 @@ function MyParts() {
       dispatch(fetchStorageCells());
     }
   }, [dispatch, user?.organization_id, selectedStorageLocation]);
+
+  useEffect(() => {
+    if (!user?.organization_id) {
+      setAvitoIntegrationReady(false);
+      return;
+    }
+    let active = true;
+    apiRequest(`/organizations/${user.organization_id}/avito/credentials`, { method: 'GET' })
+      .then((data) => {
+        if (!active) return;
+        setAvitoIntegrationReady(
+          Boolean(data?.client_id) && Boolean(data?.client_secret_configured) && Boolean(data?.avito_user_id)
+        );
+      })
+      .catch(() => {
+        if (active) setAvitoIntegrationReady(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [user?.organization_id]);
 
   // Load pending and rejected products when pending tab is active
   useEffect(() => {
@@ -856,17 +904,19 @@ function MyParts() {
                     </span>
                   )}
                 </span>
-                <button
-                  onClick={handleBulkAction}
-                  className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
-                >
-                  Действия
-                  <img
-                    src="/img/arrow_sm.svg"
-                    alt=""
-                    className={`w-3 h-3 transition-transform duration-200 filter brightness-0 saturate-100 invert-61 sepia-0 saturate-0 hue-rotate-0deg brightness-90 contrast-89`}
-                  />
-                </button>
+                {avitoIntegrationReady && (
+                  <button
+                    onClick={handleBulkAction}
+                    className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
+                  >
+                    Экспорт
+                    <img
+                      src="/img/arrow_sm.svg"
+                      alt=""
+                      className={`w-3 h-3 transition-transform duration-200 filter brightness-0 saturate-100 invert-61 sepia-0 saturate-0 hue-rotate-0deg brightness-90 contrast-89`}
+                    />
+                  </button>
+                )}
               </div>
             )}
             <table className="min-w-full divide-y divide-gray-200">
@@ -912,6 +962,8 @@ function MyParts() {
                     onSale={(p) => handleOpenModal(p, 'sale')}
                     onWriteoff={(p) => handleOpenModal(p, 'writeoff')}
                     onPrint={(p) => handleOpenPrintModal(p)}
+                    onExport={(p) => handleExportPart(p)}
+                    showExport={avitoIntegrationReady}
                     onToggleExpand={() => toggleExpand(part.id)}
                     isExpanded={expandedPartId === part.id}
                     isSelected={selectedParts.has(part.id)}
@@ -938,12 +990,14 @@ function MyParts() {
                       </span>
                     )}
                   </span>
-                  <button
-                    onClick={handleBulkAction}
-                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[44px]"
-                  >
-                    Действия
-                  </button>
+                  {avitoIntegrationReady && (
+                    <button
+                      onClick={handleBulkAction}
+                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[44px]"
+                    >
+                      Экспорт
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -1055,6 +1109,17 @@ function MyParts() {
                           >
                             Списать
                           </button>
+                          {avitoIntegrationReady && (
+                            <button
+                              onClick={() => {
+                                handleExportPart(part);
+                                setMobileActionsOpen(null);
+                              }}
+                              className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50"
+                            >
+                              Экспорт
+                            </button>
+                          )}
                           <Link
                             to={`/my-parts/edit/${part.id}`}
                             onClick={() => setMobileActionsOpen(null)}

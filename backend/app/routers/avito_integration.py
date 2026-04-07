@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
+from app.core.config import settings
 from app.db.database import get_db
 from app.models.organization import Organization as OrganizationModel
 from app.models.organization_avito_autoload_cache import OrganizationAvitoAutoloadCache
@@ -25,13 +26,16 @@ from app.schemas.avito_integration import (
     AvitoAutoloadImportRequest,
     AvitoAutoloadImportResponse,
     AvitoAutoloadApplyActionRequest,
+    AvitoAutoloadExportRequest,
+    AvitoAutoloadExportResponse,
+    AvitoAutoloadPublishResponse,
     AvitoAutoloadUploadResponse,
     AvitoCredentialsResponse,
     AvitoCredentialsUpdate,
     AvitoLastAutoloadSnapshot,
 )
 from app.services import avito_api as avito_api_svc
-from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload
+from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload, upsert_products_to_avito_autoload
 from app.utils.avito_crypto import decrypt_secret, encrypt_secret
 
 logger = logging.getLogger(__name__)
@@ -149,6 +153,35 @@ def _next_internal_code(db: Session) -> str:
         idx += 1
 
 
+def _has_avito_integration(db: Session, org_id: str) -> bool:
+    row = db.query(OrganizationAvitoIntegration).filter(
+        OrganizationAvitoIntegration.organization_id == org_id
+    ).first()
+    if not row:
+        return False
+    return bool(row.client_id and row.client_secret_encrypted and row.avito_user_id)
+
+
+def _resolve_saved_autoload_file(db: Session, org_id: str) -> tuple[Path, str]:
+    cache = (
+        db.query(OrganizationAvitoAutoloadCache)
+        .filter(OrganizationAvitoAutoloadCache.organization_id == org_id)
+        .first()
+    )
+    if cache and cache.saved_path:
+        rel_path = cache.saved_path
+        xlsx_path = Path(__file__).resolve().parents[2] / rel_path.lstrip("/")
+        if xlsx_path.is_file():
+            return xlsx_path, rel_path
+
+    base_dir = Path(__file__).resolve().parents[2] / "uploads" / "avito" / org_id
+    base_dir.mkdir(parents=True, exist_ok=True)
+    dest_name = f"autoload_{uuid.uuid4().hex[:8]}.xlsx"
+    xlsx_path = base_dir / dest_name
+    rel_path = f"/uploads/avito/{org_id}/{dest_name}"
+    return xlsx_path, rel_path
+
+
 async def _push_file_to_avito(db: Session, org_id: str, filename: str, file_bytes: bytes) -> tuple[Any, Any, Any, Any]:
     row = db.query(OrganizationAvitoIntegration).filter(
         OrganizationAvitoIntegration.organization_id == org_id
@@ -203,6 +236,102 @@ def get_avito_credentials(
         avito_user_id=int(row.avito_user_id),
         client_secret_configured=True,
         last_autoload=last,
+    )
+
+
+@router.post("/{org_id}/avito/autoload/export", response_model=AvitoAutoloadExportResponse)
+async def export_products_to_avito_autoload(
+    org_id: str,
+    body: AvitoAutoloadExportRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+    if not _has_avito_integration(db, org_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Авито не настроена")
+
+    requested_ids = list(dict.fromkeys(body.product_ids))
+    products = (
+        db.query(ProductModel)
+        .filter(
+            ProductModel.organization_id == org_id,
+            ProductModel.id.in_(requested_ids),
+        )
+        .all()
+    )
+    by_id = {p.id: p for p in products}
+    export_rows: list[dict[str, Any]] = []
+    for product_id in requested_ids:
+        product = by_id.get(product_id)
+        if not product:
+            continue
+        photos = [ph.photo_url for ph in (product.photos or []) if ph.photo_url]
+        avito_link = db.query(ProductAvitoListingLink).filter(
+            ProductAvitoListingLink.organization_id == org_id,
+            ProductAvitoListingLink.product_id == product.id,
+        ).first()
+        export_rows.append(
+            {
+                "id": product.id,
+                "article": product.article,
+                "brand": product.brand,
+                "is_new": product.is_new,
+                "price": product.price,
+                "name": product.name,
+                "description": product.description,
+                "quantity": product.quantity,
+                "photos": photos,
+                "avito_id": avito_link.avito_ad_id if avito_link else "",
+            }
+        )
+    if not export_rows:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Товары не найдены для экспорта")
+
+    xlsx_path, rel_path = _resolve_saved_autoload_file(db, org_id)
+    existing_bytes = xlsx_path.read_bytes() if xlsx_path.is_file() else None
+    merged_bytes = upsert_products_to_avito_autoload(
+        existing_bytes,
+        export_rows,
+        public_base_url=(settings.PUBLIC_BASE_URL or settings.BASE_URL or "").strip(),
+    )
+    xlsx_path.write_bytes(merged_bytes)
+    parsed = parse_and_validate_avito_autoload(merged_bytes)
+    _save_autoload_cache(
+        db,
+        org_id,
+        saved_path=rel_path,
+        items=parsed.items,
+        local_validation_ok=parsed.local_ok,
+        local_errors=parsed.local_errors,
+        sheets_parsed=parsed.sheets_parsed,
+        avito_upload=None,
+        avito_upload_status=None,
+        avito_report=None,
+        avito_token_error=None,
+    )
+    return AvitoAutoloadExportResponse(
+        saved_path=rel_path,
+        items=parsed.items,
+        local_validation_ok=parsed.local_ok,
+        local_errors=parsed.local_errors,
+        sheets_parsed=parsed.sheets_parsed,
+        exported_count=len(export_rows),
+    )
+
+
+@router.post("/{org_id}/avito/autoload/export/{product_id}", response_model=AvitoAutoloadExportResponse)
+async def export_single_product_to_avito_autoload(
+    org_id: str,
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return await export_products_to_avito_autoload(
+        org_id=org_id,
+        body=AvitoAutoloadExportRequest(product_ids=[product_id]),
+        db=db,
+        current_user=current_user,
     )
 
 
@@ -414,15 +543,6 @@ async def import_avito_autoload_rows(
                 if stale_link:
                     db.delete(stale_link)
             else:
-                if not body.update_existing:
-                    skipped_rows.append(
-                        {
-                            "sheet": key[0],
-                            "row": key[1],
-                            "reason": f"Уже импортировано (AvitoId={avito_id}, product_id={product.id})",
-                        }
-                    )
-                    continue
                 product.article = (part_number or avito_id or f"ROW-{key[1]}")[:30]
                 product.name = (title or part_number or f"Avito row {key[1]}")[:255]
                 product.brand = (manufacturer or "Unknown")[:100]
@@ -521,6 +641,56 @@ async def import_avito_autoload_rows(
         updated_products=updated_products,
         created_stock_ins=created_stock_ins,
         skipped_rows=skipped_rows,
+    )
+
+
+@router.post("/{org_id}/avito/autoload/publish", response_model=AvitoAutoloadPublishResponse)
+async def publish_avito_autoload(
+    org_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+    if not _has_avito_integration(db, org_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Авито не настроена")
+
+    cache = (
+        db.query(OrganizationAvitoAutoloadCache)
+        .filter(OrganizationAvitoAutoloadCache.organization_id == org_id)
+        .first()
+    )
+    if not cache or not cache.saved_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки не найден")
+
+    rel_path = cache.saved_path
+    xlsx_path = Path(__file__).resolve().parents[2] / rel_path.lstrip("/")
+    if not xlsx_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки на диске не найден")
+
+    file_bytes = xlsx_path.read_bytes()
+    avito_upload, avito_upload_status, avito_report, avito_token_error = await _push_file_to_avito(
+        db, org_id, xlsx_path.name, file_bytes
+    )
+    _save_autoload_cache(
+        db,
+        org_id,
+        saved_path=rel_path,
+        items=_json_loads(cache.items_json, []),
+        local_validation_ok=bool(cache.local_validation_ok),
+        local_errors=_json_loads(cache.local_errors_json, []),
+        sheets_parsed=_json_loads(cache.sheets_parsed_json, []),
+        avito_upload=avito_upload,
+        avito_upload_status=avito_upload_status,
+        avito_report=avito_report,
+        avito_token_error=avito_token_error,
+    )
+    return AvitoAutoloadPublishResponse(
+        saved_path=rel_path,
+        avito_upload=avito_upload,
+        avito_upload_status=avito_upload_status,
+        avito_report=avito_report,
+        avito_token_error=avito_token_error,
     )
 
 

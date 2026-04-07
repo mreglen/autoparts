@@ -80,9 +80,9 @@ export default function IntegrationPage() {
   const [importQuantity, setImportQuantity] = useState(1);
   const [useFilePrice, setUseFilePrice] = useState(true);
   const [importSalePrice, setImportSalePrice] = useState('');
-  const [updateExisting, setUpdateExisting] = useState(false);
   const [importWarnings, setImportWarnings] = useState([]);
   const [photoIndexes, setPhotoIndexes] = useState({});
+  const [publishing, setPublishing] = useState(false);
 
   const getPublicFileUrl = useCallback((path) => {
     if (!path) return '';
@@ -282,7 +282,7 @@ export default function IntegrationPage() {
         storage_location_id: Number(importStorageLocationId),
         quantity: Number(importQuantity),
         use_file_price: useFilePrice,
-        update_existing: updateExisting,
+        update_existing: true,
       };
       if (!useFilePrice) {
         payload.sale_price = Number(importSalePrice);
@@ -371,6 +371,29 @@ export default function IntegrationPage() {
       setError(formatErrorMessage(e));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePublishAutoload = async () => {
+    if (!orgId) return;
+    setPublishing(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const data = await apiRequest(`/organizations/${orgId}/avito/autoload/publish`, { method: 'POST' });
+      const summary = {
+        local_validation_ok: true,
+        local_errors: [],
+        avito_report: data.avito_report,
+        avito_token_error: data.avito_token_error,
+        updated_at: new Date().toISOString(),
+      };
+      setUploadResult(shouldShowResultCard(summary) ? summary : null);
+      setNotice('Файл автозагрузки отправлен в Avito API.');
+    } catch (e) {
+      setError(formatErrorMessage(e));
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -524,6 +547,14 @@ export default function IntegrationPage() {
             <span className="text-sm font-medium text-gray-700">{uploading ? 'Загрузка…' : 'Выбрать XLSX'}</span>
             <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" disabled={uploading} onChange={handleFile} />
           </label>
+          <button
+            type="button"
+            onClick={handlePublishAutoload}
+            disabled={!savedPath || publishing}
+            className="ml-2 px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50 text-sm"
+          >
+            {publishing ? 'Публикация…' : 'Выложить на Avito'}
+          </button>
         </div>
         {savedPath && (
           <div className="flex items-center gap-2">
@@ -813,16 +844,6 @@ export default function IntegrationPage() {
                         onChange={(e) => setUseFilePrice(e.target.checked)}
                       />
                       <span>Цена из файла</span>
-                    </label>
-                  </div>
-                  <div className="flex items-end">
-                    <label className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={updateExisting}
-                        onChange={(e) => setUpdateExisting(e.target.checked)}
-                      />
-                      <span>Обновить существующие</span>
                     </label>
                   </div>
                   <div>
