@@ -1,17 +1,12 @@
 // src/components/MobileBottomNav/MobileBottomNav.jsx
 import React from 'react';
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { isAutopartsNavActive, useAutopartsLandingPath, useShowNewAutoparts } from '../../utils/autopartsPublic';
 
 export default function MobileBottomNav() {
     const { user, token } = useSelector((state) => state.auth);
     const cart = useSelector((state) => state.cart);
     const navigate = useNavigate();
-    const location = useLocation();
-    const autopartsPath = useAutopartsLandingPath();
-    const showNewAutoparts = useShowNewAutoparts();
-    const autopartsNavActive = isAutopartsNavActive(location.pathname, showNewAutoparts);
 
     // Расчет данных корзины
     const cartData = React.useMemo(() => {
@@ -54,10 +49,12 @@ export default function MobileBottomNav() {
                 {/* Автозапчасти */}
                 <div className="flex flex-col items-center justify-center py-2">
                     <NavLink 
-                        to={autopartsPath}
-                        className={`flex flex-col items-center justify-center w-full h-full ${
-                            autopartsNavActive ? 'text-indigo-600' : 'text-gray-700 hover:text-indigo-600'
-                        }`}
+                        to="/autoparts/new"
+                        className={({ isActive }) => 
+                            `flex flex-col items-center justify-center w-full h-full ${
+                                isActive ? 'text-indigo-600' : 'text-gray-700 hover:text-indigo-600'
+                            }`
+                        }
                     >
                         <div className="w-6 h-6 mb-1">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">

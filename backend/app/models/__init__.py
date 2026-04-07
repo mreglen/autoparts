@@ -30,6 +30,7 @@ from app.models.tecdoc import (
 )
 from app.models.product_vehicle import ProductVehicleAssociation
 from app.models.delivery_method import DeliveryMethod, organization_delivery_methods
+from app.models.product_avito_listing_link import ProductAvitoListingLink
 
 
 from sqlalchemy.orm import relationship

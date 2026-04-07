@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
 from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, orders, carts
 import app.models.site_settings  # noqa: F401 — site_settings в metadata
+import app.models.organization_avito_integration  # noqa: F401 — avito integration
+import app.models.organization_avito_autoload_cache  # noqa: F401 — avito autoload cache
 import app.models.transmission  # noqa: F401 — transmissions, vehicle_transmissions в metadata
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
@@ -31,15 +33,15 @@ if sys.platform.startswith("win"):
     except Exception:
         pass
 
-# Create tables only if they don't exist
-# Using create_all() ensures foreign key constraints are handled correctly
+# Создаём в БД только те таблицы из metadata, которых ещё нет.
+# Раньше сравнивали len(existing) < len(metadata) — если в БД таблиц больше, чем в ORM,
+# create_all никогда не вызывался и новые модели не появлялись.
 from sqlalchemy import inspect
-inspector = inspect(engine)
-existing_tables = inspector.get_table_names()
 
-# Only create tables that don't already exist to avoid constraint errors
-if len(existing_tables) < len(Base.metadata.tables):
-    # Create all missing tables at once to properly handle foreign key dependencies
+inspector = inspect(engine)
+_existing = set(inspector.get_table_names())
+_needed = set(Base.metadata.tables.keys())
+if _needed - _existing:
     Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Автозапчасти")

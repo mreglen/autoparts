@@ -67,6 +67,18 @@ export const normalizeImageUrl = (imageUrl) => {
 };
 
 
+function formatApiDetail(detail) {
+    if (detail == null) return null;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+        return detail
+            .map((e) => (typeof e === 'object' && e != null && e.msg ? e.msg : JSON.stringify(e)))
+            .join('; ');
+    }
+    if (typeof detail === 'object') return JSON.stringify(detail);
+    return String(detail);
+}
+
 const GUEST_CART_STORAGE_KEY = 'guest_cart_token';
 
 const getGuestCartToken = () => {
@@ -102,7 +114,8 @@ export const apiRequest = async (endpoint, options = {}) => {
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+        const msg = formatApiDetail(errorData.detail) || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(msg);
     }
 
 
@@ -135,7 +148,8 @@ export const apiRequestUnauth = async (endpoint, options = {}) => {
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+        const msg = formatApiDetail(errorData.detail) || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(msg);
     }
 
 
@@ -172,7 +186,8 @@ export const apiRequestFormData = async (endpoint, formData, options = {}) => {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('apiRequestFormData - Error:', errorData);
-        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+        const msg = formatApiDetail(errorData.detail) || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(msg);
     }
 
     return response.json();

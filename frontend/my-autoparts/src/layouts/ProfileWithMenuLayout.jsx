@@ -44,6 +44,7 @@ export default function ProfileWithMenuLayout() {
             '/settings/storage-addresses': 'settings-storage-addresses',
             '/settings/organization': 'settings-organization',
             '/settings/printers': 'settings-printers',
+            '/settings/integration': 'settings-integration',
             '/settings/label': 'settings-label',
             '/settings/employees': 'settings-employees',
             '/moderation/products': 'product-moderation',
@@ -76,6 +77,7 @@ export default function ProfileWithMenuLayout() {
                 '/settings/storage-addresses': 'settings-storage-addresses',
                 '/settings/organization': 'settings-organization',
                 '/settings/printers': 'settings-printers',
+                '/settings/integration': 'settings-integration',
                 '/settings/label': 'settings-label',
                 '/settings/employees': 'settings-employees',
                 '/moderation/products': 'product-moderation',
@@ -302,6 +304,10 @@ export default function ProfileWithMenuLayout() {
             if (user?.organization_id && hasPermission('settings.printers')) {
                 settingsSubmenu.push({ id: 'settings-printers', label: 'Печать' });
             }
+
+            if (user?.organization_id) {
+                settingsSubmenu.push({ id: 'settings-integration', label: 'Интеграция' });
+            }
             
             baseTabs.push({
                 id: 'settings',
@@ -319,7 +325,8 @@ export default function ProfileWithMenuLayout() {
                     { id: 'settings-employees', label: 'Сотрудники' },
                     { id: 'settings-storage-addresses', label: 'Адресное хранение' },
                     { id: 'settings-organization', label: 'Организация' },
-                    { id: 'settings-printers', label: 'Печать' }
+                    { id: 'settings-printers', label: 'Печать' },
+                    { id: 'settings-integration', label: 'Интеграция' },
                 ]
             });
         }
@@ -333,6 +340,7 @@ export default function ProfileWithMenuLayout() {
             if (user?.organization_id) {
                 settingsSubmenu.push({ id: 'settings-organization', label: 'Организация' });
                 settingsSubmenu.push({ id: 'settings-printers', label: 'Печать' });
+                settingsSubmenu.push({ id: 'settings-integration', label: 'Интеграция' });
             }
             
             baseTabs.push({
@@ -398,6 +406,7 @@ export default function ProfileWithMenuLayout() {
             'settings-storage-addresses': '/settings/storage-addresses',
             'settings-organization': '/settings/organization',
             'settings-printers': '/settings/printers',
+            'settings-integration': '/settings/integration',
             'settings-label': '/settings/label',
             'clients': '/clients',
             'sellers': '/sellers',

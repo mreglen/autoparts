@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     CELERY_BROKER_URL: str = "redis://localhost:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+    # Ключ для Fernet-шифрования client_secret Авито (32+ байт лучше; иначе берётся SHA256 от строки).
+    # Если не задан — используется SECRET_KEY (менее желательно для прода).
+    AVITO_CREDENTIALS_SECRET: Optional[str] = None
     
     # Пути к FFmpeg для обработки видео
     FFPROBE_PATH: Optional[str] = r"C:\ffmpeg\bin\ffprobe.exe"

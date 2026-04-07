@@ -14,6 +14,11 @@ class Organization(Base):
     description = Column(Text)
     watermark = Column(Integer, default=1) 
     users = relationship("User", back_populates="organization")
+    avito_integration = relationship(
+        "OrganizationAvitoIntegration",
+        back_populates="organization",
+        uselist=False,
+    )
     products = relationship("Product", back_populates="organization")
     acquired_products = relationship("AcquiredProduct", back_populates="organization")
     storage_locations = relationship("StorageLocation", back_populates="organization")

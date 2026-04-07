@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect } from 'react';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
-import { fetchPublicSiteConfig } from './redux/slices/PublicInfoSlice';
 
 // Pages
 import Authorization from './pages/Autorization/Authorization';
@@ -18,9 +17,6 @@ import MyParts from './pages/MyParts/MyParts';
 import AddPart from './pages/MyParts/AddPart/AddPart';
 import EditPart from './pages/MyParts/EditPart/EditPart';
 import StockInList from './pages/StockIn/StockInList';
-import VehiclesList from './pages/Vehicles/VehiclesList';
-import AddVehiclePage from './pages/Vehicles/AddVehiclePage';
-import EditVehiclePage from './pages/Vehicles/EditVehiclePage';
 import { StockOutList } from './pages/StockOut';
 import CartPage from './pages/Cart/CartPage';
 import OrderRegistration from './pages/Cart/OrderRegistration';
@@ -30,7 +26,6 @@ import PurchasesOrdersPage from './pages/Sales/PurchasesOrdersPage';
 import PurchasesReturnsPage from './pages/Sales/PurchasesReturnsPage';
 import WarehouseSalesPage from './pages/Sales/WarehouseSalesPage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
-import AdminPanelPage from './pages/Admin/AdminPanelPage';
 import EmployeesPage from './pages/Profile/EmployeesPage';
 import ClientsPage from './pages/Profile/ClientsPage';
 import StorageAddressesPage from './pages/Profile/StorageAddressesPage';
@@ -39,21 +34,15 @@ import ProductModeration from './pages/Moderation/ProductModeration/ProductModer
 import SellersPage from './pages/Profile/SellersPage';
 import Organization from './pages/Settings/Organization';
 import PrintSettings from './pages/Settings/PrintSettings';
+import IntegrationPage from './pages/Settings/IntegrationPage';
 import NotFound from './pages/NotFound/NotFound';
 import PartDetail from './pages/PartDetail/PartDetail';
 
-function AutopartsIndexRedirect() {
-  const showNew = useSelector((s) => s.publicInfo.showNewAutoparts !== false);
-  return <Navigate to={showNew ? '/autoparts/new' : '/autoparts/used'} replace />;
-}
+
 
 function App() {
   const dispatch = useDispatch();
   const { token } = useSelector((state) => state.auth);
-
-  useEffect(() => {
-    dispatch(fetchPublicSiteConfig());
-  }, [dispatch]);
 
   // Check auth status on app load
   useEffect(() => {
@@ -97,15 +86,13 @@ function App() {
         {/* Основной layout — страницы без бокового меню */}
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Main />} />
-          <Route path="/autoparts" element={<AutopartsIndexRedirect />} />
+          <Route path="/autoparts" element={<Navigate to="/autoparts/new" replace />} />
           <Route path="/autoparts/new" element={<AutoParts />} />
           <Route path="/autoparts/used" element={<AutoParts />} />
           <Route path="/autoservice" element={<Home />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/order-reg" element={<OrderRegistration />} />
           <Route path="/my-parts/add" element={<AddPart />} />
-          <Route path="/vehicles/add" element={<AddVehiclePage />} />
-          <Route path="/vehicles/edit/:id" element={<EditVehiclePage />} />
           <Route path="/my-parts/edit/:id" element={<EditPart />} />
           <Route path="/part/:productId" element={<PartDetail />} />
 
@@ -115,12 +102,9 @@ function App() {
         {/* Layout с боковым меню для страниц профиля */}
         <Route path="/" element={<ProfileWithMenuLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/admin" element={<Navigate to="/admin-settings" replace />} />
-          <Route path="/admin-settings" element={<AdminPanelPage />} />
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-parts" element={<MyParts />} />
-          <Route path="/vehicles" element={<VehiclesList />} />
           <Route path="/purchases/orders" element={<PurchasesOrdersPage />} />
           <Route path="/purchases/returns" element={<PurchasesReturnsPage />} />
           <Route path="/sales/orders" element={<SalesOrdersPage />} />
@@ -132,6 +116,7 @@ function App() {
           <Route path="/settings/storage-addresses" element={<StorageAddressesPage />} />
           <Route path="/settings/organization" element={<Organization />} />
           <Route path="/settings/printers" element={<PrintSettings />} />
+          <Route path="/settings/integration" element={<IntegrationPage />} />
           <Route path="/moderation/pending-sellers" element={<PendingSellersPage />} />
           <Route path="/moderation/products" element={<ProductModeration />} />
           <Route path="/sellers" element={<SellersPage />} />

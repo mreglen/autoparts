@@ -1,10 +1,10 @@
 // src/pages/Navigation/Navigation.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, NavLink, useLocation } from 'react-router-dom';
+import { useNavigate, NavLink } from 'react-router-dom';
 import { logout } from '../../redux/slices/AuthSlice';
 import { selectCart } from '../../redux/slices/CartSlice';
-import { isAutopartsNavActive, useAutopartsLandingPath, useShowNewAutoparts } from '../../utils/autopartsPublic';
+import { fetchAdminOrganizationPhone } from '../../redux/slices/PublicInfoSlice';
 import Search from './Search/Search';
 import MobileBottomNav from '../../components/MobileBottomNav/MobileBottomNav';
 
@@ -41,10 +41,6 @@ const formatPhoneNumber = (phone) => {
 export default function Navigation() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const location = useLocation();
-    const autopartsPath = useAutopartsLandingPath();
-    const showNewAutoparts = useShowNewAutoparts();
-    const autopartsNavActive = isAutopartsNavActive(location.pathname, showNewAutoparts);
     const { user, token, permissionCodes } = useSelector((state) => state.auth);
     const cart = useSelector(selectCart);
     const { adminOrganizationPhone } = useSelector((state) => state.publicInfo);
@@ -56,6 +52,11 @@ export default function Navigation() {
     const hasPermission = (code) => {
         return permissionCodes && permissionCodes.includes(code);
     };
+
+    // Fetch admin organization phone on component mount
+    useEffect(() => {
+        dispatch(fetchAdminOrganizationPhone());
+    }, [dispatch]);
 
     const handleLogout = () => {
         dispatch(logout());
@@ -176,8 +177,9 @@ export default function Navigation() {
                     <nav className="flex flex-wrap justify-center gap-4">
                         {/* Всегда видимые пункты */}
                         <NavLink
-                            to={autopartsPath}
-                            className={`text-lg transition-colors ease-in-out ${autopartsNavActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
+                            to="/autoparts/new"
+                            className={({ isActive }) =>
+                                `text-lg transition-colors ease-in-out ${isActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
                                 }`}
                         >
                             Автозапчасти

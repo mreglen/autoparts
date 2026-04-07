@@ -28,6 +28,7 @@ from app.routers.clients import router as clients_router
 from app.routers.employees import router as employees_router
 from app.routers.delivery_methods import router as delivery_methods_router
 from app.routers.printers import router as printers_router
+from app.routers.avito_integration import router as avito_integration_router
 
 
 
@@ -65,4 +66,5 @@ api_router.include_router(clients_router)
 api_router.include_router(employees_router)
 api_router.include_router(delivery_methods_router)
 api_router.include_router(printers_router)
+api_router.include_router(avito_integration_router)
 
