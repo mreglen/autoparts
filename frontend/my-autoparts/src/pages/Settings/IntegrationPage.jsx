@@ -54,8 +54,13 @@ function CategoryPickerModal({
         const title = String(n?.title || '').trim();
         const children = Array.isArray(n?.children) ? n.children : [];
         const matched = title.toLowerCase().includes(q);
+        if (matched) {
+          // Если совпала категория — показываем всю ветку ниже (подкатегории не фильтруем).
+          out.push({ title, children });
+          return;
+        }
         const filteredChildren = filter(children);
-        if (matched || filteredChildren.length > 0) {
+        if (filteredChildren.length > 0) {
           out.push({ title, children: filteredChildren });
         }
       });
@@ -66,6 +71,7 @@ function CategoryPickerModal({
 
   const renderNodes = (nodes, path) => {
     if (!Array.isArray(nodes) || nodes.length === 0) return null;
+    const q = (query || '').trim();
     return (
       <ul className="space-y-1">
         {nodes.map((n, idx) => {
@@ -73,7 +79,7 @@ function CategoryPickerModal({
           const children = Array.isArray(n?.children) ? n.children : [];
           const key = `${path}/${idx}:${title}`;
           const hasChildren = children.length > 0;
-          const isExpanded = expanded.has(key);
+          const isExpanded = q ? true : expanded.has(key);
           return (
             <li key={key}>
               <div className="flex items-center gap-2">
@@ -81,6 +87,7 @@ function CategoryPickerModal({
                   <button
                     type="button"
                     onClick={() => toggle(key)}
+                    disabled={!!q}
                     className="w-6 h-6 inline-flex items-center justify-center border border-gray-300 rounded text-xs bg-white hover:bg-gray-50"
                     aria-label={isExpanded ? 'Свернуть' : 'Развернуть'}
                   >
@@ -232,10 +239,9 @@ export default function IntegrationPage() {
   const [savingBulkAction, setSavingBulkAction] = useState(false);
   const [importing, setImporting] = useState(false);
   const [storageLocations, setStorageLocations] = useState([]);
+  const [storageLocationsLoading, setStorageLocationsLoading] = useState(false);
   const [importStorageLocationId, setImportStorageLocationId] = useState('');
   const [importQuantity, setImportQuantity] = useState(1);
-  const [useFilePrice, setUseFilePrice] = useState(true);
-  const [importSalePrice, setImportSalePrice] = useState('');
   const [importWarnings, setImportWarnings] = useState([]);
   const [photoIndexes, setPhotoIndexes] = useState({});
   const [publishing, setPublishing] = useState(false);
@@ -277,6 +283,7 @@ export default function IntegrationPage() {
   useEffect(() => {
     if (!orgId) return;
     let active = true;
+    setStorageLocationsLoading(true);
     apiRequest(`/storage-locations?organization_id=${orgId}`, { method: 'GET' })
       .then((rows) => {
         if (!active) return;
@@ -287,7 +294,10 @@ export default function IntegrationPage() {
         }
       })
       .catch(() => {
-        if (active) setStorageLocations([]);
+        // Не затираем прошлый список — просто покажем fallback в UI.
+      })
+      .finally(() => {
+        if (active) setStorageLocationsLoading(false);
       });
     return () => {
       active = false;
@@ -352,8 +362,7 @@ export default function IntegrationPage() {
   const canImport =
     selectedRows.length > 0 &&
     importStorageLocationId &&
-    Number(importQuantity) > 0 &&
-    (useFilePrice || Number(importSalePrice) > 0);
+    Number(importQuantity) > 0;
 
   const handleToggleFilterCategory = (cat) => {
     setSelectAll(false);
@@ -437,12 +446,9 @@ export default function IntegrationPage() {
         rows: selectedRows,
         storage_location_id: Number(importStorageLocationId),
         quantity: Number(importQuantity),
-        use_file_price: useFilePrice,
+        use_file_price: true,
         update_existing: true,
       };
-      if (!useFilePrice) {
-        payload.sale_price = Number(importSalePrice);
-      }
       const data = await apiRequest(`/organizations/${orgId}/avito/autoload/import`, {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -1020,12 +1026,20 @@ export default function IntegrationPage() {
                       onChange={(e) => setImportStorageLocationId(e.target.value)}
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                     >
-                      <option value="">Выберите склад</option>
-                      {storageLocations.map((loc) => (
-                        <option key={loc.id} value={loc.id}>
-                          {loc.address || `Склад #${loc.id}`}
-                        </option>
-                      ))}
+                      {storageLocationsLoading ? (
+                        <option value="">Загрузка складов…</option>
+                      ) : storageLocations.length === 0 ? (
+                        <option value="">Склады не найдены</option>
+                      ) : (
+                        <>
+                          <option value="">Выберите склад</option>
+                          {storageLocations.map((loc) => (
+                            <option key={loc.id} value={loc.id}>
+                              {loc.address || `Склад #${loc.id}`}
+                            </option>
+                          ))}
+                        </>
+                      )}
                     </select>
                   </div>
                   <div>
@@ -1038,28 +1052,7 @@ export default function IntegrationPage() {
                       className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                     />
                   </div>
-                  <div className="flex items-end">
-                    <label className="inline-flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={useFilePrice}
-                        onChange={(e) => setUseFilePrice(e.target.checked)}
-                      />
-                      <span>Цена из файла</span>
-                    </label>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Цена прихода (если не из файла)</label>
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={importSalePrice}
-                      onChange={(e) => setImportSalePrice(e.target.value)}
-                      disabled={useFilePrice}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100"
-                    />
-                  </div>
+                  <div />
                 </div>
                 <div className="flex items-center justify-between">
                   <p className="text-xs text-gray-600">

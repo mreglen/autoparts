@@ -37,6 +37,9 @@ import PrintSettings from './pages/Settings/PrintSettings';
 import IntegrationPage from './pages/Settings/IntegrationPage';
 import NotFound from './pages/NotFound/NotFound';
 import PartDetail from './pages/PartDetail/PartDetail';
+import VehiclesList from './pages/Vehicles/VehiclesList';
+import AddVehiclePage from './pages/Vehicles/AddVehiclePage';
+import EditVehiclePage from './pages/Vehicles/EditVehiclePage';
 
 
 
@@ -105,6 +108,9 @@ function App() {
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-parts" element={<MyParts />} />
+          <Route path="/vehicles" element={<VehiclesList />} />
+          <Route path="/vehicles/add" element={<AddVehiclePage />} />
+          <Route path="/vehicles/edit/:id" element={<EditVehiclePage />} />
           <Route path="/purchases/orders" element={<PurchasesOrdersPage />} />
           <Route path="/purchases/returns" element={<PurchasesReturnsPage />} />
           <Route path="/sales/orders" element={<SalesOrdersPage />} />

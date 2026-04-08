@@ -681,11 +681,13 @@ async def set_avito_autoload_category(
         if body.sheet not in wb.sheetnames:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Лист '{body.sheet}' не найден")
         ws = wb[body.sheet]
-        header = [str(v).strip() if v is not None else "" for v in ws[2]]
         category_col = None
-        for idx, h in enumerate(header, start=1):
+        # Не используем ws[2] — в некоторых файлах openpyxl может отдавать усечённый ряд.
+        # Сканируем явными cell() до max_column.
+        for col_idx in range(1, (ws.max_column or 0) + 1):
+            h = str(ws.cell(row=2, column=col_idx).value or "").strip()
             if h == "Категория":
-                category_col = idx
+                category_col = col_idx
                 break
         if not category_col:
             raise HTTPException(
