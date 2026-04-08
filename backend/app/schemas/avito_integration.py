@@ -42,6 +42,22 @@ class AvitoAutoloadUploadResponse(BaseModel):
     avito_token_error: Optional[str] = None
 
 
+class AvitoAutoloadCategoryTreeNode(BaseModel):
+    title: str
+    children: list["AvitoAutoloadCategoryTreeNode"] = Field(default_factory=list)
+
+
+class AvitoAutoloadCategoryTreeResponse(BaseModel):
+    tree: list[AvitoAutoloadCategoryTreeNode] = Field(default_factory=list)
+    raw: Optional[dict[str, Any]] = None
+
+
+class AvitoAutoloadSetCategoryRequest(BaseModel):
+    sheet: str = Field(..., min_length=1, max_length=255)
+    row: int = Field(..., ge=5)
+    category: str = Field(..., min_length=1, max_length=255)
+
+
 class AvitoAutoloadActionRow(BaseModel):
     sheet: str = Field(..., min_length=1, max_length=255)
     row: int = Field(..., ge=5)
@@ -106,3 +122,6 @@ class AvitoAutoloadJobResponse(BaseModel):
     result: Optional[dict[str, Any]] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
+
+AvitoAutoloadCategoryTreeNode.model_rebuild()

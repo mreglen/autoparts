@@ -2,6 +2,160 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
 
+function CategoryPickerModal({
+  open,
+  orgId,
+  onClose,
+  onPick,
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [tree, setTree] = useState([]);
+  const [expanded, setExpanded] = useState(() => new Set());
+  const [query, setQuery] = useState('');
+
+  const toggle = (key) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!open || !orgId) return;
+    let active = true;
+    setLoading(true);
+    setError(null);
+    apiRequest(`/organizations/${orgId}/avito/autoload/category-tree`, { method: 'GET' })
+      .then((data) => {
+        if (!active) return;
+        const t = Array.isArray(data?.tree) ? data.tree : [];
+        setTree(t);
+      })
+      .catch((e) => {
+        if (active) setError(e?.message || String(e));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open, orgId]);
+
+  const filteredTree = useMemo(() => {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) return tree;
+    const filter = (nodes) => {
+      const out = [];
+      nodes.forEach((n) => {
+        const title = String(n?.title || '').trim();
+        const children = Array.isArray(n?.children) ? n.children : [];
+        const matched = title.toLowerCase().includes(q);
+        const filteredChildren = filter(children);
+        if (matched || filteredChildren.length > 0) {
+          out.push({ title, children: filteredChildren });
+        }
+      });
+      return out;
+    };
+    return filter(tree);
+  }, [tree, query]);
+
+  const renderNodes = (nodes, path) => {
+    if (!Array.isArray(nodes) || nodes.length === 0) return null;
+    return (
+      <ul className="space-y-1">
+        {nodes.map((n, idx) => {
+          const title = String(n?.title || '').trim();
+          const children = Array.isArray(n?.children) ? n.children : [];
+          const key = `${path}/${idx}:${title}`;
+          const hasChildren = children.length > 0;
+          const isExpanded = expanded.has(key);
+          return (
+            <li key={key}>
+              <div className="flex items-center gap-2">
+                {hasChildren ? (
+                  <button
+                    type="button"
+                    onClick={() => toggle(key)}
+                    className="w-6 h-6 inline-flex items-center justify-center border border-gray-300 rounded text-xs bg-white hover:bg-gray-50"
+                    aria-label={isExpanded ? 'Свернуть' : 'Развернуть'}
+                  >
+                    {isExpanded ? '-' : '+'}
+                  </button>
+                ) : (
+                  <span className="w-6 h-6 inline-flex items-center justify-center text-gray-300">•</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onPick(title)}
+                  className="text-sm text-blue-700 hover:underline text-left"
+                >
+                  {title || '(без названия)'}
+                </button>
+              </div>
+              {hasChildren && isExpanded && (
+                <div className="ml-8 mt-1">
+                  {renderNodes(children, key)}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
+
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full max-w-3xl max-h-[85vh] rounded-lg shadow-lg flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 gap-4">
+          <h3 className="text-lg font-semibold text-gray-900">Выбор категории</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-2 py-1 text-sm text-gray-600 hover:text-gray-900"
+          >
+            Закрыть
+          </button>
+        </div>
+        <div className="p-4 overflow-auto">
+          <div className="flex items-center gap-2 mb-3">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Поиск по дереву…"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            />
+          </div>
+          {loading ? (
+            <p className="text-sm text-gray-500">Загрузка дерева категорий…</p>
+          ) : error ? (
+            <p className="text-sm text-red-700 whitespace-pre-wrap">{error}</p>
+          ) : filteredTree.length === 0 ? (
+            <p className="text-sm text-gray-500">Ничего не найдено.</p>
+          ) : (
+            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              {renderNodes(filteredTree, 'root')}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function formatErrorMessage(err) {
   const msg = err?.message || String(err);
   return msg;
@@ -68,6 +222,8 @@ export default function IntegrationPage() {
   const [uploadResult, setUploadResult] = useState(null);
   const [savedPath, setSavedPath] = useState('');
   const [isAdsModalOpen, setIsAdsModalOpen] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [categoryTarget, setCategoryTarget] = useState(null); // { sheet, row }
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
@@ -337,6 +493,43 @@ export default function IntegrationPage() {
       setError(null);
     } catch {
       setError('Не удалось скопировать ссылку в буфер обмена.');
+    }
+  };
+
+  const openCategoryPicker = (row) => {
+    if (!row?.sheet || row?.row == null) return;
+    setCategoryTarget({ sheet: row.sheet, row: row.row });
+    setIsCategoryModalOpen(true);
+  };
+
+  const handlePickCategory = async (category) => {
+    if (!orgId || !categoryTarget) return;
+    setError(null);
+    setNotice(null);
+    try {
+      const data = await apiRequest(`/organizations/${orgId}/avito/autoload/set-category`, {
+        method: 'POST',
+        body: JSON.stringify({
+          sheet: categoryTarget.sheet,
+          row: categoryTarget.row,
+          category,
+        }),
+      });
+      setItems(data.items || []);
+      setSavedPath(data.saved_path || '');
+      const summary = {
+        local_validation_ok: data.local_validation_ok,
+        local_errors: data.local_errors || [],
+        avito_report: data.avito_report,
+        avito_token_error: data.avito_token_error,
+        updated_at: new Date().toISOString(),
+      };
+      setUploadResult(shouldShowResultCard(summary) ? summary : null);
+      setNotice('Категория сохранена в XLSX.');
+      setIsCategoryModalOpen(false);
+      setCategoryTarget(null);
+    } catch (e) {
+      setError(formatErrorMessage(e));
     }
   };
 
@@ -753,7 +946,16 @@ export default function IntegrationPage() {
                           {row.description || '-'}
                         </td>
                         <td className="px-3 py-2">{row.quantity || '-'}</td>
-                        <td className="px-3 py-2">{row.category || '-'}</td>
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => openCategoryPicker(row)}
+                            className="text-blue-700 hover:underline"
+                            title="Выбрать категорию"
+                          >
+                            {row.category || '-'}
+                          </button>
+                        </td>
                         <td className="px-3 py-2">{row.avito_status || '-'}</td>
                         <td className="px-3 py-2">
                           {currentPhoto ? (
@@ -892,6 +1094,16 @@ export default function IntegrationPage() {
           </div>
         </div>
       )}
+
+      <CategoryPickerModal
+        open={isCategoryModalOpen}
+        orgId={orgId}
+        onClose={() => {
+          setIsCategoryModalOpen(false);
+          setCategoryTarget(null);
+        }}
+        onPick={handlePickCategory}
+      />
     </div>
   );
 }

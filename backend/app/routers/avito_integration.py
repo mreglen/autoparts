@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import time
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional
@@ -32,6 +33,8 @@ from app.schemas.avito_integration import (
     AvitoAutoloadJobResponse,
     AvitoAutoloadPublishResponse,
     AvitoAutoloadUploadResponse,
+    AvitoAutoloadCategoryTreeResponse,
+    AvitoAutoloadSetCategoryRequest,
     AvitoCredentialsResponse,
     AvitoCredentialsUpdate,
     AvitoLastAutoloadSnapshot,
@@ -52,6 +55,50 @@ ACTION_VALUES = {
     "unpublish": "Снять с публикации",
     "delete": "Удалить объявление",
 }
+
+_CATEGORY_TREE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_CATEGORY_TREE_TTL_S = 20 * 60
+
+
+def _normalize_category_tree(raw: Any) -> list[dict[str, Any]]:
+    def to_nodes(obj: Any) -> list[dict[str, Any]]:
+        if obj is None:
+            return []
+        if isinstance(obj, list):
+            out: list[dict[str, Any]] = []
+            for it in obj:
+                out.extend(to_nodes(it))
+            return out
+        if not isinstance(obj, dict):
+            return []
+
+        title = str(
+            obj.get("title")
+            or obj.get("name")
+            or obj.get("label")
+            or obj.get("text")
+            or obj.get("value")
+            or ""
+        ).strip()
+
+        children_src = (
+            obj.get("children")
+            or obj.get("nested")
+            or obj.get("items")
+            or obj.get("nodes")
+            or obj.get("subcategories")
+            or []
+        )
+        children = to_nodes(children_src)
+        if not title:
+            return children
+        return [{"title": title, "children": children}]
+
+    if isinstance(raw, dict):
+        for key in ("tree", "categories", "result", "data", "items", "nodes"):
+            if key in raw:
+                return to_nodes(raw.get(key))
+    return to_nodes(raw)
 
 
 def _remove_existing_avito_xlsx_files(base_dir: Path) -> None:
@@ -237,6 +284,38 @@ async def _push_file_to_avito(db: Session, org_id: str, filename: str, file_byte
         avito_token_error = str(e)
 
     return avito_upload, avito_upload_status, avito_report, avito_token_error
+
+
+@router.get("/{org_id}/avito/autoload/category-tree", response_model=AvitoAutoloadCategoryTreeResponse)
+async def get_avito_autoload_category_tree(
+    org_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+
+    now = time.time()
+    cached = _CATEGORY_TREE_CACHE.get(org_id)
+    if cached and now - cached[0] < _CATEGORY_TREE_TTL_S:
+        raw = cached[1]
+        return AvitoAutoloadCategoryTreeResponse(tree=_normalize_category_tree(raw), raw=raw)
+
+    row = db.query(OrganizationAvitoIntegration).filter(
+        OrganizationAvitoIntegration.organization_id == org_id
+    ).first()
+    if not row or not row.client_id or not row.client_secret_encrypted:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Авито не настроена")
+
+    try:
+        sec = decrypt_secret(row.client_secret_encrypted)
+        token = await avito_api_svc.fetch_access_token(row.client_id, sec)
+        raw = await avito_api_svc.get_autoload_user_docs_tree(token)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+
+    _CATEGORY_TREE_CACHE[org_id] = (now, raw)
+    return AvitoAutoloadCategoryTreeResponse(tree=_normalize_category_tree(raw), raw=raw)
 
 
 @router.get("/{org_id}/avito/credentials", response_model=AvitoCredentialsResponse)
@@ -561,6 +640,82 @@ async def upload_avito_autoload(
     except Exception:
         logger.exception("Не удалось сохранить кэш автозагрузки")
         db.rollback()
+
+    return AvitoAutoloadUploadResponse(
+        saved_path=rel_path,
+        items=parsed.items,
+        local_validation_ok=parsed.local_ok,
+        local_errors=parsed.local_errors,
+        sheets_parsed=parsed.sheets_parsed,
+        avito_upload=avito_upload,
+        avito_upload_status=avito_upload_status,
+        avito_report=avito_report,
+        avito_token_error=avito_token_error,
+    )
+
+
+@router.post("/{org_id}/avito/autoload/set-category", response_model=AvitoAutoloadUploadResponse)
+async def set_avito_autoload_category(
+    org_id: str,
+    body: AvitoAutoloadSetCategoryRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+
+    cache = db.query(OrganizationAvitoAutoloadCache).filter(
+        OrganizationAvitoAutoloadCache.organization_id == org_id
+    ).first()
+    if not cache or not cache.saved_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки не найден")
+
+    rel_path = cache.saved_path
+    project_root = Path(__file__).resolve().parents[2]
+    xlsx_path = project_root / rel_path.lstrip("/")
+    if not xlsx_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки на диске не найден")
+
+    wb = load_workbook(str(xlsx_path), read_only=False)
+    try:
+        if body.sheet not in wb.sheetnames:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Лист '{body.sheet}' не найден")
+        ws = wb[body.sheet]
+        header = [str(v).strip() if v is not None else "" for v in ws[2]]
+        category_col = None
+        for idx, h in enumerate(header, start=1):
+            if h == "Категория":
+                category_col = idx
+                break
+        if not category_col:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"На листе '{body.sheet}' не найдена колонка 'Категория'",
+            )
+        ws.cell(row=int(body.row), column=category_col, value=body.category.strip())
+
+        out = BytesIO()
+        wb.save(out)
+        updated_bytes = out.getvalue()
+    finally:
+        wb.close()
+
+    xlsx_path.write_bytes(updated_bytes)
+    parsed = parse_and_validate_avito_autoload(updated_bytes)
+    avito_upload, avito_upload_status, avito_report, avito_token_error = (None, None, None, None)
+    _save_autoload_cache(
+        db,
+        org_id,
+        saved_path=rel_path,
+        items=parsed.items,
+        local_validation_ok=parsed.local_ok,
+        local_errors=parsed.local_errors,
+        sheets_parsed=parsed.sheets_parsed,
+        avito_upload=avito_upload,
+        avito_upload_status=avito_upload_status,
+        avito_report=avito_report,
+        avito_token_error=avito_token_error,
+    )
 
     return AvitoAutoloadUploadResponse(
         saved_path=rel_path,

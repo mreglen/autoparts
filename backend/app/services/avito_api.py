@@ -50,6 +50,24 @@ async def fetch_access_token(client_id: str, client_secret: str) -> str:
     raise RuntimeError(f"Не удалось получить токен Авито (HTTP {last.status_code if last else '?'}): {body}")
 
 
+async def get_autoload_user_docs_tree(access_token: str) -> dict[str, Any]:
+    """GET /autoload/v1/user-docs/tree — дерево категорий и параметров автозагрузки."""
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        r = await client.get(
+            f"{AVITO_BASE}/autoload/v1/user-docs/tree",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        try:
+            data: Any = r.json()
+        except Exception:
+            data = {"raw": r.text[:8000]}
+        if r.status_code != 200:
+            raise RuntimeError(f"Avito tree error (HTTP {r.status_code}): {data}")
+        if isinstance(data, dict):
+            return data
+        return {"data": data}
+
+
 async def upload_autoload_xlsx(access_token: str, filename: str, file_bytes: bytes) -> tuple[int, dict[str, Any]]:
     """
     Загрузка файла автозагрузки. Эндпоинт: POST /autoload/v1/upload
