@@ -4,6 +4,7 @@ from app.core.config import settings
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 import os
+import json
 import exifread
 from pillow_heif import register_heif_opener
 
@@ -156,6 +157,8 @@ def process_and_upload_photo(
     add_watermark: bool = False,
     logo_path: str = None,
     vehicle_photo_id: int | None = None,
+    pending_product_id: int | None = None,
+    pending_photo_index: int | None = None,
 ):
     """
     Celery task to process photo: remove metadata, convert to WebP, compress, and move to final location.
@@ -272,7 +275,54 @@ def process_and_upload_photo(
             print(f"   DB session created, executing SQL...")
             
             try:
-                if vehicle_photo_id is not None:
+                # Basename temp filename is used for both ProductPhoto lookup and pending updates
+                temp_basename = os.path.basename(temp_file_path)
+
+                # Pending workflow: update pending_products.photos JSON by index
+                if pending_product_id is not None and pending_photo_index is not None:
+                    from app.models.pending_product import PendingProduct
+
+                    pending_product = (
+                        db.query(PendingProduct)
+                        .filter(PendingProduct.id == pending_product_id)
+                        .with_for_update()
+                        .first()
+                    )
+
+                    if pending_product:
+                        photos_list = json.loads(pending_product.photos) if pending_product.photos else []
+
+                        did_update = False
+
+                        # Preferred path: update by index
+                        if pending_photo_index < len(photos_list):
+                            photos_list[pending_photo_index] = media_path
+                            did_update = True
+                        else:
+                            # Fallback: if list changed while the task was running,
+                            # replace by basename match (avoids writing `null` into JSON)
+                            match_idx = None
+                            for i, p in enumerate(photos_list):
+                                if isinstance(p, str) and temp_basename in p:
+                                    match_idx = i
+                                    break
+
+                            if match_idx is not None:
+                                photos_list[match_idx] = media_path
+                                did_update = True
+
+                        if did_update:
+                            pending_product.photos = json.dumps(photos_list)
+                            db.commit()
+                            db.refresh(pending_product)
+                            db_updated = True
+                        else:
+                            print(
+                                f"⚠️ Pending photo update skipped: "
+                                f"index={pending_photo_index}, temp_basename={temp_basename}"
+                            )
+
+                elif vehicle_photo_id is not None:
                     from app.models.vehicle_photo import VehiclePhoto
 
                     # Повторная проверка перед записью в БД: финальный файл уже на месте
@@ -291,8 +341,6 @@ def process_and_upload_photo(
                     else:
                         print(f"⚠️ VehiclePhoto id={vehicle_photo_id} not found")
                 else:
-                    # Извлекаем basename из temp_file_path для поиска
-                    temp_basename = os.path.basename(temp_file_path)
                     print(f"   Searching for photo with basename: {temp_basename}")
 
                     # Сначала пытаемся найти через ORM по basename

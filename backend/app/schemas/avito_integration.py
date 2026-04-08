@@ -87,3 +87,22 @@ class AvitoAutoloadPublishResponse(BaseModel):
     avito_upload_status: Optional[int] = None
     avito_report: Optional[dict[str, Any]] = None
     avito_token_error: Optional[str] = None
+
+
+class AvitoAutoloadExportAsyncRequest(BaseModel):
+    product_ids: list[int] = Field(default_factory=list, min_length=1)
+    publish_after_export: bool = False
+
+
+class AvitoAutoloadJobResponse(BaseModel):
+    id: int
+    job_type: str
+    status: str
+    stage: str
+    processed_count: int
+    total_count: int
+    result_file_ref: Optional[str] = None
+    error_summary: Optional[str] = None
+    result: Optional[dict[str, Any]] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None

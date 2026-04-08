@@ -84,6 +84,23 @@ const EditPart = () => {
   const [currentMediaItems, setCurrentMediaItems] = useState([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
 
+  const extractTempFilename = (mediaFile) => {
+    if (!mediaFile) return null;
+    if (mediaFile.tempPath) {
+      const parts = mediaFile.tempPath.split('/');
+      return parts[parts.length - 1] || null;
+    }
+    if (mediaFile.finalPath && mediaFile.finalPath.includes('/temp/')) {
+      const parts = mediaFile.finalPath.split('/');
+      return parts[parts.length - 1] || null;
+    }
+    if (mediaFile.filename) return mediaFile.filename;
+    if (mediaFile.finalFilename && mediaFile.finalPath && mediaFile.finalPath.includes('/temp/')) {
+      return mediaFile.finalFilename;
+    }
+    return null;
+  };
+
   // Загрузка данных продукта при получении
   useEffect(() => {
     if (currentProduct && !productLoaded) {
@@ -255,7 +272,7 @@ const EditPart = () => {
               });
               
               imageFiles[imageFiles.indexOf(file)] = fileWithPath;
-              uploadedTempFiles.push(uploadResult.temp_filename);
+              setUploadedTempFiles((prev) => [...prev, uploadResult.temp_filename]);
               console.log('📸 Photo saved to temp folder - will process on product save');
             } else if (uploadResult.path && uploadResult.filename) {
               // Synchronous response (old behavior, kept for backwards compatibility)
@@ -266,7 +283,7 @@ const EditPart = () => {
               });
               
               imageFiles[imageFiles.indexOf(file)] = fileWithPath;
-              uploadedTempFiles.push(uploadResult.filename);
+              setUploadedTempFiles((prev) => [...prev, uploadResult.filename]);
               console.log('Video successfully uploaded with path:', uploadResult.path);
             } else {
               console.error('Photo upload result missing:', uploadResult);
@@ -392,7 +409,7 @@ const EditPart = () => {
             setVideos((prev) => prev.map((v, idx) => 
               idx === videoIndex ? fileWithPath : v
             ));
-            uploadedTempFiles.push(uploadResult.temp_filename || uploadResult.filename);
+            setUploadedTempFiles((prev) => [...prev, uploadResult.temp_filename || uploadResult.filename]);
             console.log('📹 Video saved to temp folder - will process on product save');
           } else if (uploadResult.path && uploadResult.filename) {
             // Synchronous response (old behavior, kept for backwards compatibility)
@@ -406,7 +423,7 @@ const EditPart = () => {
             setVideos((prev) => prev.map((v, idx) => 
               idx === videoIndex ? fileWithPath : v
             ));
-            uploadedTempFiles.push(uploadResult.filename);
+            setUploadedTempFiles((prev) => [...prev, uploadResult.filename]);
             console.log('Video successfully uploaded with path:', uploadResult.path);
           } else {
             console.error('Video upload response missing path or filename:', uploadResult);
@@ -432,16 +449,17 @@ const EditPart = () => {
     const fileToRemove = photos[index];
     
     // If it's a File/Blob that was uploaded, delete from temp storage
-    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.finalFilename) {
+    if (fileToRemove instanceof File || fileToRemove instanceof Blob) {
       try {
-        // Extract filename from path and delete
-        const pathParts = fileToRemove.finalPath.split('/');
-        const filename = pathParts[pathParts.length - 1];
-        await apiRequest(`/upload/temp/${encodeURIComponent(filename)}`, {
-          method: 'DELETE'
-        }).catch(err => {
-          console.warn(`Failed to delete file ${filename}:`, err);
-        });
+        const filename = extractTempFilename(fileToRemove);
+        if (filename) {
+          await apiRequest(`/upload/temp/${encodeURIComponent(filename)}`, {
+            method: 'DELETE'
+          }).catch(err => {
+            console.warn(`Failed to delete file ${filename}:`, err);
+          });
+          setUploadedTempFiles((prev) => prev.filter((trackedName) => trackedName !== filename));
+        }
       } catch (error) {
         console.error('Error deleting file:', error);
       }
@@ -454,16 +472,17 @@ const EditPart = () => {
     const fileToRemove = videos[index];
     
     // If it's a File/Blob that was uploaded, delete from temp storage
-    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.finalFilename) {
+    if (fileToRemove instanceof File || fileToRemove instanceof Blob) {
       try {
-        // Extract filename from path and delete
-        const pathParts = fileToRemove.finalPath.split('/');
-        const filename = pathParts[pathParts.length - 1];
-        await apiRequest(`/upload/temp/${encodeURIComponent(filename)}`, {
-          method: 'DELETE'
-        }).catch(err => {
-          console.warn(`Failed to delete file ${filename}:`, err);
-        });
+        const filename = extractTempFilename(fileToRemove);
+        if (filename) {
+          await apiRequest(`/upload/temp/${encodeURIComponent(filename)}`, {
+            method: 'DELETE'
+          }).catch(err => {
+            console.warn(`Failed to delete file ${filename}:`, err);
+          });
+          setUploadedTempFiles((prev) => prev.filter((trackedName) => trackedName !== filename));
+        }
       } catch (error) {
         console.error('Error deleting file:', error);
       }
@@ -659,16 +678,14 @@ const EditPart = () => {
     
     // Extract filenames from photos
     photos.forEach(f => {
-      if (f.finalFilename) {
-        filesToDelete.add(f.finalFilename);
-      }
+      const filename = extractTempFilename(f);
+      if (filename) filesToDelete.add(filename);
     });
     
     // Extract filenames from videos
     videos.forEach(f => {
-      if (f.finalFilename) {
-        filesToDelete.add(f.finalFilename);
-      }
+      const filename = extractTempFilename(f);
+      if (filename) filesToDelete.add(filename);
     });
     
     // Also include tracked temp files

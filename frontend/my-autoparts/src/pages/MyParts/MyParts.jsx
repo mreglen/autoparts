@@ -289,6 +289,7 @@ function MyParts() {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [avitoIntegrationReady, setAvitoIntegrationReady] = useState(false);
+  const [avitoJob, setAvitoJob] = useState(null);
   const [formData, setFormData] = useState({
     quantity: '',
     price: '',
@@ -420,8 +421,11 @@ function MyParts() {
   const handleExportPart = async (part) => {
     if (!user?.organization_id || !part?.id) return;
     try {
-      await apiRequest(`/organizations/${user.organization_id}/avito/autoload/export/${part.id}`, { method: 'POST' });
-      alert('Позиция экспортирована в файл Avito XLSX');
+      const started = await apiRequest(`/organizations/${user.organization_id}/avito/autoload/export-async`, {
+        method: 'POST',
+        body: JSON.stringify({ product_ids: [part.id] }),
+      });
+      setAvitoJob(started);
     } catch (e) {
       alert(`Не удалось экспортировать: ${e.message || 'ошибка'}`);
     }
@@ -430,15 +434,41 @@ function MyParts() {
   const handleBulkAction = async () => {
     if (!user?.organization_id || selectedParts.size === 0) return;
     try {
-      await apiRequest(`/organizations/${user.organization_id}/avito/autoload/export`, {
+      const started = await apiRequest(`/organizations/${user.organization_id}/avito/autoload/export-async`, {
         method: 'POST',
         body: JSON.stringify({ product_ids: Array.from(selectedParts) }),
       });
-      alert(`Экспортировано позиций: ${selectedParts.size}`);
+      setAvitoJob(started);
     } catch (e) {
       alert(`Не удалось выполнить экспорт: ${e.message || 'ошибка'}`);
     }
   };
+
+  useEffect(() => {
+    if (!avitoJob?.id || !user?.organization_id) return undefined;
+    let cancelled = false;
+    const timer = setInterval(async () => {
+      try {
+        const data = await apiRequest(`/organizations/${user.organization_id}/avito/autoload/jobs/${avitoJob.id}`, { method: 'GET' });
+        if (!cancelled) {
+          setAvitoJob(data);
+          if (data.status === 'completed') {
+            clearInterval(timer);
+            alert(`Экспорт Avito завершен. Обработано: ${data.processed_count}/${data.total_count}`);
+          } else if (data.status === 'failed') {
+            clearInterval(timer);
+            alert(`Экспорт Avito завершился ошибкой: ${data.error_summary || 'неизвестная ошибка'}`);
+          }
+        }
+      } catch (e) {
+        // keep polling; transient errors are tolerated
+      }
+    }, 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [avitoJob?.id, user?.organization_id]);
 
   const handleConfirm = async () => {
     if (!selectedPart || !operationType) return;
@@ -801,6 +831,11 @@ function MyParts() {
         >
           Добавить запчасть
         </button>
+        {avitoJob && (
+          <div className="text-sm text-gray-600">
+            Avito export: {avitoJob.status} ({avitoJob.processed_count || 0}/{avitoJob.total_count || 0})
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

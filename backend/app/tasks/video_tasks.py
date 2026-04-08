@@ -6,10 +6,21 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, text
 import os
 import shutil
+import json
 
 
 @celery_app.task(bind=True, max_retries=3)
-def process_and_upload_video(self, temp_file_path: str, original_filename: str, organization_id: str, add_watermark: bool, logo_path: str = None, product_video_id: int = None):
+def process_and_upload_video(
+    self,
+    temp_file_path: str,
+    original_filename: str,
+    organization_id: str,
+    add_watermark: bool,
+    logo_path: str = None,
+    product_video_id: int = None,
+    pending_product_id: int | None = None,
+    pending_video_index: int | None = None,
+):
     """
     видео таскс обновлён
     Process video: compress, format, apply watermark, and move to final location.
@@ -33,6 +44,7 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
         print(f"✓ Temp file exists, size: {os.path.getsize(temp_file_path):,} bytes")
         
         # Get video duration before processing
+        db_updated = False
         try:
             duration = get_video_duration(temp_file_path)
             print(f"Video duration: {duration:.2f} seconds")
@@ -224,46 +236,94 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
             print(f"   DB session created, executing SQL...")
             
             try:
-                # Прямой SQL запрос для обновления (чтобы избежать проблем с ORM)
-                update_query = text("""
-                    UPDATE product_videos
-                    SET video_url = :video_url, 
-                        processing_status = :status,
-                        updated_at = NOW()
-                    WHERE id = :video_id
-                """)
-                
-                print(f"   Executing: UPDATE product_videos SET video_url='{media_path}', processing_status='completed' WHERE id={product_video_id}")
-                
-                result = db.execute(
-                    update_query,
-                    {
-                        "video_url": media_path,
-                        "status": "completed",
-                        "video_id": product_video_id
-                    }
-                )
-                
-                rows_updated = result.rowcount
-                print(f"   Rows affected: {rows_updated}")
-                
-                db.commit()
-                print(f"   ✅ Transaction committed!")
-                
-                # Проверяем что действительно обновилось
-                verify_query = text("SELECT video_url, processing_status FROM product_videos WHERE id = :id")
-                verify_result = db.execute(verify_query, {"id": product_video_id}).first()
-                
-                if verify_result:
-                    print(f"   ✅ Verification: video_url='{verify_result.video_url}', status='{verify_result.processing_status}'")
-                    if verify_result.video_url == media_path and verify_result.processing_status == 'completed':
-                        print(f"✅ Database updated successfully via SQL! Video {product_video_id} now points to: {media_path}")
-                    else:
-                        print(f"⚠️ Warning: Update succeeded but values don't match!")
-                        print(f"   Expected: video_url='{media_path}', status='completed'")
-                        print(f"   Got: video_url='{verify_result.video_url}', status='{verify_result.processing_status}'")
+                # Pending workflow: update pending_products.videos JSON by index
+                if pending_product_id is not None and pending_video_index is not None:
+                    from app.models.pending_product import PendingProduct
+
+                    pending_product = (
+                        db.query(PendingProduct)
+                        .filter(PendingProduct.id == pending_product_id)
+                        .with_for_update()
+                        .first()
+                    )
+
+                    if pending_product:
+                        videos_list = json.loads(pending_product.videos) if pending_product.videos else []
+
+                        did_update = False
+
+                        # Preferred path: update by index
+                        if pending_video_index < len(videos_list):
+                            videos_list[pending_video_index] = media_path
+                            did_update = True
+                        else:
+                            # Fallback: if list changed while the task was running,
+                            # replace by basename match (avoids writing `null` into JSON)
+                            temp_basename = os.path.basename(temp_file_path)
+                            match_idx = None
+                            for i, p in enumerate(videos_list):
+                                if isinstance(p, str) and temp_basename in p:
+                                    match_idx = i
+                                    break
+
+                            if match_idx is not None:
+                                videos_list[match_idx] = media_path
+                                did_update = True
+
+                        if did_update:
+                            pending_product.videos = json.dumps(videos_list)
+                            db.commit()
+                            db.refresh(pending_product)
+                            db_updated = True
+                        else:
+                            print(
+                                f"⚠️ Pending video update skipped: "
+                                f"index={pending_video_index}, temp_basename={os.path.basename(temp_file_path)}"
+                            )
+
+                # Product workflow (existing behavior)
                 else:
-                    print(f"⚠️ Warning: Could not verify update - record {product_video_id} not found")
+                    # Прямой SQL запрос для обновления (чтобы избежать проблем с ORM)
+                    update_query = text("""
+                        UPDATE product_videos
+                        SET video_url = :video_url, 
+                            processing_status = :status,
+                            updated_at = NOW()
+                        WHERE id = :video_id
+                    """)
+                    
+                    print(f"   Executing: UPDATE product_videos SET video_url='{media_path}', processing_status='completed' WHERE id={product_video_id}")
+                    
+                    result = db.execute(
+                        update_query,
+                        {
+                            "video_url": media_path,
+                            "status": "completed",
+                            "video_id": product_video_id
+                        }
+                    )
+                    
+                    rows_updated = result.rowcount
+                    print(f"   Rows affected: {rows_updated}")
+                    
+                    db.commit()
+                    print(f"   ✅ Transaction committed!")
+                    
+                    # Проверяем что действительно обновилось
+                    verify_query = text("SELECT video_url, processing_status FROM product_videos WHERE id = :id")
+                    verify_result = db.execute(verify_query, {"id": product_video_id}).first()
+                    
+                    if verify_result:
+                        print(f"   ✅ Verification: video_url='{verify_result.video_url}', status='{verify_result.processing_status}'")
+                        if verify_result.video_url == media_path and verify_result.processing_status == 'completed':
+                            print(f"✅ Database updated successfully via SQL! Video {product_video_id} now points to: {media_path}")
+                            db_updated = True
+                        else:
+                            print(f"⚠️ Warning: Update succeeded but values don't match!")
+                            print(f"   Expected: video_url='{media_path}', status='completed'")
+                            print(f"   Got: video_url='{verify_result.video_url}', status='{verify_result.processing_status}'")
+                    else:
+                        print(f"⚠️ Warning: Could not verify update - record {product_video_id} not found")
                     
             except Exception as sql_error:
                 print(f"   ⚠️ SQL execution failed: {sql_error}")
@@ -290,6 +350,7 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
                         
                         if video_record.video_url == media_path:
                             print(f"✅ Database updated via ORM! Video {product_video_id} now points to: {media_path}")
+                            db_updated = True
                         else:
                             print(f"⚠️ Warning: ORM update did not persist!")
                     else:
@@ -308,33 +369,36 @@ def process_and_upload_video(self, temp_file_path: str, original_filename: str, 
             print(f"⚠️ Video file saved but database NOT updated - manual fix may be required!")
             # Не прерываем задачу из-за ошибки БД - видео всё равно сохранено
         
-        # Теперь можно удалить temp файл
-        # Даём небольшую задержку чтобы файл точно перестал использоваться
-        import time
-        time.sleep(0.5)  # Ждём 0.5 секунды
-        
-        try:
-            if os.path.exists(temp_file_path):
-                # Пробуем несколько раз с паузами
-                max_attempts = 3
-                for attempt in range(max_attempts):
-                    try:
-                        os.remove(temp_file_path)
-                        print(f"✅ Temp file deleted: {temp_file_path}")
-                        break
-                    except PermissionError as pe:
-                        if attempt < max_attempts - 1:
-                            print(f"⚠️ Attempt {attempt + 1}/{max_attempts} failed - file busy, retrying in 1s...")
-                            time.sleep(1)
-                        else:
-                            print(f"⚠️ Warning: Could not delete temp file after {max_attempts} attempts: {pe}")
-                            print(f"   File will be cleaned up by cleanup task later")
-                    except Exception as delete_error:
-                        print(f"⚠️ Warning: Could not delete temp file: {delete_error}")
-                        break
-        except Exception as e:
-            print(f"⚠️ Error during temp file cleanup: {e}")
-            # Это не критично - cleanup задача удалит позже
+        # ВАЖНО: удаляем temp только после подтвержденного обновления БД
+        if db_updated:
+            # Даём небольшую задержку чтобы файл точно перестал использоваться
+            import time
+            time.sleep(0.5)
+
+            try:
+                if os.path.exists(temp_file_path):
+                    # Пробуем несколько раз с паузами
+                    max_attempts = 3
+                    for attempt in range(max_attempts):
+                        try:
+                            os.remove(temp_file_path)
+                            print(f"✅ Temp file deleted: {temp_file_path}")
+                            break
+                        except PermissionError as pe:
+                            if attempt < max_attempts - 1:
+                                print(f"⚠️ Attempt {attempt + 1}/{max_attempts} failed - file busy, retrying in 1s...")
+                                time.sleep(1)
+                            else:
+                                print(f"⚠️ Warning: Could not delete temp file after {max_attempts} attempts: {pe}")
+                                print(f"   File will be cleaned up by cleanup task later")
+                        except Exception as delete_error:
+                            print(f"⚠️ Warning: Could not delete temp file: {delete_error}")
+                            break
+            except Exception as e:
+                print(f"⚠️ Error during temp file cleanup: {e}")
+                # Это не критично - cleanup задача удалит позже
+        else:
+            print(f"⚠️ Database update FAILED - keeping temp file for debugging: {temp_file_path}")
         
         # Remove trailing slash from BASE_URL if present to avoid double slashes
         base_url = settings.BASE_URL.rstrip('/')

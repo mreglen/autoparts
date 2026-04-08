@@ -463,9 +463,8 @@ def update_product(
                 )
                 db.add(association)
 
-    # Финальный commit (если не было видео или после обновления связей)
-    if not product.videos and not photo_ids:
-        db.commit()
+    # Финальный commit после возможного обновления связей с автомобилями
+    db.commit()
     
     db.refresh(db_product)
     return db_product

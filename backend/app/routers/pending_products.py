@@ -1,18 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 import json
-import requests
-import threading
+import os
 
 from app.db.database import get_db
 from app.models.pending_product import PendingProduct as PendingProductModel
-from app.models.product import ProductPhoto, ProductVideo
 from app.models.user import User
 from app.schemas.pending_product import PendingProductCreate, PendingProduct, PendingProductUpdate
 from app.core.auth import get_current_user
-from app.core.config import settings
-# Sequential code generation is handled inline
+from app.tasks.photo_tasks import process_and_upload_photo
+from app.tasks.video_tasks import process_and_upload_video
+from app.models.organization import Organization
 
 router = APIRouter(prefix="/pending-products", tags=["Pending Products"])
 
@@ -22,7 +21,6 @@ def create_pending_product(
     product_data: PendingProductCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    request: Request = None
 ):
     """Создать новую запчасть в статусе ожидания модерации"""
     
@@ -83,73 +81,123 @@ def create_pending_product(
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
-    
-    # Create ProductPhoto and ProductVideo records and trigger processing
-    base_url = settings.BASE_URL.rstrip('/')
-    token = None
-    if request and hasattr(request, 'headers'):
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header.startswith('Bearer '):
-            token = auth_header[7:]
-    
-    # Helper function to trigger processing in background
-    def trigger_processing(endpoint):
-        try:
-            headers = {'Authorization': f'Bearer {token}'} if token else {}
-            requests.post(f"{base_url}{endpoint}", headers=headers, timeout=5.0)
-        except Exception as e:
-            print(f"⚠️ Warning: Could not trigger processing {endpoint}: {e}")
-    
-    # Process photos
+
+    # Queue photo/video processing for pending workflow.
+    # We process media immediately, but we store results in `pending_products.photos/videos`
+    # (not in `product_photos/product_videos`, because products don't exist yet).
+    org = db.query(Organization).filter(Organization.id == current_user.organization_id).first()
+    add_watermark_flag = False
+    logo_file_path = None
+
+    if org and org.watermark is not None:
+        if org.watermark == 1:
+            admin_user = db.query(User).filter(User.is_admin == True).first()
+            if admin_user and admin_user.organization_id:
+                admin_org = db.query(Organization).filter(Organization.id == admin_user.organization_id).first()
+                if admin_org and admin_org.logo_organization:
+                    add_watermark_flag = True
+                    logo_path_value = admin_org.logo_organization.lstrip("/").lstrip("\\")
+                    if not logo_path_value.lower().startswith("uploads"):
+                        logo_file_path = os.path.join("uploads", logo_path_value)
+                    else:
+                        logo_file_path = logo_path_value
+        elif org.watermark == 2:
+            if org.logo_organization:
+                add_watermark_flag = True
+                logo_path_value = org.logo_organization.lstrip("/").lstrip("\\")
+                if not logo_path_value.lower().startswith("uploads"):
+                    logo_file_path = os.path.join("uploads", logo_path_value)
+                else:
+                    logo_file_path = logo_path_value
+
+    # Process photos (temp -> final) and update pending_products.photos JSON
     if product_data.photos:
-        for photo_url in product_data.photos:
-            try:
-                # Create ProductPhoto record
-                photo = ProductPhoto(
-                    product_id=db_product.id,
-                    photo_url=photo_url,
-                    organization_id=current_user.organization_id,
-                    processing_status='pending'
-                )
-                db.add(photo)
-                db.commit()
-                db.refresh(photo)
-                
-                # Trigger processing in background thread
-                thread = threading.Thread(
-                    target=trigger_processing,
-                    args=(f"/api/upload/start-photo-processing/{photo.id}",)
-                )
-                thread.start()
-            except Exception as e:
-                print(f"Error creating ProductPhoto record: {e}")
-    
-    # Process videos
+        for idx, photo_url in enumerate(product_data.photos):
+            if not isinstance(photo_url, str) or not photo_url.startswith("/temp/"):
+                continue
+
+            temp_parts = photo_url.lstrip("/").split("/")
+            if len(temp_parts) < 3 or temp_parts[0] != "temp":
+                continue
+
+            temp_org_id = temp_parts[1]
+            temp_filename = "/".join(temp_parts[2:])
+            abs_temp_file_path = os.path.abspath(os.path.join("uploads", "temp", temp_org_id, temp_filename))
+
+            if not os.path.exists(abs_temp_file_path):
+                print(f"⚠️ Temp photo file not found: {abs_temp_file_path}")
+                continue
+
+            process_and_upload_photo.delay(
+                temp_file_path=abs_temp_file_path,
+                original_filename=os.path.basename(temp_filename),
+                organization_id=current_user.organization_id,
+                subfolder="pictures",
+                add_watermark=add_watermark_flag,
+                logo_path=logo_file_path,
+                pending_product_id=db_product.id,
+                pending_photo_index=idx,
+            )
+
+    # Process videos (temp -> final) and update pending_products.videos JSON
     if product_data.videos:
-        for video_url in product_data.videos:
-            try:
-                # Create ProductVideo record
-                video = ProductVideo(
-                    product_id=db_product.id,
-                    video_url=video_url,
-                    organization_id=current_user.organization_id,
-                    processing_status='pending'
-                )
-                db.add(video)
-                db.commit()
-                db.refresh(video)
-                
-                # Trigger processing in background thread
-                thread = threading.Thread(
-                    target=trigger_processing,
-                    args=(f"/api/upload/start-video-processing/{video.id}",)
-                )
-                thread.start()
-            except Exception as e:
-                print(f"Error creating ProductVideo record: {e}")
-    
-    # Return the created product using Pydantic from_attributes
-    return db_product
+        for idx, video_url in enumerate(product_data.videos):
+            if not isinstance(video_url, str) or not video_url.startswith("/temp/"):
+                continue
+
+            temp_parts = video_url.lstrip("/").split("/")
+            if len(temp_parts) < 3 or temp_parts[0] != "temp":
+                continue
+
+            temp_org_id = temp_parts[1]
+            temp_filename = "/".join(temp_parts[2:])
+            abs_temp_file_path = os.path.abspath(os.path.join("uploads", "temp", temp_org_id, temp_filename))
+
+            if not os.path.exists(abs_temp_file_path):
+                print(f"⚠️ Temp video file not found: {abs_temp_file_path}")
+                continue
+
+            process_and_upload_video.delay(
+                temp_file_path=abs_temp_file_path,
+                original_filename=os.path.basename(temp_filename),
+                organization_id=current_user.organization_id,
+                add_watermark=add_watermark_flag,
+                logo_path=logo_file_path,
+                pending_product_id=db_product.id,
+                pending_video_index=idx,
+            )
+
+    # Return response with photos/videos/vehicle_ids as Python lists
+    result = db_product.__dict__.copy()
+    result.pop("_sa_instance_state", None)
+
+    if result.get("photos"):
+        try:
+            result["photos"] = json.loads(result["photos"])
+        except Exception:
+            result["photos"] = []
+    else:
+        result["photos"] = []
+
+    if result.get("videos"):
+        try:
+            result["videos"] = json.loads(result["videos"])
+        except Exception:
+            result["videos"] = []
+    else:
+        result["videos"] = []
+
+    if result.get("vehicle_ids"):
+        try:
+            result["vehicle_ids"] = json.loads(result["vehicle_ids"])
+        except Exception:
+            result["vehicle_ids"] = []
+    else:
+        result["vehicle_ids"] = []
+
+    # `creator_name` is a @property, so it won't be present in __dict__
+    result["creator_name"] = db_product.creator_name
+    return result
 
 
 @router.get("/", response_model=List[PendingProduct])
