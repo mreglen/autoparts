@@ -243,8 +243,8 @@ def run_avito_export_job(self, job_id: int):
                     "quantity": product.quantity,
                     "photos": photos_for_xlsx,
                     "avito_id": link_map.get(product.id, ""),
-                    "category": category,
-                    "template_sheet": _choose_template_sheet(existing_bytes, category),
+                    "category": "Запчасти и аксессуары",  # Всегда эта категория для листа "Объявления"
+                    "template_sheet": "Объявления",  # Всегда этот лист
                     "address": address,
                 }
             )
@@ -307,7 +307,7 @@ def run_avito_export_job(self, job_id: int):
             "exported_count": len(export_rows),
             "local_validation_ok": parsed.local_ok,
             "local_errors_count": len(parsed.local_errors),
-            "unmapped_count": sum(1 for r in export_rows if r.get("category") == "Запчасти/Другое"),
+            "unmapped_count": 0,  # Все товары имеют категорию "Запчасти и аксессуары"
             "avito_upload_status": avito_upload_status,
         }
         _set_job_state(

@@ -489,7 +489,7 @@ async def export_products_to_avito_autoload(
             ProductAvitoListingLink.organization_id == org_id,
             ProductAvitoListingLink.product_id == product.id,
         ).first()
-        category = _map_avito_category(product)
+        # category больше не используется - всегда "Запчасти и аксессуары"
         storage = storage_by_id.get(product.storage_location_id) if product.storage_location_id else None
         address = (storage.address if storage and storage.address else None) or (org.address or "")
         export_rows.append(
@@ -505,7 +505,8 @@ async def export_products_to_avito_autoload(
                 "quantity": product.quantity,
                 "photos": photos,
                 "avito_id": avito_link.avito_ad_id if avito_link else "",
-                "category": category,
+                "category": "Запчасти и аксессуары",  # Всегда эта категория для листа "Объявления"
+                "template_sheet": "Объявления",  # Всегда этот лист
                 "address": address,
             }
         )
@@ -629,7 +630,47 @@ async def upload_avito_autoload(
     dest_path = base_dir / dest_name
     dest_path.write_bytes(body)
 
-    parsed = parse_and_validate_avito_autoload(body)
+    # Добавляем лист "Объявления" из template.xlsx если его ещё нет
+    try:
+        template_path = Path(__file__).resolve().parents[2] / "templates" / "avito" / "template.xlsx"
+        if template_path.is_file():
+            # Открываем загруженный файл
+            wb = load_workbook(str(dest_path), read_only=False)
+            
+            # Открываем template
+            wb_template = load_workbook(str(template_path), read_only=False)
+            
+            # Проверяем, есть ли уже лист "Объявления"
+            if "Объявления" not in wb.sheetnames:
+                # Копируем лист из template
+                if "Объявления" in wb_template.sheetnames:
+                    source_sheet = wb_template["Объявления"]
+                    
+                    # Создаём новый лист в файле пользователя
+                    target_sheet = wb.create_sheet("Объявления")
+                    
+                    # Копируем все данные из template
+                    for row in source_sheet.iter_rows():
+                        for cell in row:
+                            target_sheet.cell(row=cell.row, column=cell.column, value=cell.value)
+                            
+                    # Копируем настройки колонок (ширину и т.д.)
+                    if hasattr(source_sheet, 'column_dimensions'):
+                        for col_dim in source_sheet.column_dimensions:
+                            target_sheet.column_dimensions[col_dim] = source_sheet.column_dimensions[col_dim]
+                    
+                    wb.save(str(dest_path))
+                    print(f"✅ Added 'Объявления' sheet from template to {dest_path}")
+            
+            wb.close()
+            wb_template.close()
+    except Exception as e:
+        print(f"⚠️ Warning: Could not add 'Объявления' sheet: {e}")
+        # Продолжаем даже если не удалось добавить лист
+
+    # Перечитываем файл после добавления листа "Объявления"
+    updated_body = dest_path.read_bytes()
+    parsed = parse_and_validate_avito_autoload(updated_body)
 
     # Автопубликация отключена: загрузка файла только сохраняет и валидирует XLSX.
     avito_upload, avito_upload_status, avito_report, avito_token_error = (None, None, None, None)

@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 from openpyxl import Workbook, load_workbook
 
-TEMPLATE_XLSX_REL_PATH = "backend/uploads/avito/qMHbBIoD51/autoload.xlsx"
+TEMPLATE_XLSX_REL_PATH = "backend/app/templates/avito/template.xlsx"
 # В исходных шаблонах Авито 5-я строка часто содержит пример/дефолты.
 # В реальных файлах пользователи иногда начинают данные с 5-й строки.
 # Поэтому парсер сканирует с 5-й строки, но умеет пропускать "примерную" строку,
@@ -308,6 +308,10 @@ def _is_data_sheet(sheet_name: str) -> bool:
 
 
 def _find_matching_sheet(wb: Workbook, category_name: str) -> str | None:
+    # ПРИОРИТЕТ: Всегда используем лист "Объявления" если он есть
+    if "Объявления" in wb.sheetnames:
+        return "Объявления"
+    
     if not category_name:
         return None
     category_lower = (category_name or "").strip().lower()
@@ -552,7 +556,12 @@ def upsert_products_to_avito_autoload(
         if ADDRESS_HEADER in col_map:
             row_values[ADDRESS_HEADER] = str(product.get("address") or "")
         if CATEGORY_HEADER in col_map:
-            row_values[CATEGORY_HEADER] = str(product.get("category") or DEFAULT_CATEGORY_VALUE)
+            # Всегда используем "Запчасти и аксессуары" для листа "Объявления"
+            ws_name = ws.title if hasattr(ws, 'title') else ""
+            if ws_name == "Объявления":
+                row_values[CATEGORY_HEADER] = "Запчасти и аксессуары"
+            else:
+                row_values[CATEGORY_HEADER] = str(product.get("category") or DEFAULT_CATEGORY_VALUE)
         if AD_TYPE_HEADER in col_map:
             row_values[AD_TYPE_HEADER] = str(product.get("ad_type") or "")
         if PHOTOS_HEADER in col_map:
