@@ -18,6 +18,7 @@ from app.models.product_avito_listing_link import ProductAvitoListingLink
 from app.models.storage_location import StorageLocation as StorageLocationModel
 from app.services import avito_api as avito_api_svc
 from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload, upsert_products_to_avito_autoload
+from app.services.avito_media import ensure_local_pictures
 from app.utils.avito_crypto import decrypt_secret
 
 
@@ -216,6 +217,19 @@ def run_avito_export_job(self, job_id: int):
             category = _map_avito_category(product)
             storage = storage_by_id.get(product.storage_location_id) if product.storage_location_id else None
             address = ((storage.address if storage and storage.address else "") or org_address).strip()
+            raw_photos = photo_map.get(product.id, [])
+            photos_for_xlsx = asyncio.run(
+                ensure_local_pictures(
+                    raw_photos,
+                    org_id=org_id,
+                    db=db,
+                    for_xlsx=True,
+                    limit=5,
+                    soft_fail=True,
+                    per_photo_timeout_s=25.0,
+                    celery_timeout_s=120,
+                )
+            )
             export_rows.append(
                 {
                     "id": product.id,
@@ -227,7 +241,7 @@ def run_avito_export_job(self, job_id: int):
                     "name": product.name,
                     "description": product.description,
                     "quantity": product.quantity,
-                    "photos": photo_map.get(product.id, []),
+                    "photos": photos_for_xlsx,
                     "avito_id": link_map.get(product.id, ""),
                     "category": category,
                     "template_sheet": _choose_template_sheet(existing_bytes, category),

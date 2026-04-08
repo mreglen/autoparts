@@ -35,6 +35,7 @@ from app.schemas.avito_integration import (
     AvitoAutoloadUploadResponse,
     AvitoAutoloadCategoryTreeResponse,
     AvitoAutoloadSetCategoryRequest,
+    AvitoAutoloadSetAdTypeRequest,
     AvitoCredentialsResponse,
     AvitoCredentialsUpdate,
     AvitoLastAutoloadSnapshot,
@@ -42,6 +43,7 @@ from app.schemas.avito_integration import (
 from app.tasks.avito_tasks import run_avito_export_job, run_avito_publish_job, _map_avito_category
 from app.services import avito_api as avito_api_svc
 from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload, upsert_products_to_avito_autoload
+from app.services.avito_media import ensure_local_pictures, normalize_for_xlsx
 from app.utils.avito_crypto import decrypt_secret, encrypt_secret
 
 logger = logging.getLogger(__name__)
@@ -472,7 +474,17 @@ async def export_products_to_avito_autoload(
         product = by_id.get(product_id)
         if not product:
             continue
-        photos = [ph.photo_url for ph in (product.photos or []) if ph.photo_url]
+        raw_photos = [ph.photo_url for ph in (product.photos or []) if ph.photo_url]
+        photos = await ensure_local_pictures(
+            raw_photos,
+            org_id=org_id,
+            db=db,
+            for_xlsx=True,
+            limit=5,
+            soft_fail=True,
+            per_photo_timeout_s=25.0,
+            celery_timeout_s=120,
+        )
         avito_link = db.query(ProductAvitoListingLink).filter(
             ProductAvitoListingLink.organization_id == org_id,
             ProductAvitoListingLink.product_id == product.id,
@@ -732,6 +744,91 @@ async def set_avito_autoload_category(
     )
 
 
+@router.post("/{org_id}/avito/autoload/set-ad-type", response_model=AvitoAutoloadUploadResponse)
+async def set_avito_autoload_ad_type(
+    org_id: str,
+    body: AvitoAutoloadSetAdTypeRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+
+    cache = db.query(OrganizationAvitoAutoloadCache).filter(
+        OrganizationAvitoAutoloadCache.organization_id == org_id
+    ).first()
+    if not cache or not cache.saved_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки не найден")
+
+    rel_path = cache.saved_path
+    project_root = Path(__file__).resolve().parents[2]
+    xlsx_path = project_root / rel_path.lstrip("/")
+    if not xlsx_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки на диске не найден")
+
+    normalized_ad_type = str(body.ad_type or "").strip()
+    allowed_ad_types = {"", "Товар приобретен на продажу", "Товар от производителя"}
+    if normalized_ad_type not in allowed_ad_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Некорректный вид объявления",
+        )
+
+    wb = load_workbook(str(xlsx_path), read_only=False)
+    try:
+        if body.sheet not in wb.sheetnames:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Лист '{body.sheet}' не найден")
+        ws = wb[body.sheet]
+        ad_type_col = None
+        for col_idx in range(1, (ws.max_column or 0) + 1):
+            h = str(ws.cell(row=2, column=col_idx).value or "").strip()
+            if h == "Вид объявления":
+                ad_type_col = col_idx
+                break
+        if not ad_type_col:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"На листе '{body.sheet}' не найдена колонка 'Вид объявления'",
+            )
+
+        ws.cell(row=int(body.row), column=ad_type_col, value=normalized_ad_type or "")
+
+        out = BytesIO()
+        wb.save(out)
+        updated_bytes = out.getvalue()
+    finally:
+        wb.close()
+
+    xlsx_path.write_bytes(updated_bytes)
+    parsed = parse_and_validate_avito_autoload(updated_bytes)
+    avito_upload, avito_upload_status, avito_report, avito_token_error = (None, None, None, None)
+    _save_autoload_cache(
+        db,
+        org_id,
+        saved_path=rel_path,
+        items=parsed.items,
+        local_validation_ok=parsed.local_ok,
+        local_errors=parsed.local_errors,
+        sheets_parsed=parsed.sheets_parsed,
+        avito_upload=avito_upload,
+        avito_upload_status=avito_upload_status,
+        avito_report=avito_report,
+        avito_token_error=avito_token_error,
+    )
+
+    return AvitoAutoloadUploadResponse(
+        saved_path=rel_path,
+        items=parsed.items,
+        local_validation_ok=parsed.local_ok,
+        local_errors=parsed.local_errors,
+        sheets_parsed=parsed.sheets_parsed,
+        avito_upload=avito_upload,
+        avito_upload_status=avito_upload_status,
+        avito_report=avito_report,
+        avito_token_error=avito_token_error,
+    )
+
+
 @router.post("/{org_id}/avito/autoload/import", response_model=AvitoAutoloadImportResponse)
 async def import_avito_autoload_rows(
     org_id: str,
@@ -771,6 +868,12 @@ async def import_avito_autoload_rows(
     created_stock_ins = 0
     skipped_rows: list[dict[str, Any]] = []
 
+    # Prepare access to saved XLSX for in-place rewrite of photo links (optional).
+    xlsx_path = None
+    rel_path = None
+    wb = None
+    photo_col_cache: dict[str, int] = {}
+
     for key in row_keys:
         item = index.get((key[0], key[1]))
         if not item:
@@ -778,21 +881,14 @@ async def import_avito_autoload_rows(
             continue
 
         avito_id = str(item.get("avito_id") or "").strip()
-        if not avito_id:
-            skipped_rows.append(
-                {
-                    "sheet": key[0],
-                    "row": key[1],
-                    "reason": "Нет AvitoId — импорт запрещён для строк без ID объявления",
-                }
-            )
-            continue
+        unique_ad_id = str(item.get("unique_ad_id") or "").strip()
 
         link = None
-        link = db.query(ProductAvitoListingLink).filter(
-            ProductAvitoListingLink.organization_id == org_id,
-            ProductAvitoListingLink.avito_ad_id == avito_id,
-        ).first()
+        if avito_id:
+            link = db.query(ProductAvitoListingLink).filter(
+                ProductAvitoListingLink.organization_id == org_id,
+                ProductAvitoListingLink.avito_ad_id == avito_id,
+            ).first()
 
         file_price = None
         try:
@@ -817,6 +913,7 @@ async def import_avito_autoload_rows(
             file_quantity = None
         effective_quantity = file_quantity if file_quantity and file_quantity > 0 else int(body.quantity)
 
+        product = None
         if link:
             product = db.query(ProductModel).filter(
                 ProductModel.id == link.product_id,
@@ -830,26 +927,35 @@ async def import_avito_autoload_rows(
                 ).first()
                 if stale_link:
                     db.delete(stale_link)
-            else:
-                product.article = (part_number or avito_id or f"ROW-{key[1]}")[:30]
-                product.name = (title or part_number or f"Avito row {key[1]}")[:255]
-                product.brand = (manufacturer or "Unknown")[:100]
-                product.price = effective_price
-                product.quantity = effective_quantity
-                product.storage_location_id = body.storage_location_id
-                if description:
-                    product.description = description
-                updated_products += 1
+        if product is None and unique_ad_id:
+            product = db.query(ProductModel).filter(
+                ProductModel.organization_id == org_id,
+                ProductModel.internal_code == unique_ad_id,
+            ).first()
 
-        if link is None:
+        if product is not None:
+            # Update existing product
+            product.article = (part_number or avito_id or unique_ad_id or f"ROW-{key[1]}")[:30]
+            product.name = (title or part_number or f"Avito row {key[1]}")[:255]
+            product.brand = (manufacturer or "Unknown")[:100]
+            product.price = effective_price
+            product.quantity = effective_quantity
+            product.storage_location_id = body.storage_location_id
+            if description:
+                product.description = description
+            updated_products += 1
+
+        if product is None:
+            # Create new product
+            internal_code = unique_ad_id or _next_internal_code(db)
             product = ProductModel(
-                article=(part_number or avito_id or f"ROW-{key[1]}")[:30],
+                article=(part_number or avito_id or internal_code or f"ROW-{key[1]}")[:30],
                 name=(title or part_number or f"Avito row {key[1]}")[:255],
                 brand=(manufacturer or "Unknown")[:100],
                 price=effective_price,
                 quantity=effective_quantity,
                 is_new=False,
-                internal_code=_next_internal_code(db),
+                internal_code=internal_code,
                 description=description or f"Imported from Avito autoload (ad_id={avito_id or 'n/a'})",
                 organization_id=org_id,
                 storage_location_id=body.storage_location_id,
@@ -859,6 +965,8 @@ async def import_avito_autoload_rows(
             db.flush()
             created_products += 1
 
+        # Ensure link exists if AvitoId is provided
+        if avito_id and (link is None):
             try:
                 with db.begin_nested():
                     db.add(
@@ -870,6 +978,7 @@ async def import_avito_autoload_rows(
                     )
                     db.flush()
             except IntegrityError:
+                # Another product may already have this AvitoId; don't fail whole import.
                 skipped_rows.append(
                     {
                         "sheet": key[0],
@@ -877,16 +986,27 @@ async def import_avito_autoload_rows(
                         "reason": f"Связь уже существует для AvitoId={avito_id}",
                     }
                 )
-                continue
 
         db.query(ProductPhoto).filter(ProductPhoto.product_id == product.id).delete()
         db.query(ProductVideo).filter(ProductVideo.product_id == product.id).delete()
 
         photos = item.get("photos") or []
         videos = item.get("videos") or []
-        if isinstance(photos, list):
-            for p in photos[:5]:
-                p_url = str(p).strip()
+        if isinstance(photos, list) and photos:
+            processed_paths = await ensure_local_pictures(
+                photos,
+                org_id=org_id,
+                db=db,
+                for_xlsx=False,
+                limit=5,
+                soft_fail=True,
+                per_photo_timeout_s=25.0,
+                celery_timeout_s=120,
+            )
+            processed_urls_for_xlsx = [normalize_for_xlsx(p) for p in processed_paths]
+
+            for p_url in processed_paths[:5]:
+                p_url = str(p_url).strip()
                 if not p_url:
                     continue
                 db.add(
@@ -897,6 +1017,37 @@ async def import_avito_autoload_rows(
                         processing_status="completed",
                     )
                 )
+
+            # Rewrite XLSX cell 'Ссылки на фото' for this row so UI/next visits see local URLs.
+            try:
+                cache_row = db.query(OrganizationAvitoAutoloadCache).filter(
+                    OrganizationAvitoAutoloadCache.organization_id == org_id
+                ).first()
+                if cache_row and cache_row.saved_path:
+                    rel_path = cache_row.saved_path
+                    xlsx_path = Path(__file__).resolve().parents[2] / rel_path.lstrip("/")
+                    if xlsx_path.is_file():
+                        if wb is None:
+                            wb = load_workbook(str(xlsx_path), read_only=False)
+                        sheet_name = str(key[0])
+                        row_no = int(key[1])
+                        if sheet_name in wb.sheetnames:
+                            ws = wb[sheet_name]
+                            if sheet_name not in photo_col_cache:
+                                col = None
+                                for col_idx in range(1, (ws.max_column or 0) + 1):
+                                    h = str(ws.cell(row=2, column=col_idx).value or "").strip()
+                                    if h == "Ссылки на фото":
+                                        col = col_idx
+                                        break
+                                if col:
+                                    photo_col_cache[sheet_name] = col
+                            col = photo_col_cache.get(sheet_name)
+                            if col:
+                                ws.cell(row=row_no, column=col, value=" | ".join(processed_urls_for_xlsx))
+            except Exception:
+                # Soft fail: DB import should still succeed.
+                pass
         if isinstance(videos, list):
             for v in videos[:1]:
                 v_url = str(v).strip()
@@ -922,6 +1073,34 @@ async def import_avito_autoload_rows(
             )
         )
         created_stock_ins += 1
+
+    # If we updated XLSX in-memory, persist it and refresh cache.
+    if wb is not None and xlsx_path is not None and rel_path is not None:
+        try:
+            out = BytesIO()
+            wb.save(out)
+            wb.close()
+            updated_bytes = out.getvalue()
+            xlsx_path.write_bytes(updated_bytes)
+            parsed = parse_and_validate_avito_autoload(updated_bytes)
+            _save_autoload_cache(
+                db,
+                org_id,
+                saved_path=rel_path,
+                items=parsed.items,
+                local_validation_ok=parsed.local_ok,
+                local_errors=parsed.local_errors,
+                sheets_parsed=parsed.sheets_parsed,
+                avito_upload=None,
+                avito_upload_status=None,
+                avito_report=None,
+                avito_token_error=None,
+            )
+        except Exception:
+            try:
+                wb.close()
+            except Exception:
+                pass
 
     db.commit()
     return AvitoAutoloadImportResponse(

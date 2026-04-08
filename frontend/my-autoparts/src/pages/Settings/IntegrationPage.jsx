@@ -2,6 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
 
+const AD_TYPE_NOT_SPECIFIED = '__NOT_SPECIFIED__';
+const AD_TYPE_OPTIONS = [
+  { value: AD_TYPE_NOT_SPECIFIED, label: 'Не указано' },
+  { value: 'Товар приобретен на продажу', label: 'Товар приобретен на продажу' },
+  { value: 'Товар от производителя', label: 'Товар от производителя' },
+];
+
 function CategoryPickerModal({
   open,
   orgId,
@@ -539,6 +546,35 @@ export default function IntegrationPage() {
     }
   };
 
+  const handleSetAdType = async (row, adTypeValue) => {
+    if (!orgId || !row?.sheet || row?.row == null) return;
+    setError(null);
+    setNotice(null);
+    try {
+      const data = await apiRequest(`/organizations/${orgId}/avito/autoload/set-ad-type`, {
+        method: 'POST',
+        body: JSON.stringify({
+          sheet: row.sheet,
+          row: row.row,
+          ad_type: adTypeValue === AD_TYPE_NOT_SPECIFIED ? '' : adTypeValue,
+        }),
+      });
+      setItems(data.items || []);
+      setSavedPath(data.saved_path || '');
+      const summary = {
+        local_validation_ok: data.local_validation_ok,
+        local_errors: data.local_errors || [],
+        avito_report: data.avito_report,
+        avito_token_error: data.avito_token_error,
+        updated_at: new Date().toISOString(),
+      };
+      setUploadResult(shouldShowResultCard(summary) ? summary : null);
+      setNotice('Вид объявления сохранен в XLSX.');
+    } catch (e) {
+      setError(formatErrorMessage(e));
+    }
+  };
+
   const handleSaveCredentials = async (e) => {
     e.preventDefault();
     if (!orgId) return;
@@ -920,6 +956,7 @@ export default function IntegrationPage() {
                       <th className="px-3 py-2 font-medium">Описание</th>
                       <th className="px-3 py-2 font-medium">Количество</th>
                       <th className="px-3 py-2 font-medium">Категория</th>
+                      <th className="px-3 py-2 font-medium">Вид объявления</th>
                       <th className="px-3 py-2 font-medium">Авито статус</th>
                       <th className="px-3 py-2 font-medium">Фото</th>
                     </tr>
@@ -951,7 +988,12 @@ export default function IntegrationPage() {
                         <td className="px-3 py-2 max-w-md truncate" title={row.description}>
                           {row.description || '-'}
                         </td>
-                        <td className="px-3 py-2">{row.quantity || '-'}</td>
+                        <td className="px-3 py-2">
+                          {(() => {
+                            const q = Number(row.quantity);
+                            return Number.isFinite(q) && q > 0 ? q : 1;
+                          })()}
+                        </td>
                         <td className="px-3 py-2">
                           <button
                             type="button"
@@ -961,6 +1003,19 @@ export default function IntegrationPage() {
                           >
                             {row.category || '-'}
                           </button>
+                        </td>
+                        <td className="px-3 py-2 min-w-[220px]">
+                          <select
+                            value={row.ad_type ? row.ad_type : AD_TYPE_NOT_SPECIFIED}
+                            onChange={(e) => handleSetAdType(row, e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white"
+                          >
+                            {AD_TYPE_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                         <td className="px-3 py-2">{row.avito_status || '-'}</td>
                         <td className="px-3 py-2">

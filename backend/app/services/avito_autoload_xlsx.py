@@ -23,6 +23,8 @@ DESCRIPTION_AD_HEADER = "Описание объявления"
 PRICE_HEADER = "Цена"
 ADDRESS_HEADER = "Адрес"
 CATEGORY_HEADER = "Категория"
+DEFAULT_CATEGORY_VALUE = "Запчасти и аксессуары"
+AD_TYPE_HEADER = "Вид объявления"
 CONDITION_HEADER = "Состояние"
 PHOTOS_HEADER = "Ссылки на фото"
 PHOTO_NAMES_HEADER = "Названия фото"
@@ -145,6 +147,7 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
         cond_c = cm.get(CONDITION_HEADER)
         man_c = cm.get(MANUFACTURER_HEADER)
         category_c = cm.get(CATEGORY_HEADER)
+        ad_type_c = cm.get(AD_TYPE_HEADER)
         avito_status_c = cm.get(AVITO_STATUS_HEADER)
         description_c = _find_optional_col(
             cm,
@@ -273,6 +276,7 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
                 "price": price_display if price_ok else _cell_str(price_raw),
                 "title": _at(title_c),
                 "category": _at(category_c),
+                "ad_type": _at(ad_type_c),
                 "avito_status": _at(avito_status_c),
                 # Для импорта/связки используем именно "Номер объявления на Авито" (кол. 3),
                 # а при отсутствии — пробуем старую колонку AvitoId.
@@ -416,6 +420,7 @@ def upsert_products_to_avito_autoload(
         legacy_avito_id_col = _find_legacy_avito_id_col(col_map)
         part_col = col_map.get(PART_OEM)
 
+        row_index_by_avito_number: dict[str, int] = {}
         row_index_by_unique: dict[str, int] = {}
         row_index_by_legacy_avito_id: dict[str, int] = {}
         row_index_by_part: dict[str, int] = {}
@@ -423,12 +428,15 @@ def upsert_products_to_avito_autoload(
 
         for row_no in range(DATA_WRITE_START_ROW, ws.max_row + 1):
             uid = str(ws.cell(row=row_no, column=unique_col).value or "").strip() if unique_col else ""
+            avn = str(ws.cell(row=row_no, column=avito_num_col).value or "").strip() if avito_num_col else ""
             aid = (
                 str(ws.cell(row=row_no, column=legacy_avito_id_col).value or "").strip()
                 if legacy_avito_id_col
                 else ""
             )
             part = str(ws.cell(row=row_no, column=part_col).value or "").strip() if part_col else ""
+            if avn:
+                row_index_by_avito_number[avn] = row_no
             if uid:
                 row_index_by_unique[uid] = row_no
                 existing_unique_ids.add(uid)
@@ -454,6 +462,7 @@ def upsert_products_to_avito_autoload(
             "avito_num_col": avito_num_col,
             "legacy_avito_id_col": legacy_avito_id_col,
             "part_col": part_col,
+            "row_index_by_avito_number": row_index_by_avito_number,
             "row_index_by_unique": row_index_by_unique,
             "row_index_by_legacy_avito_id": row_index_by_legacy_avito_id,
             "row_index_by_part": row_index_by_part,
@@ -467,6 +476,7 @@ def upsert_products_to_avito_autoload(
         ctx = _get_sheet_ctx(category, str(product.get("template_sheet") or "").strip() or None)
         ws = ctx["ws"]
         col_map = ctx["col_map"]
+        row_index_by_avito_number = ctx["row_index_by_avito_number"]
         row_index_by_unique = ctx["row_index_by_unique"]
         row_index_by_legacy_avito_id = ctx["row_index_by_legacy_avito_id"]
         row_index_by_part = ctx["row_index_by_part"]
@@ -485,7 +495,8 @@ def upsert_products_to_avito_autoload(
         unique_ad_id = internal_code or _next_unique_ad_id(existing_unique_ids)
 
         target_row = (
-            (row_index_by_unique.get(unique_ad_id) if unique_ad_id else None)
+            (row_index_by_avito_number.get(legacy_avito_id) if legacy_avito_id else None)
+            or (row_index_by_unique.get(unique_ad_id) if unique_ad_id else None)
             or (row_index_by_legacy_avito_id.get(legacy_avito_id) if legacy_avito_id else None)
             or (row_index_by_part.get(part_number) if part_number else None)
         )
@@ -509,6 +520,8 @@ def upsert_products_to_avito_autoload(
 
         # 2) Затем строго заполняем ключевые колонки.
         if unique_col and UNIQUE_AD_ID_HEADER in col_map:
+            # Если строка пришла из Avito (нашли по AvitoId/номеру объявления), принудительно
+            # делаем unique id равным internal_code, чтобы дальнейшие операции были стабильны.
             row_values[UNIQUE_AD_ID_HEADER] = unique_ad_id
 
         # Номер объявления на Авито при экспорте не заполняем.
@@ -539,7 +552,9 @@ def upsert_products_to_avito_autoload(
         if ADDRESS_HEADER in col_map:
             row_values[ADDRESS_HEADER] = str(product.get("address") or "")
         if CATEGORY_HEADER in col_map:
-            row_values[CATEGORY_HEADER] = str(product.get("category") or "")
+            row_values[CATEGORY_HEADER] = str(product.get("category") or DEFAULT_CATEGORY_VALUE)
+        if AD_TYPE_HEADER in col_map:
+            row_values[AD_TYPE_HEADER] = str(product.get("ad_type") or "")
         if PHOTOS_HEADER in col_map:
             row_values[PHOTOS_HEADER] = " | ".join(photo_urls)
         if PHOTO_NAMES_HEADER in col_map and PHOTO_NAMES_HEADER not in row_values and photo_urls:
@@ -565,6 +580,9 @@ def upsert_products_to_avito_autoload(
             if existing_val:
                 row_values[h] = existing_val
                 continue
+            if h == AD_TYPE_HEADER:
+                row_values[h] = ""
+                continue
             row_values[h] = "Не указано"
 
         # 4) Запись значений только в существующие колонки шаблона.
@@ -576,6 +594,8 @@ def upsert_products_to_avito_autoload(
 
         # 5) Обновление индексов для последующих товаров.
         existing_unique_ids.add(unique_ad_id)
+        if legacy_avito_id:
+            row_index_by_avito_number[legacy_avito_id] = target_row
         if unique_ad_id:
             row_index_by_unique[unique_ad_id] = target_row
         if legacy_avito_id:

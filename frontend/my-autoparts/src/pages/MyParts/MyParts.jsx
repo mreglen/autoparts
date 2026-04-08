@@ -929,29 +929,30 @@ function MyParts() {
         <>
           {/* Десктопная версия - таблица */}
           <div className="hidden md:block w-full">
-            {selectedParts.size > 0 && (
+            {avitoIntegrationReady && (
               <div className="mb-3 flex items-center justify-between py-2 border-b border-gray-200">
                 <span className="text-sm text-gray-500">
-                  Выбрано: {selectedParts.size}
-                  {searchQuery && (
+                  Общее действие: Экспорт в Avito
+                  <span className="ml-2">•</span>
+                  <span className="ml-2">Выбрано: {selectedParts.size}</span>
+                  {searchQuery && selectedParts.size > 0 && (
                     <span className="ml-2 text-indigo-600">
                       (из {displayParts.length} найденных)
                     </span>
                   )}
                 </span>
-                {avitoIntegrationReady && (
-                  <button
-                    onClick={handleBulkAction}
-                    className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
-                  >
-                    Экспорт
-                    <img
-                      src="/img/arrow_sm.svg"
-                      alt=""
-                      className={`w-3 h-3 transition-transform duration-200 filter brightness-0 saturate-100 invert-61 sepia-0 saturate-0 hue-rotate-0deg brightness-90 contrast-89`}
-                    />
-                  </button>
-                )}
+                <button
+                  onClick={handleBulkAction}
+                  disabled={selectedParts.size === 0}
+                  className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Экспорт
+                  <img
+                    src="/img/arrow_sm.svg"
+                    alt=""
+                    className="w-3 h-3 transition-transform duration-200 filter brightness-0 saturate-100 invert-61 sepia-0 saturate-0 hue-rotate-0deg brightness-90 contrast-89"
+                  />
+                </button>
               </div>
             )}
             <table className="min-w-full divide-y divide-gray-200">
@@ -1014,25 +1015,25 @@ function MyParts() {
           {/* Мобильная версия - карточки */}
           <div className="md:hidden space-y-4">
             {/* Панель массовых действий для мобильных */}
-            {selectedParts.size > 0 && (
+            {avitoIntegrationReady && (
               <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
                 <div className="flex items-center justify-between">
                   <span className="text-base font-medium text-gray-900">
-                    Выбрано: {selectedParts.size}
-                    {searchQuery && (
+                    Общее действие: Экспорт
+                    <span className="block text-sm mt-1">Выбрано: {selectedParts.size}</span>
+                    {searchQuery && selectedParts.size > 0 && (
                       <span className="block text-sm text-indigo-600 mt-1">
                         из {displayParts.length} найденных
                       </span>
                     )}
                   </span>
-                  {avitoIntegrationReady && (
-                    <button
-                      onClick={handleBulkAction}
-                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[44px]"
-                    >
-                      Экспорт
-                    </button>
-                  )}
+                  <button
+                    onClick={handleBulkAction}
+                    disabled={selectedParts.size === 0}
+                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Экспорт
+                  </button>
                 </div>
               </div>
             )}
