@@ -8,7 +8,12 @@ from typing import Any, Optional
 from openpyxl import Workbook, load_workbook
 
 TEMPLATE_XLSX_REL_PATH = "backend/uploads/avito/qMHbBIoD51/autoload.xlsx"
-DATA_START_ROW = 6  # 1..4 — служебные строки, 5 — пример/дефолты, данные начинаются с 6
+# В исходных шаблонах Авито 5-я строка часто содержит пример/дефолты.
+# В реальных файлах пользователи иногда начинают данные с 5-й строки.
+# Поэтому парсер сканирует с 5-й строки, но умеет пропускать "примерную" строку,
+# если она совпадает с дефолтами листа.
+DATA_SCAN_START_ROW = 5
+DATA_WRITE_START_ROW = 6
 
 # Заголовки — строго из файла шаблона (2-я строка).
 UNIQUE_AD_ID_HEADER = "Уникальный идентификатор объявления"  # col 1
@@ -197,10 +202,24 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
                 mandatory_cols.append((col_idx, h))
 
         track_cols = [c for c in [pc, man_c, cond_c, price_c, title_c, category_c, avito_status_c] if c]
+        # Если в листе есть реальные данные начиная с 6-й строки,
+        # то 5-ю строку считаем "примером/дефолтами" и не включаем в items/валидацию.
+        # Если данных ниже нет — 5-я строка может быть реальными данными пользователя, её не пропускаем.
+        has_data_after_5 = False
+        if ws.max_row >= 6:
+            for _r in ws.iter_rows(min_row=6, values_only=True):
+                if _row_nonempty(tuple(_r), track_cols):
+                    has_data_after_5 = True
+                    break
 
-        for r_idx, row in enumerate(ws.iter_rows(min_row=DATA_START_ROW, values_only=True), start=DATA_START_ROW):
+        for r_idx, row in enumerate(
+            ws.iter_rows(min_row=DATA_SCAN_START_ROW, values_only=True),
+            start=DATA_SCAN_START_ROW,
+        ):
             row_t = tuple(row)
             if not _row_nonempty(row_t, track_cols):
+                continue
+            if r_idx == 5 and has_data_after_5:
                 continue
 
             for col_idx, label in mandatory_cols:
@@ -402,7 +421,7 @@ def upsert_products_to_avito_autoload(
         row_index_by_part: dict[str, int] = {}
         existing_unique_ids: set[str] = set()
 
-        for row_no in range(DATA_START_ROW, ws.max_row + 1):
+        for row_no in range(DATA_WRITE_START_ROW, ws.max_row + 1):
             uid = str(ws.cell(row=row_no, column=unique_col).value or "").strip() if unique_col else ""
             aid = (
                 str(ws.cell(row=row_no, column=legacy_avito_id_col).value or "").strip()
@@ -471,7 +490,7 @@ def upsert_products_to_avito_autoload(
             or (row_index_by_part.get(part_number) if part_number else None)
         )
         if not target_row:
-            target_row = max(ws.max_row + 1, DATA_START_ROW)
+            target_row = max(ws.max_row + 1, DATA_WRITE_START_ROW)
 
         photos = product.get("photos") or []
         photo_urls = []

@@ -95,6 +95,24 @@ def _get_last_autoload(db: Session, org_id: str) -> Optional[AvitoLastAutoloadSn
     )
     if not cache:
         return None
+
+    # Автовосстановление кэша: если файл на диске есть, а items пустые
+    # (например, из-за прошлой версии парсера), перепарсим и сохраним.
+    try:
+        items = _json_loads(cache.items_json, [])
+        if cache.saved_path and isinstance(items, list) and len(items) == 0:
+            project_root = Path(__file__).resolve().parents[2]
+            xlsx_path = project_root / cache.saved_path.lstrip("/")
+            if xlsx_path.is_file():
+                parsed = parse_and_validate_avito_autoload(xlsx_path.read_bytes())
+                cache.items_json = json.dumps(parsed.items, ensure_ascii=False)
+                cache.local_validation_ok = bool(parsed.local_ok)
+                cache.local_errors_json = json.dumps(parsed.local_errors, ensure_ascii=False)
+                cache.sheets_parsed_json = json.dumps(parsed.sheets_parsed, ensure_ascii=False)
+                db.commit()
+    except Exception:
+        db.rollback()
+
     return AvitoLastAutoloadSnapshot(
         saved_path=cache.saved_path,
         items=_json_loads(cache.items_json, []),
