@@ -69,3 +69,15 @@ input[type="password"] {
   -moz-appearance: none;
   appearance: none;
 }
+
+/* Safe area padding for mobile devices with notches */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* Ensure full height works correctly on mobile */
+@supports (-webkit-touch-callout: none) {
+  .h-\[100dvh\] {
+    height: -webkit-fill-available;
+  }
+}

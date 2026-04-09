@@ -232,6 +232,7 @@ export default function Navigation() {
                             >
                                 <button
                                     className="flex items-center gap-2 text-sm sm:text-base font-bold text-gray-700 hover:text-indigo-600 whitespace-nowrap"
+                                    onClick={() => navigate('/profile')}
                                 >
                                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold">
                                         {firstName.charAt(0).toUpperCase()}

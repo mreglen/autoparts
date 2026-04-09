@@ -134,8 +134,24 @@ const chatSlice = createSlice({
             if (state.currentChat && state.currentChat.id === message.chat_id) {
                 // Проверяем, нет ли уже такого сообщения
                 const exists = state.messages.find(m => m.id === message.id);
+                
                 if (!exists) {
-                    state.messages.push(message);
+                    // Ищем временное (оптимистичное) сообщение с тем же содержанием от того же отправителя
+                    // чтобы заменить его на реальное сообщение с сервера
+                    const tempMessageIndex = state.messages.findIndex(m => 
+                        m.id?.toString().startsWith('temp_') && 
+                        m.sender_id === message.sender_id && 
+                        m.message === message.message &&
+                        Math.abs(new Date(m.created_at) - new Date(message.created_at)) < 5000 // в пределах 5 секунд
+                    );
+                    
+                    if (tempMessageIndex !== -1) {
+                        // Заменяем временное сообщение на реальное
+                        state.messages[tempMessageIndex] = message;
+                    } else {
+                        // Если временного сообщения нет, просто добавляем новое
+                        state.messages.push(message);
+                    }
                 }
             }
             
@@ -280,8 +296,21 @@ const chatSlice = createSlice({
                 // Но на случай если WebSocket не работает, добавим вручную
                 const message = action.payload.message;
                 const exists = state.messages.find(m => m.id === message.id);
+                
                 if (!exists) {
-                    state.messages.push(message);
+                    // Ищем и заменяем временное сообщение
+                    const tempMessageIndex = state.messages.findIndex(m => 
+                        m.id?.toString().startsWith('temp_') && 
+                        m.sender_id === message.sender_id && 
+                        m.message === message.message &&
+                        Math.abs(new Date(m.created_at) - new Date(message.created_at)) < 5000
+                    );
+                    
+                    if (tempMessageIndex !== -1) {
+                        state.messages[tempMessageIndex] = message;
+                    } else {
+                        state.messages.push(message);
+                    }
                 }
             })
             .addCase(sendMessage.rejected, (state, action) => {
@@ -295,8 +324,21 @@ const chatSlice = createSlice({
             .addCase(sendChatMedia.fulfilled, (state, action) => {
                 const message = action.payload.message;
                 const exists = state.messages.find(m => m.id === message.id);
+                
                 if (!exists) {
-                    state.messages.push(message);
+                    // Ищем и заменяем временное сообщение с медиа
+                    const tempMessageIndex = state.messages.findIndex(m => 
+                        m.id?.toString().startsWith('temp_') && 
+                        m.sender_id === message.sender_id &&
+                        m.media && m.media.length > 0 &&
+                        Math.abs(new Date(m.created_at) - new Date(message.created_at)) < 5000
+                    );
+                    
+                    if (tempMessageIndex !== -1) {
+                        state.messages[tempMessageIndex] = message;
+                    } else {
+                        state.messages.push(message);
+                    }
                 }
             })
             .addCase(sendChatMedia.rejected, (state, action) => {

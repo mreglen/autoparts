@@ -17,8 +17,9 @@ export default function ProfileWithMenuLayout() {
     const location = useLocation();
     const navigate = useNavigate();
     
-    // Detect if we're in a specific chat (not just the chat list)
-    // /chats - show navigation, /chats/123 - hide navigation
+    // Detect if we're in a chat page (either list or specific chat)
+    // /chats or /chats/123 - hide navigation on mobile, show full-screen
+    const isChatPage = /^\/chats(\/\d+)?$/.test(location.pathname);
     const isSpecificChatPage = /^\/chats\/\d+/.test(location.pathname);
     
     // Helper to check if user has specific permission
@@ -434,11 +435,31 @@ export default function ProfileWithMenuLayout() {
 
     return (
         <div className={`min-h-screen bg-gray-50 ${!isSpecificChatPage ? 'pb-24 md:pb-0' : 'pb-0'}`}>
-            {!isSpecificChatPage && <Navigation />}
-            <main className={`mx-auto ${isSpecificChatPage ? 'max-w-full p-0' : 'max-w-7xl px-3 sm:px-5 lg:px-7 py-6 sm:py-8'}`}>
+            <Navigation />
+            <main className={`mx-auto ${isSpecificChatPage ? 'max-w-full p-0 md:max-w-7xl md:px-3 md:sm:px-5 md:lg:px-7 md:py-6 md:sm:py-8' : 'max-w-7xl px-3 sm:px-5 lg:px-7 py-6 sm:py-8'}`}>
                 {isSpecificChatPage ? (
-                    // Full-width chat without sidebar on specific chat pages
-                    <Outlet />
+                    // Mobile: Full-screen specific chat
+                    // Desktop: Two-column layout with sidebar
+                    <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+                        {/* Left column - menu */}
+                        <div className="lg:col-span-1">
+                            <ProfileMenuTabs
+                                tabs={tabs}
+                                activeTab={activeTab}
+                                onTabChange={handleTabChange}
+                                badgeCounts={{
+                                    'product-moderation': moderationProducts?.pendingProducts?.length || 0,
+                                    'pending-sellers': moderation?.pendingSellers?.length || 0,
+                                    'administration': ((moderationProducts?.pendingProducts?.length || 0) + (moderation?.pendingSellers?.length || 0))
+                                }}
+                            />
+                        </div>
+
+                        {/* Right column - content */}
+                        <div className="lg:col-span-5">
+                            <Outlet />
+                        </div>
+                    </div>
                 ) : (
                     // Two-column layout: menu on left, content on right
                     <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
