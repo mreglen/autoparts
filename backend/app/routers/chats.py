@@ -164,11 +164,19 @@ def get_chat_messages(
     messages_reversed = list(reversed(messages))
     
     # Добавляем медиа к каждому сообщению
+    # Фильтруем сообщения с is_processing медиа для пользователей, которые не являются отправителем
     result = []
     for msg in messages_reversed:
         media_list = db.query(ChatMedia).filter(
             ChatMedia.message_id == msg.id
         ).all()
+        
+        # Проверяем, есть ли медиа в процессе обработки
+        has_processing_media = any(m.is_processing for m in media_list)
+        
+        # Если пользователь не отправитель и есть медиа в обработке, пропускаем сообщение
+        if msg.sender_id != current_user.id and has_processing_media:
+            continue
         
         result.append(MessageResponse(
             id=msg.id,

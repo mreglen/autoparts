@@ -392,10 +392,10 @@ const ChatPage = () => {
                           <img 
                             src={chat.product_photo_url}
                             alt={chat.product_name || 'Товар'}
-                            className="w-14 h-14 rounded-full object-cover flex-shrink-0 ring-2 ring-gray-100"
+                            className="w-14 h-14 rounded-lg object-cover flex-shrink-0 ring-2 ring-gray-100"
                           />
                         ) : (
-                          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-xl flex-shrink-0 ring-2 ring-gray-100">
+                          <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-xl flex-shrink-0 ring-2 ring-gray-100">
                             {(chat.seller_name || 'П').charAt(0).toUpperCase()}
                           </div>
                         )}
@@ -478,10 +478,10 @@ const ChatPage = () => {
                     <img 
                       src={currentChat.product_photo_url}
                       alt={currentChat.product_name || 'Товар'}
-                      className="w-11 h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-gray-100"
+                      className="w-11 h-11 rounded-lg object-cover flex-shrink-0 ring-2 ring-gray-100"
                     />
                   ) : (
-                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold flex-shrink-0 ring-2 ring-gray-100">
+                    <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold flex-shrink-0 ring-2 ring-gray-100">
                       {(user.id === currentChat.seller_id 
                         ? (currentChat.buyer_name || 'П')
                         : (currentChat.seller_name || currentChat.seller_organization || 'П')
@@ -549,6 +549,11 @@ const ChatPage = () => {
                               {isOwn && (
                                 <span>
                                   {message.id?.toString().startsWith('temp_') ? (
+                                    <svg className="w-4 h-4 text-blue-200 animate-spin" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                  ) : message.media && message.media.some(m => m.is_processing) ? (
                                     <svg className="w-4 h-4 text-blue-200 animate-spin" fill="none" viewBox="0 0 24 24">
                                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -637,9 +642,9 @@ const ChatPage = () => {
                   return (
                     <div key={chat.id} onClick={() => handleSelectChat(chat)} className={`flex items-start gap-3 p-4 cursor-pointer transition-colors duration-150 ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
                       {chat.product_photo_url ? (
-                        <img src={chat.product_photo_url} alt={chat.product_name || 'Товар'} className="w-14 h-14 rounded-full object-cover flex-shrink-0 ring-2 ring-gray-100" />
+                        <img src={chat.product_photo_url} alt={chat.product_name || 'Товар'} className="w-14 h-14 rounded-lg object-cover flex-shrink-0 ring-2 ring-gray-100" />
                       ) : (
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-xl flex-shrink-0 ring-2 ring-gray-100">{(chat.seller_name || 'П').charAt(0).toUpperCase()}</div>
+                        <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-xl flex-shrink-0 ring-2 ring-gray-100">{(chat.seller_name || 'П').charAt(0).toUpperCase()}</div>
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
@@ -690,9 +695,9 @@ const ChatPage = () => {
                 </button>
                 
                 {currentChat.product_photo_url ? (
-                  <img src={currentChat.product_photo_url} alt={currentChat.product_name || 'Товар'} className="w-11 h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-gray-100" />
+                  <img src={currentChat.product_photo_url} alt={currentChat.product_name || 'Товар'} className="w-11 h-11 rounded-lg object-cover flex-shrink-0 ring-2 ring-gray-100" />
                 ) : (
-                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold flex-shrink-0 ring-2 ring-gray-100">{(user.id === currentChat.seller_id ? (currentChat.buyer_name || 'П') : (currentChat.seller_name || currentChat.seller_organization || 'П')).charAt(0).toUpperCase()}</div>
+                  <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold flex-shrink-0 ring-2 ring-gray-100">{(user.id === currentChat.seller_id ? (currentChat.buyer_name || 'П') : (currentChat.seller_name || currentChat.seller_organization || 'П')).charAt(0).toUpperCase()}</div>
                 )}
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-gray-900 truncate">{user.id === currentChat.seller_id ? (currentChat.buyer_name || 'Покупатель') : (currentChat.seller_name || currentChat.seller_organization || 'Продавец')}</h3>
@@ -726,7 +731,7 @@ const ChatPage = () => {
                           )}
                           <div className="flex items-center justify-end mt-1.5 space-x-1">
                             <p className={`text-xs ${isOwn ? 'text-blue-100' : 'text-gray-500'}`}>{formatTime(message.created_at)}</p>
-                            {isOwn && (<span>{message.id?.toString().startsWith('temp_') ? (<svg className="w-4 h-4 text-blue-200 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>) : message.is_read ? (<svg className="w-4 h-4 text-blue-200" fill="currentColor" viewBox="0 0 24 24"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z"/></svg>) : (<svg className="w-4 h-4 text-blue-200" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>)}</span>)}
+                            {isOwn && (<span>{message.id?.toString().startsWith('temp_') ? (<svg className="w-4 h-4 text-blue-200 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>) : message.media && message.media.some(m => m.is_processing) ? (<svg className="w-4 h-4 text-blue-200 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>) : message.is_read ? (<svg className="w-4 h-4 text-blue-200" fill="currentColor" viewBox="0 0 24 24"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z"/></svg>) : (<svg className="w-4 h-4 text-blue-200" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>)}</span>)}
                           </div>
                         </div>
                       </div>

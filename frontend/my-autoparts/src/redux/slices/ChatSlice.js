@@ -152,6 +152,12 @@ const chatSlice = createSlice({
                         // Если временного сообщения нет, просто добавляем новое
                         state.messages.push(message);
                     }
+                } else {
+                    // Если сообщение уже есть, обновляем его (например, после обработки медиа)
+                    const messageIndex = state.messages.findIndex(m => m.id === message.id);
+                    if (messageIndex !== -1) {
+                        state.messages[messageIndex] = message;
+                    }
                 }
             }
             

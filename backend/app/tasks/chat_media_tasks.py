@@ -7,10 +7,12 @@ from PIL import Image
 from pathlib import Path
 from app.celery_app import celery_app
 from app.db.database import SessionLocal
-from app.models.chat import ChatMedia
+from app.models.chat import ChatMedia, Message, Chat
 from app.utils.video_utils import compress_video
 import subprocess
 import logging
+import asyncio
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +126,12 @@ def compress_chat_image(self, media_id: int):
         print(f"📍 [INFO] Compressed: {compressed_path}")
         print(f"📍 [INFO] Thumbnail: {thumbnail_path}")
         print(f"📏 [INFO] Size: {os.path.getsize(compressed_path) / 1024:.1f} KB")
+        
+        # Отправляем WebSocket уведомление о готовности сообщения
+        try:
+            _send_media_ready_notification(media.message_id, db)
+        except Exception as e:
+            print(f"⚠️ [WARNING] Could not send WebSocket notification: {e}")
         
         return {
             "success": True,
@@ -249,6 +257,12 @@ def compress_chat_video(self, media_id: int):
         print(f"📏 [INFO] Size: {os.path.getsize(compressed_video_path) / 1024 / 1024:.2f} MB")
         print(f"⏱️ [INFO] Duration: {media.duration:.1f}s" if media.duration else "⏱️ [INFO] Duration: unknown")
         
+        # Отправляем WebSocket уведомление о готовности сообщения
+        try:
+            _send_media_ready_notification(media.message_id, db)
+        except Exception as e:
+            print(f"⚠️ [WARNING] Could not send WebSocket notification: {e}")
+        
         return {
             "success": True,
             "media_id": media_id,
@@ -319,3 +333,77 @@ def extract_video_thumbnail(video_path: str, thumbnail_path: str, timestamp: str
         thumbnail_path
     ]
     subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+
+def _send_media_ready_notification(message_id: int, db):
+    """
+    Отправить WebSocket уведомление о том, что медиа обработано и сообщение готово
+    """
+    from app.routers.websocket import manager
+    
+    # Получаем сообщение
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        return
+    
+    # Получаем все медиа сообщения
+    media_list = db.query(ChatMedia).filter(ChatMedia.message_id == message_id).all()
+    
+    # Проверяем, что все медиа обработано
+    if any(m.is_processing for m in media_list):
+        return  # Еще не все обработано
+    
+    # Получаем чат
+    chat = db.query(Chat).filter(Chat.id == message.chat_id).first()
+    if not chat:
+        return
+    
+    # Формируем полное сообщение с медиа
+    message_response = {
+        "type": "message",
+        "id": message.id,
+        "chat_id": message.chat_id,
+        "sender_id": message.sender_id,
+        "message": message.message,
+        "is_read": message.is_read,
+        "created_at": message.created_at.isoformat() if message.created_at else None,
+        "media": [
+            {
+                "id": m.id,
+                "message_id": m.message_id,
+                "media_type": m.media_type,
+                "file_path": m.file_path,
+                "thumbnail_path": m.thumbnail_path,
+                "original_filename": m.original_filename,
+                "file_size": m.file_size,
+                "mime_type": m.mime_type,
+                "width": m.width,
+                "height": m.height,
+                "duration": m.duration,
+                "is_processing": m.is_processing if m.is_processing is not None else False,
+                "created_at": m.created_at.isoformat() if m.created_at else None
+            }
+            for m in media_list
+        ]
+    }
+    
+    # Отправляем всем участникам чата кроме отправителя
+    print(f"📤 [WS] Sending media ready notification for message {message_id}")
+    print(f"   - Chat: {chat.id}, Sender: {message.sender_id}")
+    print(f"   - Media count: {len(media_list)}")
+    
+    # Отправляем покупателю (если это не отправитель)
+    if chat.buyer_id != message.sender_id and chat.buyer_id in manager.active_connections:
+        print(f"   - Sending to buyer: {chat.buyer_id}")
+        asyncio.get_event_loop().run_until_complete(
+            manager.send_personal_message(message_response, chat.buyer_id)
+        )
+    
+    # Отправляем продавцу (если это не отправитель)
+    if chat.seller_id != message.sender_id and chat.seller_id in manager.active_connections:
+        print(f"   - Sending to seller: {chat.seller_id}")
+        asyncio.get_event_loop().run_until_complete(
+            manager.send_personal_message(message_response, chat.seller_id)
+        )
+    
+    print(f"✅ [WS] Media ready notification sent successfully")
