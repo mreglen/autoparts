@@ -40,6 +40,8 @@ import PartDetail from './pages/PartDetail/PartDetail';
 import VehiclesList from './pages/Vehicles/VehiclesList';
 import AddVehiclePage from './pages/Vehicles/AddVehiclePage';
 import EditVehiclePage from './pages/Vehicles/EditVehiclePage';
+import ChatPage from './pages/Chat/ChatPage';
+import AdminPanelPage from './pages/Admin/AdminPanelPage';
 
 
 
@@ -119,6 +121,8 @@ function App() {
           <Route path="/stock-out" element={<StockOutList />} />
           <Route path="/warehouse-sales" element={<WarehouseSalesPage />} />
           <Route path="/settings/employees" element={<EmployeesPage />} />
+          <Route path="/chats" element={<ChatPage />} />
+          <Route path="/chats/:chatId" element={<ChatPage />} />
           <Route path="/settings/storage-addresses" element={<StorageAddressesPage />} />
           <Route path="/settings/organization" element={<Organization />} />
           <Route path="/settings/printers" element={<PrintSettings />} />
@@ -126,6 +130,7 @@ function App() {
           <Route path="/moderation/pending-sellers" element={<PendingSellersPage />} />
           <Route path="/moderation/products" element={<ProductModeration />} />
           <Route path="/sellers" element={<SellersPage />} />
+          <Route path="/admin-settings" element={<AdminPanelPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

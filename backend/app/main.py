@@ -3,6 +3,8 @@ from fastapi.staticfiles import StaticFiles
 from app.db.database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
+from app.routers import chats as chats_router
+from app.routers import websocket as websocket_router
 from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, orders, carts
 import app.models.site_settings  # noqa: F401 — site_settings в metadata
 import app.models.organization_avito_integration  # noqa: F401 — avito integration
@@ -193,6 +195,8 @@ async def run_cleanup_expired_guest_carts():
 
 
 app.include_router(api_router)
+app.include_router(chats_router.router)
+app.include_router(websocket_router.router)
 
 import os
 from pathlib import Path

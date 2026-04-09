@@ -32,6 +32,7 @@ from app.models.product_vehicle import ProductVehicleAssociation
 from app.models.delivery_method import DeliveryMethod, organization_delivery_methods
 from app.models.product_avito_listing_link import ProductAvitoListingLink
 from app.models.avito_autoload_job import AvitoAutoloadJob
+from app.models.chat import Chat, Message
 
 
 from sqlalchemy.orm import relationship
@@ -98,4 +99,12 @@ Vehicle.compatible_products = relationship("Product", secondary="product_vehicle
 
 # Organization <-> DeliveryMethod relationship
 Organization.delivery_methods = relationship("DeliveryMethod", secondary="organization_delivery_methods", back_populates="organizations")
+
+# User <-> Chat relationships
+User.buyer_chats = relationship("Chat", foreign_keys="Chat.buyer_id", back_populates="buyer")
+User.seller_chats = relationship("Chat", foreign_keys="Chat.seller_id", back_populates="seller")
+User.sent_messages = relationship("Message", foreign_keys="Message.sender_id", back_populates="sender")
+
+# Product <-> Chat relationship
+Product.chats = relationship("Chat", back_populates="product")
 

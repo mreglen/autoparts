@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
 import { fetchProduct, searchAllProducts } from '../../redux/slices/ProductSlice';
 import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart } from '../../redux/slices/CartSlice';
+import { createOrGetChat } from '../../redux/slices/ChatSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import MediaModal from '../../components/MediaModal/MediaModal';
 
@@ -41,6 +42,7 @@ const PartDetail = () => {
   
   const { currentProduct, loading, error } = useSelector((state) => state.products);
   const { organization } = useSelector((state) => state.organization);
+  const { user } = useSelector((state) => state.auth);
   const cart = useSelector(selectCart);
 
   const [addingToCartId, setAddingToCartId] = useState(null);
@@ -48,6 +50,7 @@ const PartDetail = () => {
   const [mediaItems, setMediaItems] = useState([]);
   const [initialMediaIndex, setInitialMediaIndex] = useState(0);
   const [currentMainMediaIndex, setCurrentMainMediaIndex] = useState(0);
+  const [creatingChat, setCreatingChat] = useState(false);
 
   useEffect(() => {
     if (extractedProductId) {
@@ -146,23 +149,48 @@ const PartDetail = () => {
   const formatPhoneNumber = (phone) => {
     if (!phone) return '';
     let digits = phone.replace(/\D/g, '');
-    if (digits.startsWith('7') || digits.startsWith('8')) {
+    if (digits.startsWith('8')) {
       digits = '7' + digits.slice(1);
     }
-    let formatted = '+7 ';
-    if (digits.length > 1) {
-      formatted += '(' + digits.slice(1, 4);
+    if (digits.length === 11) {
+      return `+${digits[0]} (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 9)}-${digits.slice(9)}`;
     }
-    if (digits.length > 4) {
-      formatted += ') ' + digits.slice(4, 7);
+    return phone;
+  };
+
+  const handleWriteToSeller = async () => {
+    if (!user) {
+      // Если пользователь не авторизован, перенаправляем на страницу входа
+      navigate('/login', { state: { from: window.location.pathname } });
+      return;
     }
-    if (digits.length > 7) {
-      formatted += '-' + digits.slice(7, 9);
+
+    // Проверяем, что пользователь не является продавцом этого товара
+    if (currentProduct.organization && user.organization_id === currentProduct.organization.id) {
+      alert('Вы не можете написать себе');
+      return;
     }
-    if (digits.length > 9) {
-      formatted += '-' + digits.slice(9, 11);
+
+    setCreatingChat(true);
+    try {
+      // Создаем или получаем существующий чат
+      // seller_id определяется на backend автоматически по product_id
+      const chatData = {
+        buyer_id: user.id,
+        seller_id: null, // Backend определит автоматически
+        product_id: currentProduct.id
+      };
+
+      const result = await dispatch(createOrGetChat(chatData)).unwrap();
+      
+      // Переходим на страницу чата
+      navigate(`/chats/${result.id}`);
+    } catch (error) {
+      console.error('Ошибка создания чата:', error);
+      alert('Не удалось создать чат. Попробуйте позже.');
+    } finally {
+      setCreatingChat(false);
     }
-    return formatted;
   };
 
   const isVideo = (item) => {
@@ -664,7 +692,7 @@ const PartDetail = () => {
                 {sellerOrg?.phone && (
                   <a
                     href={`tel:${sellerOrg.phone.replace(/\D/g, '')}`}
-                    className="flex items-center justify-center w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg transition-colors shadow-sm"
+                    className="flex items-center justify-center w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg transition-colors shadow-sm mb-2"
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -672,6 +700,18 @@ const PartDetail = () => {
                     {formatPhoneNumber(sellerOrg.phone)}
                   </a>
                 )}
+                
+                {/* Кнопка "Написать" */}
+                <button
+                  onClick={handleWriteToSeller}
+                  disabled={creatingChat}
+                  className="flex items-center justify-center w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors shadow-sm"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  {creatingChat ? 'Создание чата...' : 'Написать'}
+                </button>
               </div>
             )}
           </div>

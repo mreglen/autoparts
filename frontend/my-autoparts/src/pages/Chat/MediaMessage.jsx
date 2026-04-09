@@ -1,0 +1,387 @@
+import React, { useState, useEffect, useRef } from 'react';
+
+const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [showFullImage, setShowFullImage] = useState(false);
+  const [isCancelled, setIsCancelled] = useState(false);
+  const [isFailed, setIsFailed] = useState(false);
+  const abortControllerRef = useRef(null);
+
+  // Инициализируем AbortController для временных медиа
+  useEffect(() => {
+    if (media.is_processing && media.id?.toString().startsWith('temp_')) {
+      abortControllerRef.current = new AbortController();
+    }
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [media.id, media.is_processing]);
+
+  // Проверяем статус failed из media
+  useEffect(() => {
+    if (media.is_failed) {
+      setIsFailed(true);
+    }
+  }, [media.is_failed]);
+
+  // Форматируем размер файла
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  // Отмена загрузки медиа
+  const handleCancelUpload = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    setIsCancelled(true);
+    if (onCancelUpload && media.id) {
+      onCancelUpload(media.id);
+    }
+  };
+
+  // Повторная отправка медиа
+  const handleRetryUpload = () => {
+    setIsCancelled(false);
+    setIsFailed(false);
+    if (onRetryUpload && media) {
+      onRetryUpload(media);
+    }
+  };
+
+  // Получаем URL для медиа
+  const getMediaUrl = (mediaItem) => {
+    return `/api/chats/media/${mediaItem.id}`;
+  };
+
+  // Получаем URL для thumbnail
+  const getThumbnailUrl = (mediaItem) => {
+    if (mediaItem.thumbnail_path) {
+      return `/api/chats/media/${mediaItem.id}/thumbnail`;
+    }
+    return getMediaUrl(mediaItem);
+  };
+
+  // Отображение изображения
+  const renderImage = (mediaItem) => {
+    const thumbnailUrl = getThumbnailUrl(mediaItem);
+    const fullUrl = getMediaUrl(mediaItem);
+
+    return (
+      <div className="relative">
+        {mediaItem.is_processing ? (
+          <div className="flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg" style={{ minHeight: '200px' }}>
+            <div className="text-center p-4 relative">
+              {/* Кружок загрузки с крестиком или retry */}
+              <div className="relative inline-block">
+                {isFailed ? (
+                  // Значок retry
+                  <button
+                    onClick={handleRetryUpload}
+                    className="mx-auto mb-2 bg-blue-500 hover:bg-blue-600 rounded-full p-3 shadow-lg transition-colors"
+                    title="Повторить отправку"
+                  >
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                ) : (
+                  <>
+                    <svg className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {/* Крестик отмены внутри кружка */}
+                    {!isCancelled && (
+                      <button
+                        onClick={handleCancelUpload}
+                        className="absolute inset-0 flex items-center justify-center group"
+                        title="Отменить загрузку"
+                      >
+                        <div className="bg-red-500 hover:bg-red-600 rounded-full p-0.5 transition-colors">
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </div>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+              <p className="text-sm text-gray-700 font-medium">
+                {isFailed ? 'Ошибка отправки' : isCancelled ? 'Загрузка отменена' : 'Файл обрабатывается...'}
+              </p>
+              {!isCancelled && !isFailed && (
+                <p className="text-xs text-gray-500 mt-1">Пожалуйста, подождите</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            <img
+              src={thumbnailUrl}
+              alt={mediaItem.original_filename || 'Изображение'}
+              className={`max-w-full rounded-lg cursor-pointer transition-opacity duration-300 ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              style={{ maxHeight: '400px', objectFit: 'contain' }}
+              onClick={() => setShowFullImage(true)}
+              onLoad={() => setImageLoaded(true)}
+            />
+            {!imageLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-200 rounded-lg">
+                <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            )}
+            
+            {/* Lightbox для полного изображения */}
+            {showFullImage && (
+              <div
+                className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center p-4"
+                onClick={() => setShowFullImage(false)}
+              >
+                <div className="relative max-w-full max-h-full">
+                  <button
+                    className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowFullImage(false);
+                    }}
+                  >
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <img
+                    src={fullUrl}
+                    alt={mediaItem.original_filename || 'Изображение'}
+                    className="max-w-full max-h-[90vh] object-contain"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // Отображение видео
+  const renderVideo = (mediaItem) => {
+    const thumbnailUrl = getThumbnailUrl(mediaItem);
+    const videoUrl = getMediaUrl(mediaItem);
+
+    return (
+      <div className="relative">
+        {mediaItem.is_processing ? (
+          <div className="flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg" style={{ minHeight: '200px' }}>
+            <div className="text-center p-4 relative">
+              {/* Кружок загрузки с крестиком или retry */}
+              <div className="relative inline-block">
+                {isFailed ? (
+                  // Значок retry
+                  <button
+                    onClick={handleRetryUpload}
+                    className="mx-auto mb-2 bg-blue-500 hover:bg-blue-600 rounded-full p-3 shadow-lg transition-colors"
+                    title="Повторить отправку"
+                  >
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                ) : (
+                  <>
+                    <svg className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {/* Крестик отмены внутри кружка */}
+                    {!isCancelled && (
+                      <button
+                        onClick={handleCancelUpload}
+                        className="absolute inset-0 flex items-center justify-center group"
+                        title="Отменить загрузку"
+                      >
+                        <div className="bg-red-500 hover:bg-red-600 rounded-full p-0.5 transition-colors">
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </div>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+              <p className="text-sm text-gray-700 font-medium">
+                {isFailed ? 'Ошибка отправки' : isCancelled ? 'Загрузка отменена' : 'Файл обрабатывается...'}
+              </p>
+              {!isCancelled && !isFailed && (
+                <p className="text-xs text-gray-500 mt-1">Пожалуйста, подождите</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <video
+            controls
+            poster={thumbnailUrl}
+            className="max-w-full rounded-lg"
+            style={{ maxHeight: '400px' }}
+            preload="metadata"
+          >
+            <source src={videoUrl} type={mediaItem.mime_type} />
+            Ваш браузер не поддерживает воспроизведение видео.
+          </video>
+        )}
+        
+        {/* Отображение длительности видео */}
+        {mediaItem.duration && !mediaItem.is_processing && (
+          <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
+            {formatDuration(mediaItem.duration)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Форматируем длительность
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Отображение документа
+  const renderDocument = (mediaItem) => {
+    const fileUrl = getMediaUrl(mediaItem);
+    
+    // Определяем иконку по типу файла
+    const getFileIcon = () => {
+      const mimeType = mediaItem.mime_type;
+      
+      if (mimeType.includes('pdf')) {
+        return (
+          <svg className="w-12 h-12 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+          </svg>
+        );
+      } else if (mimeType.includes('word') || mimeType.includes('document')) {
+        return (
+          <svg className="w-12 h-12 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+          </svg>
+        );
+      } else if (mimeType.includes('excel') || mimeType.includes('sheet')) {
+        return (
+          <svg className="w-12 h-12 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+          </svg>
+        );
+      }
+      return (
+        <svg className="w-12 h-12 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+        </svg>
+      );
+    };
+
+    // Если файл еще обрабатывается
+    if (mediaItem.is_processing) {
+      return (
+        <div className="relative">
+          <div className="flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg" style={{ minHeight: '100px' }}>
+            <div className="text-center p-4 relative">
+              {/* Кружок загрузки с крестиком или retry */}
+              <div className="relative inline-block">
+                {isFailed ? (
+                  // Значок retry
+                  <button
+                    onClick={handleRetryUpload}
+                    className="mx-auto mb-2 bg-blue-500 hover:bg-blue-600 rounded-full p-3 shadow-lg transition-colors"
+                    title="Повторить отправку"
+                  >
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                ) : (
+                  <>
+                    <svg className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {/* Крестик отмены внутри кружка */}
+                    {!isCancelled && (
+                      <button
+                        onClick={handleCancelUpload}
+                        className="absolute inset-0 flex items-center justify-center group"
+                        title="Отменить загрузку"
+                      >
+                        <div className="bg-red-500 hover:bg-red-600 rounded-full p-0.5 transition-colors">
+                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </div>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+              <p className="text-sm text-gray-700 font-medium">
+                {isFailed ? 'Ошибка отправки' : isCancelled ? 'Загрузка отменена' : 'Файл обрабатывается...'}
+              </p>
+              {!isCancelled && !isFailed && (
+                <p className="text-xs text-gray-500 mt-1">Пожалуйста, подождите</p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="relative">
+        <a
+          href={fileUrl}
+          download={mediaItem.original_filename}
+          className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+          title="Нажмите для скачивания"
+        >
+          {getFileIcon()}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">
+              {mediaItem.original_filename || 'Документ'}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {formatFileSize(mediaItem.file_size)}
+            </p>
+          </div>
+          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+        </a>
+      </div>
+    );
+  };
+
+  // Рендерим в зависимости от типа медиа
+  if (media.media_type === 'image') {
+    return renderImage(media);
+  } else if (media.media_type === 'video') {
+    return renderVideo(media);
+  } else if (media.media_type === 'document') {
+    return renderDocument(media);
+  }
+
+  return null;
+};
+
+export default MediaMessage;

@@ -5,6 +5,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { fetchPendingProducts } from '../redux/slices/ModerationProductsSlice';
 import { fetchPendingSellers } from '../redux/slices/ModerationSlice';
 import Navigation from '../pages/Navigation/Navigation';
+import MobileBottomNav from '../components/MobileBottomNav/MobileBottomNav';
 import ProfileMenuTabs from '../pages/Profile/menu/ProfileMenuTabs';
 
 export default function ProfileWithMenuLayout() {
@@ -15,6 +16,10 @@ export default function ProfileWithMenuLayout() {
     const moderation = useSelector((state) => state.moderation);
     const location = useLocation();
     const navigate = useNavigate();
+    
+    // Detect if we're in a specific chat (not just the chat list)
+    // /chats - show navigation, /chats/123 - hide navigation
+    const isSpecificChatPage = /^\/chats\/\d+/.test(location.pathname);
     
     // Helper to check if user has specific permission
     const hasPermission = (code) => {
@@ -48,7 +53,8 @@ export default function ProfileWithMenuLayout() {
             '/settings/label': 'settings-label',
             '/settings/employees': 'settings-employees',
             '/moderation/products': 'product-moderation',
-            '/moderation/pending-sellers': 'pending-sellers'
+            '/moderation/pending-sellers': 'pending-sellers',
+            '/chats': 'chats'
         };
         return pathMap[path] || (user?.is_seller ? 'dashboard' : 'profile');
     });
@@ -81,7 +87,8 @@ export default function ProfileWithMenuLayout() {
                 '/settings/label': 'settings-label',
                 '/settings/employees': 'settings-employees',
                 '/moderation/products': 'product-moderation',
-                '/moderation/pending-sellers': 'pending-sellers'
+                '/moderation/pending-sellers': 'pending-sellers',
+                '/chats': 'chats'
             };
             return pathMap[path] || (user?.is_seller ? 'dashboard' : 'profile');
         };
@@ -93,12 +100,13 @@ export default function ProfileWithMenuLayout() {
     const getAvailableTabs = () => {
         let baseTabs = [];
 
-        // Для админов добавляем Главную, Продавцы и Клиенты
+        // Для админов добавляем Главную, Продавцы, Клиенты, Чаты и Покупки
         if (user?.is_admin) {
             baseTabs = [
                 { id: 'dashboard', label: 'Главная' },
                 { id: 'sellers', label: 'Продавцы' },
                 { id: 'clients', label: 'Клиенты' },
+                { id: 'chats', label: 'Чаты' },
                 {
                     id: 'purchases',
                     label: 'Покупки',
@@ -109,11 +117,12 @@ export default function ProfileWithMenuLayout() {
                 }
             ];
         }
-        // Для продавцов добавляем Главную, Клиенты и Покупки
+        // Для продавцов добавляем Главную, Клиенты, Чаты и Покупки
         else if (user?.is_seller) {
             baseTabs = [
                 { id: 'dashboard', label: 'Главная' },
                 { id: 'clients', label: 'Клиенты' },
+                { id: 'chats', label: 'Чаты' },
                 {
                     id: 'purchases',
                     label: 'Покупки',
@@ -124,7 +133,7 @@ export default function ProfileWithMenuLayout() {
                 }
             ];
         }
-        // Для обычных пользователей (покупателей) - только Покупки и Настройки (Профиль)
+        // Для обычных пользователей (покупателей) - только Покупки, Чаты и Настройки (Профиль)
         else {
             baseTabs = [
                 {
@@ -135,6 +144,7 @@ export default function ProfileWithMenuLayout() {
                         { id: 'purchases-returns', label: 'Возвраты' }
                     ]
                 },
+                { id: 'chats', label: 'Чаты' },
                 {
                     id: 'settings',
                     label: 'Настройки',
@@ -412,7 +422,8 @@ export default function ProfileWithMenuLayout() {
             'sellers': '/sellers',
             'settings-employees': '/settings/employees',
             'pending-sellers': '/moderation/pending-sellers',
-            'product-moderation': '/moderation/products'
+            'product-moderation': '/moderation/products',
+            'chats': '/chats'
         };
 
         const path = tabPathMap[tabId];
@@ -422,31 +433,37 @@ export default function ProfileWithMenuLayout() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-24 md:pb-0">
-            <Navigation />
-            <main className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-7 py-6 sm:py-8">
-                {/* Двухколоночный layout: меню слева, контент справа */}
-                <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
-                    {/* Левая колонка - меню */}
-                    <div className="lg:col-span-1">
-                        <ProfileMenuTabs
-                            tabs={tabs}
-                            activeTab={activeTab}
-                            onTabChange={handleTabChange}
-                            badgeCounts={{
-                                'product-moderation': moderationProducts?.pendingProducts?.length || 0,
-                                'pending-sellers': moderation?.pendingSellers?.length || 0,
-                                'administration': ((moderationProducts?.pendingProducts?.length || 0) + (moderation?.pendingSellers?.length || 0))
-                            }}
-                        />
-                    </div>
+        <div className={`min-h-screen bg-gray-50 ${!isSpecificChatPage ? 'pb-24 md:pb-0' : 'pb-0'}`}>
+            {!isSpecificChatPage && <Navigation />}
+            <main className={`mx-auto ${isSpecificChatPage ? 'max-w-full p-0' : 'max-w-7xl px-3 sm:px-5 lg:px-7 py-6 sm:py-8'}`}>
+                {isSpecificChatPage ? (
+                    // Full-width chat without sidebar on specific chat pages
+                    <Outlet />
+                ) : (
+                    // Two-column layout: menu on left, content on right
+                    <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+                        {/* Left column - menu */}
+                        <div className="lg:col-span-1">
+                            <ProfileMenuTabs
+                                tabs={tabs}
+                                activeTab={activeTab}
+                                onTabChange={handleTabChange}
+                                badgeCounts={{
+                                    'product-moderation': moderationProducts?.pendingProducts?.length || 0,
+                                    'pending-sellers': moderation?.pendingSellers?.length || 0,
+                                    'administration': ((moderationProducts?.pendingProducts?.length || 0) + (moderation?.pendingSellers?.length || 0))
+                                }}
+                            />
+                        </div>
 
-                    {/* Правая колонка - контент */}
-                    <div className="lg:col-span-5">
-                        <Outlet />
+                        {/* Right column - content */}
+                        <div className="lg:col-span-5">
+                            <Outlet />
+                        </div>
                     </div>
-                </div>
+                )}
             </main>
+            {!isSpecificChatPage && <MobileBottomNav />}
         </div>
     );
 }
