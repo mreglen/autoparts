@@ -136,27 +136,30 @@ const chatSlice = createSlice({
                 const exists = state.messages.find(m => m.id === message.id);
                 
                 if (!exists) {
-                    // Ищем временное (оптимистичное) сообщение с тем же содержанием от того же отправителя
+                    // Ищем временное сообщение с тем же содержанием от того же отправителя
                     // чтобы заменить его на реальное сообщение с сервера
                     const tempMessageIndex = state.messages.findIndex(m => 
                         m.id?.toString().startsWith('temp_') && 
                         m.sender_id === message.sender_id && 
                         m.message === message.message &&
-                        Math.abs(new Date(m.created_at) - new Date(message.created_at)) < 5000 // в пределах 5 секунд
+                        Math.abs(new Date(m.created_at) - new Date(message.created_at)) < 10000 // в пределах 10 секунд
                     );
                     
                     if (tempMessageIndex !== -1) {
                         // Заменяем временное сообщение на реальное
                         state.messages[tempMessageIndex] = message;
+                        console.log('✅ Replaced temp message with real message via WebSocket:', message.id);
                     } else {
                         // Если временного сообщения нет, просто добавляем новое
                         state.messages.push(message);
+                        console.log('📥 Added new message from WebSocket:', message.id);
                     }
                 } else {
                     // Если сообщение уже есть, обновляем его (например, после обработки медиа)
                     const messageIndex = state.messages.findIndex(m => m.id === message.id);
                     if (messageIndex !== -1) {
                         state.messages[messageIndex] = message;
+                        console.log('🔄 Updated existing message from WebSocket:', message.id);
                     }
                 }
             }
@@ -286,7 +289,25 @@ const chatSlice = createSlice({
                         });
                     }
                 });
-                state.messages = action.payload.messages;
+                
+                // Находим временные сообщения которые еще не получены с сервера
+                const tempMessages = state.messages.filter(m => 
+                    m.id?.toString().startsWith('temp_')
+                );
+                
+                // Заменяем сообщения из сервера, но сохраняем временные
+                const serverMessageIds = new Set(action.payload.messages.map(m => m.id));
+                const remainingTempMessages = tempMessages.filter(m => 
+                    !serverMessageIds.has(m.id)
+                );
+                
+                // Объединяем серверные сообщения с оставшимися временными
+                state.messages = [...action.payload.messages, ...remainingTempMessages];
+                
+                // Сортируем по created_at
+                state.messages.sort((a, b) => 
+                    new Date(a.created_at) - new Date(b.created_at)
+                );
             })
             .addCase(fetchChatMessages.rejected, (state, action) => {
                 state.loading = false;

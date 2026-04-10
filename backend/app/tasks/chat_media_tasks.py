@@ -116,16 +116,20 @@ def compress_chat_image(self, media_id: int):
         media.thumbnail_path = str(thumbnail_path)
         media.is_processing = False
         
-        db.commit()
-        
-        # Удаляем оригинальный файл
-        if os.path.exists(old_path):
-            os.remove(old_path)
-        
         print(f"✅ [SUCCESS] Image compressed successfully!")
         print(f"📍 [INFO] Compressed: {compressed_path}")
         print(f"📍 [INFO] Thumbnail: {thumbnail_path}")
         print(f"📏 [INFO] Size: {os.path.getsize(compressed_path) / 1024:.1f} KB")
+        print(f"🔍 [DEBUG] media.is_processing BEFORE db.commit(): {media.is_processing}")
+        
+        db.commit()
+        
+        print(f"🔍 [DEBUG] Transaction committed successfully")
+        
+        # Удаляем оригинальный файл
+        if os.path.exists(old_path):
+            os.remove(old_path)
+            print(f"🗑️ [INFO] Deleted original file: {old_path}")
         
         # Отправляем WebSocket уведомление о готовности сообщения
         try:
@@ -150,7 +154,8 @@ def compress_chat_image(self, media_id: int):
                 db.commit()
         except:
             pass
-        raise self.retry(exc=e, countdown=60)
+        # Don't retry on error, just mark as failed
+        return {"success": False, "error": str(e)}
     finally:
         db.close()
 
@@ -280,7 +285,8 @@ def compress_chat_video(self, media_id: int):
                 db.commit()
         except:
             pass
-        raise self.retry(exc=e, countdown=60)
+        # Don't retry on error, just mark as failed
+        return {"success": False, "error": str(e)}
     finally:
         db.close()
 
@@ -387,20 +393,21 @@ def _send_media_ready_notification(message_id: int, db):
         ]
     }
     
-    # Отправляем всем участникам чата кроме отправителя
+    # Отправляем ВСЕМ участникам чата (включая отправителя)
+    # Отправитель тоже должен получить обновление чтобы заменить временное сообщение
     print(f"📤 [WS] Sending media ready notification for message {message_id}")
     print(f"   - Chat: {chat.id}, Sender: {message.sender_id}")
     print(f"   - Media count: {len(media_list)}")
     
-    # Отправляем покупателю (если это не отправитель)
-    if chat.buyer_id != message.sender_id and chat.buyer_id in manager.active_connections:
+    # Отправляем покупателю (если подключен)
+    if chat.buyer_id in manager.active_connections:
         print(f"   - Sending to buyer: {chat.buyer_id}")
         asyncio.get_event_loop().run_until_complete(
             manager.send_personal_message(message_response, chat.buyer_id)
         )
     
-    # Отправляем продавцу (если это не отправитель)
-    if chat.seller_id != message.sender_id and chat.seller_id in manager.active_connections:
+    # Отправляем продавцу (если подключен)
+    if chat.seller_id in manager.active_connections:
         print(f"   - Sending to seller: {chat.seller_id}")
         asyncio.get_event_loop().run_until_complete(
             manager.send_personal_message(message_response, chat.seller_id)

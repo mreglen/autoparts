@@ -92,7 +92,7 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                     
                     # Обновляем время чата
                     from sqlalchemy import func
-                    chat.updated_at = func.now()
+                    db.query(Chat).filter(Chat.id == chat_id).update({"updated_at": func.now()})
                     db.commit()
                     db.refresh(new_message)
                     

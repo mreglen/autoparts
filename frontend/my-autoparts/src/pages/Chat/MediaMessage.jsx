@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { API_BASE } from '../../utils/apiClient';
 
 const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const [showFullImage, setShowFullImage] = useState(false);
   const [isCancelled, setIsCancelled] = useState(false);
   const [isFailed, setIsFailed] = useState(false);
   const abortControllerRef = useRef(null);
+
+  // Reset state when media changes
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageError(false);
+  }, [media.id]);
 
   // Инициализируем AbortController для временных медиа
   useEffect(() => {
@@ -56,13 +64,25 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
 
   // Получаем URL для медиа
   const getMediaUrl = (mediaItem) => {
-    return `/api/chats/media/${mediaItem.id}`;
+    // Если это временное медиа, возвращаем пустую строку
+    if (mediaItem.id?.toString().startsWith('temp_')) {
+      return '';
+    }
+    // Добавляем токен как query parameter для <img> тегов
+    const token = localStorage.getItem('token');
+    return `${API_BASE}/chats/media/${mediaItem.id}?token=${encodeURIComponent(token)}`;
   };
 
   // Получаем URL для thumbnail
   const getThumbnailUrl = (mediaItem) => {
+    // Если это временное медиа, возвращаем пустую строку
+    if (mediaItem.id?.toString().startsWith('temp_')) {
+      return '';
+    }
+    // Добавляем токен как query parameter для <img> тегов
+    const token = localStorage.getItem('token');
     if (mediaItem.thumbnail_path) {
-      return `/api/chats/media/${mediaItem.id}/thumbnail`;
+      return `${API_BASE}/chats/media/${mediaItem.id}/thumbnail?token=${encodeURIComponent(token)}`;
     }
     return getMediaUrl(mediaItem);
   };
@@ -74,8 +94,56 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
 
     return (
       <div className="relative">
-        {mediaItem.is_processing ? (
-          <div className="flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg" style={{ minHeight: '200px' }}>
+        {/* Always render the image */}
+        <img
+          src={thumbnailUrl}
+          alt={mediaItem.original_filename || 'Изображение'}
+          className={`max-w-full rounded-lg cursor-pointer transition-opacity duration-300 ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+          style={{ maxHeight: '400px', objectFit: 'contain' }}
+          onClick={() => setShowFullImage(true)}
+          onLoad={() => {
+            console.log('✅ Image loaded successfully:', thumbnailUrl);
+            setImageLoaded(true);
+            setImageError(false);
+          }}
+          onError={(e) => {
+            console.error('❌ Failed to load image:', thumbnailUrl);
+            console.error('Media item:', mediaItem);
+            setImageError(true);
+            setImageLoaded(false);
+          }}
+        />
+        {imageError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-200 rounded-lg p-4">
+            <svg className="w-12 h-12 text-red-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p className="text-sm text-gray-700 font-medium text-center">Ошибка загрузки изображения</p>
+            <button
+              onClick={() => {
+                setImageError(false);
+                setImageLoaded(false);
+              }}
+              className="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+            >
+              Попробовать снова
+            </button>
+          </div>
+        )}
+        {!imageLoaded && !imageError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-200 rounded-lg">
+            <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
+        )}
+        
+        {/* Overlay for processing state - shown on top of the image */}
+        {mediaItem.is_processing && !imageError && (
+          <div className="absolute inset-0 bg-black bg-opacity-40 rounded-lg flex items-center justify-center">
             <div className="text-center p-4 relative">
               {/* Кружок загрузки с крестиком или retry */}
               <div className="relative inline-block">
@@ -92,7 +160,7 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
                   </button>
                 ) : (
                   <>
-                    <svg className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-8 w-8 text-white mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -113,63 +181,42 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
                   </>
                 )}
               </div>
-              <p className="text-sm text-gray-700 font-medium">
+              <p className="text-sm text-white font-medium">
                 {isFailed ? 'Ошибка отправки' : isCancelled ? 'Загрузка отменена' : 'Файл обрабатывается...'}
               </p>
               {!isCancelled && !isFailed && (
-                <p className="text-xs text-gray-500 mt-1">Пожалуйста, подождите</p>
+                <p className="text-xs text-white mt-1">Пожалуйста, подождите</p>
               )}
             </div>
           </div>
-        ) : (
-          <>
-            <img
-              src={thumbnailUrl}
-              alt={mediaItem.original_filename || 'Изображение'}
-              className={`max-w-full rounded-lg cursor-pointer transition-opacity duration-300 ${
-                imageLoaded ? 'opacity-100' : 'opacity-0'
-              }`}
-              style={{ maxHeight: '400px', objectFit: 'contain' }}
-              onClick={() => setShowFullImage(true)}
-              onLoad={() => setImageLoaded(true)}
-            />
-            {!imageLoaded && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-200 rounded-lg">
-                <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              </div>
-            )}
+        )}
             
-            {/* Lightbox для полного изображения */}
-            {showFullImage && (
-              <div
-                className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center p-4"
-                onClick={() => setShowFullImage(false)}
+        {/* Lightbox для полного изображения */}
+        {showFullImage && (
+          <div
+            className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center p-4"
+            onClick={() => setShowFullImage(false)}
+          >
+            <div className="relative max-w-full max-h-full">
+              <button
+                className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowFullImage(false);
+                }}
               >
-                <div className="relative max-w-full max-h-full">
-                  <button
-                    className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowFullImage(false);
-                    }}
-                  >
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                  <img
-                    src={fullUrl}
-                    alt={mediaItem.original_filename || 'Изображение'}
-                    className="max-w-full max-h-[90vh] object-contain"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
-              </div>
-            )}
-          </>
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <img
+                src={fullUrl}
+                alt={mediaItem.original_filename || 'Изображение'}
+                className="max-w-full max-h-[90vh] object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
         )}
       </div>
     );
@@ -182,8 +229,21 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
 
     return (
       <div className="relative">
-        {mediaItem.is_processing ? (
-          <div className="flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg" style={{ minHeight: '200px' }}>
+        {/* Always render the video */}
+        <video
+          controls
+          poster={thumbnailUrl}
+          className="max-w-full rounded-lg"
+          style={{ maxHeight: '400px' }}
+          preload="metadata"
+        >
+          <source src={videoUrl} type={mediaItem.mime_type} />
+          Ваш браузер не поддерживает воспроизведение видео.
+        </video>
+        
+        {/* Overlay for processing state - shown on top of the video */}
+        {mediaItem.is_processing && (
+          <div className="absolute inset-0 bg-black bg-opacity-40 rounded-lg flex items-center justify-center">
             <div className="text-center p-4 relative">
               {/* Кружок загрузки с крестиком или retry */}
               <div className="relative inline-block">
@@ -200,7 +260,7 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
                   </button>
                 ) : (
                   <>
-                    <svg className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-8 w-8 text-white mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -221,25 +281,14 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
                   </>
                 )}
               </div>
-              <p className="text-sm text-gray-700 font-medium">
+              <p className="text-sm text-white font-medium">
                 {isFailed ? 'Ошибка отправки' : isCancelled ? 'Загрузка отменена' : 'Файл обрабатывается...'}
               </p>
               {!isCancelled && !isFailed && (
-                <p className="text-xs text-gray-500 mt-1">Пожалуйста, подождите</p>
+                <p className="text-xs text-white mt-1">Пожалуйста, подождите</p>
               )}
             </div>
           </div>
-        ) : (
-          <video
-            controls
-            poster={thumbnailUrl}
-            className="max-w-full rounded-lg"
-            style={{ maxHeight: '400px' }}
-            preload="metadata"
-          >
-            <source src={videoUrl} type={mediaItem.mime_type} />
-            Ваш браузер не поддерживает воспроизведение видео.
-          </video>
         )}
         
         {/* Отображение длительности видео */}

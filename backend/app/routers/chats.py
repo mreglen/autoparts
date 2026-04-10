@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from typing import List, Optional
@@ -239,7 +239,7 @@ def send_message(
     db.add(new_message)
     
     # Обновляем время обновления чата
-    chat.updated_at = func.now()
+    db.query(Chat).filter(Chat.id == chat_id).update({"updated_at": func.now()})
     
     db.commit()
     db.refresh(new_message)
@@ -385,7 +385,7 @@ async def upload_chat_media(
         media_records.append(media_record)
     
     # Обновляем время чата
-    chat.updated_at = func.now()
+    db.query(Chat).filter(Chat.id == chat_id).update({"updated_at": func.now()})
     db.commit()
     
     # Запускаем Celery задачи для сжатия (только для изображений и видео)
@@ -446,11 +446,43 @@ async def upload_chat_media(
 @router.get("/media/{media_id}")
 def get_chat_media(
     media_id: int,
+    request: Request,
+    token: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
 ):
     """Получить медиа файл"""
     from fastapi.responses import FileResponse
+    from app.core.auth import get_current_user, oauth2_scheme
+    from jose import jwt
+    from app.core.config import Settings
+    
+    settings = Settings()
+    
+    # Пробуем получить токен из query parameter или из header
+    auth_token = token
+    if not auth_token:
+        # Пробуем получить из Authorization header
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            auth_token = auth_header.split(" ", 1)[1]
+    
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    # Декодируем токен
+    try:
+        payload = jwt.decode(auth_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Недействительный токен")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Недействительный токен")
+    
+    # Получаем пользователя
+    from app.utils.phone import normalize_to_storage_format
+    current_user = db.query(User).filter(User.email == email).first()
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Пользователь не найден")
     
     media = db.query(ChatMedia).filter(ChatMedia.id == media_id).first()
     if not media:
@@ -493,11 +525,41 @@ def get_chat_media(
 @router.get("/media/{media_id}/thumbnail")
 def get_chat_media_thumbnail(
     media_id: int,
+    request: Request,
+    token: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
 ):
     """Получить thumbnail медиа файла"""
     from fastapi.responses import FileResponse
+    from jose import jwt
+    from app.core.config import Settings
+    
+    settings = Settings()
+    
+    # Пробуем получить токен из query parameter или из header
+    auth_token = token
+    if not auth_token:
+        # Пробуем получить из Authorization header
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            auth_token = auth_header.split(" ", 1)[1]
+    
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    # Декодируем токен
+    try:
+        payload = jwt.decode(auth_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Недействительный токен")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Недействительный токен")
+    
+    # Получаем пользователя
+    current_user = db.query(User).filter(User.email == email).first()
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Пользователь не найден")
     
     media = db.query(ChatMedia).filter(ChatMedia.id == media_id).first()
     if not media:
