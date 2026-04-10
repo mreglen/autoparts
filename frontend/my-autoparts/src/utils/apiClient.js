@@ -29,9 +29,12 @@ export const getWebSocketBaseUrl = () => {
     console.log('[WS Config] BACKEND_BASE from env:', BACKEND_BASE);
     console.log('[WS Config] Processed backendUrl:', backendUrl);
     
-    // If BACKEND_BASE includes /server, we need to preserve it
     // Remove trailing slash if present
     backendUrl = backendUrl.replace(/\/+$/, '');
+
+    // Defensive fallback: if someone accidentally configured .../api,
+    // WebSocket endpoint should still resolve to backend root (or /server).
+    backendUrl = backendUrl.replace(/\/api$/, '');
     
     // Convert http:// to ws:// and https:// to wss://
     let wsUrl = backendUrl

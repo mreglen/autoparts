@@ -400,17 +400,13 @@ def _send_media_ready_notification(message_id: int, db):
     print(f"   - Media count: {len(media_list)}")
     
     # Отправляем покупателю (если подключен)
-    if chat.buyer_id in manager.active_connections:
+    if manager.active_connections.get(chat.buyer_id):
         print(f"   - Sending to buyer: {chat.buyer_id}")
-        asyncio.get_event_loop().run_until_complete(
-            manager.send_personal_message(message_response, chat.buyer_id)
-        )
+        asyncio.run(manager.send_personal_message(message_response, chat.buyer_id))
     
     # Отправляем продавцу (если подключен)
-    if chat.seller_id in manager.active_connections:
+    if manager.active_connections.get(chat.seller_id):
         print(f"   - Sending to seller: {chat.seller_id}")
-        asyncio.get_event_loop().run_until_complete(
-            manager.send_personal_message(message_response, chat.seller_id)
-        )
+        asyncio.run(manager.send_personal_message(message_response, chat.seller_id))
     
     print(f"✅ [WS] Media ready notification sent successfully")

@@ -1,34 +1,48 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
-from typing import Dict
+from typing import Dict, Set
 import json
 from app.db.database import get_db
 from app.models.chat import Chat, Message
 from app.models.user import User
 from datetime import datetime
+from jose import jwt
+from app.core.config import Settings
 
 router = APIRouter()
-
-# Хранилище активных подключений: user_id -> WebSocket
-active_connections: Dict[int, WebSocket] = {}
-
+settings = Settings()
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: Dict[int, WebSocket] = {}
+        self.active_connections: Dict[int, Set[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, user_id: int):
         await websocket.accept()
-        self.active_connections[user_id] = websocket
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = set()
+        self.active_connections[user_id].add(websocket)
 
-    def disconnect(self, user_id: int):
-        if user_id in self.active_connections:
+    def disconnect(self, user_id: int, websocket: WebSocket):
+        if user_id not in self.active_connections:
+            return
+        self.active_connections[user_id].discard(websocket)
+        if not self.active_connections[user_id]:
             del self.active_connections[user_id]
 
     async def send_personal_message(self, message: dict, user_id: int):
-        if user_id in self.active_connections:
-            websocket = self.active_connections[user_id]
-            await websocket.send_json(message)
+        user_sockets = self.active_connections.get(user_id)
+        if not user_sockets:
+            return
+
+        stale_connections = []
+        for socket in list(user_sockets):
+            try:
+                await socket.send_json(message)
+            except Exception:
+                stale_connections.append(socket)
+
+        for socket in stale_connections:
+            self.disconnect(user_id, socket)
 
     async def broadcast_to_chat(self, message: dict, chat_id: int, db: Session, exclude_user_id: int = None):
         """Отправить сообщение всем участникам чата + push notification если offline"""
@@ -40,11 +54,15 @@ class ConnectionManager:
         if chat:
             # Получаем информацию об отправителе
             sender = db.query(User).filter(User.id == message.get("sender_id")).first()
-            sender_name = sender.name if sender else "Неизвестный"
+            sender_name = (
+                sender.first_name
+                or sender.phone
+                or sender.email
+            ) if sender else "Неизвестный"
             
             # Отправляем покупателю (если это не отправитель)
             if chat.buyer_id != exclude_user_id:
-                if chat.buyer_id in self.active_connections:
+                if self.active_connections.get(chat.buyer_id):
                     await self.send_personal_message(message, chat.buyer_id)
                 else:
                     # User not connected via WebSocket - send push notification
@@ -61,7 +79,7 @@ class ConnectionManager:
             
             # Отправляем продавцу (если это не отправитель)
             if chat.seller_id != exclude_user_id:
-                if chat.seller_id in self.active_connections:
+                if self.active_connections.get(chat.seller_id):
                     await self.send_personal_message(message, chat.seller_id)
                 else:
                     # User not connected via WebSocket - send push notification
@@ -87,6 +105,32 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
     print(f"[WS] Connection attempt for user_id={user_id}")
     print(f"[WS] Client: {websocket.client}")
     
+    # Проверяем токен авторизации и соответствие user_id
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008, reason="Missing auth token")
+        return
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email = payload.get("sub")
+        if not email:
+            await websocket.close(code=1008, reason="Invalid token payload")
+            return
+    except Exception:
+        await websocket.close(code=1008, reason="Invalid auth token")
+        return
+
+    db_gen = get_db()
+    db = next(db_gen)
+    try:
+        ws_user = db.query(User).filter(User.email == email).first()
+        if not ws_user or ws_user.id != int(user_id):
+            await websocket.close(code=1008, reason="Token user mismatch")
+            return
+    finally:
+        db.close()
+
     try:
         await manager.connect(websocket, user_id)
         print(f"[WS] Successfully connected user_id={user_id}")
@@ -108,6 +152,8 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                 reply_to_id = message_data.get("reply_to_id")
                 
                 if not all([chat_id, message_text, sender_id]):
+                    continue
+                if int(sender_id) != int(user_id):
                     continue
                 
                 # Сохраняем сообщение в БД
@@ -179,12 +225,20 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                 # Отправляем индикатор набора текста
                 chat_id = message_data.get("chat_id")
                 if chat_id:
-                    typing_message = {
-                        "type": "typing",
-                        "user_id": user_id,
-                        "chat_id": chat_id
-                    }
-                    await manager.broadcast_to_chat(typing_message, chat_id, None)
+                    db_gen = get_db()
+                    db = next(db_gen)
+                    try:
+                        chat = db.query(Chat).filter(Chat.id == chat_id).first()
+                        if chat:
+                            typing_message = {
+                                "type": "typing",
+                                "user_id": user_id,
+                                "chat_id": chat_id
+                            }
+                            recipient_id = chat.seller_id if int(user_id) == chat.buyer_id else chat.buyer_id
+                            await manager.send_personal_message(typing_message, recipient_id)
+                    finally:
+                        db.close()
             
             elif message_data.get("type") == "ping":
                 # Respond to ping to keep connection alive
@@ -194,7 +248,7 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                 })
                     
     except WebSocketDisconnect:
-        manager.disconnect(user_id)
+        manager.disconnect(user_id, websocket)
     except Exception as e:
         print(f"WebSocket error: {e}")
-        manager.disconnect(user_id)
+        manager.disconnect(user_id, websocket)

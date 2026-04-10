@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from typing import List, Optional
+import anyio
 import os
 import uuid
 from pathlib import Path
@@ -19,6 +20,7 @@ from app.schemas.chat import (
     ChatBlockResponse
 )
 from app.core.auth import get_current_user
+from app.routers.websocket import manager as websocket_manager
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -155,11 +157,30 @@ def get_chat_messages(
         Message.sender_id != current_user.id,
         Message.is_read == False
     ).all()
-    
+
+    read_message_ids = []
+    sender_ids_to_notify = set()
     for msg in unread_messages:
         msg.is_read = True
-    
+        read_message_ids.append(msg.id)
+        sender_ids_to_notify.add(msg.sender_id)
+
     db.commit()
+
+    # Уведомляем отправителей о прочтении сообщений через WebSocket (если они online)
+    if read_message_ids:
+        read_event = {
+            "type": "messages_read",
+            "chat_id": chat_id,
+            "message_ids": read_message_ids,
+            "read_by_user_id": current_user.id
+        }
+        for sender_id in sender_ids_to_notify:
+            try:
+                anyio.from_thread.run(websocket_manager.send_personal_message, read_event, sender_id)
+            except Exception:
+                # Не ломаем API-ответ, если realtime-уведомление не доставилось
+                pass
     
     # Возвращаем сообщения в правильном порядке (от старых к новым)
     messages_reversed = list(reversed(messages))
@@ -257,6 +278,24 @@ def send_message(
     
     db.commit()
     db.refresh(new_message)
+
+    # Push realtime-сообщение второму участнику чата
+    recipient_id = chat.seller_id if current_user.id == chat.buyer_id else chat.buyer_id
+    ws_payload = {
+        "type": "message",
+        "id": new_message.id,
+        "chat_id": new_message.chat_id,
+        "sender_id": new_message.sender_id,
+        "message": new_message.message,
+        "is_read": new_message.is_read,
+        "reply_to_id": new_message.reply_to_id,
+        "created_at": new_message.created_at.isoformat(),
+        "media": []
+    }
+    try:
+        anyio.from_thread.run(websocket_manager.send_personal_message, ws_payload, recipient_id)
+    except Exception:
+        pass
     
     # Получаем информацию об ответе, если есть
     reply_to = None
@@ -456,6 +495,40 @@ async def upload_chat_media(
     
     # Возвращаем сообщение с медиа
     db.refresh(new_message)
+
+    # Push realtime-сообщение второму участнику чата
+    recipient_id = chat.seller_id if current_user.id == chat.buyer_id else chat.buyer_id
+    ws_payload = {
+        "type": "message",
+        "id": new_message.id,
+        "chat_id": new_message.chat_id,
+        "sender_id": new_message.sender_id,
+        "message": new_message.message,
+        "is_read": new_message.is_read,
+        "created_at": new_message.created_at.isoformat(),
+        "media": [
+            {
+                "id": m.id,
+                "message_id": m.message_id,
+                "media_type": m.media_type,
+                "file_path": m.file_path,
+                "thumbnail_path": m.thumbnail_path,
+                "original_filename": m.original_filename,
+                "file_size": m.file_size,
+                "mime_type": m.mime_type,
+                "width": m.width,
+                "height": m.height,
+                "duration": m.duration,
+                "is_processing": m.is_processing if m.is_processing is not None else False,
+                "created_at": m.created_at.isoformat()
+            }
+            for m in media_records
+        ]
+    }
+    try:
+        await websocket_manager.send_personal_message(ws_payload, recipient_id)
+    except Exception:
+        pass
     
     return MessageResponse(
         id=new_message.id,

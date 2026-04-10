@@ -131,53 +131,26 @@ const ChatPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Polling для получения новых сообщений когда WebSocket не работает
+  // Единый polling: fallback при отключенном WS + обновление статуса медиа в обработке
   useEffect(() => {
-    const wsConnected = wsConnectedState;
-    
-    // Если WebSocket подключен, polling не нужен
-    if (wsConnected || !selectedChatId) {
-      return;
-    }
-    
-    console.log('🔄 WebSocket not connected, starting HTTP polling for chat:', selectedChatId);
-    
-    // Polling каждые 3 секунды
-    const interval = setInterval(() => {
-      console.log('🔄 Polling - fetching messages...');
-      dispatch(fetchChatMessages({ chatId: parseInt(selectedChatId) }));
-    }, 3000);
-    
-    return () => {
-      console.log('🛑 Stopping polling');
-      clearInterval(interval);
-    };
-  }, [wsConnectedState, selectedChatId, dispatch]);
+    if (!selectedChatId) return;
 
-  // Polling для обновления статуса обработки медиа
-  useEffect(() => {
-    // Проверяем есть ли сообщения с медиа в статусе обработки
-    const hasProcessingMedia = messages.some(msg => 
+    const hasProcessingMedia = messages.some(msg =>
       msg.media && msg.media.some(m => m.is_processing)
     );
-    
-    console.log('🔄 Polling check - hasProcessingMedia:', hasProcessingMedia, 'selectedChatId:', selectedChatId);
-    
-    if (!hasProcessingMedia || !selectedChatId) return;
-    
-    console.log('🔄 Starting polling for chat:', selectedChatId);
-    
-    // Polling каждые 3 секунды для обновления статуса
+    const shouldPoll = !wsConnectedState || hasProcessingMedia;
+
+    if (!shouldPoll) return;
+
+    const intervalMs = !wsConnectedState ? 3000 : 5000;
     const interval = setInterval(() => {
-      console.log('🔄 Polling - fetching messages...');
       dispatch(fetchChatMessages({ chatId: parseInt(selectedChatId) }));
-    }, 3000);
-    
+    }, intervalMs);
+
     return () => {
-      console.log('🔄 Cleaning up polling interval');
       clearInterval(interval);
     };
-  }, [messages, selectedChatId, dispatch]);
+  }, [wsConnectedState, messages, selectedChatId, dispatch]);
 
   // Закрыть меню при клике вне его
   useEffect(() => {

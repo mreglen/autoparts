@@ -288,6 +288,29 @@ const chatSlice = createSlice({
         // WebSocket подключен
         setWsConnected: (state, action) => {
             state.wsConnected = action.payload;
+        },
+
+        // Пометить сообщения как прочитанные по realtime-событию
+        markMessagesAsRead: (state, action) => {
+            const { chat_id, message_ids } = action.payload;
+            if (!Array.isArray(message_ids) || message_ids.length === 0) return;
+
+            // Обновляем сообщения открытого чата
+            if (state.currentChat && state.currentChat.id === chat_id) {
+                state.messages.forEach((m) => {
+                    if (message_ids.includes(m.id)) {
+                        m.is_read = true;
+                    }
+                });
+            }
+
+            // Обновляем последнее сообщение в списке чатов (для галочки в списке)
+            const chatIndex = state.chats.findIndex((c) => c.id === chat_id);
+            if (chatIndex !== -1 && state.chats[chatIndex].last_message) {
+                if (message_ids.includes(state.chats[chatIndex].last_message.id)) {
+                    state.chats[chatIndex].last_message.is_read = true;
+                }
+            }
         }
     },
     extraReducers: (builder) => {
@@ -492,7 +515,12 @@ export const connectWebSocket = (userId) => (dispatch) => {
     
     // Получаем базовый URL для WebSocket из конфигурации API
     const wsBaseUrl = getWebSocketBaseUrl();
-    const wsUrl = `${wsBaseUrl}/ws/chat/${userId}`;
+    const token = localStorage.getItem('token');
+    if (!token) {
+        console.warn('[WS] Missing auth token, skipping connect');
+        return;
+    }
+    const wsUrl = `${wsBaseUrl}/ws/chat/${userId}?token=${encodeURIComponent(token)}`;
     
     console.log('[WS] Connecting to:', wsUrl);
     console.log('[WS] Reconnect attempt:', wsReconnectAttempts + 1);
@@ -513,13 +541,21 @@ export const connectWebSocket = (userId) => (dispatch) => {
     };
     
     ws.onmessage = (event) => {
-        console.log('[WS] 📨 Message received');
-        const data = JSON.parse(event.data);
+        let data;
+        try {
+            data = JSON.parse(event.data);
+        } catch (error) {
+            console.error('[WS] Failed to parse WS message', event.data);
+            return;
+        }
         
         if (data.type === 'message') {
             dispatch(addWebSocketMessage(data));
             // Обновляем счетчик непрочитанных
             dispatch(fetchUnreadCount());
+        } else if (data.type === 'messages_read') {
+            dispatch(markMessagesAsRead(data));
+            dispatch(fetchUserChats({ skip: 0, limit: 50 }));
         } else if (data.type === 'pong') {
             console.log('[WS] 🏓 Pong received');
         }
@@ -745,6 +781,6 @@ function urlBase64ToUint8Array(base64String) {
     return outputArray;
 }
 
-export const { setCurrentChat, addWebSocketMessage, addOptimisticMessage, updateMediaProcessingStatus, updateMediaFailedStatus, resetChat, setReplyToMessage, setWsConnected } = chatSlice.actions;
+export const { setCurrentChat, addWebSocketMessage, addOptimisticMessage, updateMediaProcessingStatus, updateMediaFailedStatus, resetChat, setReplyToMessage, setWsConnected, markMessagesAsRead } = chatSlice.actions;
 
 export default chatSlice.reducer;
