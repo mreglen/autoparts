@@ -465,17 +465,26 @@ const chatSlice = createSlice({
 
 // WebSocket helpers
 export const connectWebSocket = (userId) => (dispatch) => {
+    // Проверяем, есть ли уже активное подключение
     if (ws && ws.readyState === WebSocket.OPEN) {
+        console.log('[WS] Already connected, skipping');
         return;
+    }
+    
+    // Закрываем старое подключение если есть
+    if (ws) {
+        ws.close();
+        ws = null;
     }
     
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws/chat/${userId}`;
     
+    console.log('[WS] Connecting to:', wsUrl);
     ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('[WS] WebSocket connected');
         dispatch(setWsConnected(true));
     };
     
@@ -490,22 +499,27 @@ export const connectWebSocket = (userId) => (dispatch) => {
     };
     
     ws.onclose = () => {
-        console.log('WebSocket disconnected');
+        console.log('[WS] WebSocket disconnected');
         dispatch(setWsConnected(false));
+        ws = null;
         
-        // Переподключение через 3 секунды
+        // Переподключение через 5 секунд (увеличили время)
         wsReconnectTimer = setTimeout(() => {
+            console.log('[WS] Attempting to reconnect...');
             dispatch(connectWebSocket(userId));
-        }, 3000);
+        }, 5000);
     };
     
     ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('[WS] WebSocket error:', error);
+        // Закрываем соединение при ошибке
+        ws.close();
     };
 };
 
 export const sendWebSocketMessage = (chatId, senderId, message, replyToId = null) => (dispatch, getState) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
+        console.log('[WS] Sending message via WebSocket');
         ws.send(JSON.stringify({
             type: 'message',
             chat_id: chatId,
@@ -514,6 +528,7 @@ export const sendWebSocketMessage = (chatId, senderId, message, replyToId = null
             reply_to_id: replyToId
         }));
     } else {
+        console.log('[WS] WebSocket not connected, falling back to HTTP');
         // Fallback to HTTP если WebSocket не подключен
         dispatch(sendMessage({
             chatId,
@@ -528,16 +543,17 @@ export const sendWebSocketMessage = (chatId, senderId, message, replyToId = null
 };
 
 export const disconnectWebSocket = () => (dispatch) => {
-    if (ws) {
-        ws.close();
-        ws = null;
-    }
-    
     if (wsReconnectTimer) {
         clearTimeout(wsReconnectTimer);
         wsReconnectTimer = null;
     }
     
+    if (ws) {
+        ws.close();
+        ws = null;
+    }
+    
+    console.log('[WS] WebSocket disconnected manually');
     dispatch(setWsConnected(false));
 };
 

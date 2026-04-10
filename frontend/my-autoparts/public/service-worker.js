@@ -62,7 +62,5 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  // Default fetch handler - pass through
-  event.respondWith(fetch(event.request));
-});
+// НЕ перехватываем fetch - позволяем браузеру работать напрямую
+// Service Worker только для push уведомлений
