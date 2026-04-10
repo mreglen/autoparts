@@ -185,6 +185,13 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                         "chat_id": chat_id
                     }
                     await manager.broadcast_to_chat(typing_message, chat_id, None)
+            
+            elif message_data.get("type") == "ping":
+                # Respond to ping to keep connection alive
+                await websocket.send_json({
+                    "type": "pong",
+                    "timestamp": datetime.utcnow().isoformat()
+                })
                     
     except WebSocketDisconnect:
         manager.disconnect(user_id)

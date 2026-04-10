@@ -4,6 +4,10 @@ import { apiRequest, apiRequestFormData, getWebSocketBaseUrl } from '../../utils
 // WebSocket подключение
 let ws = null;
 let wsReconnectTimer = null;
+let wsReconnectAttempts = 0;
+let pingInterval = null;
+const MAX_RECONNECT_ATTEMPTS = 10;
+const BASE_RECONNECT_DELAY = 1000; // 1 секунда
 
 // --- Async Thunks ---
 
@@ -468,13 +472,22 @@ export const connectWebSocket = (userId) => (dispatch) => {
     // Проверяем, есть ли уже активное подключение
     if (ws && ws.readyState === WebSocket.OPEN) {
         console.log('[WS] Already connected, skipping');
+        wsReconnectAttempts = 0;
         return;
     }
     
     // Закрываем старое подключение если есть
     if (ws) {
+        console.log('[WS] Closing old connection');
+        ws.onclose = null; // Prevent reconnect when intentionally closing
         ws.close();
         ws = null;
+    }
+    
+    // Clear any existing reconnect timer
+    if (wsReconnectTimer) {
+        clearTimeout(wsReconnectTimer);
+        wsReconnectTimer = null;
     }
     
     // Получаем базовый URL для WebSocket из конфигурации API
@@ -482,75 +495,135 @@ export const connectWebSocket = (userId) => (dispatch) => {
     const wsUrl = `${wsBaseUrl}/ws/chat/${userId}`;
     
     console.log('[WS] Connecting to:', wsUrl);
+    console.log('[WS] Reconnect attempt:', wsReconnectAttempts + 1);
     
     try {
         ws = new WebSocket(wsUrl);
     } catch (error) {
         console.error('[WS] Failed to create WebSocket:', error);
-        // Retry after 5 seconds
-        wsReconnectTimer = setTimeout(() => {
-            console.log('[WS] Attempting to reconnect...');
-            dispatch(connectWebSocket(userId));
-        }, 5000);
+        scheduleReconnect(dispatch, userId);
         return;
     }
     
     ws.onopen = () => {
-        console.log('[WS] WebSocket connected');
+        console.log('[WS] ✅ WebSocket connected successfully');
+        wsReconnectAttempts = 0; // Reset on successful connection
         dispatch(setWsConnected(true));
+        startPingInterval();
     };
     
     ws.onmessage = (event) => {
+        console.log('[WS] 📨 Message received');
         const data = JSON.parse(event.data);
         
         if (data.type === 'message') {
             dispatch(addWebSocketMessage(data));
             // Обновляем счетчик непрочитанных
             dispatch(fetchUnreadCount());
+        } else if (data.type === 'pong') {
+            console.log('[WS] 🏓 Pong received');
         }
     };
     
     ws.onclose = (event) => {
-        console.log('[WS] WebSocket disconnected', {
+        console.log('[WS] ❌ WebSocket disconnected', {
             code: event.code,
             reason: event.reason,
             wasClean: event.wasClean
         });
         dispatch(setWsConnected(false));
+        stopPingInterval();
         ws = null;
         
         // Don't reconnect if intentionally closed (code 1000 = normal close)
         if (event.code === 1000) {
             console.log('[WS] Normal closure, not reconnecting');
+            wsReconnectAttempts = 0;
             return;
         }
         
-        // Переподключение через 5 секунд
-        wsReconnectTimer = setTimeout(() => {
-            console.log('[WS] Attempting to reconnect...');
-            dispatch(connectWebSocket(userId));
-        }, 5000);
+        // Переподключение с exponential backoff
+        scheduleReconnect(dispatch, userId);
     };
     
     ws.onerror = (error) => {
-        console.error('[WS] WebSocket error:', error);
+        console.error('[WS] ❌ WebSocket error');
         // Don't try to close here - onclose will be triggered automatically
-        // Just log the error and let onclose handle reconnection
     };
+};
+
+// Helper function for reconnection with exponential backoff
+const scheduleReconnect = (dispatch, userId) => {
+    if (wsReconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.error('[WS] ❌ Max reconnection attempts reached');
+        wsReconnectAttempts = 0;
+        return;
+    }
+    
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (max)
+    const delay = Math.min(
+        BASE_RECONNECT_DELAY * Math.pow(2, wsReconnectAttempts),
+        30000
+    );
+    
+    wsReconnectAttempts++;
+    
+    console.log(`[WS] 🔄 Scheduling reconnect #${wsReconnectAttempts} in ${delay}ms`);
+    
+    wsReconnectTimer = setTimeout(() => {
+        console.log('[WS] Attempting to reconnect...');
+        dispatch(connectWebSocket(userId));
+    }, delay);
+};
+
+// Ping interval to keep connection alive
+const startPingInterval = () => {
+    stopPingInterval(); // Clear any existing interval
+    
+    pingInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            try {
+                ws.send(JSON.stringify({ type: 'ping' }));
+                console.log('[WS] 🏓 Ping sent');
+            } catch (error) {
+                console.error('[WS] Failed to send ping:', error);
+            }
+        }
+    }, 30000); // Ping every 30 seconds
+};
+
+const stopPingInterval = () => {
+    if (pingInterval) {
+        clearInterval(pingInterval);
+        pingInterval = null;
+    }
 };
 
 export const sendWebSocketMessage = (chatId, senderId, message, replyToId = null) => (dispatch, getState) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        console.log('[WS] Sending message via WebSocket');
-        ws.send(JSON.stringify({
-            type: 'message',
-            chat_id: chatId,
-            sender_id: senderId,
-            message: message,
-            reply_to_id: replyToId
-        }));
+        console.log('[WS] 📤 Sending message via WebSocket');
+        try {
+            ws.send(JSON.stringify({
+                type: 'message',
+                chat_id: chatId,
+                sender_id: senderId,
+                message: message,
+                reply_to_id: replyToId
+            }));
+        } catch (error) {
+            console.error('[WS] Failed to send via WebSocket, falling back to HTTP:', error);
+            dispatch(sendMessage({
+                chatId,
+                messageData: {
+                    chat_id: chatId,
+                    sender_id: senderId,
+                    message: message,
+                    reply_to_id: replyToId
+                }
+            }));
+        }
     } else {
-        console.log('[WS] WebSocket not connected, falling back to HTTP');
+        console.log('[WS] ⚠️ WebSocket not connected, falling back to HTTP');
         // Fallback to HTTP если WebSocket не подключен
         dispatch(sendMessage({
             chatId,
@@ -570,11 +643,16 @@ export const disconnectWebSocket = () => (dispatch) => {
         wsReconnectTimer = null;
     }
     
+    stopPingInterval();
+    
     if (ws) {
-        ws.close();
+        console.log('[WS] Intentionally closing WebSocket');
+        ws.onclose = null; // Prevent auto-reconnect
+        ws.close(1000, 'Normal closure');
         ws = null;
     }
     
+    wsReconnectAttempts = 0;
     console.log('[WS] WebSocket disconnected manually');
     dispatch(setWsConnected(false));
 };
