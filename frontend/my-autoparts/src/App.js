@@ -1,5 +1,5 @@
 // src/App.jsx
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect } from 'react';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
@@ -45,6 +45,27 @@ import AdminPanelPage from './pages/Admin/AdminPanelPage';
 
 
 
+// Component to handle Service Worker navigation messages
+function ServiceWorkerNavigationHandler() {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    const handleNavigateToChat = (event) => {
+      const { chatId } = event.detail;
+      console.log('[App] Navigating to chat from notification:', chatId);
+      navigate(`/chats/${chatId}`);
+    };
+    
+    window.addEventListener('navigateToChat', handleNavigateToChat);
+    
+    return () => {
+      window.removeEventListener('navigateToChat', handleNavigateToChat);
+    };
+  }, [navigate]);
+  
+  return null; // This component doesn't render anything
+}
+
 function App() {
   const dispatch = useDispatch();
   const { token } = useSelector((state) => state.auth);
@@ -83,6 +104,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ServiceWorkerNavigationHandler />
       <Routes>
         {/* Публичные маршруты */}
         <Route path="/auth" element={<Authorization />} />

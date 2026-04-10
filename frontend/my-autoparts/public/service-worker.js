@@ -22,7 +22,9 @@ self.addEventListener('push', (event) => {
     badge: '/favicons/favicon-32x32.png',
     data: {
       chatId: data.chatId,
-      url: data.url || '/chat'
+      senderId: data.senderId,
+      senderName: data.senderName,
+      url: data.url || '/chats'
     },
     actions: [
       {
@@ -45,18 +47,46 @@ self.addEventListener('notificationclick', (event) => {
   
   event.notification.close();
   
-  const urlToOpen = event.notification.data?.url || '/chat';
+  const urlToOpen = event.notification.data?.url || '/chats';
+  const chatId = event.notification.data?.chatId;
   
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((windowClients) => {
-        // Check if there's already a window open
+        // Если есть chatId, пытаемся найти окно с этим чатом или открыть новый
+        if (chatId) {
+          const specificChatUrl = `/chats/${chatId}`;
+          
+          // Ищем уже открытое окно с этим чатом
+          for (let client of windowClients) {
+            if (client.url.includes(specificChatUrl) && 'focus' in client) {
+              return client.focus();
+            }
+          }
+          
+          // Ищем любое окно с /chats и переключаем на нужный чат
+          for (let client of windowClients) {
+            if (client.url.includes('/chats') && 'focus' in client) {
+              // Фокусируем окно и отправляем сообщение для навигации
+              client.postMessage({
+                type: 'NAVIGATE_TO_CHAT',
+                chatId: chatId
+              });
+              return client.focus();
+            }
+          }
+          
+          // Нет открытых окон - открываем новый с нужным чатом
+          return clients.openWindow(specificChatUrl);
+        }
+        
+        // Нет chatId - просто открываем /chats
         for (let client of windowClients) {
-          if (client.url.includes('/chat') && 'focus' in client) {
+          if (client.url.includes('/chats') && 'focus' in client) {
             return client.focus();
           }
         }
-        // No window open, open new one
+        
         return clients.openWindow(urlToOpen);
       })
   );

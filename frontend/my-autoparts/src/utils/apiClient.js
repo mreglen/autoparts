@@ -21,6 +21,28 @@ if (process.env.NODE_ENV !== 'production') {
 
 export { API_BASE, BACKEND_BASE };
 
+// WebSocket URL configuration
+export const getWebSocketBaseUrl = () => {
+    // Get the backend base URL and convert http/https to ws/wss
+    let backendUrl = BACKEND_BASE || '';
+    
+    console.log('[WS Config] BACKEND_BASE from env:', BACKEND_BASE);
+    console.log('[WS Config] Processed backendUrl:', backendUrl);
+    
+    // If BACKEND_BASE includes /server, we need to preserve it
+    // Remove trailing slash if present
+    backendUrl = backendUrl.replace(/\/+$/, '');
+    
+    // Convert http:// to ws:// and https:// to wss://
+    let wsUrl = backendUrl
+        .replace(/^http:\/\//, 'ws://')
+        .replace(/^https:\/\//, 'wss://');
+    
+    console.log('[WS Config] Final WebSocket URL:', wsUrl);
+    
+    return wsUrl;
+};
+
 
 export const getAuthHeaders = () => {
     const token = localStorage.getItem('token');

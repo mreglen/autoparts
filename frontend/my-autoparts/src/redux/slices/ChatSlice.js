@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
+import { apiRequest, apiRequestFormData, getWebSocketBaseUrl } from '../../utils/apiClient';
 
 // WebSocket подключение
 let ws = null;
@@ -477,11 +477,23 @@ export const connectWebSocket = (userId) => (dispatch) => {
         ws = null;
     }
     
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/chat/${userId}`;
+    // Получаем базовый URL для WebSocket из конфигурации API
+    const wsBaseUrl = getWebSocketBaseUrl();
+    const wsUrl = `${wsBaseUrl}/ws/chat/${userId}`;
     
     console.log('[WS] Connecting to:', wsUrl);
-    ws = new WebSocket(wsUrl);
+    
+    try {
+        ws = new WebSocket(wsUrl);
+    } catch (error) {
+        console.error('[WS] Failed to create WebSocket:', error);
+        // Retry after 5 seconds
+        wsReconnectTimer = setTimeout(() => {
+            console.log('[WS] Attempting to reconnect...');
+            dispatch(connectWebSocket(userId));
+        }, 5000);
+        return;
+    }
     
     ws.onopen = () => {
         console.log('[WS] WebSocket connected');
@@ -498,12 +510,22 @@ export const connectWebSocket = (userId) => (dispatch) => {
         }
     };
     
-    ws.onclose = () => {
-        console.log('[WS] WebSocket disconnected');
+    ws.onclose = (event) => {
+        console.log('[WS] WebSocket disconnected', {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean
+        });
         dispatch(setWsConnected(false));
         ws = null;
         
-        // Переподключение через 5 секунд (увеличили время)
+        // Don't reconnect if intentionally closed (code 1000 = normal close)
+        if (event.code === 1000) {
+            console.log('[WS] Normal closure, not reconnecting');
+            return;
+        }
+        
+        // Переподключение через 5 секунд
         wsReconnectTimer = setTimeout(() => {
             console.log('[WS] Attempting to reconnect...');
             dispatch(connectWebSocket(userId));
@@ -512,8 +534,8 @@ export const connectWebSocket = (userId) => (dispatch) => {
     
     ws.onerror = (error) => {
         console.error('[WS] WebSocket error:', error);
-        // Закрываем соединение при ошибке
-        ws.close();
+        // Don't try to close here - onclose will be triggered automatically
+        // Just log the error and let onclose handle reconnection
     };
 };
 

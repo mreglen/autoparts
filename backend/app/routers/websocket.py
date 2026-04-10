@@ -34,9 +34,14 @@ class ConnectionManager:
         """Отправить сообщение всем участникам чата + push notification если offline"""
         from app.routers.notifications import send_push_notification
         from app.models.chat import Chat
+        from app.models.user import User
         
         chat = db.query(Chat).filter(Chat.id == chat_id).first()
         if chat:
+            # Получаем информацию об отправителе
+            sender = db.query(User).filter(User.id == message.get("sender_id")).first()
+            sender_name = sender.name if sender else "Неизвестный"
+            
             # Отправляем покупателю (если это не отправитель)
             if chat.buyer_id != exclude_user_id:
                 if chat.buyer_id in self.active_connections:
@@ -45,10 +50,12 @@ class ConnectionManager:
                     # User not connected via WebSocket - send push notification
                     push_data = {
                         "type": "message",
-                        "title": "Новое сообщение",
+                        "title": f"Новое сообщение от {sender_name}",
                         "body": message.get("message", "")[:100],  # Truncate to 100 chars
                         "chatId": chat_id,
-                        "url": f"/chat/{chat_id}"
+                        "senderId": message.get("sender_id"),
+                        "senderName": sender_name,
+                        "url": f"/chats/{chat_id}"
                     }
                     send_push_notification(chat.buyer_id, push_data, db)
             
@@ -60,10 +67,12 @@ class ConnectionManager:
                     # User not connected via WebSocket - send push notification
                     push_data = {
                         "type": "message",
-                        "title": "Новое сообщение",
+                        "title": f"Новое сообщение от {sender_name}",
                         "body": message.get("message", "")[:100],  # Truncate to 100 chars
                         "chatId": chat_id,
-                        "url": f"/chat/{chat_id}"
+                        "senderId": message.get("sender_id"),
+                        "senderName": sender_name,
+                        "url": f"/chats/{chat_id}"
                     }
                     send_push_notification(chat.seller_id, push_data, db)
 
@@ -75,7 +84,15 @@ manager = ConnectionManager()
 async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
     """WebSocket endpoint для чатов"""
     
-    await manager.connect(websocket, user_id)
+    print(f"[WS] Connection attempt for user_id={user_id}")
+    print(f"[WS] Client: {websocket.client}")
+    
+    try:
+        await manager.connect(websocket, user_id)
+        print(f"[WS] Successfully connected user_id={user_id}")
+    except Exception as e:
+        print(f"[WS] Error accepting connection for user_id={user_id}: {e}")
+        return
     
     try:
         while True:
