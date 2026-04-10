@@ -599,8 +599,10 @@ const stopPingInterval = () => {
     }
 };
 
-export const sendWebSocketMessage = (chatId, senderId, message, replyToId = null) => (dispatch, getState) => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
+export const sendWebSocketMessage = (chatId, senderId, message, replyToId = null) => async (dispatch, getState) => {
+    const wsConnected = ws && ws.readyState === WebSocket.OPEN;
+    
+    if (wsConnected) {
         console.log('[WS] 📤 Sending message via WebSocket');
         try {
             ws.send(JSON.stringify({
@@ -610,22 +612,24 @@ export const sendWebSocketMessage = (chatId, senderId, message, replyToId = null
                 message: message,
                 reply_to_id: replyToId
             }));
+            console.log('[WS] ✅ Message sent via WebSocket');
         } catch (error) {
-            console.error('[WS] Failed to send via WebSocket, falling back to HTTP:', error);
-            dispatch(sendMessage({
-                chatId,
-                messageData: {
-                    chat_id: chatId,
-                    sender_id: senderId,
-                    message: message,
-                    reply_to_id: replyToId
-                }
-            }));
+            console.error('[WS] Failed to send via WebSocket:', error);
+            // Fallback to HTTP
+            await dispatch(sendMessageViaHTTP(chatId, senderId, message, replyToId));
         }
     } else {
-        console.log('[WS] ⚠️ WebSocket not connected, falling back to HTTP');
+        console.log('[WS] ⚠️ WebSocket not connected (readyState:', ws?.readyState, '), using HTTP');
         // Fallback to HTTP если WebSocket не подключен
-        dispatch(sendMessage({
+        await dispatch(sendMessageViaHTTP(chatId, senderId, message, replyToId));
+    }
+};
+
+// Helper function for HTTP message sending
+const sendMessageViaHTTP = (chatId, senderId, message, replyToId) => async (dispatch) => {
+    console.log('[HTTP] 📤 Sending message via HTTP API');
+    try {
+        const result = await dispatch(sendMessage({
             chatId,
             messageData: {
                 chat_id: chatId,
@@ -633,7 +637,20 @@ export const sendWebSocketMessage = (chatId, senderId, message, replyToId = null
                 message: message,
                 reply_to_id: replyToId
             }
-        }));
+        })).unwrap();
+        
+        console.log('[HTTP] ✅ Message sent successfully:', result);
+        
+        // Обновляем список чатов чтобы показать новое сообщение
+        dispatch(fetchUserChats({ skip: 0, limit: 50 }));
+        
+        // Перезагружаем сообщения чата
+        dispatch(fetchChatMessages({ chatId, skip: 0, limit: 100 }));
+        
+        return result;
+    } catch (error) {
+        console.error('[HTTP] ❌ Failed to send message:', error);
+        throw error;
     }
 };
 

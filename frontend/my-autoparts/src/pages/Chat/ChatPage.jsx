@@ -63,7 +63,7 @@ const ChatPage = () => {
   const isSpecificChat = /^\/chats\/\d+/.test(location.pathname);
   
   const { user } = useSelector((state) => state.auth);
-  const { chats, currentChat, messages, loading, wsConnected } = useSelector((state) => state.chats);
+  const { chats, currentChat, messages, loading, wsConnected: wsConnectedState } = useSelector((state) => state.chats);
   const { adminOrganizationPhone } = useSelector((state) => state.publicInfo);
   
   const [newMessage, setNewMessage] = useState('');
@@ -130,6 +130,29 @@ const ChatPage = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Polling для получения новых сообщений когда WebSocket не работает
+  useEffect(() => {
+    const wsConnected = wsConnectedState;
+    
+    // Если WebSocket подключен, polling не нужен
+    if (wsConnected || !selectedChatId) {
+      return;
+    }
+    
+    console.log('🔄 WebSocket not connected, starting HTTP polling for chat:', selectedChatId);
+    
+    // Polling каждые 3 секунды
+    const interval = setInterval(() => {
+      console.log('🔄 Polling - fetching messages...');
+      dispatch(fetchChatMessages({ chatId: parseInt(selectedChatId) }));
+    }, 3000);
+    
+    return () => {
+      console.log('🛑 Stopping polling');
+      clearInterval(interval);
+    };
+  }, [wsConnectedState, selectedChatId, dispatch]);
 
   // Polling для обновления статуса обработки медиа
   useEffect(() => {
