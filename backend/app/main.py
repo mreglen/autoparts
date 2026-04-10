@@ -5,7 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
 from app.routers import chats as chats_router
 from app.routers import websocket as websocket_router
+from app.routers import notifications as notifications_router
 from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, orders, carts
+from app.models import chat  # noqa: F401 — chat models в metadata
 import app.models.site_settings  # noqa: F401 — site_settings в metadata
 import app.models.organization_avito_integration  # noqa: F401 — avito integration
 import app.models.organization_avito_autoload_cache  # noqa: F401 — avito autoload cache
@@ -40,11 +42,17 @@ if sys.platform.startswith("win"):
 # create_all никогда не вызывался и новые модели не появлялись.
 from sqlalchemy import inspect
 
-inspector = inspect(engine)
-_existing = set(inspector.get_table_names())
-_needed = set(Base.metadata.tables.keys())
-if _needed - _existing:
-    Base.metadata.create_all(bind=engine)
+try:
+    inspector = inspect(engine)
+    _existing = set(inspector.get_table_names())
+    _needed = set(Base.metadata.tables.keys())
+    if _needed - _existing:
+        logger.info(f"Creating missing tables: {_needed - _existing}")
+        Base.metadata.create_all(bind=engine)
+        logger.info("All tables created successfully")
+except Exception as e:
+    logger.error(f"Error creating tables: {e}")
+    raise
 
 app = FastAPI(title="Автозапчасти")
 
@@ -197,6 +205,7 @@ async def run_cleanup_expired_guest_carts():
 app.include_router(api_router)
 app.include_router(chats_router.router)
 app.include_router(websocket_router.router)
+app.include_router(notifications_router.router)
 
 import os
 from pathlib import Path

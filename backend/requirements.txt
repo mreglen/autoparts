@@ -56,6 +56,7 @@ pydantic==2.12.4
 pydantic-settings==2.12.0
 pydantic_core==2.41.5
 pyee==13.0.1
+pywebpush==1.14.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 python-jose==3.5.0

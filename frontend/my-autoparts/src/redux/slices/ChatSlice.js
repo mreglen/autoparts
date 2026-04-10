@@ -105,6 +105,49 @@ export const fetchUnreadCount = createAsyncThunk(
     }
 );
 
+// Заблокировать пользователя в чате
+export const blockUserInChat = createAsyncThunk(
+    'chats/blockUser',
+    async ({ chatId, userId }, { rejectWithValue }) => {
+        try {
+            const response = await apiRequest(`/chats/${chatId}/block/${userId}`, {
+                method: 'POST'
+            });
+            return { chatId, userId, ...response };
+        } catch (err) {
+            return rejectWithValue(err?.response?.data?.detail || 'Ошибка блокировки');
+        }
+    }
+);
+
+// Разблокировать пользователя в чате
+export const unblockUserInChat = createAsyncThunk(
+    'chats/unblockUser',
+    async ({ chatId, userId }, { rejectWithValue }) => {
+        try {
+            const response = await apiRequest(`/chats/${chatId}/block/${userId}`, {
+                method: 'DELETE'
+            });
+            return { chatId, userId, ...response };
+        } catch (err) {
+            return rejectWithValue(err?.response?.data?.detail || 'Ошибка разблокировки');
+        }
+    }
+);
+
+// Получить статус блокировки
+export const fetchBlockStatus = createAsyncThunk(
+    'chats/fetchBlockStatus',
+    async (chatId, { rejectWithValue }) => {
+        try {
+            const response = await apiRequest(`/chats/${chatId}/block-status`);
+            return { chatId, ...response };
+        } catch (err) {
+            return rejectWithValue(err?.response?.data?.detail || 'Ошибка получения статуса');
+        }
+    }
+);
+
 const initialState = {
     chats: [],
     currentChat: null,
@@ -113,7 +156,8 @@ const initialState = {
     error: null,
     unreadCount: 0,
     wsConnected: false,
-    totalChats: 0
+    totalChats: 0,
+    replyToMessage: null  // Message being replied to
 };
 
 const chatSlice = createSlice({
@@ -229,6 +273,12 @@ const chatSlice = createSlice({
         resetChat: (state) => {
             state.currentChat = null;
             state.messages = [];
+            state.replyToMessage = null;
+        },
+        
+        // Установить сообщение для ответа
+        setReplyToMessage: (state, action) => {
+            state.replyToMessage = action.payload;
         },
         
         // WebSocket подключен
@@ -375,6 +425,40 @@ const chatSlice = createSlice({
             // Fetch unread count
             .addCase(fetchUnreadCount.fulfilled, (state, action) => {
                 state.unreadCount = action.payload;
+            })
+            
+            // Block user
+            .addCase(blockUserInChat.fulfilled, (state, action) => {
+                const { chatId, userId } = action.payload;
+                // Обновить статус в текущем чате
+                if (state.currentChat && state.currentChat.id === chatId) {
+                    state.currentChat.blocked_users_count = (state.currentChat.blocked_users_count || 0) + 1;
+                }
+                // Обновить в списке чатов
+                const chat = state.chats.find(c => c.id === chatId);
+                if (chat) {
+                    chat.blocked_users_count = (chat.blocked_users_count || 0) + 1;
+                }
+            })
+            
+            // Unblock user
+            .addCase(unblockUserInChat.fulfilled, (state, action) => {
+                const { chatId, userId } = action.payload;
+                if (state.currentChat && state.currentChat.id === chatId) {
+                    state.currentChat.blocked_users_count = Math.max(0, (state.currentChat.blocked_users_count || 1) - 1);
+                }
+                const chat = state.chats.find(c => c.id === chatId);
+                if (chat) {
+                    chat.blocked_users_count = Math.max(0, (chat.blocked_users_count || 1) - 1);
+                }
+            })
+            
+            // Fetch block status
+            .addCase(fetchBlockStatus.fulfilled, (state, action) => {
+                const { chatId, is_blocked } = action.payload;
+                if (state.currentChat && state.currentChat.id === chatId) {
+                    state.currentChat.is_current_user_blocked = is_blocked;
+                }
             });
     }
 });
@@ -420,13 +504,14 @@ export const connectWebSocket = (userId) => (dispatch) => {
     };
 };
 
-export const sendWebSocketMessage = (chatId, senderId, message) => (dispatch, getState) => {
+export const sendWebSocketMessage = (chatId, senderId, message, replyToId = null) => (dispatch, getState) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
             type: 'message',
             chat_id: chatId,
             sender_id: senderId,
-            message: message
+            message: message,
+            reply_to_id: replyToId
         }));
     } else {
         // Fallback to HTTP если WebSocket не подключен
@@ -435,7 +520,8 @@ export const sendWebSocketMessage = (chatId, senderId, message) => (dispatch, ge
             messageData: {
                 chat_id: chatId,
                 sender_id: senderId,
-                message: message
+                message: message,
+                reply_to_id: replyToId
             }
         }));
     }
@@ -455,6 +541,77 @@ export const disconnectWebSocket = () => (dispatch) => {
     dispatch(setWsConnected(false));
 };
 
-export const { setCurrentChat, addWebSocketMessage, addOptimisticMessage, updateMediaProcessingStatus, updateMediaFailedStatus, resetChat, setWsConnected } = chatSlice.actions;
+// Push Notification Subscription
+export const subscribeToPushNotifications = () => async (dispatch, getState) => {
+    try {
+        // Check if browser supports notifications
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+            console.log('[Push] Push notifications not supported');
+            return;
+        }
+        
+        // Request permission
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            console.log('[Push] Notification permission denied');
+            return;
+        }
+        
+        // Get VAPID public key from backend
+        const response = await fetch('/api/notifications/vapid-public-key');
+        const { public_key } = await response.json();
+        
+        if (!public_key) {
+            console.log('[Push] VAPID public key not configured');
+            return;
+        }
+        
+        // Register service worker
+        const registration = await navigator.serviceWorker.register('/service-worker.js');
+        console.log('[Push] Service Worker registered');
+        
+        // Subscribe to push
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(public_key)
+        });
+        
+        console.log('[Push] Subscribed to push notifications');
+        
+        // Send subscription to backend
+        const token = getState().auth.token;
+        await fetch('/api/notifications/subscribe', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                endpoint: subscription.endpoint,
+                p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')))),
+                auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')))),
+                user_agent: navigator.userAgent
+            })
+        });
+        
+        console.log('[Push] Subscription sent to backend');
+    } catch (error) {
+        console.error('[Push] Subscription failed:', error);
+    }
+};
+
+// Helper function to convert VAPID key
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+export const { setCurrentChat, addWebSocketMessage, addOptimisticMessage, updateMediaProcessingStatus, updateMediaFailedStatus, resetChat, setReplyToMessage, setWsConnected } = chatSlice.actions;
 
 export default chatSlice.reducer;

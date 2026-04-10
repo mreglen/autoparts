@@ -17,6 +17,19 @@ root.render(
   </React.StrictMode>
 );
 
+// Register Service Worker for Push Notifications
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(registration => {
+        console.log('[SW] Service Worker registered:', registration.scope);
+      })
+      .catch(registrationError => {
+        console.log('[SW] Service Worker registration failed:', registrationError);
+      });
+  });
+}
+
 // Optional: Web vitals reporting
 // import reportWebVitals from './reportWebVitals';
 // reportWebVitals();

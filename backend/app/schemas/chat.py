@@ -26,9 +26,22 @@ class ChatMediaResponse(BaseModel):
         from_attributes = True
 
 
+class ChatBlockResponse(BaseModel):
+    """Response when blocking a user"""
+    chat_id: int
+    blocked_user_id: int
+    blocked_by_id: int
+    is_blocked: bool
+    created_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+
 class MessageCreate(MessageBase):
     chat_id: int
     sender_id: int
+    reply_to_id: Optional[int] = None
 
 
 class MessageCreateWithMedia(BaseModel):
@@ -36,6 +49,7 @@ class MessageCreateWithMedia(BaseModel):
     chat_id: int
     sender_id: int
     message: Optional[str] = ""
+    reply_to_id: Optional[int] = None
 
 
 class MessageResponse(MessageBase):
@@ -43,8 +57,12 @@ class MessageResponse(MessageBase):
     chat_id: int
     sender_id: int
     is_read: bool
+    reply_to_id: Optional[int] = None
     created_at: datetime
     media: List[ChatMediaResponse] = []
+    
+    # Replied message info (nested)
+    reply_to: Optional['MessageResponse'] = None
 
     class Config:
         from_attributes = True
@@ -70,6 +88,10 @@ class ChatResponse(BaseModel):
     is_active: bool
     last_message: Optional[MessageResponse] = None
     unread_count: int = 0
+    
+    # Block status
+    is_current_user_blocked: Optional[bool] = False  # Is current user blocked
+    blocked_users_count: Optional[int] = 0  # How many users are blocked
     
     # Информация о продавце
     seller_name: Optional[str] = None

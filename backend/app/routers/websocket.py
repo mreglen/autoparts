@@ -31,15 +31,41 @@ class ConnectionManager:
             await websocket.send_json(message)
 
     async def broadcast_to_chat(self, message: dict, chat_id: int, db: Session, exclude_user_id: int = None):
-        """Отправить сообщение всем участникам чата, кроме отправителя"""
+        """Отправить сообщение всем участникам чата + push notification если offline"""
+        from app.routers.notifications import send_push_notification
+        from app.models.chat import Chat
+        
         chat = db.query(Chat).filter(Chat.id == chat_id).first()
         if chat:
             # Отправляем покупателю (если это не отправитель)
-            if chat.buyer_id != exclude_user_id and chat.buyer_id in self.active_connections:
-                await self.send_personal_message(message, chat.buyer_id)
+            if chat.buyer_id != exclude_user_id:
+                if chat.buyer_id in self.active_connections:
+                    await self.send_personal_message(message, chat.buyer_id)
+                else:
+                    # User not connected via WebSocket - send push notification
+                    push_data = {
+                        "type": "message",
+                        "title": "Новое сообщение",
+                        "body": message.get("message", "")[:100],  # Truncate to 100 chars
+                        "chatId": chat_id,
+                        "url": f"/chat/{chat_id}"
+                    }
+                    send_push_notification(chat.buyer_id, push_data, db)
+            
             # Отправляем продавцу (если это не отправитель)
-            if chat.seller_id != exclude_user_id and chat.seller_id in self.active_connections:
-                await self.send_personal_message(message, chat.seller_id)
+            if chat.seller_id != exclude_user_id:
+                if chat.seller_id in self.active_connections:
+                    await self.send_personal_message(message, chat.seller_id)
+                else:
+                    # User not connected via WebSocket - send push notification
+                    push_data = {
+                        "type": "message",
+                        "title": "Новое сообщение",
+                        "body": message.get("message", "")[:100],  # Truncate to 100 chars
+                        "chatId": chat_id,
+                        "url": f"/chat/{chat_id}"
+                    }
+                    send_push_notification(chat.seller_id, push_data, db)
 
 
 manager = ConnectionManager()
@@ -62,6 +88,7 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                 chat_id = message_data.get("chat_id")
                 message_text = message_data.get("message")
                 sender_id = message_data.get("sender_id")
+                reply_to_id = message_data.get("reply_to_id")
                 
                 if not all([chat_id, message_text, sender_id]):
                     continue
@@ -85,7 +112,8 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                         chat_id=chat_id,
                         sender_id=sender_id,
                         message=message_text,
-                        is_read=False
+                        is_read=False,
+                        reply_to_id=reply_to_id
                     )
                     
                     db.add(new_message)
@@ -96,6 +124,18 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                     db.commit()
                     db.refresh(new_message)
                     
+                    # Получаем информацию об ответе
+                    reply_to = None
+                    if new_message.reply_to_id:
+                        reply_to_msg = db.query(Message).filter(Message.id == new_message.reply_to_id).first()
+                        if reply_to_msg:
+                            reply_to = {
+                                "id": reply_to_msg.id,
+                                "message": reply_to_msg.message,
+                                "sender_id": reply_to_msg.sender_id,
+                                "created_at": reply_to_msg.created_at.isoformat()
+                            }
+                    
                     # Формируем ответ
                     message_response = {
                         "type": "message",
@@ -104,6 +144,8 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                         "sender_id": new_message.sender_id,
                         "message": new_message.message,
                         "is_read": new_message.is_read,
+                        "reply_to_id": new_message.reply_to_id,
+                        "reply_to": reply_to,
                         "created_at": new_message.created_at.isoformat()
                     }
                     

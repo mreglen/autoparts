@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # Пути к FFmpeg для обработки видео
     FFPROBE_PATH: Optional[str] = r"C:\ffmpeg\bin\ffprobe.exe"
     FFMPEG_PATH: Optional[str] = r"C:\ffmpeg\bin\ffmpeg.exe"
+    
+    # VAPID Keys для Push Notifications
+    VAPID_PUBLIC_KEY: Optional[str] = ""
+    VAPID_PRIVATE_KEY: Optional[str] = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
 

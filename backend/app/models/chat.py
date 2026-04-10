@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean, Float
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean, Float, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from ..db.database import Base
@@ -30,11 +30,13 @@ class Message(Base):
     sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     message = Column(Text, nullable=False)
     is_read = Column(Boolean, default=False)
+    reply_to_id = Column(Integer, ForeignKey("messages.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
     chat = relationship("Chat", back_populates="messages")
     sender = relationship("User", foreign_keys=[sender_id])
+    reply_to = relationship("Message", remote_side=[id], backref="replies", foreign_keys=[reply_to_id])
     media = relationship("ChatMedia", back_populates="message", cascade="all, delete-orphan")
 
 
@@ -57,3 +59,24 @@ class ChatMedia(Base):
 
     # Relationships
     message = relationship("Message", back_populates="media")
+
+
+class ChatBlockedUser(Base):
+    """Model for tracking blocked users in specific chats"""
+    __tablename__ = "chat_blocked_users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    blocked_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Who blocked
+    blocked_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Who was blocked
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    chat = relationship("Chat", foreign_keys=[chat_id])
+    blocked_by = relationship("User", foreign_keys=[blocked_by_id])
+    blocked_user = relationship("User", foreign_keys=[blocked_user_id])
+    
+    # Unique constraint: one user can be blocked only once per chat
+    __table_args__ = (
+        UniqueConstraint('chat_id', 'blocked_user_id', name='uq_chat_blocked_user'),
+    )

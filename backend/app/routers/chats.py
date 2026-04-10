@@ -6,7 +6,7 @@ import os
 import uuid
 from pathlib import Path
 from app.db.database import get_db
-from app.models.chat import Chat, Message, ChatMedia
+from app.models.chat import Chat, Message, ChatMedia, ChatBlockedUser
 from app.models.user import User
 from app.models.product import Product
 from app.schemas.chat import (
@@ -15,7 +15,8 @@ from app.schemas.chat import (
     ChatListResponse,
     MessageCreate,
     MessageResponse,
-    ChatMediaResponse
+    ChatMediaResponse,
+    ChatBlockResponse
 )
 from app.core.auth import get_current_user
 
@@ -225,6 +226,18 @@ def send_message(
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
     
+    # Проверяем, что отправитель не заблокирован
+    blocked = db.query(ChatBlockedUser).filter(
+        ChatBlockedUser.chat_id == chat_id,
+        ChatBlockedUser.blocked_user_id == current_user.id
+    ).first()
+    
+    if blocked:
+        raise HTTPException(
+            status_code=403, 
+            detail="Вы заблокированы в этом чате и не можете отправлять сообщения"
+        )
+    
     # Проверяем, что отправитель является участником чата
     if current_user.id != message_data.sender_id:
         raise HTTPException(status_code=403, detail="Вы не можете отправлять сообщения от имени другого пользователя")
@@ -233,7 +246,8 @@ def send_message(
     new_message = Message(
         chat_id=chat_id,
         sender_id=current_user.id,
-        message=message_data.message
+        message=message_data.message,
+        reply_to_id=message_data.reply_to_id
     )
     
     db.add(new_message)
@@ -244,12 +258,27 @@ def send_message(
     db.commit()
     db.refresh(new_message)
     
+    # Получаем информацию об ответе, если есть
+    reply_to = None
+    if new_message.reply_to_id:
+        reply_to = db.query(Message).filter(Message.id == new_message.reply_to_id).first()
+        # Преобразуем в простой dict для response
+        if reply_to:
+            reply_to = {
+                "id": reply_to.id,
+                "message": reply_to.message,
+                "sender_id": reply_to.sender_id,
+                "created_at": reply_to.created_at
+            }
+    
     return MessageResponse(
         id=new_message.id,
         chat_id=new_message.chat_id,
         sender_id=new_message.sender_id,
         message=new_message.message,
         is_read=new_message.is_read,
+        reply_to_id=new_message.reply_to_id,
+        reply_to=reply_to,
         created_at=new_message.created_at,
         media=[]  # Обычные сообщения без медиа
     )
@@ -290,6 +319,18 @@ async def upload_chat_media(
     
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
+    
+    # Проверяем, что отправитель не заблокирован
+    blocked = db.query(ChatBlockedUser).filter(
+        ChatBlockedUser.chat_id == chat_id,
+        ChatBlockedUser.blocked_user_id == current_user.id
+    ).first()
+    
+    if blocked:
+        raise HTTPException(
+            status_code=403, 
+            detail="Вы заблокированы в этом чате и не можете отправлять сообщения"
+        )
     
     # Проверяем количество файлов (макс 5)
     if len(files) > 5:
@@ -591,6 +632,125 @@ def get_chat_media_thumbnail(
     )
 
 
+@router.post("/{chat_id}/block/{user_id}", response_model=ChatBlockResponse)
+def block_user_in_chat(
+    chat_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Block a user in the chat"""
+    # Check access to chat
+    chat = db.query(Chat).filter(
+        Chat.id == chat_id,
+        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id))
+    ).first()
+    
+    if not chat:
+        raise HTTPException(status_code=404, detail="Чат не найден")
+    
+    # Cannot block yourself
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Нельзя заблокировать себя")
+    
+    # Check that user_id is a chat participant
+    if user_id not in [chat.buyer_id, chat.seller_id]:
+        raise HTTPException(status_code=400, detail="Пользователь не является участником чата")
+    
+    # Check if already blocked
+    existing = db.query(ChatBlockedUser).filter(
+        ChatBlockedUser.chat_id == chat_id,
+        ChatBlockedUser.blocked_user_id == user_id
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Пользователь уже заблокирован")
+    
+    # Create block
+    block = ChatBlockedUser(
+        chat_id=chat_id,
+        blocked_by_id=current_user.id,
+        blocked_user_id=user_id
+    )
+    
+    db.add(block)
+    db.commit()
+    db.refresh(block)
+    
+    return ChatBlockResponse(
+        chat_id=block.chat_id,
+        blocked_user_id=block.blocked_user_id,
+        blocked_by_id=block.blocked_by_id,
+        is_blocked=True,
+        created_at=block.created_at
+    )
+
+
+@router.delete("/{chat_id}/block/{user_id}")
+def unblock_user_in_chat(
+    chat_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Unblock a user in the chat"""
+    # Find the block
+    block = db.query(ChatBlockedUser).filter(
+        ChatBlockedUser.chat_id == chat_id,
+        ChatBlockedUser.blocked_user_id == user_id,
+        ChatBlockedUser.blocked_by_id == current_user.id
+    ).first()
+    
+    if not block:
+        raise HTTPException(status_code=404, detail="Блокировка не найдена")
+    
+    db.delete(block)
+    db.commit()
+    
+    return {"message": "Пользователь разблокирован", "is_blocked": False}
+
+
+@router.get("/{chat_id}/block-status")
+def get_block_status(
+    chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get block status in the chat"""
+    # Check access to chat
+    chat = db.query(Chat).filter(
+        Chat.id == chat_id,
+        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id))
+    ).first()
+    
+    if not chat:
+        raise HTTPException(status_code=404, detail="Чат не найден")
+    
+    # Check if current user is blocked
+    is_blocked = db.query(ChatBlockedUser).filter(
+        ChatBlockedUser.chat_id == chat_id,
+        ChatBlockedUser.blocked_user_id == current_user.id
+    ).first()
+    
+    # Get all blocked users
+    blocked_users = db.query(ChatBlockedUser).filter(
+        ChatBlockedUser.chat_id == chat_id
+    ).all()
+    
+    return {
+        "is_blocked": is_blocked is not None,
+        "blocked_by_id": is_blocked.blocked_by_id if is_blocked else None,
+        "blocked_users": [
+            {
+                "user_id": b.blocked_user_id,
+                "blocked_by_id": b.blocked_by_id,
+                "created_at": b.created_at
+            }
+            for b in blocked_users
+        ]
+    }
+
+
 def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> ChatResponse:
     """Создать ответ чата с дополнительной информацией"""
     
@@ -649,6 +809,16 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
                 # Используем full_url property для получения полного URL
                 product_photo_url = first_photo.full_url
     
+    # Проверяем статус блокировки
+    is_blocked = db.query(ChatBlockedUser).filter(
+        ChatBlockedUser.chat_id == chat.id,
+        ChatBlockedUser.blocked_user_id == current_user.id
+    ).first() is not None
+    
+    blocked_count = db.query(ChatBlockedUser).filter(
+        ChatBlockedUser.chat_id == chat.id
+    ).count()
+    
     return ChatResponse(
         id=chat.id,
         buyer_id=chat.buyer_id,
@@ -676,5 +846,7 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
         product_price=product_price,
         product_photo_url=product_photo_url,
         product_url=product_url,
-        current_user_id=current_user.id if current_user else None
+        current_user_id=current_user.id if current_user else None,
+        is_current_user_blocked=is_blocked,
+        blocked_users_count=blocked_count
     )
