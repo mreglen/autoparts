@@ -40,7 +40,7 @@ import PartDetail from './pages/PartDetail/PartDetail';
 import VehiclesList from './pages/Vehicles/VehiclesList';
 import AddVehiclePage from './pages/Vehicles/AddVehiclePage';
 import EditVehiclePage from './pages/Vehicles/EditVehiclePage';
-import ChatPage from './pages/Chat/ChatPage';
+import ChatsHubPage from './pages/Chat/ChatsHubPage';
 import AdminPanelPage from './pages/Admin/AdminPanelPage';
 
 
@@ -143,8 +143,8 @@ function App() {
           <Route path="/stock-out" element={<StockOutList />} />
           <Route path="/warehouse-sales" element={<WarehouseSalesPage />} />
           <Route path="/settings/employees" element={<EmployeesPage />} />
-          <Route path="/chats" element={<ChatPage />} />
-          <Route path="/chats/:chatId" element={<ChatPage />} />
+          <Route path="/chats" element={<ChatsHubPage />} />
+          <Route path="/chats/:chatId" element={<ChatsHubPage />} />
           <Route path="/settings/storage-addresses" element={<StorageAddressesPage />} />
           <Route path="/settings/organization" element={<Organization />} />
           <Route path="/settings/printers" element={<PrintSettings />} />

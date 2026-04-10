@@ -18,6 +18,7 @@ import moderationProductsReducer from './slices/ModerationProductsSlice';
 import sellersReducer from './slices/SellerSlice';
 import publicInfoReducer from './slices/PublicInfoSlice';
 import chatReducer from './slices/ChatSlice';
+import avitoChatReducer from './slices/AvitoChatSlice';
 
 export const store = configureStore({
   reducer: {
@@ -40,6 +41,7 @@ export const store = configureStore({
     sellers: sellersReducer,
     publicInfo: publicInfoReducer,
     chats: chatReducer,
+    avitoChats: avitoChatReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

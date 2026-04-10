@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { apiRequest, apiRequestFormData, getWebSocketBaseUrl } from '../../utils/apiClient';
+import { API_BASE, apiRequest, apiRequestFormData, getWebSocketBaseUrl } from '../../utils/apiClient';
 
 // WebSocket подключение
 let ws = null;
@@ -745,7 +745,12 @@ export const subscribeToPushNotifications = () => async (dispatch, getState) => 
         }
         
         // Get VAPID public key from backend
-        const response = await fetch('/api/notifications/vapid-public-key');
+        const response = await fetch(`${API_BASE}/notifications/vapid-public-key`);
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok || !contentType.includes('application/json')) {
+            console.log('[Push] VAPID endpoint returned non-JSON response');
+            return;
+        }
         const { public_key } = await response.json();
         
         if (!public_key) {
@@ -767,7 +772,7 @@ export const subscribeToPushNotifications = () => async (dispatch, getState) => 
         
         // Send subscription to backend
         const token = getState().auth.token;
-        await fetch('/api/notifications/subscribe', {
+        await fetch(`${API_BASE}/notifications/subscribe`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
