@@ -212,8 +212,10 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                         "created_at": new_message.created_at.isoformat()
                     }
                     
-                    # Отправляем всем участникам чата (кроме отправителя)
-                    await manager.broadcast_to_chat(message_response, chat_id, db, exclude_user_id=int(user_id))
+                    # Отправляем всем участникам чата, включая отправителя.
+                    # Это нужно, чтобы на клиенте временное сообщение (temp_*) заменялось
+                    # на реальное сообщение с id из БД без ожидания ручного refresh.
+                    await manager.broadcast_to_chat(message_response, chat_id, db)
                     
                 except Exception as e:
                     print(f"Error processing message: {e}")

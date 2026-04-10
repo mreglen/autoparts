@@ -9,6 +9,19 @@ let pingInterval = null;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY = 1000; // 1 секунда
 
+const mergeMessageWithTempReply = (serverMessage, tempMessage) => {
+    if (!tempMessage) return serverMessage;
+
+    const merged = { ...serverMessage };
+    if (!merged.reply_to_id && tempMessage.reply_to_id) {
+        merged.reply_to_id = tempMessage.reply_to_id;
+    }
+    if (!merged.reply_to && tempMessage.reply_to) {
+        merged.reply_to = tempMessage.reply_to;
+    }
+    return merged;
+};
+
 // --- Async Thunks ---
 
 // Получить список чатов пользователя
@@ -195,7 +208,8 @@ const chatSlice = createSlice({
                     
                     if (tempMessageIndex !== -1) {
                         // Заменяем временное сообщение на реальное
-                        state.messages[tempMessageIndex] = message;
+                        const tempMessage = state.messages[tempMessageIndex];
+                        state.messages[tempMessageIndex] = mergeMessageWithTempReply(message, tempMessage);
                         console.log('✅ Replaced temp message with real message via WebSocket:', message.id);
                     } else {
                         // Если временного сообщения нет, просто добавляем новое
@@ -206,7 +220,8 @@ const chatSlice = createSlice({
                     // Если сообщение уже есть, обновляем его (например, после обработки медиа)
                     const messageIndex = state.messages.findIndex(m => m.id === message.id);
                     if (messageIndex !== -1) {
-                        state.messages[messageIndex] = message;
+                        const existingMessage = state.messages[messageIndex];
+                        state.messages[messageIndex] = mergeMessageWithTempReply(message, existingMessage);
                         console.log('🔄 Updated existing message from WebSocket:', message.id);
                     }
                 }
@@ -227,7 +242,7 @@ const chatSlice = createSlice({
         
         // Добавить сообщение оптимистично (до ответа сервера)
         addOptimisticMessage: (state, action) => {
-            const { chatId, message, senderId, media = [] } = action.payload;
+            const { chatId, message, senderId, media = [], reply_to_id = null, reply_to = null } = action.payload;
             
             if (state.currentChat && state.currentChat.id === chatId) {
                 const tempMessage = {
@@ -236,6 +251,8 @@ const chatSlice = createSlice({
                     sender_id: senderId,
                     message: message,
                     is_read: false,
+                    reply_to_id: reply_to_id,
+                    reply_to: reply_to,
                     created_at: new Date().toISOString(),
                     media: media
                 };
@@ -411,7 +428,8 @@ const chatSlice = createSlice({
                     );
                     
                     if (tempMessageIndex !== -1) {
-                        state.messages[tempMessageIndex] = message;
+                        const tempMessage = state.messages[tempMessageIndex];
+                        state.messages[tempMessageIndex] = mergeMessageWithTempReply(message, tempMessage);
                     } else {
                         state.messages.push(message);
                     }

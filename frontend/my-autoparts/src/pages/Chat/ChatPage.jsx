@@ -79,6 +79,7 @@ const ChatPage = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const messageInputRef = useRef(null);
+  const prevMessagesCountRef = useRef(0);
 
   // Fetch admin organization phone on component mount
   useEffect(() => {
@@ -128,8 +129,27 @@ const ChatPage = () => {
 
   // Автоскролл к последнему сообщению
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!messagesEndRef.current) return;
+
+    const prevCount = prevMessagesCountRef.current;
+    const nextCount = messages.length;
+
+    // При первом открытии/загрузке чата прокручиваем сразу вниз без анимации
+    const behavior = prevCount === 0 ? 'auto' : 'smooth';
+    messagesEndRef.current.scrollIntoView({ behavior });
+
+    prevMessagesCountRef.current = nextCount;
   }, [messages]);
+
+  // При переключении на другой чат сразу прыгаем в конец после рендера
+  useEffect(() => {
+    prevMessagesCountRef.current = 0;
+    if (!selectedChatId) return;
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [selectedChatId]);
 
   // Единый polling: fallback при отключенном WS + обновление статуса медиа в обработке
   useEffect(() => {
@@ -197,7 +217,13 @@ const ChatPage = () => {
       chatId: chatIdNum,
       message: messageText,
       senderId: user.id,
-      reply_to_id: replyToMessage?.id || null
+      reply_to_id: replyToMessage?.id || null,
+      reply_to: replyToMessage ? {
+        id: replyToMessage.id,
+        message: replyToMessage.message,
+        sender_id: replyToMessage.sender_id,
+        created_at: replyToMessage.created_at
+      } : null
     }));
     
     // Отправляем через WebSocket в реальном времени

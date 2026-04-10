@@ -101,7 +101,7 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
           className={`max-w-full rounded-lg cursor-pointer transition-opacity duration-300 ${
             imageLoaded ? 'opacity-100' : 'opacity-0'
           }`}
-          style={{ maxHeight: '400px', objectFit: 'contain' }}
+          style={{ maxHeight: '340px', objectFit: 'contain' }}
           onClick={() => setShowFullImage(true)}
           onLoad={() => {
             console.log('✅ Image loaded successfully:', thumbnailUrl);
@@ -234,7 +234,7 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
           controls
           poster={thumbnailUrl}
           className="max-w-full rounded-lg"
-          style={{ maxHeight: '400px' }}
+          style={{ maxHeight: '340px' }}
           preload="metadata"
         >
           <source src={videoUrl} type={mediaItem.mime_type} />
@@ -318,25 +318,25 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
       
       if (mimeType.includes('pdf')) {
         return (
-          <svg className="w-12 h-12 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-10 h-10 text-red-500" fill="currentColor" viewBox="0 0 24 24">
             <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
           </svg>
         );
       } else if (mimeType.includes('word') || mimeType.includes('document')) {
         return (
-          <svg className="w-12 h-12 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-10 h-10 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
             <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
           </svg>
         );
       } else if (mimeType.includes('excel') || mimeType.includes('sheet')) {
         return (
-          <svg className="w-12 h-12 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-10 h-10 text-green-600" fill="currentColor" viewBox="0 0 24 24">
             <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
           </svg>
         );
       }
       return (
-        <svg className="w-12 h-12 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+        <svg className="w-10 h-10 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
           <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
         </svg>
       );
@@ -346,7 +346,7 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
     if (mediaItem.is_processing) {
       return (
         <div className="relative">
-          <div className="flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg" style={{ minHeight: '100px' }}>
+          <div className="flex items-center justify-center bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg" style={{ minHeight: '85px' }}>
             <div className="text-center p-4 relative">
               {/* Кружок загрузки с крестиком или retry */}
               <div className="relative inline-block">
@@ -401,19 +401,19 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
         <a
           href={fileUrl}
           download={mediaItem.original_filename}
-          className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+          className="flex items-center gap-2.5 p-2.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
           title="Нажмите для скачивания"
         >
           {getFileIcon()}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">
+            <p className="text-[13px] font-medium text-gray-900 truncate">
               {mediaItem.original_filename || 'Документ'}
             </p>
             <p className="text-xs text-gray-500 mt-0.5">
               {formatFileSize(mediaItem.file_size)}
             </p>
           </div>
-          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
         </a>

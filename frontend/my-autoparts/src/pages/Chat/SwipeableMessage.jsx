@@ -17,13 +17,8 @@ const SwipeableMessage = ({ message, onReply, children, isOwn }) => {
     const onTouchMove = (e) => {
         const currentTouch = e.targetTouches[0].clientX;
         const distance = touchStart - currentTouch;
-        
-        // Only allow swipe in one direction based on message position
-        if (isOwn && distance < 0) {
-            setSwipeOffset(Math.abs(distance));
-        } else if (!isOwn && distance > 0) {
-            setSwipeOffset(distance);
-        }
+        const absDistance = Math.abs(distance);
+        setSwipeOffset(absDistance);
         
         setTouchEnd(currentTouch);
     };
@@ -35,13 +30,8 @@ const SwipeableMessage = ({ message, onReply, children, isOwn }) => {
         }
 
         const distance = touchStart - touchEnd;
-        const isSwipeLeft = distance > 0;
-        const isSwipeRight = distance < 0;
-
-        // Swipe direction depends on message position
-        if (isOwn && isSwipeRight && Math.abs(distance) >= minSwipeDistance) {
-            onReply(message);
-        } else if (!isOwn && isSwipeLeft && Math.abs(distance) >= minSwipeDistance) {
+        // Разрешаем reply свайпом в любую сторону для своих и чужих сообщений
+        if (Math.abs(distance) >= minSwipeDistance) {
             onReply(message);
         }
 
@@ -58,7 +48,7 @@ const SwipeableMessage = ({ message, onReply, children, isOwn }) => {
             onTouchEnd={onTouchEnd}
             className="relative"
             style={{
-                transform: `translateX(${isOwn ? swipeOffset : -swipeOffset}px)`,
+                transform: `translateX(${(touchStart && touchEnd) ? (touchEnd - touchStart) : 0}px)`,
                 transition: swipeOffset > 0 ? 'none' : 'transform 0.2s ease'
             }}
         >
