@@ -193,9 +193,13 @@ const ChatPage = ({ fillMobileHub = false }) => {
     const prevCount = prevMessagesCountRef.current;
     const nextCount = messages.length;
 
-    // При первом открытии/загрузке чата прокручиваем сразу вниз без анимации
-    const behavior = prevCount === 0 ? 'auto' : 'smooth';
-    messagesEndRef.current.scrollIntoView({ behavior });
+    // Прокручиваем только если добавились новые сообщения (изменилось количество)
+    // Не прокручиваем при обновлении существующих сообщений (например, статус прочтения)
+    if (nextCount > prevCount) {
+      // При первом открытии/загрузке чата прокручиваем сразу вниз без анимации
+      const behavior = prevCount === 0 ? 'auto' : 'smooth';
+      messagesEndRef.current.scrollIntoView({ behavior });
+    }
 
     prevMessagesCountRef.current = nextCount;
   }, [messages]);
