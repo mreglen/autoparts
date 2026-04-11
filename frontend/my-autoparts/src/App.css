@@ -36,3 +36,54 @@
     transform: rotate(360deg);
   }
 }
+
+/* Анимация подсветки сообщения при переходе к ответу */
+@keyframes messageHighlight {
+  0% {
+    filter: brightness(1);
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  }
+  15% {
+    filter: brightness(0.6);
+    box-shadow: 0 0 20px 4px rgba(0, 0, 0, 0.3);
+  }
+  70% {
+    filter: brightness(0.6);
+    box-shadow: 0 0 20px 4px rgba(0, 0, 0, 0.3);
+  }
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  }
+}
+
+.message-highlight {
+  animation: messageHighlight 2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+/* Для белых сообщений добавляем overlay */
+.message-highlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: highlightOverlay 2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes highlightOverlay {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

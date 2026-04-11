@@ -150,7 +150,7 @@ function AvitoChatListRow({ chat, selected, avitoUserId, onSelect }) {
   );
 }
 
-const AvitoChatPage = ({ fillMobileHub = false }) => {
+const AvitoChatPage = ({ fillMobileHub = false, onBack }) => {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const {
@@ -339,12 +339,16 @@ const AvitoChatPage = ({ fillMobileHub = false }) => {
   }, []);
 
   const handleMobileBack = () => {
-    setMobileListMode(true);
-    dispatch(setSelectedAvitoChatId(null));
-    const next = new URLSearchParams(searchParams);
-    next.set('tab', 'avito');
-    next.delete('avitoChatId');
-    setSearchParams(next);
+    if (onBack) {
+      onBack();
+    } else {
+      setMobileListMode(true);
+      dispatch(setSelectedAvitoChatId(null));
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', 'avito');
+      next.delete('avitoChatId');
+      setSearchParams(next);
+    }
   };
 
   if (integrationLoading) {
@@ -554,11 +558,15 @@ const AvitoChatPage = ({ fillMobileHub = false }) => {
                 displayChat={displayChat}
                 avitoUserId={avitoUserId}
                 onBack={() => {
-                  dispatch(setSelectedAvitoChatId(null));
-                  const next = new URLSearchParams(searchParams);
-                  next.set('tab', 'avito');
-                  next.delete('avitoChatId');
-                  setSearchParams(next);
+                  if (onBack) {
+                    onBack();
+                  } else {
+                    dispatch(setSelectedAvitoChatId(null));
+                    const next = new URLSearchParams(searchParams);
+                    next.set('tab', 'avito');
+                    next.delete('avitoChatId');
+                    setSearchParams(next);
+                  }
                 }}
               />
               {chatDetailLoading && (

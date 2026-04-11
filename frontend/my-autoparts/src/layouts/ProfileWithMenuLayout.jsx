@@ -460,7 +460,7 @@ export default function ProfileWithMenuLayout() {
                         </div>
 
                         {/* Right column - content */}
-                        <div className="lg:col-span-5">
+                        <div className="min-h-0 lg:col-span-5">
                             <Outlet />
                         </div>
                     </div>
@@ -482,7 +482,7 @@ export default function ProfileWithMenuLayout() {
                         </div>
 
                         {/* Right column - content */}
-                        <div className="lg:col-span-5">
+                        <div className="min-h-0 lg:col-span-5">
                             <Outlet />
                         </div>
                     </div>

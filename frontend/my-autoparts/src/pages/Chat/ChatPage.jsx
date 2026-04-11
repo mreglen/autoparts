@@ -94,7 +94,7 @@ function MessageReplyQuote({ replyTo, replyToId, isOwn, currentChat, userId, onJ
   );
 }
 
-const ChatPage = ({ fillMobileHub = false }) => {
+const ChatPage = ({ fillMobileHub = false, onBack }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -696,9 +696,13 @@ const ChatPage = ({ fillMobileHub = false }) => {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => {
-                      dispatch(setCurrentChat(null));
-                      setSelectedChatId(null);
-                      navigate('/chats');
+                      if (onBack) {
+                        onBack();
+                      } else {
+                        dispatch(setCurrentChat(null));
+                        setSelectedChatId(null);
+                        navigate('/chats');
+                      }
                     }}
                     className="text-gray-600 hover:text-gray-900 transition-colors"
                   >
@@ -778,12 +782,12 @@ const ChatPage = ({ fillMobileHub = false }) => {
                             onReply={handleReply}
                             isOwn={isOwn}
                           >
-                            <div className="relative">
-                              {/* Message content */}
-                              <div className={`relative max-w-xs sm:max-w-sm px-4 py-2.5 rounded-2xl ${
+                            <div
+                              className={`flex items-center gap-1.5 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
+                            >
+                              <div className={`relative min-w-0 max-w-xs sm:max-w-sm px-4 py-2.5 rounded-2xl ${
                                 isOwn ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white text-gray-900 shadow-sm rounded-bl-md'
                               }`}>
-                                <ReplyArrow message={message} onReply={handleReply} isOwn={isOwn} />
                                 {message.reply_to && (
                                   <MessageReplyQuote
                                     replyTo={message.reply_to}
@@ -835,6 +839,7 @@ const ChatPage = ({ fillMobileHub = false }) => {
                               )}
                                 </div>
                               </div>
+                              <ReplyArrow message={message} onReply={handleReply} isOwn={isOwn} />
                             </div>
                           </SwipeableMessage>
                         </div>
@@ -1100,8 +1105,10 @@ const ChatPage = ({ fillMobileHub = false }) => {
                         data-message-row-id={message.id}
                         className={`group flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div className={`relative max-w-md px-4 py-2.5 rounded-2xl ${isOwn ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white text-gray-900 shadow-sm rounded-bl-md'}`}>
-                          <ReplyArrow message={message} onReply={handleReply} isOwn={isOwn} />
+                        <div
+                          className={`flex max-w-md items-center gap-1.5 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}
+                        >
+                          <div className={`relative min-w-0 flex-1 px-4 py-2.5 rounded-2xl ${isOwn ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white text-gray-900 shadow-sm rounded-bl-md'}`}>
                           {message.reply_to && (
                             <MessageReplyQuote
                               replyTo={message.reply_to}
@@ -1122,6 +1129,8 @@ const ChatPage = ({ fillMobileHub = false }) => {
                             <p className={`text-xs ${isOwn ? 'text-blue-100' : 'text-gray-500'}`}>{formatTime(message.created_at)}</p>
                             {isOwn && (<span>{message.id?.toString().startsWith('temp_') ? (<svg className="w-4 h-4 text-blue-200 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>) : message.media && message.media.some(m => m.is_processing) ? (<svg className="w-4 h-4 text-blue-200 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>) : message.is_read ? (<svg className="w-4 h-4 text-blue-200" fill="currentColor" viewBox="0 0 24 24"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z"/></svg>) : (<svg className="w-4 h-4 text-blue-200" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>)}</span>)}
                           </div>
+                          </div>
+                          <ReplyArrow message={message} onReply={handleReply} isOwn={isOwn} />
                         </div>
                       </div>
                     );
