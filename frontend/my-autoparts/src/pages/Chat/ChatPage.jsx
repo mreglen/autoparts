@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   fetchUserChats,
@@ -675,6 +675,11 @@ const ChatPage = ({ fillMobileHub = false }) => {
                             {chat.unread_count}
                           </span>
                         )}
+                        
+                        {/* Иконка источника чата - Свой Гараж */}
+                        <div className="flex-shrink-0 flex flex-col items-center justify-center ml-2">
+                          <img src="/logos/svoygarage.png" alt="Свой Гараж" className="w-6 h-6 object-contain" />
+                        </div>
                       </div>
                     );
                   })}
@@ -1004,6 +1009,11 @@ const ChatPage = ({ fillMobileHub = false }) => {
                         </span>
                       )}
                       
+                      {/* Иконка источника чата - Свой Гараж */}
+                      <div className="flex-shrink-0 flex flex-col items-center justify-center ml-2">
+                        <img src="/logos/svoygarage.png" alt="Свой Гараж" className="w-6 h-6 object-contain" />
+                      </div>
+                      
                       {/* Меню чата (три точки) */}
                       <div className="relative flex-shrink-0">
                         <button
@@ -1012,7 +1022,6 @@ const ChatPage = ({ fillMobileHub = false }) => {
                             setActiveChatMenuId(showMenu ? null : chat.id);
                           }}
                           className="p-1.5 hover:bg-gray-200 rounded-full transition-colors"
-                          title="Меню чата"
                         >
                           <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>

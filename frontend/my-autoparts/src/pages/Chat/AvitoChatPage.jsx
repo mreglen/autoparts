@@ -141,6 +141,11 @@ function AvitoChatListRow({ chat, selected, avitoUserId, onSelect }) {
           {chat.unread_count}
         </span>
       )}
+      
+      {/* Иконка источника чата - Avito */}
+      <div className="flex-shrink-0 flex flex-col items-center justify-center ml-2">
+        <img src="/logos/avito.png" alt="Avito" className="w-6 h-6 object-contain" />
+      </div>
     </button>
   );
 }

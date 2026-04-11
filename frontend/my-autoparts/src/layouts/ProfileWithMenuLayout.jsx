@@ -101,13 +101,13 @@ export default function ProfileWithMenuLayout() {
     const getAvailableTabs = () => {
         let baseTabs = [];
 
-        // Для админов добавляем Главную, Продавцы, Клиенты, Чаты и Покупки
+        // Для админов добавляем Главную, Продавцы, Клиенты, Сообщения и Покупки
         if (user?.is_admin) {
             baseTabs = [
                 { id: 'dashboard', label: 'Главная' },
                 { id: 'sellers', label: 'Продавцы' },
                 { id: 'clients', label: 'Клиенты' },
-                { id: 'chats', label: 'Чаты' },
+                { id: 'chats', label: 'Сообщения' },
                 {
                     id: 'purchases',
                     label: 'Покупки',
@@ -118,12 +118,12 @@ export default function ProfileWithMenuLayout() {
                 }
             ];
         }
-        // Для продавцов добавляем Главную, Клиенты, Чаты и Покупки
+        // Для продавцов добавляем Главную, Клиенты, Сообщения и Покупки
         else if (user?.is_seller) {
             baseTabs = [
                 { id: 'dashboard', label: 'Главная' },
                 { id: 'clients', label: 'Клиенты' },
-                { id: 'chats', label: 'Чаты' },
+                { id: 'chats', label: 'Сообщения' },
                 {
                     id: 'purchases',
                     label: 'Покупки',
@@ -134,7 +134,7 @@ export default function ProfileWithMenuLayout() {
                 }
             ];
         }
-        // Для обычных пользователей (покупателей) - только Покупки, Чаты и Настройки (Профиль)
+        // Для обычных пользователей (покупателей) - только Покупки, Сообщения и Настройки (Профиль)
         else {
             baseTabs = [
                 {
@@ -145,7 +145,7 @@ export default function ProfileWithMenuLayout() {
                         { id: 'purchases-returns', label: 'Возвраты' }
                     ]
                 },
-                { id: 'chats', label: 'Чаты' },
+                { id: 'chats', label: 'Сообщения' },
                 {
                     id: 'settings',
                     label: 'Настройки',
