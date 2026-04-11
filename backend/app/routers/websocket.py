@@ -44,6 +44,37 @@ class ConnectionManager:
         for socket in stale_connections:
             self.disconnect(user_id, socket)
 
+    async def broadcast_to_organization(
+        self,
+        organization_id: str,
+        ws_payload: dict,
+        db: Session,
+        *,
+        push_title: str,
+        push_body: str,
+    ) -> None:
+        """Всем пользователям организации: WebSocket; если офлайн — Web Push."""
+        from app.routers.notifications import send_push_notification
+
+        users = db.query(User).filter(User.organization_id == organization_id).all()
+        chat_q = ws_payload.get("avito_chat_id")
+        url_suffix = f"/chats?tab=avito&avitoChatId={chat_q}" if chat_q else "/chats?tab=avito"
+        for u in users:
+            uid = u.id
+            if self.active_connections.get(uid):
+                await self.send_personal_message(ws_payload, uid)
+            else:
+                send_push_notification(
+                    uid,
+                    {
+                        "type": "avito_messenger",
+                        "title": push_title,
+                        "body": (push_body or "Новое сообщение")[:120],
+                        "url": url_suffix,
+                    },
+                    db,
+                )
+
     async def broadcast_to_chat(self, message: dict, chat_id: int, db: Session, exclude_user_id: int = None):
         """Отправить сообщение всем участникам чата + push notification если offline"""
         from app.routers.notifications import send_push_notification

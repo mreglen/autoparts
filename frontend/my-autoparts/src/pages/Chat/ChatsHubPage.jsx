@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import ChatPage from './ChatPage';
@@ -11,19 +11,16 @@ const ChatsHubPage = () => {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useSelector((state) => state.auth);
-  const { enabled, integrationLoading } = useSelector((state) => state.avitoChats);
 
-  const canUseAvitoTabs = useMemo(
-    () => Boolean(user?.organization_id && enabled),
-    [enabled, user?.organization_id]
-  );
+  /** Вкладка «Чат Авито» видна всем авторизованным пользователям; доступ к API — по флагу enabled внутри страницы. */
+  const showAvitoTabs = Boolean(user);
 
   useEffect(() => {
-    if (!user?.organization_id) return;
+    if (!user) return;
     dispatch(fetchAvitoMessengerEnabled());
-  }, [dispatch, user?.organization_id]);
+  }, [dispatch, user]);
 
-  const activeTab = canUseAvitoTabs ? (searchParams.get('tab') === 'avito' ? 'avito' : 'garage') : 'garage';
+  const activeTab = showAvitoTabs ? (searchParams.get('tab') === 'avito' ? 'avito' : 'garage') : 'garage';
 
   const switchTab = (tab) => {
     const next = new URLSearchParams(searchParams);
@@ -41,7 +38,7 @@ const ChatsHubPage = () => {
 
   return (
     <div className="space-y-4">
-      {canUseAvitoTabs && (
+      {showAvitoTabs && (
         <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
           <button
             type="button"
@@ -68,9 +65,7 @@ const ChatsHubPage = () => {
         </div>
       )}
 
-      {integrationLoading && user?.organization_id ? (
-        <div className="text-sm text-gray-500">Проверка интеграции Avito...</div>
-      ) : activeTab === 'avito' ? (
+      {activeTab === 'avito' ? (
         <AvitoChatPage />
       ) : (
         <ChatPage />

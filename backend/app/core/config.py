@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     VAPID_PUBLIC_KEY: Optional[str] = ""
     VAPID_PRIVATE_KEY: Optional[str] = ""
 
+    # Опционально: общий секрет для POST /webhooks/avito/messenger (?secret= или заголовок X-Webhook-Secret)
+    AVITO_WEBHOOK_SECRET: Optional[str] = None
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
 
 settings = Settings()

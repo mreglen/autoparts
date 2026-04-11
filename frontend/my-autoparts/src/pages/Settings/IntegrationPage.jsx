@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
+import { apiRequest, apiRequestFormData, BACKEND_BASE } from '../../utils/apiClient';
 
 const AD_TYPE_NOT_SPECIFIED = '__NOT_SPECIFIED__';
 const AD_TYPE_OPTIONS = [
@@ -170,6 +170,242 @@ function CategoryPickerModal({
   );
 }
 
+const AVITO_DEVELOPERS_URL = 'https://developers.avito.ru';
+
+const CONNECT_STEP_COUNT = 4;
+
+function AvitoConnectWizardModal({
+  open,
+  onClose,
+  step,
+  setStep,
+  clientId,
+  setClientId,
+  clientSecret,
+  setClientSecret,
+  avitoUserId,
+  setAvitoUserId,
+  secretConfigured,
+  saving,
+  onSave,
+  loadingCreds,
+}) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const canGoNext = step < CONNECT_STEP_COUNT - 1;
+  const canGoBack = step > 0;
+  const isLastStep = step === CONNECT_STEP_COUNT - 1;
+
+  const uidNum = parseInt(avitoUserId, 10);
+  const canSave =
+    clientId.trim().length > 0 &&
+    (secretConfigured || clientSecret.trim().length > 0) &&
+    uidNum > 0;
+
+  const handleNext = () => {
+    if (canGoNext) setStep((s) => Math.min(s + 1, CONNECT_STEP_COUNT - 1));
+  };
+  const handleBack = () => {
+    if (canGoBack) setStep((s) => Math.max(s - 1, 0));
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-4"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className="bg-white w-full max-w-lg max-h-[90vh] rounded-xl shadow-xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-labelledby="avito-connect-title"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+          <h2 id="avito-connect-title" className="text-lg font-semibold text-gray-900">
+            Подключение API Авито
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm text-gray-500 hover:text-gray-800 px-2 py-1"
+          >
+            Закрыть
+          </button>
+        </div>
+
+        <div className="px-5 pt-4 pb-2">
+          <div className="flex gap-1 mb-1">
+            {Array.from({ length: CONNECT_STEP_COUNT }, (_, i) => (
+              <div
+                key={i}
+                className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-blue-600' : 'bg-gray-200'}`}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-gray-500">
+            Шаг {step + 1} из {CONNECT_STEP_COUNT}
+          </p>
+        </div>
+
+        <div className="px-5 py-3 overflow-y-auto flex-1 text-sm text-gray-700 space-y-3">
+          {step === 0 && (
+            <>
+              <p className="font-medium text-gray-900">Зачем подключать API</p>
+              <p>
+                После сохранения ключей ваш сайт сможет обращаться к API Авито от имени организации: выгрузка и
+                обновление объявлений через файл автозагрузки (XLSX), а также переписка с покупателями во вкладке
+                «Чат Авито».
+              </p>
+              <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-3">
+                Ключи хранятся на сервере в зашифрованном виде. Client secret на экране не показывается повторно —
+                при смене ключа введите новый secret целиком.
+              </p>
+            </>
+          )}
+
+          {step === 1 && (
+            <>
+              <p className="font-medium text-gray-900">Создайте приложение в Авито</p>
+              <ol className="list-decimal pl-5 space-y-2">
+                <li>
+                  Откройте портал разработчика:{' '}
+                  <a
+                    href={AVITO_DEVELOPERS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    developers.avito.ru
+                  </a>
+                  .
+                </li>
+                <li>Войдите под аккаунтом, с которым работаете на Авито как продавец.</li>
+                <li>Создайте приложение и получите <strong>Client ID</strong> и <strong>Client secret</strong>.</li>
+                <li>
+                  В настройках приложения подключите нужные API: как минимум методы для{' '}
+                  <strong>автозагрузки</strong> и при необходимости <strong>Messenger</strong> (чаты), в соответствии с
+                  документацией Авито.
+                </li>
+              </ol>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <p className="font-medium text-gray-900">ID пользователя Авито (user_id)</p>
+              <p>
+                Это <strong>числовой идентификатор</strong> вашего профиля на Авито. Он используется в запросах к API,
+                например:{' '}
+                <code className="text-xs bg-gray-100 px-1 rounded">
+                  /messenger/v2/accounts/&#123;user_id&#125;/chats
+                </code>
+                .
+              </p>
+              <p className="text-xs text-gray-600 bg-amber-50 border border-amber-100 rounded-lg p-3">
+                Где посмотреть: в личном кабинете Авито (профиль / настройки / раздел для разработчиков) или в
+                документации портала — число обычно указано рядом с аккаунтом. Если не уверены, уточните в поддержке
+                Авито по API.
+              </p>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <p className="font-medium text-gray-900">Введите данные приложения</p>
+              {loadingCreds ? (
+                <p className="text-gray-500">Загрузка…</p>
+              ) : (
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Client ID</label>
+                    <input
+                      type="text"
+                      value={clientId}
+                      onChange={(ev) => setClientId(ev.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      autoComplete="off"
+                      placeholder="Из кабинета разработчика Авито"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Client secret</label>
+                    <input
+                      type="password"
+                      value={clientSecret}
+                      onChange={(ev) => setClientSecret(ev.target.value)}
+                      placeholder={
+                        secretConfigured ? 'Оставьте пустым, если не меняете' : 'Обязательно при первом подключении'
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">ID пользователя Авито</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={avitoUserId}
+                      onChange={(ev) => setAvitoUserId(ev.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Число, например 123456789"
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-2">
+            {canGoBack && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+              >
+                Назад
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {!isLastStep && (
+              <button
+                type="button"
+                onClick={handleNext}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Далее
+              </button>
+            )}
+            {isLastStep && (
+              <button
+                type="button"
+                disabled={saving || loadingCreds || !canSave}
+                onClick={() => onSave()}
+                className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {saving ? 'Сохранение…' : 'Сохранить и подключить'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function formatErrorMessage(err) {
   const msg = err?.message || String(err);
   return msg;
@@ -252,6 +488,21 @@ export default function IntegrationPage() {
   const [importWarnings, setImportWarnings] = useState([]);
   const [photoIndexes, setPhotoIndexes] = useState({});
   const [publishing, setPublishing] = useState(false);
+  const [isAvitoConnectOpen, setIsAvitoConnectOpen] = useState(false);
+  const [connectStep, setConnectStep] = useState(0);
+  const [webhookSubscribing, setWebhookSubscribing] = useState(false);
+
+  const avitoApiConnected =
+    Boolean(secretConfigured && (clientId || '').trim() && (avitoUserId || '').trim());
+
+  const messengerWebhookUrl = useMemo(() => {
+    const base = String(BACKEND_BASE || '')
+      .trim()
+      .replace(/\/+$/, '')
+      .replace(/\/api$/, '');
+    if (!base) return '';
+    return `${base}/webhooks/avito/messenger`;
+  }, []);
 
   const getPublicFileUrl = useCallback((path) => {
     if (!path) return '';
@@ -575,13 +826,20 @@ export default function IntegrationPage() {
     }
   };
 
-  const handleSaveCredentials = async (e) => {
-    e.preventDefault();
-    if (!orgId) return;
+  const saveAvitoCredentials = async () => {
+    if (!orgId) return false;
     const uid = parseInt(avitoUserId, 10);
     if (!uid || uid <= 0) {
       setError('Укажите корректный ID пользователя Авито');
-      return;
+      return false;
+    }
+    if (!clientId.trim()) {
+      setError('Укажите Client ID');
+      return false;
+    }
+    if (!secretConfigured && !clientSecret.trim()) {
+      setError('Укажите Client secret');
+      return false;
     }
     setSaving(true);
     setError(null);
@@ -598,16 +856,45 @@ export default function IntegrationPage() {
         method: 'PUT',
         body: JSON.stringify(body),
       });
-      setNotice('Настройки сохранены');
+      setNotice('API Авито подключён, ключи сохранены.');
       setClientSecret('');
       setSecretConfigured(true);
-      loadCredentials();
+      await loadCredentials();
+      setIsAvitoConnectOpen(false);
+      setConnectStep(0);
+      return true;
     } catch (e) {
       setError(formatErrorMessage(e));
+      return false;
     } finally {
       setSaving(false);
     }
   };
+
+  const openAvitoConnectModal = () => {
+    setError(null);
+    setConnectStep(0);
+    setIsAvitoConnectOpen(true);
+  };
+
+  const closeAvitoConnectModal = () => {
+    setIsAvitoConnectOpen(false);
+    setConnectStep(0);
+  };
+
+  const subscribeAvitoMessengerWebhook = useCallback(async () => {
+    if (!orgId || !avitoApiConnected) return;
+    setWebhookSubscribing(true);
+    setError(null);
+    try {
+      const data = await apiRequest('/avito/messenger/webhook/subscribe', { method: 'POST' });
+      setNotice(`Вебхук Messenger зарегистрирован в Avito: ${data?.url || ''}`);
+    } catch (e) {
+      setError(formatErrorMessage(e));
+    } finally {
+      setWebhookSubscribing(false);
+    }
+  }, [orgId, avitoApiConnected]);
 
   const handlePublishAutoload = async () => {
     if (!orgId) return;
@@ -684,12 +971,98 @@ export default function IntegrationPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Интеграция Авито</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Ключи API и файлы автозагрузки XLSX. 
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Интеграция Авито</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            API Авито: автозагрузка объявлений (XLSX) и чаты с покупателями на сайте.
+          </p>
+        </div>
+        <div className="flex flex-col items-stretch sm:items-end gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={openAvitoConnectModal}
+            className="px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 shadow-sm"
+          >
+            {avitoApiConnected ? 'Изменить подключение API' : 'Подключить Авито'}
+          </button>
+          {loadingCreds ? (
+            <span className="text-xs text-gray-500">Проверка статуса…</span>
+          ) : avitoApiConnected ? (
+            <span className="text-xs text-emerald-700 font-medium">API подключён</span>
+          ) : (
+            <span className="text-xs text-amber-700">API не настроен — нажмите «Подключить Авито»</span>
+          )}
+        </div>
+      </div>
+
+      <div
+        className={`rounded-lg border px-4 py-3 text-sm ${
+          avitoApiConnected
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+            : 'border-gray-200 bg-gray-50 text-gray-700'
+        }`}
+      >
+        <p className="font-medium">Статус подключения</p>
+        <p className="mt-1 text-xs sm:text-sm">
+          {avitoApiConnected ? (
+            <>
+              Client ID сохранён, секрет в системе есть, user_id:{' '}
+              <span className="font-mono">{avitoUserId || '—'}</span>. Детали ключей меняются только через кнопку
+              выше.
+            </>
+          ) : (
+            <>
+              Пошагово укажите ключи приложения с портала{' '}
+              <a
+                href={AVITO_DEVELOPERS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                developers.avito.ru
+              </a>
+              .
+            </>
+          )}
         </p>
       </div>
+
+      {avitoApiConnected && (
+        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm space-y-3 shadow-sm">
+          <div>
+            <h2 className="font-medium text-gray-900">Вебхук Messenger (обновления чатов)</h2>
+            <p className="mt-1 text-xs text-gray-600 leading-relaxed">
+              Скопируйте URL ниже в настройки вебхуков Авито для мгновенных уведомлений сотрудникам организации. На
+              продакшене адрес должен быть доступен по <span className="font-medium">HTTPS</span>. На сервере задайте{' '}
+              <code className="text-[11px] bg-gray-100 px-1 py-0.5 rounded">PUBLIC_BASE_URL</code> — от него строится
+              ссылка при регистрации через кнопку. Опционально: переменная{' '}
+              <code className="text-[11px] bg-gray-100 px-1 py-0.5 rounded">AVITO_WEBHOOK_SECRET</code> — тогда в URL
+              добавьте <code className="text-[11px] bg-gray-100 px-1 py-0.5 rounded">?secret=…</code> или передайте тот
+              же секрет заголовком <code className="text-[11px] bg-gray-100 px-1 py-0.5 rounded">X-Webhook-Secret</code>
+              .
+            </p>
+          </div>
+          {messengerWebhookUrl ? (
+            <p className="font-mono text-xs break-all bg-gray-50 border border-gray-100 rounded px-2 py-2 text-gray-800">
+              {messengerWebhookUrl}
+            </p>
+          ) : (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-2">
+              Укажите в .env фронтенда <code className="text-[11px]">REACT_APP_BACKEND_BASE_URL</code> (корень API без{' '}
+              <code className="text-[11px]">/api</code>), чтобы отобразить полный URL вебхука.
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={subscribeAvitoMessengerWebhook}
+            disabled={webhookSubscribing || !avitoApiConnected}
+            className="px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {webhookSubscribing ? 'Регистрация…' : 'Подписать URL в Avito (API)'}
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm whitespace-pre-wrap">
@@ -722,55 +1095,6 @@ export default function IntegrationPage() {
           </div>
         )}
       </div>
-
-      <form onSubmit={handleSaveCredentials} className="space-y-4 max-w-xl">
-        <h2 className="text-lg font-medium text-gray-900">Ключи API</h2>
-        {loadingCreds ? (
-          <p className="text-sm text-gray-500">Загрузка…</p>
-        ) : (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Client ID</label>
-              <input
-                type="text"
-                value={clientId}
-                onChange={(ev) => setClientId(ev.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoComplete="off"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Client secret</label>
-              <input
-                type="password"
-                value={clientSecret}
-                onChange={(ev) => setClientSecret(ev.target.value)}
-                placeholder={secretConfigured ? 'Оставьте пустым, чтобы не менять' : 'Обязательно при первом сохранении'}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoComplete="new-password"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">ID пользователя Авито</label>
-              <input
-                type="number"
-                min="1"
-                value={avitoUserId}
-                onChange={(ev) => setAvitoUserId(ev.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="mt-1 text-xs text-gray-500">Числовой ID из личного кабинета Авито (для отчётов API).</p>
-            </div>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-            >
-              {saving ? 'Сохранение…' : 'Сохранить'}
-            </button>
-          </>
-        )}
-      </form>
 
       <div className="space-y-3">
         <h2 className="text-lg font-medium text-gray-900">Файл автозагрузки (.xlsx)</h2>
@@ -1151,6 +1475,23 @@ export default function IntegrationPage() {
           setCategoryTarget(null);
         }}
         onPick={handlePickCategory}
+      />
+
+      <AvitoConnectWizardModal
+        open={isAvitoConnectOpen}
+        onClose={closeAvitoConnectModal}
+        step={connectStep}
+        setStep={setConnectStep}
+        clientId={clientId}
+        setClientId={setClientId}
+        clientSecret={clientSecret}
+        setClientSecret={setClientSecret}
+        avitoUserId={avitoUserId}
+        setAvitoUserId={setAvitoUserId}
+        secretConfigured={secretConfigured}
+        saving={saving}
+        onSave={saveAvitoCredentials}
+        loadingCreds={loadingCreds}
       />
     </div>
   );

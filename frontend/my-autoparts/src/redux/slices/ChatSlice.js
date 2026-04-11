@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { API_BASE, apiRequest, apiRequestFormData, getWebSocketBaseUrl } from '../../utils/apiClient';
+import { fetchAvitoChats, fetchAvitoMessages } from './AvitoChatSlice';
 
 // WebSocket подключение
 let ws = null;
@@ -574,6 +575,12 @@ export const connectWebSocket = (userId) => (dispatch) => {
         } else if (data.type === 'messages_read') {
             dispatch(markMessagesAsRead(data));
             dispatch(fetchUserChats({ skip: 0, limit: 50 }));
+        } else if (data.type === 'avito_messenger_refresh') {
+            const cid = data.avito_chat_id != null ? String(data.avito_chat_id) : null;
+            dispatch(fetchAvitoChats({ silent: true }));
+            if (cid) {
+                dispatch(fetchAvitoMessages({ chatId: cid, silent: true, markRead: false }));
+            }
         } else if (data.type === 'pong') {
             console.log('[WS] 🏓 Pong received');
         }
