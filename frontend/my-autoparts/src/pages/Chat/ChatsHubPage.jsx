@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import MobileBottomNav from '../../components/MobileBottomNav/MobileBottomNav';
 import {
   connectWebSocket,
   disconnectWebSocket,
@@ -145,7 +146,7 @@ const ChatsHubPage = () => {
 
   return (
     <div className="max-md:fixed max-md:inset-0 max-md:z-[60] max-md:flex max-md:min-h-0 max-md:flex-col max-md:bg-white max-md:pt-[env(safe-area-inset-top,0px)] md:static md:z-auto md:min-h-0 md:inset-auto md:bg-transparent md:pt-0">
-      <div className="flex min-h-0 w-full flex-1 flex-row bg-white max-md:min-h-0 md:h-[calc(100vh-200px)] md:overflow-hidden md:rounded-lg md:border md:border-gray-200 md:shadow-sm">
+      <div className="flex min-h-0 w-full flex-1 flex-row bg-white max-md:min-h-0 max-md:pb-[env(safe-area-inset-bottom,0px)] md:h-[calc(100vh-200px)] md:overflow-hidden md:rounded-lg md:border md:border-gray-200 md:shadow-sm">
         {/* Левая панель - Список чатов */}
         <div
           className={`${
@@ -252,6 +253,9 @@ const ChatsHubPage = () => {
           )}
         </div>
       </div>
+      
+      {/* Мобильное нижнее меню - показывается только в списке чатов */}
+      {!activeChatId && <MobileBottomNav />}
     </div>
   );
 };
