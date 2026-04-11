@@ -9,9 +9,6 @@ import {
   addOptimisticMessage,
   setCurrentChat,
   setReplyToMessage,
-  subscribeToPushNotifications,
-  connectWebSocket,
-  disconnectWebSocket,
   updateMediaFailedStatus
 } from '../../redux/slices/ChatSlice';
 import { fetchAdminOrganizationPhone } from '../../redux/slices/PublicInfoSlice';
@@ -85,24 +82,6 @@ const ChatPage = () => {
   useEffect(() => {
     dispatch(fetchAdminOrganizationPhone());
   }, [dispatch]);
-
-  // Подключаем WebSocket при загрузке
-  useEffect(() => {
-    if (user) {
-      dispatch(connectWebSocket(user.id));
-    }
-    
-    return () => {
-      dispatch(disconnectWebSocket());
-    };
-  }, [dispatch, user]);
-
-  // Подписываемся на push уведомления
-  useEffect(() => {
-    if (user) {
-      dispatch(subscribeToPushNotifications());
-    }
-  }, [dispatch, user]);
 
   // Загружаем чаты пользователя
   useEffect(() => {

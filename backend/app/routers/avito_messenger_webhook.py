@@ -40,14 +40,40 @@ def _value_dict(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def parse_messenger_webhook(body: dict[str, Any]) -> tuple[Optional[int], Optional[str], str]:
-    """(avito_account_user_id, chat_id_str, preview_text)."""
+    """(avito_account_user_id, chat_id_str, preview_text). user_id — как в OrganizationAvitoIntegration.avito_user_id."""
     val = _value_dict(body)
-    uid = _as_int(val.get("user_id") or val.get("account_user_id") or val.get("author_id"))
+
+    def _uid_from_mapping(m: dict[str, Any]) -> Optional[int]:
+        if not m:
+            return None
+        for key in (
+            "user_id",
+            "account_user_id",
+            "account_id",
+            "owner_id",
+            "author_id",
+            "avito_user_id",
+            "recipient_id",
+        ):
+            u = _as_int(m.get(key))
+            if u is not None:
+                return u
+        for nest_key in ("user", "author", "account", "recipient", "seller", "buyer"):
+            nested = m.get(nest_key)
+            if isinstance(nested, dict):
+                u = _as_int(nested.get("id") or nested.get("user_id"))
+                if u is not None:
+                    return u
+        return None
+
+    uid = _uid_from_mapping(val) if isinstance(val, dict) else None
     if uid is None:
-        uid = _as_int(body.get("user_id"))
+        uid = _uid_from_mapping(body)
     cid = val.get("chat_id") if val else None
     if cid is None:
         cid = val.get("chatId") if val else None
+    if cid is None and isinstance(body.get("chat_id"), (str, int)):
+        cid = body.get("chat_id")
     chat_id_str = str(cid) if cid is not None else None
 
     preview = ""
@@ -85,7 +111,14 @@ async def avito_messenger_webhook(
 
     avito_uid, chat_id, preview = parse_messenger_webhook(body)
     if avito_uid is None:
-        logger.debug("Avito webhook: no user_id in payload keys=%s", list(body.keys())[:20])
+        top = list(body.keys())[:20]
+        val = _value_dict(body)
+        inner_keys = list(val.keys())[:25] if isinstance(val, dict) else type(val).__name__
+        logger.warning(
+            "Avito webhook: could not resolve user_id (body keys=%s; value keys=%s)",
+            top,
+            inner_keys,
+        )
         return {"ok": True, "ignored": True}
 
     row = (

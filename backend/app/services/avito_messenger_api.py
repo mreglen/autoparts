@@ -118,6 +118,15 @@ def _extract_list(data: Any) -> list[dict[str, Any]]:
     return []
 
 
+def _extract_chats_response(data: Any) -> list[dict[str, Any]]:
+    """Список чатов: приоритет ключа chats (как messages для переписки)."""
+    if isinstance(data, dict) and "chats" in data:
+        inner = data.get("chats")
+        if isinstance(inner, list):
+            return [x for x in inner if isinstance(x, dict)]
+    return _extract_list(data)
+
+
 def _extract_messages_response(data: Any) -> list[dict[str, Any]]:
     """Сообщения: сначала ключ messages (не путать с chats в составном JSON), затем корень-массив, затем прочие ключи."""
     if isinstance(data, dict) and "messages" in data:
@@ -328,24 +337,45 @@ async def get_voice_file_urls(access_token: str, user_id: int, voice_ids: list[s
 
 
 async def list_chats(access_token: str, user_id: int) -> list[dict[str, Any]]:
-    """Сначала v3 (как в актуальном API); иначе при HTTP 200 от v2 с пустым списком v3 никогда не вызывался."""
-    status, data = await _request_with_candidates(
-        method="GET",
-        access_token=access_token,
-        candidates=[
-            f"/messenger/v3/accounts/{user_id}/chats/",
-            f"/messenger/v3/accounts/{user_id}/chats",
-            f"/messenger/v2/accounts/{user_id}/chats",
-            f"/messenger/v1/accounts/{user_id}/chats",
-        ],
-        params={"limit": 100},
-    )
-    if status != 200:
-        raise AvitoMessengerError(f"Avito chats error (HTTP {status}): {data}")
-    chats = _extract_list(data)
-    return [
-        normalize_chat(chat, idx, account_user_id=user_id) for idx, chat in enumerate(chats)
+    """Сначала v3; при 200 и пустом списке чатов пробуем v2/v1 (аналогично get_chat_messages)."""
+    candidates = [
+        f"/messenger/v3/accounts/{user_id}/chats/",
+        f"/messenger/v3/accounts/{user_id}/chats",
+        f"/messenger/v2/accounts/{user_id}/chats",
+        f"/messenger/v1/accounts/{user_id}/chats",
     ]
+    params: dict[str, Any] = {"limit": 100}
+    headers = {"Authorization": f"Bearer {access_token}"}
+    last_status = 0
+    last_data: Any = None
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        for path in candidates:
+            url = f"{AVITO_BASE}{path}"
+            response = await client.get(url, headers=headers, params=params)
+            last_status = response.status_code
+            try:
+                data: Any = response.json()
+            except Exception:
+                data = {"raw": response.text[:8000]}
+            last_data = data
+
+            if response.status_code in (404, 405):
+                continue
+            if response.status_code == 400:
+                logger.warning("Avito GET chats %s HTTP 400: %s", path, data)
+                continue
+            if response.status_code != 200:
+                continue
+
+            chats = _extract_chats_response(data)
+            is_v3 = "/messenger/v3/" in path
+            if chats or not is_v3:
+                return [normalize_chat(chat, idx, account_user_id=user_id) for idx, chat in enumerate(chats)]
+
+            logger.info("Avito GET chats: v3 %s returned 200 with 0 chats, trying next path", path)
+
+    raise AvitoMessengerError(f"Avito chats error (HTTP {last_status}): {last_data}")
 
 
 async def get_chat_detail(access_token: str, user_id: int, chat_id: str) -> dict[str, Any]:

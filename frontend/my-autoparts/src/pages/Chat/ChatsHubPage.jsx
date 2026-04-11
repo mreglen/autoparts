@@ -4,6 +4,11 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import ChatPage from './ChatPage';
 import AvitoChatPage from './AvitoChatPage';
 import { fetchAvitoMessengerEnabled } from '../../redux/slices/AvitoChatSlice';
+import {
+  connectWebSocket,
+  disconnectWebSocket,
+  subscribeToPushNotifications,
+} from '../../redux/slices/ChatSlice';
 
 const ChatsHubPage = () => {
   const dispatch = useDispatch();
@@ -18,6 +23,20 @@ const ChatsHubPage = () => {
   useEffect(() => {
     if (!user) return;
     dispatch(fetchAvitoMessengerEnabled());
+  }, [dispatch, user]);
+
+  /** WebSocket и push на уровне хаба: иначе при вкладке «Чат Авито» ChatPage размонтируется и WS отключается. */
+  useEffect(() => {
+    if (!user) return undefined;
+    dispatch(connectWebSocket(user.id));
+    return () => {
+      dispatch(disconnectWebSocket());
+    };
+  }, [dispatch, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    dispatch(subscribeToPushNotifications());
   }, [dispatch, user]);
 
   const activeTab = showAvitoTabs ? (searchParams.get('tab') === 'avito' ? 'avito' : 'garage') : 'garage';

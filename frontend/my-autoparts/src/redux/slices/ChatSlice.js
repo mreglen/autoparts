@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { API_BASE, apiRequest, apiRequestFormData, getWebSocketBaseUrl } from '../../utils/apiClient';
-import { fetchAvitoChats, fetchAvitoMessages } from './AvitoChatSlice';
+import { fetchAvitoChatDetail, fetchAvitoChats, fetchAvitoMessages } from './AvitoChatSlice';
 
 // WebSocket подключение
 let ws = null;
@@ -510,7 +510,7 @@ const chatSlice = createSlice({
 });
 
 // WebSocket helpers
-export const connectWebSocket = (userId) => (dispatch) => {
+export const connectWebSocket = (userId) => (dispatch, getState) => {
     // Проверяем, есть ли уже активное подключение
     if (ws && ws.readyState === WebSocket.OPEN) {
         console.log('[WS] Already connected, skipping');
@@ -580,6 +580,10 @@ export const connectWebSocket = (userId) => (dispatch) => {
             dispatch(fetchAvitoChats({ silent: true }));
             if (cid) {
                 dispatch(fetchAvitoMessages({ chatId: cid, silent: true, markRead: false }));
+                const selected = getState().avitoChats?.selectedChatId;
+                if (selected != null && String(selected) === String(cid)) {
+                    dispatch(fetchAvitoChatDetail({ chatId: cid, silent: true }));
+                }
             }
         } else if (data.type === 'pong') {
             console.log('[WS] 🏓 Pong received');

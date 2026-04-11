@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
 import { apiRequest, apiRequestFormData, BACKEND_BASE } from '../../utils/apiClient';
 
 const AD_TYPE_NOT_SPECIFIED = '__NOT_SPECIFIED__';
@@ -480,12 +481,6 @@ export default function IntegrationPage() {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [bulkAction, setBulkAction] = useState('');
   const [savingBulkAction, setSavingBulkAction] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [storageLocations, setStorageLocations] = useState([]);
-  const [storageLocationsLoading, setStorageLocationsLoading] = useState(false);
-  const [importStorageLocationId, setImportStorageLocationId] = useState('');
-  const [importQuantity, setImportQuantity] = useState(1);
-  const [importWarnings, setImportWarnings] = useState([]);
   const [photoIndexes, setPhotoIndexes] = useState({});
   const [publishing, setPublishing] = useState(false);
   const [isAvitoConnectOpen, setIsAvitoConnectOpen] = useState(false);
@@ -537,30 +532,6 @@ export default function IntegrationPage() {
   useEffect(() => {
     loadCredentials();
   }, [loadCredentials]);
-
-  useEffect(() => {
-    if (!orgId) return;
-    let active = true;
-    setStorageLocationsLoading(true);
-    apiRequest(`/storage-locations?organization_id=${orgId}`, { method: 'GET' })
-      .then((rows) => {
-        if (!active) return;
-        const list = Array.isArray(rows) ? rows : [];
-        setStorageLocations(list);
-        if (!importStorageLocationId && list[0]?.id) {
-          setImportStorageLocationId(String(list[0].id));
-        }
-      })
-      .catch(() => {
-        // Не затираем прошлый список — просто покажем fallback в UI.
-      })
-      .finally(() => {
-        if (active) setStorageLocationsLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [orgId, importStorageLocationId]);
 
   useEffect(() => {
     if (!isAdsModalOpen) return undefined;
@@ -616,11 +587,6 @@ export default function IntegrationPage() {
         .filter((r) => r.sheet && r.row != null),
     [items, isRowChecked],
   );
-
-  const canImport =
-    selectedRows.length > 0 &&
-    importStorageLocationId &&
-    Number(importQuantity) > 0;
 
   const handleToggleFilterCategory = (cat) => {
     setSelectAll(false);
@@ -690,42 +656,6 @@ export default function IntegrationPage() {
       setError(formatErrorMessage(e));
     } finally {
       setSavingBulkAction(false);
-    }
-  };
-
-  const handleImportSelected = async () => {
-    if (!orgId || !canImport) return;
-    setImporting(true);
-    setError(null);
-    setNotice(null);
-    setImportWarnings([]);
-    try {
-      const payload = {
-        rows: selectedRows,
-        storage_location_id: Number(importStorageLocationId),
-        quantity: Number(importQuantity),
-        use_file_price: true,
-        update_existing: true,
-      };
-      const data = await apiRequest(`/organizations/${orgId}/avito/autoload/import`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      const skippedCount = Array.isArray(data.skipped_rows) ? data.skipped_rows.length : 0;
-      setImportWarnings(Array.isArray(data.skipped_rows) ? data.skipped_rows : []);
-      const skippedPreview = skippedCount > 0
-        ? ` Пропущено: ${skippedCount}. ${data.skipped_rows
-            .slice(0, 3)
-            .map((r) => `${r.sheet || '-'}:${r.row || '-'} — ${r.reason || 'причина не указана'}`)
-            .join('; ')}`
-        : '';
-      setNotice(
-        `Импорт завершен: создано ${data.created_products || 0}, обновлено ${data.updated_products || 0}, поступлений ${data.created_stock_ins || 0}, пропущено ${skippedCount}.${skippedPreview}`,
-      );
-    } catch (e) {
-      setError(formatErrorMessage(e));
-    } finally {
-      setImporting(false);
     }
   };
 
@@ -970,99 +900,13 @@ export default function IntegrationPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Интеграция Авито</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            API Авито: автозагрузка объявлений (XLSX) и чаты с покупателями на сайте.
-          </p>
-        </div>
-        <div className="flex flex-col items-stretch sm:items-end gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={openAvitoConnectModal}
-            className="px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 shadow-sm"
-          >
-            {avitoApiConnected ? 'Изменить подключение API' : 'Подключить Авито'}
-          </button>
-          {loadingCreds ? (
-            <span className="text-xs text-gray-500">Проверка статуса…</span>
-          ) : avitoApiConnected ? (
-            <span className="text-xs text-emerald-700 font-medium">API подключён</span>
-          ) : (
-            <span className="text-xs text-amber-700">API не настроен — нажмите «Подключить Авито»</span>
-          )}
-        </div>
-      </div>
-
-      <div
-        className={`rounded-lg border px-4 py-3 text-sm ${
-          avitoApiConnected
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-            : 'border-gray-200 bg-gray-50 text-gray-700'
-        }`}
-      >
-        <p className="font-medium">Статус подключения</p>
-        <p className="mt-1 text-xs sm:text-sm">
-          {avitoApiConnected ? (
-            <>
-              Client ID сохранён, секрет в системе есть, user_id:{' '}
-              <span className="font-mono">{avitoUserId || '—'}</span>. Детали ключей меняются только через кнопку
-              выше.
-            </>
-          ) : (
-            <>
-              Пошагово укажите ключи приложения с портала{' '}
-              <a
-                href={AVITO_DEVELOPERS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
-              >
-                developers.avito.ru
-              </a>
-              .
-            </>
-          )}
+    <div className="space-y-8 max-w-3xl">
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">Интеграция Авито</h1>
+        <p className="mt-1 text-sm text-gray-600">
+          Подключение API, чат на сайте и автозагрузка объявлений (XLSX).
         </p>
       </div>
-
-      {avitoApiConnected && (
-        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm space-y-3 shadow-sm">
-          <div>
-            <h2 className="font-medium text-gray-900">Вебхук Messenger (обновления чатов)</h2>
-            <p className="mt-1 text-xs text-gray-600 leading-relaxed">
-              Скопируйте URL ниже в настройки вебхуков Авито для мгновенных уведомлений сотрудникам организации. На
-              продакшене адрес должен быть доступен по <span className="font-medium">HTTPS</span>. На сервере задайте{' '}
-              <code className="text-[11px] bg-gray-100 px-1 py-0.5 rounded">PUBLIC_BASE_URL</code> — от него строится
-              ссылка при регистрации через кнопку. Опционально: переменная{' '}
-              <code className="text-[11px] bg-gray-100 px-1 py-0.5 rounded">AVITO_WEBHOOK_SECRET</code> — тогда в URL
-              добавьте <code className="text-[11px] bg-gray-100 px-1 py-0.5 rounded">?secret=…</code> или передайте тот
-              же секрет заголовком <code className="text-[11px] bg-gray-100 px-1 py-0.5 rounded">X-Webhook-Secret</code>
-              .
-            </p>
-          </div>
-          {messengerWebhookUrl ? (
-            <p className="font-mono text-xs break-all bg-gray-50 border border-gray-100 rounded px-2 py-2 text-gray-800">
-              {messengerWebhookUrl}
-            </p>
-          ) : (
-            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-2">
-              Укажите в .env фронтенда <code className="text-[11px]">REACT_APP_BACKEND_BASE_URL</code> (корень API без{' '}
-              <code className="text-[11px]">/api</code>), чтобы отобразить полный URL вебхука.
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={subscribeAvitoMessengerWebhook}
-            disabled={webhookSubscribing || !avitoApiConnected}
-            className="px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {webhookSubscribing ? 'Регистрация…' : 'Подписать URL в Avito (API)'}
-          </button>
-        </div>
-      )}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm whitespace-pre-wrap">
@@ -1075,34 +919,82 @@ export default function IntegrationPage() {
         </div>
       )}
 
-      <div className="space-y-2">
-        <h2 className="text-lg font-medium text-gray-900">Запчасти из файла автозагрузки</h2>
-        {loadingCreds ? (
-          <p className="text-sm text-gray-500">Загрузка списка…</p>
-        ) : items.length === 0 ? (
-          <p className="text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg px-4 py-8 text-center">
-            Пока нет данных. Загрузите XLSX ниже — строки появятся здесь и сохранятся для следующих визитов.
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">1. API приложения</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Ключи в{' '}
+              <a href={AVITO_DEVELOPERS_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                developers.avito.ru
+              </a>
+              .
+            </p>
+            {loadingCreds ? (
+              <p className="mt-2 text-xs text-gray-500">Загрузка…</p>
+            ) : avitoApiConnected ? (
+              <p className="mt-2 text-sm text-emerald-800">
+                Подключено. User ID: <span className="font-mono">{avitoUserId || '—'}</span>
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-amber-800">Нужны Client ID, secret и числовой user_id.</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={openAvitoConnectModal}
+            className="px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 shadow-sm shrink-0"
+          >
+            {avitoApiConnected ? 'Изменить ключи' : 'Подключить Авито'}
+          </button>
+        </div>
+      </section>
+
+      {avitoApiConnected && (
+        <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">2. Чат на сайте</h2>
+          <p className="text-sm text-gray-600">
+            Раздел «Чат Авито». Для быстрых уведомлений о новых сообщениях зарегистрируйте вебхук (на проде — HTTPS, на
+            бэкенде задайте <code className="text-xs bg-gray-100 px-1 rounded">PUBLIC_BASE_URL</code>). При{' '}
+            <code className="text-xs bg-gray-100 px-1 rounded">AVITO_WEBHOOK_SECRET</code> кнопка добавит{' '}
+            <code className="text-xs bg-gray-100 px-1 rounded">?secret=</code> к URL.
           </p>
-        ) : (
-          <div className="border border-gray-200 rounded-lg p-4 bg-white">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              to="/chats?tab=avito"
+              className="inline-flex px-4 py-2 text-sm font-medium text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50"
+            >
+              Открыть чаты
+            </Link>
             <button
               type="button"
-              onClick={() => setIsAdsModalOpen(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              onClick={subscribeAvitoMessengerWebhook}
+              disabled={webhookSubscribing}
+              className="px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-900 disabled:opacity-50"
             >
-              Просмотреть объявления
+              {webhookSubscribing ? 'Регистрация…' : 'Подписать вебхук в Avito'}
             </button>
           </div>
-        )}
-      </div>
+          {messengerWebhookUrl ? (
+            <p className="font-mono text-xs break-all bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-gray-800">
+              {messengerWebhookUrl}
+            </p>
+          ) : (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              Для отображения URL задайте <code className="text-[11px]">REACT_APP_BACKEND_BASE_URL</code> без{' '}
+              <code className="text-[11px]">/api</code> в .env фронтенда.
+            </p>
+          )}
+        </section>
+      )}
 
-      <div className="space-y-3">
-        <h2 className="text-lg font-medium text-gray-900">Файл автозагрузки (.xlsx)</h2>
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900">3. Автозагрузка (.xlsx)</h2>
         <p className="text-sm text-gray-600">
-          Файл будет сохранён на сервере и отправлен в API Авито (если настроены ключи).
+          Файл сохраняется на сервере; кнопка «Выложить» отправляет его в API Avito (нужны ключи из шага 1).
         </p>
-        <div>
-          <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md cursor-pointer bg-white hover:bg-gray-50">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg cursor-pointer bg-white hover:bg-gray-50">
             <span className="text-sm font-medium text-gray-700">{uploading ? 'Загрузка…' : 'Выбрать XLSX'}</span>
             <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" disabled={uploading} onChange={handleFile} />
           </label>
@@ -1110,30 +1002,44 @@ export default function IntegrationPage() {
             type="button"
             onClick={handlePublishAutoload}
             disabled={!savedPath || publishing}
-            className="ml-2 px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50 text-sm"
+            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"
           >
             {publishing ? 'Публикация…' : 'Выложить на Avito'}
           </button>
+          {!loadingCreds && items.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsAdsModalOpen(true)}
+              className="px-4 py-2 text-sm font-medium text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50"
+            >
+              Просмотреть объявления ({items.length})
+            </button>
+          )}
         </div>
         {savedPath && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
             <button
               type="button"
               onClick={handleCopyAutoloadLink}
-              className="px-4 py-2 border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-sm"
+              className="px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm w-fit"
             >
-              Скопировать ссылку на файл автозагрузки
+              Скопировать ссылку на файл
             </button>
-            <span className="text-xs text-gray-500 truncate max-w-[40rem]" title={getPublicFileUrl(savedPath)}>
+            <span className="text-xs text-gray-500 truncate" title={getPublicFileUrl(savedPath)}>
               {getPublicFileUrl(savedPath)}
             </span>
           </div>
         )}
-      </div>
+        {!loadingCreds && items.length === 0 && (
+          <p className="text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">
+            Строк пока нет — загрузите XLSX выше; список сохранится и откроется в «Просмотреть объявления».
+          </p>
+        )}
+      </section>
 
       {uploadResult && shouldShowResultCard(uploadResult) && (
-        <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-4">
-          <h3 className="font-medium text-gray-900">Результат проверки (последняя выгрузка)</h3>
+        <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h3 className="font-semibold text-gray-900">Отчёт после выгрузки</h3>
           {uploadResult.updated_at && (
             <p className="text-xs text-gray-500">Обновлено: {formatUpdatedAt(uploadResult.updated_at)}</p>
           )}
@@ -1395,73 +1301,6 @@ export default function IntegrationPage() {
                   </button>
                 </div>
               )}
-              <div className="mt-3 border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-3">
-                <div className="text-sm font-medium text-gray-800">Импорт в товары и поступления</div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Склад</label>
-                    <select
-                      value={importStorageLocationId}
-                      onChange={(e) => setImportStorageLocationId(e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                    >
-                      {storageLocationsLoading ? (
-                        <option value="">Загрузка складов…</option>
-                      ) : storageLocations.length === 0 ? (
-                        <option value="">Склады не найдены</option>
-                      ) : (
-                        <>
-                          <option value="">Выберите склад</option>
-                          {storageLocations.map((loc) => (
-                            <option key={loc.id} value={loc.id}>
-                              {loc.address || `Склад #${loc.id}`}
-                            </option>
-                          ))}
-                        </>
-                      )}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Количество</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={importQuantity}
-                      onChange={(e) => setImportQuantity(e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                    />
-                  </div>
-                  <div />
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-gray-600">
-                    Для импорта выбрано строк: <span className="font-medium">{selectedRows.length}</span>
-                  </p>
-                  <button
-                    type="button"
-                    disabled={!canImport || importing}
-                    onClick={handleImportSelected}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    {importing ? 'Импорт…' : 'Импортировать'}
-                  </button>
-                </div>
-                {importWarnings.length > 0 && (
-                  <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
-                    <p className="text-sm font-medium">Предупреждения импорта</p>
-                    <ul className="mt-1 text-xs list-disc pl-5 space-y-1">
-                      {importWarnings.slice(0, 10).map((w, i) => (
-                        <li key={`${w.sheet || 'sheet'}-${w.row || i}-${i}`}>
-                          {(w.sheet || '-')}:{w.row ?? '-'} — {w.reason || 'причина не указана'}
-                        </li>
-                      ))}
-                    </ul>
-                    {importWarnings.length > 10 && (
-                      <p className="mt-1 text-xs">И ещё: {importWarnings.length - 10}</p>
-                    )}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </div>

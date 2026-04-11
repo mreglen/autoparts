@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -229,6 +231,9 @@ async def post_avito_subscribe_messenger_webhook(
             detail="Задайте PUBLIC_BASE_URL в .env для URL вебхука",
         )
     hook_url = (url.strip() if url else f"{base}/webhooks/avito/messenger")
+    if settings.AVITO_WEBHOOK_SECRET:
+        sep = "&" if "?" in hook_url else "?"
+        hook_url = f"{hook_url}{sep}secret={quote(str(settings.AVITO_WEBHOOK_SECRET), safe='')}"
     try:
         result = await subscribe_messenger_webhook(token, hook_url)
         return {"ok": True, "url": hook_url, "result": result}
