@@ -50,7 +50,7 @@ const formatPhoneNumber = (phone) => {
     return formatted;
 };
 
-const ChatPage = () => {
+const ChatPage = ({ fillMobileHub = false }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -430,7 +430,13 @@ const ChatPage = () => {
   return (
     <>
       {/* Mobile: Full-screen chat interface */}
-      <div className="md:hidden h-[100dvh] bg-white overflow-hidden fixed inset-0 z-50">
+      <div
+        className={`md:hidden flex flex-col overflow-hidden bg-white min-h-0 ${
+          fillMobileHub
+            ? 'relative h-full flex-1'
+            : 'fixed inset-0 z-50 h-[100dvh]'
+        }`}
+      >
         <div className="flex h-full">
           {/* Mobile Chat List */}
           <div className={`flex flex-col h-full w-full ${currentChat ? 'hidden' : 'flex'}`}>

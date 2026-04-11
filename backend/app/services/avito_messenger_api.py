@@ -395,6 +395,23 @@ async def get_chat_detail(access_token: str, user_id: int, chat_id: str) -> dict
     return normalize_chat(payload, 0, account_user_id=user_id)
 
 
+async def _finalize_messages(
+    access_token: str, user_id: int, messages: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    normalized = [normalize_message(msg, idx, account_user_id=user_id) for idx, msg in enumerate(messages)]
+    voice_ids = list(
+        {m["voice_id"] for m in normalized if m.get("message_type") == "voice" and m.get("voice_id")}
+    )
+    if voice_ids:
+        urls = await get_voice_file_urls(access_token, user_id, voice_ids)
+        for m in normalized:
+            vid = m.get("voice_id")
+            if vid and vid in urls:
+                m["voice_url"] = urls[vid]
+    normalized.sort(key=_sort_message_key)
+    return normalized
+
+
 async def mark_chat_read(access_token: str, user_id: int, chat_id: str) -> bool:
     """POST …/read — после GET v3 сообщений (не помечает прочитанным сам по себе)."""
     for path in (
@@ -416,6 +433,8 @@ async def get_chat_messages(access_token: str, user_id: int, chat_id: str) -> li
     Если v3 отвечает 200 с пустым списком, а переписка есть — пробуем v2/v1 (иначе общий клиент
     останавливался на первом 200 и сообщения не подгружались).
 
+    Лимит по умолчанию 100: у Авито запрос с limit=200 часто даёт HTTP 400 без тела (как в avito-api).
+
     Real-time — вебхук → /webhooks/avito/messenger → WebSocket/push.
     """
     candidates = [
@@ -424,49 +443,69 @@ async def get_chat_messages(access_token: str, user_id: int, chat_id: str) -> li
         f"/messenger/v2/accounts/{user_id}/chats/{chat_id}/messages",
         f"/messenger/v1/accounts/{user_id}/chats/{chat_id}/messages",
     ]
-    params: dict[str, Any] = {"limit": 200, "offset": 0}
     headers = {"Authorization": f"Bearer {access_token}"}
     last_status = 0
     last_data: Any = None
 
     async with httpx.AsyncClient(timeout=45.0) as client:
         for path in candidates:
-            url = f"{AVITO_BASE}{path}"
-            response = await client.get(url, headers=headers, params=params)
-            last_status = response.status_code
-            try:
-                data: Any = response.json()
-            except Exception:
-                data = {"raw": response.text[:8000]}
-            last_data = data
-
-            if response.status_code in (404, 405):
-                continue
-            if response.status_code == 400:
-                logger.warning("Avito GET messages %s HTTP 400: %s", path, data)
-                continue
-            if response.status_code != 200:
-                continue
-
-            messages = _extract_messages_response(data)
             is_v3 = "/messenger/v3/" in path
-            if messages or not is_v3:
-                normalized = [
-                    normalize_message(msg, idx, account_user_id=user_id) for idx, msg in enumerate(messages)
-                ]
-                voice_ids = list(
-                    {m["voice_id"] for m in normalized if m.get("message_type") == "voice" and m.get("voice_id")}
-                )
-                if voice_ids:
-                    urls = await get_voice_file_urls(access_token, user_id, voice_ids)
-                    for m in normalized:
-                        vid = m.get("voice_id")
-                        if vid and vid in urls:
-                            m["voice_url"] = urls[vid]
-                normalized.sort(key=_sort_message_key)
-                return normalized
+            # v3: как в официальном avito-api (limit=100); при 400 — повтор без query (некоторые окружения Авито).
+            param_sets: list[Optional[dict[str, Any]]]
+            if is_v3:
+                param_sets = [{"limit": 100, "offset": 0}, None]
+            else:
+                param_sets = [{"limit": 100, "offset": 0}]
 
-            logger.info("Avito GET messages: v3 %s returned 200 with 0 messages, trying next path", path)
+            for params in param_sets:
+                url = f"{AVITO_BASE}{path}"
+                response = await client.get(url, headers=headers, params=params)
+                last_status = response.status_code
+                try:
+                    data: Any = response.json()
+                except Exception:
+                    data = {"raw": response.text[:8000]}
+                last_data = data
+
+                if response.status_code in (404, 405):
+                    break
+                if response.status_code == 400:
+                    raw_hint = (response.text or "").strip()[:500]
+                    logger.warning(
+                        "Avito GET messages %s params=%s HTTP 400: %s text=%r",
+                        path,
+                        params,
+                        data,
+                        raw_hint,
+                    )
+                    continue
+                if response.status_code != 200:
+                    continue
+
+                messages = _extract_messages_response(data)
+                if messages or not is_v3:
+                    return await _finalize_messages(access_token, user_id, messages)
+
+                logger.info("Avito GET messages: v3 %s returned 200 with 0 messages, trying next path", path)
+                break
+
+    # GET …/messages недоступен (v2 404 и т.д.), но в теле чата иногда есть список messages
+    status_chat, data_chat = await _request_with_candidates(
+        method="GET",
+        access_token=access_token,
+        candidates=[
+            f"/messenger/v2/accounts/{user_id}/chats/{chat_id}",
+            f"/messenger/v3/accounts/{user_id}/chats/{chat_id}",
+            f"/messenger/v1/accounts/{user_id}/chats/{chat_id}",
+        ],
+    )
+    if status_chat == 200 and isinstance(data_chat, dict):
+        embedded = _extract_messages_response(data_chat)
+        if not embedded:
+            embedded = _extract_messages_response(_extract_chat_payload(data_chat))
+        if embedded:
+            logger.info("Avito messages: using embedded list from GET chat (%s items)", len(embedded))
+            return await _finalize_messages(access_token, user_id, embedded)
 
     raise AvitoMessengerError(f"Avito messages error (HTTP {last_status}): {last_data}")
 

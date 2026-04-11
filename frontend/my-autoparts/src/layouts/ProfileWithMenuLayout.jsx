@@ -434,15 +434,19 @@ export default function ProfileWithMenuLayout() {
     };
 
     return (
-        <div className={`min-h-screen bg-gray-50 ${!isSpecificChatPage ? 'pb-24 md:pb-0' : 'pb-0'}`}>
-            <Navigation />
-            <main className={`mx-auto ${isSpecificChatPage ? 'max-w-full p-0 md:max-w-7xl md:px-3 md:sm:px-5 md:lg:px-7 md:py-6 md:sm:py-8' : 'max-w-7xl px-3 sm:px-5 lg:px-7 py-6 sm:py-8'}`}>
+        <div className={`min-h-screen bg-gray-50 ${!isSpecificChatPage && !isChatPage ? 'pb-24 md:pb-0' : 'pb-0'}`}>
+            <div className={isChatPage ? 'max-md:hidden' : ''}>
+                <Navigation />
+            </div>
+            <main
+                className={`mx-auto ${isSpecificChatPage ? 'max-w-full p-0 md:max-w-7xl md:px-3 md:sm:px-5 md:lg:px-7 md:py-6 md:sm:py-8' : 'max-w-7xl px-3 sm:px-5 lg:px-7 py-6 sm:py-8'} ${isChatPage ? 'max-md:p-0 max-md:py-0' : ''}`}
+            >
                 {isSpecificChatPage ? (
                     // Mobile: Full-screen specific chat
                     // Desktop: Two-column layout with sidebar
                     <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
                         {/* Left column - menu */}
-                        <div className="lg:col-span-1">
+                        <div className={`lg:col-span-1 ${isChatPage ? 'max-md:hidden' : ''}`}>
                             <ProfileMenuTabs
                                 tabs={tabs}
                                 activeTab={activeTab}
@@ -464,7 +468,7 @@ export default function ProfileWithMenuLayout() {
                     // Two-column layout: menu on left, content on right
                     <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
                         {/* Left column - menu */}
-                        <div className="lg:col-span-1">
+                        <div className={`lg:col-span-1 ${isChatPage ? 'max-md:hidden' : ''}`}>
                             <ProfileMenuTabs
                                 tabs={tabs}
                                 activeTab={activeTab}
@@ -484,7 +488,9 @@ export default function ProfileWithMenuLayout() {
                     </div>
                 )}
             </main>
-            {!isSpecificChatPage && <MobileBottomNav />}
+            <div className={isChatPage ? 'max-md:hidden' : ''}>
+                {!isSpecificChatPage && <MobileBottomNav />}
+            </div>
         </div>
     );
 }

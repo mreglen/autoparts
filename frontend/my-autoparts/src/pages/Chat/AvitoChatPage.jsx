@@ -145,7 +145,7 @@ function AvitoChatListRow({ chat, selected, avitoUserId, onSelect }) {
   );
 }
 
-const AvitoChatPage = () => {
+const AvitoChatPage = ({ fillMobileHub = false }) => {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const {
@@ -452,7 +452,13 @@ const AvitoChatPage = () => {
         aria-hidden
         onChange={handleImageSelected}
       />
-      <div className="md:hidden h-[100dvh] bg-white overflow-hidden fixed inset-0 z-50">
+      <div
+        className={`md:hidden flex flex-col overflow-hidden bg-white min-h-0 ${
+          fillMobileHub
+            ? 'relative h-full flex-1'
+            : 'fixed inset-0 z-50 h-[100dvh]'
+        }`}
+      >
         {mobileListMode ? (
           <div className="h-full overflow-y-auto divide-y divide-gray-100">
             {chats.map((chat) => (
