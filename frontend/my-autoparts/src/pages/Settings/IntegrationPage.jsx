@@ -173,13 +173,9 @@ function CategoryPickerModal({
 
 const AVITO_DEVELOPERS_URL = 'https://developers.avito.ru';
 
-const CONNECT_STEP_COUNT = 4;
-
 function AvitoConnectWizardModal({
   open,
   onClose,
-  step,
-  setStep,
   clientId,
   setClientId,
   clientSecret,
@@ -202,205 +198,108 @@ function AvitoConnectWizardModal({
 
   if (!open) return null;
 
-  const canGoNext = step < CONNECT_STEP_COUNT - 1;
-  const canGoBack = step > 0;
-  const isLastStep = step === CONNECT_STEP_COUNT - 1;
-
   const uidNum = parseInt(avitoUserId, 10);
   const canSave =
     clientId.trim().length > 0 &&
     (secretConfigured || clientSecret.trim().length > 0) &&
     uidNum > 0;
 
-  const handleNext = () => {
-    if (canGoNext) setStep((s) => Math.min(s + 1, CONNECT_STEP_COUNT - 1));
-  };
-  const handleBack = () => {
-    if (canGoBack) setStep((s) => Math.max(s - 1, 0));
-  };
-
   return (
     <div
-      className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="bg-white w-full max-w-lg max-h-[90vh] rounded-xl shadow-xl flex flex-col"
+        className="bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-labelledby="avito-connect-title"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <h2 id="avito-connect-title" className="text-lg font-semibold text-gray-900">
-            Подключение API Авито
-          </h2>
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            
+            <h2 id="avito-connect-title" className="text-xl font-bold text-gray-900">
+              Подключение Авито
+            </h2>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-sm text-gray-500 hover:text-gray-800 px-2 py-1"
+            className="text-gray-400 hover:text-gray-600 p-1"
           >
-            Закрыть
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
-        <div className="px-5 pt-4 pb-2">
-          <div className="flex gap-1 mb-1">
-            {Array.from({ length: CONNECT_STEP_COUNT }, (_, i) => (
-              <div
-                key={i}
-                className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-blue-600' : 'bg-gray-200'}`}
-              />
-            ))}
-          </div>
-          <p className="text-xs text-gray-500">
-            Шаг {step + 1} из {CONNECT_STEP_COUNT}
-          </p>
-        </div>
-
-        <div className="px-5 py-3 overflow-y-auto flex-1 text-sm text-gray-700 space-y-3">
-          {step === 0 && (
+        <div className="px-6 py-5 space-y-4">
+          {loadingCreds ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
             <>
-              <p className="font-medium text-gray-900">Зачем подключать API</p>
-              <p>
-                После сохранения ключей ваш сайт сможет обращаться к API Авито от имени организации: выгрузка и
-                обновление объявлений через файл автозагрузки (XLSX), а также переписка с покупателями во вкладке
-                «Чат Авито».
-              </p>
-              <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-3">
-                Ключи хранятся на сервере в зашифрованном виде. Client secret на экране не показывается повторно —
-                при смене ключа введите новый secret целиком.
-              </p>
-            </>
-          )}
-
-          {step === 1 && (
-            <>
-              <p className="font-medium text-gray-900">Создайте приложение в Авито</p>
-              <ol className="list-decimal pl-5 space-y-2">
-                <li>
-                  Откройте портал разработчика:{' '}
-                  <a
-                    href={AVITO_DEVELOPERS_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    developers.avito.ru
-                  </a>
-                  .
-                </li>
-                <li>Войдите под аккаунтом, с которым работаете на Авито как продавец.</li>
-                <li>Создайте приложение и получите <strong>Client ID</strong> и <strong>Client secret</strong>.</li>
-                <li>
-                  В настройках приложения подключите нужные API: как минимум методы для{' '}
-                  <strong>автозагрузки</strong> и при необходимости <strong>Messenger</strong> (чаты), в соответствии с
-                  документацией Авито.
-                </li>
-              </ol>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              <p className="font-medium text-gray-900">ID пользователя Авито (user_id)</p>
-              <p>
-                Это <strong>числовой идентификатор</strong> вашего профиля на Авито. Он используется в запросах к API,
-                например:{' '}
-                <code className="text-xs bg-gray-100 px-1 rounded">
-                  /messenger/v2/accounts/&#123;user_id&#125;/chats
-                </code>
-                .
-              </p>
-              <p className="text-xs text-gray-600 bg-amber-50 border border-amber-100 rounded-lg p-3">
-                Где посмотреть: в личном кабинете Авито (профиль / настройки / раздел для разработчиков) или в
-                документации портала — число обычно указано рядом с аккаунтом. Если не уверены, уточните в поддержке
-                Авито по API.
-              </p>
-            </>
-          )}
-
-          {step === 3 && (
-            <>
-              <p className="font-medium text-gray-900">Введите данные приложения</p>
-              {loadingCreds ? (
-                <p className="text-gray-500">Загрузка…</p>
-              ) : (
-                <div className="space-y-3 pt-1">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Client ID</label>
-                    <input
-                      type="text"
-                      value={clientId}
-                      onChange={(ev) => setClientId(ev.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      autoComplete="off"
-                      placeholder="Из кабинета разработчика Авито"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Client secret</label>
-                    <input
-                      type="password"
-                      value={clientSecret}
-                      onChange={(ev) => setClientSecret(ev.target.value)}
-                      placeholder={
-                        secretConfigured ? 'Оставьте пустым, если не меняете' : 'Обязательно при первом подключении'
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      autoComplete="new-password"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">ID пользователя Авито</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={avitoUserId}
-                      onChange={(ev) => setAvitoUserId(ev.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Число, например 123456789"
-                    />
-                  </div>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Client ID</label>
+                <input
+                  type="text"
+                  value={clientId}
+                  onChange={(ev) => setClientId(ev.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
+                  autoComplete="off"
+                  placeholder="Введите Client ID"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Client secret</label>
+                <input
+                  type="password"
+                  value={clientSecret}
+                  onChange={(ev) => setClientSecret(ev.target.value)}
+                  placeholder={
+                    secretConfigured ? 'Оставьте пустым, если не меняете' : 'Введите Client secret'
+                  }
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ID пользователя Авито</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={avitoUserId}
+                  onChange={(ev) => setAvitoUserId(ev.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
+                  placeholder="Числовой ID, например 123456789"
+                />
+              </div>
+              <a
+                href={AVITO_DEVELOPERS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+              >
+                Получить ключи на developers.avito.ru
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
             </>
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-200 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex gap-2">
-            {canGoBack && (
-              <button
-                type="button"
-                onClick={handleBack}
-                className="px-4 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
-              >
-                Назад
-              </button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {!isLastStep && (
-              <button
-                type="button"
-                onClick={handleNext}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Далее
-              </button>
-            )}
-            {isLastStep && (
-              <button
-                type="button"
-                disabled={saving || loadingCreds || !canSave}
-                onClick={() => onSave()}
-                className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {saving ? 'Сохранение…' : 'Сохранить и подключить'}
-              </button>
-            )}
-          </div>
+        <div className="px-6 py-4 border-t border-gray-100">
+          <button
+            type="button"
+            disabled={saving || loadingCreds || !canSave}
+            onClick={() => onSave()}
+            className="w-full px-6 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {saving ? 'Подключение…' : 'Подключить'}
+          </button>
         </div>
       </div>
     </div>
@@ -484,7 +383,6 @@ export default function IntegrationPage() {
   const [photoIndexes, setPhotoIndexes] = useState({});
   const [publishing, setPublishing] = useState(false);
   const [isAvitoConnectOpen, setIsAvitoConnectOpen] = useState(false);
-  const [connectStep, setConnectStep] = useState(0);
   const [webhookSubscribing, setWebhookSubscribing] = useState(false);
 
   const avitoApiConnected =
@@ -786,12 +684,21 @@ export default function IntegrationPage() {
         method: 'PUT',
         body: JSON.stringify(body),
       });
-      setNotice('API Авито подключён, ключи сохранены.');
+      setNotice('API Авито подключён, ключи сохранены. Вебхук Messenger зарегистрирован.');
       setClientSecret('');
       setSecretConfigured(true);
       await loadCredentials();
+      
+      // Автоматически подписываем вебхук после подключения API
+      try {
+        await apiRequest('/avito/messenger/webhook/subscribe', { method: 'POST' });
+        setNotice('API Авито подключён, ключи сохранены. Вебхук Messenger зарегистрирован.');
+      } catch (webhookErr) {
+        // Не прерываем основной процесс, просто логируем ошибку вебхука
+        console.warn('Не удалось подписаться на вебхук:', webhookErr);
+      }
+      
       setIsAvitoConnectOpen(false);
-      setConnectStep(0);
       return true;
     } catch (e) {
       setError(formatErrorMessage(e));
@@ -803,13 +710,11 @@ export default function IntegrationPage() {
 
   const openAvitoConnectModal = () => {
     setError(null);
-    setConnectStep(0);
     setIsAvitoConnectOpen(true);
   };
 
   const closeAvitoConnectModal = () => {
     setIsAvitoConnectOpen(false);
-    setConnectStep(0);
   };
 
   const subscribeAvitoMessengerWebhook = useCallback(async () => {
@@ -900,178 +805,194 @@ export default function IntegrationPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Интеграция Авито</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Подключение API, чат на сайте и автозагрузка объявлений (XLSX).
-        </p>
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Интеграция с Авито</h1>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm whitespace-pre-wrap">
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm whitespace-pre-wrap">
           {error}
         </div>
       )}
       {notice && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-900 text-sm">
+        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-green-900 text-sm">
           {notice}
         </div>
       )}
 
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">1. API приложения</h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Ключи в{' '}
-              <a href={AVITO_DEVELOPERS_URL} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                developers.avito.ru
-              </a>
-              .
-            </p>
-            {loadingCreds ? (
-              <p className="mt-2 text-xs text-gray-500">Загрузка…</p>
-            ) : avitoApiConnected ? (
-              <p className="mt-2 text-sm text-emerald-800">
-                Подключено. User ID: <span className="font-mono">{avitoUserId || '—'}</span>
-              </p>
-            ) : (
-              <p className="mt-2 text-sm text-amber-800">Нужны Client ID, secret и числовой user_id.</p>
+      <div className="space-y-4">
+        {/* API подключения */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <h2 className="text-base font-semibold text-gray-900 mb-1">API приложения</h2>
+              {loadingCreds ? (
+                <p className="text-sm text-gray-500">Загрузка…</p>
+              ) : avitoApiConnected ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                  <p className="text-sm text-gray-700">Подключено · User ID: <span className="font-mono text-gray-900">{avitoUserId}</span></p>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Не подключено</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={openAvitoConnectModal}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shrink-0"
+            >
+              {avitoApiConnected ? 'Изменить' : 'Подключить'}
+            </button>
+          </div>
+        </div>
+
+        {/* Автозагрузка */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Автозагрузка объявлений</h2>
+          
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colors">
+              <span className="text-sm font-medium text-gray-700">{uploading ? 'Загрузка…' : 'Загрузить XLSX'}</span>
+              <input type="file" accept=".xlsx" className="hidden" disabled={uploading} onChange={handleFile} />
+            </label>
+            <button
+              type="button"
+              onClick={handlePublishAutoload}
+              disabled={!savedPath || publishing}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+            >
+              {publishing ? 'Публикация…' : 'Опубликовать'}
+            </button>
+            {!loadingCreds && items.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsAdsModalOpen(true)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Просмотреть ({items.length})
+              </button>
             )}
           </div>
-          <button
-            type="button"
-            onClick={openAvitoConnectModal}
-            className="px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 shadow-sm shrink-0"
-          >
-            {avitoApiConnected ? 'Изменить ключи' : 'Подключить Авито'}
-          </button>
-        </div>
-      </section>
 
-      {avitoApiConnected && (
-        <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">2. Чат на сайте</h2>
-          <p className="text-sm text-gray-600">
-            Раздел «Чат Авито». Для быстрых уведомлений о новых сообщениях зарегистрируйте вебхук (на проде — HTTPS, на
-            бэкенде задайте <code className="text-xs bg-gray-100 px-1 rounded">PUBLIC_BASE_URL</code>). При{' '}
-            <code className="text-xs bg-gray-100 px-1 rounded">AVITO_WEBHOOK_SECRET</code> кнопка добавит{' '}
-            <code className="text-xs bg-gray-100 px-1 rounded">?secret=</code> к URL.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              to="/chats?tab=avito"
-              className="inline-flex px-4 py-2 text-sm font-medium text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50"
-            >
-              Открыть чаты
-            </Link>
-            <button
-              type="button"
-              onClick={subscribeAvitoMessengerWebhook}
-              disabled={webhookSubscribing}
-              className="px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-900 disabled:opacity-50"
-            >
-              {webhookSubscribing ? 'Регистрация…' : 'Подписать вебхук в Avito'}
-            </button>
-          </div>
-          {messengerWebhookUrl ? (
-            <p className="font-mono text-xs break-all bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-gray-800">
-              {messengerWebhookUrl}
-            </p>
-          ) : (
-            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-              Для отображения URL задайте <code className="text-[11px]">REACT_APP_BACKEND_BASE_URL</code> без{' '}
-              <code className="text-[11px]">/api</code> в .env фронтенда.
-            </p>
-          )}
-        </section>
-      )}
-
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">3. Автозагрузка (.xlsx)</h2>
-        <p className="text-sm text-gray-600">
-          Файл сохраняется на сервере; кнопка «Выложить» отправляет его в API Avito (нужны ключи из шага 1).
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg cursor-pointer bg-white hover:bg-gray-50">
-            <span className="text-sm font-medium text-gray-700">{uploading ? 'Загрузка…' : 'Выбрать XLSX'}</span>
-            <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" disabled={uploading} onChange={handleFile} />
-          </label>
-          <button
-            type="button"
-            onClick={handlePublishAutoload}
-            disabled={!savedPath || publishing}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"
-          >
-            {publishing ? 'Публикация…' : 'Выложить на Avito'}
-          </button>
-          {!loadingCreds && items.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setIsAdsModalOpen(true)}
-              className="px-4 py-2 text-sm font-medium text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50"
-            >
-              Просмотреть объявления ({items.length})
-            </button>
-          )}
-        </div>
-        {savedPath && (
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={handleCopyAutoloadLink}
-              className="px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm w-fit"
-            >
-              Скопировать ссылку на файл
-            </button>
-            <span className="text-xs text-gray-500 truncate" title={getPublicFileUrl(savedPath)}>
-              {getPublicFileUrl(savedPath)}
-            </span>
-          </div>
-        )}
-        {!loadingCreds && items.length === 0 && (
-          <p className="text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">
-            Строк пока нет — загрузите XLSX выше; список сохранится и откроется в «Просмотреть объявления».
-          </p>
-        )}
-      </section>
-
-      {uploadResult && shouldShowResultCard(uploadResult) && (
-        <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h3 className="font-semibold text-gray-900">Отчёт после выгрузки</h3>
-          {uploadResult.updated_at && (
-            <p className="text-xs text-gray-500">Обновлено: {formatUpdatedAt(uploadResult.updated_at)}</p>
-          )}
-          {uploadResult.avito_token_error && (
-            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded p-2">
-              API Авито: {uploadResult.avito_token_error}
+          {savedPath && (
+            <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={handleCopyAutoloadLink}
+                className="text-sm text-blue-600 hover:text-blue-700 hover:underline shrink-0"
+              >
+                Скопировать ссылку
+              </button>
+              <span className="text-xs text-gray-400 truncate" title={getPublicFileUrl(savedPath)}>
+                {getPublicFileUrl(savedPath)}
+              </span>
             </div>
           )}
-          {uploadResult.avito_report != null && (
-            <>
-              <p className="text-sm font-medium text-gray-800 mt-2">Отчёт Авито</p>
-              <pre className="text-xs bg-gray-50 border rounded p-3 overflow-x-auto max-h-64 overflow-y-auto">
-                {JSON.stringify(uploadResult.avito_report, null, 2)}
-              </pre>
-            </>
-          )}
-          {(uploadResult.local_errors || []).length > 0 && (
-            <>
-              <p className="text-sm font-medium text-red-800">Замечания</p>
-              <ul className="text-sm text-red-900 list-disc pl-5 space-y-1">
-                {uploadResult.local_errors.map((le, i) => (
-                  <li key={i}>
-                    {le.sheet && `${le.sheet}`}
-                    {le.row != null && `, строка ${le.row}`}
-                    {le.field && ` — ${le.field}`}: {le.message}
-                  </li>
-                ))}
-              </ul>
-            </>
+
+          {!loadingCreds && items.length === 0 && !savedPath && (
+            <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
+              <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <p className="text-sm text-gray-500">Загрузите файл XLSX для начала работы</p>
+            </div>
           )}
         </div>
-      )}
+
+        {/* Результат выгрузки */}
+        {uploadResult && shouldShowResultCard(uploadResult) && (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+              <h3 className="text-sm font-semibold text-gray-900">Результат выгрузки</h3>
+            </div>
+            
+            <div className="p-5">
+              {uploadResult.avito_token_error ? (
+                <div className="flex items-start gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-lg">
+                  <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+                  </svg>
+                  <p className="text-sm text-red-800 flex-1">{uploadResult.avito_token_error}</p>
+                </div>
+              ) : uploadResult.avito_report ? (
+                <div className="space-y-3">
+                  {(() => {
+                    const report = uploadResult.avito_report;
+                    const total = report.total || report.items_count || 0;
+                    const success = report.success || report.loaded || report.ok_count || 0;
+                    const errors = report.errors || report.error_count || report.failed || 0;
+                    const warnings = report.warnings || report.warning_count || 0;
+                    
+                    const items = report.items || report.results || [];
+                    const calculatedTotal = items.length > 0 ? items.length : total;
+                    const calculatedSuccess = calculatedTotal > 0 && success === 0 
+                      ? items.filter(i => !i.errors && !i.warnings).length 
+                      : success;
+                    const calculatedErrors = calculatedTotal > 0 && errors === 0
+                      ? items.filter(i => i.errors && i.errors.length > 0).length
+                      : errors;
+                    const calculatedWarnings = calculatedTotal > 0 && warnings === 0
+                      ? items.filter(i => i.warnings && i.warnings.length > 0 && (!i.errors || i.errors.length === 0)).length
+                      : warnings;
+
+                    return (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0 w-6 h-6 bg-emerald-100 rounded-full flex items-center justify-center">
+                            <svg className="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                            </svg>
+                          </div>
+                          <span className="text-sm text-gray-700 flex-1">Успешно</span>
+                          <span className="text-sm font-semibold text-gray-900">{calculatedSuccess}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0 w-6 h-6">
+                            <svg className="w-6 h-6 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                            </svg>
+                          </div>
+                          <span className="text-sm text-gray-700 flex-1">Предупреждения</span>
+                          <span className="text-sm font-semibold text-gray-900">{calculatedWarnings}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0 w-6 h-6 bg-red-100 rounded-full flex items-center justify-center">
+                            <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+                            </svg>
+                          </div>
+                          <span className="text-sm text-gray-700 flex-1">Ошибки</span>
+                          <span className="text-sm font-semibold text-gray-900">{calculatedErrors}</span>
+                        </div>
+                        
+                        {calculatedTotal > 0 && (
+                          <div className="pt-3 mt-3 border-t border-gray-100">
+                            <div className="flex items-center justify-between text-sm text-gray-600">
+                              <span>Всего</span>
+                              <span className="font-semibold">{calculatedTotal}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                  </svg>
+                  <p className="text-sm text-blue-800">Файл сохранён</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {isAdsModalOpen && (
         <div
@@ -1319,8 +1240,6 @@ export default function IntegrationPage() {
       <AvitoConnectWizardModal
         open={isAvitoConnectOpen}
         onClose={closeAvitoConnectModal}
-        step={connectStep}
-        setStep={setConnectStep}
         clientId={clientId}
         setClientId={setClientId}
         clientSecret={clientSecret}
