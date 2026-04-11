@@ -45,7 +45,7 @@ class ChatMedia(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     message_id = Column(Integer, ForeignKey("messages.id"), nullable=False)
-    media_type = Column(String(20), nullable=False)  # 'image', 'video' или 'document'
+    media_type = Column(String(20), nullable=False)  # 'image', 'video', 'document'
     file_path = Column(String(500), nullable=False)
     thumbnail_path = Column(String(500), nullable=True)
     original_filename = Column(String(255), nullable=True)
@@ -53,7 +53,7 @@ class ChatMedia(Base):
     mime_type = Column(String(100), nullable=False)
     width = Column(Integer, nullable=True)
     height = Column(Integer, nullable=True)
-    duration = Column(Float, nullable=True)  # только для видео
+    duration = Column(Float, nullable=True)  # в основном для видео
     is_processing = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

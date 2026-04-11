@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -50,6 +50,50 @@ const formatPhoneNumber = (phone) => {
     return formatted;
 };
 
+function replyAuthorLabel(replyTo, currentChat, viewerUserId) {
+  if (!replyTo || viewerUserId == null || !currentChat) return 'Сообщение';
+  const sid = replyTo.sender_id;
+  if (sid === viewerUserId) return 'Вы';
+  if (sid === currentChat.seller_id) {
+    return currentChat.seller_name || currentChat.seller_organization || 'Продавец';
+  }
+  if (sid === currentChat.buyer_id) {
+    return currentChat.buyer_name || 'Покупатель';
+  }
+  return 'Собеседник';
+}
+
+/** Превью ответа внутри пузыря (в духе Telegram) */
+function MessageReplyQuote({ replyTo, replyToId, isOwn, currentChat, userId, onJump }) {
+  if (!replyTo) return null;
+  const label = replyAuthorLabel(replyTo, currentChat, userId);
+  const preview =
+    (replyTo.message && String(replyTo.message).trim()) ||
+    (replyTo.media && replyTo.media.length > 0 ? '📎 Медиа' : 'Сообщение');
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onJump(replyToId);
+      }}
+      className={`block w-full text-left rounded-md overflow-hidden mb-2 pl-2 border-l-[3px] ${
+        isOwn ? 'border-white/90 bg-white/15' : 'border-blue-500 bg-gray-100/90'
+      }`}
+    >
+      <div className={`py-1.5 pr-2 ${isOwn ? 'text-blue-50' : 'text-gray-800'}`}>
+        <p
+          className={`text-[11px] font-semibold uppercase tracking-wide ${isOwn ? 'text-blue-100' : 'text-blue-600'}`}
+        >
+          Ответ · {label}
+        </p>
+        <p className={`text-xs truncate mt-0.5 ${isOwn ? 'text-blue-50/95' : 'text-gray-600'}`}>{preview}</p>
+      </div>
+    </button>
+  );
+}
+
 const ChatPage = ({ fillMobileHub = false }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -74,9 +118,14 @@ const ChatPage = ({ fillMobileHub = false }) => {
   const [activeChatMenuId, setActiveChatMenuId] = useState(null);
   const replyToMessage = useSelector(state => state.chats.replyToMessage);
   const messagesEndRef = useRef(null);
+  const messagesScrollMobileRef = useRef(null);
+  const messagesScrollDesktopRef = useRef(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const fileInputRef = useRef(null);
   const messageInputRef = useRef(null);
   const prevMessagesCountRef = useRef(0);
+  /** Не перезагружать переписку при каждом обновлении списка чатов (WS / fetchUserChats) — только при смене chatId в URL */
+  const syncedChatIdFromRouteRef = useRef(null);
 
   // Fetch admin organization phone on component mount
   useEffect(() => {
@@ -90,21 +139,52 @@ const ChatPage = ({ fillMobileHub = false }) => {
     }
   }, [dispatch, user]);
 
-  // Если есть chatId в URL, загружаем этот чат
+  // Синхронизация с URL: при смене chatId — открываем чат и грузим сообщения; при обновлении только списка чатов — лишь метаданные
   useEffect(() => {
-    if (chatId) {
-      setSelectedChatId(chatId);
-      const chat = chats.find(c => c.id === parseInt(chatId));
-      if (chat) {
-        dispatch(setCurrentChat(chat));
-        dispatch(fetchChatMessages({ chatId: parseInt(chatId) }));
-      }
-    } else {
-      // Если нет chatId в URL, сбрасываем текущий чат
+    if (!chatId) {
+      syncedChatIdFromRouteRef.current = null;
       dispatch(setCurrentChat(null));
       setSelectedChatId(null);
+      return;
+    }
+
+    setSelectedChatId(chatId);
+    const idNum = parseInt(chatId, 10);
+    const chat = chats.find((c) => c.id === idNum);
+    if (!chat) {
+      return;
+    }
+
+    const routeChanged = syncedChatIdFromRouteRef.current !== chatId;
+    syncedChatIdFromRouteRef.current = chatId;
+
+    dispatch(setCurrentChat(chat));
+    if (routeChanged) {
+      dispatch(fetchChatMessages({ chatId: idNum }));
     }
   }, [chatId, chats, dispatch]);
+
+  // Переход из push / события SW: один раз прокрутить в самый низ после отрисовки сообщений
+  useEffect(() => {
+    if (!location.state?.scrollToBottom || !chatId || messages.length === 0) return;
+
+    let innerRaf = 0;
+    const outerRaf = requestAnimationFrame(() => {
+      innerRaf = requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+        prevMessagesCountRef.current = messages.length;
+        navigate(`${location.pathname}${location.search || ''}${location.hash || ''}`, {
+          replace: true,
+          state: {},
+        });
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(outerRaf);
+      if (innerRaf) cancelAnimationFrame(innerRaf);
+    };
+  }, [location.state, location.pathname, location.search, location.hash, messages.length, chatId, navigate]);
 
   // Автоскролл к последнему сообщению
   useEffect(() => {
@@ -162,11 +242,10 @@ const ChatPage = ({ fillMobileHub = false }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [activeChatMenuId]);
 
-  // Выбираем чат
+  // Выбираем чат (сообщения подгрузит эффект по смене chatId в URL)
   const handleSelectChat = (chat) => {
     setSelectedChatId(chat.id);
     dispatch(setCurrentChat(chat));
-    dispatch(fetchChatMessages({ chatId: chat.id }));
     navigate(`/chats/${chat.id}`);
   };
 
@@ -233,38 +312,163 @@ const ChatPage = ({ fillMobileHub = false }) => {
     messageInputRef.current?.focus();
   };
 
-  // Обработка клика на ответ - прокрутка к оригинальному сообщению
-  const handleReplyClick = (replyToId) => {
-    if (!replyToId) return;
-    
-    const element = document.getElementById(`message-${replyToId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Добавляем подсветку
-      element.classList.add('bg-blue-100');
-      setTimeout(() => {
-        element.classList.remove('bg-blue-100');
-      }, 2000);
+  const updateScrollToBottomVisibility = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const isMobileLayout = window.matchMedia('(max-width: 767px)').matches;
+    const el = isMobileLayout ? messagesScrollMobileRef.current : messagesScrollDesktopRef.current;
+    if (!el) return;
+    const threshold = 100;
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollToBottom(dist > threshold);
+  }, []);
+
+  useEffect(() => {
+    if (!currentChat || messages.length === 0) {
+      setShowScrollToBottom(false);
+      return;
     }
+
+    const mobile = messagesScrollMobileRef.current;
+    const desktop = messagesScrollDesktopRef.current;
+    const onScroll = () => updateScrollToBottomVisibility();
+
+    mobile?.addEventListener('scroll', onScroll, { passive: true });
+    desktop?.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(updateScrollToBottomVisibility);
+    });
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      mobile?.removeEventListener('scroll', onScroll);
+      desktop?.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [currentChat, messages.length, updateScrollToBottomVisibility]);
+
+  const handleScrollToBottomClick = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const isMobileLayout = window.matchMedia('(max-width: 767px)').matches;
+    const el = isMobileLayout ? messagesScrollMobileRef.current : messagesScrollDesktopRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }
+  }, []);
+
+  // Обработка клика на цитату — скролл к оригиналу в видимой колонке (моб./десктоп рендерятся оба, id дублировались)
+  const handleReplyClick = (replyToId) => {
+    if (replyToId == null || replyToId === '') return;
+    const sid = String(replyToId);
+    const isMobileLayout = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+    const root = isMobileLayout ? messagesScrollMobileRef.current : messagesScrollDesktopRef.current;
+    const element = root?.querySelector(`[data-message-row-id="${CSS.escape(sid)}"]`);
+    if (!element) return;
+
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    const dimAfterMs = 280;
+    const dimHoldMs = 420;
+    const transitionMs = 320;
+    window.setTimeout(() => {
+      element.classList.add('transition-[filter]', 'duration-300', 'brightness-90');
+    }, dimAfterMs);
+    window.setTimeout(() => {
+      element.classList.remove('brightness-90');
+    }, dimAfterMs + dimHoldMs);
+    window.setTimeout(() => {
+      element.classList.remove('transition-[filter]', 'duration-300');
+    }, dimAfterMs + dimHoldMs + transitionMs);
   };
+
+  const sendMediaFileList = useCallback(
+    async (files) => {
+      if (!files?.length || !selectedChatId || !user) return;
+
+      if (currentChat?.is_current_user_blocked) {
+        setShowBlockedModal(true);
+        return;
+      }
+
+      setUploading(true);
+      const chatIdNum = parseInt(selectedChatId, 10);
+      const messageText = newMessage.trim();
+
+      try {
+        const tempMedia = files.map((file, idx) => {
+          let mediaType;
+          if (file.type.startsWith('image/')) mediaType = 'image';
+          else if (file.type.startsWith('video/')) mediaType = 'video';
+          else mediaType = 'document';
+
+          return {
+            id: `temp_${Date.now()}_${idx}_${Math.random()}`,
+            media_type: mediaType,
+            is_processing: true,
+            original_filename: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          };
+        });
+
+        dispatch(
+          addOptimisticMessage({
+            chatId: chatIdNum,
+            message: messageText,
+            senderId: user.id,
+            media: tempMedia,
+          })
+        );
+
+        await dispatch(
+          sendChatMedia({
+            chatId: chatIdNum,
+            files,
+            message: messageText,
+          })
+        );
+
+        setSelectedFiles([]);
+        setNewMessage('');
+      } catch (error) {
+        console.error('Ошибка отправки медиа:', error);
+        dispatch(
+          updateMediaFailedStatus({
+            chatId: chatIdNum,
+            isFailed: true,
+          })
+        );
+      } finally {
+        setUploading(false);
+      }
+    },
+    [selectedChatId, user, currentChat, newMessage, dispatch]
+  );
 
   // Обработка выбора файлов
   const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files);
-    
-    // Проверяем лимит файлов
+    const files = Array.from(e.target.files || []);
+
     if (selectedFiles.length + files.length > 5) {
       setShowFileLimitModal(true);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
-    
-    // Проверяем типы файлов - теперь поддерживаем больше форматов
+
     const allowedTypes = [
-      // Изображения
-      'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
-      // Видео
-      'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo',
-      // Документы
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'video/mp4',
+      'video/webm',
+      'video/quicktime',
+      'video/x-msvideo',
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -275,22 +479,18 @@ const ChatPage = ({ fillMobileHub = false }) => {
       'text/plain',
       'application/zip',
       'application/x-rar-compressed',
-      'application/x-7z-compressed'
+      'application/x-7z-compressed',
     ];
-    
-    const invalidFiles = files.filter(f => !allowedTypes.includes(f.type));
-    
+
+    const invalidFiles = files.filter((f) => !allowedTypes.includes(f.type));
     if (invalidFiles.length > 0) {
       setShowUnsupportedFilesModal(true);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
-    
+
     setSelectedFiles([...selectedFiles, ...files]);
-    
-    // Сбрасываем input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // Удаление файла из очереди
@@ -299,70 +499,8 @@ const ChatPage = ({ fillMobileHub = false }) => {
     setSelectedFiles(newFiles);
   };
 
-  // Отправка медиа
   const handleSendMedia = async () => {
-    if (selectedFiles.length === 0 || !selectedChatId || !user) return;
-    
-    // Проверить заблокирован ли пользователь
-    if (currentChat?.is_current_user_blocked) {
-      setShowBlockedModal(true);
-      return;
-    }
-    
-    setUploading(true);
-    const chatIdNum = parseInt(selectedChatId);
-    const messageText = newMessage.trim();
-    
-    try {
-      // Создаем временное сообщение с медиа
-      const tempMedia = selectedFiles.map(file => {
-        let mediaType;
-        if (file.type.startsWith('image/')) {
-          mediaType = 'image';
-        } else if (file.type.startsWith('video/')) {
-          mediaType = 'video';
-        } else {
-          mediaType = 'document';
-        }
-        
-        return {
-          id: `temp_${Date.now()}_${Math.random()}`,
-          media_type: mediaType,
-          is_processing: true,
-          original_filename: file.name,
-          file_size: file.size,
-          mime_type: file.type
-        };
-      });
-      
-      // Оптимистичное добавление
-      dispatch(addOptimisticMessage({
-        chatId: chatIdNum,
-        message: messageText,
-        senderId: user.id,
-        media: tempMedia
-      }));
-      
-      // Отправляем на сервер
-      await dispatch(sendChatMedia({
-        chatId: chatIdNum,
-        files: selectedFiles,
-        message: messageText
-      }));
-      
-      // Очищаем
-      setSelectedFiles([]);
-      setNewMessage('');
-    } catch (error) {
-      console.error('Ошибка отправки медиа:', error);
-      // Обновляем статус медиа на failed
-      dispatch(updateMediaFailedStatus({
-        chatId: chatIdNum,
-        isFailed: true
-      }));
-    } finally {
-      setUploading(false);
-    }
+    await sendMediaFileList(selectedFiles);
   };
 
   // Форматируем время
@@ -600,7 +738,11 @@ const ChatPage = ({ fillMobileHub = false }) => {
               </div>
               
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-0">
+              <div className="relative flex-1 min-h-0 flex flex-col">
+                <div
+                  ref={messagesScrollMobileRef}
+                  className="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-0"
+                >
                 {messages.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="text-center">
@@ -617,9 +759,9 @@ const ChatPage = ({ fillMobileHub = false }) => {
                     {messages.map((message) => {
                       const isOwn = message.sender_id === user.id;
                       return (
-                        <div 
-                          key={message.id} 
-                          id={`message-${message.id}`}
+                        <div
+                          key={message.id}
+                          data-message-row-id={message.id}
                           className={`group flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                         >
                           <SwipeableMessage 
@@ -628,33 +770,21 @@ const ChatPage = ({ fillMobileHub = false }) => {
                             isOwn={isOwn}
                           >
                             <div className="relative">
-                              {/* Reply badge - показываем если это ответ */}
-                              {message.reply_to && (
-                                <button
-                                  onClick={() => handleReplyClick(message.reply_to_id)}
-                                  className={`block w-full text-left mb-2 px-3 py-1.5 rounded-lg border-l-2 border-blue-400 ${
-                                    isOwn ? 'bg-blue-500' : 'bg-gray-50'
-                                  } hover:opacity-80 transition-opacity`}
-                                >
-                                  <p className={`text-xs truncate ${
-                                    isOwn ? 'text-blue-100' : 'text-gray-600'
-                                  }`}>
-                                    {message.reply_to.message || '📎 Медиафайл'}
-                                  </p>
-                                </button>
-                              )}
-                              
-                              {/* Стрелка ответа при наведении */}
-                              <ReplyArrow 
-                                message={message} 
-                                onReply={handleReply}
-                                isOwn={isOwn}
-                              />
-                              
                               {/* Message content */}
-                              <div className={`max-w-xs sm:max-w-sm px-4 py-2.5 rounded-2xl ${
+                              <div className={`relative max-w-xs sm:max-w-sm px-4 py-2.5 rounded-2xl ${
                                 isOwn ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white text-gray-900 shadow-sm rounded-bl-md'
                               }`}>
+                                <ReplyArrow message={message} onReply={handleReply} isOwn={isOwn} />
+                                {message.reply_to && (
+                                  <MessageReplyQuote
+                                    replyTo={message.reply_to}
+                                    replyToId={message.reply_to_id ?? message.reply_to?.id}
+                                    isOwn={isOwn}
+                                    currentChat={currentChat}
+                                    userId={user.id}
+                                    onJump={handleReplyClick}
+                                  />
+                                )}
                                 {message.message && <p className="text-sm break-words">{message.message}</p>}
                                 {message.media && message.media.length > 0 && (
                                   <div className="mt-2 space-y-2">
@@ -694,8 +824,8 @@ const ChatPage = ({ fillMobileHub = false }) => {
                                   )}
                                 </span>
                               )}
-                            </div>
-                          </div>
+                                </div>
+                              </div>
                             </div>
                           </SwipeableMessage>
                         </div>
@@ -703,6 +833,20 @@ const ChatPage = ({ fillMobileHub = false }) => {
                     })}
                     <div ref={messagesEndRef} />
                   </div>
+                )}
+                </div>
+                {showScrollToBottom && messages.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleScrollToBottomClick}
+                    className="absolute bottom-3 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-blue-600 shadow-md transition-colors hover:bg-gray-50"
+                    title="К последнему сообщению"
+                    aria-label="К последнему сообщению"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                  </button>
                 )}
               </div>
               
@@ -919,7 +1063,11 @@ const ChatPage = ({ fillMobileHub = false }) => {
               </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-0">
+            <div className="relative flex-1 min-h-0 flex flex-col">
+              <div
+                ref={messagesScrollDesktopRef}
+                className="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-0"
+              >
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
@@ -934,8 +1082,23 @@ const ChatPage = ({ fillMobileHub = false }) => {
                   {messages.map((message) => {
                     const isOwn = message.sender_id === user.id;
                     return (
-                      <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-md px-4 py-2.5 rounded-2xl ${isOwn ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white text-gray-900 shadow-sm rounded-bl-md'}`}>
+                      <div
+                        key={message.id}
+                        data-message-row-id={message.id}
+                        className={`group flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div className={`relative max-w-md px-4 py-2.5 rounded-2xl ${isOwn ? 'bg-blue-600 text-white rounded-br-md' : 'bg-white text-gray-900 shadow-sm rounded-bl-md'}`}>
+                          <ReplyArrow message={message} onReply={handleReply} isOwn={isOwn} />
+                          {message.reply_to && (
+                            <MessageReplyQuote
+                              replyTo={message.reply_to}
+                              replyToId={message.reply_to_id ?? message.reply_to?.id}
+                              isOwn={isOwn}
+                              currentChat={currentChat}
+                              userId={user.id}
+                              onJump={handleReplyClick}
+                            />
+                          )}
                           {message.message && <p className="text-sm break-words">{message.message}</p>}
                           {message.media && message.media.length > 0 && (
                             <div className="mt-2 space-y-2">
@@ -952,6 +1115,20 @@ const ChatPage = ({ fillMobileHub = false }) => {
                   })}
                   <div ref={messagesEndRef} />
                 </div>
+              )}
+              </div>
+              {showScrollToBottom && messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleScrollToBottomClick}
+                  className="absolute bottom-3 right-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-blue-600 shadow-md transition-colors hover:bg-gray-50"
+                  title="К последнему сообщению"
+                  aria-label="К последнему сообщению"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </button>
               )}
             </div>
             

@@ -10,7 +10,7 @@ class MessageBase(BaseModel):
 class ChatMediaResponse(BaseModel):
     id: int
     message_id: int
-    media_type: str  # 'image' или 'video'
+    media_type: str  # image | video | document
     file_path: str
     thumbnail_path: Optional[str] = None
     original_filename: Optional[str] = None

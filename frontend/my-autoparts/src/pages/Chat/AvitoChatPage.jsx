@@ -503,18 +503,6 @@ const AvitoChatPage = ({ fillMobileHub = false }) => {
                   />
                 </svg>
               </button>
-              <button
-                type="button"
-                className={voiceButtonClass}
-                disabled={sending || !selectedChatId}
-                onClick={() => (isRecordingVoice ? stopVoiceRecording() : startVoiceRecording())}
-                aria-label={isRecordingVoice ? 'Остановить запись' : 'Записать голос'}
-                title={isRecordingVoice ? 'Стоп' : 'Голос'}
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z" />
-                </svg>
-              </button>
               <input
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
@@ -594,18 +582,6 @@ const AvitoChatPage = ({ fillMobileHub = false }) => {
                       strokeWidth="2"
                       d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
                     />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  className={voiceButtonClass}
-                  disabled={sending || !selectedChatId}
-                  onClick={() => (isRecordingVoice ? stopVoiceRecording() : startVoiceRecording())}
-                  aria-label={isRecordingVoice ? 'Остановить запись' : 'Записать голос'}
-                  title={isRecordingVoice ? 'Стоп' : 'Голос'}
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z" />
                   </svg>
                 </button>
                 <input

@@ -3,17 +3,24 @@ import React from 'react';
 const ReplyArrow = ({ message, onReply, isOwn }) => {
     return (
         <button
+            type="button"
             onClick={(e) => {
                 e.stopPropagation();
                 onReply(message);
             }}
-            className={`opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 ${
-                isOwn ? 'left-0 -translate-x-full pr-2' : 'right-0 translate-x-full pl-2'
-            } p-1.5 hover:bg-gray-100 rounded-full transition-colors bg-white/80`}
+            className={`pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 transition-opacity absolute z-10 top-1/2 -translate-y-1/2 p-1.5 rounded-full shadow-sm ${
+                isOwn
+                    ? 'right-full mr-2'
+                    : 'left-full ml-2'
+            } ${
+                isOwn
+                    ? 'bg-blue-500/35 hover:bg-blue-500/55 text-white'
+                    : 'bg-white/95 hover:bg-gray-100 text-gray-600 ring-1 ring-gray-200/80'
+            }`}
             title="Ответить на сообщение"
         >
             <svg 
-                className={`w-4 h-4 ${isOwn ? 'text-blue-600' : 'text-gray-500'}`} 
+                className="w-4 h-4" 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"

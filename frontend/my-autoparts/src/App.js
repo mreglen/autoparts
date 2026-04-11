@@ -53,7 +53,7 @@ function ServiceWorkerNavigationHandler() {
     const handleNavigateToChat = (event) => {
       const { chatId } = event.detail;
       console.log('[App] Navigating to chat from notification:', chatId);
-      navigate(`/chats/${chatId}`);
+      navigate(`/chats/${chatId}`, { state: { scrollToBottom: true } });
     };
     
     window.addEventListener('navigateToChat', handleNavigateToChat);

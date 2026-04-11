@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc, func
 from typing import List, Optional
 import anyio
@@ -23,6 +23,35 @@ from app.core.auth import get_current_user
 from app.routers.websocket import manager as websocket_manager
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
+
+
+def _last_message_list_preview(msg: Optional[Message]) -> str:
+    """Текст превью в списке чатов: пустое тело + только медиа."""
+    if not msg:
+        return ""
+    text = (msg.message or "").strip()
+    if text:
+        return msg.message or ""
+    if not getattr(msg, "media", None):
+        return msg.message or ""
+    if msg.media:
+        return "Медиа"
+    return msg.message or ""
+
+
+def _message_reply_snippet(db_msg: Message) -> MessageResponse:
+    """Компактное вложенное сообщение для reply_to (без рекурсии)."""
+    return MessageResponse(
+        id=db_msg.id,
+        chat_id=db_msg.chat_id,
+        sender_id=db_msg.sender_id,
+        message=db_msg.message or "",
+        is_read=db_msg.is_read,
+        created_at=db_msg.created_at,
+        reply_to_id=None,
+        reply_to=None,
+        media=[],
+    )
 
 
 @router.post("/", response_model=ChatResponse)
@@ -184,7 +213,13 @@ def get_chat_messages(
     
     # Возвращаем сообщения в правильном порядке (от старых к новым)
     messages_reversed = list(reversed(messages))
-    
+
+    reply_parent_ids = {m.reply_to_id for m in messages_reversed if m.reply_to_id}
+    reply_parents: dict[int, Message] = {}
+    if reply_parent_ids:
+        for parent in db.query(Message).filter(Message.id.in_(reply_parent_ids)).all():
+            reply_parents[parent.id] = parent
+
     # Добавляем медиа к каждому сообщению
     # Фильтруем сообщения с is_processing медиа для пользователей, которые не являются отправителем
     result = []
@@ -199,13 +234,19 @@ def get_chat_messages(
         # Если пользователь не отправитель и есть медиа в обработке, пропускаем сообщение
         if msg.sender_id != current_user.id and has_processing_media:
             continue
-        
+
+        reply_to = None
+        if msg.reply_to_id and msg.reply_to_id in reply_parents:
+            reply_to = _message_reply_snippet(reply_parents[msg.reply_to_id])
+
         result.append(MessageResponse(
             id=msg.id,
             chat_id=msg.chat_id,
             sender_id=msg.sender_id,
             message=msg.message,
             is_read=msg.is_read,
+            reply_to_id=msg.reply_to_id,
+            reply_to=reply_to,
             created_at=msg.created_at,
             media=[
                 ChatMediaResponse(
@@ -279,8 +320,30 @@ def send_message(
     db.commit()
     db.refresh(new_message)
 
+    # Цитируемое сообщение (для HTTP-ответа и WS)
+    reply_to = None
+    if new_message.reply_to_id:
+        parent_msg = db.query(Message).filter(Message.id == new_message.reply_to_id).first()
+        if parent_msg:
+            reply_to = {
+                "id": parent_msg.id,
+                "message": parent_msg.message,
+                "sender_id": parent_msg.sender_id,
+                "created_at": parent_msg.created_at,
+            }
+
     # Push realtime-сообщение второму участнику чата
     recipient_id = chat.seller_id if current_user.id == chat.buyer_id else chat.buyer_id
+    reply_to_ws = None
+    if reply_to:
+        reply_to_ws = {
+            "id": reply_to["id"],
+            "message": reply_to["message"],
+            "sender_id": reply_to["sender_id"],
+            "created_at": reply_to["created_at"].isoformat()
+            if hasattr(reply_to["created_at"], "isoformat")
+            else reply_to["created_at"],
+        }
     ws_payload = {
         "type": "message",
         "id": new_message.id,
@@ -289,26 +352,14 @@ def send_message(
         "message": new_message.message,
         "is_read": new_message.is_read,
         "reply_to_id": new_message.reply_to_id,
+        "reply_to": reply_to_ws,
         "created_at": new_message.created_at.isoformat(),
-        "media": []
+        "media": [],
     }
     try:
         anyio.from_thread.run(websocket_manager.send_personal_message, ws_payload, recipient_id)
     except Exception:
         pass
-    
-    # Получаем информацию об ответе, если есть
-    reply_to = None
-    if new_message.reply_to_id:
-        reply_to = db.query(Message).filter(Message.id == new_message.reply_to_id).first()
-        # Преобразуем в простой dict для response
-        if reply_to:
-            reply_to = {
-                "id": reply_to.id,
-                "message": reply_to.message,
-                "sender_id": reply_to.sender_id,
-                "created_at": reply_to.created_at
-            }
     
     return MessageResponse(
         id=new_message.id,
@@ -348,7 +399,7 @@ async def upload_chat_media(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Загрузить медиа файлы (изображения/видео) в чат"""
+    """Загрузить медиа файлы (изображения, видео, документы) в чат"""
     
     # Проверяем доступ к чату
     chat = db.query(Chat).filter(
@@ -409,68 +460,92 @@ async def upload_chat_media(
     max_document_size = 20 * 1024 * 1024  # 20MB
     
     media_records = []
-    
-    for file in files:
-        # Валидация типа файла
-        if (file.content_type not in allowed_image_types and 
-            file.content_type not in allowed_video_types and 
-            file.content_type not in allowed_document_types):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Неподдерживаемый тип файла: {file.content_type}. Поддерживаются: изображения, видео, PDF, Word, Excel, PowerPoint, архивы"
+    saved_paths: List[str] = []
+
+    def _cleanup_saved_files():
+        for p in saved_paths:
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except OSError:
+                pass
+
+    try:
+        for file in files:
+            # Валидация типа файла
+            if (file.content_type not in allowed_image_types and
+                    file.content_type not in allowed_video_types and
+                    file.content_type not in allowed_document_types):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Неподдерживаемый тип файла: {file.content_type}. "
+                        "Поддерживаются: изображения, видео, PDF, Word, Excel, PowerPoint, архивы"
+                    ),
+                )
+
+            # Читаем файл для проверки размера
+            content = await file.read()
+            file_size = len(content)
+
+            # Проверка размера
+            if file.content_type in allowed_image_types and file_size > max_image_size:
+                raise HTTPException(status_code=400, detail="Изображение слишком большое (макс 10MB)")
+
+            if file.content_type in allowed_video_types and file_size > max_video_size:
+                raise HTTPException(status_code=400, detail="Видео слишком большое (макс 50MB)")
+
+            if file.content_type in allowed_document_types and file_size > max_document_size:
+                raise HTTPException(status_code=400, detail="Файл слишком большой (макс 20MB)")
+
+            # Определяем тип медиа
+            if file.content_type in allowed_image_types:
+                media_type = 'image'
+            elif file.content_type in allowed_video_types:
+                media_type = 'video'
+            else:
+                media_type = 'document'
+
+            # Генерируем уникальное имя файла
+            if file.filename and Path(file.filename).suffix:
+                file_ext = Path(file.filename).suffix
+            else:
+                file_ext = '.jpg'
+            unique_filename = f"{uuid.uuid4().hex}{file_ext}"
+            file_path = upload_dir / unique_filename
+
+            # Сохраняем файл
+            with open(file_path, 'wb') as f:
+                f.write(content)
+            saved_paths.append(str(file_path))
+
+            media_record = ChatMedia(
+                message_id=new_message.id,
+                media_type=media_type,
+                file_path=str(file_path),
+                original_filename=file.filename,
+                file_size=file_size,
+                mime_type=file.content_type or 'application/octet-stream',
+                is_processing=True,
             )
-        
-        # Читаем файл для проверки размера
-        content = await file.read()
-        file_size = len(content)
-        
-        # Проверка размера
-        if file.content_type in allowed_image_types and file_size > max_image_size:
-            raise HTTPException(status_code=400, detail="Изображение слишком большое (макс 10MB)")
-        
-        if file.content_type in allowed_video_types and file_size > max_video_size:
-            raise HTTPException(status_code=400, detail="Видео слишком большое (макс 50MB)")
-        
-        if file.content_type in allowed_document_types and file_size > max_document_size:
-            raise HTTPException(status_code=400, detail="Файл слишком большой (макс 20MB)")
-        
-        # Определяем тип медиа
-        if file.content_type in allowed_image_types:
-            media_type = 'image'
-        elif file.content_type in allowed_video_types:
-            media_type = 'video'
-        else:
-            media_type = 'document'
-        
-        # Генерируем уникальное имя файла
-        file_ext = Path(file.filename).suffix if file.filename else '.jpg'
-        unique_filename = f"{uuid.uuid4().hex}{file_ext}"
-        file_path = upload_dir / unique_filename
-        
-        # Сохраняем файл
-        with open(file_path, 'wb') as f:
-            f.write(content)
-        
-        # Создаем запись в БД
-        media_record = ChatMedia(
-            message_id=new_message.id,
-            media_type=media_type,
-            file_path=str(file_path),
-            original_filename=file.filename,
-            file_size=file_size,
-            mime_type=file.content_type,
-            is_processing=True
-        )
-        db.add(media_record)
-        media_records.append(media_record)
-    
-    # Обновляем время чата
-    db.query(Chat).filter(Chat.id == chat_id).update({"updated_at": func.now()})
-    db.commit()
-    
+            db.add(media_record)
+            media_records.append(media_record)
+
+        # Обновляем время чата
+        db.query(Chat).filter(Chat.id == chat_id).update({"updated_at": func.now()})
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        _cleanup_saved_files()
+        raise
+    except Exception:
+        db.rollback()
+        _cleanup_saved_files()
+        raise
+
     # Запускаем Celery задачи для сжатия (только для изображений и видео)
     from app.tasks.chat_media_tasks import compress_chat_image, compress_chat_video, log_error
-    
+
     for media in media_records:
         try:
             if media.media_type == 'image':
@@ -619,8 +694,7 @@ def get_chat_media(
     if not os.path.exists(media.file_path):
         raise HTTPException(status_code=404, detail="Файл не найден")
     
-    # Для документов добавляем заголовок для скачивания
-    # Для изображений и видео - inline (просмотр в браузере)
+    # Для документов — attachment; изображения и видео — inline
     if media.media_type == 'document':
         return FileResponse(
             path=media.file_path,
@@ -827,10 +901,14 @@ def get_block_status(
 def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> ChatResponse:
     """Создать ответ чата с дополнительной информацией"""
     
-    # Получаем последнее сообщение
-    last_message = db.query(Message).filter(
-        Message.chat_id == chat.id
-    ).order_by(desc(Message.created_at)).first()
+    # Получаем последнее сообщение (с медиа — для превью в списке чатов)
+    last_message = (
+        db.query(Message)
+        .options(joinedload(Message.media))
+        .filter(Message.chat_id == chat.id)
+        .order_by(desc(Message.created_at))
+        .first()
+    )
     
     # Получаем количество непрочитанных сообщений для текущего пользователя
     unread_count = 0
@@ -904,7 +982,7 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
             id=last_message.id,
             chat_id=last_message.chat_id,
             sender_id=last_message.sender_id,
-            message=last_message.message,
+            message=_last_message_list_preview(last_message),
             is_read=last_message.is_read,
             created_at=last_message.created_at
         ) if last_message else None,

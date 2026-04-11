@@ -182,10 +182,15 @@ const chatSlice = createSlice({
     name: 'chats',
     initialState,
     reducers: {
-        // Установить текущий чат
+        // Установить текущий чат (сообщения сбрасываем только при смене чата, не при обновлении списка чатов)
         setCurrentChat: (state, action) => {
-            state.currentChat = action.payload;
-            state.messages = [];
+            const next = action.payload;
+            const prevId = state.currentChat?.id ?? null;
+            const nextId = next?.id ?? null;
+            if (prevId !== nextId) {
+                state.messages = [];
+            }
+            state.currentChat = next;
         },
         
         // Добавить сообщение через WebSocket

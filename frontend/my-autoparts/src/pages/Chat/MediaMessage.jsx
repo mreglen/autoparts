@@ -426,6 +426,11 @@ const MediaMessage = ({ media, isOwn, onCancelUpload, onRetryUpload }) => {
     return renderImage(media);
   } else if (media.media_type === 'video') {
     return renderVideo(media);
+  } else if (media.media_type === 'voice') {
+    // Устаревшие записи в БД: только воспроизведение, без отправки новых
+    return (
+      <audio controls className="max-w-[260px]" preload="metadata" src={getMediaUrl(media)} />
+    );
   } else if (media.media_type === 'document') {
     return renderDocument(media);
   }
