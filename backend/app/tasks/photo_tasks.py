@@ -245,11 +245,14 @@ def process_and_upload_photo(
             raise Exception(f"Final file missing or empty after write: {final_path}")
 
         # Construct relative path (without domain) - frontend will add backend base URL
-        # Add /uploads prefix only for logo_organizations subfolder
-        if subfolder == "logo_organizations":
-            media_path = f"/uploads/{subfolder}/{organization_id}/{final_filename}"
-        else:
-            media_path = f"/{subfolder}/{organization_id}/{final_filename}"
+        # IMPORTANT: This path is relative to web root, NOT including /server/ prefix
+        # On hosting:
+        #   - media_path = /uploads/pictures/org_id/file.webp
+        #   - PUBLIC_BASE_URL = https://svoygarage.ru/server
+        #   - Final URL = https://svoygarage.ru/server/uploads/pictures/org_id/file.webp
+        #
+        # nginx serves /server/uploads/ -> /home/fast/autoparts/backend/uploads/
+        media_path = f"/uploads/{subfolder}/{organization_id}/{final_filename}"
         
         print(f"✓ Photo saved successfully!")
         print(f"  Final path: {final_path}")

@@ -58,7 +58,20 @@ def is_local_media(url: str) -> bool:
 
 
 def normalize_for_xlsx(url_or_path: str) -> str:
-    """Return absolute URL for XLSX if we have BASE_URL; otherwise keep as-is."""
+    """
+    Return absolute URL for XLSX export.
+    
+    For local media paths (/pictures/, /uploads/, /temp/):
+    - Prepends PUBLIC_BASE_URL to create absolute URL
+    - Example: /pictures/org123/photo.webp -> https://svoygarage.ru/pictures/org123/photo.webp
+    
+    For external URLs (Avito, other domains):
+    - Returns as-is without modification
+    - This allows external photo URLs to pass through
+    
+    IMPORTANT: PUBLIC_BASE_URL should be the root domain (e.g., https://svoygarage.ru)
+    NOT the API path (e.g., NOT https://svoygarage.ru/server/)
+    """
     value = (url_or_path or "").strip()
     if not value:
         return ""
@@ -66,6 +79,7 @@ def normalize_for_xlsx(url_or_path: str) -> str:
     if any(pathish.startswith(p) for p in LOCAL_PREFIXES):
         bu = _base_url()
         return f"{bu}{pathish}" if bu else pathish
+    # External URL - return as-is (Avito URLs, other domains, etc.)
     return value
 
 
