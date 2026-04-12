@@ -310,6 +310,8 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
                     )
                 ),
                 "videos": _split_media_urls(_at(video_csv_c)),
+                # NEW: Include part_type_name for import mapping
+                "part_type_name": _at(part_type_c),
             }
             out.items.append(item)
 

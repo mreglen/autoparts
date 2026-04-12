@@ -572,6 +572,10 @@ const AddPart = () => {
       alert('Выберите место хранения');
       return;
     }
+    if (!formData.part_type_id) {
+      alert('Выберите вид запчасти');
+      return;
+    }
 
     let photoUrls = [];
     let videoUrls = [];
@@ -635,7 +639,7 @@ const AddPart = () => {
       quantity: parseInt(formData.quantity, 10) || 1,
       is_new: formData.condition === 'новый',
       storage_location_id: parseInt(formData.storage_location_id, 10) || 1,
-      part_type_id: formData.part_type_id ? parseInt(formData.part_type_id, 10) : null,
+      part_type_id: formData.part_type_id ? parseInt(formData.part_type_id, 10) : null, // Required field
       vehicle_ids: selectedVehicle ? [selectedVehicle.id] : [],
       photos: photoUrls.length > 0 ? photoUrls : null,
       videos: videoUrls.length > 0 ? videoUrls : null,
@@ -787,20 +791,9 @@ const AddPart = () => {
         {/* Вид запчасти */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
-            Вид запчасти (необязательно)
+            Вид запчасти *
           </label>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-              <input
-                type="radio"
-                name="part_type"
-                value=""
-                checked={formData.part_type_id === ''}
-                onChange={(e) => setFormData({...formData, part_type_id: e.target.value})}
-                className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
-              />
-              <span className="ml-2 text-sm text-gray-700">Не выбрано</span>
-            </label>
             {partTypes.map(partType => (
               <label key={partType.id} className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                 <input

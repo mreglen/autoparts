@@ -20,7 +20,7 @@ class Product(Base):
     organization = relationship("Organization", back_populates="products")
     storage_location_id = Column(Integer, ForeignKey("storage_locations.id"))
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    part_type_id = Column(Integer, ForeignKey("part_types.id"), nullable=True)
+    part_type_id = Column(Integer, ForeignKey("part_types.id"), nullable=False)
    
     creator = relationship("User", foreign_keys=[created_by])
     photos = relationship("ProductPhoto", back_populates="product", cascade="all, delete-orphan")

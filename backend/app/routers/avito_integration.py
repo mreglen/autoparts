@@ -237,6 +237,17 @@ def _next_internal_code(db: Session) -> str:
         idx += 1
 
 
+def _get_part_type_id_by_name(db: Session, name: str) -> int | None:
+    """Find part_type_id by name (case-insensitive). Returns default (12) if not found."""
+    if not name:
+        return 12  # Default to "Тормозная система"
+    from app.models.part_type import PartType
+    pt = db.query(PartType).filter(
+        PartType.name.ilike(name.strip())
+    ).first()
+    return pt.id if pt else 12  # Default to "Тормозная система" if not found
+
+
 def _has_avito_integration(db: Session, org_id: str) -> bool:
     row = db.query(OrganizationAvitoIntegration).filter(
         OrganizationAvitoIntegration.organization_id == org_id
@@ -1001,6 +1012,14 @@ async def import_avito_autoload_rows(
             product.price = effective_price
             product.quantity = effective_quantity
             product.storage_location_id = body.storage_location_id
+            # part_type_id is required - try to get from item or use default
+            if item.get("part_type_id"):
+                product.part_type_id = int(item.get("part_type_id"))
+            elif item.get("part_type_name"):
+                # Map part_type_name to part_type_id
+                product.part_type_id = _get_part_type_id_by_name(db, item.get("part_type_name"))
+            elif not product.part_type_id:
+                product.part_type_id = 12  # Default to "Тормозная система"
             if description:
                 product.description = description
             updated_products += 1
@@ -1008,6 +1027,19 @@ async def import_avito_autoload_rows(
         if product is None:
             # Create new product
             internal_code = unique_ad_id or _next_internal_code(db)
+            # part_type_id is REQUIRED - try to get from item or use default
+            part_type_id = None
+            if item.get("part_type_id"):
+                try:
+                    part_type_id = int(item.get("part_type_id"))
+                except (TypeError, ValueError):
+                    part_type_id = None
+            if not part_type_id and item.get("part_type_name"):
+                # Map part_type_name to part_type_id
+                part_type_id = _get_part_type_id_by_name(db, item.get("part_type_name"))
+            if not part_type_id:
+                part_type_id = 12  # Default to "Тормозная система" (id=12)
+            
             try:
                 product = ProductModel(
                     article=(part_number or avito_id or internal_code or f"ROW-{key[1]}")[:30],
@@ -1021,6 +1053,7 @@ async def import_avito_autoload_rows(
                     organization_id=org_id,
                     storage_location_id=body.storage_location_id,
                     created_by=current_user.id,
+                    part_type_id=part_type_id,  # REQUIRED FIELD
                 )
                 db.add(product)
                 db.flush()
@@ -1042,6 +1075,7 @@ async def import_avito_autoload_rows(
                         organization_id=org_id,
                         storage_location_id=body.storage_location_id,
                         created_by=current_user.id,
+                        part_type_id=part_type_id,  # REQUIRED FIELD
                     )
                     db.add(product)
                     db.flush()

@@ -14,7 +14,7 @@ class ProductBase(BaseModel):
     quantity: int
     is_new: bool = True
     storage_location_id: int
-    part_type_id: Optional[int] = None
+    part_type_id: int  # Required field
 
 
 class Product(ProductBase):
@@ -28,8 +28,8 @@ class Product(ProductBase):
     compatible_vehicles: List["Vehicle"] = [] 
     storage_location: Optional[StorageLocation] = None
     organization: Optional[Organization] = None
-    part_type_id: Optional[int] = None
-    part_type: Optional[PartType] = None
+    part_type_id: int  # Required field
+    part_type: PartType  # Required field
 
     class Config:
         from_attributes = True
@@ -94,11 +94,11 @@ class ProductCreate(ProductBase):
     vehicle_ids: Optional[List[int]] = None
     photos: Optional[List[str]] = None
     videos: Optional[List[str]] = None
-    part_type_id: Optional[int] = None
+    part_type_id: int  # Required field
 
 
 class ProductUpdate(BaseModel):
-    """Schema for updating an existing product - all fields are optional"""
+    """Schema for updating an existing product - all fields are optional except part_type_id"""
     article: Optional[str] = None
     name: Optional[str] = None
     brand: Optional[str] = None
@@ -111,7 +111,7 @@ class ProductUpdate(BaseModel):
     vehicle_ids: Optional[List[int]] = None
     photos: Optional[List[str]] = None
     videos: Optional[List[str]] = None
-    part_type_id: Optional[int] = None
+    part_type_id: Optional[int] = None  # Can be updated, but if provided must be valid
 
 class ProductQuantityUpdate(BaseModel):
     quantity: int

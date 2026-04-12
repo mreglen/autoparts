@@ -54,19 +54,19 @@ class AvitoAutoloadCategoryTreeResponse(BaseModel):
 
 class AvitoAutoloadSetCategoryRequest(BaseModel):
     sheet: str = Field(..., min_length=1, max_length=255)
-    row: int = Field(..., ge=5)
+    row: int = Field(..., ge=2)  # NEW FORMAT: Data starts from Row 2
     category: str = Field(..., min_length=1, max_length=255)
 
 
 class AvitoAutoloadSetAdTypeRequest(BaseModel):
     sheet: str = Field(..., min_length=1, max_length=255)
-    row: int = Field(..., ge=5)
+    row: int = Field(..., ge=2)  # NEW FORMAT: Data starts from Row 2
     ad_type: str = Field("", max_length=255)
 
 
 class AvitoAutoloadActionRow(BaseModel):
     sheet: str = Field(..., min_length=1, max_length=255)
-    row: int = Field(..., ge=5)
+    row: int = Field(..., ge=2)  # NEW FORMAT: Data starts from Row 2
 
 
 class AvitoAutoloadApplyActionRequest(BaseModel):

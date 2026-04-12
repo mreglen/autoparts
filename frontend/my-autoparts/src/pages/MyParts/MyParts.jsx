@@ -135,7 +135,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
                     onClick={(e) => { e.stopPropagation(); onExport(part); setShowActions(false); }}
                     className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
                   >
-                    Экспорт
+                    Экспорт Avito
                   </button>
                 )}
                 <Link
@@ -281,6 +281,7 @@ function MyParts() {
   const [expandedPartId, setExpandedPartId] = useState(null);
   const [selectedParts, setSelectedParts] = useState(new Set());
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
+  const [showBulkActions, setShowBulkActions] = useState(false); // Dropdown for bulk actions
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || ''); // Поисковый запрос
   const [selectedStorageLocation, setSelectedStorageLocation] = useState(searchParams.get('storage') || ''); // Выбранный склад
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'in-stock'); // 'in-stock' or 'pending'
@@ -417,6 +418,23 @@ function MyParts() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [mobileActionsOpen]);
+
+  // Закрытие dropdown массовых действий при клике вне
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.actions-dropdown')) {
+        setShowBulkActions(false);
+      }
+    };
+
+    if (showBulkActions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showBulkActions]);
 
   const handleExportPart = async (part) => {
     if (!user?.organization_id || !part?.id) return;
@@ -932,8 +950,6 @@ function MyParts() {
             {avitoIntegrationReady && (
               <div className="mb-3 flex items-center justify-between py-2 border-b border-gray-200">
                 <span className="text-sm text-gray-500">
-                  Общее действие: Экспорт в Avito
-                  <span className="ml-2">•</span>
                   <span className="ml-2">Выбрано: {selectedParts.size}</span>
                   {searchQuery && selectedParts.size > 0 && (
                     <span className="ml-2 text-indigo-600">
@@ -941,18 +957,34 @@ function MyParts() {
                     </span>
                   )}
                 </span>
-                <button
-                  onClick={handleBulkAction}
-                  disabled={selectedParts.size === 0}
-                  className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Экспорт
-                  <img
-                    src="/img/arrow_sm.svg"
-                    alt=""
-                    className="w-3 h-3 transition-transform duration-200 filter brightness-0 saturate-100 invert-61 sepia-0 saturate-0 hue-rotate-0deg brightness-90 contrast-89"
-                  />
-                </button>
+                <div className="relative actions-dropdown">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
+                    disabled={selectedParts.size === 0}
+                    className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Действия
+                    <img
+                      src="/img/arrow_sm.svg"
+                      alt=""
+                      className={`w-3 h-3 transition-transform duration-200 filter brightness-0 saturate-100 invert-61 sepia-0 saturate-0 hue-rotate-0deg brightness-90 contrast-89 ${showBulkActions ? 'rotate-90' : ''}`}
+                    />
+                  </button>
+
+                  {showBulkActions && (
+                    <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
+                      <div className="py-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleBulkAction(); setShowBulkActions(false); }}
+                          disabled={selectedParts.size === 0}
+                          className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Экспорт в Avito
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             <table className="min-w-full divide-y divide-gray-200">
@@ -1019,7 +1051,6 @@ function MyParts() {
               <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
                 <div className="flex items-center justify-between">
                   <span className="text-base font-medium text-gray-900">
-                    Общее действие: Экспорт
                     <span className="block text-sm mt-1">Выбрано: {selectedParts.size}</span>
                     {searchQuery && selectedParts.size > 0 && (
                       <span className="block text-sm text-indigo-600 mt-1">
@@ -1027,13 +1058,34 @@ function MyParts() {
                       </span>
                     )}
                   </span>
-                  <button
-                    onClick={handleBulkAction}
-                    disabled={selectedParts.size === 0}
-                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Экспорт
-                  </button>
+                  <div className="relative actions-dropdown">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
+                      disabled={selectedParts.size === 0}
+                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      Действия
+                      <img
+                        src="/img/arrow_sm.svg"
+                        alt=""
+                        className={`w-3 h-3 transition-transform duration-200 ${showBulkActions ? 'rotate-90' : ''}`}
+                      />
+                    </button>
+
+                    {showBulkActions && (
+                      <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
+                        <div className="py-1">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleBulkAction(); setShowBulkActions(false); }}
+                            disabled={selectedParts.size === 0}
+                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Экспорт в Avito
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -1153,7 +1205,7 @@ function MyParts() {
                               }}
                               className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50"
                             >
-                              Экспорт
+                              Экспорт Avito
                             </button>
                           )}
                           <Link
