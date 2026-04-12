@@ -12,7 +12,7 @@ import StockOutModal from './StockOutModal/StockOutModal';
 import PendingParts from './PendingParts/PendingParts';
 import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
 
-const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onPrint, onExport, showExport, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [] }) => {
+const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onPrint, onExport, showExport, onExportDrom, showDromExport, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [] }) => {
   const [showActions, setShowActions] = useState(false);
 
   
@@ -151,6 +151,14 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
                     className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
                   >
                     Экспорт Avito
+                  </button>
+                )}
+                {showDromExport && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onExportDrom(part); setShowActions(false); }}
+                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                  >
+                    Экспорт Drom
                   </button>
                 )}
                 <Link
@@ -314,6 +322,7 @@ function MyParts() {
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [avitoIntegrationReady, setAvitoIntegrationReady] = useState(false);
   const [avitoJob, setAvitoJob] = useState(null);
+  const [dromIntegrationReady, setDromIntegrationReady] = useState(false);
   const [formData, setFormData] = useState({
     quantity: '',
     price: '',
@@ -472,6 +481,19 @@ function MyParts() {
     }
   };
 
+  const handleExportPartDrom = async (part) => {
+    if (!user?.organization_id || !part?.id) return;
+    try {
+      await apiRequest(`/organizations/${user.organization_id}/drom/autoload/export`, {
+        method: 'POST',
+        body: JSON.stringify({ product_ids: [part.id] }),
+      });
+      alert('Товар экспортирован в Drom');
+    } catch (e) {
+      alert(`Не удалось экспортировать в Drom: ${e.message || 'ошибка'}`);
+    }
+  };
+
   const handleBulkAction = async () => {
     if (!user?.organization_id || selectedParts.size === 0) return;
     try {
@@ -482,6 +504,19 @@ function MyParts() {
       setAvitoJob(started);
     } catch (e) {
       alert(`Не удалось выполнить экспорт: ${e.message || 'ошибка'}`);
+    }
+  };
+
+  const handleBulkExportDrom = async () => {
+    if (!user?.organization_id || selectedParts.size === 0) return;
+    try {
+      await apiRequest(`/organizations/${user.organization_id}/drom/autoload/export`, {
+        method: 'POST',
+        body: JSON.stringify({ product_ids: Array.from(selectedParts) }),
+      });
+      alert(`Экспорт в Drom выполнен. Товаров: ${selectedParts.size}`);
+    } catch (e) {
+      alert(`Не удалось выполнить экспорт в Drom: ${e.message || 'ошибка'}`);
     }
   };
 
@@ -622,6 +657,25 @@ function MyParts() {
       })
       .catch(() => {
         if (active) setAvitoIntegrationReady(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [user?.organization_id]);
+
+  useEffect(() => {
+    if (!user?.organization_id) {
+      setDromIntegrationReady(false);
+      return;
+    }
+    let active = true;
+    apiRequest(`/organizations/${user.organization_id}/drom/credentials`, { method: 'GET' })
+      .then((data) => {
+        if (!active) return;
+        setDromIntegrationReady(!!data?.is_enabled);
+      })
+      .catch(() => {
+        if (active) setDromIntegrationReady(false);
       });
     return () => {
       active = false;
@@ -1004,6 +1058,15 @@ function MyParts() {
                         >
                           Экспорт в Avito
                         </button>
+                        {dromIntegrationReady && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleBulkExportDrom(); setShowBulkActions(false); }}
+                            disabled={selectedParts.size === 0}
+                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Экспорт в Drom
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1055,6 +1118,8 @@ function MyParts() {
                     onPrint={(p) => handleOpenPrintModal(p)}
                     onExport={(p) => handleExportPart(p)}
                     showExport={avitoIntegrationReady}
+                    onExportDrom={(p) => handleExportPartDrom(p)}
+                    showDromExport={dromIntegrationReady}
                     onToggleExpand={() => toggleExpand(part.id)}
                     isExpanded={expandedPartId === part.id}
                     isSelected={selectedParts.has(part.id)}
@@ -1105,6 +1170,15 @@ function MyParts() {
                           >
                             Экспорт в Avito
                           </button>
+                          {dromIntegrationReady && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleBulkExportDrom(); setShowBulkActions(false); }}
+                              disabled={selectedParts.size === 0}
+                              className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Экспорт в Drom
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}

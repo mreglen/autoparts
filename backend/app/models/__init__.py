@@ -32,6 +32,9 @@ from app.models.product_vehicle import ProductVehicleAssociation
 from app.models.delivery_method import DeliveryMethod, organization_delivery_methods
 from app.models.product_avito_listing_link import ProductAvitoListingLink
 from app.models.avito_autoload_job import AvitoAutoloadJob
+from app.models.organization_drom_integration import OrganizationDromIntegration
+from app.models.organization_drom_autoload_cache import OrganizationDromAutoloadCache
+from app.models.product_drom_listing_link import ProductDromListingLink
 from app.models.chat import Chat, Message
 from app.models.part_type import PartType
 

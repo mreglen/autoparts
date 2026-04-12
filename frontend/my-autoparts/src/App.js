@@ -37,6 +37,8 @@ import PrintSettings from './pages/Settings/PrintSettings';
 import IntegrationPage from './pages/Settings/IntegrationPage';
 import AvitoIntegrationPage from './pages/Settings/AvitoIntegrationPage';
 import AvitoNomenclaturePage from './pages/Settings/AvitoNomenclaturePage';
+import DromIntegrationPage from './pages/Settings/DromIntegrationPage';
+import DromNomenclaturePage from './pages/Settings/DromNomenclaturePage';
 import NotFound from './pages/NotFound/NotFound';
 import PartDetail from './pages/PartDetail/PartDetail';
 import VehiclesList from './pages/Vehicles/VehiclesList';
@@ -153,6 +155,8 @@ function App() {
           <Route path="/settings/integration" element={<IntegrationPage />} />
           <Route path="/settings/integration/avito" element={<AvitoIntegrationPage />} />
           <Route path="/settings/integration/avito/nomenclature" element={<AvitoNomenclaturePage />} />
+          <Route path="/settings/integration/drom" element={<DromIntegrationPage />} />
+          <Route path="/settings/integration/drom/nomenclature" element={<DromNomenclaturePage />} />
           <Route path="/moderation/pending-sellers" element={<PendingSellersPage />} />
           <Route path="/moderation/products" element={<ProductModeration />} />
           <Route path="/sellers" element={<SellersPage />} />

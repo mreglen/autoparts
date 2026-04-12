@@ -19,6 +19,12 @@ class Organization(Base):
         back_populates="organization",
         uselist=False,
     )
+    drom_integration = relationship(
+        "OrganizationDromIntegration",
+        back_populates="organization",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
     products = relationship("Product", back_populates="organization")
     acquired_products = relationship("AcquiredProduct", back_populates="organization")
     storage_locations = relationship("StorageLocation", back_populates="organization")
