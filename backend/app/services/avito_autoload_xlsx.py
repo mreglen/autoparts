@@ -8,30 +8,44 @@ from typing import Any, Optional
 from openpyxl import Workbook, load_workbook
 
 TEMPLATE_XLSX_REL_PATH = "backend/app/templates/avito/template.xlsx"
-# В исходных шаблонах Авито 5-я строка часто содержит пример/дефолты.
-# В реальных файлах пользователи иногда начинают данные с 5-й строки.
-# Поэтому парсер сканирует с 5-й строки, но умеет пропускать "примерную" строку,
-# если она совпадает с дефолтами листа.
-DATA_SCAN_START_ROW = 5
-DATA_WRITE_START_ROW = 6
+# В новом формате Авито заголовки находятся в 1-й строке (Row 1),
+# данные начинаются со 2-й строки (Row 2).
+DATA_SCAN_START_ROW = 2
+DATA_WRITE_START_ROW = 2
 
-# Заголовки — строго из файла шаблона (2-я строка).
-UNIQUE_AD_ID_HEADER = "Уникальный идентификатор объявления"  # col 1
-AVITO_AD_NUMBER_HEADER = "Номер объявления на Авито"  # col 3 (Avito возвращает после загрузки)
-TITLE_HEADER = "Название объявления"
-DESCRIPTION_AD_HEADER = "Описание объявления"
-PRICE_HEADER = "Цена"
-ADDRESS_HEADER = "Адрес"
-CATEGORY_HEADER = "Категория"
+# Заголовки — строго из файла шаблона (1-я строка, Row 1).
+# Новый формат использует английские названия колонок
+UNIQUE_AD_ID_HEADER = "Id"  # col 1
+AVITO_AD_NUMBER_HEADER = "AvitoId"  # col 2 (Avito возвращает после загрузки)
+TITLE_HEADER = "Title"
+DESCRIPTION_AD_HEADER = "Description"
+PRICE_HEADER = "Price"
+ADDRESS_HEADER = "Address"
+CATEGORY_HEADER = "Category"
 DEFAULT_CATEGORY_VALUE = "Запчасти и аксессуары"
-AD_TYPE_HEADER = "Вид объявления"
-CONDITION_HEADER = "Состояние"
-PHOTOS_HEADER = "Ссылки на фото"
-PHOTO_NAMES_HEADER = "Названия фото"
-QUANTITY_HEADER = "Количество"
-MANUFACTURER_HEADER = "Производитель"
-PART_OEM = "Номер детали OEM"
+AD_TYPE_HEADER = "AdType"
+CONDITION_HEADER = "Condition"
+PHOTOS_HEADER = "ImageUrls"
+PHOTO_NAMES_HEADER = None  # Not in new template
+QUANTITY_HEADER = None  # Not in new template - use Availability instead
+MANUFACTURER_HEADER = "Brand"
+PART_OEM = "OEM"
 AVITO_STATUS_HEADER = "AvitoStatus"
+PART_TYPE_HEADER = "SparePartType"
+
+# Дополнительные колонки нового формата
+AVITO_DATE_END_HEADER = "AvitoDateEnd"
+LISTING_FEE_HEADER = "ListingFee"
+GOODS_TYPE_HEADER = "GoodsType"
+PRODUCT_TYPE_HEADER = "ProductType"
+EMAIL_HEADER = "EMail"
+CONTACT_PHONE_HEADER = "ContactPhone"
+CONTACT_METHOD_HEADER = "ContactMethod"
+AVAILABILITY_HEADER = "Availability"
+COMPANY_NAME_HEADER = "CompanyName"
+ORIGINALITY_HEADER = "Originality"
+TARGET_AUDIENCE_HEADER = "TargetAudience"
+TYPE_ID_HEADER = "TypeID"
 
 
 def _cell_str(v: Any) -> str:
@@ -121,18 +135,21 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
 
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
-        head_rows = list(ws.iter_rows(min_row=1, max_row=4, values_only=True))
-        if len(head_rows) < 3:
+        # НОВЫЙ ФОРМАТ: заголовки в Row 1, данные начинаются с Row 2
+        # Читаем первые 2 строки (заголовки + пример данных)
+        head_rows = list(ws.iter_rows(min_row=1, max_row=2, values_only=True))
+        if len(head_rows) < 1:
             continue
 
-        raw_headers = list(head_rows[1])
-        raw_req = list(head_rows[2])
+        raw_headers = list(head_rows[0])  # Row 1 - заголовки
+        # НОВЫЙ ФОРМАТ: строки требований больше нет
+        raw_req = []
 
         n = len(raw_headers)
         while n > 0 and not _cell_str(raw_headers[n - 1]):
             n -= 1
         headers = raw_headers[:n]
-        requirements = (raw_req + [None] * n)[:n]
+        requirements = (raw_req + [None] * n)[:n]  # Пустые требования
 
         if not any(_cell_str(x) == TITLE_HEADER for x in headers):
             continue
@@ -196,23 +213,25 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
             continue
 
         mandatory_cols: list[tuple[int, str]] = []
+        # НОВЫЙ ФОРМАТ: требования больше не используются, все колонки опциональны
+        # кроме тех, что явно проверяем (title, price, condition)
         for i in range(len(headers)):
             col_idx = i + 1
             h = _cell_str(headers[i])
             if not h:
                 continue
-            if _is_mandatory(requirements[i] if i < len(requirements) else None):
-                mandatory_cols.append((col_idx, h))
+            # Пропускаем проверку требований для нового формата
+            # if _is_mandatory(requirements[i] if i < len(requirements) else None):
+            #     mandatory_cols.append((col_idx, h))
 
         track_cols = [c for c in [pc, man_c, cond_c, price_c, title_c, category_c, avito_status_c] if c]
-        # Если в листе есть реальные данные начиная с 6-й строки,
-        # то 5-ю строку считаем "примером/дефолтами" и не включаем в items/валидацию.
-        # Если данных ниже нет — 5-я строка может быть реальными данными пользователя, её не пропускаем.
-        has_data_after_5 = False
-        if ws.max_row >= 6:
-            for _r in ws.iter_rows(min_row=6, values_only=True):
+        # НОВЫЙ ФОРМАТ: Row 2 - пример данных, реальные данные начинаются с Row 2
+        # Проверяем, есть ли данные после Row 2
+        has_data_after_2 = False
+        if ws.max_row >= 3:
+            for _r in ws.iter_rows(min_row=3, values_only=True):
                 if _row_nonempty(tuple(_r), track_cols):
-                    has_data_after_5 = True
+                    has_data_after_2 = True
                     break
 
         for r_idx, row in enumerate(
@@ -222,7 +241,8 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
             row_t = tuple(row)
             if not _row_nonempty(row_t, track_cols):
                 continue
-            if r_idx == 5 and has_data_after_5:
+            # НОВЫЙ ФОРМАТ: пропускаем Row 2 (пример данных), если есть реальные данные
+            if r_idx == 2 and has_data_after_2:
                 continue
 
             for col_idx, label in mandatory_cols:
@@ -333,9 +353,9 @@ def _load_template_workbook() -> Workbook:
 
 
 def _read_sheet_headers(ws) -> list[str]:
-    # Шаблон Авито: заголовки во 2-й строке, требования в 3-й.
+    # НОВЫЙ ФОРМАТ: заголовки в 1-й строке (Row 1)
     # Колонки справа могут быть пустыми — обрезаем хвост.
-    values = [ws.cell(row=2, column=i).value for i in range(1, ws.max_column + 1)]
+    values = [ws.cell(row=1, column=i).value for i in range(1, ws.max_column + 1)]
     out = [_cell_str(v) for v in values]
     while out and not out[-1]:
         out.pop()
@@ -343,14 +363,13 @@ def _read_sheet_headers(ws) -> list[str]:
 
 
 def _read_sheet_requirements(ws, n_cols: int) -> list[str]:
-    req = [ws.cell(row=3, column=i).value for i in range(1, n_cols + 1)]
-    out = [_cell_str(v) for v in req]
-    return out
+    # НОВЫЙ ФОРМАТ: строки требований больше нет
+    return [""] * n_cols
 
 
 def _read_sheet_defaults(ws, n_cols: int) -> list[Any]:
-    # В примере (обычно 5-я строка) в шаблоне заполнены дефолты.
-    return [ws.cell(row=5, column=i).value for i in range(1, n_cols + 1)]
+    # НОВЫЙ ФОРМАТ: пример данных в 2-й строке (Row 2)
+    return [ws.cell(row=2, column=i).value for i in range(1, n_cols + 1)]
 
 
 def _next_unique_ad_id(existing: set[str]) -> str:
@@ -564,6 +583,14 @@ def upsert_products_to_avito_autoload(
                 row_values[CATEGORY_HEADER] = str(product.get("category") or DEFAULT_CATEGORY_VALUE)
         if AD_TYPE_HEADER in col_map:
             row_values[AD_TYPE_HEADER] = str(product.get("ad_type") or "")
+        if AVAILABILITY_HEADER in col_map:
+            qty = product.get("quantity", 0)
+            row_values[AVAILABILITY_HEADER] = "В наличии" if qty and qty > 0 else "Под заказ"
+        if ORIGINALITY_HEADER in col_map:
+            # Заполняем на основе is_new
+            row_values[ORIGINALITY_HEADER] = "Оригинал" if product.get("is_new") else "Неоригинал"
+        if PART_TYPE_HEADER in col_map:
+            row_values[PART_TYPE_HEADER] = str(product.get("part_type_name") or "")
         if PHOTOS_HEADER in col_map:
             row_values[PHOTOS_HEADER] = " | ".join(photo_urls)
         if PHOTO_NAMES_HEADER in col_map and PHOTO_NAMES_HEADER not in row_values and photo_urls:

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
+from sqlalchemy.orm import selectinload
 from app.celery_app import celery_app
 from app.core.config import settings
 from app.db.database import SessionLocal
@@ -172,7 +173,9 @@ def run_avito_export_job(self, job_id: int):
             _set_job_state(db, job_id, status="failed", stage="failed", error_summary="Нет product_ids")
             return {"status": "failed", "error": "empty product ids"}
 
-        products = db.query(ProductModel).filter(
+        products = db.query(ProductModel).options(
+            selectinload(ProductModel.part_type),
+        ).filter(
             ProductModel.organization_id == org_id,
             ProductModel.id.in_(product_ids),
         ).all()
@@ -246,6 +249,10 @@ def run_avito_export_job(self, job_id: int):
                     "category": "Запчасти и аксессуары",  # Всегда эта категория для листа "Объявления"
                     "template_sheet": "Объявления",  # Всегда этот лист
                     "address": address,
+                    "part_type_name": product.part_type.name if product.part_type else "",
+                    # NEW: Map to new format fields
+                    "availability": "В наличии" if product.quantity > 0 else "Под заказ",
+                    "originality": "Оригинал" if product.is_new else "Неоригинал",
                 }
             )
             if idx % 100 == 0 or idx == len(ordered_products):

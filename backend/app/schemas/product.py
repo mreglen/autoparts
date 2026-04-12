@@ -2,6 +2,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from app.schemas.storage_location import StorageLocation
 from app.schemas.organization import Organization
+from app.schemas.part_type import PartType
 
 class ProductBase(BaseModel):
     article: str
@@ -13,6 +14,7 @@ class ProductBase(BaseModel):
     quantity: int
     is_new: bool = True
     storage_location_id: int
+    part_type_id: Optional[int] = None
 
 
 class Product(ProductBase):
@@ -26,6 +28,8 @@ class Product(ProductBase):
     compatible_vehicles: List["Vehicle"] = [] 
     storage_location: Optional[StorageLocation] = None
     organization: Optional[Organization] = None
+    part_type_id: Optional[int] = None
+    part_type: Optional[PartType] = None
 
     class Config:
         from_attributes = True
@@ -90,6 +94,7 @@ class ProductCreate(ProductBase):
     vehicle_ids: Optional[List[int]] = None
     photos: Optional[List[str]] = None
     videos: Optional[List[str]] = None
+    part_type_id: Optional[int] = None
 
 
 class ProductUpdate(BaseModel):
@@ -106,6 +111,7 @@ class ProductUpdate(BaseModel):
     vehicle_ids: Optional[List[int]] = None
     photos: Optional[List[str]] = None
     videos: Optional[List[str]] = None
+    part_type_id: Optional[int] = None
 
 class ProductQuantityUpdate(BaseModel):
     quantity: int

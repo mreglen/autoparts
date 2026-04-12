@@ -4,11 +4,6 @@ import { Link } from 'react-router-dom';
 import { apiRequest, apiRequestFormData, BACKEND_BASE } from '../../utils/apiClient';
 
 const AD_TYPE_NOT_SPECIFIED = '__NOT_SPECIFIED__';
-const AD_TYPE_OPTIONS = [
-  { value: AD_TYPE_NOT_SPECIFIED, label: 'Не указано' },
-  { value: 'Товар приобретен на продажу', label: 'Товар приобретен на продажу' },
-  { value: 'Товар от производителя', label: 'Товар от производителя' },
-];
 
 function CategoryPickerModal({
   open,
@@ -371,10 +366,6 @@ export default function AvitoIntegrationPage() {
   const [items, setItems] = useState([]);
   const [uploadResult, setUploadResult] = useState(null);
   const [savedPath, setSavedPath] = useState('');
-  const [isAdsModalOpen, setIsAdsModalOpen] = useState(false);
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [categoryTarget, setCategoryTarget] = useState(null); // { sheet, row }
-  const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedStatuses, setSelectedStatuses] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
@@ -431,22 +422,6 @@ export default function AvitoIntegrationPage() {
     loadCredentials();
   }, [loadCredentials]);
 
-  useEffect(() => {
-    if (!isAdsModalOpen) return undefined;
-    const onEsc = (e) => {
-      if (e.key === 'Escape') setIsAdsModalOpen(false);
-    };
-    window.addEventListener('keydown', onEsc);
-    return () => window.removeEventListener('keydown', onEsc);
-  }, [isAdsModalOpen]);
-
-  const categories = useMemo(() => {
-    const set = new Set();
-    items.forEach((row) => {
-      if (row.category) set.add(row.category);
-    });
-    return Array.from(set).sort();
-  }, [items]);
 
   const statuses = useMemo(() => {
     const set = new Set();
@@ -461,21 +436,16 @@ export default function AvitoIntegrationPage() {
 
   const isRowChecked = useCallback((row, idx) => {
     const key = makeRowKey(row, idx);
-    const matchesCategory =
-      selectedCategories.length === 0 ||
-      selectedCategories.includes(row.category || '');
     const matchesStatus =
       selectedStatuses.length === 0 ||
       selectedStatuses.includes(row.avito_status || '');
-    const anyFilters =
-      selectedCategories.length > 0 ||
-      selectedStatuses.length > 0;
+    const anyFilters = selectedStatuses.length > 0;
     return selectAll
       ? true
       : anyFilters
-        ? (matchesCategory && matchesStatus)
+        ? matchesStatus
         : selectedRowKeys.includes(key);
-  }, [selectAll, selectedCategories, selectedStatuses, selectedRowKeys]);
+  }, [selectAll, selectedStatuses, selectedRowKeys]);
 
   const selectedRows = useMemo(
     () =>
@@ -485,14 +455,6 @@ export default function AvitoIntegrationPage() {
         .filter((r) => r.sheet && r.row != null),
     [items, isRowChecked],
   );
-
-  const handleToggleFilterCategory = (cat) => {
-    setSelectAll(false);
-    setSelectedRowKeys([]);
-    setSelectedCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
-    );
-  };
 
   const handleToggleFilterStatus = (st) => {
     setSelectAll(false);
@@ -505,16 +467,12 @@ export default function AvitoIntegrationPage() {
   const handleToggleSelectAll = (checked) => {
     setSelectAll(checked);
     setSelectedRowKeys([]);
-    // По требованию: при любом клике по общему чекбоксу сбрасываем фильтры.
-    setSelectedCategories([]);
     setSelectedStatuses([]);
   };
 
   const handleToggleRow = (row, idx) => {
     const key = makeRowKey(row, idx);
     setSelectAll(false);
-    // По требованию: при ручном выборе строки сбрасываем фильтры.
-    setSelectedCategories([]);
     setSelectedStatuses([]);
     setSelectedRowKeys((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
@@ -548,7 +506,6 @@ export default function AvitoIntegrationPage() {
       setBulkAction('');
       setSelectAll(false);
       setSelectedRowKeys([]);
-      setSelectedCategories([]);
       setSelectedStatuses([]);
     } catch (e) {
       setError(formatErrorMessage(e));
@@ -557,21 +514,6 @@ export default function AvitoIntegrationPage() {
     }
   };
 
-  const handlePhotoPrev = (rowKey, total) => {
-    if (total <= 1) return;
-    setPhotoIndexes((prev) => {
-      const cur = prev[rowKey] || 0;
-      return { ...prev, [rowKey]: (cur - 1 + total) % total };
-    });
-  };
-
-  const handlePhotoNext = (rowKey, total) => {
-    if (total <= 1) return;
-    setPhotoIndexes((prev) => {
-      const cur = prev[rowKey] || 0;
-      return { ...prev, [rowKey]: (cur + 1) % total };
-    });
-  };
 
   const handleCopyAutoloadLink = async () => {
     const url = getPublicFileUrl(savedPath);
@@ -588,71 +530,6 @@ export default function AvitoIntegrationPage() {
     }
   };
 
-  const openCategoryPicker = (row) => {
-    if (!row?.sheet || row?.row == null) return;
-    setCategoryTarget({ sheet: row.sheet, row: row.row });
-    setIsCategoryModalOpen(true);
-  };
-
-  const handlePickCategory = async (category) => {
-    if (!orgId || !categoryTarget) return;
-    setError(null);
-    setNotice(null);
-    try {
-      const data = await apiRequest(`/organizations/${orgId}/avito/autoload/set-category`, {
-        method: 'POST',
-        body: JSON.stringify({
-          sheet: categoryTarget.sheet,
-          row: categoryTarget.row,
-          category,
-        }),
-      });
-      setItems(data.items || []);
-      setSavedPath(data.saved_path || '');
-      const summary = {
-        local_validation_ok: data.local_validation_ok,
-        local_errors: data.local_errors || [],
-        avito_report: data.avito_report,
-        avito_token_error: data.avito_token_error,
-        updated_at: new Date().toISOString(),
-      };
-      setUploadResult(shouldShowResultCard(summary) ? summary : null);
-      setNotice('Категория сохранена в XLSX.');
-      setIsCategoryModalOpen(false);
-      setCategoryTarget(null);
-    } catch (e) {
-      setError(formatErrorMessage(e));
-    }
-  };
-
-  const handleSetAdType = async (row, adTypeValue) => {
-    if (!orgId || !row?.sheet || row?.row == null) return;
-    setError(null);
-    setNotice(null);
-    try {
-      const data = await apiRequest(`/organizations/${orgId}/avito/autoload/set-ad-type`, {
-        method: 'POST',
-        body: JSON.stringify({
-          sheet: row.sheet,
-          row: row.row,
-          ad_type: adTypeValue === AD_TYPE_NOT_SPECIFIED ? '' : adTypeValue,
-        }),
-      });
-      setItems(data.items || []);
-      setSavedPath(data.saved_path || '');
-      const summary = {
-        local_validation_ok: data.local_validation_ok,
-        local_errors: data.local_errors || [],
-        avito_report: data.avito_report,
-        avito_token_error: data.avito_token_error,
-        updated_at: new Date().toISOString(),
-      };
-      setUploadResult(shouldShowResultCard(summary) ? summary : null);
-      setNotice('Вид объявления сохранен в XLSX.');
-    } catch (e) {
-      setError(formatErrorMessage(e));
-    }
-  };
 
   const saveAvitoCredentials = async () => {
     if (!orgId) return false;
@@ -866,13 +743,12 @@ export default function AvitoIntegrationPage() {
               {publishing ? 'Публикация…' : 'Опубликовать'}
             </button>
             {!loadingCreds && items.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setIsAdsModalOpen(true)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              <Link
+                to="/settings/integration/avito/nomenclature"
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors inline-block"
               >
                 Просмотреть ({items.length})
-              </button>
+              </Link>
             )}
           </div>
 
@@ -993,249 +869,6 @@ export default function AvitoIntegrationPage() {
           </div>
         )}
       </div>
-
-      {isAdsModalOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-          onClick={() => setIsAdsModalOpen(false)}
-        >
-          <div
-            className="bg-white w-full max-w-6xl max-h-[85vh] rounded-lg shadow-lg flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 gap-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Объявления из файла автозагрузки
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsAdsModalOpen(false)}
-                className="px-2 py-1 text-sm text-gray-600 hover:text-gray-900"
-              >
-                Закрыть
-              </button>
-            </div>
-            <div className="overflow-auto p-4">
-              <div className="mb-3 flex flex-wrap gap-4 text-xs text-gray-800">
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium">Действия</span>
-                  <div className="flex flex-col gap-1">
-                    <label className="inline-flex items-center gap-1">
-                      <input
-                        type="radio"
-                        name="avito-bulk-action"
-                        checked={bulkAction === 'publish'}
-                        onChange={() => setBulkAction('publish')}
-                      />
-                      <span>Опубликовать объявление</span>
-                    </label>
-                    <label className="inline-flex items-center gap-1">
-                      <input
-                        type="radio"
-                        name="avito-bulk-action"
-                        checked={bulkAction === 'unpublish'}
-                        onChange={() => setBulkAction('unpublish')}
-                      />
-                      <span>Снять с публикации</span>
-                    </label>
-                    <label className="inline-flex items-center gap-1">
-                      <input
-                        type="radio"
-                        name="avito-bulk-action"
-                        checked={bulkAction === 'delete'}
-                        onChange={() => setBulkAction('delete')}
-                      />
-                      <span>Удалить объявление</span>
-                    </label>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium">Категории</span>
-                  <div className="flex flex-wrap gap-2">
-                    {categories.length === 0 ? (
-                      <span className="text-gray-400">нет данных</span>
-                    ) : (
-                      categories.map((cat) => (
-                        <label key={cat} className="inline-flex items-center gap-1">
-                          <input
-                            type="checkbox"
-                            checked={selectedCategories.includes(cat)}
-                            onChange={() => handleToggleFilterCategory(cat)}
-                          />
-                          <span>{cat}</span>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium">Статусы</span>
-                  <div className="flex flex-wrap gap-2">
-                    {statuses.length === 0 ? (
-                      <span className="text-gray-400">нет данных</span>
-                    ) : (
-                      statuses.map((st) => (
-                        <label key={st} className="inline-flex items-center gap-1">
-                          <input
-                            type="checkbox"
-                            checked={selectedStatuses.includes(st)}
-                            onChange={() => handleToggleFilterStatus(st)}
-                          />
-                          <span>{st}</span>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                <table className="min-w-full text-sm text-left">
-                  <thead className="bg-gray-50 text-gray-700">
-                    <tr>
-                      <th className="px-3 py-2 font-medium">
-                        <input
-                          type="checkbox"
-                          checked={selectAll}
-                          onChange={(e) => handleToggleSelectAll(e.target.checked)}
-                        />
-                      </th>
-                      <th className="px-3 py-2 font-medium">Номер детали (OEM)</th>
-                      <th className="px-3 py-2 font-medium">Производитель</th>
-                      <th className="px-3 py-2 font-medium">Состояние</th>
-                      <th className="px-3 py-2 font-medium">Цена</th>
-                      <th className="px-3 py-2 font-medium">Название объявления</th>
-                      <th className="px-3 py-2 font-medium">Описание</th>
-                      <th className="px-3 py-2 font-medium">Количество</th>
-                      <th className="px-3 py-2 font-medium">Категория</th>
-                      <th className="px-3 py-2 font-medium">Вид объявления</th>
-                      <th className="px-3 py-2 font-medium">Авито статус</th>
-                      <th className="px-3 py-2 font-medium">Фото</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {items.map((row, idx) => {
-                      const key = makeRowKey(row, idx);
-                      const checked = isRowChecked(row, idx);
-                      const photos = Array.isArray(row.photos) ? row.photos : [];
-                      const totalPhotos = photos.length;
-                      const photoIdx = Math.min(photoIndexes[key] || 0, Math.max(totalPhotos - 1, 0));
-                      const currentPhoto = totalPhotos > 0 ? photos[photoIdx] : '';
-                      return (
-                      <tr key={key} className="bg-white">
-                        <td className="px-3 py-2">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => handleToggleRow(row, idx)}
-                          />
-                        </td>
-                        <td className="px-3 py-2">{row.part_number}</td>
-                        <td className="px-3 py-2">{row.manufacturer}</td>
-                        <td className="px-3 py-2">{row.condition}</td>
-                        <td className="px-3 py-2">{row.price}</td>
-                        <td className="px-3 py-2 max-w-md truncate" title={row.title}>
-                          {row.title}
-                        </td>
-                        <td className="px-3 py-2 max-w-md truncate" title={row.description}>
-                          {row.description || '-'}
-                        </td>
-                        <td className="px-3 py-2">
-                          {(() => {
-                            const q = Number(row.quantity);
-                            return Number.isFinite(q) && q > 0 ? q : 1;
-                          })()}
-                        </td>
-                        <td className="px-3 py-2">
-                          <button
-                            type="button"
-                            onClick={() => openCategoryPicker(row)}
-                            className="text-blue-700 hover:underline"
-                            title="Выбрать категорию"
-                          >
-                            {row.category || '-'}
-                          </button>
-                        </td>
-                        <td className="px-3 py-2 min-w-[220px]">
-                          <select
-                            value={row.ad_type ? row.ad_type : AD_TYPE_NOT_SPECIFIED}
-                            onChange={(e) => handleSetAdType(row, e.target.value)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm bg-white"
-                          >
-                            {AD_TYPE_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-3 py-2">{row.avito_status || '-'}</td>
-                        <td className="px-3 py-2">
-                          {currentPhoto ? (
-                            <div className="flex items-center gap-2">
-                              {totalPhotos > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handlePhotoPrev(key, totalPhotos)}
-                                  className="px-1 border border-gray-300 rounded text-xs"
-                                  aria-label="Предыдущее фото"
-                                >
-                                  {'<'}
-                                </button>
-                              )}
-                              <img
-                                src={currentPhoto}
-                                alt="Фото объявления"
-                                className="w-14 h-14 object-cover rounded border border-gray-200"
-                              />
-                              {totalPhotos > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handlePhotoNext(key, totalPhotos)}
-                                  className="px-1 border border-gray-300 rounded text-xs"
-                                  aria-label="Следующее фото"
-                                >
-                                  {'>'}
-                                </button>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-xs">нет фото</span>
-                          )}
-                        </td>
-                      </tr>
-                    )})}
-                  </tbody>
-                </table>
-              </div>
-              {bulkAction && (
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <p className="text-xs text-gray-600">
-                    Выбрано строк: <span className="font-medium">{selectedRows.length}</span>
-                  </p>
-                  <button
-                    type="button"
-                    disabled={savingBulkAction || selectedRows.length === 0}
-                    onClick={handleApplyBulkAction}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {savingBulkAction ? 'Сохранение…' : 'Сохранить'}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <CategoryPickerModal
-        open={isCategoryModalOpen}
-        orgId={orgId}
-        onClose={() => {
-          setIsCategoryModalOpen(false);
-          setCategoryTarget(null);
-        }}
-        onPick={handlePickCategory}
-      />
 
       <AvitoConnectWizardModal
         open={isAvitoConnectOpen}

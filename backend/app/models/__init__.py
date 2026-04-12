@@ -33,6 +33,7 @@ from app.models.delivery_method import DeliveryMethod, organization_delivery_met
 from app.models.product_avito_listing_link import ProductAvitoListingLink
 from app.models.avito_autoload_job import AvitoAutoloadJob
 from app.models.chat import Chat, Message
+from app.models.part_type import PartType
 
 
 from sqlalchemy.orm import relationship

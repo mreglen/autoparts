@@ -74,6 +74,10 @@ class AvitoAutoloadApplyActionRequest(BaseModel):
     rows: list[AvitoAutoloadActionRow] = Field(default_factory=list, min_length=1)
 
 
+class AvitoAutoloadRemoveRowsRequest(BaseModel):
+    rows: list[AvitoAutoloadActionRow] = Field(default_factory=list, min_length=1)
+
+
 class AvitoAutoloadImportRequest(BaseModel):
     rows: list[AvitoAutoloadActionRow] = Field(default_factory=list, min_length=1)
     storage_location_id: int = Field(..., gt=0)

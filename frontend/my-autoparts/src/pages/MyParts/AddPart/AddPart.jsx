@@ -6,6 +6,7 @@ import { createStockIn, clearStockInError } from '../../../redux/slices/StockInS
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { fetchStorageCells, createStorageCell } from '../../../redux/slices/StorageCellsSlice';
 import { createPendingProductStorageCellsBatch } from '../../../redux/slices/PendingProductStorageCellsSlice';
+import { fetchPartTypes } from '../../../redux/slices/PartTypeSlice';
 import { normalizeImageUrl, apiRequest, apiRequestFormData } from '../../../utils/apiClient';
 
 import VehicleModal from './VehicleModal';
@@ -23,6 +24,7 @@ const AddPart = () => {
   const productError = useSelector((state) => state.products.error);
   const { storageLocations } = useSelector((state) => state.organization);
   const { storageCells, lastModified } = useSelector((state) => state.storageCells);
+  const { items: partTypes } = useSelector((state) => state.partTypes);
 
   const stockInError = useSelector((state) => state.stockIn.error);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
@@ -37,6 +39,7 @@ const AddPart = () => {
     quantity: '',
     sale_price: '',
     storage_location_id: '',
+    part_type_id: '',
   });
 
   const [articleOptions, setArticleOptions] = useState([]);
@@ -61,6 +64,7 @@ const AddPart = () => {
     if (user?.organization_id) {
       dispatch(fetchStorageLocations(user.organization_id));
     }
+    dispatch(fetchPartTypes());
   }, [dispatch, user?.organization_id]);
 
   // Fetch storage cells when storage location changes
@@ -631,6 +635,7 @@ const AddPart = () => {
       quantity: parseInt(formData.quantity, 10) || 1,
       is_new: formData.condition === 'новый',
       storage_location_id: parseInt(formData.storage_location_id, 10) || 1,
+      part_type_id: formData.part_type_id ? parseInt(formData.part_type_id, 10) : null,
       vehicle_ids: selectedVehicle ? [selectedVehicle.id] : [],
       photos: photoUrls.length > 0 ? photoUrls : null,
       videos: videoUrls.length > 0 ? videoUrls : null,
@@ -777,6 +782,39 @@ const AddPart = () => {
               ))}
             </ul>
           )}
+        </div>
+        
+        {/* Вид запчасти */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Вид запчасти (необязательно)
+          </label>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+              <input
+                type="radio"
+                name="part_type"
+                value=""
+                checked={formData.part_type_id === ''}
+                onChange={(e) => setFormData({...formData, part_type_id: e.target.value})}
+                className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+              />
+              <span className="ml-2 text-sm text-gray-700">Не выбрано</span>
+            </label>
+            {partTypes.map(partType => (
+              <label key={partType.id} className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <input
+                  type="radio"
+                  name="part_type"
+                  value={partType.id}
+                  checked={formData.part_type_id === partType.id.toString()}
+                  onChange={(e) => setFormData({...formData, part_type_id: e.target.value})}
+                  className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">{partType.name}</span>
+              </label>
+            ))}
+          </div>
         </div>
         
         {/* Описание */}

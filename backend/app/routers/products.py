@@ -201,7 +201,8 @@ def read_product(
             selectinload(VehicleModel.mileage_row),
         ),
         selectinload(ProductModel.storage_location),
-        selectinload(ProductModel.organization)
+        selectinload(ProductModel.organization),
+        selectinload(ProductModel.part_type)
     ).filter(
         ProductModel.id == product_id,
         ProductModel.organization_id == current_user.organization_id
@@ -289,7 +290,8 @@ def update_product(
             selectinload(VehicleModel.mileage_row),
         ),
         selectinload(ProductModel.storage_location),
-        selectinload(ProductModel.organization)
+        selectinload(ProductModel.organization),
+        selectinload(ProductModel.part_type)
     ).filter(
         ProductModel.id == product_id,
         ProductModel.organization_id == current_user.organization_id

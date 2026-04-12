@@ -27,6 +27,7 @@ from app.schemas.avito_integration import (
     AvitoAutoloadImportRequest,
     AvitoAutoloadImportResponse,
     AvitoAutoloadApplyActionRequest,
+    AvitoAutoloadRemoveRowsRequest,
     AvitoAutoloadExportRequest,
     AvitoAutoloadExportAsyncRequest,
     AvitoAutoloadExportResponse,
@@ -213,9 +214,22 @@ def _save_autoload_cache(
 def _next_internal_code(db: Session) -> str:
     # В модели Product internal_code уникален глобально (не по organization_id),
     # поэтому подбираем код по всей таблице products.
+    # Начинаем с большего номера, чтобы избежать конфликтов
     existing = db.query(ProductModel.internal_code).all()
-    existing_codes = {r[0] for r in existing}
-    idx = 1
+    existing_codes = {r[0] for r in existing if r[0]}
+    
+    # Находим максимальный существующий числовой код
+    max_code = 0
+    for code in existing_codes:
+        try:
+            num = int(code)
+            if num > max_code:
+                max_code = num
+        except (ValueError, TypeError):
+            pass
+    
+    # Начинаем с max_code + 1
+    idx = max_code + 1
     while True:
         candidate = f"{idx:05d}"
         if candidate not in existing_codes:
@@ -455,6 +469,7 @@ async def export_products_to_avito_autoload(
     requested_ids = list(dict.fromkeys(body.product_ids))
     products = (
         db.query(ProductModel)
+        .options(selectinload(ProductModel.part_type))
         .filter(
             ProductModel.organization_id == org_id,
             ProductModel.id.in_(requested_ids),
@@ -508,6 +523,10 @@ async def export_products_to_avito_autoload(
                 "category": "Запчасти и аксессуары",  # Всегда эта категория для листа "Объявления"
                 "template_sheet": "Объявления",  # Всегда этот лист
                 "address": address,
+                "part_type_name": product.part_type.name if product.part_type else "",
+                # NEW: Map to new format fields
+                "availability": "В наличии" if product.quantity > 0 else "Под заказ",
+                "originality": "Оригинал" if product.is_new else "Неоригинал",
             }
         )
     if not export_rows:
@@ -747,7 +766,7 @@ async def set_avito_autoload_category(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"На листе '{body.sheet}' не найдена колонка 'Категория'",
             )
-        ws.cell(row=int(body.row), column=category_col, value=body.category.strip())
+        ws.cell(row=int(body.row), column=category_col, value="Запчасти и аксессуары")
 
         out = BytesIO()
         wb.save(out)
@@ -832,7 +851,7 @@ async def set_avito_autoload_ad_type(
                 detail=f"На листе '{body.sheet}' не найдена колонка 'Вид объявления'",
             )
 
-        ws.cell(row=int(body.row), column=ad_type_col, value=normalized_ad_type or "")
+        ws.cell(row=int(body.row), column=ad_type_col, value="Товар приобретен на продажу")
 
         out = BytesIO()
         wb.save(out)
@@ -989,22 +1008,53 @@ async def import_avito_autoload_rows(
         if product is None:
             # Create new product
             internal_code = unique_ad_id or _next_internal_code(db)
-            product = ProductModel(
-                article=(part_number or avito_id or internal_code or f"ROW-{key[1]}")[:30],
-                name=(title or part_number or f"Avito row {key[1]}")[:255],
-                brand=(manufacturer or "Unknown")[:100],
-                price=effective_price,
-                quantity=effective_quantity,
-                is_new=False,
-                internal_code=internal_code,
-                description=description or f"Imported from Avito autoload (ad_id={avito_id or 'n/a'})",
-                organization_id=org_id,
-                storage_location_id=body.storage_location_id,
-                created_by=current_user.id,
-            )
-            db.add(product)
-            db.flush()
-            created_products += 1
+            try:
+                product = ProductModel(
+                    article=(part_number or avito_id or internal_code or f"ROW-{key[1]}")[:30],
+                    name=(title or part_number or f"Avito row {key[1]}")[:255],
+                    brand=(manufacturer or "Unknown")[:100],
+                    price=effective_price,
+                    quantity=effective_quantity,
+                    is_new=False,
+                    internal_code=internal_code,
+                    description=description or f"Imported from Avito autoload (ad_id={avito_id or 'n/a'})",
+                    organization_id=org_id,
+                    storage_location_id=body.storage_location_id,
+                    created_by=current_user.id,
+                )
+                db.add(product)
+                db.flush()
+                created_products += 1
+            except IntegrityError:
+                db.rollback()
+                # Если internal_code уже существует, пробуем другой
+                if not unique_ad_id:
+                    internal_code = _next_internal_code(db)
+                    product = ProductModel(
+                        article=(part_number or avito_id or internal_code or f"ROW-{key[1]}")[:30],
+                        name=(title or part_number or f"Avito row {key[1]}")[:255],
+                        brand=(manufacturer or "Unknown")[:100],
+                        price=effective_price,
+                        quantity=effective_quantity,
+                        is_new=False,
+                        internal_code=internal_code,
+                        description=description or f"Imported from Avito autoload (ad_id={avito_id or 'n/a'})",
+                        organization_id=org_id,
+                        storage_location_id=body.storage_location_id,
+                        created_by=current_user.id,
+                    )
+                    db.add(product)
+                    db.flush()
+                    created_products += 1
+                else:
+                    skipped_rows.append(
+                        {
+                            "sheet": key[0],
+                            "row": key[1],
+                            "reason": f"internal_code={internal_code} уже существует",
+                        }
+                    )
+                    continue
 
         # Ensure link exists if AvitoId is provided
         if avito_id and (link is None):
@@ -1077,8 +1127,9 @@ async def import_avito_autoload_rows(
                             if sheet_name not in photo_col_cache:
                                 col = None
                                 for col_idx in range(1, (ws.max_column or 0) + 1):
-                                    h = str(ws.cell(row=2, column=col_idx).value or "").strip()
-                                    if h == "Ссылки на фото":
+                                    # НОВЫЙ ФОРМАТ: заголовки в Row 1
+                                    h = str(ws.cell(row=1, column=col_idx).value or "").strip()
+                                    if h in ("ImageUrls", "Ссылки на фото", "Фото"):
                                         col = col_idx
                                         break
                                 if col:
@@ -1273,6 +1324,104 @@ async def apply_avito_autoload_actions(
 
     parsed = parse_and_validate_avito_autoload(updated_bytes)
     # Автопубликация отключена: действия только обновляют файл.
+    avito_upload, avito_upload_status, avito_report, avito_token_error = (None, None, None, None)
+
+    _save_autoload_cache(
+        db,
+        org_id,
+        saved_path=rel_path,
+        items=parsed.items,
+        local_validation_ok=parsed.local_ok,
+        local_errors=parsed.local_errors,
+        sheets_parsed=parsed.sheets_parsed,
+        avito_upload=avito_upload,
+        avito_upload_status=avito_upload_status,
+        avito_report=avito_report,
+        avito_token_error=avito_token_error,
+    )
+
+    return AvitoAutoloadUploadResponse(
+        saved_path=rel_path,
+        items=parsed.items,
+        local_validation_ok=parsed.local_ok,
+        local_errors=parsed.local_errors,
+        sheets_parsed=parsed.sheets_parsed,
+        avito_upload=avito_upload,
+        avito_upload_status=avito_upload_status,
+        avito_report=avito_report,
+        avito_token_error=avito_token_error,
+    )
+
+
+@router.post("/{org_id}/avito/autoload/remove-rows", response_model=AvitoAutoloadUploadResponse)
+async def remove_avito_autoload_rows(
+    org_id: str,
+    body: AvitoAutoloadRemoveRowsRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Удаляет строки из XLSX файла и обновляет кэш."""
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+
+    cache = (
+        db.query(OrganizationAvitoAutoloadCache)
+        .filter(OrganizationAvitoAutoloadCache.organization_id == org_id)
+        .first()
+    )
+    if not cache or not cache.saved_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки не найден")
+
+    rel_path = cache.saved_path
+    project_root = Path(__file__).resolve().parents[2]
+    xlsx_path = project_root / rel_path.lstrip("/")
+    if not xlsx_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки на диске не найден")
+
+    wb = load_workbook(str(xlsx_path), read_only=False)
+    
+    # Группируем строки по листам
+    rows_by_sheet: dict[str, list[int]] = {}
+    for row_info in body.rows:
+        sheet_name = row_info.sheet
+        row_no = int(row_info.row)
+        if sheet_name not in rows_by_sheet:
+            rows_by_sheet[sheet_name] = []
+        rows_by_sheet[sheet_name].append(row_no)
+    
+    removed_count = 0
+    missing_sheets: set[str] = set()
+    
+    for sheet_name, row_numbers in rows_by_sheet.items():
+        if sheet_name not in wb.sheetnames:
+            missing_sheets.add(sheet_name)
+            continue
+        
+        ws = wb[sheet_name]
+        # Сортируем номера строк по убыванию, чтобы удалять с конца (чтобы номера строк не смещались)
+        row_numbers_sorted = sorted(row_numbers, reverse=True)
+        
+        for row_no in row_numbers_sorted:
+            ws.delete_rows(row_no, 1)
+            removed_count += 1
+    
+    if missing_sheets:
+        wb.close()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Не найдены листы: {', '.join(sorted(missing_sheets))}",
+        )
+    if removed_count == 0:
+        wb.close()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Нет строк для удаления")
+
+    out = BytesIO()
+    wb.save(out)
+    wb.close()
+    updated_bytes = out.getvalue()
+    xlsx_path.write_bytes(updated_bytes)
+
+    parsed = parse_and_validate_avito_autoload(updated_bytes)
     avito_upload, avito_upload_status, avito_report, avito_token_error = (None, None, None, None)
 
     _save_autoload_cache(

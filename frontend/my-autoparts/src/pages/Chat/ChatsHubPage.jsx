@@ -262,6 +262,7 @@ const ChatsHubPage = () => {
 
 // Универсальный компонент строки чата
 function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUserId, onSelect }) {
+  const navigate = useNavigate();
   const img = isAvito 
     ? (chat.context_image_url || chat.avatar_url)
     : chat.product_photo_url;
@@ -291,6 +292,23 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
 
   const placeholderLetter = (title && title.charAt(0).toUpperCase()) || 'Ч';
 
+  // Обработчик клика по фото/названию для перехода к товару
+  const handleNavigateToProduct = (e) => {
+    e.stopPropagation(); // Предотвращаем открытие чата
+    
+    if (isAvito) {
+      // Для Avito переходим по ссылке контекста
+      if (chat.context_url) {
+        window.open(chat.context_url, '_blank', 'noopener,noreferrer');
+      }
+    } else {
+      // Для Свой Гараж переходим на карточку товара
+      if (chat.product_id) {
+        navigate(`/part/${chat.product_id}`);
+      }
+    }
+  };
+
   return (
     <button
       type="button"
@@ -300,12 +318,15 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
       }`}
     >
       {/* Аватар */}
-      <div className="flex-shrink-0">
+      <div 
+        className="flex-shrink-0 cursor-pointer" 
+        onClick={(chat.product_id || (isAvito && chat.context_url)) ? handleNavigateToProduct : undefined}
+      >
         {img ? (
           <img 
             src={img} 
             alt="" 
-            className="w-14 h-14 rounded-lg object-cover ring-2 ring-gray-100" 
+            className="w-14 h-14 rounded-lg object-cover ring-2 ring-gray-100 hover:ring-blue-300 transition-all" 
           />
         ) : (
           <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-xl ring-2 ring-gray-100">
@@ -317,7 +338,12 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
       {/* Информация о чате */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <h3 className="font-semibold text-gray-900 truncate text-base">{title}</h3>
+          <h3 
+            className={`font-semibold truncate text-base ${(chat.product_id || (isAvito && chat.context_url)) ? 'text-blue-600 hover:text-blue-800 hover:underline cursor-pointer' : 'text-gray-900'}`}
+            onClick={(chat.product_id || (isAvito && chat.context_url)) ? handleNavigateToProduct : undefined}
+          >
+            {title}
+          </h3>
           {lastMessageTime && (
             <span className="text-xs text-gray-500 flex-shrink-0">
               {formatTime(lastMessageTime)}
@@ -326,11 +352,21 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
         </div>
         
         {!isAvito && chat.product_name && (
-          <p className="text-xs text-gray-500 truncate mb-1.5">{chat.product_name}</p>
+          <p 
+            className="text-xs text-gray-500 truncate mb-1.5 cursor-pointer hover:text-blue-600 hover:underline"
+            onClick={chat.product_id ? handleNavigateToProduct : undefined}
+          >
+            {chat.product_name}
+          </p>
         )}
         
         {isAvito && chat.context_title && (
-          <p className="text-xs text-gray-500 truncate mb-1.5">{chat.context_title}</p>
+          <p 
+            className="text-xs text-gray-500 truncate mb-1.5 cursor-pointer hover:text-blue-600 hover:underline"
+            onClick={chat.context_url ? handleNavigateToProduct : undefined}
+          >
+            {chat.context_title}
+          </p>
         )}
         
         {lastMessageText && (

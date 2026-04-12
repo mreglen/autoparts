@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { updateProduct, uploadPhotos, uploadMedia, clearProductError, resetProducts, fetchProduct, deleteProductPhotos, deleteProductVideos, deleteProductVideo } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { fetchStorageCells, fetchProductStorageCells, linkProductToCell, deleteProductCellLink } from '../../../redux/slices/StorageCellsSlice';
+import { fetchPartTypes } from '../../../redux/slices/PartTypeSlice';
 import VehicleModal from '../AddPart/VehicleModal';
 import PhotoGallery from '../../../components/PhotoGallery/PhotoGallery';
 import MediaModal from '../../../components/MediaModal/MediaModal';
@@ -20,6 +21,7 @@ const EditPart = () => {
   const currentProduct = useSelector((state) => state.products.currentProduct);
   const { storageLocations } = useSelector((state) => state.organization);
   const { storageCells, productStorageCells, lastModified } = useSelector((state) => state.storageCells);
+  const { items: partTypes } = useSelector((state) => state.partTypes);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -36,6 +38,7 @@ const EditPart = () => {
     if (user?.organization_id) {
       dispatch(fetchStorageLocations(user.organization_id));
     }
+    dispatch(fetchPartTypes());
   }, [dispatch, user?.organization_id]);
 
   useEffect(() => {
@@ -66,6 +69,7 @@ const EditPart = () => {
     quantity: '',
     sale_price: '',
     storage_location_id: '',
+    part_type_id: '',
   });
 
   const [photos, setPhotos] = useState([]);
@@ -113,6 +117,7 @@ const EditPart = () => {
         quantity: currentProduct.quantity?.toString() || '',
         sale_price: currentProduct.price?.toString() || '',
         storage_location_id: currentProduct.storage_location_id?.toString() || '',
+        part_type_id: currentProduct.part_type_id?.toString() || '',
       });
 
       // Сохраняем полные объекты ProductPhoto для доступа к ID
@@ -868,6 +873,7 @@ const EditPart = () => {
       quantity: parseInt(formData.quantity, 10),
       is_new: formData.condition === 'новый',
       storage_location_id: parseInt(formData.storage_location_id, 10),
+      part_type_id: formData.part_type_id ? parseInt(formData.part_type_id, 10) : null,
       internal_code: currentProduct?.internal_code || null,
       vehicle_ids: selectedVehicle ? [selectedVehicle.id] : [],
       photos: allPhotoUrls.length > 0 ? allPhotoUrls : null,
@@ -1028,6 +1034,39 @@ const EditPart = () => {
             required
             className="mt-1 block w-full px-3 py-2 border rounded-md"
           />
+        </div>
+
+        {/* Вид запчасти */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Вид запчасти (необязательно)
+          </label>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <label className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+              <input
+                type="radio"
+                name="part_type"
+                value=""
+                checked={formData.part_type_id === ''}
+                onChange={(e) => setFormData({...formData, part_type_id: e.target.value})}
+                className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+              />
+              <span className="ml-2 text-sm text-gray-700">Не выбрано</span>
+            </label>
+            {partTypes.map(partType => (
+              <label key={partType.id} className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <input
+                  type="radio"
+                  name="part_type"
+                  value={partType.id}
+                  checked={formData.part_type_id === partType.id.toString()}
+                  onChange={(e) => setFormData({...formData, part_type_id: e.target.value})}
+                  className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">{partType.name}</span>
+              </label>
+            ))}
+          </div>
         </div>
 
         {/* Описание */}

@@ -209,6 +209,9 @@ app.include_router(websocket_router.router)
 app.include_router(notifications_router.router)
 app.include_router(avito_messenger_webhook_router.router)
 
+from app.routers import part_types as part_types_router
+app.include_router(part_types_router.router, prefix="/api")
+
 import os
 from pathlib import Path
 
