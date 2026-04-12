@@ -47,7 +47,7 @@ export default function DromNomenclaturePage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-6">
         <Link
           to="/settings/integration/drom"
@@ -55,7 +55,7 @@ export default function DromNomenclaturePage() {
         >
           ← Назад к интеграции
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Номенклатура Drom</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Номенклатура Drom</h1>
         <p className="text-sm text-gray-600 mt-1">Товары, добавленные в экспорт для Drom.ru</p>
       </div>
 
@@ -87,7 +87,8 @@ export default function DromNomenclaturePage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -148,6 +149,52 @@ export default function DromNomenclaturePage() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-gray-200">
+            {items.map((item, idx) => (
+              <div key={idx} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-mono font-semibold text-gray-900 truncate">
+                      {item.Артикул || item.article || '-'}
+                    </p>
+                    <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                      {item['Наименование товара'] || item.name || '-'}
+                    </p>
+                  </div>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+                    (item.Наличие || item.availability) === 'В наличии'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {item.Наличие || item.availability || '-'}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-xs text-gray-500">Производитель</p>
+                    <p className="text-gray-900 truncate">{item.Производитель || item.brand || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Состояние</p>
+                    <p className="text-gray-900">{item['Новый/б.у.'] || item.condition || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Кол-во</p>
+                    <p className="text-gray-900">{item['Кол-во'] ?? item.quantity ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Цена</p>
+                    <p className="text-gray-900 font-medium">
+                      {item.Цена ?? item.price ? `${Number(item.Цена ?? item.price).toLocaleString('ru-RU')} ₽` : '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">

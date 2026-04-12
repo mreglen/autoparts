@@ -834,7 +834,8 @@ def get_products(
         selectinload(ProductModel.creator),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization),
-        selectinload(ProductModel.avito_listing_links)  # Load Avito listing links
+        selectinload(ProductModel.avito_listing_links),  # Load Avito listing links
+        selectinload(ProductModel.drom_listing_links)  # Load Drom listing links
     ).filter(
         ProductModel.organization_id == current_user.organization_id,
         ProductModel.quantity > 0
@@ -846,9 +847,10 @@ def get_products(
     
     products = query.all()
     
-    # Set is_on_avito flag for each product
+    # Set is_on_avito and is_on_drom flags for each product
     for product in products:
         product.is_on_avito = len(product.avito_listing_links) > 0
+        product.is_on_drom = len(product.drom_listing_links) > 0
     
     return products
 

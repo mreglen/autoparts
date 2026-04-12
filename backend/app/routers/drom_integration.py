@@ -10,8 +10,8 @@ from app.core.auth import get_current_user
 from app.core.config import settings
 from app.db.database import get_db
 from app.models.organization import Organization as OrganizationModel
-from app.models.organization_drom_integration import OrganizationDromIntegration
 from app.models.organization_drom_autoload_cache import OrganizationDromAutoloadCache
+from app.models.organization_drom_integration import OrganizationDromIntegration
 from app.models.product import Product as ProductModel
 from app.models.product_drom_listing_link import ProductDromListingLink
 from app.models.storage_location import StorageLocation as StorageLocationModel
@@ -272,6 +272,28 @@ async def export_products_to_drom_autoload(
         local_validation_ok=parsed.local_ok,
         local_errors=parsed.local_errors,
     )
+    
+    # Создаем записи в product_drom_listing_links для экспортированных товаров
+    for product_id in requested_ids:
+        if product_id not in by_id:
+            continue
+        
+        # Проверяем, существует ли уже запись
+        existing_link = db.query(ProductDromListingLink).filter(
+            ProductDromListingLink.organization_id == org_id,
+            ProductDromListingLink.product_id == product_id,
+        ).first()
+        
+        if not existing_link:
+            # Создаем новую запись
+            link = ProductDromListingLink(
+                organization_id=org_id,
+                product_id=product_id,
+                drom_status="exported",
+            )
+            db.add(link)
+    
+    db.commit()
     
     return DromAutoloadExportResponse(
         saved_path=rel_path,

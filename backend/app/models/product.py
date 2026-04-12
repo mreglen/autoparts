@@ -32,6 +32,7 @@ class Product(Base):
     compatible_vehicles = relationship("Vehicle", secondary="product_vehicle_association", back_populates="compatible_products")
     part_type = relationship("PartType", back_populates="products")
     avito_listing_links = relationship("ProductAvitoListingLink", back_populates="product", cascade="all, delete-orphan")
+    drom_listing_links = relationship("ProductDromListingLink", back_populates="product", cascade="all, delete-orphan")
 
     @property
     def creator_name(self):

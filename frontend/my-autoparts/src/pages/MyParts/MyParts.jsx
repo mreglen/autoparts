@@ -107,6 +107,15 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
               title="Avito"
             />
           )}
+          {/* Drom icon - shown only if product is on Drom */}
+          {part.is_on_drom && (
+            <img 
+              src="/logos/drom.png" 
+              alt="Drom" 
+              className="w-5 h-5 object-contain"
+              title="Drom"
+            />
+          )}
         </div>
       </td>
       <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-500">

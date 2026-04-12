@@ -688,7 +688,7 @@ export default function AvitoNomenclaturePage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <Link
@@ -697,7 +697,7 @@ export default function AvitoNomenclaturePage() {
           >
             ← Назад к интеграции
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Номенклатура Авито</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Номенклатура Авито</h1>
         </div>
       </div>
 
@@ -759,8 +759,8 @@ export default function AvitoNomenclaturePage() {
       ) : (
         <>
           {/* Filters in white block */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-            <div className="flex flex-wrap gap-4 text-xs text-gray-800">
+          <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 mb-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 text-xs sm:text-sm text-gray-800">
               <div className="flex flex-col gap-1">
                 <span className="font-medium">Действия</span>
                 <div className="flex flex-col gap-1">
@@ -823,15 +823,15 @@ export default function AvitoNomenclaturePage() {
               </div>
             </div>
             {bulkAction && (
-              <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between gap-3">
-                <p className="text-xs text-gray-600">
+              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
+                <p className="text-xs sm:text-sm text-gray-600">
                   Выбрано строк: <span className="font-medium">{selectedRows.length}</span>
                 </p>
                 <button
                   type="button"
                   disabled={savingBulkAction || selectedRows.length === 0}
                   onClick={handleApplyBulkAction}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm"
                 >
                   {savingBulkAction 
                     ? 'Сохранение…' 
@@ -843,8 +843,8 @@ export default function AvitoNomenclaturePage() {
             )}
           </div>
 
-          {/* Table separate from white block */}
-          <div className="overflow-x-auto border border-gray-200 rounded-lg">
+          {/* Table separate from white block - Desktop */}
+          <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-lg">
             <table className="min-w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-700">
                 <tr>
@@ -933,6 +933,84 @@ export default function AvitoNomenclaturePage() {
                 )})}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-3">
+            {items.map((row, idx) => {
+              const key = makeRowKey(row, idx);
+              const checked = isRowChecked(row, idx);
+              const photos = Array.isArray(row.photos) ? row.photos.map(p => normalizeImageUrl(p)) : [];
+              const totalPhotos = photos.length;
+              const photoIdx = Math.min(photoIndexes[key] || 0, Math.max(totalPhotos - 1, 0));
+              const currentPhoto = totalPhotos > 0 ? photos[photoIdx] : '';
+              
+              return (
+                <div key={key} className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => handleToggleRow(row, idx)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {row.part_number || '-'}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                        {row.title || '-'}
+                      </p>
+                    </div>
+                    {currentPhoto && (
+                      <div className="relative flex-shrink-0">
+                        <img
+                          src={currentPhoto}
+                          alt="Фото"
+                          className="w-16 h-16 object-cover rounded border border-gray-200"
+                        />
+                        {totalPhotos > 1 && (
+                          <div className="absolute -bottom-1 -right-1 bg-gray-800 text-white text-xs px-1.5 py-0.5 rounded">
+                            {photoIdx + 1}/{totalPhotos}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                    <div>
+                      <p className="text-xs text-gray-500">Производитель</p>
+                      <p className="text-gray-900 truncate">{row.manufacturer || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Состояние</p>
+                      <p className="text-gray-900">{row.condition || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Цена</p>
+                      <p className="text-gray-900 font-medium">{row.price || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Количество</p>
+                      <p className="text-gray-900">
+                        {(() => {
+                          const q = Number(row.quantity);
+                          return Number.isFinite(q) && q > 0 ? q : 1;
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {row.avito_status && (
+                    <div className="pt-2 border-t border-gray-100">
+                      <p className="text-xs text-gray-500">Статус</p>
+                      <p className="text-sm text-gray-900">{row.avito_status}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </>
       )}

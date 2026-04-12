@@ -31,6 +31,7 @@ class Product(ProductBase):
     part_type_id: int  # Required field
     part_type: PartType  # Required field
     is_on_avito: bool = False  # Indicates if product is published on Avito
+    is_on_drom: bool = False  # Indicates if product is exported to Drom
 
     class Config:
         from_attributes = True
