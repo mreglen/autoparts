@@ -18,4 +18,5 @@ class OrganizationAvitoAutoloadCache(Base):
     avito_upload_status = Column(Integer, nullable=True)
     avito_report_json = Column(Text, nullable=True)
     avito_token_error = Column(Text, nullable=True)
+    warnings_json = Column(Text, nullable=True, default="[]")
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)

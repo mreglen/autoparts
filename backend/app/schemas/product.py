@@ -30,6 +30,7 @@ class Product(ProductBase):
     organization: Optional[Organization] = None
     part_type_id: int  # Required field
     part_type: PartType  # Required field
+    is_on_avito: bool = False  # Indicates if product is published on Avito
 
     class Config:
         from_attributes = True
@@ -108,10 +109,10 @@ class ProductUpdate(BaseModel):
     quantity: Optional[int] = None
     is_new: Optional[bool] = None
     storage_location_id: Optional[int] = None
+    part_type_id: Optional[int] = None  # Can be updated, but if provided must be valid
     vehicle_ids: Optional[List[int]] = None
     photos: Optional[List[str]] = None
     videos: Optional[List[str]] = None
-    part_type_id: Optional[int] = None  # Can be updated, but if provided must be valid
 
 class ProductQuantityUpdate(BaseModel):
     quantity: int

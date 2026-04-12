@@ -174,6 +174,7 @@ def _get_last_autoload(db: Session, org_id: str) -> Optional[AvitoLastAutoloadSn
         avito_report=_json_loads(cache.avito_report_json, None) if cache.avito_report_json else None,
         avito_token_error=cache.avito_token_error,
         updated_at=cache.updated_at.isoformat() if cache.updated_at else None,
+        warnings=_json_loads(cache.warnings_json, []) if cache.warnings_json else None,
     )
 
 
@@ -190,6 +191,7 @@ def _save_autoload_cache(
     avito_upload_status: Optional[int],
     avito_report: Any,
     avito_token_error: Optional[str],
+    warnings: Optional[list] = None,
 ) -> None:
     row = (
         db.query(OrganizationAvitoAutoloadCache)
@@ -208,6 +210,7 @@ def _save_autoload_cache(
     row.avito_upload_status = avito_upload_status
     row.avito_report_json = json.dumps(avito_report, ensure_ascii=False) if avito_report is not None else None
     row.avito_token_error = avito_token_error
+    row.warnings_json = json.dumps(warnings, ensure_ascii=False) if warnings else None
     db.commit()
 
 
@@ -702,6 +705,88 @@ async def upload_avito_autoload(
     updated_body = dest_path.read_bytes()
     parsed = parse_and_validate_avito_autoload(updated_body)
 
+    # Debug logging for XLSX parsing
+    print(f"📊 Avito XLSX Parse Results:")
+    print(f"  - Items found: {len(parsed.items)}")
+    print(f"  - Sheets parsed: {parsed.sheets_parsed}")
+    print(f"  - Local OK: {parsed.local_ok}")
+    print(f"  - Local errors: {len(parsed.local_errors)}")
+    if parsed.local_errors:
+        for err in parsed.local_errors[:5]:  # First 5 errors
+            print(f"    Error: {err}")
+
+    # Проверка формата файла и предупреждения
+    warnings = []
+    if len(parsed.items) == 0 and not parsed.local_errors:
+        warnings.append(
+            "Файл загружен, но товары не найдены. "
+            "Убедитесь, что файл содержит лист с колонкой 'Title' и данными товаров, "
+            "начиная со второй строки."
+        )
+    
+    if not parsed.sheets_parsed or len(parsed.sheets_parsed) == 0:
+        warnings.append(
+            "В файле не найдено листов с данными. "
+            "Проверьте что файл содержит корректный шаблон Авито с английскими заголовками "
+            "(Title, Price, Brand, OEM и т.д.)."
+        )
+    
+    if parsed.local_ok and len(parsed.items) == 0:
+        warnings.append(
+            "Локальная проверка пройдена, но товаров нет. "
+            "Возможно файл содержит только заголовки без данных."
+        )
+
+    # Создаем записи в product_avito_listing_links для товаров из файла
+    # у которых есть AvitoId (уже опубликованы на Avito)
+    try:
+        avito_id_count = 0
+        for item in parsed.items:
+            # Проверяем есть ли у товара AvitoId
+            avito_id = item.get('avito_id')
+            
+            # Для сопоставления с продуктом используем internal_code (уникальный ID)
+            # который хранится в колонке "Id" в XLSX
+            internal_code = item.get('unique_ad_id')
+            
+            if avito_id and internal_code:
+                # Находим продукт по internal_code
+                product = db.query(ProductModel).filter(
+                    ProductModel.organization_id == org_id,
+                    ProductModel.internal_code == str(internal_code),
+                ).first()
+                
+                if product:
+                    # Проверяем существует ли уже запись
+                    existing_link = db.query(ProductAvitoListingLink).filter(
+                        ProductAvitoListingLink.organization_id == org_id,
+                        ProductAvitoListingLink.product_id == product.id,
+                    ).first()
+                    
+                    if not existing_link:
+                        # Создаем новую запись
+                        new_link = ProductAvitoListingLink(
+                            organization_id=org_id,
+                            product_id=product.id,
+                            avito_ad_id=str(avito_id),
+                        )
+                        db.add(new_link)
+                        avito_id_count += 1
+                        print(f"  ✅ Created Avito link for product {product.id} (internal_code: {internal_code})")
+                    elif existing_link.avito_ad_id != str(avito_id):
+                        # Обновляем Avito ID если он изменился
+                        existing_link.avito_ad_id = str(avito_id)
+                        avito_id_count += 1
+                        print(f"  ✅ Updated Avito link for product {product.id} (internal_code: {internal_code})")
+        
+        if avito_id_count > 0:
+            db.commit()
+            print(f"✅ Created/updated {avito_id_count} Avito listing link(s) from nomenclature import")
+    except Exception as e:
+        logger.exception("Failed to create Avito listing links from nomenclature import")
+        db.rollback()
+        # Не прерываем загрузку файла из-за ошибок в links
+
     # Автопубликация отключена: загрузка файла только сохраняет и валидирует XLSX.
     avito_upload, avito_upload_status, avito_report, avito_token_error = (None, None, None, None)
 
@@ -719,6 +804,7 @@ async def upload_avito_autoload(
             avito_upload_status=avito_upload_status,
             avito_report=avito_report,
             avito_token_error=avito_token_error,
+            warnings=warnings if warnings else None,
         )
     except Exception:
         logger.exception("Не удалось сохранить кэш автозагрузки")
@@ -734,6 +820,7 @@ async def upload_avito_autoload(
         avito_upload_status=avito_upload_status,
         avito_report=avito_report,
         avito_token_error=avito_token_error,
+        warnings=warnings if warnings else None,
     )
 
 

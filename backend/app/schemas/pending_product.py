@@ -12,6 +12,7 @@ class PendingProductBase(BaseModel):
     price: Optional[float] = None
     quantity: Optional[int] = None
     storage_location_id: Optional[int] = None
+    part_type_id: Optional[int] = None  # Required field
     photos: Optional[List[str]] = None
     videos: Optional[List[str]] = None
     vehicle_ids: Optional[List[int]] = None
@@ -50,6 +51,7 @@ class PendingProductUpdate(BaseModel):
     price: Optional[float] = None
     quantity: Optional[int] = None
     storage_location_id: Optional[int] = None
+    part_type_id: Optional[int] = None  # Required field
     photos: Optional[List[str]] = None
     videos: Optional[List[str]] = None
     vehicle_ids: Optional[List[int]] = None

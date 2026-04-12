@@ -833,7 +833,8 @@ def get_products(
         ),
         selectinload(ProductModel.creator),
         selectinload(ProductModel.storage_location),
-        selectinload(ProductModel.organization)
+        selectinload(ProductModel.organization),
+        selectinload(ProductModel.avito_listing_links)  # Load Avito listing links
     ).filter(
         ProductModel.organization_id == current_user.organization_id,
         ProductModel.quantity > 0
@@ -844,6 +845,11 @@ def get_products(
         query = query.filter(ProductModel.storage_location_id == storage_location_id)
     
     products = query.all()
+    
+    # Set is_on_avito flag for each product
+    for product in products:
+        product.is_on_avito = len(product.avito_listing_links) > 0
+    
     return products
 
 

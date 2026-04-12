@@ -21,6 +21,7 @@ class AvitoLastAutoloadSnapshot(BaseModel):
     avito_report: Optional[Any] = None
     avito_token_error: Optional[str] = None
     updated_at: Optional[str] = None
+    warnings: Optional[list[str]] = None
 
 
 class AvitoCredentialsResponse(BaseModel):
@@ -40,6 +41,7 @@ class AvitoAutoloadUploadResponse(BaseModel):
     avito_upload_status: Optional[int] = None
     avito_report: Optional[dict[str, Any]] = None
     avito_token_error: Optional[str] = None
+    warnings: Optional[list[str]] = None
 
 
 class AvitoAutoloadCategoryTreeNode(BaseModel):

@@ -18,6 +18,7 @@ class PendingProduct(Base):
     quantity = Column(Integer)
     organization_id = Column(String, ForeignKey("organizations.id"))
     storage_location_id = Column(Integer, ForeignKey("storage_locations.id"))
+    part_type_id = Column(Integer, ForeignKey("part_types.id"))  # Required field
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=func.now())
     photos = Column(Text)  # JSON строка с URL фото

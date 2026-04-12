@@ -75,14 +75,6 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
         {part.name || '—'}
       </td>
       <td 
-        className="px-2 py-3 whitespace-nowrap text-sm cursor-pointer"
-        onClick={onToggleExpand}
-      >
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-          {part.is_new ? 'Новый' : 'Б/у'}
-        </span>
-      </td>
-      <td 
         className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
         onClick={onToggleExpand}
       >
@@ -93,6 +85,29 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
         onClick={onToggleExpand}
       >
         {part.price != null && !isNaN(parseFloat(part.price)) ? `${parseFloat(part.price).toFixed(2)} ₽` : '—'}
+      </td>
+      <td 
+        className="px-2 py-3 whitespace-nowrap cursor-pointer"
+        onClick={onToggleExpand}
+      >
+        <div className="flex items-center gap-1">
+          {/* Svoygarage icon - always shown */}
+          <img 
+            src="/logos/svoygarage.png" 
+            alt="Свой Гараж" 
+            className="w-5 h-5 object-contain"
+            title="Свой Гараж"
+          />
+          {/* Avito icon - shown only if product is on Avito */}
+          {part.is_on_avito && (
+            <img 
+              src="/logos/avito.png" 
+              alt="Avito" 
+              className="w-5 h-5 object-contain"
+              title="Avito"
+            />
+          )}
+        </div>
       </td>
       <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-500">
         <div className="relative actions-dropdown">
@@ -155,7 +170,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
     {/* Раскрывающаяся карточка */}
     {isExpanded && (
       <tr className="bg-gray-50">
-        <td colSpan="9" className="px-6 py-4 border-t">
+        <td colSpan="10" className="px-6 py-4 border-t">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Фото и видео */}
             <div>
@@ -179,6 +194,14 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
 
               {/* Дополнительная информация */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <span className="text-xs text-gray-500">Состояние</span>
+                  <div className="font-medium mt-1">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                      {part.is_new ? 'Новый' : 'Б/у'}
+                    </span>
+                  </div>
+                </div>
                 <div>
                   <span className="text-xs text-gray-500">Склад</span>
                   <div className="font-medium mt-1">
@@ -1014,9 +1037,9 @@ function MyParts() {
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Номер</th>
                   <th className="hidden md:table-cell px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Внутр. код</th>
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Наименование</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Состояние</th>
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Остаток</th>
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена, ₽</th>
+                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Выгрузка</th>
                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
                 </tr>
               </thead>
@@ -1127,9 +1150,6 @@ function MyParts() {
                     </div>
                     <h3 className="text-base font-medium text-gray-800 mb-2 leading-tight">{part.name || '—'}</h3>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                        {part.is_new ? 'Новый' : 'Б/у'}
-                      </span>
                       {part.internal_code && (
                         <span className="text-xs text-gray-500 font-mono">{part.internal_code}</span>
                       )}
@@ -1147,6 +1167,23 @@ function MyParts() {
                         {part.price != null && !isNaN(parseFloat(part.price)) ? `${parseFloat(part.price).toFixed(2)} ₽` : '—'}
                       </div>
                       <div className="text-sm text-gray-600">{part.quantity || 0} шт.</div>
+                      {/* Export icons */}
+                      <div className="flex items-center gap-1 mt-2 justify-end">
+                        <img 
+                          src="/logos/svoygarage.png" 
+                          alt="Свой Гараж" 
+                          className="w-5 h-5 object-contain"
+                          title="Свой Гараж"
+                        />
+                        {part.is_on_avito && (
+                          <img 
+                            src="/logos/avito.png" 
+                            alt="Avito" 
+                            className="w-5 h-5 object-contain"
+                            title="Avito"
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1254,6 +1291,14 @@ function MyParts() {
 
                         {/* Дополнительная информация */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-sm text-gray-500 block mb-1">Состояние</span>
+                            <div className="text-base font-medium text-gray-900">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                {part.is_new ? 'Новый' : 'Б/у'}
+                              </span>
+                            </div>
+                          </div>
                           <div>
                             <span className="text-sm text-gray-500 block mb-1">Склад</span>
                             <div className="text-base font-medium text-gray-900">

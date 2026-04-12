@@ -1044,24 +1044,23 @@ const EditPart = () => {
 
         {/* Вид запчасти */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Вид запчасти *
           </label>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <select
+            name="part_type_id"
+            value={formData.part_type_id}
+            onChange={handleInputChange}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            required
+          >
+            <option value="">Выберите вид запчасти</option>
             {partTypes.map(partType => (
-              <label key={partType.id} className="flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                <input
-                  type="radio"
-                  name="part_type"
-                  value={partType.id}
-                  checked={formData.part_type_id === partType.id.toString()}
-                  onChange={(e) => setFormData({...formData, part_type_id: e.target.value})}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
-                />
-                <span className="ml-2 text-sm text-gray-700">{partType.name}</span>
-              </label>
+              <option key={partType.id} value={partType.id}>
+                {partType.name}
+              </option>
             ))}
-          </div>
+          </select>
         </div>
 
         {/* Описание */}

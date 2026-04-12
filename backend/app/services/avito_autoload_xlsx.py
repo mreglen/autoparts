@@ -152,6 +152,10 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
         requirements = (raw_req + [None] * n)[:n]  # Пустые требования
 
         if not any(_cell_str(x) == TITLE_HEADER for x in headers):
+            # Логирование для отладки: какие заголовки найдены в файле
+            found_headers = [_cell_str(x) for x in headers if _cell_str(x)]
+            print(f"⚠️ Sheet '{sheet_name}' skipped: no '{TITLE_HEADER}' column found")
+            print(f"   Found headers: {found_headers[:20]}")  # First 20 headers
             continue
 
         cm = _find_col_map(headers)
@@ -166,6 +170,7 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
         category_c = cm.get(CATEGORY_HEADER)
         ad_type_c = cm.get(AD_TYPE_HEADER)
         avito_status_c = cm.get(AVITO_STATUS_HEADER)
+        part_type_c = cm.get(PART_TYPE_HEADER)  # может отсутствовать
         description_c = _find_optional_col(
             cm,
             DESCRIPTION_AD_HEADER,

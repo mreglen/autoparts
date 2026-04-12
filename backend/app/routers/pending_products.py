@@ -39,6 +39,13 @@ def create_pending_product(
                 detail="Максимум 1 видео на запчасть"
             )
     
+    # Validate that part_type_id is set
+    if not product_data.part_type_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Выберите вид запчасти"
+        )
+    
     # Генерируем последовательный числовой внутренний код
     # Находим все существующие internal_code для организации
     existing_codes_result = db.query(PendingProductModel.internal_code).all()
@@ -70,6 +77,7 @@ def create_pending_product(
         price=product_data.price,
         quantity=product_data.quantity,
         storage_location_id=product_data.storage_location_id,
+        part_type_id=product_data.part_type_id,
         photos=photos_json,
         videos=videos_json,
         vehicle_ids=vehicle_ids_json,
