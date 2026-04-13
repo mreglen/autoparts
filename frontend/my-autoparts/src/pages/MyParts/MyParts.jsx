@@ -222,7 +222,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
     </tr>
 
     {/* Mobile card version */}
-    <div className="md:hidden bg-white rounded-lg shadow-sm border border-gray-200 mb-3 overflow-hidden">
+    <div className="md:hidden bg-white rounded-lg shadow-sm border border-gray-200 mb-3">
       {/* Card header with checkbox and actions */}
       <div className="flex items-center justify-between p-3 border-b border-gray-100">
         <input
@@ -246,7 +246,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
           </button>
 
           {showActions && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20 actions-dropdown">
+            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 actions-dropdown">
               <button
                 onClick={(e) => { e.stopPropagation(); onPrint(part); setShowActions(false); }}
                 className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
