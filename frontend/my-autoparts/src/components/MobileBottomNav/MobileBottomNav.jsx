@@ -6,7 +6,8 @@ import { useSelector } from 'react-redux';
 export default function MobileBottomNav() {
     const { user, token } = useSelector((state) => state.auth);
     const cart = useSelector((state) => state.cart);
-    const { unreadCount } = useSelector((state) => state.chats);
+    const { unreadCount, chats } = useSelector((state) => state.chats);
+    const { chats: avitoChats } = useSelector((state) => state.avitoChats);
     const navigate = useNavigate();
 
     // Расчет данных корзины
@@ -29,9 +30,45 @@ export default function MobileBottomNav() {
         return { itemCount };
     }, [cart]);
 
+    // Расчет непрочитанных сообщений для Свой Гараж
+    const garageUnreadCount = React.useMemo(() => {
+        if (!chats || chats.length === 0) return 0;
+        
+        return chats.reduce((total, chat) => {
+            // Считаем непрочитанные сообщения в каждом чате
+            if (chat.unread_count) {
+                return total + chat.unread_count;
+            }
+            // Если нет unread_count, проверяем last_message
+            if (chat.last_message && !chat.last_message.is_read && chat.last_message.sender_id !== user?.id) {
+                return total + 1;
+            }
+            return total;
+        }, 0);
+    }, [chats, user?.id]);
+
+    // Расчет непрочитанных сообщений для Avito
+    const avitoUnreadCount = React.useMemo(() => {
+        if (!avitoChats || avitoChats.length === 0) return 0;
+        
+        return avitoChats.reduce((total, chat) => {
+            // Avito чаты могут иметь different structure для непрочитанных
+            if (chat.unread_count) {
+                return total + chat.unread_count;
+            }
+            if (chat.has_unread_messages) {
+                return total + 1;
+            }
+            return total;
+        }, 0);
+    }, [avitoChats]);
+
+    // Общее количество непрочитанных
+    const totalUnreadCount = garageUnreadCount + avitoUnreadCount;
+
     return (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
-            <div className="grid grid-cols-5 gap-1 p-2">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-1">
+            <div className="grid grid-cols-5 gap-1 p-3">
                 {/* Главная */}
                 <div className="flex flex-col items-center justify-center py-2">
                     <button 
@@ -110,9 +147,9 @@ export default function MobileBottomNav() {
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                 </svg>
-                                {unreadCount > 0 && (
-                                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                                        {unreadCount}
+                                {totalUnreadCount > 0 && (
+                                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center font-bold px-1">
+                                        {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
                                     </span>
                                 )}
                             </div>

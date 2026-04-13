@@ -45,7 +45,8 @@ export default function Navigation() {
     const { user, token, permissionCodes } = useSelector((state) => state.auth);
     const cart = useSelector(selectCart);
     const { adminOrganizationPhone } = useSelector((state) => state.publicInfo);
-    const { unreadCount } = useSelector((state) => state.chats);
+    const { unreadCount, chats } = useSelector((state) => state.chats);
+    const { chats: avitoChats } = useSelector((state) => state.avitoChats);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [closeTimeout, setCloseTimeout] = useState(null);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -139,6 +140,39 @@ export default function Navigation() {
 
         return { itemCount, totalPrice };
     }, [cart]);
+
+    // Расчет непрочитанных сообщений для Свой Гараж
+    const garageUnreadCount = React.useMemo(() => {
+        if (!chats || chats.length === 0) return 0;
+        
+        return chats.reduce((total, chat) => {
+            if (chat.unread_count) {
+                return total + chat.unread_count;
+            }
+            if (chat.last_message && !chat.last_message.is_read && chat.last_message.sender_id !== user?.id) {
+                return total + 1;
+            }
+            return total;
+        }, 0);
+    }, [chats, user?.id]);
+
+    // Расчет непрочитанных сообщений для Avito
+    const avitoUnreadCount = React.useMemo(() => {
+        if (!avitoChats || avitoChats.length === 0) return 0;
+        
+        return avitoChats.reduce((total, chat) => {
+            if (chat.unread_count) {
+                return total + chat.unread_count;
+            }
+            if (chat.has_unread_messages) {
+                return total + 1;
+            }
+            return total;
+        }, 0);
+    }, [avitoChats]);
+
+    // Общее количество непрочитанных
+    const totalUnreadCount = garageUnreadCount + avitoUnreadCount;
 
     const formatPrice = (price) => {
         return new Intl.NumberFormat('ru-RU', {
@@ -318,9 +352,9 @@ export default function Navigation() {
                                     <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                     </svg>
-                                    {unreadCount > 0 && (
+                                    {totalUnreadCount > 0 && (
                                         <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                                            {unreadCount}
+                                            {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
                                         </span>
                                     )}
                                 </div>
@@ -344,7 +378,7 @@ export default function Navigation() {
             </div>
 
             {/* Мобильная версия - локация и телефон над поиском */}
-            <div className="md:hidden bg-white border-b border-gray-200 px-3 py-2">
+            <div className="md:hidden bg-white border-b border-gray-200 px-4 py-3">
                 <div className="flex justify-between items-center mb-2">
                     <div className="flex items-center gap-1">
                         <img
