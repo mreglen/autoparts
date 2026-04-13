@@ -5,3 +5,4 @@ from .order_status import OrderStatus
 from .order_item import OrderItem
 from .order_item_status import OrderItemStatus
 from .rossko_status import RosskoStatus
+from .avito_order_status import AvitoOrderStatus

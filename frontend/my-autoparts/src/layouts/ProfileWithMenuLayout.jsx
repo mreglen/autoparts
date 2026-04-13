@@ -439,7 +439,7 @@ export default function ProfileWithMenuLayout() {
                 <Navigation />
             </div>
             <main
-                className={`mx-auto ${isSpecificChatPage ? 'max-w-full p-0 md:max-w-7xl md:px-2 md:sm:px-3 md:lg:px-4 md:py-6 md:sm:py-8' : 'max-w-7xl px-2 sm:px-3 lg:px-4 py-6 sm:py-8'} ${isChatPage ? 'max-md:p-0 max-md:py-0' : ''}`}
+                className={`mx-auto ${isSpecificChatPage ? 'max-w-full p-0 md:max-w-7xl md:px-0 md:sm:px-1 md:lg:px-2 md:py-6 md:sm:py-8' : 'max-w-7xl px-0 sm:px-1 lg:px-2 py-6 sm:py-8'} ${isChatPage ? 'max-md:p-0 max-md:py-0' : ''}`}
             >
                 {isSpecificChatPage ? (
                     // Mobile: Full-screen specific chat

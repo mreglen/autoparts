@@ -11,7 +11,7 @@ export default function MainLayout() {
     return (
         <div className={`min-h-screen bg-gray-50 ${!isSpecificChatPage ? 'pb-24 md:pb-0' : 'pb-0'}`}>
             {!isSpecificChatPage && <Navigation />}
-            <main className={`mx-auto ${isSpecificChatPage ? 'max-w-full p-0' : 'max-w-7xl px-2 sm:px-3 lg:px-4 py-6 sm:py-8'}`}>
+            <main className={`mx-auto ${isSpecificChatPage ? 'max-w-full p-0' : 'max-w-7xl px-0 sm:px-1 lg:px-2 py-6 sm:py-8'}`}>
                 <Outlet />
             </main>
             {!isSpecificChatPage && <MobileBottomNav />}

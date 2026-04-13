@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, BigInteger, String, DateTime, Float, Boolean, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.database import Base
@@ -27,6 +27,12 @@ class Order(Base):
 
     # Статус заказа
     status_id = Column(Integer, ForeignKey("order_statuses.id"), nullable=False)
+    
+    # Источник заказа
+    source = Column(String(20), nullable=False, server_default='garage')  # 'garage' или 'avito'
+    avito_order_id = Column(BigInteger, nullable=True)  # ID заказа в Авито
+    avito_status_code = Column(String(50), nullable=True)  # Статус из Авито
+    avito_data = Column(JSON, nullable=True)  # Дополнительные данные из API Авито
 
     # Даты
     created_at = Column(DateTime(timezone=True), server_default=func.now())

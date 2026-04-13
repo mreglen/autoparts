@@ -6,11 +6,13 @@ import {
   fetchAvitoChats,
   fetchAvitoMessengerEnabled,
   fetchAvitoMessages,
+  markAvitoChatRead,
   sendAvitoImageFile,
   sendAvitoMessage,
   sendAvitoVoiceFile,
   setSelectedAvitoChatId,
 } from '../../redux/slices/AvitoChatSlice';
+import VoicePlayer from './VoicePlayer';
 
 /**
  * Основной канал новых сообщений: вебхук Avito → бэкенд → WebSocket (`avito_messenger_refresh`).
@@ -178,6 +180,8 @@ const AvitoChatPage = ({ fillMobileHub = false, onBack }) => {
   const audioChunksRef = useRef([]);
   const mediaStreamRef = useRef(null);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     if (!user?.organization_id) return;
@@ -263,6 +267,8 @@ const AvitoChatPage = ({ fillMobileHub = false, onBack }) => {
     next.set('avitoChatId', String(chat.id));
     setSearchParams(next);
     setMobileListMode(false);
+    // Mark as read
+    dispatch(markAvitoChatRead(chat.id));
   };
 
   const handleSendMessage = async (e) => {
@@ -276,7 +282,35 @@ const AvitoChatPage = ({ fillMobileHub = false, onBack }) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || !selectedChatId || !canLoadAvitoApi) return;
-    dispatch(sendAvitoImageFile({ chatId: selectedChatId, file }));
+    setUploadingImage(true);
+    dispatch(sendAvitoImageFile({ chatId: selectedChatId, file })).finally(() => {
+      setUploadingImage(false);
+    });
+  };
+
+  // Drag & Drop handlers
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (!selectedChatId || !canLoadAvitoApi) return;
+    
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      setUploadingImage(true);
+      dispatch(sendAvitoImageFile({ chatId: selectedChatId, file })).finally(() => {
+        setUploadingImage(false);
+      });
+    }
   };
 
   const stopVoiceRecording = useCallback(() => {
@@ -425,11 +459,7 @@ const AvitoChatPage = ({ fillMobileHub = false, onBack }) => {
               </div>
             )}
             {message.voice_url ? (
-              <audio
-                controls
-                src={message.voice_url}
-                className={`w-full max-w-xs my-1 ${isOwn ? 'opacity-95' : ''}`}
-              />
+              <VoicePlayer src={message.voice_url} isOwn={isOwn} />
             ) : null}
             {(mt === 'image' || mt === 'voice' || mt === 'file') &&
             !showText &&
@@ -481,7 +511,12 @@ const AvitoChatPage = ({ fillMobileHub = false, onBack }) => {
             ))}
           </div>
         ) : (
-          <div className="h-full flex flex-col">
+          <div 
+            className="h-full flex flex-col"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             <AvitoConversationHeader
               displayChat={displayChat}
               avitoUserId={avitoUserId}
@@ -490,27 +525,46 @@ const AvitoChatPage = ({ fillMobileHub = false, onBack }) => {
             {chatDetailLoading && (
               <p className="px-4 py-1 text-xs text-gray-400 bg-white border-b border-gray-100">Обновление…</p>
             )}
-            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-0">
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-0 relative">
               {messages.map(renderMessageBubble)}
               <div ref={messagesEndMobileRef} />
+              
+              {/* Drag overlay */}
+              {isDragging && (
+                <div className="absolute inset-0 bg-blue-500/10 border-2 border-dashed border-blue-500 flex items-center justify-center z-10">
+                  <div className="bg-white p-6 rounded-lg shadow-lg">
+                    <svg className="w-12 h-12 text-blue-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-blue-600 font-medium">Перетащите изображение сюда</p>
+                  </div>
+                </div>
+              )}
             </div>
             <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200 bg-white flex gap-2 flex-shrink-0 items-center">
               <button
                 type="button"
                 className={attachmentButtonClass}
-                disabled={sending || !selectedChatId}
+                disabled={sending || !selectedChatId || uploadingImage}
                 onClick={() => imageInputRef.current?.click()}
                 aria-label="Прикрепить изображение"
-                title="Изображение"
+                title={uploadingImage ? 'Загрузка...' : 'Изображение'}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                  />
-                </svg>
+                {uploadingImage ? (
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                    />
+                  </svg>
+                )}
               </button>
               <input
                 value={newMessage}
@@ -572,9 +626,26 @@ const AvitoChatPage = ({ fillMobileHub = false, onBack }) => {
               {chatDetailLoading && (
                 <p className="px-4 py-1 text-xs text-gray-400 bg-white border-b border-gray-100">Обновление…</p>
               )}
-              <div className="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-0">
+              <div 
+                className="flex-1 overflow-y-auto p-4 bg-gray-50 min-h-0 relative"
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
                 {messages.map(renderMessageBubble)}
                 <div ref={messagesEndDesktopRef} />
+                
+                {/* Drag overlay */}
+                {isDragging && (
+                  <div className="absolute inset-0 bg-blue-500/10 border-2 border-dashed border-blue-500 flex items-center justify-center z-10">
+                    <div className="bg-white p-6 rounded-lg shadow-lg">
+                      <svg className="w-12 h-12 text-blue-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <p className="text-blue-600 font-medium">Перетащите изображение сюда</p>
+                    </div>
+                  </div>
+                )}
               </div>
               <form
                 onSubmit={handleSendMessage}
@@ -583,19 +654,26 @@ const AvitoChatPage = ({ fillMobileHub = false, onBack }) => {
                 <button
                   type="button"
                   className={attachmentButtonClass}
-                  disabled={sending || !selectedChatId}
+                  disabled={sending || !selectedChatId || uploadingImage}
                   onClick={() => imageInputRef.current?.click()}
                   aria-label="Прикрепить изображение"
-                  title="Изображение"
+                  title={uploadingImage ? 'Загрузка...' : 'Изображение'}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                    />
-                  </svg>
+                  {uploadingImage ? (
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                      />
+                    </svg>
+                  )}
                 </button>
                 <input
                   type="text"

@@ -357,8 +357,10 @@ export default function AvitoIntegrationPage() {
   const [clientSecret, setClientSecret] = useState('');
   const [avitoUserId, setAvitoUserId] = useState('');
   const [secretConfigured, setSecretConfigured] = useState(false);
+  const [integrationEnabled, setIntegrationEnabled] = useState(true);
   const [loadingCreds, setLoadingCreds] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [toggling, setToggling] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState(null);
   const [error, setError] = useState(null);
@@ -375,10 +377,13 @@ export default function AvitoIntegrationPage() {
   const [photoIndexes, setPhotoIndexes] = useState({});
   const [publishing, setPublishing] = useState(false);
   const [isAvitoConnectOpen, setIsAvitoConnectOpen] = useState(false);
+  const [isConfirmDisableOpen, setIsConfirmDisableOpen] = useState(false);
   const [webhookSubscribing, setWebhookSubscribing] = useState(false);
+  const [avitoDeliveryWarning, setAvitoDeliveryWarning] = useState(null);
+  const [checkingDelivery, setCheckingDelivery] = useState(false);
 
   const avitoApiConnected =
-    Boolean(secretConfigured && (clientId || '').trim() && (avitoUserId || '').trim());
+    Boolean(secretConfigured && (clientId || '').trim() && (avitoUserId || '').trim() && integrationEnabled);
 
   const messengerWebhookUrl = useMemo(() => {
     const base = String(BACKEND_BASE || '')
@@ -404,6 +409,7 @@ export default function AvitoIntegrationPage() {
       setClientId(data.client_id || '');
       setAvitoUserId(data.avito_user_id != null ? String(data.avito_user_id) : '');
       setSecretConfigured(!!data.client_secret_configured);
+      setIntegrationEnabled(data.enabled !== false); // Default to true if not specified
       const {
         items: cachedItems,
         uploadResult: cachedPreview,
@@ -423,6 +429,39 @@ export default function AvitoIntegrationPage() {
   useEffect(() => {
     loadCredentials();
   }, [loadCredentials]);
+
+  // Проверка Avito Доставки при загрузке страницы (если API подключено)
+  useEffect(() => {
+    if (!orgId || !avitoApiConnected) {
+      setAvitoDeliveryWarning(null);
+      return;
+    }
+
+    let active = true;
+    setCheckingDelivery(true);
+    
+    apiRequest(`/organizations/${orgId}/avito/delivery/check`, { method: 'GET' })
+      .then((data) => {
+        if (!active) return;
+        if (data && data.delivery_enabled === false && data.message) {
+          setAvitoDeliveryWarning(data.message);
+        } else {
+          setAvitoDeliveryWarning(null);
+        }
+      })
+      .catch((e) => {
+        // Если ошибка - не показываем предупреждение, т.к. это может быть проблема с API
+        console.warn('Ошибка проверки Avito доставки:', e);
+        if (active) setAvitoDeliveryWarning(null);
+      })
+      .finally(() => {
+        if (active) setCheckingDelivery(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [orgId, avitoApiConnected]);
 
 
   const statuses = useMemo(() => {
@@ -578,6 +617,16 @@ export default function AvitoIntegrationPage() {
         console.warn('Не удалось подписаться на вебхук:', webhookErr);
       }
       
+      // Проверяем Avito Доставку после подключения
+      try {
+        const deliveryCheck = await apiRequest(`/organizations/${orgId}/avito/delivery/check`, { method: 'GET' });
+        if (deliveryCheck && deliveryCheck.delivery_enabled === false && deliveryCheck.message) {
+          setAvitoDeliveryWarning(deliveryCheck.message);
+        }
+      } catch (deliveryErr) {
+        console.warn('Ошибка проверки Avito доставки:', deliveryErr);
+      }
+      
       setIsAvitoConnectOpen(false);
       return true;
     } catch (e) {
@@ -596,6 +645,49 @@ export default function AvitoIntegrationPage() {
   const closeAvitoConnectModal = () => {
     setIsAvitoConnectOpen(false);
   };
+
+  const handleToggleIntegration = useCallback(async () => {
+    if (!orgId || !secretConfigured) return;
+    setToggling(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const data = await apiRequest(`/organizations/${orgId}/avito/toggle-enabled`, { method: 'PATCH' });
+      setIntegrationEnabled(data.enabled);
+      if (data.enabled) {
+        setNotice('Интеграция с Авито включена.');
+      } else {
+        setNotice('Интеграция с Авито отключена.');
+      }
+    } catch (e) {
+      setError(formatErrorMessage(e));
+    } finally {
+      setToggling(false);
+    }
+  }, [orgId, secretConfigured]);
+
+  const handleDisableClick = () => {
+    setIsConfirmDisableOpen(true);
+  };
+
+  const handleConfirmDisable = async () => {
+    setIsConfirmDisableOpen(false);
+    await handleToggleIntegration();
+  };
+
+  const handleCancelDisable = () => {
+    setIsConfirmDisableOpen(false);
+  };
+
+  // Handle Escape key for confirmation modal
+  useEffect(() => {
+    if (!isConfirmDisableOpen) return undefined;
+    const onEsc = (e) => {
+      if (e.key === 'Escape') handleCancelDisable();
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [isConfirmDisableOpen]);
 
   const subscribeAvitoMessengerWebhook = useCallback(async () => {
     if (!orgId || !avitoApiConnected) return;
@@ -701,6 +793,19 @@ export default function AvitoIntegrationPage() {
           {notice}
         </div>
       )}
+      {avitoDeliveryWarning && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+            </svg>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800 mb-1">Внимание: Авито Доставка не подключена</p>
+              <p className="text-sm text-amber-700">{avitoDeliveryWarning}</p>
+            </div>
+          </div>
+        </div>
+      )}
       {warnings && warnings.length > 0 && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
           <div className="flex items-start gap-2">
@@ -732,17 +837,38 @@ export default function AvitoIntegrationPage() {
                   <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
                   <p className="text-sm text-gray-700">Подключено · User ID: <span className="font-mono text-gray-900">{avitoUserId}</span></p>
                 </div>
+              ) : secretConfigured ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                  <p className="text-sm text-gray-700">Отключено · User ID: <span className="font-mono text-gray-900">{avitoUserId}</span></p>
+                </div>
               ) : (
                 <p className="text-sm text-gray-500">Не подключено</p>
               )}
             </div>
-            <button
-              type="button"
-              onClick={openAvitoConnectModal}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shrink-0"
-            >
-              {avitoApiConnected ? 'Изменить' : 'Подключить'}
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {secretConfigured && (
+                <button
+                  type="button"
+                  onClick={integrationEnabled ? handleDisableClick : handleToggleIntegration}
+                  disabled={toggling}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors shrink-0 ${
+                    integrationEnabled
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {toggling ? 'Переключение…' : integrationEnabled ? 'Отключить' : 'Включить'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openAvitoConnectModal}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shrink-0"
+              >
+                {avitoApiConnected || secretConfigured ? 'Изменить' : 'Подключить'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -905,6 +1031,81 @@ export default function AvitoIntegrationPage() {
         onSave={saveAvitoCredentials}
         loadingCreds={loadingCreds}
       />
+
+      {/* Confirmation Modal for Disabling Integration */}
+      {isConfirmDisableOpen && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-4"
+          onClick={handleCancelDisable}
+        >
+          <div
+            className="bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-labelledby="confirm-disable-title"
+          >
+            <div className="px-6 py-5 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h2 id="confirm-disable-title" className="text-lg font-bold text-gray-900">
+                  Отключить интеграцию?
+                </h2>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              <p className="text-sm text-gray-700 mb-4">
+                Вы уверены, что хотите отключить интеграцию с Авито?
+              </p>
+              <ul className="text-sm text-gray-600 space-y-2">
+                <li className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                  </svg>
+                  <span>Автозагрузка объявлений будет остановлена</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                  </svg>
+                  <span>Чат Авито Messenger станет недоступен</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                  </svg>
+                  <span>Экспорт товаров на Авито будет заблокирован</span>
+                </li>
+              </ul>
+              <p className="text-xs text-gray-500 mt-4">
+                Вы сможете включить интеграцию обратно в любой момент.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
+              <button
+                type="button"
+                onClick={handleCancelDisable}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-all"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDisable}
+                disabled={toggling}
+                className="flex-1 px-4 py-3 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {toggling ? 'Отключение…' : 'Отключить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

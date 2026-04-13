@@ -257,6 +257,8 @@ def _has_avito_integration(db: Session, org_id: str) -> bool:
     ).first()
     if not row:
         return False
+    if not row.enabled:
+        return False
     return bool(row.client_id and row.client_secret_encrypted and row.avito_user_id)
 
 
@@ -365,12 +367,14 @@ def get_avito_credentials(
             client_id="",
             avito_user_id=None,
             client_secret_configured=False,
+            enabled=True,
             last_autoload=last,
         )
     return AvitoCredentialsResponse(
         client_id=row.client_id,
         avito_user_id=int(row.avito_user_id),
         client_secret_configured=True,
+        enabled=row.enabled,
         last_autoload=last,
     )
 
@@ -619,6 +623,7 @@ def put_avito_credentials(
             avito_user_id=body.avito_user_id,
             client_id=body.client_id.strip(),
             client_secret_encrypted=encrypt_secret(secret_in),
+            enabled=True,
         )
         db.add(row)
     else:
@@ -634,6 +639,42 @@ def put_avito_credentials(
         client_id=row.client_id,
         avito_user_id=int(row.avito_user_id),
         client_secret_configured=True,
+        enabled=row.enabled,
+        last_autoload=last,
+    )
+
+
+@router.patch("/{org_id}/avito/toggle-enabled", response_model=AvitoCredentialsResponse)
+def toggle_avito_integration_enabled(
+    org_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Toggle Avito integration enabled/disabled state."""
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+
+    row = db.query(OrganizationAvitoIntegration).filter(
+        OrganizationAvitoIntegration.organization_id == org_id
+    ).first()
+
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Интеграция Авито не настроена. Сначала подключите API.",
+        )
+
+    # Toggle the enabled state
+    row.enabled = not row.enabled
+    db.commit()
+    db.refresh(row)
+
+    last = _get_last_autoload(db, org_id)
+    return AvitoCredentialsResponse(
+        client_id=row.client_id,
+        avito_user_id=int(row.avito_user_id),
+        client_secret_configured=True,
+        enabled=row.enabled,
         last_autoload=last,
     )
 

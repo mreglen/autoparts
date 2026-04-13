@@ -137,6 +137,21 @@ export const sendAvitoVoiceFile = createAsyncThunk(
   }
 );
 
+export const markAvitoChatRead = createAsyncThunk(
+  'avitoChats/markChatRead',
+  async (chatId, { rejectWithValue }) => {
+    try {
+      const response = await apiRequest(
+        `/avito/messenger/chats/${encodeURIComponent(chatId)}/mark-read`,
+        { method: 'POST' }
+      );
+      return { chatId, success: response?.ok };
+    } catch (err) {
+      return rejectWithValue(err?.message || 'Ошибка пометки чата прочитанным');
+    }
+  }
+);
+
 const initialState = {
   enabled: false,
   /** ID пользователя Авито (аккаунт API), для стороны «я / собеседник» в переписке */

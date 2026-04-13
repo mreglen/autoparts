@@ -400,7 +400,8 @@ async def get_sales_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Получение заказов для страницы продаж с учетом роли пользователя и is_admin директора"""
+    """Получение заказов для страницы продаж с учетом роли пользователя и is_admin директора
+    Включает заказы из Свой Гараж и Авито"""
     from app.models.user import User
     from app.models.organization import Organization
     from sqlalchemy import or_, and_
@@ -437,12 +438,21 @@ async def get_sales_orders(
     if current_user.organization_id:
         # Все продавцы и сотрудники видят заказы б/у запчастей своей организации
         # (где seller_organization_id = organization_id пользователя)
+        # PLUS заказы Авито (привязаны к owner_user_id организации)
         
         # Получаем ID заказов, где есть б/у запчасти от организации пользователя
         used_parts_order_ids = db.query(OrderItem.order_id).filter(
             OrderItem.seller_organization_id == current_user.organization_id
         ).distinct().all()
         used_parts_order_ids = [oid for (oid,) in used_parts_order_ids]
+        
+        # Получаем user_id владельцев организации (админов)
+        from sqlalchemy import select
+        org_admin_ids = db.query(User.id).filter(
+            User.organization_id == current_user.organization_id,
+            User.is_admin == True
+        ).all()
+        org_admin_ids = [uid for (uid,) in org_admin_ids]
         
         if can_view_new_parts_orders:
             # Если директор is_admin=true - также видим заказы новых запчастей от Rossko
@@ -454,16 +464,28 @@ async def get_sales_orders(
                     # Б/у запчасти от своей организации
                     Order.id.in_(used_parts_order_ids),
                     # Новые запчасти от Rossko
-                    Order.new_parts_order != None
+                    Order.new_parts_order != None,
+                    # Заказы Авито (от админов организации)
+                    and_(
+                        Order.source == 'avito',
+                        Order.user_id.in_(org_admin_ids)
+                    )
                 )
             ).offset(skip).limit(limit).all()
         else:
-            # Обычные продавцы/сотрудники - только б/у запчасти своей организации
+            # Обычные продавцы/сотрудники - только б/у запчасти своей организации + Авито
             orders = db.query(Order).options(
                 joinedload(Order.status),
                 selectinload(Order.items).joinedload(OrderItem.status)
             ).filter(
-                Order.id.in_(used_parts_order_ids)
+                or_(
+                    Order.id.in_(used_parts_order_ids),
+                    # Заказы Авито (от админов организации)
+                    and_(
+                        Order.source == 'avito',
+                        Order.user_id.in_(org_admin_ids)
+                    )
+                )
             ).offset(skip).limit(limit).all()
     else:
         # Пользователь без организации (включая админов без организации) - пустой результат
@@ -473,7 +495,10 @@ async def get_sales_orders(
                 joinedload(Order.status),
                 selectinload(Order.items).joinedload(OrderItem.status)
             ).filter(
-                Order.new_parts_order != None
+                or_(
+                    Order.new_parts_order != None,
+                    Order.source == 'avito'
+                )
             ).offset(skip).limit(limit).all()
         else:
             return []
@@ -486,8 +511,8 @@ async def get_sales_orders(
     result = []
     for order in orders:
         order_response = order_to_response(order, db, filter_organization_id=filter_org_id)
-        # Only include orders that have at least one visible item after filtering
-        if order_response.items:
+        # Include Avito orders even if they don't have items in our system
+        if order_response.items or order.source == 'avito':
             result.append(order_response)
     
     return result

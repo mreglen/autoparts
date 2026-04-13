@@ -16,6 +16,7 @@ export default function SalesOrdersPage() {
   const [editingStatus, setEditingStatus] = useState(null); // {type: 'order'|'item', id: number}
   const [availableStatuses, setAvailableStatuses] = useState([]);
   const [authChecked, setAuthChecked] = useState(false);
+  const [userOrgId, setUserOrgId] = useState(null);
 
   console.log('orders:', orders);
   console.log('user:', user);
@@ -51,13 +52,37 @@ export default function SalesOrdersPage() {
     if (!authChecked) return;
     
     if (hasPermission) {
+      // Получаем organization_id пользователя
+      if (user?.organization_id) {
+        setUserOrgId(user.organization_id);
+      }
       fetchOrders();
     }
-  }, [hasPermission, authChecked]);
+  }, [hasPermission, authChecked, user]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
+
+      // Сначала синхронизируем заказы Авито
+      if (userOrgId) {
+        try {
+          await apiAxios.get(`/organizations/${userOrgId}/avito/orders/sync`);
+          console.log('Avito orders synced successfully');
+        } catch (err) {
+          // Тихо игнорируем ошибки синхронизации Авито
+          // Если Авито не настроен или API недоступен - просто продолжаем загрузку
+          const errorMsg = err.response?.data?.detail || '';
+          if (errorMsg.includes('Интеграция с Авито не настроена')) {
+            console.log('Avito integration not configured');
+          } else if (errorMsg.includes('API Авито')) {
+            console.warn('Avito API error:', errorMsg);
+          } else {
+            console.log('Avito sync skipped:', err.message);
+          }
+          // Не прерываем выполнение - продолжаем загрузку заказов
+        }
+      }
 
       // Используем новый endpoint /orders/sales/all который учитывает роль пользователя
       // и is_admin директора организации
@@ -71,6 +96,7 @@ export default function SalesOrdersPage() {
       setLoading(false);
     }
   };
+
 
   const updateOrderStatus = async (orderId, statusCode) => {
     try {
@@ -151,6 +177,51 @@ export default function SalesOrdersPage() {
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('ru-RU');
+  };
+
+  const getAvitoStatusColor = (statusCode) => {
+    const colorMap = {
+      'on_confirmation': 'bg-yellow-100 text-yellow-800',
+      'ready_to_ship': 'bg-blue-100 text-blue-800',
+      'in_transit': 'bg-purple-100 text-purple-800',
+      'delivered': 'bg-green-100 text-green-800',
+      'canceled': 'bg-red-100 text-red-800',
+      'closed': 'bg-gray-100 text-gray-800',
+      'on_return': 'bg-orange-100 text-orange-800',
+      'in_dispute': 'bg-pink-100 text-pink-800',
+    };
+    return colorMap[statusCode] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getAvitoStatusName = (statusCode) => {
+    const statusMap = {
+      'on_confirmation': 'Ожидает подтверждения',
+      'ready_to_ship': 'Ждет отправки',
+      'in_transit': 'В пути',
+      'delivered': 'Доставлен',
+      'canceled': 'Отменен',
+      'closed': 'Закрыт',
+      'on_return': 'На возврате',
+      'in_dispute': 'Открыт спор',
+    };
+    return statusMap[statusCode] || statusCode;
+  };
+
+  const handleAvitoTransition = async (avitoOrderId, transition) => {
+    if (!userOrgId) return;
+    
+    try {
+      await apiAxios.post(
+        `/organizations/${userOrgId}/avito/orders/${avitoOrderId}/transition`,
+        { transition }
+      );
+      
+      // Перезагружаем заказы
+      await fetchOrders();
+    } catch (error) {
+      console.error('Ошибка изменения статуса Авито:', error);
+      alert('Не удалось изменить статус: ' + (error.response?.data?.detail || error.message));
+    }
   };
 
   const formatPrice = (price) => {
@@ -280,28 +351,31 @@ export default function SalesOrdersPage() {
             <table className="w-full table-fixed divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="w-[13%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Номер заказа
                   </th>
-                  <th className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-[7%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Дата
                   </th>
-                  <th className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-[5%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Источник
+                  </th>
+                  <th className="w-[11%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Клиент
                   </th>
-                  <th className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-[11%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Телефон
                   </th>
-                  <th className="w-[18%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-[16%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Способ доставки
                   </th>
-                  <th className="w-[8%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-[7%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Оплата
                   </th>
                   <th className="w-[10%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Статус
                   </th>
-                  <th className="w-[11%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Сумма
                   </th>
                 </tr>
@@ -318,6 +392,14 @@ export default function SalesOrdersPage() {
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatDate(order.created_at)}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-center">
+                      <img 
+                        src={order.source === 'avito' ? '/logos/avito.png' : '/logos/svoygarage.png'} 
+                        alt={order.source === 'avito' ? 'Авито' : 'Свой Гараж'} 
+                        className="w-6 h-6 object-contain mx-auto" 
+                        title={order.source === 'avito' ? 'Заказ из Авито' : 'Заказ Свой Гараж'}
+                      />
                     </td>
                     <td className="px-3 py-4 text-sm text-gray-900">
                       {order.recipient_name}
@@ -338,7 +420,14 @@ export default function SalesOrdersPage() {
                       </span>
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-center">
-                      {editingStatus?.type === 'order' && editingStatus?.id === order.id ? (
+                      {order.source === 'avito' && order.avito_status_code ? (
+                        <span
+                          className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${getAvitoStatusColor(order.avito_status_code)}`}
+                          title={`Авито: ${getAvitoStatusName(order.avito_status_code)}`}
+                        >
+                          {getAvitoStatusName(order.avito_status_code)}
+                        </span>
+                      ) : editingStatus?.type === 'order' && editingStatus?.id === order.id ? (
                         <select
                           value={order.status.code}
                           onChange={(e) => updateOrderStatus(order.id, e.target.value)}
@@ -374,7 +463,7 @@ export default function SalesOrdersPage() {
                   {/* Детали заказа - таблица с запчастями */}
                   {expandedOrderId === order.id && order.items && order.items.length > 0 && (
                     <tr>
-                      <td colSpan="8" className="px-6 py-4 bg-gray-50">
+                      <td colSpan="9" className="px-6 py-4 bg-gray-50">
                         <div className="border border-gray-200 rounded-lg overflow-hidden">
                           <table className="w-full table-fixed divide-y divide-gray-200">
                             <thead className="bg-gray-100">
@@ -506,9 +595,20 @@ export default function SalesOrdersPage() {
                 <div className="flex-1 pr-4">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-base font-semibold text-gray-900">Заказ #{order.order_number}</span>
+                    <img 
+                      src={order.source === 'avito' ? '/logos/avito.png' : '/logos/svoygarage.png'} 
+                      alt={order.source === 'avito' ? 'Авито' : 'Свой Гараж'} 
+                      className="w-5 h-5 object-contain" 
+                      title={order.source === 'avito' ? 'Заказ из Авито' : 'Заказ Свой Гараж'}
+                    />
                     <span className="text-sm text-gray-400">•</span>
                     <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
                   </div>
+                  {order.source === 'avito' && order.avito_order_id && (
+                    <div className="text-xs text-gray-500 mb-1">
+                      Авито ID: {order.avito_order_id}
+                    </div>
+                  )}
                   <div className="text-base text-gray-800 mb-1">{order.recipient_name}</div>
                   <div className="text-sm text-gray-600 mb-3">{order.recipient_phone}</div>
                   <div className="text-sm text-gray-600">{getDeliveryInfo(order)}</div>
@@ -525,6 +625,11 @@ export default function SalesOrdersPage() {
                     }`}>
                       {order.is_paid ? 'Оплачено' : 'Не оплачено'}
                     </span>
+                    {order.source === 'avito' && order.avito_status_code && (
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full self-end ${getAvitoStatusColor(order.avito_status_code)}`}>
+                        {getAvitoStatusName(order.avito_status_code)}
+                      </span>
+                    )}
                     <div className="mt-2">
                       {editingStatus?.type === 'order' && editingStatus?.id === order.id ? (
                         <select

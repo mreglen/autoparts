@@ -28,6 +28,7 @@ class AvitoCredentialsResponse(BaseModel):
     client_id: str = ""
     avito_user_id: Optional[int] = None
     client_secret_configured: bool = False
+    enabled: bool = True
     last_autoload: Optional[AvitoLastAutoloadSnapshot] = None
 
 

@@ -73,7 +73,7 @@ async def avito_messenger_enabled(
     row = db.query(OrganizationAvitoIntegration).filter(
         OrganizationAvitoIntegration.organization_id == current_user.organization_id
     ).first()
-    enabled = bool(row and row.client_id and row.client_secret_encrypted and row.avito_user_id)
+    enabled = bool(row and row.enabled and row.client_id and row.client_secret_encrypted and row.avito_user_id)
     avito_uid = int(row.avito_user_id) if row and row.avito_user_id is not None else None
     return {"enabled": enabled, "avito_user_id": avito_uid}
 
@@ -122,6 +122,21 @@ async def get_avito_chat_messages(
         if mark_read:
             await mark_chat_read(token, avito_user_id, chat_id)
         return {"messages": messages}
+    except AvitoMessengerError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+
+
+@router.post("/chats/{chat_id}/mark-read")
+async def mark_avito_chat_read(
+    chat_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Пометить чат Авито как прочитанный"""
+    token, avito_user_id = await _get_access_token_for_user(db, current_user)
+    try:
+        result = await mark_chat_read(token, avito_user_id, chat_id)
+        return {"ok": result}
     except AvitoMessengerError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
