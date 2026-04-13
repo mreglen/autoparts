@@ -280,6 +280,84 @@ async def sync_avito_orders(
         )
 
 
+@router.get("/{org_id}/avito/orders/raw")
+async def get_raw_avito_orders(
+    org_id: str,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """
+    Получить сырые данные заказов напрямую из API Авито
+    Возвращает ответ как есть от https://api.avito.ru/order-management/1/orders
+    
+    Args:
+        status: Фильтр по статусу (опционально)
+            Доступные статусы:
+            - on_confirmation: Ожидает подтверждения
+            - ready_to_ship: Ждет отправки
+            - in_transit: В пути
+            - delivered: Доставлен
+            - canceled: Отменен
+            - closed: Закрыт
+            - on_return: На возврате
+            - in_dispute: Открыт спор
+    """
+    _ensure_org_access(current_user, org_id)
+    
+    # Получаем интеграцию
+    integration = db.query(OrganizationAvitoIntegration).filter(
+        OrganizationAvitoIntegration.organization_id == org_id
+    ).first()
+    
+    if not integration:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Интеграция с Авито не настроена"
+        )
+    
+    if not integration.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Интеграция с Авито отключена"
+        )
+    
+    try:
+        # Получаем токен
+        secret = decrypt_secret(integration.client_secret_encrypted)
+        token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
+        avito_user_id = int(integration.avito_user_id)
+        
+        # Получаем все заказы напрямую из API Авито с фильтром по статусу
+        response = await fetch_avito_orders(token, avito_user_id, status=status)
+        
+        logger.info(f"Fetched {len(response.get('orders', []))} raw orders from Avito API for org {org_id} with status={status}")
+        
+        # Возвращаем ответ как есть от API Авито
+        return {
+            "success": True,
+            "avito_user_id": avito_user_id,
+            "total_orders": len(response.get('orders', [])),
+            "filter_status": status,
+            "raw_response": response
+        }
+    except HTTPException:
+        raise
+    except AvitoOrdersError as e:
+        error_msg = str(e)
+        logger.warning(f"Avito API error: {error_msg}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ошибка API Авито: {error_msg}"
+        )
+    except Exception as e:
+        logger.exception("Error fetching raw Avito orders")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка получения данных из Авито: {str(e)}"
+        )
+
+
 @router.post("/{org_id}/avito/orders/{avito_order_id}/transition")
 async def apply_avito_order_transition(
     org_id: str,

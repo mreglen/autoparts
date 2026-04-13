@@ -139,7 +139,11 @@ def order_to_response(order: Order, db_session=None, filter_organization_id=None
         status=order.status,
         created_at=order.created_at,
         items=items_response,
-        new_parts_order=new_parts_order_response
+        new_parts_order=new_parts_order_response,
+        source=order.source,
+        avito_order_id=order.avito_order_id,
+        avito_status_code=order.avito_status_code,
+        avito_data=order.avito_data
     )
 
 def init_order_statuses(db: Session):
@@ -405,6 +409,12 @@ async def get_sales_orders(
     from app.models.user import User
     from app.models.organization import Organization
     from sqlalchemy import or_, and_
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Логируем информацию о текущем пользователе
+    logger.info(f"get_sales_orders: user_id={current_user.id}, is_admin={current_user.is_admin}, organization_id={current_user.organization_id}")
     
     # Проверяем, что пользователь имеет право просматривать заказы продаж
     # (продавец, админ, директор, или сотрудник)
@@ -438,7 +448,7 @@ async def get_sales_orders(
     if current_user.organization_id:
         # Все продавцы и сотрудники видят заказы б/у запчастей своей организации
         # (где seller_organization_id = organization_id пользователя)
-        # PLUS заказы Авито (привязаны к owner_user_id организации)
+        # PLUS все заказы Авито (привязаны к организации, а не к конкретному пользователю)
         
         # Получаем ID заказов, где есть б/у запчасти от организации пользователя
         used_parts_order_ids = db.query(OrderItem.order_id).filter(
@@ -446,13 +456,17 @@ async def get_sales_orders(
         ).distinct().all()
         used_parts_order_ids = [oid for (oid,) in used_parts_order_ids]
         
-        # Получаем user_id владельцев организации (админов)
-        from sqlalchemy import select
-        org_admin_ids = db.query(User.id).filter(
-            User.organization_id == current_user.organization_id,
-            User.is_admin == True
-        ).all()
-        org_admin_ids = [uid for (uid,) in org_admin_ids]
+        logger.info(f"used_parts_order_ids count: {len(used_parts_order_ids)}")
+        
+        # Проверяем сколько заказов Авито есть в базе для этой организации
+        # Заказы Авито привязаны к owner_user_id, но должны быть видны всем из организации
+        avito_orders_in_org = db.query(Order).filter(
+            Order.source == 'avito',
+            Order.user_id.in_(
+                db.query(User.id).filter(User.organization_id == current_user.organization_id).subquery()
+            )
+        ).count()
+        logger.info(f"Avito orders for org {current_user.organization_id}: {avito_orders_in_org}")
         
         if can_view_new_parts_orders:
             # Если директор is_admin=true - также видим заказы новых запчастей от Rossko
@@ -462,31 +476,37 @@ async def get_sales_orders(
             ).filter(
                 or_(
                     # Б/у запчасти от своей организации
-                    Order.id.in_(used_parts_order_ids),
+                    Order.id.in_(used_parts_order_ids) if used_parts_order_ids else False,
                     # Новые запчасти от Rossko
                     Order.new_parts_order != None,
-                    # Заказы Авито (от админов организации)
+                    # Все заказы Авито от пользователей этой организации
                     and_(
                         Order.source == 'avito',
-                        Order.user_id.in_(org_admin_ids)
+                        Order.user_id.in_(
+                            db.query(User.id).filter(User.organization_id == current_user.organization_id).subquery()
+                        )
                     )
                 )
             ).offset(skip).limit(limit).all()
         else:
-            # Обычные продавцы/сотрудники - только б/у запчасти своей организации + Авито
+            # Обычные продавцы/сотрудники - только б/у запчасти своей организации + все заказы Авито
             orders = db.query(Order).options(
                 joinedload(Order.status),
                 selectinload(Order.items).joinedload(OrderItem.status)
             ).filter(
                 or_(
-                    Order.id.in_(used_parts_order_ids),
-                    # Заказы Авито (от админов организации)
+                    Order.id.in_(used_parts_order_ids) if used_parts_order_ids else False,
+                    # Все заказы Авито от пользователей этой организации
                     and_(
                         Order.source == 'avito',
-                        Order.user_id.in_(org_admin_ids)
+                        Order.user_id.in_(
+                            db.query(User.id).filter(User.organization_id == current_user.organization_id).subquery()
+                        )
                     )
                 )
             ).offset(skip).limit(limit).all()
+        
+        logger.info(f"Found {len(orders)} orders for user {current_user.id}")
     else:
         # Пользователь без организации (включая админов без организации) - пустой результат
         # или только новые запчасти если can_view_new_parts_orders
