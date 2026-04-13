@@ -12,7 +12,7 @@ import StockOutModal from './StockOutModal/StockOutModal';
 import PendingParts from './PendingParts/PendingParts';
 import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
 
-const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onPrint, onExport, showExport, onExportDrom, showDromExport, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [] }) => {
+const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onPrint, onExport, showExport, onExportDrom, showDromExport, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [], imageErrors = {}, onImageError }) => {
   const [showActions, setShowActions] = useState(false);
 
   
@@ -32,14 +32,17 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
     };
   }, [showActions]);
 
+  // Get first photo for card preview
+  const firstPhoto = part.photos && part.photos.length > 0 
+    ? (typeof part.photos[0] === 'string' ? part.photos[0] : part.photos[0].photo_url || part.photos[0].full_url || '')
+    : null;
+  const normalizedPhotoUrl = firstPhoto ? normalizeImageUrl(firstPhoto) : null;
+  const hasImageError = imageErrors[part.id];
+
   return (
   <React.Fragment>
-    <tr
-      className="hover:bg-gray-50"
-    >
-      <td 
-        className="px-2 py-3 whitespace-nowrap border-r border-gray-200"
-      >
+    <tr className="group hover:bg-gray-50/50 transition-all duration-200 border-b border-gray-100">
+      <td className="px-4 py-4 whitespace-nowrap">
         <input
           type="checkbox"
           checked={isSelected}
@@ -50,146 +53,179 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
           className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
         />
       </td>
-      <td 
-        className="px-2 py-3 whitespace-nowrap text-sm font-medium text-gray-900 cursor-pointer"
-        onClick={onToggleExpand}
-      >
-        {part.brand || '—'}
-      </td>
-      <td 
-        className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 font-mono cursor-pointer"
-        onClick={onToggleExpand}
-      >
-        {part.article || '—'}
-      </td>
-      <td 
-        className="hidden md:table-cell px-3 py-3 whitespace-nowrap text-sm text-gray-500 font-mono cursor-pointer"
-        onClick={onToggleExpand}
-      >
-        {part.internal_code || '—'}
-      </td>
-      <td 
-        className="px-2 py-3 text-sm text-gray-500 max-w-0 truncate sm:max-w-none sm:whitespace-normal cursor-pointer"
-        onClick={onToggleExpand}
-      >
-        {part.name || '—'}
-      </td>
-      <td 
-        className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
-        onClick={onToggleExpand}
-      >
-        {part.quantity || 0}
-      </td>
-      <td 
-        className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
-        onClick={onToggleExpand}
-      >
-        {part.price != null && !isNaN(parseFloat(part.price)) ? `${parseFloat(part.price).toFixed(2)} ₽` : '—'}
-      </td>
-      <td 
-        className="px-2 py-3 whitespace-nowrap cursor-pointer"
-        onClick={onToggleExpand}
-      >
-        <div className="flex items-center gap-1">
-          {/* Svoygarage icon - always shown */}
-          <img 
-            src="/logos/svoygarage.png" 
-            alt="Свой Гараж" 
-            className="w-5 h-5 object-contain"
-            title="Свой Гараж"
-          />
-          {/* Avito icon - shown only if product is on Avito */}
-          {part.is_on_avito && (
-            <img 
-              src="/logos/avito.png" 
-              alt="Avito" 
-              className="w-5 h-5 object-contain"
-              title="Avito"
-            />
-          )}
-          {/* Drom icon - shown only if product is on Drom */}
-          {part.is_on_drom && (
-            <img 
-              src="/logos/drom.png" 
-              alt="Drom" 
-              className="w-5 h-5 object-contain"
-              title="Drom"
-            />
-          )}
+      
+      {/* Product info cell with image */}
+      <td className="px-4 py-4" colSpan={4}>
+        <div className="flex items-start gap-4">
+          {/* Product image */}
+          <div 
+            className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 cursor-pointer" 
+            onClick={onToggleExpand}
+          >
+            {normalizedPhotoUrl && !hasImageError ? (
+              <img 
+                src={normalizedPhotoUrl} 
+                alt={part.name}
+                className="w-full h-full object-cover"
+                onError={() => onImageError(part.id)}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+            )}
+          </div>
+
+          {/* Product details */}
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={onToggleExpand}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-base font-semibold text-gray-900">{part.brand || '—'}</span>
+              <span className="text-sm text-gray-400">•</span>
+              <span className="text-sm text-gray-500 font-mono">{part.article || '—'}</span>
+            </div>
+            {part.internal_code && (
+              <div className="text-xs text-gray-500 mb-1">
+                Внутренний код: <span className="font-mono">{part.internal_code}</span>
+              </div>
+            )}
+            <h3 className="text-sm font-medium text-gray-800 mb-2 line-clamp-2">{part.name || '—'}</h3>
+            
+            {/* Status badges */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+              }`}>
+                {part.is_new ? 'Новый' : 'Б/у'}
+              </span>
+              
+              {/* Platform icons */}
+              <div className="flex items-center gap-1">
+                <img 
+                  src="/logos/svoygarage.png" 
+                  alt="Свой Гараж" 
+                  className="w-4 h-4 object-contain"
+                  title="Свой Гараж"
+                />
+                {part.is_on_avito && (
+                  <img 
+                    src="/logos/avito.png" 
+                    alt="Avito" 
+                    className="w-4 h-4 object-contain"
+                    title="Avito"
+                  />
+                )}
+                {part.is_on_drom && (
+                  <img 
+                    src="/logos/drom.png" 
+                    alt="Drom" 
+                    className="w-4 h-4 object-contain"
+                    title="Drom"
+                  />
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </td>
-      <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-500">
+      
+      {/* Quantity and Price */}
+      <td className="px-4 py-4 whitespace-nowrap">
+        <div className="text-center">
+          <div className="text-sm font-medium text-gray-900">{part.quantity || 0}</div>
+          <div className="text-xs text-gray-500">шт.</div>
+        </div>
+      </td>
+      <td className="px-4 py-4 whitespace-nowrap">
+        <div className="text-base font-bold text-gray-900">
+          {part.price != null && !isNaN(parseFloat(part.price)) ? `${parseFloat(part.price).toLocaleString('ru-RU')} ₽` : '—'}
+        </div>
+      </td>
+      
+      {/* Actions */}
+      <td className="px-4 py-4 whitespace-nowrap">
         <div className="relative actions-dropdown">
           <button
             onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
-            className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
-            Действия
-            <img
-              src="/img/arrow_sm.svg"
-              alt=""
-              className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${showActions ? 'rotate-90' : ''}`}
-              style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
-            />
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+            </svg>
+            <span className="hidden sm:inline">Действия</span>
           </button>
 
           {showActions && (
-            <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
-              <div className="py-1">
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20 actions-dropdown">
+              <button
+                onClick={(e) => { e.stopPropagation(); onPrint(part); setShowActions(false); }}
+                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Печать
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onSale(part); setShowActions(false); }}
+                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Продать
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onWriteoff(part); setShowActions(false); }}
+                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Списать
+              </button>
+              {showExport && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); onPrint(part); setShowActions(false); }}
-                  className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                  onClick={(e) => { e.stopPropagation(); onExport(part); setShowActions(false); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >
-                  Печать
+                  <img src="/logos/avito.png" alt="" className="w-4 h-4" />
+                  Экспорт Avito
                 </button>
+              )}
+              {showDromExport && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); onSale(part); setShowActions(false); }}
-                  className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                  onClick={(e) => { e.stopPropagation(); onExportDrom(part); setShowActions(false); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                 >
-                  Продать
+                  <img src="/logos/drom.png" alt="" className="w-4 h-4" />
+                  Экспорт Drom
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onWriteoff(part); setShowActions(false); }}
-                  className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                >
-                  Списать
-                </button>
-                {showExport && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onExport(part); setShowActions(false); }}
-                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                  >
-                    Экспорт Avito
-                  </button>
-                )}
-                {showDromExport && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onExportDrom(part); setShowActions(false); }}
-                    className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                  >
-                    Экспорт Drom
-                  </button>
-                )}
-                <Link
-                  to={`/my-parts/edit/${part.id}`}
-                  onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
-                  className="block w-full px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                >
-                  Редактировать
-                </Link>
-              </div>
+              )}
+              <div className="border-t border-gray-100 my-1"></div>
+              <Link
+                to={`/my-parts/edit/${part.id}`}
+                onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
+                className="w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Редактировать
+              </Link>
             </div>
           )}
         </div>
       </td>
     </tr>
 
-    {/* Раскрывающаяся карточка */}
+    {/* Expandable details row */}
     {isExpanded && (
-      <tr className="bg-gray-50">
-        <td colSpan="10" className="px-6 py-4 border-t">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Фото и видео */}
+      <tr className="bg-gray-50/50">
+        <td colSpan="7" className="px-6 py-6 border-t border-gray-200">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Photos and Videos */}
             <div>
               <PhotoThumbnail 
                 photos={part.photos || []} 
@@ -198,99 +234,102 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
               />
             </div>
 
-            {/* Описание и авто */}
-            <div className="space-y-4">
-
-              {/* Описание */}
-              <div>
-                <span className="text-xs text-gray-500">Описание</span>
-                <div className="font-medium mt-1">
-                  {part.description || '—'}
-                </div>
-              </div>
-
-              {/* Дополнительная информация */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Description and Info */}
+            <div className="space-y-5">
+              {/* Description */}
+              {part.description && (
                 <div>
-                  <span className="text-xs text-gray-500">Состояние</span>
-                  <div className="font-medium mt-1">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                      {part.is_new ? 'Новый' : 'Б/у'}
-                    </span>
-                  </div>
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Описание</h4>
+                  <p className="text-sm text-gray-900 leading-relaxed">{part.description}</p>
+                </div>
+              )}
+
+              {/* Additional Info Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Состояние</h4>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                    part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {part.is_new ? 'Новый' : 'Б/у'}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-xs text-gray-500">Склад</span>
-                  <div className="font-medium mt-1">
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Склад</h4>
+                  <p className="text-sm text-gray-900">
                     {part.storage_location_id ? getStorageAddress(part.storage_location_id) : '—'}
-                  </div>
+                  </p>
                 </div>
                 <div>
-                  <span className="text-xs text-gray-500">Ответственный</span>
-                  <div className="font-medium mt-1">
-                    {part.creator_name || '—'}
-                  </div>
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Ответственный</h4>
+                  <p className="text-sm text-gray-900">{part.creator_name || '—'}</p>
                 </div>
               </div>
 
-              {/* Адрес хранения */}
+              {/* Storage Location */}
               {productStorageCells && productStorageCells.length > 0 && (
                 <div>
-                  <span className="text-xs text-gray-500">Адрес хранения</span>
-                  <div className="mt-2">
-                    <div className="px-3 py-2 bg-gray-50 rounded text-sm text-gray-700 border border-gray-200">
-                      {productStorageCells
-                        .map((cellLink) => cellLink.value)
-                        .filter(value => value)
-                        .join('; ')
-                      }
-                    </div>
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Адрес хранения</h4>
+                  <div className="px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm text-gray-700">
+                    {productStorageCells
+                      .map((cellLink) => cellLink.value)
+                      .filter(value => value)
+                      .join('; ')
+                    }
                   </div>
                 </div>
               )}
 
-              {/* Автомобиль(и) */}
+              {/* Compatible Vehicles */}
               {part.compatible_vehicles && part.compatible_vehicles.length > 0 && (
                 <div>
-                  <span className="text-xs text-gray-500">Автомобиль</span>
-                  <div className="mt-2 space-y-3">
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Совместимые автомобили</h4>
+                  <div className="space-y-3">
                     {part.compatible_vehicles.map((vehicle) => (
                       <div
                         key={vehicle.id}
-                        className="grid grid-cols-1 md:grid-cols-2 gap-2 p-3 bg-white rounded border"
+                        className="p-4 bg-white rounded-lg border border-gray-200"
                       >
-                        <div>
-                          <span className="text-xs text-gray-500">Марка</span>
-                          <div className="font-medium">{vehicle.brand}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Модель</span>
-                          <div className="font-medium">{vehicle.model}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Поколение</span>
-                          <div className="font-medium">{vehicle.generation || '—'}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">Двигатель</span>
-                          <div className="font-medium">{vehicle.engine || '—'}</div>
-                        </div>
-                        <div>
-                          <span className="text-xs text-gray-500">КПП</span>
-                          <div className="font-medium">{vehicle.transmission || '—'}</div>
-                        </div>
-                        {vehicle.vin && (
+                        <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <span className="text-xs text-gray-500">VIN</span>
-                            <div className="font-medium">{vehicle.vin}</div>
+                            <span className="text-xs text-gray-500">Марка</span>
+                            <p className="text-sm font-medium text-gray-900">{vehicle.brand}</p>
                           </div>
-                        )}
-                        {vehicle.mileage && (
                           <div>
-                            <span className="text-xs text-gray-500">Пробег</span>
-                            <div className="font-medium">{vehicle.mileage.toLocaleString()} км</div>
+                            <span className="text-xs text-gray-500">Модель</span>
+                            <p className="text-sm font-medium text-gray-900">{vehicle.model}</p>
                           </div>
-                        )}
+                          {vehicle.generation && (
+                            <div>
+                              <span className="text-xs text-gray-500">Поколение</span>
+                              <p className="text-sm font-medium text-gray-900">{vehicle.generation}</p>
+                            </div>
+                          )}
+                          {vehicle.engine && (
+                            <div>
+                              <span className="text-xs text-gray-500">Двигатель</span>
+                              <p className="text-sm font-medium text-gray-900">{vehicle.engine}</p>
+                            </div>
+                          )}
+                          {vehicle.transmission && (
+                            <div>
+                              <span className="text-xs text-gray-500">КПП</span>
+                              <p className="text-sm font-medium text-gray-900">{vehicle.transmission}</p>
+                            </div>
+                          )}
+                          {vehicle.vin && (
+                            <div>
+                              <span className="text-xs text-gray-500">VIN</span>
+                              <p className="text-sm font-medium font-mono text-gray-900">{vehicle.vin}</p>
+                            </div>
+                          )}
+                          {vehicle.mileage && (
+                            <div>
+                              <span className="text-xs text-gray-500">Пробег</span>
+                              <p className="text-sm font-medium text-gray-900">{vehicle.mileage.toLocaleString()} км</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -332,6 +371,7 @@ function MyParts() {
   const [avitoIntegrationReady, setAvitoIntegrationReady] = useState(false);
   const [avitoJob, setAvitoJob] = useState(null);
   const [dromIntegrationReady, setDromIntegrationReady] = useState(false);
+  const [imageErrors, setImageErrors] = useState({}); // Track image errors by part ID
   const [formData, setFormData] = useState({
     quantity: '',
     price: '',
@@ -1047,14 +1087,12 @@ function MyParts() {
                   <button
                     onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
                     disabled={selectedParts.size === 0}
-                    className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Действия
-                    <img
-                      src="/img/arrow_sm.svg"
-                      alt=""
-                      className={`w-3 h-3 transition-transform duration-200 filter brightness-0 saturate-100 invert-61 sepia-0 saturate-0 hue-rotate-0deg brightness-90 contrast-89 ${showBulkActions ? 'rotate-90' : ''}`}
-                    />
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                    <span className="hidden sm:inline">Действия</span>
                   </button>
 
                   {showBulkActions && (
@@ -1063,17 +1101,19 @@ function MyParts() {
                         <button
                           onClick={(e) => { e.stopPropagation(); handleBulkAction(); setShowBulkActions(false); }}
                           disabled={selectedParts.size === 0}
-                          className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          Экспорт в Avito
+                          <img src="/logos/avito.png" alt="" className="w-4 h-4" />
+                          Экспорт Avito
                         </button>
                         {dromIntegrationReady && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleBulkExportDrom(); setShowBulkActions(false); }}
                             disabled={selectedParts.size === 0}
-                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Экспорт в Drom
+                            <img src="/logos/drom.png" alt="" className="w-4 h-4" />
+                            Экспорт Drom
                           </button>
                         )}
                       </div>
@@ -1085,7 +1125,7 @@ function MyParts() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left">
                     <input
                       type="checkbox"
                       checked={displayParts.length > 0 && selectedParts.size === displayParts.length}
@@ -1105,14 +1145,10 @@ function MyParts() {
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                   </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бренд</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Номер</th>
-                  <th className="hidden md:table-cell px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Внутр. код</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Наименование</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Остаток</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена, ₽</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Выгрузка</th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider" colSpan={4}>Запчасть</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Остаток</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Цена</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Действия</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -1135,336 +1171,38 @@ function MyParts() {
                     onSelect={() => handlePartSelect(part.id)}
                     onImageClick={handleOpenMediaModal}
                     productStorageCells={productStorageCells[part.id] || []}
+                    imageErrors={imageErrors}
+                    onImageError={(partId) => setImageErrors(prev => ({ ...prev, [partId]: true }))}
                   />
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* Мобильная версия - карточки */}
-          <div className="md:hidden space-y-4">
-            {/* Панель массовых действий для мобильных */}
-            {avitoIntegrationReady && (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-medium text-gray-900">
-                    <span className="block text-sm mt-1">Выбрано: {selectedParts.size}</span>
-                    {searchQuery && selectedParts.size > 0 && (
-                      <span className="block text-sm text-indigo-600 mt-1">
-                        из {displayParts.length} найденных
-                      </span>
-                    )}
-                  </span>
-                  <div className="relative actions-dropdown">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
-                      disabled={selectedParts.size === 0}
-                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                    >
-                      Действия
-                      <img
-                        src="/img/arrow_sm.svg"
-                        alt=""
-                        className={`w-3 h-3 transition-transform duration-200 ${showBulkActions ? 'rotate-90' : ''}`}
-                      />
-                    </button>
-
-                    {showBulkActions && (
-                      <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
-                        <div className="py-1">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleBulkAction(); setShowBulkActions(false); }}
-                            disabled={selectedParts.size === 0}
-                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Экспорт в Avito
-                          </button>
-                          {dromIntegrationReady && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleBulkExportDrom(); setShowBulkActions(false); }}
-                              disabled={selectedParts.size === 0}
-                              className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              Экспорт в Drom
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Чекбокс "Выбрать все" для мобильных */}
-            {displayParts.length > 1 && (
-              <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3 mb-4">
-                <span className="text-sm font-medium text-gray-700">Выбрать все</span>
-                <input
-                  type="checkbox"
-                  checked={displayParts.length > 0 && selectedParts.size === displayParts.length}
-                  onChange={() => {
-                    if (selectedParts.size === displayParts.length) {
-                      // Снимаем выделение со всех отображаемых запчастей
-                      const newSelected = new Set(selectedParts);
-                      displayParts.forEach(part => newSelected.delete(part.id));
-                      setSelectedParts(newSelected);
-                    } else {
-                      // Выделяем все отображаемые запчасти
-                      const newSelected = new Set(selectedParts);
-                      displayParts.forEach(part => newSelected.add(part.id));
-                      setSelectedParts(newSelected);
-                    }
-                  }}
-                  className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                />
-              </div>
-            )}
-
+          {/* Мобильная версия - используем тот же CardPart */}
+          <div className="md:hidden">
             {sortedDisplayParts.map((part) => (
-              <div key={part.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                {/* Заголовок и чекбокс */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1 pr-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-base font-semibold text-gray-900">{part.brand || '—'}</span>
-                      <span className="text-sm text-gray-400">•</span>
-                      <span className="text-sm text-gray-500 font-mono">{part.article || '—'}</span>
-                    </div>
-                    <h3 className="text-base font-medium text-gray-800 mb-2 leading-tight">{part.name || '—'}</h3>
-                    <div className="flex items-center gap-2 mb-2">
-                      {part.internal_code && (
-                        <span className="text-xs text-gray-500 font-mono">{part.internal_code}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedParts.has(part.id)}
-                      onChange={() => handlePartSelect(part.id)}
-                      className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-gray-900 mb-1">
-                        {part.price != null && !isNaN(parseFloat(part.price)) ? `${parseFloat(part.price).toFixed(2)} ₽` : '—'}
-                      </div>
-                      <div className="text-sm text-gray-600">{part.quantity || 0} шт.</div>
-                      {/* Export icons */}
-                      <div className="flex items-center gap-1 mt-2 justify-end">
-                        <img 
-                          src="/logos/svoygarage.png" 
-                          alt="Свой Гараж" 
-                          className="w-5 h-5 object-contain"
-                          title="Свой Гараж"
-                        />
-                        {part.is_on_avito && (
-                          <img 
-                            src="/logos/avito.png" 
-                            alt="Avito" 
-                            className="w-5 h-5 object-contain"
-                            title="Avito"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Кнопка действий */}
-                <div className="mb-4">
-                  <div className="relative mobile-actions-dropdown">
-                    <button
-                      onClick={() => toggleMobileActions(part.id)}
-                      className="w-full text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
-                    >
-                      Действия
-                      <img
-                        src="/img/arrow_sm.svg"
-                        alt=""
-                        className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${mobileActionsOpen === part.id ? 'rotate-90' : ''}`}
-                        style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
-                      />
-                    </button>
-
-                    {mobileActionsOpen === part.id && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 mobile-actions-dropdown w-32 mx-auto">
-                        <div className="py-1">
-                          <button
-                            onClick={() => {
-                              handleOpenPrintModal(part);
-                              setMobileActionsOpen(null);
-                            }}
-                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50"
-                          >
-                            Печать
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleOpenModal(part, 'sale');
-                              setMobileActionsOpen(null);
-                            }}
-                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50"
-                          >
-                            Продать
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleOpenModal(part, 'writeoff');
-                              setMobileActionsOpen(null);
-                            }}
-                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50"
-                          >
-                            Списать
-                          </button>
-                          {avitoIntegrationReady && (
-                            <button
-                              onClick={() => {
-                                handleExportPart(part);
-                                setMobileActionsOpen(null);
-                              }}
-                              className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50"
-                            >
-                              Экспорт Avito
-                            </button>
-                          )}
-                          <Link
-                            to={`/my-parts/edit/${part.id}`}
-                            onClick={() => setMobileActionsOpen(null)}
-                            className="block w-full px-3 py-2 text-sm text-black hover:bg-gray-50"
-                          >
-                            Редактировать
-                          </Link>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Кнопка показа деталей */}
-                <div className="pt-3 border-t border-gray-100">
-                  <button
-                    onClick={() => toggleExpand(part.id)}
-                    className="w-full text-indigo-600 text-sm font-medium hover:text-indigo-800 transition-colors py-2"
-                  >
-                    {expandedPartId === part.id ? 'Скрыть детали' : 'Показать детали'}
-                  </button>
-                </div>
-
-                {/* Детали запчасти - мобильная версия */}
-                {expandedPartId === part.id && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="grid grid-cols-1 gap-4">
-                      {/* Фото и видео */}
-                      <div>
-                        <PhotoThumbnail 
-                          photos={part.photos || []} 
-                          videos={part.videos || []}
-                          onImageClick={handleOpenMediaModal}
-                        />
-                      </div>
-
-                      {/* Описание и информация */}
-                      <div className="space-y-4">
-                        {/* Описание */}
-                        <div>
-                          <span className="text-sm text-gray-500 block mb-1">Описание</span>
-                          <div className="text-base text-gray-900">{part.description || '—'}</div>
-                        </div>
-
-                        {/* Дополнительная информация */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <span className="text-sm text-gray-500 block mb-1">Состояние</span>
-                            <div className="text-base font-medium text-gray-900">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                {part.is_new ? 'Новый' : 'Б/у'}
-                              </span>
-                            </div>
-                          </div>
-                          <div>
-                            <span className="text-sm text-gray-500 block mb-1">Склад</span>
-                            <div className="text-base font-medium text-gray-900">
-                              {part.storage_location_id ? getStorageAddress(part.storage_location_id) : '—'}
-                            </div>
-                          </div>
-                          <div>
-                            <span className="text-sm text-gray-500 block mb-1">Ответственный</span>
-                            <div className="text-base font-medium text-gray-900">
-                              {part.creator_name || '—'}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Адрес хранения */}
-                        {productStorageCells && productStorageCells.length > 0 && (
-                          <div>
-                            <span className="text-sm text-gray-500 block mb-2">Адрес хранения</span>
-                            <div>
-                              <div className="px-3 py-2 bg-gray-50 rounded text-sm text-gray-700 border border-gray-200">
-                                {productStorageCells
-                                  .map((cellLink) => cellLink.value)
-                                  .filter(value => value)
-                                  .join('; ')
-                                }
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Автомобиль(и) */}
-                        {part.compatible_vehicles && part.compatible_vehicles.length > 0 && (
-                          <div>
-                            <span className="text-sm text-gray-500 block mb-2">Автомобиль</span>
-                            <div className="space-y-3">
-                              {part.compatible_vehicles.map((vehicle) => (
-                                <div
-                                  key={vehicle.id}
-                                  className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded border text-sm"
-                                >
-                                  <div>
-                                    <span className="text-gray-500">Марка:</span>
-                                    <div className="font-medium">{vehicle.brand}</div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Модель:</span>
-                                    <div className="font-medium">{vehicle.model}</div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Поколение:</span>
-                                    <div className="font-medium">{vehicle.generation || '—'}</div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Двигатель:</span>
-                                    <div className="font-medium">{vehicle.engine || '—'}</div>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">КПП:</span>
-                                    <div className="font-medium">{vehicle.transmission || '—'}</div>
-                                  </div>
-                                  {vehicle.vin && (
-                                    <div className="col-span-2">
-                                      <span className="text-gray-500">VIN:</span>
-                                      <div className="font-medium">{vehicle.vin}</div>
-                                    </div>
-                                  )}
-                                  {vehicle.mileage && (
-                                    <div className="col-span-2">
-                                      <span className="text-gray-500">Пробег:</span>
-                                      <div className="font-medium">{vehicle.mileage.toLocaleString()} км</div>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <CardPart
+                key={part.id}
+                part={part}
+                getStorageAddress={getStorageAddress}
+                getCellName={getCellName}
+                onSale={(p) => handleOpenModal(p, 'sale')}
+                onWriteoff={(p) => handleOpenModal(p, 'writeoff')}
+                onPrint={(p) => handleOpenPrintModal(p)}
+                onExport={(p) => handleExportPart(p)}
+                showExport={avitoIntegrationReady}
+                onExportDrom={(p) => handleExportPartDrom(p)}
+                showDromExport={dromIntegrationReady}
+                onToggleExpand={() => toggleExpand(part.id)}
+                isExpanded={expandedPartId === part.id}
+                isSelected={selectedParts.has(part.id)}
+                onSelect={() => handlePartSelect(part.id)}
+                onImageClick={handleOpenMediaModal}
+                productStorageCells={productStorageCells[part.id] || []}
+                imageErrors={imageErrors}
+                onImageError={(partId) => setImageErrors(prev => ({ ...prev, [partId]: true }))}
+              />
             ))}
           </div>
         </>
