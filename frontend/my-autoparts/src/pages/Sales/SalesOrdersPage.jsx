@@ -17,23 +17,6 @@ export default function SalesOrdersPage() {
   const [availableStatuses, setAvailableStatuses] = useState([]);
   const [authChecked, setAuthChecked] = useState(false);
   const [userOrgId, setUserOrgId] = useState(null);
-  const [rawAvitoOrders, setRawAvitoOrders] = useState(null);
-  const [showRawAvito, setShowRawAvito] = useState(false);
-  const [loadingRawAvito, setLoadingRawAvito] = useState(false);
-  const [selectedAvitoStatus, setSelectedAvitoStatus] = useState('');
-
-  // Статусы Авито API
-  const avitoStatuses = [
-    { value: '', label: 'Все статусы' },
-    { value: 'on_confirmation', label: 'Ожидает подтверждения' },
-    { value: 'ready_to_ship', label: 'Ждет отправки' },
-    { value: 'in_transit', label: 'В пути' },
-    { value: 'delivered', label: 'Доставлен' },
-    { value: 'canceled', label: 'Отменен' },
-    { value: 'closed', label: 'Закрыт' },
-    { value: 'on_return', label: 'На возврате' },
-    { value: 'in_dispute', label: 'Открыт спор' },
-  ];
 
   console.log('orders:', orders);
   console.log('user:', user);
@@ -92,18 +75,26 @@ export default function SalesOrdersPage() {
           const syncResponse = await apiAxios.get(`/organizations/${userOrgId}/avito/orders/sync`);
           console.log('Avito orders sync response:', syncResponse.data);
           console.log(`Created: ${syncResponse.data.created_count}, Updated: ${syncResponse.data.updated_count}`);
+          
+          // Показываем ошибки синхронизации если они есть
+          if (syncResponse.data.errors && syncResponse.data.errors.length > 0) {
+            console.error('Avito sync errors:', syncResponse.data.errors);
+            // Не показываем ошибку пользователю если есть хотя бы один успешный заказ
+            if (syncResponse.data.created_count === 0 && syncResponse.data.updated_count === 0) {
+              console.warn('Avito sync failed with errors:', syncResponse.data.errors);
+            }
+          }
         } catch (err) {
-          // Тихо игнорируем ошибки синхронизации Авито
-          // Если Авито не настроен или API недоступен - просто продолжаем загрузку
-          const errorMsg = err.response?.data?.detail || '';
+          // Показываем ошибку синхронизации
+          console.error('Avito sync FAILED:', err);
+          const errorMsg = err.response?.data?.detail || err.message;
+          
+          // Не прерываем загрузку обычных заказов
           if (errorMsg.includes('Интеграция с Авито не настроена')) {
             console.log('Avito integration not configured');
-          } else if (errorMsg.includes('API Авито')) {
-            console.warn('Avito API error:', errorMsg);
           } else {
-            console.log('Avito sync skipped:', err.message);
+            console.error('Avito sync error:', errorMsg);
           }
-          // Не прерываем выполнение - продолжаем загрузку заказов
         }
       }
 
@@ -259,24 +250,7 @@ export default function SalesOrdersPage() {
     }
   };
 
-  const fetchRawAvitoOrders = async () => {
-    if (!userOrgId) return;
-    
-    try {
-      setLoadingRawAvito(true);
-      const statusParam = selectedAvitoStatus ? `?status=${selectedAvitoStatus}` : '';
-      console.log('Fetching raw Avito orders with status:', selectedAvitoStatus || 'all');
-      const response = await apiAxios.get(`/organizations/${userOrgId}/avito/orders/raw${statusParam}`);
-      console.log('Raw Avito response:', response.data);
-      setRawAvitoOrders(response.data);
-      setShowRawAvito(true);
-    } catch (error) {
-      console.error('Ошибка загрузки сырых данных Авито:', error);
-      alert('Не удалось загрузить данные из Авито: ' + (error.response?.data?.detail || error.message));
-    } finally {
-      setLoadingRawAvito(false);
-    }
-  };
+
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('ru-RU', {
@@ -399,177 +373,8 @@ export default function SalesOrdersPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Заказы покупателей</h1>
             <p className="mt-2 text-gray-600 text-base sm:text-base">Управление заказами клиентов</p>
           </div>
-          {userOrgId && (
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-              {/* Выпадающий список для выбора статуса Авито */}
-              <div className="flex-1 sm:flex-none">
-                <label htmlFor="avito-status" className="block text-xs font-medium text-gray-700 mb-1">
-                  Фильтр по статусу Авито
-                </label>
-                <select
-                  id="avito-status"
-                  value={selectedAvitoStatus}
-                  onChange={(e) => setSelectedAvitoStatus(e.target.value)}
-                  className="w-full sm:w-56 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 min-h-[48px]"
-                >
-                  {avitoStatuses.map((status) => (
-                    <option key={status.value} value={status.value}>
-                      {status.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="flex-1 sm:flex-none self-end">
-                <button
-                  onClick={fetchRawAvitoOrders}
-                  disabled={loadingRawAvito}
-                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px]"
-                >
-                  {loadingRawAvito ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Загрузка...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      Показать данные Авито API
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
-
-      {/* Секция с сырыми данными Авито */}
-      {showRawAvito && rawAvitoOrders && (
-        <div className="mb-6 bg-white border border-purple-200 rounded-lg shadow-sm">
-          <div className="px-6 py-4 border-b border-purple-200 bg-purple-50 flex justify-between items-center">
-            <div>
-              <h2 className="text-lg font-semibold text-purple-900">Сырые данные из Авито API</h2>
-              <p className="text-sm text-purple-700 mt-1">
-                Прямой ответ от https://api.avito.ru/order-management/1/orders
-              </p>
-            </div>
-            <button
-              onClick={() => setShowRawAvito(false)}
-              className="text-purple-600 hover:text-purple-800 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          
-          <div className="px-6 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <div className="bg-purple-50 rounded-lg p-4">
-                <div className="text-sm text-purple-600 mb-1">Всего заказов</div>
-                <div className="text-2xl font-bold text-purple-900">{rawAvitoOrders.total_orders}</div>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-4">
-                <div className="text-sm text-purple-600 mb-1">Avito User ID</div>
-                <div className="text-2xl font-bold text-purple-900">{rawAvitoOrders.avito_user_id}</div>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-4">
-                <div className="text-sm text-purple-600 mb-1">Фильтр по статусу</div>
-                <div className="text-lg font-bold text-purple-900">
-                  {rawAvitoOrders.filter_status ? (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
-                      {avitoStatuses.find(s => s.value === rawAvitoOrders.filter_status)?.label || rawAvitoOrders.filter_status}
-                    </span>
-                  ) : (
-                    <span className="text-green-600">Все статусы</span>
-                  )}
-                </div>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-4">
-                <div className="text-sm text-purple-600 mb-1">Статус</div>
-                <div className="text-2xl font-bold text-green-600">✓ Успешно</div>
-              </div>
-            </div>
-            
-            <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-              <pre className="text-sm text-green-400 whitespace-pre-wrap break-words" style={{ maxHeight: '600px', overflow: 'auto' }}>
-                {JSON.stringify(rawAvitoOrders.raw_response, null, 2)}
-              </pre>
-            </div>
-            
-            {/* Отображение списка заказов */}
-            {rawAvitoOrders.raw_response?.orders && rawAvitoOrders.raw_response.orders.length > 0 && (
-              <div className="mt-6">
-                <h3 className="text-md font-semibold text-gray-900 mb-3">Список заказов ({rawAvitoOrders.raw_response.orders.length})</h3>
-                <div className="space-y-3">
-                  {rawAvitoOrders.raw_response.orders.map((order) => (
-                    <div key={order.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                        <div>
-                          <div className="text-xs text-gray-500">ID заказа</div>
-                          <div className="text-sm font-semibold text-gray-900">{order.id}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-500">Статус</div>
-                          <div className="text-sm">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              order.status === 'on_confirmation' ? 'bg-yellow-100 text-yellow-800' :
-                              order.status === 'ready_to_ship' ? 'bg-blue-100 text-blue-800' :
-                              order.status === 'in_transit' ? 'bg-purple-100 text-purple-800' :
-                              order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                              order.status === 'canceled' ? 'bg-red-100 text-red-800' :
-                              order.status === 'closed' ? 'bg-gray-100 text-gray-800' :
-                              order.status === 'on_return' ? 'bg-orange-100 text-orange-800' :
-                              order.status === 'in_dispute' ? 'bg-pink-100 text-pink-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {avitoStatuses.find(s => s.value === order.status)?.label || order.status}
-                            </span>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-500">Создан</div>
-                          <div className="text-sm text-gray-900">{order.created_at ? new Date(order.created_at).toLocaleString('ru-RU') : '-'}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-500">Покупатель</div>
-                          <div className="text-sm text-gray-900">{order.buyer?.name || '-'}</div>
-                        </div>
-                      </div>
-                      {order.items && order.items.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <div className="text-xs text-gray-500 mb-2">Товары ({order.items.length})</div>
-                          <div className="space-y-2">
-                            {order.items.map((item, idx) => (
-                              <div key={idx} className="bg-white rounded p-2 text-sm">
-                                <div className="flex justify-between items-start">
-                                  <div className="flex-1">
-                                    <div className="font-medium text-gray-900">{item.name || 'Товар'}</div>
-                                    <div className="text-xs text-gray-600">Кол-во: {item.quantity || 1}</div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="font-semibold text-gray-900">{item.price?.toLocaleString('ru-RU')} ₽</div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <div className="space-y-6">
         {/* Десктопная версия - таблица */}

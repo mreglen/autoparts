@@ -211,6 +211,8 @@ async def sync_avito_orders(
         token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
         avito_user_id = int(integration.avito_user_id)
         
+        logger.info(f"Syncing Avito orders for org {org_id}, avito_user_id={avito_user_id}")
+        
         # Находим владельца организации (кто настроил интеграцию)
         from app.models.user import User
         org_owner = db.query(User).filter(
@@ -230,6 +232,10 @@ async def sync_avito_orders(
         
         orders_data = response.get('orders', [])
         logger.info(f"Fetched {len(orders_data)} orders from Avito API for org {org_id}")
+        
+        if len(orders_data) == 0:
+            logger.warning(f"No orders returned from Avito API for org {org_id}, avito_user_id={avito_user_id}")
+            logger.warning(f"Full API response: {response}")
         created_count = 0
         updated_count = 0
         errors = []
@@ -268,6 +274,7 @@ async def sync_avito_orders(
         # Возвращаем 400 вместо 502, если API Авито недоступен
         error_msg = str(e)
         logger.warning(f"Avito API error during sync: {error_msg}")
+        logger.exception("Full traceback for Avito API error")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Ошибка API Авито: {error_msg}"
@@ -278,6 +285,77 @@ async def sync_avito_orders(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка синхронизации: {str(e)}"
         )
+
+
+@router.get("/{org_id}/avito/orders/check")
+async def check_avito_orders_config(
+    org_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """
+    Проверить конфигурацию Avito и получить диагностическую информацию
+    """
+    _ensure_org_access(current_user, org_id)
+    
+    result = {
+        "integration_exists": False,
+        "enabled": False,
+        "avito_user_id": None,
+        "client_id": None,
+        "token_valid": False,
+        "orders_count": 0,
+        "error": None
+    }
+    
+    try:
+        # Получаем интеграцию
+        integration = db.query(OrganizationAvitoIntegration).filter(
+            OrganizationAvitoIntegration.organization_id == org_id
+        ).first()
+        
+        if not integration:
+            result["error"] = "Интеграция с Авито не настроена"
+            return result
+        
+        result["integration_exists"] = True
+        result["enabled"] = integration.enabled
+        result["avito_user_id"] = integration.avito_user_id
+        result["client_id"] = integration.client_id
+        
+        if not integration.enabled:
+            result["error"] = "Интеграция с Авито отключена"
+            return result
+        
+        # Пробуем получить токен
+        try:
+            secret = decrypt_secret(integration.client_secret_encrypted)
+            token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
+            result["token_valid"] = True
+            
+            # Пробуем получить заказы
+            try:
+                response = await fetch_avito_orders(token, int(integration.avito_user_id))
+                orders_count = len(response.get('orders', []))
+                result["orders_count"] = orders_count
+                
+                if orders_count == 0:
+                    result["error"] = f"API вернул 0 заказов. Проверьте что avito_user_id={integration.avito_user_id} правильный и у токена есть права на order-management API"
+                
+            except AvitoOrdersError as e:
+                result["error"] = f"Ошибка получения заказов: {str(e)}"
+                logger.error(f"Error fetching orders during check: {str(e)}")
+            
+        except Exception as e:
+            result["token_valid"] = False
+            result["error"] = f"Ошибка получения токена: {str(e)}"
+            logger.error(f"Error getting token during check: {str(e)}")
+        
+    except Exception as e:
+        result["error"] = f"Неожиданная ошибка: {str(e)}"
+        logger.exception("Error in check_avito_orders_config")
+    
+    return result
 
 
 @router.get("/{org_id}/avito/orders/raw")

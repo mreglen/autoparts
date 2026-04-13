@@ -48,10 +48,20 @@ async def fetch_avito_orders(
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, params=params, headers=headers)
-            logger.info(f"Avito API response status: {response.status_code}")
+            logger.info(f"Avito API Request: GET {url}")
+            logger.info(f"Params: {params}")
+            logger.info(f"Response Status: {response.status_code}")
+            logger.info(f"Response Headers: {dict(response.headers)}")
+            logger.info(f"Response Body: {response.text[:500]}")
             response.raise_for_status()
             data = response.json()
             logger.info(f"Received {len(data.get('orders', []))} orders from Avito API")
+            
+            # Log warning if empty orders list
+            if not data.get('orders'):
+                logger.warning("Avito API returned empty orders list")
+                logger.warning(f"Full response: {data}")
+            
             return data
     except httpx.HTTPStatusError as e:
         logger.error(f"HTTP error fetching Avito orders: {e.response.status_code} - {e.response.text}")
