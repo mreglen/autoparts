@@ -152,6 +152,17 @@ export const markAvitoChatRead = createAsyncThunk(
   }
 );
 
+export const fetchAvitoChatProductLink = createAsyncThunk(
+  'avitoChats/fetchProductLink',
+  async (chatId, { rejectWithValue }) => {
+    try {
+      return await apiRequest(`/avito/messenger/chats/${encodeURIComponent(chatId)}/product-link`);
+    } catch (err) {
+      return rejectWithValue(err?.message || 'Ошибка проверки связи с товаром');
+    }
+  }
+);
+
 const initialState = {
   enabled: false,
   /** ID пользователя Авито (аккаунт API), для стороны «я / собеседник» в переписке */
@@ -289,6 +300,14 @@ const avitoChatSlice = createSlice({
       .addCase(sendAvitoVoiceFile.rejected, (state, action) => {
         state.sending = false;
         state.error = action.payload;
+      })
+      .addCase(fetchAvitoChatProductLink.fulfilled, (state, action) => {
+        // Store link info in the corresponding chat object
+        const chat = state.chats.find(c => String(c.id) === String(action.meta.arg));
+        if (chat) {
+          chat.linked_product_id = action.payload?.product_id;
+          chat.is_linked_to_product = action.payload?.linked;
+        }
       });
   },
 });

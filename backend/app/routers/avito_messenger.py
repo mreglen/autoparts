@@ -91,6 +91,39 @@ async def get_avito_chats(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
 
+@router.get("/chats/{chat_id}/product-link")
+async def get_avito_chat_product_link(
+    chat_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Check if Avito chat is linked to an internal product via product_avito_listing_links."""
+    if not current_user.organization_id:
+        return {"linked": False, "product_id": None}
+    
+    # Get chat detail to extract context_id (Avito ad ID)
+    try:
+        token, avito_user_id = await _get_access_token_for_user(db, current_user)
+        chat_detail = await get_chat_detail(token, avito_user_id, chat_id)
+        context_id = chat_detail.get("context_id")
+        
+        if not context_id:
+            return {"linked": False, "product_id": None}
+        
+        # Check if this Avito ad ID is linked to any internal product
+        from app.models.product_avito_listing_link import ProductAvitoListingLink
+        link = db.query(ProductAvitoListingLink).filter(
+            ProductAvitoListingLink.organization_id == current_user.organization_id,
+            ProductAvitoListingLink.avito_ad_id == str(context_id)
+        ).first()
+        
+        if link:
+            return {"linked": True, "product_id": link.product_id}
+        return {"linked": False, "product_id": None}
+    except Exception as exc:
+        return {"linked": False, "product_id": None, "error": str(exc)}
+
+
 @router.get("/chats/{chat_id}")
 async def get_avito_chat_detail(
     chat_id: str,

@@ -14,7 +14,7 @@ import {
   addOptimisticMessage,
   setReplyToMessage,
 } from '../../redux/slices/ChatSlice';
-import { fetchAvitoMessengerEnabled, setSelectedAvitoChatId, fetchAvitoMessages, fetchAvitoChatDetail, sendAvitoMessage, fetchAvitoChats } from '../../redux/slices/AvitoChatSlice';
+import { fetchAvitoMessengerEnabled, setSelectedAvitoChatId, fetchAvitoMessages, fetchAvitoChatDetail, sendAvitoMessage, fetchAvitoChats, fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
 import MediaLightbox from './MediaLightbox';
 import ReplyPreview from './ReplyPreview';
 import SwipeableMessage from './SwipeableMessage';
@@ -85,6 +85,17 @@ const ChatsHubPage = () => {
     if (!user?.organization_id || !avitoEnabled) return;
     dispatch(fetchAvitoChats());
   }, [dispatch, user?.organization_id, avitoEnabled]);
+
+  // Fetch product links for Avito chats
+  useEffect(() => {
+    if (avitoChats.length > 0) {
+      avitoChats.forEach(chat => {
+        if (!chat.linked_product_id && chat.id) {
+          dispatch(fetchAvitoChatProductLink(chat.id));
+        }
+      });
+    }
+  }, [avitoChats.length, dispatch]);
 
   // Объединяем чаты из обоих источников и сортируем по дате последнего сообщения
   const unifiedChats = useMemo(() => {
@@ -292,17 +303,36 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
 
   const placeholderLetter = (title && title.charAt(0).toUpperCase()) || 'Ч';
 
-  // Обработчик клика по фото/названию для перехода к товару
-  const handleNavigateToProduct = (e) => {
-    e.stopPropagation(); // Предотвращаем открытие чата
+  // Handler for photo click - navigate to product
+  const handlePhotoClick = (e) => {
+    e.stopPropagation(); // Prevent chat selection
     
     if (isAvito) {
-      // Для Avito переходим по ссылке контекста
+      // For Avito: check if product is linked
+      if (chat.linked_product_id) {
+        navigate(`/part/${chat.linked_product_id}`);
+      } else if (chat.context_url) {
+        window.open(chat.context_url, '_blank', 'noopener,noreferrer');
+      }
+    } else {
+      // For Свой Гараж: navigate to internal product
+      if (chat.product_id) {
+        navigate(`/part/${chat.product_id}`);
+      }
+    }
+  };
+
+  // Handler for source icon click
+  const handleSourceIconClick = (e) => {
+    e.stopPropagation(); // Prevent chat selection
+    
+    if (isAvito) {
+      // Avito icon: always open external URL
       if (chat.context_url) {
         window.open(chat.context_url, '_blank', 'noopener,noreferrer');
       }
     } else {
-      // Для Свой Гараж переходим на карточку товара
+      // Свой Гараж icon: navigate to internal product
       if (chat.product_id) {
         navigate(`/part/${chat.product_id}`);
       }
@@ -320,7 +350,8 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
       {/* Аватар */}
       <div 
         className="flex-shrink-0 cursor-pointer" 
-        onClick={(chat.product_id || (isAvito && chat.context_url)) ? handleNavigateToProduct : undefined}
+        onClick={handlePhotoClick}
+        title="Перейти к товару"
       >
         {img ? (
           <img 
@@ -338,10 +369,7 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
       {/* Информация о чате */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <h3 
-            className={`font-semibold truncate text-base ${(chat.product_id || (isAvito && chat.context_url)) ? 'text-blue-600 hover:text-blue-800 hover:underline cursor-pointer' : 'text-gray-900'}`}
-            onClick={(chat.product_id || (isAvito && chat.context_url)) ? handleNavigateToProduct : undefined}
-          >
+          <h3 className="font-semibold truncate text-base text-gray-900">
             {title}
           </h3>
           {lastMessageTime && (
@@ -352,19 +380,13 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
         </div>
         
         {!isAvito && chat.product_name && (
-          <p 
-            className="text-xs text-gray-500 truncate mb-1.5 cursor-pointer hover:text-blue-600 hover:underline"
-            onClick={chat.product_id ? handleNavigateToProduct : undefined}
-          >
+          <p className="text-xs text-gray-500 truncate mb-1.5">
             {chat.product_name}
           </p>
         )}
         
         {isAvito && chat.context_title && (
-          <p 
-            className="text-xs text-gray-500 truncate mb-1.5 cursor-pointer hover:text-blue-600 hover:underline"
-            onClick={chat.context_url ? handleNavigateToProduct : undefined}
-          >
+          <p className="text-xs text-gray-500 truncate mb-1.5">
             {chat.context_title}
           </p>
         )}
@@ -394,7 +416,11 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
       )}
       
       {/* Иконка источника чата */}
-      <div className="flex-shrink-0 flex flex-col items-center justify-center ml-2">
+      <div 
+        className="flex-shrink-0 flex flex-col items-center justify-center ml-2 cursor-pointer hover:opacity-70 transition-opacity"
+        onClick={handleSourceIconClick}
+        title={isAvito ? 'Открыть на Авито' : 'Перейти к товару'}
+      >
         <img 
           src={isAvito ? '/logos/avito.png' : '/logos/svoygarage.png'} 
           alt={isAvito ? 'Авито' : 'Свой Гараж'} 
@@ -629,17 +655,8 @@ function GarageChatPanel({ chat, chatId, onBack }) {
           )}
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-gray-900 truncate">{title}</h3>
-            {chat?.product_name && chat?.product_id ? (
-              <a 
-                href={`/part/${chat.product_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:text-blue-800 hover:underline block truncate"
-              >
-                {chat.product_name}{chat.product_article ? ` - ${chat.product_article}` : ''}
-              </a>
-            ) : chat?.product_name ? (
-              <p className="text-xs text-gray-500 truncate">{chat.product_name}</p>
+            {chat?.product_name ? (
+              <p className="text-xs text-gray-500 truncate">{chat.product_name}{chat.product_article ? ` - ${chat.product_article}` : ''}</p>
             ) : null}
           </div>
         </div>
@@ -1052,17 +1069,8 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
           )}
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-gray-900 truncate">{title}</h3>
-            {displayChat?.context_url && displayChat?.context_title ? (
-              <a
-                href={displayChat.context_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:text-blue-800 hover:underline block truncate"
-              >
-                {[displayChat.context_title, displayChat.context_price].filter(Boolean).join(' — ')}
-              </a>
-            ) : displayChat?.context_title ? (
-              <p className="text-xs text-gray-500 truncate">{displayChat.context_title}</p>
+            {displayChat?.context_title ? (
+              <p className="text-xs text-gray-500 truncate">{[displayChat.context_title, displayChat.context_price].filter(Boolean).join(' — ')}</p>
             ) : null}
           </div>
         </div>
