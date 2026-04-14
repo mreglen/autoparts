@@ -18,6 +18,7 @@ from app.services import avito_api as avito_api_svc
 from app.services.avito_orders_api import (
     fetch_avito_orders,
     apply_order_transition,
+    raw_fetch_avito_orders,
     AvitoOrdersError,
 )
 from app.utils.avito_crypto import decrypt_secret
@@ -236,6 +237,7 @@ async def sync_avito_orders(
         if len(orders_data) == 0:
             logger.warning(f"No orders returned from Avito API for org {org_id}, avito_user_id={avito_user_id}")
             logger.warning(f"Full API response: {response}")
+        
         created_count = 0
         updated_count = 0
         errors = []
@@ -362,6 +364,10 @@ async def check_avito_orders_config(
 async def get_raw_avito_orders(
     org_id: str,
     status: Optional[str] = None,
+    statuses: Optional[str] = None,
+    date_from: Optional[int] = None,
+    page: Optional[int] = None,
+    limit: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
@@ -369,17 +375,23 @@ async def get_raw_avito_orders(
     Получить сырые данные заказов напрямую из API Авито
     Возвращает ответ как есть от https://api.avito.ru/order-management/1/orders
     
+    Согласно документации: https://developers.avito.ru/api-catalog/order-management/documentation#operation/getOrders
+    
     Args:
-        status: Фильтр по статусу (опционально)
+        status: Фильтр по одному статусу (опционально, для обратной совместимости)
+        statuses: Фильтр по нескольким статусам через запятую (опционально)
             Доступные статусы:
-            - on_confirmation: Ожидает подтверждения
-            - ready_to_ship: Ждет отправки
-            - in_transit: В пути
-            - delivered: Доставлен
-            - canceled: Отменен
-            - closed: Закрыт
-            - on_return: На возврате
-            - in_dispute: Открыт спор
+            - on_confirmation: ожидает подтверждения
+            - ready_to_ship: ждет отправки
+            - in_transit: в пути
+            - canceled: отменный заказ
+            - delivered: доставлен покупателю
+            - on_return: на возврате
+            - in_dispute: по заказу открыт спор
+            - closed: заказ закрыт
+        date_from: Timestamp, с момента которого созданы покупки (опционально)
+        page: Номер страницы для пагинации (опционально)
+        limit: Максимальное количество заказов на странице (0-20) (опционально)
     """
     _ensure_org_access(current_user, org_id)
     
@@ -406,17 +418,37 @@ async def get_raw_avito_orders(
         token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
         avito_user_id = int(integration.avito_user_id)
         
-        # Получаем все заказы напрямую из API Авито с фильтром по статусу
-        response = await fetch_avito_orders(token, avito_user_id, status=status)
+        # Подготавливаем параметры для запроса согласно документации Avito
+        statuses_list = None
+        if statuses:
+            # Разделяем statuses по запятой если это строка
+            statuses_list = [s.strip() for s in statuses.split(',') if s.strip()]
+        elif status:
+            # Для обратной совместимости с одиночным статусом
+            statuses_list = [status]
         
-        logger.info(f"Fetched {len(response.get('orders', []))} raw orders from Avito API for org {org_id} with status={status}")
+        # Получаем все заказы напрямую из API Авито
+        response = await fetch_avito_orders(
+            token, 
+            avito_user_id, 
+            statuses=statuses_list,
+            date_from=date_from,
+            page=page,
+            limit=limit
+        )
+        
+        logger.info(f"Fetched {len(response.get('orders', []))} raw orders from Avito API for org {org_id}")
+        logger.info(f"Params: statuses={statuses_list}, date_from={date_from}, page={page}, limit={limit}")
         
         # Возвращаем ответ как есть от API Авито
         return {
             "success": True,
             "avito_user_id": avito_user_id,
             "total_orders": len(response.get('orders', [])),
-            "filter_status": status,
+            "filter_statuses": statuses_list,
+            "filter_date_from": date_from,
+            "filter_page": page,
+            "filter_limit": limit,
             "raw_response": response
         }
     except HTTPException:
@@ -552,6 +584,97 @@ async def get_avito_orders(
             for order in orders
         ]
     }
+
+
+@router.get("/{org_id}/avito/orders/raw")
+async def get_raw_avito_orders_request(
+    org_id: str,
+    statuses: Optional[str] = None,
+    ids: Optional[str] = None,
+    dateFrom: Optional[int] = None,
+    page: Optional[int] = None,
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """
+    Отправить сырой GET запрос к API заказов Авито
+    Возвращает ответ как есть от https://api.avito.ru/order-management/1/orders
+    
+    Параметры запроса должны быть в формате, рекомендуемом Avito документации:
+    https://developers.avito.ru/api-catalog/order-management/documentation#operation/getOrders
+    
+    Args:
+        statuses: Фильтр по статусам через запятую (on_confirmation, ready_to_ship, in_transit, canceled, delivered, on_return, in_dispute, closed)
+        ids: Идентификаторы заказов через запятую
+        dateFrom: Timestamp, с момента которого созданы покупки
+        page: Номер страницы для пагинации
+        limit: Максимальное количество заказов на странице (0-20)
+    """
+    _ensure_org_access(current_user, org_id)
+    
+    # Получаем интеграцию
+    integration = db.query(OrganizationAvitoIntegration).filter(
+        OrganizationAvitoIntegration.organization_id == org_id
+    ).first()
+    
+    if not integration:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Интеграция с Авито не настроена"
+        )
+    
+    if not integration.enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Интеграция с Авито отключена"
+        )
+    
+    try:
+        # Получаем токен
+        secret = decrypt_secret(integration.client_secret_encrypted)
+        token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
+        
+        # Подготавливаем параметры запроса в формате Avito
+        avito_params = {}
+        if statuses:
+            avito_params["statuses"] = [s.strip() for s in statuses.split(',') if s.strip()]
+        if ids:
+            avito_params["ids"] = [i.strip() for i in ids.split(',') if i.strip()]
+        if dateFrom is not None:
+            avito_params["dateFrom"] = dateFrom
+        if page is not None:
+            avito_params["page"] = page
+        if limit is not None:
+            avito_params["limit"] = min(limit, 20)  # Максимум 20 по документации
+        
+        # Отправляем сырой запрос в Avito API
+        response = await raw_fetch_avito_orders(token, avito_params)
+        
+        logger.info(f"Raw GET request to Avito API for org {org_id}")
+        logger.info(f"Query params: {avito_params}")
+        
+        # Возвращаем ответ как есть от API Авито
+        return {
+            "success": True,
+            "query_params_sent": avito_params,
+            "raw_response": response
+        }
+    except HTTPException:
+        raise
+    except AvitoOrdersError as e:
+        error_msg = str(e)
+        logger.warning(f"Avito API error in raw GET request: {error_msg}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ошибка API Авито: {error_msg}"
+        )
+    except Exception as e:
+        logger.exception("Error in raw GET Avito orders request")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка выполнения запроса к Авито: {str(e)}"
+        )
 
 
 @router.get("/{org_id}/avito/delivery/check")

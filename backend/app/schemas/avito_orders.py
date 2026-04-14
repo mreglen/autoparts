@@ -40,3 +40,12 @@ class AvitoOrderSyncResponse(BaseModel):
     created_count: int = Field(..., description="Количество созданных заказов")
     updated_count: int = Field(..., description="Количество обновленных заказов")
     errors: list[str] = Field(default_factory=list, description="Список ошибок")
+
+
+class AvitoRawOrderRequest(BaseModel):
+    """Сырой запрос к API заказов Авито"""
+    statuses: Optional[list[str]] = Field(default=None, description="Фильтр по статусам заказов")
+    ids: Optional[list[str]] = Field(default=None, description="Идентификаторы заказов")
+    dateFrom: Optional[int] = Field(default=None, description="Timestamp, с момента которого созданы покупки")
+    page: Optional[int] = Field(default=None, description="Номер страницы для пагинации")
+    limit: Optional[int] = Field(default=None, description="Максимальное количество заказов на странице (0-20)")

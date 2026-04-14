@@ -16,34 +16,66 @@ class AvitoOrdersError(RuntimeError):
 async def fetch_avito_orders(
     access_token: str,
     user_id: int,
-    status: Optional[str] = None
+    statuses: Optional[list[str]] = None,
+    ids: Optional[list[str]] = None,
+    date_from: Optional[int] = None,
+    page: Optional[int] = None,
+    limit: Optional[int] = None
 ) -> dict[str, Any]:
     """
     Получение списка заказов из Авито
     
     GET https://api.avito.ru/order-management/1/orders
     
+    Согласно документации: https://developers.avito.ru/api-catalog/order-management/documentation#operation/getOrders
+    
     Args:
         access_token: Токен доступа Авито
-        user_id: ID пользователя Авито
-        status: Фильтр по статусу (опционально)
+        user_id: ID пользователя Авито (не используется в query params)
+        statuses: Фильтр по статусам (опционально)
+            Доступные статусы:
+            - on_confirmation: ожидает подтверждения
+            - ready_to_ship: ждет отправки
+            - in_transit: в пути
+            - canceled: отменный заказ
+            - delivered: доставлен покупателю
+            - on_return: на возврате
+            - in_dispute: по заказу открыт спор
+            - closed: заказ закрыт
+        ids: Идентификаторы заказов (опционально)
+        date_from: Метка времени (timestamp), с момента которого созданы покупки (опционально)
+        page: Номер страницы для пагинации (опционально)
+        limit: Максимальное количество заказов на странице (0-20) (опционально)
         
     Returns:
         Dict с данными о заказах
     """
     url = f"{AVITO_BASE}/order-management/1/orders"
-    params = {"user_id": user_id}
+    params = {}
     
-    if status:
-        params["status"] = status
+    # Добавляем параметры согласно документации Avito
+    if statuses:
+        params["statuses"] = statuses
+    
+    if ids:
+        params["ids"] = ids
+    
+    if date_from:
+        params["dateFrom"] = date_from
+    
+    if page is not None:
+        params["page"] = page
+    
+    if limit is not None:
+        params["limit"] = min(limit, 20)  # Максимум 20 по документации
     
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json"
     }
     
-    logger.info(f"Fetching Avito orders with status filter: {status}")
-    logger.info(f"URL: {url}, Params: {params}")
+    logger.info(f"Fetching Avito orders with params: {params}")
+    logger.info(f"URL: {url}")
     
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -199,3 +231,49 @@ async def get_available_transitions(
     except Exception as e:
         logger.exception(f"Error fetching transitions for order {order_id}")
         raise AvitoOrdersError(f"Ошибка получения доступных переходов: {str(e)}")
+
+
+async def raw_fetch_avito_orders(
+    access_token: str,
+    request_body: dict[str, Any]
+) -> dict[str, Any]:
+    """
+    Сырой запрос к API заказов Авито
+    
+    GET https://api.avito.ru/order-management/1/orders
+    
+    Args:
+        access_token: Токен доступа Авито
+        request_body: Параметры запроса в формате, рекомендуемом Avito
+        
+    Returns:
+        Dict с данными о заказах
+    """
+    url = f"{AVITO_BASE}/order-management/1/orders"
+    
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    
+    logger.info(f"Сырой запрос к API заказов Авито с параметрами: {request_body}")
+    logger.info(f"URL: {url}")
+    
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url, params=request_body, headers=headers)
+            logger.info(f"Запрос к API Авито: GET {url}")
+            logger.info(f"Параметры запроса: {request_body}")
+            logger.info(f"Статус ответа: {response.status_code}")
+            logger.info(f"Заголовки ответа: {dict(response.headers)}")
+            logger.info(f"Тело ответа: {response.text[:500]}")
+            response.raise_for_status()
+            data = response.json()
+            logger.info(f"Получен сырой ответ от API Авито")
+            return data
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP ошибка в сыром запросе к API заказов Авито: {e.response.status_code} - {e.response.text}")
+        raise AvitoOrdersError(f"Ошибка API Авито: {e.response.status_code}")
+    except Exception as e:
+        logger.exception("Ошибка в сыром запросе к API заказов Авито")
+        raise AvitoOrdersError(f"Ошибка выполнения запроса: {str(e)}")
