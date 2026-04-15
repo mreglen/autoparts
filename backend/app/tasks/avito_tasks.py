@@ -194,7 +194,8 @@ def run_avito_export_job(self, job_id: int):
             ProductAvitoListingLink.organization_id == org_id,
             ProductAvitoListingLink.product_id.in_(product_id_list),
         ).all()
-        link_map = {l.product_id: l.avito_ad_id for l in links}
+        # Используем реальный avito_id (Avito item_id), а не avito_ad_id (internal_code)
+        link_map = {l.product_id: (l.avito_id or "") for l in links}
 
         photos = db.query(ProductPhoto).filter(
             ProductPhoto.organization_id == org_id,
