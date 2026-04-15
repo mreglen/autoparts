@@ -470,6 +470,7 @@ def sync_avito_ad_ids_task(self, org_id: str):
         # 4. For each item, get details and extract internal code
         processed = 0
         updated = 0
+        created = 0
         errors = 0
         
         for item in items_list:
@@ -502,15 +503,34 @@ def sync_avito_ad_ids_task(self, org_id: str):
                 ).first()
                 
                 if not link:
-                    print(f"⚠️ No link found for internal_code {internal_code}")
-                    processed += 1
-                    continue
-                
-                # d. Update avito_id field with the real Avito item_id
-                if link.avito_id != item_id:
-                    link.avito_id = item_id
-                    updated += 1
-                    print(f"✅ Updated link for {internal_code}: avito_id = {item_id}")
+                    # NEW: Find product by internal_code and create new link
+                    from app.models.product import Product as ProductModel
+                    product = db.query(ProductModel).filter(
+                        ProductModel.organization_id == org_id,
+                        ProductModel.internal_code == internal_code,
+                    ).first()
+                    
+                    if product:
+                        # Create new link
+                        link = ProductAvitoListingLink(
+                            organization_id=org_id,
+                            product_id=product.id,
+                            avito_ad_id=internal_code,
+                            avito_id=item_id,
+                        )
+                        db.add(link)
+                        created += 1
+                        print(f"✅ Created new link for {internal_code}: avito_id = {item_id}")
+                    else:
+                        print(f"⚠️ No product found for internal_code {internal_code}")
+                        processed += 1
+                        continue
+                else:
+                    # Update existing link
+                    if link.avito_id != item_id:
+                        link.avito_id = item_id
+                        updated += 1
+                        print(f"✅ Updated link for {internal_code}: avito_id = {item_id}")
                 
                 processed += 1
                 
@@ -525,6 +545,7 @@ def sync_avito_ad_ids_task(self, org_id: str):
             "status": "completed",
             "processed": processed,
             "updated": updated,
+            "created": created,
             "errors": errors,
             "total_items": len(items_list),
         }

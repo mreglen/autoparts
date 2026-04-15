@@ -612,6 +612,21 @@ export default function AvitoIntegrationPage() {
     }
   };
 
+  const handleSyncAvitoAdIds = async () => {
+    if (!orgId) return;
+    try {
+      setSaving(true);
+      const data = await apiRequest(`/organizations/${orgId}/avito/sync-ad-ids`, {
+        method: 'POST',
+      });
+      setNotice(data.message || 'Синхронизация запущена');
+    } catch (e) {
+      setError(formatErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
 
   const saveAvitoCredentials = async () => {
     if (!orgId) return false;
@@ -950,6 +965,18 @@ export default function AvitoIntegrationPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
                 <span>Скачать файл</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleSyncAvitoAdIds}
+                disabled={saving}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                title="Синхронизировать Avito ID из описаний объявлений"
+              >
+                <svg className={`w-4 h-4 ${saving ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>{saving ? 'Синхронизация...' : 'Синхронизировать Avito ID'}</span>
               </button>
               <button
                 type="button"

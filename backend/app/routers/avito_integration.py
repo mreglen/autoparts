@@ -426,6 +426,46 @@ async def download_avito_autoload(
     )
 
 
+@router.post("/{org_id}/avito/sync-ad-ids")
+async def sync_avito_ad_ids(
+    org_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Ручной запуск синхронизации Avito ad IDs."""
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+    
+    # Check Avito integration is configured
+    integration = db.query(OrganizationAvitoIntegration).filter(
+        OrganizationAvitoIntegration.organization_id == org_id
+    ).first()
+    
+    if not integration or not integration.client_id or not integration.client_secret_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Интеграция с Авито не настроена"
+        )
+    
+    # Launch background task
+    try:
+        from app.tasks.avito_tasks import sync_avito_ad_ids_task
+        task = sync_avito_ad_ids_task.delay(org_id)
+        print(f"🔄 Manual sync launched for org {org_id}, task_id={task.id}")
+        
+        return {
+            "status": "started",
+            "message": "Синхронизация запущена в фоновом режиме",
+            "task_id": task.id,
+        }
+    except Exception as e:
+        logger.exception("Failed to launch sync task")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка запуска синхронизации: {str(e)}"
+        )
+
+
 @router.post("/{org_id}/avito/autoload/export-async", response_model=AvitoAutoloadJobResponse)
 async def export_products_to_avito_autoload_async(
     org_id: str,
