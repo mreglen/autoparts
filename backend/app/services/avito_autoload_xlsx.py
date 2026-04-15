@@ -601,11 +601,11 @@ def upsert_products_to_avito_autoload(
         if DESCRIPTION_AD_HEADER in col_map:
             description = str(product.get("description") or "")
             # Добавляем внутренний код товара на новую строку в конец описания
-            if part_number:
+            if internal_code:
                 if description:
-                    description += f"\n\nВнутренний код: {part_number}"
+                    description += f"\n\nВнутренний код: {internal_code}"
                 else:
-                    description = f"Внутренний код: {part_number}"
+                    description = f"Внутренний код: {internal_code}"
             row_values[DESCRIPTION_AD_HEADER] = description
         if ADDRESS_HEADER in col_map:
             row_values[ADDRESS_HEADER] = str(product.get("address") or "")

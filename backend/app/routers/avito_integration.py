@@ -612,6 +612,15 @@ async def export_products_to_avito_autoload(
         # category больше не используется - всегда "Запчасти и аксессуары"
         storage = storage_by_id.get(product.storage_location_id) if product.storage_location_id else None
         address = (storage.address if storage and storage.address else None) or (org.address or "")
+        # Add internal code to description for Avito
+        description = product.description or ""
+        if product.internal_code:
+            # Append internal code to end of description
+            if description:
+                description = description.rstrip() + f"\n\nВнутренний код: {product.internal_code}"
+            else:
+                description = f"Внутренний код: {product.internal_code}"
+        
         export_rows.append(
             {
                 "id": product.id,
@@ -621,7 +630,7 @@ async def export_products_to_avito_autoload(
                 "is_new": product.is_new,
                 "price": product.price,
                 "name": product.name,
-                "description": product.description,
+                "description": description,
                 "quantity": product.quantity,
                 "photos": photos,
                 "avito_id": avito_link.avito_ad_id if avito_link else "",

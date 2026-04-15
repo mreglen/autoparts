@@ -418,6 +418,7 @@ export default function AvitoNomenclaturePage() {
   const [categoryTarget, setCategoryTarget] = useState(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [expandedRows, setExpandedRows] = useState({});
 
   const statuses = useMemo(() => {
     const set = new Set();
@@ -585,6 +586,13 @@ export default function AvitoNomenclaturePage() {
       const cur = prev[rowKey] || 0;
       return { ...prev, [rowKey]: (cur + 1) % total };
     });
+  };
+
+  const toggleRowExpand = (rowKey) => {
+    setExpandedRows((prev) => ({
+      ...prev,
+      [rowKey]: !prev[rowKey],
+    }));
   };
 
   const openCategoryPicker = (row) => {
@@ -898,9 +906,11 @@ export default function AvitoNomenclaturePage() {
                   const totalPhotos = photos.length;
                   const photoIdx = Math.min(photoIndexes[key] || 0, Math.max(totalPhotos - 1, 0));
                   const currentPhoto = totalPhotos > 0 ? photos[photoIdx] : '';
+                  const isExpanded = expandedRows[key];
                   return (
-                  <tr key={key} className="bg-white">
-                    <td className="px-3 py-2">
+                  <>
+                  <tr key={key} className="bg-white hover:bg-gray-50 cursor-pointer" onClick={() => toggleRowExpand(key)}>
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={checked}
@@ -921,7 +931,7 @@ export default function AvitoNomenclaturePage() {
                       })()}
                     </td>
                     <td className="px-3 py-2">{row.avito_status || '-'}</td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       {currentPhoto ? (
                         <div className="relative group w-20 h-20">
                           <img
@@ -955,6 +965,19 @@ export default function AvitoNomenclaturePage() {
                       )}
                     </td>
                   </tr>
+                  {isExpanded && row.description && (
+                    <tr className="bg-gray-50">
+                      <td colSpan="9" className="px-6 py-4">
+                        <div className="text-sm">
+                          <div className="font-medium text-gray-900 mb-2">Описание:</div>
+                          <div className="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-gray-200">
+                            {row.description}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </>
                 )})}
               </tbody>
             </table>
@@ -969,70 +992,86 @@ export default function AvitoNomenclaturePage() {
               const totalPhotos = photos.length;
               const photoIdx = Math.min(photoIndexes[key] || 0, Math.max(totalPhotos - 1, 0));
               const currentPhoto = totalPhotos > 0 ? photos[photoIdx] : '';
+              const isExpanded = expandedRows[key];
               
               return (
-                <div key={key} className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-start gap-3 mb-3">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => handleToggleRow(row, idx)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">
-                        {row.part_number || '-'}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                        {row.title || '-'}
-                      </p>
+                <div key={key} className="bg-white border border-gray-200 rounded-lg">
+                  <div 
+                    className="p-4 cursor-pointer hover:bg-gray-50" 
+                    onClick={() => toggleRowExpand(key)}
+                  >
+                    <div className="flex items-start gap-3 mb-3">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {row.part_number || '-'}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                          {row.title || '-'}
+                        </p>
+                      </div>
+                      {currentPhoto && (
+                        <div className="relative flex-shrink-0">
+                          <img
+                            src={currentPhoto}
+                            alt="Фото"
+                            className="w-16 h-16 object-cover rounded border border-gray-200"
+                          />
+                          {totalPhotos > 1 && (
+                            <div className="absolute -bottom-1 -right-1 bg-gray-800 text-white text-xs px-1.5 py-0.5 rounded">
+                              {photoIdx + 1}/{totalPhotos}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {currentPhoto && (
-                      <div className="relative flex-shrink-0">
-                        <img
-                          src={currentPhoto}
-                          alt="Фото"
-                          className="w-16 h-16 object-cover rounded border border-gray-200"
-                        />
-                        {totalPhotos > 1 && (
-                          <div className="absolute -bottom-1 -right-1 bg-gray-800 text-white text-xs px-1.5 py-0.5 rounded">
-                            {photoIdx + 1}/{totalPhotos}
-                          </div>
-                        )}
+                    
+                    <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                      <div>
+                        <p className="text-xs text-gray-500">Производитель</p>
+                        <p className="text-gray-900 truncate">{row.manufacturer || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Состояние</p>
+                        <p className="text-gray-900">{row.condition || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Цена</p>
+                        <p className="text-gray-900 font-medium">{row.price || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Количество</p>
+                        <p className="text-gray-900">
+                          {(() => {
+                            const q = Number(row.quantity);
+                            return Number.isFinite(q) && q > 0 ? q : 1;
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {row.avito_status && (
+                      <div className="pt-2 border-t border-gray-100">
+                        <p className="text-xs text-gray-500">Статус</p>
+                        <p className="text-sm text-gray-900">{row.avito_status}</p>
+                      </div>
+                    )}
+                    
+                    {isExpanded && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className="text-xs text-gray-500 mb-2">Описание:</p>
+                        <div className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">
+                          {row.description || 'Нет описания'}
+                        </div>
                       </div>
                     )}
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-sm mb-2">
-                    <div>
-                      <p className="text-xs text-gray-500">Производитель</p>
-                      <p className="text-gray-900 truncate">{row.manufacturer || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Состояние</p>
-                      <p className="text-gray-900">{row.condition || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Цена</p>
-                      <p className="text-gray-900 font-medium">{row.price || '-'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Количество</p>
-                      <p className="text-gray-900">
-                        {(() => {
-                          const q = Number(row.quantity);
-                          return Number.isFinite(q) && q > 0 ? q : 1;
-                        })()}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {row.avito_status && (
-                    <div className="pt-2 border-t border-gray-100">
-                      <p className="text-xs text-gray-500">Статус</p>
-                      <p className="text-sm text-gray-900">{row.avito_status}</p>
-                    </div>
-                  )}
                 </div>
               );
             })}
