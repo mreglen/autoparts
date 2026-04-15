@@ -1,70 +1,75 @@
-{
-  "orders": [
-    {
-      "id": 7,
-      "order_number": "000000007",
-      "avito_order_id": 55000000049575530,
-      "avito_status": "on_confirmation",
-      "status": "В ожидании",
-      "recipient_name": "Фомина Анастасия Алексеевна",
-      "recipient_phone": "",
-      "total_amount": 0,
-      "is_paid": false,
-      "created_at": "2026-04-14T23:10:23.567645+05:00",
-      "source": "avito",
-      "avito_data": {
-        "availableActions": [
-          {
-            "name": "reject",
-            "required": false
-          },
-          {
-            "name": "setMarkings",
-            "required": false
-          },
-          {
-            "name": "setCNCDetails",
-            "required": true
-          }
-        ],
-        "createdAt": "2026-04-14T11:53:01Z",
-        "delivery": {
-          "buyerInfo": {
-            "fullName": "Флмина Анастасия Алексеевна",
-            "phoneNumber": "+79221152695"
-          },
-          "serviceName": "Самовывоз от продавца",
-          "serviceType": "cnc"
-        },
-        "id": "55000000049575527",
-        "items": [
-          {
-            "avitoId": "8101099085",
-            "chatId": "u2i-qcq2nljuGXRCBkuz_5cOZw",
-            "count": 1,
-            "location": "Екатеринбург",
-            "prices": {
-              "commission": 1,
-              "price": 35,
-              "total": 34
-            },
-            "title": "Болты для глушителя M8x50"
-          }
-        ],
-        "marketplaceId": "70000000425562616",
-        "prices": {
-          "commission": 1,
-          "price": 35,
-          "total": 34
-        },
-        "schedules": {
-          "deliveryDateMax": "2026-04-21T11:52:27Z",
-          "deliveryDateMaх": "2026-04-21T11:52:27Z",
-          "deliveryDateMin": "2026-04-14T11:52:27Z"
-        },
-        "status": "on_confirmation",
-        "updatedAt": "2026-04-14T11:53:01Z"
-      }
-    }
-  ]
-}
+апр 15 10:11:57 vm2512296768 uvicorn[28421]: INFO:     94.25.170.5:0 - "GET /api                                                                                                 /storage-locations/?organization_id=TVgpq7hgzd HTTP/1.0" 200 OK
+апр 15 10:11:58 vm2512296768 uvicorn[28421]: INFO:     94.25.170.5:0 - "POST /ap                                                                                                 i/organizations/TVgpq7hgzd/avito/autoload/import HTTP/1.0" 500 Internal Server E                                                                                                 rror
+апр 15 10:11:58 vm2512296768 uvicorn[28421]: ERROR:    Exception in ASGI applica                                                                                                 tion
+апр 15 10:11:58 vm2512296768 uvicorn[28421]: Traceback (most recent call last):
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", l                                                                                                 ine 409, in run_asgi
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     result = await app(  # type: ig                                                                                                 nore[func-returns-value]
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:              ^^^^^^^^^^^^^^^^^^^^^^                                                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 6                                                                                                 0, in __call__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     return await self.app(scope, re                                                                                                 ceive, send)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:            ^^^^^^^^^^^^^^^^^^^^^^^^                                                                                                 ^^^^^^^^^^^^
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/fastapi/applications.py", line 1134, in __ca                                                                                                 ll__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await super().__call__(scope, r                                                                                                 eceive, send)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/applications.py", line 113, in __c                                                                                                 all__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await self.middleware_stack(sco                                                                                                 pe, receive, send)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, i                                                                                                 n __call__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     raise exc
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, i                                                                                                 n __call__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await self.app(scope, receive,                                                                                                  _send)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 191, in                                                                                                  __call__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     with recv_stream, send_stream,                                                                                                  collapse_excgroups():
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/usr/lib/python3.12/context                                                                                                 lib.py", line 158, in __exit__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     self.gen.throw(value)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/_utils.py", line 85, in collapse_e                                                                                                 xcgroups
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     raise exc
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 193, in                                                                                                  __call__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     response = await self.dispatch_                                                                                                 func(request, call_next)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:                ^^^^^^^^^^^^^^^^^^^^                                                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/app/main.py", line 100, in handle_large_files
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     raise e
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/app/main.py", line 92, in handle_large_files
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     response = await call_next(requ                                                                                                 est)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:                ^^^^^^^^^^^^^^^^^^^^                                                                                                 ^^^^
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 168, in                                                                                                  call_next
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     raise app_exc from app_exc.__ca                                                                                                 use__ or app_exc.__context__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 144, in                                                                                                  coro
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await self.app(scope, receive_o                                                                                                 r_disconnect, send_no_error)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 93, in _                                                                                                 _call__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await self.simple_response(scop                                                                                                 e, receive, send, request_headers=headers)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 144, in                                                                                                  simple_response
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await self.app(scope, receive,                                                                                                  send)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63                                                                                                 , in __call__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await wrap_app_handling_excepti                                                                                                 ons(self.app, conn)(scope, receive, send)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, i                                                                                                 n wrapped_app
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     raise exc
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, i                                                                                                 n wrapped_app
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await app(scope, receive, sende                                                                                                 r)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line                                                                                                  18, in __call__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await self.app(scope, receive,                                                                                                  send)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/routing.py", line 716, in __call__
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await self.middleware_stack(sco                                                                                                 pe, receive, send)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/routing.py", line 736, in app
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await route.handle(scope, recei                                                                                                 ve, send)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/routing.py", line 290, in handle
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await self.app(scope, receive,                                                                                                  send)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/fastapi/routing.py", line 125, in app
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await wrap_app_handling_excepti                                                                                                 ons(app, request)(scope, receive, send)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, i                                                                                                 n wrapped_app
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     raise exc
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, i                                                                                                 n wrapped_app
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     await app(scope, receive, sende                                                                                                 r)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/fastapi/routing.py", line 111, in app
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     response = await f(request)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:                ^^^^^^^^^^^^^^^^
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/fastapi/routing.py", line 391, in app
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     raw_response = await run_endpoi                                                                                                 nt_function(
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:                    ^^^^^^^^^^^^^^^^                                                                                                 ^^^^^^^^^^^^
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/venv/lib/python3.12/site-packages/fastapi/routing.py", line 290, in run_endpoi                                                                                                 nt_function
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     return await dependant.call(**v                                                                                                 alues)
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:            ^^^^^^^^^^^^^^^^^^^^^^^^                                                                                                 ^^^^^^
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:   File "/home/fast/autoparts/backen                                                                                                 d/app/routers/avito_integration.py", line 1237, in import_avito_autoload_rows
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:     avito_ad_id=str(internal_code),                                                                                                   # Сохраняем внутренний код вместо avito_id
+апр 15 10:11:58 vm2512296768 uvicorn[28421]:                     ^^^^^^^^^^^^^
+апр 15 10:11:58 vm2512296768 uvicorn[28421]: UnboundLocalError: cannot access lo                                                                                                 cal variable 'internal_code' where it is not associated with a value
+^C
+root@vm2512296768:/home/fast/autoparts/frontend/my-autoparts#

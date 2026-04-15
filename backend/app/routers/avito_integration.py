@@ -1221,7 +1221,7 @@ async def import_avito_autoload_rows(
                         {
                             "sheet": key[0],
                             "row": key[1],
-                            "reason": f"internal_code={internal_code} уже существует",
+                            "reason": f"internal_code={unique_ad_id} уже существует",
                         }
                     )
                     continue
@@ -1234,7 +1234,7 @@ async def import_avito_autoload_rows(
                         ProductAvitoListingLink(
                             organization_id=org_id,
                             product_id=product.id,
-                            avito_ad_id=str(internal_code),  # Сохраняем внутренний код вместо avito_id
+                            avito_ad_id=str(product.internal_code or ""),  # Сохраняем внутренний код
                         )
                     )
                     db.flush()
@@ -1244,7 +1244,7 @@ async def import_avito_autoload_rows(
                     {
                         "sheet": key[0],
                         "row": key[1],
-                        "reason": f"Связь уже существует для internal_code={internal_code}",
+                        "reason": f"Связь уже существует для internal_code={product.internal_code}",
                     }
                 )
 
