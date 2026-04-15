@@ -761,6 +761,12 @@ async def upload_avito_autoload(
     if parsed.local_errors:
         for err in parsed.local_errors[:5]:  # First 5 errors
             print(f"    Error: {err}")
+    
+    # Проверка: если товаров нет, но есть листы - возможно файл в старом формате
+    if len(parsed.items) == 0 and len(parsed.sheets_parsed) == 0:
+        print(f"⚠️ WARNING: No sheets parsed! File may be in old format (Russian headers)")
+        print(f"   The system expects NEW FORMAT with English headers: Title, Price, Brand, OEM, etc.")
+        print(f"   Please convert your file to the new Avito template format.")
 
     # Проверка формата файла и предупреждения
     warnings = []
@@ -770,12 +776,22 @@ async def upload_avito_autoload(
             "Убедитесь, что файл содержит лист с колонкой 'Title' и данными товаров, "
             "начиная со второй строки."
         )
+        warnings.append(
+            "⚠️ ВНИМАНИЕ: Возможно вы используете СТАРЫЙ формат файла (с русскими заголовками). "
+            "Система требует НОВЫЙ формат с английскими заголовками: "
+            "Title, Price, Brand, OEM, Condition, Id, AvitoId, ImageUrls и т.д. "
+            "Используйте шаблон template_autoload.xlsx для создания файла в правильном формате."
+        )
     
     if not parsed.sheets_parsed or len(parsed.sheets_parsed) == 0:
         warnings.append(
             "В файле не найдено листов с данными. "
             "Проверьте что файл содержит корректный шаблон Авито с английскими заголовками "
             "(Title, Price, Brand, OEM и т.д.)."
+        )
+        warnings.append(
+            "💡 СКАЧАЙТЕ НОВЫЙ ШАБЛОН: Используйте файл template_autoload.xlsx как основу. "
+            "Заполните лист 'Объявления' вашими данными, сохраняя английские заголовки."
         )
     
     if parsed.local_ok and len(parsed.items) == 0:
