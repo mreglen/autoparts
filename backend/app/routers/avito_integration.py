@@ -144,24 +144,30 @@ def _get_last_autoload(db: Session, org_id: str) -> Optional[AvitoLastAutoloadSn
         .first()
     )
     if not cache:
+        print(f"📭 No autoload cache found for org {org_id}")
         return None
 
     # Автовосстановление кэша: если файл на диске есть, а items пустые
     # (например, из-за прошлой версии парсера), перепарсим и сохраним.
     try:
         items = _json_loads(cache.items_json, [])
+        print(f"📦 Loading autoload cache for org {org_id}: {len(items)} items from DB")
         if cache.saved_path and isinstance(items, list) and len(items) == 0:
             project_root = Path(__file__).resolve().parents[2]
             xlsx_path = project_root / cache.saved_path.lstrip("/")
             if xlsx_path.is_file():
+                print(f"🔄 Auto-recovering cache from file: {xlsx_path}")
                 parsed = parse_and_validate_avito_autoload(xlsx_path.read_bytes())
                 cache.items_json = json.dumps(parsed.items, ensure_ascii=False)
                 cache.local_validation_ok = bool(parsed.local_ok)
                 cache.local_errors_json = json.dumps(parsed.local_errors, ensure_ascii=False)
                 cache.sheets_parsed_json = json.dumps(parsed.sheets_parsed, ensure_ascii=False)
                 db.commit()
+                print(f"✅ Cache recovered: {len(parsed.items)} items")
+                items = parsed.items
     except Exception:
         db.rollback()
+        print(f"❌ Error during cache auto-recovery for org {org_id}")
 
     return AvitoLastAutoloadSnapshot(
         saved_path=cache.saved_path,
@@ -841,6 +847,7 @@ async def upload_avito_autoload(
 
     rel_path = f"/uploads/avito/{org_id}/{dest_name}"
     try:
+        print(f"💾 Saving autoload cache for org {org_id}: {len(parsed.items)} items")
         _save_autoload_cache(
             db,
             org_id,
@@ -855,9 +862,11 @@ async def upload_avito_autoload(
             avito_token_error=avito_token_error,
             warnings=warnings if warnings else None,
         )
+        print(f"✅ Autoload cache saved successfully for org {org_id}")
     except Exception:
         logger.exception("Не удалось сохранить кэш автозагрузки")
         db.rollback()
+        print(f"❌ Failed to save autoload cache for org {org_id}")
 
     return AvitoAutoloadUploadResponse(
         saved_path=rel_path,
