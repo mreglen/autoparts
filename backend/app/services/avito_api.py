@@ -130,15 +130,15 @@ async def get_last_report_v1(access_token: str, user_id: int) -> Optional[dict[s
 
 async def get_avito_items_list(access_token: str, user_id: int) -> list[dict[str, Any]]:
     """
-    GET /core/v1/items - Get list of all ads for the user.
+    GET /core/v1/accounts/{user_id}/items - Get list of all ads for the user.
     Returns list of items with basic info including item_id.
     """
     items = []
     async with httpx.AsyncClient(timeout=60.0) as client:
         r = await client.get(
-            f"{AVITO_BASE}/core/v1/items/",
+            f"{AVITO_BASE}/core/v1/accounts/{user_id}/items/",
             headers={"Authorization": f"Bearer {access_token}"},
-            params={"user_id": user_id, "limit": 100},
+            params={"limit": 100},
         )
         try:
             data = r.json()
