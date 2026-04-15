@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from openpyxl import load_workbook
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -382,6 +383,46 @@ def get_avito_credentials(
         client_secret_configured=True,
         enabled=row.enabled,
         last_autoload=last,
+    )
+
+
+@router.get("/{org_id}/avito/autoload/download")
+async def download_avito_autoload(
+    org_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Скачать файл автозагрузки без кэширования."""
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+    
+    cache = (
+        db.query(OrganizationAvitoAutoloadCache)
+        .filter(OrganizationAvitoAutoloadCache.organization_id == org_id)
+        .first()
+    )
+    if not cache or not cache.saved_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки не найден")
+    
+    rel_path = cache.saved_path
+    project_root = Path(__file__).resolve().parents[2]
+    xlsx_path = project_root / rel_path.lstrip("/")
+    
+    if not xlsx_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки на диске не найден")
+    
+    print(f"📥 Downloading autoload file for org {org_id}: {xlsx_path}")
+    
+    # Возвращаем файл с заголовками запрещающими кэширование
+    return FileResponse(
+        path=str(xlsx_path),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename="autoload.xlsx",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
     )
 
 
