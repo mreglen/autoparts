@@ -1730,3 +1730,104 @@ async def remove_avito_autoload_rows(
         avito_report=avito_report,
         avito_token_error=avito_token_error,
     )
+
+
+@router.get("/{org_id}/avito/debug-item-detail")
+async def debug_avito_item_detail(
+    org_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """
+    DEBUG ENDPOINT - temporarily exposed for testing.
+    Fetches first item from Avito API and returns full detail response.
+    """
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+    
+    # Get Avito integration
+    integration = db.query(OrganizationAvitoIntegration).filter(
+        OrganizationAvitoIntegration.organization_id == org_id
+    ).first()
+    
+    if not integration or not integration.client_id or not integration.client_secret_encrypted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Интеграция с Авито не настроена"
+        )
+    
+    try:
+        import asyncio
+        
+        # Get access token
+        secret = decrypt_secret(integration.client_secret_encrypted)
+        token = await avito_api_svc.fetch_access_token(
+            integration.client_id,
+            secret
+        )
+        user_id = int(integration.avito_user_id)
+        
+        # Get items list
+        items_list = await avito_api_svc.get_avito_items_list(token, user_id)
+        
+        if not items_list:
+            return {
+                "status": "error",
+                "message": "No items found",
+            }
+        
+        # Take first item
+        first_item = items_list[0]
+        item_id = str(first_item.get("id", ""))
+        item_url = first_item.get("url", "")
+        
+        # Try to get item detail from API
+        api_detail = None
+        api_error = None
+        try:
+            api_detail = await avito_api_svc.get_avito_item_detail(token, user_id, item_id)
+        except Exception as e:
+            api_error = str(e)
+        
+        # Try to fetch HTML page
+        html_content = None
+        html_error = None
+        description_from_html = None
+        if item_url:
+            try:
+                html_content = await avito_api_svc.fetch_avito_item_page_html(item_url)
+                description_from_html = avito_api_svc.extract_description_from_html(html_content)
+            except Exception as e:
+                html_error = str(e)
+        
+        return {
+            "status": "success",
+            "item_from_list": {
+                "id": item_id,
+                "title": first_item.get("title"),
+                "url": item_url,
+                "full_data": first_item,
+            },
+            "api_detail": {
+                "success": api_detail is not None,
+                "error": api_error,
+                "keys": list(api_detail.keys()) if api_detail else None,
+                "has_description": "description" in api_detail if api_detail else False,
+                "full_response": api_detail,
+            },
+            "html_parsing": {
+                "url": item_url,
+                "success": html_content is not None,
+                "error": html_error,
+                "html_length": len(html_content) if html_content else 0,
+                "description_extracted": description_from_html,
+            },
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "message": str(e),
+            "traceback": traceback.format_exc(),
+        }

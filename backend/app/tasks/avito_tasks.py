@@ -235,6 +235,15 @@ def run_avito_export_job(self, job_id: int):
                     celery_timeout_s=120,
                 )
             )
+            # Add internal code to description for Avito
+            description = product.description or ""
+            if product.internal_code:
+                # Append internal code to end of description
+                if description:
+                    description = description.rstrip() + f"\n\nВнутренний код: {product.internal_code}"
+                else:
+                    description = f"Внутренний код: {product.internal_code}"
+            
             export_rows.append(
                 {
                     "id": product.id,
@@ -244,7 +253,7 @@ def run_avito_export_job(self, job_id: int):
                     "is_new": product.is_new,
                     "price": product.price,
                     "name": product.name,
-                    "description": product.description,
+                    "description": description,
                     "quantity": product.quantity,
                     "photos": photos_for_xlsx,
                     "avito_id": link_map.get(product.id, ""),
@@ -475,24 +484,42 @@ def sync_avito_ad_ids_task(self, org_id: str):
         
         for item in items_list:
             try:
-                item_id = str(item.get("id") or item.get("item_id", ""))
+                # Avito API returns item with "id" field at top level
+                item_id = str(item.get("id") or "")
+                item_url = item.get("url", "")
+                
                 if not item_id:
+                    print(f"⚠️ Item missing id field: {item}")
                     continue
                 
-                # a. Get detailed info via GET /core/v1/accounts/{user_id}/items/{item_id}/
-                try:
-                    item_detail = asyncio.run(avito_api_svc.get_avito_item_detail(token, user_id, item_id))
-                except Exception as e:
-                    print(f"⚠️ Failed to get detail for item {item_id}: {e}")
+                # Get description by parsing HTML page from URL
+                if not item_url:
+                    title = item.get("title", "unknown")
+                    print(f"⚠️ No URL for item {item_id} (title: {title})")
                     errors += 1
                     continue
                 
-                # b. Extract internal_code from description
-                description = item_detail.get("description", "")
+                try:
+                    html = asyncio.run(avito_api_svc.fetch_avito_item_page_html(item_url))
+                    description = avito_api_svc.extract_description_from_html(html)
+                except Exception as e:
+                    print(f"⚠️ Failed to fetch page for item {item_id}: {e}")
+                    errors += 1
+                    continue
+                
+                if not description:
+                    title = item.get("title", "unknown")
+                    print(f"⚠️ No description found in HTML for item {item_id} (title: {title})")
+                    errors += 1
+                    continue
+                
+                # Extract internal_code from description
                 internal_code = extract_internal_code_from_description(description)
                 
                 if not internal_code:
-                    print(f"⚠️ No internal code found in item {item_id} description")
+                    # Print title to help debug
+                    title = item.get("title", "unknown")
+                    print(f"⚠️ No internal code found in item {item_id} (title: {title})")
                     processed += 1
                     continue
                 
@@ -533,6 +560,8 @@ def sync_avito_ad_ids_task(self, org_id: str):
                         print(f"✅ Updated link for {internal_code}: avito_id = {item_id}")
                 
                 processed += 1
+                if processed % 10 == 0 or processed == len(items_list):
+                    print(f"📊 Progress: {processed}/{len(items_list)} items processed (created={created}, updated={updated})")
                 
             except Exception as e:
                 print(f"❌ Error processing item: {e}")

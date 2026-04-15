@@ -130,30 +130,75 @@ async def get_last_report_v1(access_token: str, user_id: int) -> Optional[dict[s
 
 async def get_avito_items_list(access_token: str, user_id: int) -> list[dict[str, Any]]:
     """
-    GET /core/v1/accounts/{user_id}/items - Get list of all ads for the user.
+    GET /core/v1/items - Get list of all ads for the user.
     Returns list of items with basic info including item_id.
+    
+    According to Avito docs:
+    https://developers.avito.ru/api-catalog/itemmgmt/documentation#operation/getItems
+    
+    Response structure:
+    {
+      "meta": {...},
+      "resources": [
+        {
+          "id": 12345678,
+          "address": "...",
+          "category": {"id": 111},
+          "price": 5000,
+          "status": "active",
+          "title": "...",
+          "url": "..."
+        }
+      ]
+    }
     """
     items = []
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        r = await client.get(
-            f"{AVITO_BASE}/core/v1/accounts/{user_id}/items/",
-            headers={"Authorization": f"Bearer {access_token}"},
-            params={"limit": 100},
-        )
-        try:
-            data = r.json()
-        except Exception:
-            data = {"raw": r.text[:8000]}
-        
-        if r.status_code != 200:
-            raise RuntimeError(f"Avito items list error (HTTP {r.status_code}): {data}")
-        
-        # Extract items from response
-        if isinstance(data, dict):
-            items = data.get("items", []) or data.get("data", []) or []
-        elif isinstance(data, list):
-            items = data
+    page = 1
+    per_page = 100
     
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        # Fetch all pages
+        while True:
+            r = await client.get(
+                f"{AVITO_BASE}/core/v1/items",
+                headers={"Authorization": f"Bearer {access_token}"},
+                params={"per_page": per_page, "page": page, "status": "active"},
+            )
+            try:
+                data = r.json()
+            except Exception:
+                data = {"raw": r.text[:8000]}
+            
+            if r.status_code != 200:
+                raise RuntimeError(f"Avito items list error (HTTP {r.status_code}): {data}")
+            
+            # Extract items from response - Avito returns "resources" array
+            page_items = []
+            if isinstance(data, dict):
+                # Try "resources" first (correct field name), then fallback to "items" or "data"
+                page_items = data.get("resources", []) or data.get("items", []) or data.get("data", []) or []
+            elif isinstance(data, list):
+                page_items = data
+            
+            items.extend(page_items)
+            
+            # Check if there are more pages
+            total_items = 0
+            if isinstance(data, dict):
+                meta = data.get("meta", {})
+                total_items = meta.get("total", meta.get("totalCount", 0))
+            
+            if len(page_items) < per_page or len(items) >= total_items:
+                break
+            
+            page += 1
+            
+            # Safety limit to prevent infinite loops
+            if page > 100:
+                print(f"⚠️ Reached safety limit of 100 pages, stopping")
+                break
+    
+    print(f"✅ Fetched {len(items)} items from Avito API")
     return items
 
 
@@ -176,3 +221,57 @@ async def get_avito_item_detail(access_token: str, user_id: int, item_id: str) -
             raise RuntimeError(f"Avito item detail error (HTTP {r.status_code}): {data}")
         
         return data if isinstance(data, dict) else {}
+
+
+async def fetch_avito_item_page_html(item_url: str) -> str:
+    """
+    Fetch the HTML content of an Avito item page by URL.
+    Used to parse description from the page when API doesn't return it.
+    """
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        r = await client.get(
+            item_url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            },
+        )
+        if r.status_code != 200:
+            raise RuntimeError(f"Failed to fetch Avito page {item_url}: HTTP {r.status_code}")
+        return r.text
+
+
+def extract_description_from_html(html: str) -> str:
+    """
+    Extract description text from Avito item HTML page.
+    Looks for description in meta tags or script data.
+    """
+    try:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # Try to find description in meta tags
+        meta_desc = soup.find('meta', attrs={'name': 'description'})
+        if meta_desc and meta_desc.get('content'):
+            return meta_desc['content']
+        
+        # Try to find in JSON-LD or script data
+        # Avito often embeds data in script tags
+        for script in soup.find_all('script', type='application/ld+json'):
+            if script.string:
+                try:
+                    import json
+                    data = json.loads(script.string)
+                    if isinstance(data, dict) and 'description' in data:
+                        return data['description']
+                except:
+                    pass
+        
+        # Fallback: look for any element with description-like class
+        desc_element = soup.find(class_=lambda x: x and 'description' in x.lower())
+        if desc_element:
+            return desc_element.get_text(strip=True)
+        
+        return ""
+    except Exception as e:
+        print(f"⚠️ Error extracting description from HTML: {e}")
+        return ""
