@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 from openpyxl import Workbook, load_workbook
 
-TEMPLATE_XLSX_REL_PATH = "backend/app/templates/avito/template.xlsx"
+TEMPLATE_XLSX_REL_PATH = "backend/app/templates/avito/template_autoload.xlsx"
 # В новом формате Авито заголовки находятся в 1-й строке (Row 1),
 # данные начинаются со 2-й строки (Row 2).
 DATA_SCAN_START_ROW = 2

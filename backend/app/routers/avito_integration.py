@@ -704,9 +704,9 @@ async def upload_avito_autoload(
     dest_path = base_dir / dest_name
     dest_path.write_bytes(body)
 
-    # Добавляем лист "Объявления" из template.xlsx если его ещё нет
+    # Добавляем лист "Объявления" из template_autoload.xlsx если его ещё нет
     try:
-        template_path = Path(__file__).resolve().parents[2] / "templates" / "avito" / "template.xlsx"
+        template_path = Path(__file__).resolve().parents[2] / "templates" / "avito" / "template_autoload.xlsx"
         if template_path.is_file():
             # Открываем загруженный файл
             wb = load_workbook(str(dest_path), read_only=False)
