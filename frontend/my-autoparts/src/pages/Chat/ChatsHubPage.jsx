@@ -273,6 +273,7 @@ const ChatsHubPage = () => {
 
 // Универсальный компонент строки чата
 function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUserId, onSelect }) {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const img = isAvito 
     ? (chat.context_image_url || chat.avatar_url)
@@ -304,17 +305,31 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
   const placeholderLetter = (title && title.charAt(0).toUpperCase()) || 'Ч';
 
   // Handler for photo click - navigate to product
-  const handlePhotoClick = (e) => {
+  const handlePhotoClick = async (e) => {
     e.stopPropagation(); // Prevent chat selection
     
     if (isAvito) {
       // For Avito: check if product is linked
       if (chat.linked_product_id) {
+        // Already have the link - navigate directly
         navigate(`/part/${chat.linked_product_id}`);
       } else if (chat.context_url) {
-        // No link found - open ProductNotFound page in new tab
-        const encodedUrl = encodeURIComponent(chat.context_url);
-        window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
+        // Try to fetch product link first
+        try {
+          const linkData = await dispatch(fetchAvitoChatProductLink(chat.id)).unwrap();
+          if (linkData?.linked && linkData?.product_id) {
+            // Product is linked - navigate to it
+            navigate(`/part/${linkData.product_id}`);
+          } else {
+            // No link - open ProductNotFound page in new tab
+            const encodedUrl = encodeURIComponent(chat.context_url);
+            window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
+          }
+        } catch (error) {
+          // Error fetching link - open ProductNotFound page
+          const encodedUrl = encodeURIComponent(chat.context_url);
+          window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
+        }
       }
     } else {
       // For Свой Гараж: navigate to internal product
@@ -922,6 +937,8 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
     if (chatId) {
       dispatch(fetchAvitoMessages(chatId));
       dispatch(fetchAvitoChatDetail(chatId));
+      // Fetch product link for this chat
+      dispatch(fetchAvitoChatProductLink(chatId));
     }
   }, [dispatch, chatId]);
 

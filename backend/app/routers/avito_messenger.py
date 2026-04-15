@@ -107,20 +107,39 @@ async def get_avito_chat_product_link(
         chat_detail = await get_chat_detail(token, avito_user_id, chat_id)
         context_id = chat_detail.get("context_id")
         
+        print(f"🔍 DEBUG: chat_id={chat_id}, context_id={context_id}, organization_id={current_user.organization_id}")
+        
         if not context_id:
+            print(f"⚠️ WARNING: No context_id found for chat {chat_id}")
             return {"linked": False, "product_id": None}
         
         # Check if this Avito ad ID is linked to any internal product
         from app.models.product_avito_listing_link import ProductAvitoListingLink
+        
+        # Сначала ищем по avito_id (real Avito item_id) - это context.value.id из API
+        link = db.query(ProductAvitoListingLink).filter(
+            ProductAvitoListingLink.organization_id == current_user.organization_id,
+            ProductAvitoListingLink.avito_id == str(context_id)
+        ).first()
+        
+        if link:
+            print(f"✅ Found link by avito_id: product_id={link.product_id}")
+            return {"linked": True, "product_id": link.product_id}
+        
+        # Если не нашли, пробуем по avito_ad_id (internal_code)
         link = db.query(ProductAvitoListingLink).filter(
             ProductAvitoListingLink.organization_id == current_user.organization_id,
             ProductAvitoListingLink.avito_ad_id == str(context_id)
         ).first()
         
         if link:
+            print(f"✅ Found link by avito_ad_id: product_id={link.product_id}")
             return {"linked": True, "product_id": link.product_id}
+        
+        print(f"❌ No link found for context_id={context_id}")
         return {"linked": False, "product_id": None}
     except Exception as exc:
+        print(f"❌ ERROR: {exc}")
         return {"linked": False, "product_id": None, "error": str(exc)}
 
 

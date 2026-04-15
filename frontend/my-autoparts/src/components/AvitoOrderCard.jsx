@@ -1,4 +1,7 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+import { fetchAvitoChatProductLink } from '../redux/slices/AvitoChatSlice';
 
 /**
  * Компонент карточки заказа Авито
@@ -29,6 +32,57 @@ export function AvitoOrderCard({ order, isExpanded, onToggle, editingStatus, onE
   const avitoPrice = prices.price || 0;
   const avitoCommission = prices.commission || 0;
   const avitoTotal = prices.total || 0;
+  
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  
+  // Обработчик клика по названию товара
+  const handleProductClick = async (item, e) => {
+    e.stopPropagation();
+    
+    console.log('AvitoOrderCard - handleProductClick:', item);
+    console.log('AvitoOrderCard - item.product_id:', item.product_id);
+    console.log('AvitoOrderCard - item.avitoItemId:', item.avitoItemId);
+    
+    // Если есть product_id или linked_product_id - переходим на /part/
+    if (item.product_id || item.linked_product_id) {
+      const productId = item.product_id || item.linked_product_id;
+      console.log('AvitoOrderCard - Navigating to /part/', productId);
+      navigate(`/part/${productId}`);
+    } 
+    // Если есть avitoItemId (avito_id товара) - проверяем связь
+    else if (item.avitoItemId || item.avito_id) {
+      try {
+        const avitoId = item.avitoItemId || item.avito_id;
+        console.log('AvitoOrderCard - Checking Avito link for avito_id:', avitoId);
+        const linkData = await dispatch(fetchAvitoChatProductLink(avitoId)).unwrap();
+        console.log('AvitoOrderCard - Link data:', linkData);
+        if (linkData?.linked && linkData?.product_id) {
+          navigate(`/part/${linkData.product_id}`);
+        } else if (item.avitoUrl || item.url) {
+          // Нет связи, но есть ссылка - открываем страницу подтверждения
+          const encodedUrl = encodeURIComponent(item.avitoUrl || item.url);
+          window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
+        }
+      } catch (error) {
+        console.error('AvitoOrderCard - Error checking Avito link:', error);
+        // Ошибка - если есть ссылка, открываем страницу подтверждения
+        if (item.avitoUrl || item.url) {
+          const encodedUrl = encodeURIComponent(item.avitoUrl || item.url);
+          window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
+        }
+      }
+    }
+    // Если есть просто avito_url
+    else if (item.avitoUrl || item.url) {
+      console.log('AvitoOrderCard - Opening product-not-found with avito_url');
+      const encodedUrl = encodeURIComponent(item.avitoUrl || item.url);
+      window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
+    } else {
+      console.log('AvitoOrderCard - No product link found');
+    }
+  };
+  
   return (
     <div 
       className={`bg-white rounded-lg border transition-all ${
@@ -164,7 +218,14 @@ export function AvitoOrderCard({ order, isExpanded, onToggle, editingStatus, onE
                   <div key={item.avitoId || index} className="bg-white rounded p-3 border border-gray-200">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="font-medium text-gray-900 mb-1">{item.title}</div>
+                        {/* Название товара - кликабельное */}
+                        <button
+                          onClick={(e) => handleProductClick(item, e)}
+                          className="font-medium text-gray-900 mb-1 hover:text-indigo-600 transition-colors cursor-pointer text-left underline"
+                          title="Перейти к товару"
+                        >
+                          {item.title}
+                        </button>
                         <div className="flex items-center gap-3 text-sm text-gray-600">
                           {item.location && (
                             <span>{item.location}</span>

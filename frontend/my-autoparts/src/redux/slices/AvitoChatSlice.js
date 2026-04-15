@@ -302,11 +302,17 @@ const avitoChatSlice = createSlice({
         state.error = action.payload;
       })
       .addCase(fetchAvitoChatProductLink.fulfilled, (state, action) => {
+        const chatId = action.meta.arg;
         // Store link info in the corresponding chat object
-        const chat = state.chats.find(c => String(c.id) === String(action.meta.arg));
+        const chat = state.chats.find(c => String(c.id) === String(chatId));
         if (chat) {
           chat.linked_product_id = action.payload?.product_id;
           chat.is_linked_to_product = action.payload?.linked;
+        }
+        // Also update chatDetail if it's the same chat
+        if (state.chatDetail && String(state.chatDetail.id) === String(chatId)) {
+          state.chatDetail.linked_product_id = action.payload?.product_id;
+          state.chatDetail.is_linked_to_product = action.payload?.linked;
         }
       });
   },

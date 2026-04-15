@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect } from 'react';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
+import { fetchPublicSiteConfig } from './redux/slices/PublicInfoSlice';
 
 // Pages
 import Authorization from './pages/Autorization/Authorization';
@@ -90,6 +91,8 @@ function App() {
           }
         });
     }
+    // Load public site config on app start (always, regardless of auth)
+    dispatch(fetchPublicSiteConfig());
   }, [dispatch]);
 
   // Fetch profile when token changes
