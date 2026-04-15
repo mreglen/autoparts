@@ -514,7 +514,7 @@ async def sync_avito_ad_ids(
     
     # Get access token
     try:
-        from app.core.security import decrypt_secret
+        from app.utils.avito_crypto import decrypt_secret
         import app.services.avito_api as avito_api_module
         
         secret = decrypt_secret(integration.client_secret_encrypted)
