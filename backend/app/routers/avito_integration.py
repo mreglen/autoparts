@@ -1121,6 +1121,7 @@ async def import_avito_autoload_rows(
         effective_quantity = file_quantity if file_quantity and file_quantity > 0 else int(body.quantity)
 
         product = None
+        product_created = False  # Флаг: был ли товар создан (а не обновлён)
         if link:
             product = db.query(ProductModel).filter(
                 ProductModel.id == link.product_id,
@@ -1162,6 +1163,7 @@ async def import_avito_autoload_rows(
 
         if product is None:
             # Create new product
+            product_created = True  # Устанавливаем флаг
             internal_code = unique_ad_id or _next_internal_code(db)
             # part_type_id is REQUIRED - try to get from item or use default
             part_type_id = None
@@ -1216,6 +1218,7 @@ async def import_avito_autoload_rows(
                     db.add(product)
                     db.flush()
                     created_products += 1
+                    product_created = True  # Устанавливаем флаг
                 else:
                     skipped_rows.append(
                         {
@@ -1324,17 +1327,19 @@ async def import_avito_autoload_rows(
                     )
                 )
 
-        db.add(
-            StockInModel(
-                quantity=effective_quantity,
-                sale_price=effective_price,
-                organization_id=org_id,
-                storage_location_id=body.storage_location_id,
-                product_id=product.id,
-                created_by=current_user.id,
+        # Создаём запись StockIn только для НОВЫХ товаров (не для обновлённых)
+        if product_created:
+            db.add(
+                StockInModel(
+                    quantity=effective_quantity,
+                    sale_price=effective_price,
+                    organization_id=org_id,
+                    storage_location_id=body.storage_location_id,
+                    product_id=product.id,
+                    created_by=current_user.id,
+                )
             )
-        )
-        created_stock_ins += 1
+            created_stock_ins += 1
 
     # If we updated XLSX in-memory, persist it and refresh cache.
     if wb is not None and xlsx_path is not None and rel_path is not None:
