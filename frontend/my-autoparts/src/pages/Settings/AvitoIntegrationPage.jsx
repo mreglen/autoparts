@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
-import { apiRequest, apiRequestFormData, BACKEND_BASE } from '../../utils/apiClient';
+import { apiRequest, apiRequestFormData, API_BASE, BACKEND_BASE } from '../../utils/apiClient';
 
 const AD_TYPE_NOT_SPECIFIED = '__NOT_SPECIFIED__';
 
@@ -576,7 +576,7 @@ export default function AvitoIntegrationPage() {
     if (!orgId) return;
     try {
       // Используем новый endpoint для скачивания без кэша
-      const downloadUrl = `${BACKEND_BASE}/organizations/${orgId}/avito/autoload/download`;
+      const downloadUrl = `${API_BASE}/organizations/${orgId}/avito/autoload/download`;
       
       // Получаем токен авторизации
       const token = localStorage.getItem('token');
