@@ -238,7 +238,23 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
                 if _row_nonempty(tuple(_r), track_cols):
                     has_data_after_2 = True
                     break
+        
+        # Проверяем, является ли Row 2 примером (а не реальными данными)
+        # Row 2 считается примером если:
+        # 1. Есть данные после него И
+        # 2. Row 2 содержит шаблонные значения или выглядит как пример
+        is_row2_example = False
+        if has_data_after_2 and ws.max_row >= 3:
+            row2_values = tuple(ws.iter_rows(min_row=2, max_row=2, values_only=True).__next__())
+            # Проверяем типичные признаки примера:
+            row2_str = " ".join([_cell_str(v) for v in row2_values]).lower()
+            example_indicators = ["пример", "example", "sample", "тест", "test"]
+            is_row2_example = any(ind in row2_str for ind in example_indicators)
+        
+        print(f"  📋 Sheet '{sheet_name}': max_row={ws.max_row}, has_data_after_2={has_data_after_2}, is_row2_example={is_row2_example}, track_cols={len(track_cols)}")
 
+        row_count = 0
+        skipped_row2 = False
         for r_idx, row in enumerate(
             ws.iter_rows(min_row=DATA_SCAN_START_ROW, values_only=True),
             start=DATA_SCAN_START_ROW,
@@ -246,8 +262,10 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
             row_t = tuple(row)
             if not _row_nonempty(row_t, track_cols):
                 continue
-            # НОВЫЙ ФОРМАТ: пропускаем Row 2 (пример данных), если есть реальные данные
-            if r_idx == 2 and has_data_after_2:
+            # НОВЫЙ ФОРМАТ: пропускаем Row 2 только если это явный пример
+            if r_idx == 2 and is_row2_example:
+                skipped_row2 = True
+                print(f"    ⚠️ Skipping row 2 (example data detected)")
                 continue
 
             for col_idx, label in mandatory_cols:
@@ -319,6 +337,9 @@ def parse_and_validate_avito_autoload(xlsx_bytes: bytes) -> AvitoXlsxParseResult
                 "part_type_name": _at(part_type_c),
             }
             out.items.append(item)
+            row_count += 1
+        
+        print(f"  ✅ Sheet '{sheet_name}': parsed {row_count} items (skipped_row2={skipped_row2})")
 
         out.sheets_parsed.append(sheet_name)
 
