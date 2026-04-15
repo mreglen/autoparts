@@ -1114,6 +1114,11 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
         isOpen={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
         onIndexChange={setLightboxMediaIndex}
+        chatInfo={{
+          isAvito: true,
+          linkedProductId: displayChat?.linked_product_id || null,
+          contextUrl: displayChat?.context_url || null,
+        }}
       />
     </div>
   );

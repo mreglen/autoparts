@@ -9,7 +9,8 @@ const MediaLightbox = ({
   currentIndex, 
   isOpen, 
   onClose,
-  onIndexChange 
+  onIndexChange,
+  chatInfo  // { isAvito: boolean, linkedProductId: number|null, contextUrl: string|null }
 }) => {
   const [currentIdx, setCurrentIdx] = useState(currentIndex || 0);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -99,6 +100,40 @@ const MediaLightbox = ({
     }
   };
 
+  // Handle image click for Avito chats
+  const handleImageClick = (e) => {
+    e.stopPropagation();
+    
+    if (!chatInfo || !chatInfo.isAvito) {
+      return; // Do nothing for garage chats
+    }
+    
+    if (chatInfo.linkedProductId) {
+      // Navigate to product page
+      window.location.href = `/part/${chatInfo.linkedProductId}`;
+    } else if (chatInfo.contextUrl) {
+      // Open Avito ad in new tab
+      window.open(chatInfo.contextUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  // Handle video click for Avito chats
+  const handleVideoClick = (e) => {
+    e.stopPropagation();
+    
+    if (!chatInfo || !chatInfo.isAvito) {
+      return; // Do nothing for garage chats
+    }
+    
+    if (chatInfo.linkedProductId) {
+      // Navigate to product page
+      window.location.href = `/part/${chatInfo.linkedProductId}`;
+    } else if (chatInfo.contextUrl) {
+      // Open Avito ad in new tab
+      window.open(chatInfo.contextUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   if (!isOpen || !mediaItems || mediaItems.length === 0) return null;
 
   const currentMedia = mediaItems[currentIdx];
@@ -138,6 +173,13 @@ const MediaLightbox = ({
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-black bg-opacity-50 text-white px-4 py-2 rounded-full text-sm">
         {currentIdx + 1} / {mediaItems.length}
       </div>
+
+      {/* Hint for Avito chats */}
+      {chatInfo?.isAvito && (chatInfo?.linkedProductId || chatInfo?.contextUrl) && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 bg-black bg-opacity-50 text-white px-4 py-2 rounded-full text-xs">
+          Нажмите на фото для перехода к {chatInfo.linkedProductId ? 'товару' : 'объявлению'}
+        </div>
+      )}
 
       {/* Кнопка Назад */}
       {currentIdx > 0 && (
@@ -187,13 +229,13 @@ const MediaLightbox = ({
               src={currentMedia.url}
               alt={currentMedia.original_filename || 'Изображение'}
               className={`max-w-full max-h-[90vh] object-contain transition-opacity duration-300 ${
-                imageLoaded ? 'opacity-100' : 'opacity-0 absolute inset-0'
-              }`}
+                chatInfo?.isAvito && (chatInfo?.linkedProductId || chatInfo?.contextUrl) ? 'cursor-pointer hover:opacity-90' : ''
+              } ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute inset-0'}`}
               onLoad={() => setImageLoaded(true)}
               onError={(e) => {
                 console.error('Failed to load image:', currentMedia.url);
               }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={handleImageClick}
             />
           </div>
         )}
@@ -202,9 +244,11 @@ const MediaLightbox = ({
           <video
             controls
             src={currentMedia.url}
-            className="max-w-full max-h-[90vh] object-contain"
+            className={`max-w-full max-h-[90vh] object-contain ${
+              chatInfo?.isAvito && (chatInfo?.linkedProductId || chatInfo?.contextUrl) ? 'cursor-pointer hover:opacity-90' : ''
+            }`}
             autoPlay
-            onClick={(e) => e.stopPropagation()}
+            onClick={handleVideoClick}
           >
             Ваш браузер не поддерживает воспроизведение видео.
           </video>

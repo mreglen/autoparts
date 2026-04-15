@@ -432,11 +432,11 @@ async def sync_avito_ad_ids(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Ручной запуск синхронизации Avito ad IDs."""
+    """Sync Avito ad IDs using autoload API - fast batch sync."""
     _ensure_org_access(current_user, org_id)
     _org_exists(db, org_id)
     
-    # Check Avito integration is configured
+    # Get Avito integration
     integration = db.query(OrganizationAvitoIntegration).filter(
         OrganizationAvitoIntegration.organization_id == org_id
     ).first()
@@ -447,23 +447,141 @@ async def sync_avito_ad_ids(
             detail="Интеграция с Авито не настроена"
         )
     
-    # Launch background task
-    try:
-        from app.tasks.avito_tasks import sync_avito_ad_ids_task
-        task = sync_avito_ad_ids_task.delay(org_id)
-        print(f"🔄 Manual sync launched for org {org_id}, task_id={task.id}")
-        
+    # Get all ProductAvitoListingLink for this org
+    from app.models.product_avito_listing_link import ProductAvitoListingLink
+    from app.models.product import Product as ProductModel
+    from app.models.organization_avito_autoload_cache import OrganizationAvitoAutoloadCache
+    import json
+    
+    # First, collect all unique_ad_id (internal codes) from xlsx cache
+    cache = db.query(OrganizationAvitoAutoloadCache).filter(
+        OrganizationAvitoAutoloadCache.organization_id == org_id
+    ).first()
+    
+    if not cache or not cache.items_json:
         return {
-            "status": "started",
-            "message": "Синхронизация запущена в фоновом режиме",
-            "task_id": task.id,
+            "status": "error",
+            "message": "Нет данных автозагрузки. Сначала загрузите xlsx файл",
         }
+    
+    try:
+        items = json.loads(cache.items_json)
+    except:
+        items = []
+    
+    # Extract unique_ad_id from items
+    query_ids = list(set([
+        str(item.get("unique_ad_id")) 
+        for item in items 
+        if item.get("unique_ad_id")
+    ]))
+    
+    if not query_ids:
+        return {
+            "status": "error",
+            "message": "Нет внутренних кодов в файле автозагрузки",
+        }
+    
+    # Create links for products that don't have them yet
+    created_links = 0
+    for internal_code in query_ids:
+        # Check if link already exists
+        existing_link = db.query(ProductAvitoListingLink).filter(
+            ProductAvitoListingLink.organization_id == org_id,
+            ProductAvitoListingLink.avito_ad_id == internal_code,
+        ).first()
+        
+        if not existing_link:
+            # Find product by internal_code and create link
+            product = db.query(ProductModel).filter(
+                ProductModel.organization_id == org_id,
+                ProductModel.internal_code == internal_code,
+            ).first()
+            
+            if product:
+                new_link = ProductAvitoListingLink(
+                    organization_id=org_id,
+                    product_id=product.id,
+                    avito_ad_id=internal_code,
+                    avito_id=None,  # Will be synced below
+                )
+                db.add(new_link)
+                created_links += 1
+    
+    if created_links > 0:
+        db.commit()
+        print(f"✅ Created {created_links} new listing links")
+    
+    # Get access token
+    try:
+        from app.core.security import decrypt_secret
+        import app.services.avito_api as avito_api_module
+        
+        secret = decrypt_secret(integration.client_secret_encrypted)
+        token = await avito_api_module.fetch_access_token(
+            integration.client_id, secret
+        )
     except Exception as e:
-        logger.exception("Failed to launch sync task")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка запуска синхронизации: {str(e)}"
+            detail=f"Ошибка получения токена: {str(e)}"
         )
+    
+    # Batch sync using Avito API
+    synced = 0
+    updated = 0
+    batch_size = 100
+    
+    for i in range(0, len(query_ids), batch_size):
+        batch_ids = query_ids[i:i + batch_size]
+        
+        try:
+            # Call Avito API
+            mapping = await avito_api_module.get_avito_ids_by_query(token, batch_ids)
+            
+            # Update database
+            for internal_code, avito_id in mapping.items():
+                link = db.query(ProductAvitoListingLink).filter(
+                    ProductAvitoListingLink.organization_id == org_id,
+                    ProductAvitoListingLink.avito_ad_id == internal_code,
+                ).first()
+                
+                if link:
+                    if not link.avito_id:
+                        link.avito_id = str(avito_id)
+                        synced += 1
+                    elif link.avito_id != str(avito_id):
+                        link.avito_id = str(avito_id)
+                        updated += 1
+                else:
+                    # Find product and create new link
+                    product = db.query(ProductModel).filter(
+                        ProductModel.organization_id == org_id,
+                        ProductModel.internal_code == internal_code,
+                    ).first()
+                    
+                    if product:
+                        new_link = ProductAvitoListingLink(
+                            organization_id=org_id,
+                            product_id=product.id,
+                            avito_ad_id=internal_code,
+                            avito_id=str(avito_id),
+                        )
+                        db.add(new_link)
+                        synced += 1
+            
+            db.commit()
+        except Exception as e:
+            logger.warning(f"Failed to sync batch {i}: {e}")
+            db.rollback()
+    
+    return {
+        "status": "ok",
+        "message": f"Создано: {created_links}, Синхронизировано: {synced} новых, {updated} обновлено",
+        "created": created_links,
+        "synced": synced,
+        "updated": updated,
+    }
 
 
 @router.post("/{org_id}/avito/autoload/export-async", response_model=AvitoAutoloadJobResponse)
@@ -559,6 +677,60 @@ async def get_avito_autoload_job_status(
     return _job_to_response(job)
 
 
+def _sync_avito_links_from_parsed_items(
+    db: Session,
+    org_id: str,
+    parsed_items: list[dict],
+) -> dict[str, int]:
+    """
+    Update product_avito_listing_links with AvitoId from parsed xlsx items.
+    
+    Returns stats: {"updated": N, "created": N, "skipped": N}
+    """
+    from app.models.product import Product as ProductModel
+    from app.models.product_avito_listing_link import ProductAvitoListingLink
+    
+    stats = {"updated": 0, "created": 0, "skipped": 0}
+    
+    for item in parsed_items:
+        internal_code = item.get('unique_ad_id')
+        avito_id_from_xlsx = item.get('avito_id')
+        
+        if not internal_code or not avito_id_from_xlsx:
+            stats["skipped"] += 1
+            continue
+        
+        link = db.query(ProductAvitoListingLink).filter(
+            ProductAvitoListingLink.organization_id == org_id,
+            ProductAvitoListingLink.avito_ad_id == str(internal_code),
+        ).first()
+        
+        if link:
+            if link.avito_id != str(avito_id_from_xlsx):
+                link.avito_id = str(avito_id_from_xlsx)
+                stats["updated"] += 1
+        else:
+            product = db.query(ProductModel).filter(
+                ProductModel.organization_id == org_id,
+                ProductModel.internal_code == str(internal_code),
+            ).first()
+            
+            if product:
+                new_link = ProductAvitoListingLink(
+                    organization_id=org_id,
+                    product_id=product.id,
+                    avito_ad_id=str(internal_code),
+                    avito_id=str(avito_id_from_xlsx),
+                )
+                db.add(new_link)
+                stats["created"] += 1
+            else:
+                stats["skipped"] += 1
+    
+    db.commit()
+    return stats
+
+
 @router.post("/{org_id}/avito/autoload/export", response_model=AvitoAutoloadExportResponse)
 async def export_products_to_avito_autoload(
     org_id: str,
@@ -612,14 +784,7 @@ async def export_products_to_avito_autoload(
         # category больше не используется - всегда "Запчасти и аксессуары"
         storage = storage_by_id.get(product.storage_location_id) if product.storage_location_id else None
         address = (storage.address if storage and storage.address else None) or (org.address or "")
-        # Add internal code to description for Avito
         description = product.description or ""
-        if product.internal_code:
-            # Append internal code to end of description
-            if description:
-                description = description.rstrip() + f"\n\nВнутренний код: {product.internal_code}"
-            else:
-                description = f"Внутренний код: {product.internal_code}"
         
         export_rows.append(
             {
@@ -935,14 +1100,6 @@ async def upload_avito_autoload(
         if avito_id_count > 0:
             db.commit()
             print(f"✅ Created/updated {avito_id_count} Avito listing link(s) from nomenclature import")
-        
-        # Launch background task to sync real Avito IDs
-        try:
-            from app.tasks.avito_tasks import sync_avito_ad_ids_task
-            sync_avito_ad_ids_task.delay(org_id)
-            print(f"🔄 Launched background task to sync Avito ad IDs for org {org_id}")
-        except Exception as e:
-            logger.warning(f"Failed to launch Avito ad ID sync task: {e}")
     except Exception as e:
         logger.exception("Failed to create Avito listing links from nomenclature import")
         db.rollback()
@@ -973,6 +1130,15 @@ async def upload_avito_autoload(
         logger.exception("Не удалось сохранить кэш автозагрузки")
         db.rollback()
         print(f"❌ Failed to save autoload cache for org {org_id}")
+
+    # Sync AvitoId from xlsx to product_avito_listing_links
+    try:
+        sync_stats = _sync_avito_links_from_parsed_items(db, org_id, parsed.items)
+        print(f"✅ Avito ID sync completed: {sync_stats}")
+    except Exception as e:
+        logger.warning(f"Failed to sync Avito IDs from xlsx: {e}")
+        db.rollback()
+        # Don't fail the upload if sync fails
 
     return AvitoAutoloadUploadResponse(
         saved_path=rel_path,

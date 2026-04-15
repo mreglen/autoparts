@@ -202,6 +202,48 @@ async def get_avito_items_list(access_token: str, user_id: int) -> list[dict[str
     return items
 
 
+async def get_avito_ids_by_query(access_token: str, query_ids: list[str]) -> dict[str, int]:
+    """
+    GET /autoload/v2/items/avito_ids - Get real Avito item IDs by internal codes.
+    
+    Returns dict mapping internal_code -> avito_id
+    Example: {"12345": 987654321, "12346": 987654322}
+    """
+    if not query_ids:
+        return {}
+    
+    # Join IDs with comma (Avito accepts comma or pipe separator)
+    query_string = ",".join(query_ids)
+    
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        r = await client.get(
+            f"{AVITO_BASE}/autoload/v2/items/avito_ids",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"query": query_string},
+        )
+        
+        try:
+            data = r.json()
+        except Exception:
+            data = {"raw": r.text[:8000]}
+        
+        if r.status_code != 200:
+            raise RuntimeError(f"Avito avito_ids error (HTTP {r.status_code}): {data}")
+        
+        # Parse response and build mapping
+        result = {}
+        items = data.get("items", []) if isinstance(data, dict) else []
+        
+        for item in items:
+            query_id = item.get("query_id")
+            avito_id = item.get("avito_id")
+            
+            if query_id and avito_id:
+                result[str(query_id)] = int(avito_id)
+        
+        return result
+
+
 async def get_avito_item_detail(access_token: str, user_id: int, item_id: str) -> dict[str, Any]:
     """
     GET /core/v1/accounts/{user_id}/items/{item_id}/ - Get detailed ad info including description.

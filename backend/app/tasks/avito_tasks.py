@@ -235,14 +235,7 @@ def run_avito_export_job(self, job_id: int):
                     celery_timeout_s=120,
                 )
             )
-            # Add internal code to description for Avito
             description = product.description or ""
-            if product.internal_code:
-                # Append internal code to end of description
-                if description:
-                    description = description.rstrip() + f"\n\nВнутренний код: {product.internal_code}"
-                else:
-                    description = f"Внутренний код: {product.internal_code}"
             
             export_rows.append(
                 {
@@ -303,6 +296,57 @@ def run_avito_export_job(self, job_id: int):
                             avito_report = asyncio.run(
                                 avito_api_svc.get_last_report_v1(token, int(row.avito_user_id))
                             )
+                        
+                        # After successful publish, re-parse xlsx to get AvitoIds and sync links
+                        try:
+                            updated_bytes = xlsx_path.read_bytes()
+                            updated_parsed = parse_and_validate_avito_autoload(updated_bytes)
+                            
+                            # Sync AvitoIds to database
+                            sync_stats = {"updated": 0, "created": 0, "skipped": 0}
+                            for item in updated_parsed.items:
+                                internal_code = item.get('unique_ad_id')
+                                avito_id_from_xlsx = item.get('avito_id')
+                                
+                                if not internal_code or not avito_id_from_xlsx:
+                                    sync_stats["skipped"] += 1
+                                    continue
+                                
+                                link = db.query(ProductAvitoListingLink).filter(
+                                    ProductAvitoListingLink.organization_id == org_id,
+                                    ProductAvitoListingLink.avito_ad_id == str(internal_code),
+                                ).first()
+                                
+                                if link:
+                                    if link.avito_id != str(avito_id_from_xlsx):
+                                        link.avito_id = str(avito_id_from_xlsx)
+                                        sync_stats["updated"] += 1
+                                else:
+                                    product = db.query(ProductModel).filter(
+                                        ProductModel.organization_id == org_id,
+                                        ProductModel.internal_code == str(internal_code),
+                                    ).first()
+                                    
+                                    if product:
+                                        new_link = ProductAvitoListingLink(
+                                            organization_id=org_id,
+                                            product_id=product.id,
+                                            avito_ad_id=str(internal_code),
+                                            avito_id=str(avito_id_from_xlsx),
+                                        )
+                                        db.add(new_link)
+                                        sync_stats["created"] += 1
+                                    else:
+                                        sync_stats["skipped"] += 1
+                            
+                            db.commit()
+                            print(f"✅ Avito ID sync after publish: {sync_stats}")
+                            
+                            # Update parsed items with fresh data
+                            parsed = updated_parsed
+                        except Exception as sync_err:
+                            print(f"⚠️ Failed to sync Avito IDs after publish: {sync_err}")
+                            db.rollback()
                 except Exception as e:
                     avito_token_error = str(e)
 
@@ -384,6 +428,54 @@ def run_avito_publish_job(self, job_id: int):
                 avito_report = asyncio.run(avito_api_svc.get_last_completed_report_v3(token))
                 if avito_report is None:
                     avito_report = asyncio.run(avito_api_svc.get_last_report_v1(token, int(row.avito_user_id)))
+                
+                # After successful publish, re-parse xlsx to get AvitoIds and sync links
+                try:
+                    updated_bytes = xlsx_path.read_bytes()
+                    updated_parsed = parse_and_validate_avito_autoload(updated_bytes)
+                    
+                    # Sync AvitoIds to database
+                    sync_stats = {"updated": 0, "created": 0, "skipped": 0}
+                    for item in updated_parsed.items:
+                        internal_code = item.get('unique_ad_id')
+                        avito_id_from_xlsx = item.get('avito_id')
+                        
+                        if not internal_code or not avito_id_from_xlsx:
+                            sync_stats["skipped"] += 1
+                            continue
+                        
+                        link = db.query(ProductAvitoListingLink).filter(
+                            ProductAvitoListingLink.organization_id == org_id,
+                            ProductAvitoListingLink.avito_ad_id == str(internal_code),
+                        ).first()
+                        
+                        if link:
+                            if link.avito_id != str(avito_id_from_xlsx):
+                                link.avito_id = str(avito_id_from_xlsx)
+                                sync_stats["updated"] += 1
+                        else:
+                            product = db.query(ProductModel).filter(
+                                ProductModel.organization_id == org_id,
+                                ProductModel.internal_code == str(internal_code),
+                            ).first()
+                            
+                            if product:
+                                new_link = ProductAvitoListingLink(
+                                    organization_id=org_id,
+                                    product_id=product.id,
+                                    avito_ad_id=str(internal_code),
+                                    avito_id=str(avito_id_from_xlsx),
+                                )
+                                db.add(new_link)
+                                sync_stats["created"] += 1
+                            else:
+                                sync_stats["skipped"] += 1
+                    
+                    db.commit()
+                    print(f"✅ Avito ID sync after publish job: {sync_stats}")
+                except Exception as sync_err:
+                    print(f"⚠️ Failed to sync Avito IDs after publish job: {sync_err}")
+                    db.rollback()
         except Exception as e:
             avito_token_error = str(e)
 
@@ -423,168 +515,5 @@ def run_avito_publish_job(self, job_id: int):
     except Exception as e:
         _set_job_state(db, job_id, status="failed", stage="failed", error_summary=str(e))
         raise
-    finally:
-        db.close()
-
-
-def extract_internal_code_from_description(description: str) -> str | None:
-    """Extract internal code from description text."""
-    if not description:
-        return None
-    match = re.search(r"Внутренний код:\s*(\S+)", description)
-    return match.group(1) if match else None
-
-
-@celery_app.task(bind=True, max_retries=1)
-def sync_avito_ad_ids_task(self, org_id: str):
-    """
-    Background task to sync Avito ad IDs.
-    Fetches all ads from Avito API, extracts internal codes from descriptions,
-    and saves real Avito item_id to product_avito_listing_links.avito_id
-    """
-    db = SessionLocal()
-    try:
-        print(f"🔄 Starting Avito ad ID sync for organization {org_id}")
-        
-        # 1. Get organization's Avito credentials
-        integration = db.query(OrganizationAvitoIntegration).filter(
-            OrganizationAvitoIntegration.organization_id == org_id
-        ).first()
-        
-        if not integration:
-            print(f"❌ Avito integration not found for org {org_id}")
-            return {"status": "failed", "error": "Avito integration not found"}
-        
-        if not integration.client_id or not integration.client_secret_encrypted or not integration.avito_user_id:
-            print(f"❌ Avito credentials not configured for org {org_id}")
-            return {"status": "failed", "error": "Avito credentials not configured"}
-        
-        # 2. Fetch access token
-        try:
-            secret = decrypt_secret(integration.client_secret_encrypted)
-            token = asyncio.run(avito_api_svc.fetch_access_token(integration.client_id, secret))
-            user_id = int(integration.avito_user_id)
-        except Exception as e:
-            print(f"❌ Failed to get access token: {e}")
-            return {"status": "failed", "error": f"Token error: {str(e)}"}
-        
-        # 3. Get list of all items via GET /core/v1/items
-        try:
-            items_list = asyncio.run(avito_api_svc.get_avito_items_list(token, user_id))
-            print(f"✅ Fetched {len(items_list)} items from Avito")
-        except Exception as e:
-            print(f"❌ Failed to fetch items list: {e}")
-            return {"status": "failed", "error": f"Items list error: {str(e)}"}
-        
-        # 4. For each item, get details and extract internal code
-        processed = 0
-        updated = 0
-        created = 0
-        errors = 0
-        
-        for item in items_list:
-            try:
-                # Avito API returns item with "id" field at top level
-                item_id = str(item.get("id") or "")
-                item_url = item.get("url", "")
-                
-                if not item_id:
-                    print(f"⚠️ Item missing id field: {item}")
-                    continue
-                
-                # Get description by parsing HTML page from URL
-                if not item_url:
-                    title = item.get("title", "unknown")
-                    print(f"⚠️ No URL for item {item_id} (title: {title})")
-                    errors += 1
-                    continue
-                
-                try:
-                    html = asyncio.run(avito_api_svc.fetch_avito_item_page_html(item_url))
-                    description = avito_api_svc.extract_description_from_html(html)
-                except Exception as e:
-                    print(f"⚠️ Failed to fetch page for item {item_id}: {e}")
-                    errors += 1
-                    continue
-                
-                if not description:
-                    title = item.get("title", "unknown")
-                    print(f"⚠️ No description found in HTML for item {item_id} (title: {title})")
-                    errors += 1
-                    continue
-                
-                # Extract internal_code from description
-                internal_code = extract_internal_code_from_description(description)
-                
-                if not internal_code:
-                    # Print title to help debug
-                    title = item.get("title", "unknown")
-                    print(f"⚠️ No internal code found in item {item_id} (title: {title})")
-                    processed += 1
-                    continue
-                
-                # c. Find ProductAvitoListingLink by organization_id + avito_ad_id (which is internal_code)
-                link = db.query(ProductAvitoListingLink).filter(
-                    ProductAvitoListingLink.organization_id == org_id,
-                    ProductAvitoListingLink.avito_ad_id == internal_code,
-                ).first()
-                
-                if not link:
-                    # NEW: Find product by internal_code and create new link
-                    from app.models.product import Product as ProductModel
-                    product = db.query(ProductModel).filter(
-                        ProductModel.organization_id == org_id,
-                        ProductModel.internal_code == internal_code,
-                    ).first()
-                    
-                    if product:
-                        # Create new link
-                        link = ProductAvitoListingLink(
-                            organization_id=org_id,
-                            product_id=product.id,
-                            avito_ad_id=internal_code,
-                            avito_id=item_id,
-                        )
-                        db.add(link)
-                        created += 1
-                        print(f"✅ Created new link for {internal_code}: avito_id = {item_id}")
-                    else:
-                        print(f"⚠️ No product found for internal_code {internal_code}")
-                        processed += 1
-                        continue
-                else:
-                    # Update existing link
-                    if link.avito_id != item_id:
-                        link.avito_id = item_id
-                        updated += 1
-                        print(f"✅ Updated link for {internal_code}: avito_id = {item_id}")
-                
-                processed += 1
-                if processed % 10 == 0 or processed == len(items_list):
-                    print(f"📊 Progress: {processed}/{len(items_list)} items processed (created={created}, updated={updated})")
-                
-            except Exception as e:
-                print(f"❌ Error processing item: {e}")
-                errors += 1
-        
-        # 5. Commit changes
-        db.commit()
-        
-        result = {
-            "status": "completed",
-            "processed": processed,
-            "updated": updated,
-            "created": created,
-            "errors": errors,
-            "total_items": len(items_list),
-        }
-        
-        print(f"✅ Avito ad ID sync completed: {result}")
-        return result
-        
-    except Exception as e:
-        db.rollback()
-        print(f"❌ Avito ad ID sync failed: {e}")
-        raise self.retry(exc=e, countdown=60)
     finally:
         db.close()
