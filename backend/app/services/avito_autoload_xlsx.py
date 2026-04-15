@@ -545,11 +545,12 @@ def upsert_products_to_avito_autoload(
         internal_code = str(product.get("internal_code") or "").strip()
         unique_ad_id = internal_code or _next_unique_ad_id(existing_unique_ids)
 
+        # Поиск существующей строки только по internal_code (unique_ad_id)
+        # Не ищем по article, чтобы не создавать дубликаты
         target_row = (
             (row_index_by_avito_number.get(legacy_avito_id) if legacy_avito_id else None)
             or (row_index_by_unique.get(unique_ad_id) if unique_ad_id else None)
             or (row_index_by_legacy_avito_id.get(legacy_avito_id) if legacy_avito_id else None)
-            or (row_index_by_part.get(part_number) if part_number else None)
         )
         if not target_row:
             target_row = max(ws.max_row + 1, DATA_WRITE_START_ROW)
@@ -671,8 +672,7 @@ def upsert_products_to_avito_autoload(
             row_index_by_unique[unique_ad_id] = target_row
         if legacy_avito_id:
             row_index_by_legacy_avito_id[legacy_avito_id] = target_row
-        if part_number:
-            row_index_by_part[part_number] = target_row
+        # Не индексируем по part_number (article), чтобы избежать дубликатов
 
     out = BytesIO()
     wb.save(out)
