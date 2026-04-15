@@ -45,6 +45,7 @@ import VehiclesList from './pages/Vehicles/VehiclesList';
 import AddVehiclePage from './pages/Vehicles/AddVehiclePage';
 import EditVehiclePage from './pages/Vehicles/EditVehiclePage';
 import ChatsHubPage from './pages/Chat/ChatsHubPage';
+import ProductNotFound from './pages/Chat/ProductNotFound';
 import AdminPanelPage from './pages/Admin/AdminPanelPage';
 
 
@@ -126,6 +127,7 @@ function App() {
           <Route path="/my-parts/add" element={<AddPart />} />
           <Route path="/my-parts/edit/:id" element={<EditPart />} />
           <Route path="/part/:productId" element={<PartDetail />} />
+          <Route path="/product-not-found" element={<ProductNotFound />} />
 
           <Route path="*" element={<NotFound />} />
         </Route>

@@ -312,7 +312,9 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
       if (chat.linked_product_id) {
         navigate(`/part/${chat.linked_product_id}`);
       } else if (chat.context_url) {
-        window.open(chat.context_url, '_blank', 'noopener,noreferrer');
+        // No link found - open ProductNotFound page in new tab
+        const encodedUrl = encodeURIComponent(chat.context_url);
+        window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
       }
     } else {
       // For Свой Гараж: navigate to internal product

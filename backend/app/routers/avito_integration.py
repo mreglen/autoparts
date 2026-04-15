@@ -469,12 +469,16 @@ async def sync_avito_ad_ids(
     except:
         items = []
     
+    print(f"🔍 DEBUG: Found {len(items)} items in cache")
+    
     # Extract unique_ad_id from items
     query_ids = list(set([
         str(item.get("unique_ad_id")) 
         for item in items 
         if item.get("unique_ad_id")
     ]))
+    
+    print(f"🔍 DEBUG: Extracted {len(query_ids)} unique_ad_ids: {query_ids[:10]}")  # Show first 10
     
     if not query_ids:
         return {
@@ -511,6 +515,8 @@ async def sync_avito_ad_ids(
     if created_links > 0:
         db.commit()
         print(f"✅ Created {created_links} new listing links")
+    else:
+        print(f"⚠️ No new links created (links may already exist or products not found)")
     
     # Get access token
     try:
@@ -537,22 +543,29 @@ async def sync_avito_ad_ids(
         
         try:
             # Call Avito API
+            print(f"🔍 DEBUG: Calling Avito API with batch {i+1}: {batch_ids[:5]}...")  # Show first 5
             mapping = await avito_api_module.get_avito_ids_by_query(token, batch_ids)
+            print(f"🔍 DEBUG: Avito API returned: {mapping}")
             
             # Update database
+            print(f"🔍 DEBUG: Mapping from API: {mapping}")
             for internal_code, avito_id in mapping.items():
+                print(f"🔍 DEBUG: Processing internal_code={internal_code}, avito_id={avito_id}")
                 link = db.query(ProductAvitoListingLink).filter(
                     ProductAvitoListingLink.organization_id == org_id,
                     ProductAvitoListingLink.avito_ad_id == internal_code,
                 ).first()
                 
                 if link:
+                    print(f"🔍 DEBUG: Found link id={link.id}, current avito_id={link.avito_id}")
                     if not link.avito_id:
                         link.avito_id = str(avito_id)
                         synced += 1
+                        print(f"✅ Set avito_id={avito_id} for link id={link.id}")
                     elif link.avito_id != str(avito_id):
                         link.avito_id = str(avito_id)
                         updated += 1
+                        print(f"🔄 Updated avito_id from {link.avito_id} to {avito_id}")
                 else:
                     # Find product and create new link
                     product = db.query(ProductModel).filter(
@@ -569,12 +582,16 @@ async def sync_avito_ad_ids(
                         )
                         db.add(new_link)
                         synced += 1
+                        print(f"✅ Created new link for internal_code={internal_code}, avito_id={avito_id}")
+                    else:
+                        print(f"⚠️ No product found for internal_code={internal_code}")
             
             db.commit()
         except Exception as e:
             logger.warning(f"Failed to sync batch {i}: {e}")
             db.rollback()
     
+    print(f"✅ Final sync stats: synced={synced}, updated={updated}, total_links={len(query_ids)}")
     return {
         "status": "ok",
         "message": f"Создано: {created_links}, Синхронизировано: {synced} новых, {updated} обновлено",

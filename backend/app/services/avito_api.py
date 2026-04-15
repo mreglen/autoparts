@@ -227,6 +227,9 @@ async def get_avito_ids_by_query(access_token: str, query_ids: list[str]) -> dic
         except Exception:
             data = {"raw": r.text[:8000]}
         
+        # DEBUG: Log raw response
+        print(f"🔍 DEBUG Avito API Response (status {r.status_code}): {data}")
+        
         if r.status_code != 200:
             raise RuntimeError(f"Avito avito_ids error (HTTP {r.status_code}): {data}")
         
@@ -235,11 +238,12 @@ async def get_avito_ids_by_query(access_token: str, query_ids: list[str]) -> dic
         items = data.get("items", []) if isinstance(data, dict) else []
         
         for item in items:
-            query_id = item.get("query_id")
+            # Avito returns "ad_id" (not "query_id") and "avito_id"
+            ad_id = item.get("ad_id")
             avito_id = item.get("avito_id")
             
-            if query_id and avito_id:
-                result[str(query_id)] = int(avito_id)
+            if ad_id and avito_id:
+                result[str(ad_id)] = int(avito_id)
         
         return result
 

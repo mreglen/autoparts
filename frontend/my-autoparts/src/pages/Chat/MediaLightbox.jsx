@@ -112,8 +112,9 @@ const MediaLightbox = ({
       // Navigate to product page
       window.location.href = `/part/${chatInfo.linkedProductId}`;
     } else if (chatInfo.contextUrl) {
-      // Open Avito ad in new tab
-      window.open(chatInfo.contextUrl, '_blank', 'noopener,noreferrer');
+      // No link found - open ProductNotFound page in new tab
+      const encodedUrl = encodeURIComponent(chatInfo.contextUrl);
+      window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
     }
   };
 
@@ -129,8 +130,9 @@ const MediaLightbox = ({
       // Navigate to product page
       window.location.href = `/part/${chatInfo.linkedProductId}`;
     } else if (chatInfo.contextUrl) {
-      // Open Avito ad in new tab
-      window.open(chatInfo.contextUrl, '_blank', 'noopener,noreferrer');
+      // No link found - open ProductNotFound page in new tab
+      const encodedUrl = encodeURIComponent(chatInfo.contextUrl);
+      window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
     }
   };
 
