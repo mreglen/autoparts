@@ -4,7 +4,7 @@ from sqlalchemy import func, cast, Integer
 from app.db.database import get_db
 from app.core.auth import get_current_user, get_current_admin_user
 from app.models.user import User
-from app.models.orders import Order, NewPartsOrder, OrderStatus, OrderItem, OrderItemStatus, RosskoStatus
+from app.models.orders import Order, NewPartsOrder, OrderStatus, OrderItem, OrderItemStatus, RosskoStatus, AvitoOrderStatus
 from app.models.product import Product
 from app.models.carts import Cart, NewPartsCart, UsedPartsCart
 from app.schemas.orders import OrderCreate, OrderResponse, OrderStatusResponse, OrderItemResponse, NewPartsOrderResponse
@@ -143,7 +143,10 @@ def order_to_response(order: Order, db_session=None, filter_organization_id=None
         source=order.source,
         avito_order_id=order.avito_order_id,
         avito_status_code=order.avito_status_code,
-        avito_data=order.avito_data
+        avito_data=order.avito_data,
+        avito_last_name=order.avito_last_name,
+        avito_first_name=order.avito_first_name,
+        avito_patronymic=order.avito_patronymic
     )
 
 def init_order_statuses(db: Session):
@@ -184,6 +187,31 @@ def init_order_item_statuses(db: Session):
             status = OrderItemStatus(name=status_data["name"], code=status_data["code"])
             db.add(status)
 
+    db.commit()
+
+def init_avito_order_statuses(db: Session):
+    """Инициализация статусов заказов Авито"""
+    statuses = [
+        {"code": "on_confirmation", "name": "Ожидает подтверждения", "description": "Заказ ожидает подтверждения продавцом"},
+        {"code": "ready_to_ship", "name": "Ждет отправки", "description": "Заказ подтвержден и ждет отправки"},
+        {"code": "in_transit", "name": "В пути", "description": "Заказ передан в доставку"},
+        {"code": "delivered", "name": "Доставлен", "description": "Заказ доставлен покупателю"},
+        {"code": "canceled", "name": "Отменен", "description": "Заказ отменен"},
+        {"code": "closed", "name": "Закрыт", "description": "Заказ закрыт"},
+        {"code": "on_return", "name": "На возврате", "description": "Заказ на возврате"},
+        {"code": "in_dispute", "name": "Открыт спор", "description": "По заказу открыт спор"},
+    ]
+    
+    for status_data in statuses:
+        existing = db.query(AvitoOrderStatus).filter(AvitoOrderStatus.code == status_data["code"]).first()
+        if not existing:
+            status = AvitoOrderStatus(
+                code=status_data["code"],
+                name=status_data["name"],
+                description=status_data["description"]
+            )
+            db.add(status)
+    
     db.commit()
 
 def init_rossko_statuses(db: Session):
@@ -577,6 +605,7 @@ async def initialize_order_statuses(
         # Инициализируем статусы
         init_order_statuses(db)
         init_order_item_statuses(db)
+        init_avito_order_statuses(db)
         init_rossko_statuses(db)
 
         return {"message": "Все статусы заказов успешно инициализированы"}

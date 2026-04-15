@@ -805,24 +805,32 @@ async def upload_avito_autoload(
                     ).first()
                     
                     if not existing_link:
-                        # Создаем новую запись
+                        # Создаем новую запись - сохраняем internal_code вместо avito_id
                         new_link = ProductAvitoListingLink(
                             organization_id=org_id,
                             product_id=product.id,
-                            avito_ad_id=str(avito_id),
+                            avito_ad_id=str(internal_code),  # Сохраняем внутренний код
                         )
                         db.add(new_link)
                         avito_id_count += 1
                         print(f"  ✅ Created Avito link for product {product.id} (internal_code: {internal_code})")
-                    elif existing_link.avito_ad_id != str(avito_id):
-                        # Обновляем Avito ID если он изменился
-                        existing_link.avito_ad_id = str(avito_id)
+                    elif existing_link.avito_ad_id != str(internal_code):
+                        # Обновляем internal_code если он изменился
+                        existing_link.avito_ad_id = str(internal_code)
                         avito_id_count += 1
                         print(f"  ✅ Updated Avito link for product {product.id} (internal_code: {internal_code})")
         
         if avito_id_count > 0:
             db.commit()
             print(f"✅ Created/updated {avito_id_count} Avito listing link(s) from nomenclature import")
+        
+        # Launch background task to sync real Avito IDs
+        try:
+            from app.tasks.avito_tasks import sync_avito_ad_ids_task
+            sync_avito_ad_ids_task.delay(org_id)
+            print(f"🔄 Launched background task to sync Avito ad IDs for org {org_id}")
+        except Exception as e:
+            logger.warning(f"Failed to launch Avito ad ID sync task: {e}")
     except Exception as e:
         logger.exception("Failed to create Avito listing links from nomenclature import")
         db.rollback()
@@ -1226,7 +1234,7 @@ async def import_avito_autoload_rows(
                         ProductAvitoListingLink(
                             organization_id=org_id,
                             product_id=product.id,
-                            avito_ad_id=avito_id,
+                            avito_ad_id=str(internal_code),  # Сохраняем внутренний код вместо avito_id
                         )
                     )
                     db.flush()
@@ -1236,7 +1244,7 @@ async def import_avito_autoload_rows(
                     {
                         "sheet": key[0],
                         "row": key[1],
-                        "reason": f"Связь уже существует для AvitoId={avito_id}",
+                        "reason": f"Связь уже существует для internal_code={internal_code}",
                     }
                 )
 

@@ -578,7 +578,14 @@ def upsert_products_to_avito_autoload(
         if TITLE_HEADER in col_map:
             row_values[TITLE_HEADER] = str(product.get("name") or part_number or f"Товар {product_id}")
         if DESCRIPTION_AD_HEADER in col_map:
-            row_values[DESCRIPTION_AD_HEADER] = str(product.get("description") or "")
+            description = str(product.get("description") or "")
+            # Добавляем внутренний код товара на новую строку в конец описания
+            if part_number:
+                if description:
+                    description += f"\n\nВнутренний код: {part_number}"
+                else:
+                    description = f"Внутренний код: {part_number}"
+            row_values[DESCRIPTION_AD_HEADER] = description
         if ADDRESS_HEADER in col_map:
             row_values[ADDRESS_HEADER] = str(product.get("address") or "")
         if CATEGORY_HEADER in col_map:

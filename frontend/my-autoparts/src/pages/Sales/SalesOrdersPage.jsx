@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 import { fetchProductStorageCells } from '../../redux/slices/StorageCellsSlice';
+import { AvitoOrderCard } from '../../components/AvitoOrderCard';
 
 export default function SalesOrdersPage() {
   const navigate = useNavigate();
@@ -13,10 +14,13 @@ export default function SalesOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
-  const [editingStatus, setEditingStatus] = useState(null); // {type: 'order'|'item', id: number}
+  const [editingStatus, setEditingStatus] = useState(null); // {type: 'order'|'item'|'avito', id: number}
   const [availableStatuses, setAvailableStatuses] = useState([]);
   const [authChecked, setAuthChecked] = useState(false);
   const [userOrgId, setUserOrgId] = useState(null);
+  const [avitoStatuses, setAvitoStatuses] = useState([]);
+  const [avitoTransitions, setAvitoTransitions] = useState({}); // { avitoOrderId: [transitions] }
+  const [activeTab, setActiveTab] = useState('garage'); // 'garage' | 'avito'
 
   console.log('orders:', orders);
   console.log('user:', user);
@@ -59,6 +63,22 @@ export default function SalesOrdersPage() {
       fetchOrders();
     }
   }, [hasPermission, authChecked, user]);
+
+  // Загружаем статусы Авито при монтировании
+  useEffect(() => {
+    const fetchAvitoStatuses = async () => {
+      try {
+        const response = await apiAxios.get('/organizations/avito/order-statuses');
+        setAvitoStatuses(response.data);
+      } catch (error) {
+        console.error('Ошибка загрузки статусов Авито:', error);
+      }
+    };
+    
+    if (hasPermission) {
+      fetchAvitoStatuses();
+    }
+  }, [hasPermission]);
 
   const fetchOrders = async () => {
     try {
@@ -244,6 +264,7 @@ export default function SalesOrdersPage() {
       
       // Перезагружаем заказы
       await fetchOrders();
+      setEditingStatus(null);
     } catch (error) {
       console.error('Ошибка изменения статуса Авито:', error);
       alert('Не удалось изменить статус: ' + (error.response?.data?.detail || error.message));
@@ -344,24 +365,25 @@ export default function SalesOrdersPage() {
     );
   }
 
-  const toggleOrderExpansion = (orderId) => {
+  const toggleOrderExpansion = async (orderId) => {
     const isExpanding = expandedOrderId !== orderId;
     setExpandedOrderId(isExpanding ? orderId : null);
     
     if (isExpanding) {
-      // When expanding an order, no need to fetch storage cells since they come with the order data
-      // The storage cells are already included in the order items
-      // const order = orders.find(o => o.id === orderId);
-      // if (order && order.items) {
-      //   order.items.forEach(item => {
-      //     // Try to get product ID from various possible fields
-      //     const productId = item.product_id || item.product?.id;
-      //     if (productId) {
-      //       // Use the Redux action to fetch storage cells
-      //       dispatch(fetchProductStorageCells(productId));
-      //     }
-      //   });
-      // }
+      const order = orders.find(o => o.id === orderId);
+      if (order && order.source === 'avito' && order.avito_order_id && userOrgId) {
+        try {
+          const response = await apiAxios.get(
+            `/organizations/${userOrgId}/avito/orders/${order.avito_order_id}/transitions`
+          );
+          setAvitoTransitions(prev => ({
+            ...prev,
+            [order.avito_order_id]: response.data.transitions
+          }));
+        } catch (error) {
+          console.error('Ошибка загрузки переходов Авито:', error);
+        }
+      }
     }
   };
 
@@ -377,125 +399,301 @@ export default function SalesOrdersPage() {
       </div>
 
       <div className="space-y-6">
-        {/* Десктопная версия - таблица */}
+        {/* Вкладки для разделения заказов */}
+        <div className="bg-white shadow-sm rounded-lg">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab('garage')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'garage'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Свой Гараж
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                  {orders.filter(o => o.source === 'garage' || !o.source).length}
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab('avito')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'avito'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Авито
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                  {orders.filter(o => o.source === 'avito').length}
+                </span>
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {/* Десктопная версия - таблица (только для Свой Гараж) */}
+        {activeTab === 'garage' && (
         <div className="hidden md:block bg-white shadow-sm rounded-lg">
           <div className="overflow-x-auto">
             <table className="w-full table-fixed divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Номер заказа
-                  </th>
-                  <th className="w-[7%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Дата
-                  </th>
-                  <th className="w-[5%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Источник
-                  </th>
-                  <th className="w-[11%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Клиент
-                  </th>
-                  <th className="w-[11%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Телефон
-                  </th>
-                  <th className="w-[16%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Способ доставки
-                  </th>
-                  <th className="w-[7%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Оплата
-                  </th>
-                  <th className="w-[10%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Статус
-                  </th>
-                  <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Сумма
-                  </th>
+                  {activeTab === 'garage' ? (
+                    // Колонки для заказов Свой Гараж
+                    <>
+                      <th className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Номер заказа
+                      </th>
+                      <th className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Дата
+                      </th>
+                      <th className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Клиент
+                      </th>
+                      <th className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Телефон
+                      </th>
+                      <th className="w-[18%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Способ доставки
+                      </th>
+                      <th className="w-[8%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Оплата
+                      </th>
+                      <th className="w-[12%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Статус
+                      </th>
+                      <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Сумма
+                      </th>
+                      <th className="w-[8%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Действия
+                      </th>
+                    </>
+                  ) : (
+                    // Колонки для заказов Авито
+                    <>
+                      <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ID Авито
+                      </th>
+                      <th className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Дата
+                      </th>
+                      <th className="w-[15%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ФИО покупателя
+                      </th>
+                      <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Телефон
+                      </th>
+                      <th className="w-[15%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Адрес доставки
+                      </th>
+                      <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ТК
+                      </th>
+                      <th className="w-[7%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Оплата
+                      </th>
+                      <th className="w-[12%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Статус Авито
+                      </th>
+                      <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Сумма
+                      </th>
+                      <th className="w-[3%] px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        
+                      </th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {orders.map((order) => (
+                {orders
+                  .filter(order => {
+                    if (activeTab === 'garage') {
+                      return order.source === 'garage' || !order.source;
+                    } else if (activeTab === 'avito') {
+                      return order.source === 'avito';
+                    }
+                    return true;
+                  })
+                  .map((order) => (
                   <React.Fragment key={order.id}>
                     <tr
                       className="hover:bg-gray-50 cursor-pointer"
                       onClick={() => toggleOrderExpansion(order.id)}
                     >
-                    <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {order.order_number}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(order.created_at)}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-center">
-                      <img 
-                        src={order.source === 'avito' ? '/logos/avito.png' : '/logos/svoygarage.png'} 
-                        alt={order.source === 'avito' ? 'Авито' : 'Свой Гараж'} 
-                        className="w-6 h-6 object-contain mx-auto" 
-                        title={order.source === 'avito' ? 'Заказ из Авито' : 'Заказ Свой Гараж'}
-                      />
-                    </td>
-                    <td className="px-3 py-4 text-sm text-gray-900">
-                      {order.recipient_name}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {order.recipient_phone}
-                    </td>
-                    <td className="px-3 py-4 text-sm text-gray-900">
-                      {getDeliveryInfo(order)}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-center">
-                      <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${
-                        order.is_paid
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {order.is_paid ? 'Оплачено' : 'Не оплачено'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-center">
-                      {order.source === 'avito' && order.avito_status_code ? (
-                        <span
-                          className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${getAvitoStatusColor(order.avito_status_code)}`}
-                          title={`Авито: ${getAvitoStatusName(order.avito_status_code)}`}
-                        >
-                          {getAvitoStatusName(order.avito_status_code)}
-                        </span>
-                      ) : editingStatus?.type === 'order' && editingStatus?.id === order.id ? (
-                        <select
-                          value={order.status.code}
-                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                          onBlur={() => setEditingStatus(null)}
-                          className="text-xs px-1.5 py-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                          autoFocus
-                        >
-                          <option value="pending">В ожидании</option>
-                          <option value="confirmed">Подтверждён</option>
-                          <option value="rejected">Не подтверждён</option>
-                          <option value="assembled">Сформирован</option>
-                          <option value="shipped">Передан в доставку</option>
-                          <option value="delivered">Получен</option>
-                          <option value="closed">Закрыт</option>
-                        </select>
-                      ) : (
-                        <span
-                          className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 ${getStatusColor(order.status.code)}`}
-                          onClick={(e) => {
-                            e.stopPropagation(); // Предотвращаем вызов toggleOrderExpansion
-                            setEditingStatus({ type: 'order', id: order.id });
-                          }}
-                        >
-                          {order.status.name}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-left">
-                      {formatPrice(order.total_amount)}
-                    </td>
+                    {activeTab === 'garage' ? (
+                      // Строка для заказов Свой Гараж
+                      <>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {order.order_number}
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatDate(order.created_at)}
+                        </td>
+                        <td className="px-3 py-4 text-sm text-gray-900">
+                          {order.recipient_name}
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {order.recipient_phone}
+                        </td>
+                        <td className="px-3 py-4 text-sm text-gray-900">
+                          {getDeliveryInfo(order)}
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-center">
+                          <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full ${
+                            order.is_paid
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {order.is_paid ? 'Оплачено' : 'Не оплачено'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-center">
+                          {editingStatus?.type === 'order' && editingStatus?.id === order.id ? (
+                            <select
+                              value={order.status.code}
+                              onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                              onBlur={() => setEditingStatus(null)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs px-1.5 py-0.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                              autoFocus
+                            >
+                              <option value="pending">В ожидании</option>
+                              <option value="confirmed">Подтверждён</option>
+                              <option value="rejected">Не подтверждён</option>
+                              <option value="assembled">Сформирован</option>
+                              <option value="shipped">Передан в доставку</option>
+                              <option value="delivered">Получен</option>
+                              <option value="closed">Закрыт</option>
+                            </select>
+                          ) : (
+                            <span
+                              className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 ${getStatusColor(order.status.code)}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingStatus({ type: 'order', id: order.id });
+                              }}
+                            >
+                              {order.status.name}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-left">
+                          {formatPrice(order.total_amount)}
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // TODO: Добавить действие (например, просмотр деталей)
+                            }}
+                            className="text-indigo-600 hover:text-indigo-900"
+                            title="Подробнее"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          </button>
+                        </td>
+                      </>
+                    ) : (
+                      // Строка для заказов Авито
+                      <>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                          <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">
+                            #{order.avito_order_id}
+                          </span>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatDate(order.created_at)}
+                        </td>
+                        <td className="px-3 py-4 text-sm text-gray-900">
+                          <div className="font-medium">
+                            {[order.avito_last_name, order.avito_first_name, order.avito_patronymic]
+                              .filter(Boolean)
+                              .join(' ')}
+                          </div>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {order.recipient_phone || '-'}
+                        </td>
+                        <td className="px-3 py-4 text-sm text-gray-700 max-w-[200px]" title={order.delivery_address || 'Адрес не указан'}>
+                          <div className="truncate">
+                            {order.delivery_address || <span className="text-gray-400 italic">Не указан</span>}
+                          </div>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {order.transport_company || <span className="text-gray-400 italic">Не указана</span>}
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-center">
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            order.is_paid
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-orange-100 text-orange-800'
+                          }`}>
+                            {order.is_paid ? '✓ Оплачено' : '◷ Не оплачено'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-center">
+                          {editingStatus?.type === 'avito' && editingStatus?.id === order.id ? (
+                            <select
+                              value={order.avito_status_code}
+                              onChange={(e) => handleAvitoTransition(order.avito_order_id, e.target.value)}
+                              onBlur={() => setEditingStatus(null)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              autoFocus
+                            >
+                              {avitoStatuses.map(status => (
+                                <option key={status.code} value={status.code}>
+                                  {status.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span
+                              className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full cursor-pointer hover:shadow-sm transition-shadow ${getAvitoStatusColor(order.avito_status_code)}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingStatus({ type: 'avito', id: order.id });
+                              }}
+                              title={`Нажмите для изменения статуса. Текущий: ${getAvitoStatusName(order.avito_status_code)}`}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5"></span>
+                              {getAvitoStatusName(order.avito_status_code)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                          {formatPrice(order.total_amount)}
+                        </td>
+                        <td className="px-3 py-4 whitespace-nowrap text-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleOrderExpansion(order.id);
+                            }}
+                            className="text-indigo-600 hover:text-indigo-900 transition-colors"
+                            title="Показать детали заказа"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
 
                   {/* Детали заказа - таблица с запчастями */}
                   {expandedOrderId === order.id && order.items && order.items.length > 0 && (
                     <tr>
-                      <td colSpan="9" className="px-6 py-4 bg-gray-50">
+                      <td colSpan={activeTab === 'garage' ? 9 : 10} className="px-6 py-4 bg-gray-50">
                         <div className="border border-gray-200 rounded-lg overflow-hidden">
                           <table className="w-full table-fixed divide-y divide-gray-200">
                             <thead className="bg-gray-100">
@@ -607,43 +805,137 @@ export default function SalesOrdersPage() {
             </table>
           </div>
 
-          {orders.length === 0 && (
+          {orders.filter(order => {
+            if (activeTab === 'garage') {
+              return order.source === 'garage' || !order.source;
+            } else if (activeTab === 'avito') {
+              return order.source === 'avito';
+            }
+            return true;
+          }).length === 0 && (
             <div className="text-center py-12">
               <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Заказов покупателей нет</h3>
-              <p className="mt-1 text-sm text-gray-500">Здесь будут отображаться оформленные заказы</p>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">
+                {activeTab === 'garage' ? 'Заказов Свой Гараж нет' : 'Заказов Авито нет'}
+              </h3>
+              <p className="mt-1 text-sm text-gray-500">
+                {activeTab === 'garage' 
+                  ? 'Здесь будут отображаться заказы с сайта' 
+                  : 'Здесь будут отображаться заказы из Авито'}
+              </p>
             </div>
           )}
         </div>
+        )}
+
+        {/* Десктопная версия - карточки Авито */}
+        {activeTab === 'avito' && (
+        <div className="hidden md:block">
+          <div className="space-y-4">
+            {orders
+              .filter(order => order.source === 'avito')
+              .map((order) => (
+                <AvitoOrderCard
+                  key={order.id}
+                  order={order}
+                  isExpanded={expandedOrderId === order.id}
+                  onToggle={toggleOrderExpansion}
+                  editingStatus={editingStatus}
+                  onEditStatus={setEditingStatus}
+                  onAvitoTransition={handleAvitoTransition}
+                  avitoStatuses={avitoStatuses}
+                  getAvitoStatusColor={getAvitoStatusColor}
+                  getAvitoStatusName={getAvitoStatusName}
+                  formatDate={formatDate}
+                  formatPrice={formatPrice}
+                />
+              ))}
+          </div>
+
+          {orders.filter(order => order.source === 'avito').length === 0 && (
+            <div className="text-center py-16 bg-white rounded-lg shadow-sm">
+              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">Заказов Авито нет</h3>
+              <p className="mt-1 text-sm text-gray-500">Здесь будут отображаться заказы из Авито</p>
+            </div>
+          )}
+        </div>
+        )}
 
         {/* Мобильная версия - карточки */}
         <div className="md:hidden space-y-5">
-          {orders.map((order) => (
+          {orders
+            .filter(order => {
+              if (activeTab === 'garage') {
+                return order.source === 'garage' || !order.source;
+              } else if (activeTab === 'avito') {
+                return order.source === 'avito';
+              }
+              return true;
+            })
+            .map((order) => (
             <div key={order.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               {/* Заголовок карточки */}
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1 pr-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-base font-semibold text-gray-900">Заказ #{order.order_number}</span>
-                    <img 
-                      src={order.source === 'avito' ? '/logos/avito.png' : '/logos/svoygarage.png'} 
-                      alt={order.source === 'avito' ? 'Авито' : 'Свой Гараж'} 
-                      className="w-5 h-5 object-contain" 
-                      title={order.source === 'avito' ? 'Заказ из Авито' : 'Заказ Свой Гараж'}
-                    />
-                    <span className="text-sm text-gray-400">•</span>
-                    <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
-                  </div>
-                  {order.source === 'avito' && order.avito_order_id && (
-                    <div className="text-xs text-gray-500 mb-1">
-                      Авито ID: {order.avito_order_id}
-                    </div>
+                  {activeTab === 'garage' ? (
+                    // Карточка для заказов Свой Гараж
+                    <>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-base font-semibold text-gray-900">Заказ #{order.order_number}</span>
+                        <span className="text-sm text-gray-400">•</span>
+                        <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
+                      </div>
+                      <div className="text-base text-gray-800 mb-1">
+                        {order.recipient_name}
+                      </div>
+                      <div className="text-sm text-gray-600 mb-3">{order.recipient_phone}</div>
+                      <div className="text-sm text-gray-600">{getDeliveryInfo(order)}</div>
+                    </>
+                  ) : (
+                    // Карточка для заказов Авито
+                    <>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-mono">
+                          Авито #{order.avito_order_id}
+                        </span>
+                        <span className="text-sm text-gray-400">•</span>
+                        <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
+                      </div>
+                      <div className="text-base font-semibold text-gray-900 mb-2">
+                        {[order.avito_last_name, order.avito_first_name, order.avito_patronymic]
+                          .filter(Boolean)
+                          .join(' ')}
+                      </div>
+                      <div className="space-y-2 mb-3">
+                        <div className="flex items-start gap-2">
+                          <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                          <span className="text-sm text-gray-700">{order.recipient_phone || 'Не указан'}</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span className="text-sm text-gray-700">{order.delivery_address || 'Адрес не указан'}</span>
+                        </div>
+                        {order.transport_company && (
+                          <div className="flex items-start gap-2">
+                            <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                            </svg>
+                            <span className="text-sm text-gray-700">{order.transport_company}</span>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
-                  <div className="text-base text-gray-800 mb-1">{order.recipient_name}</div>
-                  <div className="text-sm text-gray-600 mb-3">{order.recipient_phone}</div>
-                  <div className="text-sm text-gray-600">{getDeliveryInfo(order)}</div>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <div className="text-lg font-bold text-gray-900 mb-2">
@@ -657,18 +949,41 @@ export default function SalesOrdersPage() {
                     }`}>
                       {order.is_paid ? 'Оплачено' : 'Не оплачено'}
                     </span>
-                    {order.source === 'avito' && order.avito_status_code && (
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full self-end ${getAvitoStatusColor(order.avito_status_code)}`}>
-                        {getAvitoStatusName(order.avito_status_code)}
-                      </span>
-                    )}
-                    <div className="mt-2">
-                      {editingStatus?.type === 'order' && editingStatus?.id === order.id ? (
+                    {activeTab === 'avito' ? (
+                      // Статус Авито
+                      editingStatus?.type === 'avito' && editingStatus?.id === order.id ? (
+                        <select
+                          value={order.avito_status_code}
+                          onChange={(e) => handleAvitoTransition(order.avito_order_id, e.target.value)}
+                          onBlur={() => setEditingStatus(null)}
+                          className="text-xs px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px] mt-1"
+                          autoFocus
+                        >
+                          {avitoStatuses.map(status => (
+                            <option key={status.code} value={status.code}>
+                              {status.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 self-end mt-1 ${getAvitoStatusColor(order.avito_status_code)}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingStatus({ type: 'avito', id: order.id });
+                          }}
+                        >
+                          {getAvitoStatusName(order.avito_status_code)}
+                        </span>
+                      )
+                    ) : (
+                      // Статус Свой Гараж
+                      editingStatus?.type === 'order' && editingStatus?.id === order.id ? (
                         <select
                           value={order.status.code}
                           onChange={(e) => updateOrderStatus(order.id, e.target.value)}
                           onBlur={() => setEditingStatus(null)}
-                          className="text-sm px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
+                          className="text-sm px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px] mt-1"
                           autoFocus
                         >
                           <option value="pending">В ожидании</option>
@@ -681,15 +996,15 @@ export default function SalesOrdersPage() {
                         </select>
                       ) : (
                         <span
-                          className={`inline-flex px-2 py-1 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 ${getStatusColor(order.status.code)}`}
+                          className={`inline-flex px-2 py-1 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 mt-1 ${getStatusColor(order.status.code)}`}
                           onClick={() => {
                             setEditingStatus({ type: 'order', id: order.id });
                           }}
                         >
                           {order.status.name}
                         </span>
-                      )}
-                    </div>
+                      )
+                    )}
                   </div>
                 </div>
               </div>

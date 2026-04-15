@@ -102,6 +102,9 @@ class OrderResponse(BaseModel):
     avito_order_id: Optional[int] = None
     avito_status_code: Optional[str] = None
     avito_data: Optional[dict] = None
+    avito_last_name: Optional[str] = None
+    avito_first_name: Optional[str] = None
+    avito_patronymic: Optional[str] = None
 
     class Config:
         from_attributes = True

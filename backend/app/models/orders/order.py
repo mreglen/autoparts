@@ -33,6 +33,9 @@ class Order(Base):
     avito_order_id = Column(BigInteger, nullable=True)  # ID заказа в Авито
     avito_status_code = Column(String(50), nullable=True)  # Статус из Авито
     avito_data = Column(JSON, nullable=True)  # Дополнительные данные из API Авито
+    avito_last_name = Column(String(100), nullable=True)  # Фамилия клиента из Авито
+    avito_first_name = Column(String(100), nullable=True)  # Имя клиента из Авито
+    avito_patronymic = Column(String(100), nullable=True)  # Отчество клиента из Авито
 
     # Даты
     created_at = Column(DateTime(timezone=True), server_default=func.now())

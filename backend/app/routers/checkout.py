@@ -8,7 +8,7 @@ from app.models.orders import Order, NewPartsOrder, OrderStatus, OrderItem, Orde
 from app.models.client import Client as ClientModel
 from app.schemas.checkout import CheckoutFromCartRequest, OrderFromCartResponse
 from app.routers.rossko_api.rossko_api import rossko_checkout
-from app.routers.orders import generate_order_number, order_to_response, init_order_statuses, init_order_item_statuses
+from app.routers.orders import generate_order_number, order_to_response, init_order_statuses, init_order_item_statuses, init_avito_order_statuses
 from app.utils.phone import normalize_to_storage_format
 
 router = APIRouter(prefix="/checkout", tags=["Checkout"])
@@ -46,6 +46,7 @@ async def checkout_from_cart(
         # Инициализировать статусы если они не существуют
         init_order_statuses(db)
         init_order_item_statuses(db)
+        init_avito_order_statuses(db)
 
         # Создать или получить клиента на основе контактной информации
         # Note: Contact schema doesn't include email, using phone as primary identifier

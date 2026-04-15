@@ -13,7 +13,8 @@ class ProductAvitoListingLink(Base):
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(String(10), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
-    avito_ad_id = Column(String(64), nullable=False, index=True)
+    avito_ad_id = Column(String(64), nullable=False, index=True)  # Stores internal_code
+    avito_id = Column(String(64), nullable=True, index=True)  # Stores real Avito item_id
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 

@@ -18,6 +18,7 @@ from app.services import avito_api as avito_api_svc
 from app.services.avito_orders_api import (
     fetch_avito_orders,
     apply_order_transition,
+    get_available_transitions,
     raw_fetch_avito_orders,
     AvitoOrdersError,
 )
@@ -63,6 +64,24 @@ def _get_avito_token_for_org(db: Session, org_id: str) -> tuple[str, int]:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка получения токена Авито: {str(e)}"
         )
+
+
+def _parse_full_name(full_name: str) -> dict[str, str | None]:
+    """
+    Парсит fullName в формате 'Фамилия Имя Отчество' на отдельные поля
+    """
+    if not full_name:
+        return {"last_name": None, "first_name": None, "patronymic": None}
+    
+    parts = full_name.strip().split()
+    
+    result = {
+        "last_name": parts[0] if len(parts) > 0 else None,
+        "first_name": parts[1] if len(parts) > 1 else None,
+        "patronymic": parts[2] if len(parts) > 2 else None,
+    }
+    
+    return result
 
 
 def _map_avito_status_to_internal(avito_status_code: str) -> str:
@@ -138,6 +157,15 @@ def _sync_avito_order_to_db(
         existing_order.recipient_name = buyer_info.get('name', existing_order.recipient_name)
         existing_order.recipient_phone = buyer_info.get('phone', existing_order.recipient_phone)
         existing_order.recipient_email = buyer_info.get('email', existing_order.recipient_email)
+        
+        # Парсим ФИО из fullName
+        full_name = buyer_info.get('fullName')
+        if full_name:
+            name_parts = _parse_full_name(full_name)
+            existing_order.avito_last_name = name_parts['last_name']
+            existing_order.avito_first_name = name_parts['first_name']
+            existing_order.avito_patronymic = name_parts['patronymic']
+        
         existing_order.avito_data = avito_order
         
         db.commit()
@@ -151,6 +179,10 @@ def _sync_avito_order_to_db(
     next_number = (max_order_number or 0) + 1
     order_number = f"{next_number:09d}"
     
+    # Парсим ФИО из fullName
+    full_name = buyer_info.get('fullName')
+    name_parts = _parse_full_name(full_name) if full_name else {}
+    
     new_order = Order(
         order_number=order_number,
         user_id=owner_user_id,  # Владелец организации, настроивший интеграцию
@@ -161,6 +193,9 @@ def _sync_avito_order_to_db(
         recipient_name=buyer_info.get('name', 'Покупатель Авито'),
         recipient_phone=buyer_info.get('phone', ''),
         recipient_email=buyer_info.get('email', ''),
+        avito_last_name=name_parts.get('last_name'),
+        avito_first_name=name_parts.get('first_name'),
+        avito_patronymic=name_parts.get('patronymic'),
         delivery_type='transport',  # Default for Avito
         delivery_address=avito_order.get('delivery_address', ''),
         transport_company=avito_order.get('delivery_service', ''),
@@ -550,6 +585,55 @@ async def apply_avito_order_transition(
         )
 
 
+@router.get("/{org_id}/avito/orders/{avito_order_id}/transitions")
+async def get_order_transitions(
+    org_id: str,
+    avito_order_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Получить доступные переходы для заказа Авито"""
+    _ensure_org_access(current_user, org_id)
+    
+    # Получаем заказ
+    order = db.query(Order).filter(
+        Order.avito_order_id == avito_order_id,
+        Order.source == 'avito'
+    ).first()
+    
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Заказ Авито не найден"
+        )
+    
+    # Получаем интеграцию
+    integration = db.query(OrganizationAvitoIntegration).filter(
+        OrganizationAvitoIntegration.organization_id == org_id
+    ).first()
+    
+    if not integration:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Интеграция с Авито не настроена"
+        )
+    
+    try:
+        secret = decrypt_secret(integration.client_secret_encrypted)
+        token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
+        avito_user_id = int(integration.avito_user_id)
+        
+        transitions = await get_available_transitions(token, avito_user_id, avito_order_id)
+        
+        return {"transitions": transitions}
+    except Exception as e:
+        logger.exception(f"Error fetching transitions for order {avito_order_id}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
 @router.get("/{org_id}/avito/orders")
 async def get_avito_orders(
     org_id: str,
@@ -751,3 +835,21 @@ async def check_avito_delivery(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка проверки доставки: {str(e)}"
         )
+
+
+@router.get("/avito/order-statuses")
+async def get_avito_order_statuses(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Получить все статусы заказов Авито"""
+    statuses = db.query(AvitoOrderStatus).all()
+    return [
+        {
+            "id": s.id,
+            "code": s.code,
+            "name": s.name,
+            "description": s.description
+        }
+        for s in statuses
+    ]

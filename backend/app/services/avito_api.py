@@ -126,3 +126,53 @@ async def get_last_report_v1(access_token: str, user_id: int) -> Optional[dict[s
             return r.json()
         except Exception:
             return None
+
+
+async def get_avito_items_list(access_token: str, user_id: int) -> list[dict[str, Any]]:
+    """
+    GET /core/v1/items - Get list of all ads for the user.
+    Returns list of items with basic info including item_id.
+    """
+    items = []
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        r = await client.get(
+            f"{AVITO_BASE}/core/v1/items/",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"user_id": user_id, "limit": 100},
+        )
+        try:
+            data = r.json()
+        except Exception:
+            data = {"raw": r.text[:8000]}
+        
+        if r.status_code != 200:
+            raise RuntimeError(f"Avito items list error (HTTP {r.status_code}): {data}")
+        
+        # Extract items from response
+        if isinstance(data, dict):
+            items = data.get("items", []) or data.get("data", []) or []
+        elif isinstance(data, list):
+            items = data
+    
+    return items
+
+
+async def get_avito_item_detail(access_token: str, user_id: int, item_id: str) -> dict[str, Any]:
+    """
+    GET /core/v1/accounts/{user_id}/items/{item_id}/ - Get detailed ad info including description.
+    Returns full item data with description field.
+    """
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        r = await client.get(
+            f"{AVITO_BASE}/core/v1/accounts/{user_id}/items/{item_id}/",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        try:
+            data = r.json()
+        except Exception:
+            data = {"raw": r.text[:8000]}
+        
+        if r.status_code != 200:
+            raise RuntimeError(f"Avito item detail error (HTTP {r.status_code}): {data}")
+        
+        return data if isinstance(data, dict) else {}
