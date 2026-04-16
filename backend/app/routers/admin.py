@@ -41,6 +41,13 @@ class SiteSettingsPatch(BaseModel):
     new_parts_markup_percent: Optional[float] = Field(None, ge=0, le=500)
 
 
+class OrdersV2MigrationResponse(BaseModel):
+    used_created: int
+    new_created: int
+    avito_created: int
+    skipped: int
+
+
 @router.get("/site-settings", response_model=SiteSettingsResponse)
 def get_site_settings_admin(
     current_user: User = Depends(get_current_admin_user),
@@ -75,6 +82,28 @@ def patch_site_settings_admin(
     return SiteSettingsResponse(
         show_new_autoparts=row.show_new_autoparts,
         new_parts_markup_percent=_new_parts_markup_percent_value(row),
+    )
+
+
+@router.post("/migrations/orders-v2/up", response_model=OrdersV2MigrationResponse)
+def migrate_orders_v2_up(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Миграции заказов отключены (таблицы и ORM-модели заказов удалены)",
+    )
+
+
+@router.post("/migrations/orders-v2/down")
+def migrate_orders_v2_down(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Миграции заказов отключены (таблицы и ORM-модели заказов удалены)",
     )
 
 
@@ -209,22 +238,11 @@ def get_seller_dashboard_stats(
     # Get seller's organization
     organization_id = seller.organization_id
     
-    # Get orders where items belong to this seller's organization
-    # We need to join Order with OrderItem to find orders containing items from this organization
-    from app.models.orders import Order, OrderItem
-    orders = db.query(Order).join(Order.items).filter(OrderItem.seller_organization_id == organization_id).distinct().all()
-    
-    # Filter orders from new parts (Rossko) - exclude them
-    filtered_orders = [order for order in orders if order.new_parts_order is None]
-    
-    # Calculate order statistics
-    active_orders = [o for o in filtered_orders if o.status.code not in ['closed', 'cancelled']]
-    
-    seven_days_ago = datetime.now() - timedelta(days=7)
-    new_orders = [o for o in filtered_orders if o.created_at > seven_days_ago]
-    
-    pending_orders = [o for o in filtered_orders if o.status.code == 'pending']
-    completed_orders = [o for o in filtered_orders if o.status.code in ['delivered', 'closed']]
+    # Orders disabled: order tables/models removed.
+    active_orders = []
+    new_orders = []
+    pending_orders = []
+    completed_orders = []
     
     # Get products for this organization
     products = db.query(Product).filter(Product.organization_id == organization_id).all()

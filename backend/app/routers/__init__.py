@@ -23,15 +23,16 @@ from app.routers.search_products import router as search_products_router
 from app.routers.tecdoc_parts import router as tecdoc_parts_router
 from app.routers.carts import router as carts_router
 from app.routers.checkout import router as checkout_router
-from app.routers.orders import router as orders_router
 from app.routers.clients import router as clients_router
 from app.routers.employees import router as employees_router
 from app.routers.delivery_methods import router as delivery_methods_router
 from app.routers.printers import router as printers_router
 from app.routers.avito_integration import router as avito_integration_router
 from app.routers.avito_messenger import router as avito_messenger_router
-from app.routers.avito_orders import router as avito_orders_router
 from app.routers.drom_integration import router as drom_integration_router
+from app.routers.sales import router as sales_router
+from app.routers.orders_meta import router as orders_meta_router
+from app.routers.orders_legacy import router as orders_legacy_router
 
 
 
@@ -64,13 +65,14 @@ api_router.include_router(stock_ins_router)
 api_router.include_router(stock_outs_router)
 api_router.include_router(carts_router)
 api_router.include_router(checkout_router)
-api_router.include_router(orders_router)
 api_router.include_router(clients_router)
 api_router.include_router(employees_router)
 api_router.include_router(delivery_methods_router)
 api_router.include_router(printers_router)
 api_router.include_router(avito_integration_router)
 api_router.include_router(avito_messenger_router)
-api_router.include_router(avito_orders_router)
 api_router.include_router(drom_integration_router)
+api_router.include_router(sales_router)
+api_router.include_router(orders_meta_router)
+api_router.include_router(orders_legacy_router)
 

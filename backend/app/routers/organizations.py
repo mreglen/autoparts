@@ -9,7 +9,6 @@ from app.models.user import User as UserModel
 from app.schemas.user import EmployeeCreate, UserResponse, UserUpdate
 from app.utils.id_generator import random_id
 from app.utils.phone import normalize_to_storage_format
-from app.models.orders import OrderStatus, OrderItemStatus
 from app.utils.event_logger import log_event
 import logging
 
@@ -18,24 +17,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
 def init_order_item_statuses(db: Session):
-    """Инициализация статусов элементов заказа"""
-    statuses = [
-        {"name": "В ожидании", "code": "pending"},
-        {"name": "Подтверждён", "code": "confirmed"},
-        {"name": "Не подтверждён", "code": "rejected"},
-        {"name": "Сформирован", "code": "assembled"},
-        {"name": "Передан в доставку", "code": "shipped"},
-        {"name": "Получен", "code": "delivered"},
-        {"name": "Закрыт", "code": "closed"}
-    ]
-
-    for status_data in statuses:
-        existing = db.query(OrderItemStatus).filter(OrderItemStatus.code == status_data["code"]).first()
-        if not existing:
-            status = OrderItemStatus(name=status_data["name"], code=status_data["code"])
-            db.add(status)
-
-    db.commit()
+    """Инициализация статусов элементов заказа (отключено)."""
+    # Заказы полностью удалены: таблицы и ORM-модели больше не существуют.
+    # Оставляем функцию, чтобы старые вызовы не ломали импорт/запуск.
+    return
 
 @router.put("/{org_id}/employees/{user_id}", response_model=UserResponse)
 def update_employee(
@@ -101,8 +86,6 @@ def remove_employee(
     from app.models.user_permission import UserPermission
     from app.models.user_session import UserSession
     from app.models.carts import Cart, NewPartsCart, UsedPartsCart
-    from app.models.orders.order import Order
-    from app.models.orders.order_item import OrderItem
     from app.models.pending_product import PendingProduct
     from app.models.product import Product
     from app.models.rejected_product import RejectedProduct
@@ -122,13 +105,6 @@ def remove_employee(
     
     # Delete user's stock out records
     db.query(StockOut).filter(StockOut.user_id == user_id).delete()
-    
-    # Delete orders and their items
-    # First delete order items, then orders
-    user_orders = db.query(Order).filter(Order.user_id == user_id).all()
-    for order in user_orders:
-        db.query(OrderItem).filter(OrderItem.order_id == order.id).delete()
-        db.delete(order)
     
     # Products created by this user - set created_by to NULL
     db.query(Product).filter(Product.created_by == user_id).update({"created_by": None})
@@ -408,14 +384,4 @@ async def initialize_order_item_statuses(
     current_user: UserModel = Depends(get_current_admin_user)  # Только для админов
 ):
     """Инициализация статусов элементов заказов (только для админов)"""
-    try:
-        # Инициализируем статусы элементов заказов
-        init_order_item_statuses(db)
-
-        return {"message": "Статусы элементов заказов успешно инициализированы"}
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка инициализации статусов элементов заказов: {str(e)}"
-        )
+    return {"message": "Заказы отключены: инициализация статусов элементов заказа недоступна"}

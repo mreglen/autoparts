@@ -12,7 +12,6 @@ from app.models.pickup_location import PickupLocation
 from app.models.stock_in import StockIn
 from app.models.stock_out import StockOut
 from app.models.carts import Cart, NewPartsCart, UsedPartsCart, GuestCart, GuestNewPartsCart, GuestUsedPartsCart
-from app.models.orders import Order, NewPartsOrder, UsedPartsOrder, OrderStatus, OrderItem, OrderItemStatus
 from app.models.client import Client
 from app.models.permission import Permission
 from app.models.user_permission import UserPermission
@@ -32,6 +31,9 @@ from app.models.product_vehicle import ProductVehicleAssociation
 from app.models.delivery_method import DeliveryMethod, organization_delivery_methods
 from app.models.product_avito_listing_link import ProductAvitoListingLink
 from app.models.avito_autoload_job import AvitoAutoloadJob
+from app.models.garage_used_orders import GarageUsedOrder, GarageUsedOrderItem
+from app.models.garage_new_orders import GarageNewOrder, GarageNewOrderItem
+from app.models.avito_orders_cache import AvitoOrderCache
 from app.models.organization_drom_integration import OrganizationDromIntegration
 from app.models.organization_drom_autoload_cache import OrganizationDromAutoloadCache
 from app.models.product_drom_listing_link import ProductDromListingLink
@@ -88,14 +90,6 @@ StockOut.user = relationship(User, back_populates="stock_outs")
 
 # Cart relationships
 User.carts = relationship(Cart, back_populates="user")
-
-# Order relationships
-User.orders = relationship(Order, back_populates="user")
-OrderStatus.orders = relationship(Order, back_populates="status")
-OrderItemStatus.order_items = relationship(OrderItem, back_populates="status")
-Order.items = relationship(OrderItem, back_populates="order")
-Order.new_parts_order = relationship(NewPartsOrder, back_populates="order")
-Order.used_parts_order = relationship(UsedPartsOrder, back_populates="order")
 
 # Product <-> Vehicle relationship using the association table
 Product.compatible_vehicles = relationship("Vehicle", secondary="product_vehicle_association", back_populates="compatible_products")

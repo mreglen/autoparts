@@ -1,13 +1,20 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+const DEFAULT_AVITO_URL = 'https://www.avito.ru';
+
 const ProductNotFound = () => {
   const [searchParams] = useSearchParams();
-  const avitoUrl = searchParams.get('avitoUrl') || 'https://avito.ru';
+  const avitoUrlFromQuery = searchParams.get('avitoUrl');
+  const avitoId = searchParams.get('avitoId');
+  const title = searchParams.get('title');
+
+  const resolvedAvitoUrl = avitoUrlFromQuery
+    || (avitoId ? `https://www.avito.ru/items/${encodeURIComponent(avitoId)}` : DEFAULT_AVITO_URL);
 
   const handleGoToAvito = () => {
     // Открываем Avito в новой вкладке
-    window.open(avitoUrl, '_blank', 'noopener,noreferrer');
+    window.open(resolvedAvitoUrl, '_blank', 'noopener,noreferrer');
     // Закрываем текущую вкладку
     window.close();
   };
@@ -40,6 +47,11 @@ const ProductNotFound = () => {
           <p className="text-gray-600">
             Извините, но такого товара нет на сайте. Вы уверены, что хотите перейти?
           </p>
+          {title && (
+            <p className="text-sm text-gray-500 mt-3">
+              Товар: <span className="font-medium text-gray-700">{title}</span>
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-3">

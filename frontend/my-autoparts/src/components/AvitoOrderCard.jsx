@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { fetchAvitoChatProductLink } from '../redux/slices/AvitoChatSlice';
+import { openAvitoProductFlow } from '../utils/avitoProductFlow';
 
 /**
  * Компонент карточки заказа Авито
@@ -52,59 +53,12 @@ export function AvitoOrderCard({
   // Обработчик клика по названию товара
   const handleProductClick = async (item, e) => {
     e.stopPropagation();
-    
-    console.log('=== AvitoOrderCard - HANDLE PRODUCT CLICK ===');
-    console.log('Full item data:', JSON.stringify(item, null, 2));
-    console.log('AvitoOrderCard - item.product_id:', item.product_id);
-    console.log('AvitoOrderCard - item.productId:', item.productId);
-    console.log('AvitoOrderCard - item.linked_product_id:', item.linked_product_id);
-    console.log('AvitoOrderCard - item.linkedProductId:', item.linkedProductId);
-    console.log('AvitoOrderCard - item.avitoItemId:', item.avitoItemId);
-    console.log('AvitoOrderCard - item.avito_id:', item.avito_id);
-    console.log('AvitoOrderCard - item.avitoUrl:', item.avitoUrl);
-    console.log('AvitoOrderCard - item.url:', item.url);
-    
-    // Если есть product_id или linked_product_id - переходим на /part/
-    if (item.product_id || item.productId || item.linked_product_id || item.linkedProductId) {
-      const productId = item.product_id || item.productId || item.linked_product_id || item.linkedProductId;
-      console.log('✅ AvitoOrderCard - Navigating to /part/', productId);
-      navigate(`/part/${productId}`);
-    } 
-    // Если есть avitoItemId (avito_id товара) - проверяем связь
-    else if (item.avitoItemId || item.avito_id) {
-      try {
-        const avitoId = item.avitoItemId || item.avito_id;
-        console.log('🔍 AvitoOrderCard - Checking Avito link for avito_id:', avitoId);
-        const linkData = await dispatch(fetchAvitoChatProductLink(avitoId)).unwrap();
-        console.log('AvitoOrderCard - Link data:', linkData);
-        if (linkData?.linked && linkData?.product_id) {
-          console.log('✅ AvitoOrderCard - Found linked product, navigating to /part/', linkData.product_id);
-          navigate(`/part/${linkData.product_id}`);
-        } else if (item.avitoUrl || item.url) {
-          console.log('❌ AvitoOrderCard - No link found, opening confirmation page');
-          // Нет связи, но есть ссылка - открываем страницу подтверждения
-          const encodedUrl = encodeURIComponent(item.avitoUrl || item.url);
-          window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
-        } else {
-          console.log('⚠️ AvitoOrderCard - No link and no URL found');
-        }
-      } catch (error) {
-        console.error('❌ AvitoOrderCard - Error checking Avito link:', error);
-        // Ошибка - если есть ссылка, открываем страницу подтверждения
-        if (item.avitoUrl || item.url) {
-          const encodedUrl = encodeURIComponent(item.avitoUrl || item.url);
-          window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
-        }
-      }
-    }
-    // Если есть просто avito_url
-    else if (item.avitoUrl || item.url) {
-      console.log('🔗 AvitoOrderCard - Opening product-not-found with avito_url');
-      const encodedUrl = encodeURIComponent(item.avitoUrl || item.url);
-      window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
-    } else {
-      console.log('⚠️ AvitoOrderCard - No product link data found in item');
-    }
+    await openAvitoProductFlow({
+      item,
+      dispatch,
+      navigate,
+      fetchLinkThunk: fetchAvitoChatProductLink,
+    });
   };
   
   return (

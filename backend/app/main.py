@@ -7,7 +7,7 @@ from app.routers import chats as chats_router
 from app.routers import websocket as websocket_router
 from app.routers import notifications as notifications_router
 from app.routers import avito_messenger_webhook as avito_messenger_webhook_router
-from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, orders, carts
+from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, carts
 from app.models import chat  # noqa: F401 — chat models в metadata
 import app.models.site_settings  # noqa: F401 — site_settings в metadata
 import app.models.organization_avito_integration  # noqa: F401 — avito integration

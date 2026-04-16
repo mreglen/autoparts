@@ -9,6 +9,7 @@ import { fetchAvitoChatProductLink } from '../redux/slices/AvitoChatSlice';
  */
 export function GarageOrderCard({ 
   order, 
+  orderType = 'used',
   isExpanded, 
   onToggle, 
   editingStatus, 
@@ -96,7 +97,9 @@ export function GarageOrderCard({
           <div className="flex items-center gap-4">
             <div>
               <div className="text-xs text-gray-500 mb-1">Номер заказа</div>
-              <div className="font-mono font-semibold text-gray-900">#{order.order_number}</div>
+              <div className="font-mono font-semibold text-gray-900">
+                {orderType === 'new' ? 'Новый' : 'Б/У'} #{order.id}
+              </div>
             </div>
             <div className="h-8 w-px bg-gray-300"></div>
             <div>
@@ -137,10 +140,10 @@ export function GarageOrderCard({
           <div>
             <div className="text-xs text-gray-500 mb-2">Клиент</div>
             <div className="font-medium text-gray-900 mb-1">
-              {order.recipient_name || 'Не указан'}
+              {order.buyer_name || order.recipient_name || 'Не указан'}
             </div>
             <div className="text-sm text-gray-600">
-              {order.recipient_phone || 'Не указан'}
+              {order.buyer_phone || order.recipient_phone || 'Не указан'}
             </div>
           </div>
 
@@ -167,9 +170,9 @@ export function GarageOrderCard({
           {/* Статус */}
           <div>
             <div className="text-xs text-gray-500 mb-2">Статус</div>
-            {editingStatus?.type === 'order' && editingStatus?.id === order.id ? (
+            {editingStatus?.type === orderType && editingStatus?.id === order.id ? (
               <select
-                value={order.status?.code || 'pending'}
+                value={order.status_code || 'pending'}
                 onChange={(e) => {
                   e.stopPropagation();
                   onUpdateStatus(order.id, e.target.value);
@@ -190,13 +193,13 @@ export function GarageOrderCard({
               </select>
             ) : (
               <div
-                className={`inline-flex items-center px-3 py-1.5 rounded cursor-pointer hover:opacity-80 ${getStatusColor(order.status?.code)}`}
+                className={`inline-flex items-center px-3 py-1.5 rounded cursor-pointer hover:opacity-80 ${getStatusColor(order.status_code)}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onEditStatus({ type: 'order', id: order.id });
+                  onEditStatus({ type: orderType, id: order.id });
                 }}
               >
-                <span className="text-sm font-medium">{getStatusName(order.status?.code)}</span>
+                <span className="text-sm font-medium">{getStatusName(order.status_code)}</span>
               </div>
             )}
           </div>

@@ -4,11 +4,9 @@ from app.db.database import get_db
 from app.core.auth import get_current_user
 from app.models.user import User
 from app.models.carts import Cart, NewPartsCart, UsedPartsCart
-from app.models.orders import Order, NewPartsOrder, OrderStatus, OrderItem, OrderItemStatus
 from app.models.client import Client as ClientModel
 from app.schemas.checkout import CheckoutFromCartRequest, OrderFromCartResponse
 from app.routers.rossko_api.rossko_api import rossko_checkout
-from app.routers.orders import generate_order_number, order_to_response, init_order_statuses, init_order_item_statuses, init_avito_order_statuses
 from app.utils.phone import normalize_to_storage_format
 
 router = APIRouter(prefix="/checkout", tags=["Checkout"])
@@ -21,6 +19,11 @@ async def checkout_from_cart(
     current_user: User = Depends(get_current_user)
 ):
     """Оформление заказа из корзины"""
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Оформление заказов отключено (ORM-модели заказов удалены)",
+    )
+    '''
     try:
         # Получить корзину пользователя
         cart = db.query(Cart).filter(Cart.user_id == current_user.id).first()
@@ -166,8 +169,83 @@ async def checkout_from_cart(
             )
             db.add(new_parts_order)
         
-        # If there are used parts items, we could create a separate UsedPartsOrder if needed
-        # For now, just ensure the product_id is properly stored in order items for used parts
+        # --- v2 orders split (used/new) ---
+        # New parts: single order for current organization
+        if new_parts_items and current_user.organization_id:
+            np_order = NewPartsOrderV2(
+                organization_id=current_user.organization_id,
+                buyer_name=checkout_data.contact.name,
+                buyer_phone=checkout_data.contact.phone,
+                buyer_email=current_user.email or "",
+                delivery_type="transport",
+                delivery_address="",
+                transport_company="",
+                total_amount=sum(float(i.price) * i.quantity for i in new_parts_items if i.price),
+                is_paid=False,
+                status_code="pending",
+                seller="Росско",
+                deliver_in_parts=checkout_data.delivery_parts,
+            )
+            db.add(np_order)
+            db.flush()
+            for i in new_parts_items:
+                name = i.name or f"{i.brand} {i.partnumber}".strip()
+                db.add(NewPartsOrderItemV2(
+                    order_id=np_order.id,
+                    name=name,
+                    brand=i.brand,
+                    partnumber=i.partnumber,
+                    quantity=i.quantity,
+                    price=float(i.price) if i.price else 0.0,
+                    status_code="pending",
+                ))
+
+        # Used parts: split by seller organization (product.organization_id)
+        if used_parts_items:
+            # Build groups seller_org -> [items]
+            groups: dict[str, list[UsedPartsCart]] = {}
+            for i in used_parts_items:
+                product_org = None
+                try:
+                    if i.product_id:
+                        from app.models.product import Product as ProductModel
+                        p = db.query(ProductModel).filter(ProductModel.id == i.product_id).first()
+                        if p:
+                            product_org = p.organization_id
+                except Exception:
+                    product_org = None
+                seller_org = product_org or current_user.organization_id
+                if not seller_org:
+                    continue
+                groups.setdefault(seller_org, []).append(i)
+
+            for seller_org, items_for_org in groups.items():
+                up_order = UsedPartsOrderV2(
+                    organization_id=seller_org,
+                    buyer_name=checkout_data.contact.name,
+                    buyer_phone=checkout_data.contact.phone,
+                    buyer_email=current_user.email or "",
+                    delivery_type="transport",
+                    delivery_address="",
+                    transport_company="",
+                    total_amount=sum(float(i.price) * i.quantity for i in items_for_org if i.price),
+                    is_paid=False,
+                    status_code="pending",
+                )
+                db.add(up_order)
+                db.flush()
+                for i in items_for_org:
+                    name = i.name or f"{i.brand} {i.partnumber}".strip()
+                    db.add(UsedPartsOrderItemV2(
+                        order_id=up_order.id,
+                        product_id=i.product_id,
+                        name=name,
+                        brand=i.brand,
+                        partnumber=i.partnumber,
+                        quantity=i.quantity,
+                        price=float(i.price) if i.price else 0.0,
+                        status_code="pending",
+                    ))
 
         # Подготовить данные для RossKo API (только для новых запчастей)
         parts = []
@@ -229,3 +307,4 @@ async def checkout_from_cart(
             status_code=500,
             detail=f"Ошибка при оформлении заказа: {str(e)}"
         )
+    '''

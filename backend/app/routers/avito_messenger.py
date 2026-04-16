@@ -107,7 +107,7 @@ async def get_avito_chat_product_link(
 ):
     """Check if Avito chat is linked to an internal product via product_avito_listing_links."""
     if not current_user.organization_id:
-        return {"linked": False, "product_id": None}
+        return {"linked": False, "product_id": None, "matched_by": None}
 
     from app.models.product_avito_listing_link import ProductAvitoListingLink
 
@@ -120,7 +120,7 @@ async def get_avito_chat_product_link(
 
     if direct_link:
         print(f"✅ Found direct link by avito_id={chat_id}: product_id={direct_link.product_id}")
-        return {"linked": True, "product_id": direct_link.product_id}
+        return {"linked": True, "product_id": direct_link.product_id, "matched_by": "avito_id"}
 
     direct_link = db.query(ProductAvitoListingLink).filter(
         ProductAvitoListingLink.organization_id == current_user.organization_id,
@@ -129,13 +129,13 @@ async def get_avito_chat_product_link(
 
     if direct_link:
         print(f"✅ Found direct link by avito_ad_id={chat_id}: product_id={direct_link.product_id}")
-        return {"linked": True, "product_id": direct_link.product_id}
+        return {"linked": True, "product_id": direct_link.product_id, "matched_by": "avito_ad_id"}
 
     # 2) Performance guard: numeric IDs are usually Avito item/ad ids, not messenger chat ids.
     # For them, skip expensive Avito chat-detail fallback (multiple API attempts across versions).
     if str(chat_id).isdigit():
         print(f"⚡ Skip chat-detail fallback for numeric id={chat_id}")
-        return {"linked": False, "product_id": None}
+        return {"linked": False, "product_id": None, "matched_by": "numeric_skip"}
 
     # 3) Fallback: treat param as real chat_id and resolve context_id via Avito API.
     try:
@@ -147,7 +147,7 @@ async def get_avito_chat_product_link(
         
         if not context_id:
             print(f"⚠️ WARNING: No context_id found for chat {chat_id}")
-            return {"linked": False, "product_id": None}
+            return {"linked": False, "product_id": None, "matched_by": "no_context_id"}
         
         # Check if this Avito ad ID is linked to any internal product
 
@@ -160,7 +160,7 @@ async def get_avito_chat_product_link(
         
         if link:
             print(f"✅ Found link by avito_id: product_id={link.product_id}")
-            return {"linked": True, "product_id": link.product_id}
+            return {"linked": True, "product_id": link.product_id, "matched_by": "context_avito_id"}
         
         # Если не нашли, пробуем по avito_ad_id (internal_code)
         link = db.query(ProductAvitoListingLink).filter(
@@ -170,22 +170,22 @@ async def get_avito_chat_product_link(
         
         if link:
             print(f"✅ Found link by avito_ad_id: product_id={link.product_id}")
-            return {"linked": True, "product_id": link.product_id}
+            return {"linked": True, "product_id": link.product_id, "matched_by": "context_avito_ad_id"}
         
         print(f"❌ No link found for context_id={context_id}")
-        return {"linked": False, "product_id": None}
+        return {"linked": False, "product_id": None, "matched_by": "not_found_by_context"}
     except HTTPException as exc:
         # Для item-id, который не является chat_id, Avito может вернуть 404.
         # Это не фатально для lookup - просто считаем, что связь не найдена.
         if exc.status_code == status.HTTP_404_NOT_FOUND:
             print(f"⚠️ Chat detail not found for id={chat_id}, returning unlinked")
-            return {"linked": False, "product_id": None}
+            return {"linked": False, "product_id": None, "matched_by": "chat_not_found"}
         # Остальные HTTP ошибки пробрасываем (403/400/502 и т.д.)
         raise
     except Exception as exc:
         print(f"❌ ERROR: {exc}")
         # Логируем ошибку, но не падаем - возвращаем пустой результат
-        return {"linked": False, "product_id": None, "error": str(exc)}
+        return {"linked": False, "product_id": None, "matched_by": "error", "error": str(exc)}
 
 
 @router.get("/chats/{chat_id}")
