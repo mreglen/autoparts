@@ -236,9 +236,10 @@ export const fetchProduct = createAsyncThunk(
     'products/fetchProduct',
     async (productId, { rejectWithValue }) => {
         try {
-            const response = await apiAxiosUnauth.get(
-                `/products/public/${productId}`,
-            );
+            const hasToken = Boolean(localStorage.getItem('token'));
+            const response = hasToken
+                ? await apiAxios.get(`/products/${productId}`)
+                : await apiAxiosUnauth.get(`/products/public/${productId}`);
             return response.data;
         } catch (error) {
             return rejectWithValue(

@@ -32,7 +32,9 @@ export default function SalesOrdersPage() {
     console.log('=== HANDLE PRODUCT CLICK ===');
     console.log('Full item data:', JSON.stringify(item, null, 2));
     console.log('item.product_id:', item.product_id);
+    console.log('item.productId:', item.productId);
     console.log('item.linked_product_id:', item.linked_product_id);
+    console.log('item.linkedProductId:', item.linkedProductId);
     console.log('item.avito_context_id:', item.avito_context_id);
     console.log('item.avito_context_url:', item.avito_context_url);
     console.log('item.avito_url:', item.avito_url);
@@ -43,8 +45,8 @@ export default function SalesOrdersPage() {
     console.log('item.url:', item.url);
     
     // Если есть product_id или linked_product_id - переходим на /part/
-    if (item.product_id || item.linked_product_id) {
-      const productId = item.product_id || item.linked_product_id;
+    if (item.product_id || item.productId || item.linked_product_id || item.linkedProductId) {
+      const productId = item.product_id || item.productId || item.linked_product_id || item.linkedProductId;
       console.log('✅ Navigating to /part/', productId);
       navigate(`/part/${productId}`);
     }

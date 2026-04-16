@@ -43,15 +43,17 @@ export function AvitoOrderCard({ order, isExpanded, onToggle, editingStatus, onE
     console.log('=== AvitoOrderCard - HANDLE PRODUCT CLICK ===');
     console.log('Full item data:', JSON.stringify(item, null, 2));
     console.log('AvitoOrderCard - item.product_id:', item.product_id);
+    console.log('AvitoOrderCard - item.productId:', item.productId);
     console.log('AvitoOrderCard - item.linked_product_id:', item.linked_product_id);
+    console.log('AvitoOrderCard - item.linkedProductId:', item.linkedProductId);
     console.log('AvitoOrderCard - item.avitoItemId:', item.avitoItemId);
     console.log('AvitoOrderCard - item.avito_id:', item.avito_id);
     console.log('AvitoOrderCard - item.avitoUrl:', item.avitoUrl);
     console.log('AvitoOrderCard - item.url:', item.url);
     
     // Если есть product_id или linked_product_id - переходим на /part/
-    if (item.product_id || item.linked_product_id) {
-      const productId = item.product_id || item.linked_product_id;
+    if (item.product_id || item.productId || item.linked_product_id || item.linkedProductId) {
+      const productId = item.product_id || item.productId || item.linked_product_id || item.linkedProductId;
       console.log('✅ AvitoOrderCard - Navigating to /part/', productId);
       navigate(`/part/${productId}`);
     } 

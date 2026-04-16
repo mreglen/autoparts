@@ -30,7 +30,9 @@ export function GarageOrderCard({
     console.log('=== GarageOrderCard - HANDLE PRODUCT CLICK ===');
     console.log('Full item data:', JSON.stringify(item, null, 2));
     console.log('GarageOrderCard - item.product_id:', item.product_id);
+    console.log('GarageOrderCard - item.productId:', item.productId);
     console.log('GarageOrderCard - item.linked_product_id:', item.linked_product_id);
+    console.log('GarageOrderCard - item.linkedProductId:', item.linkedProductId);
     console.log('GarageOrderCard - item.avito_context_id:', item.avito_context_id);
     console.log('GarageOrderCard - item.avito_context_url:', item.avito_context_url);
     console.log('GarageOrderCard - item.avito_url:', item.avito_url);
@@ -41,8 +43,8 @@ export function GarageOrderCard({
     console.log('GarageOrderCard - item.url:', item.url);
     
     // Если есть product_id или linked_product_id - переходим на /part/
-    if (item.product_id || item.linked_product_id) {
-      const productId = item.product_id || item.linked_product_id;
+    if (item.product_id || item.productId || item.linked_product_id || item.linkedProductId) {
+      const productId = item.product_id || item.productId || item.linked_product_id || item.linkedProductId;
       console.log('✅ GarageOrderCard - Navigating to /part/', productId);
       navigate(`/part/${productId}`);
     } 

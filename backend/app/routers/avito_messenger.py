@@ -108,8 +108,36 @@ async def get_avito_chat_product_link(
     """Check if Avito chat is linked to an internal product via product_avito_listing_links."""
     if not current_user.organization_id:
         return {"linked": False, "product_id": None}
-    
-    # Get chat detail to extract context_id (Avito ad ID)
+
+    from app.models.product_avito_listing_link import ProductAvitoListingLink
+
+    # 1) Fast-path: sometimes frontend passes Avito item/ad id instead of chat_id.
+    # Try direct lookup first to avoid unnecessary Avito API call and chat 404.
+    direct_link = db.query(ProductAvitoListingLink).filter(
+        ProductAvitoListingLink.organization_id == current_user.organization_id,
+        ProductAvitoListingLink.avito_id == str(chat_id)
+    ).first()
+
+    if direct_link:
+        print(f"✅ Found direct link by avito_id={chat_id}: product_id={direct_link.product_id}")
+        return {"linked": True, "product_id": direct_link.product_id}
+
+    direct_link = db.query(ProductAvitoListingLink).filter(
+        ProductAvitoListingLink.organization_id == current_user.organization_id,
+        ProductAvitoListingLink.avito_ad_id == str(chat_id)
+    ).first()
+
+    if direct_link:
+        print(f"✅ Found direct link by avito_ad_id={chat_id}: product_id={direct_link.product_id}")
+        return {"linked": True, "product_id": direct_link.product_id}
+
+    # 2) Performance guard: numeric IDs are usually Avito item/ad ids, not messenger chat ids.
+    # For them, skip expensive Avito chat-detail fallback (multiple API attempts across versions).
+    if str(chat_id).isdigit():
+        print(f"⚡ Skip chat-detail fallback for numeric id={chat_id}")
+        return {"linked": False, "product_id": None}
+
+    # 3) Fallback: treat param as real chat_id and resolve context_id via Avito API.
     try:
         token, avito_user_id = await _get_access_token_for_user(db, current_user)
         chat_detail = await get_chat_detail(token, avito_user_id, chat_id)
@@ -122,8 +150,7 @@ async def get_avito_chat_product_link(
             return {"linked": False, "product_id": None}
         
         # Check if this Avito ad ID is linked to any internal product
-        from app.models.product_avito_listing_link import ProductAvitoListingLink
-        
+
         # Сначала ищем по avito_id (real Avito item_id) - это context.value.id из API
         # Используем .first() для быстрого запроса без загрузки всех объектов
         link = db.query(ProductAvitoListingLink).filter(
@@ -147,8 +174,13 @@ async def get_avito_chat_product_link(
         
         print(f"❌ No link found for context_id={context_id}")
         return {"linked": False, "product_id": None}
-    except HTTPException:
-        # Пробрасываем HTTPException (например, 403, 400, 502)
+    except HTTPException as exc:
+        # Для item-id, который не является chat_id, Avito может вернуть 404.
+        # Это не фатально для lookup - просто считаем, что связь не найдена.
+        if exc.status_code == status.HTTP_404_NOT_FOUND:
+            print(f"⚠️ Chat detail not found for id={chat_id}, returning unlinked")
+            return {"linked": False, "product_id": None}
+        # Остальные HTTP ошибки пробрасываем (403/400/502 и т.д.)
         raise
     except Exception as exc:
         print(f"❌ ERROR: {exc}")
