@@ -6,6 +6,15 @@ import { fetchProductStorageCells } from '../../redux/slices/StorageCellsSlice';
 import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
 import { AvitoOrderCard } from '../../components/AvitoOrderCard';
 import { GarageOrderCard } from '../../components/GarageOrderCard';
+import {
+  getAvitoBuyerAndDelivery,
+  getAvitoDisplayTotal,
+  getAvitoMobileDeliveryText,
+  getAvitoOrderItems,
+  getAvitoLineItemTitle,
+  getAvitoLineItemTotal,
+  getAvitoLineItemQty,
+} from './avitoOrderDisplay';
 
 export default function SalesOrdersPage() {
   const navigate = useNavigate();
@@ -27,18 +36,24 @@ export default function SalesOrdersPage() {
     console.log('item.avito_context_id:', item.avito_context_id);
     console.log('item.avito_context_url:', item.avito_context_url);
     console.log('item.avito_url:', item.avito_url);
+    console.log('item.avitoId:', item.avitoId);
+    console.log('item.avitoItemId:', item.avitoItemId);
+    console.log('item.avito_id:', item.avito_id);
+    console.log('item.avitoUrl:', item.avitoUrl);
+    console.log('item.url:', item.url);
     
     // Если есть product_id или linked_product_id - переходим на /part/
     if (item.product_id || item.linked_product_id) {
       const productId = item.product_id || item.linked_product_id;
       console.log('✅ Navigating to /part/', productId);
       navigate(`/part/${productId}`);
-    } 
-    // Если есть avito контекст и ссылка - проверяем связь
-    else if (item.avito_context_id && item.avito_context_url) {
-      console.log('🔍 Checking Avito link for context_id:', item.avito_context_id);
+    }
+    // Если есть avito id - проверяем связь (для Авито позиций и чатов)
+    else if (item.avitoItemId || item.avitoId || item.avito_id || item.avito_context_id) {
+      const avitoId = item.avitoItemId || item.avitoId || item.avito_id || item.avito_context_id;
+      console.log('🔍 Checking Avito link for avito id:', avitoId);
       try {
-        const linkData = await dispatch(fetchAvitoChatProductLink(item.avito_context_id)).unwrap();
+        const linkData = await dispatch(fetchAvitoChatProductLink(avitoId)).unwrap();
         console.log('Avito link data:', linkData);
         if (linkData?.linked && linkData?.product_id) {
           console.log('✅ Found linked product, navigating to /part/', linkData.product_id);
@@ -46,20 +61,22 @@ export default function SalesOrdersPage() {
         } else {
           console.log('❌ No link found, opening confirmation page');
           // Нет связи - открываем страницу подтверждения
-          const encodedUrl = encodeURIComponent(item.avito_context_url);
+          const fallbackUrl = item.avitoUrl || item.url || item.avito_context_url || item.avito_url || 'https://avito.ru';
+          const encodedUrl = encodeURIComponent(fallbackUrl);
           window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
         }
       } catch (error) {
         console.error('❌ Error checking Avito link:', error);
         // Ошибка - открываем страницу подтверждения
-        const encodedUrl = encodeURIComponent(item.avito_context_url);
+        const fallbackUrl = item.avitoUrl || item.url || item.avito_context_url || item.avito_url || 'https://avito.ru';
+        const encodedUrl = encodeURIComponent(fallbackUrl);
         window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
       }
     }
     // Если есть просто avito_url
-    else if (item.avito_url) {
+    else if (item.avitoUrl || item.url || item.avito_url || item.avito_context_url) {
       console.log('🔗 Opening product-not-found with avito_url');
-      const encodedUrl = encodeURIComponent(item.avito_url);
+      const encodedUrl = encodeURIComponent(item.avitoUrl || item.url || item.avito_url || item.avito_context_url);
       window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
     } else {
       console.log('⚠️ No product link data found in item');
@@ -337,6 +354,14 @@ export default function SalesOrdersPage() {
 
 
   const getDeliveryInfo = (order) => {
+    // Для Avito заказов используем avito_data
+    if (order.source === 'avito') {
+      const avitoData = order.avito_data || {};
+      const delivery = avitoData.delivery || {};
+      return delivery.serviceName || 'Доставка Авито';
+    }
+    
+    // Для обычных заказов
     if (order.delivery_type === 'pickup') {
       return `Самовывоз: ${order.pickup_address || 'Адрес не указан'}`;
     } else if (order.delivery_type === 'transport') {
@@ -573,139 +598,50 @@ export default function SalesOrdersPage() {
             .map((order) => (
             <div key={order.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
               {/* Заголовок карточки */}
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex-1 pr-4">
-                  {activeTab === 'garage' ? (
-                    // Карточка для заказов Свой Гараж
-                    <>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-base font-semibold text-gray-900">Заказ #{order.order_number}</span>
-                        <span className="text-sm text-gray-400">•</span>
-                        <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        <span className="text-base text-gray-800">{order.recipient_name}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                        </svg>
-                        <span className="text-sm text-gray-600">{order.recipient_phone}</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-                        </svg>
-                        <span className="text-sm text-gray-600">{getDeliveryInfo(order)}</span>
-                      </div>
-                    </>
-                  ) : (
-                    // Карточка для заказов Авито
-                    <>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-mono">
-                          Авито #{order.avito_order_id}
-                        </span>
-                        <span className="text-sm text-gray-400">•</span>
-                        <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
-                      </div>
-                      <div className="text-base font-semibold text-gray-900 mb-2">
-                        {[order.avito_last_name, order.avito_first_name, order.avito_patronymic]
-                          .filter(Boolean)
-                          .join(' ')}
-                      </div>
-                      <div className="space-y-2 mb-3">
-                        <div className="flex items-start gap-2">
-                          <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                          </svg>
-                          <span className="text-sm text-gray-700">{order.recipient_phone || 'Не указан'}</span>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <span className="text-sm text-gray-700">{order.delivery_address || 'Адрес не указан'}</span>
-                        </div>
-                        {order.transport_company && (
-                          <div className="flex items-start gap-2">
-                            <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-                            </svg>
-                            <span className="text-sm text-gray-700">{order.transport_company}</span>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
+              {activeTab === 'garage' ? (
+              <div className="mb-4 space-y-3 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-base font-semibold text-gray-900">Заказ #{order.order_number}</span>
+                  <span className="text-sm text-gray-400">•</span>
+                  <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-lg font-bold text-gray-900 mb-2">
-                    {formatPrice(order.total_amount)}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full self-end ${
-                      order.is_paid
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {order.is_paid ? 'Оплачено' : 'Не оплачено'}
-                    </span>
-                    {activeTab === 'avito' ? (
-                      // Статус Авито
-                      editingStatus?.type === 'avito' && editingStatus?.id === order.id ? (
-                        <select
-                          value={order.avito_status_code}
-                          onChange={(e) => handleAvitoTransition(order.avito_order_id, e.target.value)}
-                          onBlur={() => setEditingStatus(null)}
-                          className="text-xs px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px] mt-1"
-                          autoFocus
-                        >
-                          {avitoStatuses.map(status => (
-                            <option key={status.code} value={status.code}>
-                              {status.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
+
+                <div className="flex items-start gap-2 min-w-0">
+                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span className="text-sm text-gray-800 break-words min-w-0">{order.recipient_name}</span>
+                </div>
+
+                <div className="flex items-start gap-2 min-w-0">
+                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <span className="text-sm text-gray-600 break-all min-w-0">{order.recipient_phone}</span>
+                </div>
+
+                <div className="flex items-start gap-2 min-w-0">
+                  <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                  </svg>
+                  <span className="text-sm text-gray-600 break-words min-w-0">{getDeliveryInfo(order)}</span>
+                </div>
+
+                <div className="pt-3 border-t border-gray-100 flex flex-col gap-3 min-w-0">
+                  <div className="text-lg font-bold text-gray-900">{formatPrice(order.total_amount)}</div>
+
+                  <div className="flex flex-col gap-2 w-full min-w-0">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full shrink-0 leading-tight whitespace-normal ${
+                        order.is_paid
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {order.is_paid ? 'Оплачен' : 'Не оплачено'}
+                      </span>
+                      {editingStatus?.type === 'order' && editingStatus?.id === order.id ? null : (
                         <span
-                          className={`inline-flex px-2 py-1 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 self-end mt-1 ${getAvitoStatusColor(order.avito_status_code)}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingStatus({ type: 'avito', id: order.id });
-                          }}
-                        >
-                          {getAvitoStatusName(order.avito_status_code)}
-                        </span>
-                      )
-                    ) : (
-                      // Статус Свой Гараж
-                      editingStatus?.type === 'order' && editingStatus?.id === order.id ? (
-                        <select
-                          value={order.status.code || 'pending'}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            updateOrderStatus(order.id, e.target.value);
-                          }}
-                          onBlur={() => setEditingStatus(null)}
-                          className="text-sm px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px] mt-1"
-                          autoFocus
-                        >
-                          <option value="pending">В ожидании</option>
-                          <option value="confirmed">Подтверждён</option>
-                          <option value="rejected">Не подтверждён</option>
-                          <option value="assembled">Сформирован</option>
-                          <option value="shipped">Передан в доставку</option>
-                          <option value="delivered">Получен</option>
-                          <option value="closed">Закрыт</option>
-                        </select>
-                      ) : (
-                        <span
-                          className={`inline-flex px-2 py-1 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 mt-1 ${getStatusColor(order.status.code)}`}
+                          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 max-w-full min-w-0 break-words ${getStatusColor(order.status.code)}`}
                           onClick={(e) => {
                             e.stopPropagation();
                             setEditingStatus({ type: 'order', id: order.id });
@@ -713,11 +649,108 @@ export default function SalesOrdersPage() {
                         >
                           {order.status.name}
                         </span>
-                      )
-                    )}
+                      )}
+                    </div>
+
+                    {editingStatus?.type === 'order' && editingStatus?.id === order.id ? (
+                      <select
+                        value={order.status.code || 'pending'}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          updateOrderStatus(order.id, e.target.value);
+                        }}
+                        onBlur={() => setEditingStatus(null)}
+                        className="text-xs px-2 py-1.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 w-full max-w-full min-w-0"
+                        autoFocus
+                      >
+                        <option value="pending">В ожидании</option>
+                        <option value="confirmed">Подтверждён</option>
+                        <option value="rejected">Не подтверждён</option>
+                        <option value="assembled">Сформирован</option>
+                        <option value="shipped">Передан в доставку</option>
+                        <option value="delivered">Получен</option>
+                        <option value="closed">Закрыт</option>
+                      </select>
+                    ) : null}
                   </div>
                 </div>
               </div>
+              ) : (
+              (() => {
+                const { delivery, buyerName, buyerPhone } = getAvitoBuyerAndDelivery(order);
+                const displayTotal = getAvitoDisplayTotal(order);
+                const deliveryText = getAvitoMobileDeliveryText(delivery);
+                return (
+              <div className="mb-4 space-y-3 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-mono">
+                    Авито #{order.avito_order_id}
+                  </span>
+                  <span className="text-sm text-gray-400">•</span>
+                  <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
+                </div>
+                <div className="flex items-start gap-2 min-w-0">
+                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span className="text-sm text-gray-800 break-words min-w-0">{buyerName}</span>
+                </div>
+                <div className="flex items-start gap-2 min-w-0">
+                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <span className="text-sm text-gray-600 break-all min-w-0">{buyerPhone}</span>
+                </div>
+                <div className="flex items-start gap-2 min-w-0">
+                  <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                  </svg>
+                  <span className="text-sm text-gray-600 break-words min-w-0">{deliveryText}</span>
+                </div>
+                <div className="pt-3 border-t border-gray-100 flex flex-col gap-3 min-w-0">
+                  <div className="text-lg font-bold text-gray-900">{formatPrice(displayTotal)}</div>
+                  <div className="flex flex-col gap-2 w-full min-w-0">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full shrink-0 leading-tight whitespace-normal ${
+                        order.is_paid
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {order.is_paid ? 'Оплачен' : 'Не оплачено'}
+                      </span>
+                      {editingStatus?.type === 'avito' && editingStatus?.id === order.id ? null : (
+                        <span
+                          className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 max-w-full min-w-0 break-words ${getAvitoStatusColor(order.avito_status_code)}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingStatus({ type: 'avito', id: order.id });
+                          }}
+                        >
+                          {getAvitoStatusName(order.avito_status_code)}
+                        </span>
+                      )}
+                    </div>
+                    {editingStatus?.type === 'avito' && editingStatus?.id === order.id ? (
+                      <select
+                        value={order.avito_status_code}
+                        onChange={(e) => handleAvitoTransition(order.avito_order_id, e.target.value)}
+                        onBlur={() => setEditingStatus(null)}
+                        className="text-xs px-2 py-1.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 w-full max-w-full min-w-0"
+                        autoFocus
+                      >
+                        {avitoStatuses.map(status => (
+                          <option key={status.code} value={status.code}>
+                            {status.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+                );
+              })()
+              )}
 
               {/* Кнопка показа деталей */}
               <div className="pt-3 border-t border-gray-100">
@@ -725,100 +758,143 @@ export default function SalesOrdersPage() {
                   onClick={() => toggleOrderExpansion(order.id)}
                   className="w-full text-indigo-600 text-sm font-medium hover:text-indigo-800 transition-colors py-2"
                 >
-                  {expandedOrderId === order.id ? 'Скрыть товары' : `Показать товары (${order.items?.length || 0})`}
+                  {(() => {
+                    const itemsCount = activeTab === 'avito'
+                      ? getAvitoOrderItems(order).length
+                      : (order.items?.length || 0);
+                    return expandedOrderId === order.id ? 'Скрыть товары' : `Показать товары (${itemsCount})`;
+                  })()}
                 </button>
               </div>
 
               {/* Детали заказа - мобильная версия */}
-              {expandedOrderId === order.id && order.items && order.items.length > 0 && (
+              {expandedOrderId === order.id && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <div className="space-y-3">
-                    {order.items.filter((item, index, self) =>
-                      index === self.findIndex(i => i.id === item.id)  // Remove duplicates by ID
-                    ).map((item) => (
-                      <div key={item.id} className="bg-gray-50 rounded-lg p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1 pr-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-medium text-gray-900">{item.brand}</span>
-                              <span className="text-xs text-gray-400">•</span>
-                              <span className="text-xs text-gray-500 font-mono">{item.partnumber}</span>
+                    {activeTab === 'avito' ? (
+                      (() => {
+                        const avitoItems = getAvitoOrderItems(order);
+                        return avitoItems.length > 0 ? (
+                          avitoItems.map((item, index) => (
+                          <div key={item.avitoId || item.id || index} className="bg-gray-50 rounded-lg p-3">
+                            <div className="flex justify-between items-start mb-2 gap-2 min-w-0">
+                              <div className="flex-1 pr-3 min-w-0">
+                                <button
+                                  onClick={(e) => handleProductClick(item, e)}
+                                  className="text-sm font-medium text-gray-900 leading-tight hover:text-indigo-600 transition-colors cursor-pointer text-left underline break-words"
+                                  title="Перейти к товару"
+                                >
+                                  {getAvitoLineItemTitle(item)}
+                                </button>
+                                {item.product_id && (
+                                  <div className="text-xs text-indigo-600 mt-1">ID товара: #{item.product_id}</div>
+                                )}
+                                {item.location && (
+                                  <div className="text-xs text-gray-500 mt-1">{item.location}</div>
+                                )}
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <div className="text-sm font-semibold text-gray-900 mb-1">
+                                  {formatPrice(getAvitoLineItemTotal(item))}
+                                </div>
+                                <div className="text-xs text-gray-600">{getAvitoLineItemQty(item)} шт.</div>
+                              </div>
                             </div>
-                            {/* Название товара - кликабельное */}
-                            <button
-                              onClick={(e) => handleProductClick(item, e)}
-                              className="text-sm text-gray-800 leading-tight hover:text-indigo-600 transition-colors cursor-pointer text-left underline"
-                              title="Перейти к товару"
-                            >
-                              {item.name}
-                            </button>
-                            {item.product_id && (
-                              <div className="text-xs text-gray-400 mt-1">Код товара: #{item.product_id}</div>
+                          </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-4 text-gray-500 text-sm">
+                            Товары не загружены
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      // Товары Свой Гараж из order.items
+                      order.items.filter((item, index, self) =>
+                        index === self.findIndex(i => i.id === item.id)
+                      ).map((item) => (
+                        <div key={item.id} className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex-1 pr-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium text-gray-900">{item.brand}</span>
+                                <span className="text-xs text-gray-400">•</span>
+                                <span className="text-xs text-gray-500 font-mono">{item.partnumber}</span>
+                              </div>
+                              {/* Название товара - кликабельное */}
+                              <button
+                                onClick={(e) => handleProductClick(item, e)}
+                                className="text-sm text-gray-800 leading-tight hover:text-indigo-600 transition-colors cursor-pointer text-left underline"
+                                title="Перейти к товару"
+                              >
+                                {item.name}
+                              </button>
+                              {item.product_id && (
+                                <div className="text-xs text-gray-400 mt-1">Код товара: #{item.product_id}</div>
+                              )}
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <div className="text-sm font-semibold text-gray-900 mb-1">
+                                {formatPrice(item.price * item.quantity)}
+                              </div>
+                              <div className="text-xs text-gray-600">{item.quantity} шт. × {formatPrice(item.price)}</div>
+                            </div>
+                          </div>
+                          <div className="mb-2">
+                            <div className="flex items-center gap-1 mb-1">
+                              <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                              </svg>
+                              <span className="text-xs text-gray-500">Адрес хранения</span>
+                            </div>
+                            {(() => {
+                              let storageAddress = null;
+                              if (item.product_id) {
+                                storageAddress = getProductStorageAddressFromItem(item);
+                              }
+                              if (!storageAddress && !item.product_id) {
+                                storageAddress = getProductStorageAddressByBrandPartNumber(item);
+                              }
+                              return storageAddress ? (
+                                <div className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-700 border border-gray-200">
+                                  {storageAddress}
+                                </div>
+                              ) : (
+                                <div className="text-gray-400 italic text-xs">Не указан</div>
+                              );
+                            })()}
+                          </div>
+                          <div className="flex justify-end">
+                            {editingStatus?.type === 'item' && editingStatus?.id === item.id ? (
+                              <select
+                                value={item.status.code}
+                                onChange={(e) => updateItemStatus(item.id, e.target.value)}
+                                onBlur={() => setEditingStatus(null)}
+                                className="text-sm px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
+                                autoFocus
+                              >
+                                <option value="pending">В ожидании</option>
+                                <option value="confirmed">Подтверждён</option>
+                                <option value="rejected">Не подтверждён</option>
+                                <option value="assembled">Сформирован</option>
+                                <option value="shipped">Передан в доставку</option>
+                                <option value="delivered">Получен</option>
+                                <option value="closed">Закрыт</option>
+                              </select>
+                            ) : (
+                              <span
+                                className={`inline-flex px-2 py-1 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 ${getStatusColor(item.status.code)}`}
+                                onClick={() => {
+                                  setEditingStatus({ type: 'item', id: item.id });
+                                }}
+                              >
+                                {item.status.name}
+                              </span>
                             )}
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="text-sm font-semibold text-gray-900 mb-1">
-                              {formatPrice(item.price * item.quantity)}
-                            </div>
-                            <div className="text-xs text-gray-600">{item.quantity} шт. × {formatPrice(item.price)}</div>
-                          </div>
                         </div>
-                        <div className="mb-2">
-                          <div className="flex items-center gap-1 mb-1">
-                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                            </svg>
-                            <span className="text-xs text-gray-500">Адрес хранения</span>
-                          </div>
-                          {(() => {
-                            let storageAddress = null;
-                            // First, try to get storage address by product_id
-                            if (item.product_id) {
-                              storageAddress = getProductStorageAddressFromItem(item);
-                            }
-                            // If no storage address found and no product_id, try to get by brand/partnumber
-                            if (!storageAddress && !item.product_id) {
-                              storageAddress = getProductStorageAddressByBrandPartNumber(item);
-                            }
-                            return storageAddress ? (
-                              <div className="px-2 py-1 bg-gray-100 rounded text-xs text-gray-700 border border-gray-200">
-                                {storageAddress}
-                              </div>
-                            ) : (
-                              <div className="text-gray-400 italic text-xs">Не указан</div>
-                            );
-                          })()}
-                        </div>
-                        <div className="flex justify-end">
-                          {editingStatus?.type === 'item' && editingStatus?.id === item.id ? (
-                            <select
-                              value={item.status.code}
-                              onChange={(e) => updateItemStatus(item.id, e.target.value)}
-                              onBlur={() => setEditingStatus(null)}
-                              className="text-sm px-2 py-1 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
-                              autoFocus
-                            >
-                              <option value="pending">В ожидании</option>
-                              <option value="confirmed">Подтверждён</option>
-                              <option value="rejected">Не подтверждён</option>
-                              <option value="assembled">Сформирован</option>
-                              <option value="shipped">Передан в доставку</option>
-                              <option value="delivered">Получен</option>
-                              <option value="closed">Закрыт</option>
-                            </select>
-                          ) : (
-                            <span
-                              className={`inline-flex px-2 py-1 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 ${getStatusColor(item.status.code)}`}
-                              onClick={() => {
-                                setEditingStatus({ type: 'item', id: item.id });
-                              }}
-                            >
-                              {item.status.name}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
               )}
