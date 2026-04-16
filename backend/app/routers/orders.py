@@ -50,6 +50,8 @@ def order_to_response(order: Order, db_session=None, filter_organization_id=None
                 continue  # Skip used parts from other organizations
         # Find product by brand and partnumber since there's no direct relationship in the model
         storage_location = None
+        found_product_id = item.product_id  # Start with existing product_id
+        
         if db_session:
             # Query product by brand and partnumber (article in Product model)
             from sqlalchemy import and_
@@ -60,14 +62,19 @@ def order_to_response(order: Order, db_session=None, filter_organization_id=None
                 )
             ).first()
             
-            if product and product.storage_location:
-                storage_location = StorageLocation.from_orm(product.storage_location)
+            if product:
+                # Если product_id не установлен, но нашли товар по brand+partnumber
+                if not found_product_id:
+                    found_product_id = product.id
+                
+                if product.storage_location:
+                    storage_location = StorageLocation.from_orm(product.storage_location)
         
         # Fetch product storage cells if product_id exists
         product_storage_cells = []
-        if item.product_id:
+        if found_product_id:
             storage_cells = db_session.query(ProductStorageCellModel).filter(
-                ProductStorageCellModel.product_id == item.product_id
+                ProductStorageCellModel.product_id == found_product_id
             ).all()
             
             # Convert to response format
@@ -98,7 +105,7 @@ def order_to_response(order: Order, db_session=None, filter_organization_id=None
             price=item.price,
             status=item.status,
             storage_location=storage_location,
-            product_id=item.product_id,
+            product_id=found_product_id,  # Используем найденный product_id
             product_storage_cells=product_storage_cells,
             seller_organization_id=item.seller_organization_id,
             seller_organization=seller_organization

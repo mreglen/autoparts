@@ -57,9 +57,17 @@ async def _get_access_token_for_user(db: Session, current_user: User) -> tuple[s
     row = _get_org_integration_or_raise(db, current_user)
     try:
         secret = decrypt_secret(row.client_secret_encrypted)
-        token = await fetch_access_token(row.client_id, secret)
+        # Кэш включён по умолчанию для снижения нагрузки на Avito API
+        token = await fetch_access_token(row.client_id, secret, use_cache=True)
         return token, int(row.avito_user_id)
+    except HTTPException:
+        # Пробрасываем HTTPException
+        raise
     except Exception as exc:
+        # При ошибке инвалидируем кэш для этого client_id
+        from app.services.avito_token_cache import token_cache
+        cache_key = f"{row.client_id}:{row.client_secret_encrypted[:8]}"
+        token_cache.invalidate(cache_key)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Ошибка авторизации Avito: {exc}")
 
 
@@ -117,6 +125,7 @@ async def get_avito_chat_product_link(
         from app.models.product_avito_listing_link import ProductAvitoListingLink
         
         # Сначала ищем по avito_id (real Avito item_id) - это context.value.id из API
+        # Используем .first() для быстрого запроса без загрузки всех объектов
         link = db.query(ProductAvitoListingLink).filter(
             ProductAvitoListingLink.organization_id == current_user.organization_id,
             ProductAvitoListingLink.avito_id == str(context_id)
@@ -138,8 +147,12 @@ async def get_avito_chat_product_link(
         
         print(f"❌ No link found for context_id={context_id}")
         return {"linked": False, "product_id": None}
+    except HTTPException:
+        # Пробрасываем HTTPException (например, 403, 400, 502)
+        raise
     except Exception as exc:
         print(f"❌ ERROR: {exc}")
+        # Логируем ошибку, но не падаем - возвращаем пустой результат
         return {"linked": False, "product_id": None, "error": str(exc)}
 
 

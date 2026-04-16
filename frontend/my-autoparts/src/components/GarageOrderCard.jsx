@@ -27,31 +27,37 @@ export function GarageOrderCard({
   const handleProductClick = async (item, e) => {
     e.stopPropagation();
     
-    console.log('GarageOrderCard - handleProductClick:', item);
+    console.log('=== GarageOrderCard - HANDLE PRODUCT CLICK ===');
+    console.log('Full item data:', JSON.stringify(item, null, 2));
     console.log('GarageOrderCard - item.product_id:', item.product_id);
     console.log('GarageOrderCard - item.linked_product_id:', item.linked_product_id);
+    console.log('GarageOrderCard - item.avito_context_id:', item.avito_context_id);
+    console.log('GarageOrderCard - item.avito_context_url:', item.avito_context_url);
+    console.log('GarageOrderCard - item.avito_url:', item.avito_url);
     
     // Если есть product_id или linked_product_id - переходим на /part/
     if (item.product_id || item.linked_product_id) {
       const productId = item.product_id || item.linked_product_id;
-      console.log('GarageOrderCard - Navigating to /part/', productId);
+      console.log('✅ GarageOrderCard - Navigating to /part/', productId);
       navigate(`/part/${productId}`);
     } 
     // Если есть avito контекст и ссылка - проверяем связь
     else if (item.avito_context_id && item.avito_context_url) {
+      console.log('🔍 GarageOrderCard - Checking Avito link for context_id:', item.avito_context_id);
       try {
-        console.log('GarageOrderCard - Checking Avito link for context_id:', item.avito_context_id);
         const linkData = await dispatch(fetchAvitoChatProductLink(item.avito_context_id)).unwrap();
         console.log('GarageOrderCard - Link data:', linkData);
         if (linkData?.linked && linkData?.product_id) {
+          console.log('✅ GarageOrderCard - Found linked product, navigating to /part/', linkData.product_id);
           navigate(`/part/${linkData.product_id}`);
         } else {
+          console.log('❌ GarageOrderCard - No link found, opening confirmation page');
           // Нет связи - открываем страницу подтверждения
           const encodedUrl = encodeURIComponent(item.avito_context_url);
           window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
         }
       } catch (error) {
-        console.error('GarageOrderCard - Error checking Avito link:', error);
+        console.error('❌ GarageOrderCard - Error checking Avito link:', error);
         // Ошибка - открываем страницу подтверждения
         const encodedUrl = encodeURIComponent(item.avito_context_url);
         window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
@@ -59,11 +65,11 @@ export function GarageOrderCard({
     }
     // Если есть просто avito_url
     else if (item.avito_url) {
-      console.log('GarageOrderCard - Opening product-not-found with avito_url');
+      console.log('🔗 GarageOrderCard - Opening product-not-found with avito_url');
       const encodedUrl = encodeURIComponent(item.avito_url);
       window.open(`/product-not-found?avitoUrl=${encodedUrl}`, '_blank');
     } else {
-      console.log('GarageOrderCard - No product link found');
+      console.log('⚠️ GarageOrderCard - No product link data found in item');
     }
   };
   
@@ -227,6 +233,14 @@ export function GarageOrderCard({
                         <span className="text-gray-500">Внутр. код: </span>
                         <span className="text-gray-900 font-medium">{item.internal_code || item.product?.internal_code || '-'}</span>
                       </div>
+                      
+                      {/* Product ID */}
+                      {item.product_id && (
+                        <div>
+                          <span className="text-gray-500">ID товара: </span>
+                          <span className="text-indigo-600 font-medium">#{item.product_id}</span>
+                        </div>
+                      )}
                       
                       {/* Количество и цена */}
                       <div>

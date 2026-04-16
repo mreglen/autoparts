@@ -1,53 +1,102 @@
 import logging
+import asyncio
 from typing import Any, Optional
 
 import httpx
+
+from app.services.avito_token_cache import token_cache
 
 logger = logging.getLogger(__name__)
 
 AVITO_BASE = "https://api.avito.ru"
 
 
-async def fetch_access_token(client_id: str, client_secret: str) -> str:
-    """OAuth2 client_credentials. Сначала POST form, затем GET /token/ как в публичном Swagger Авито."""
-    last: Optional[httpx.Response] = None
-    async with httpx.AsyncClient(timeout=45.0) as client:
-        r_post = await client.post(
-            f"{AVITO_BASE}/token",
-            data={
-                "grant_type": "client_credentials",
-                "client_id": client_id,
-                "client_secret": client_secret,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        last = r_post
-        if r_post.status_code == 200:
-            data = r_post.json()
-            token = data.get("access_token")
-            if token:
-                return token
-            raise RuntimeError(f"Ответ /token без access_token: {data}")
-
-        r_get = await client.get(
-            f"{AVITO_BASE}/token/",
-            params={
-                "grant_type": "client_credentials",
-                "client_id": client_id,
-                "client_secret": client_secret,
-            },
-        )
-        last = r_get
-        if r_get.status_code == 200:
-            data = r_get.json()
-            token = data.get("access_token")
-            if token:
-                return token
-            raise RuntimeError(f"Ответ /token/ без access_token: {data}")
-
-    body = (last.text[:800] if last else "") or ""
-    logger.warning("Avito OAuth не удался: %s %s", last.status_code if last else "?", body)
-    raise RuntimeError(f"Не удалось получить токен Авито (HTTP {last.status_code if last else '?'}): {body}")
+async def fetch_access_token(client_id: str, client_secret: str, use_cache: bool = True) -> str:
+    """
+    OAuth2 client_credentials. Сначала проверяем кэш, затем запрашиваем новый токен.
+    Добавлена retry логика для обработки временных сбоев сети.
+    """
+    # Проверяем кэш
+    if use_cache:
+        cache_key = f"{client_id}:{client_secret[:8]}"  # Используем часть secret для ключа
+        cached_token = token_cache.get_token(cache_key)
+        if cached_token:
+            logger.info(f"Using cached Avito token for client {client_id}")
+            return cached_token
+    
+    # Retry логика: 3 попытки с экспоненциальной задержкой
+    max_retries = 3
+    last_exception = None
+    
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                # Пробуем POST
+                r_post = await client.post(
+                    f"{AVITO_BASE}/token",
+                    data={
+                        "grant_type": "client_credentials",
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                    },
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+                
+                if r_post.status_code == 200:
+                    data = r_post.json()
+                    token = data.get("access_token")
+                    if token:
+                        expires_in = data.get("expires_in", 1800)
+                        # Сохраняем в кэш
+                        if use_cache:
+                            cache_key = f"{client_id}:{client_secret[:8]}"
+                            token_cache.set_token(cache_key, token, expires_in)
+                            logger.info(f"Cached new Avito token for client {client_id}, expires in {expires_in}s")
+                        return token
+                    raise RuntimeError(f"Ответ /token без access_token: {data}")
+                
+                # Если POST не удался, пробуем GET
+                r_get = await client.get(
+                    f"{AVITO_BASE}/token/",
+                    params={
+                        "grant_type": "client_credentials",
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                    },
+                )
+                
+                if r_get.status_code == 200:
+                    data = r_get.json()
+                    token = data.get("access_token")
+                    if token:
+                        expires_in = data.get("expires_in", 1800)
+                        if use_cache:
+                            cache_key = f"{client_id}:{client_secret[:8]}"
+                            token_cache.set_token(cache_key, token, expires_in)
+                            logger.info(f"Cached new Avito token for client {client_id}, expires in {expires_in}s")
+                        return token
+                    raise RuntimeError(f"Ответ /token/ без access_token: {data}")
+                
+                # Если обе попытки не удались
+                last_exception = RuntimeError(
+                    f"Не удалось получить токен Авито (HTTP POST {r_post.status_code}, GET {r_get.status_code}): "
+                    f"POST: {r_post.text[:200]}, GET: {r_get.text[:200]}"
+                )
+                
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError) as e:
+            # Сетевые ошибки - retry
+            last_exception = e
+            logger.warning(f"Avito OAuth attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # 1s, 2s, 4s
+                await asyncio.sleep(wait_time)
+        except Exception as e:
+            # Другие ошибки - сразу пробрасываем
+            raise RuntimeError(f"Avito OAuth error: {e}")
+    
+    # Все попытки исчерпаны
+    logger.error(f"All {max_retries} Avito OAuth attempts failed")
+    raise last_exception or RuntimeError("Не удалось получить токен Авито")
 
 
 async def get_autoload_user_docs_tree(access_token: str) -> dict[str, Any]:
