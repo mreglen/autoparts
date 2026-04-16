@@ -145,7 +145,8 @@ async def get_avito_order(
 async def apply_order_transition(
     access_token: str,
     order_id: int,
-    transition: str
+    transition: str,
+    params: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     """
     Изменение статуса заказа
@@ -153,17 +154,16 @@ async def apply_order_transition(
     POST https://api.avito.ru/order-management/1/order/applyTransition
     
     Доступные переходы (transitions):
-    - confirm: on_confirmation → ready_to_ship
-    - ship: ready_to_ship → in_transit
-    - deliver: in_transit → delivered
-    - cancel: любой → canceled
-    - return: delivered → on_return
-    - close: on_return → closed
+    - confirm: подтверждение заказа
+    - reject: отмена заказа
+    - perform: подтверждение отправки заказа (RDBS)
+    - receive: подтверждение доставки заказа (RDBS, CNC)
     
     Args:
         access_token: Токен доступа Авито
         order_id: ID заказа в Авито
-        transition: Тип перехода (confirm, ship, deliver, cancel, return, close)
+        transition: Тип перехода (confirm, reject, perform, receive)
+        params: Дополнительные параметры для перехода (например params.cnc.*)
         
     Returns:
         Dict с результатом операции
@@ -175,10 +175,12 @@ async def apply_order_transition(
         "Content-Type": "application/json"
     }
     
-    body = {
-        "order_id": order_id,
-        "transition": transition
+    body: dict[str, Any] = {
+        "orderId": str(order_id),
+        "transition": transition,
     }
+    if params:
+        body["params"] = params
     
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:

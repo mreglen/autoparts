@@ -148,7 +148,7 @@ def order_to_response(order: Order, db_session=None, filter_organization_id=None
         items=items_response,
         new_parts_order=new_parts_order_response,
         source=order.source,
-        avito_order_id=order.avito_order_id,
+        avito_order_id=str(order.avito_order_id) if order.avito_order_id is not None else None,
         avito_status_code=order.avito_status_code,
         avito_data=order.avito_data,
         avito_last_name=order.avito_last_name,
@@ -655,10 +655,47 @@ async def update_order_status(
         if not order:
             raise HTTPException(status_code=404, detail="Заказ не найден")
 
-        # Находим новый статус
-        new_status = db.query(OrderStatus).filter(OrderStatus.code == status_data.get("status_code")).first()
+        requested_raw = status_data.get("status_code")
+        requested_status_code = str(requested_raw).strip() if requested_raw is not None else ""
+
+        if not requested_status_code:
+            raise HTTPException(status_code=400, detail="Неверный код статуса: пустое значение")
+
+        # Находим новый статус по внутреннему коду
+        new_status = db.query(OrderStatus).filter(OrderStatus.code == requested_status_code).first()
+
+        # Если пришло имя статуса вместо кода — поддерживаем и этот вариант
         if not new_status:
-            raise HTTPException(status_code=400, detail="Неверный код статуса")
+            new_status = db.query(OrderStatus).filter(OrderStatus.name == requested_status_code).first()
+
+        # Совместимость: если фронт передал статус из avito_order_statuses,
+        # маппим его во внутренний status.code для orders.
+        if not new_status and requested_status_code:
+            avito_to_internal = {
+                "on_confirmation": "pending",
+                "ready_to_ship": "confirmed",
+                "in_transit": "shipped",
+                "delivered": "delivered",
+                "canceled": "rejected",
+                "closed": "closed",
+                "on_return": "rejected",
+                "in_dispute": "pending",
+            }
+            # Поддерживаем и code, и name из avito_order_statuses
+            avito_status = db.query(AvitoOrderStatus).filter(
+                (AvitoOrderStatus.code == requested_status_code) |
+                (AvitoOrderStatus.name == requested_status_code)
+            ).first()
+            avito_code = avito_status.code if avito_status else requested_status_code
+            mapped_code = avito_to_internal.get(avito_code)
+            if mapped_code:
+                new_status = db.query(OrderStatus).filter(OrderStatus.code == mapped_code).first()
+
+        if not new_status:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Неверный код статуса: '{requested_status_code}'"
+            )
 
         # Обновляем статус
         order.status_id = new_status.id

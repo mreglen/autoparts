@@ -280,7 +280,8 @@ async def sync_avito_orders(
         # Синхронизируем каждый заказ
         for avito_order in orders_data:
             try:
-                avito_order_id = avito_order.get('id')
+                avito_order_id_raw = avito_order.get('id')
+                avito_order_id = int(avito_order_id_raw) if avito_order_id_raw is not None else None
                 if not avito_order_id:
                     errors.append(f"Order missing ID: {avito_order}")
                     continue
@@ -506,7 +507,7 @@ async def get_raw_avito_orders(
 @router.post("/{org_id}/avito/orders/{avito_order_id}/transition")
 async def apply_avito_order_transition(
     org_id: str,
-    avito_order_id: int,
+    avito_order_id: str,
     body: AvitoOrderTransitionRequest,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
@@ -519,8 +520,16 @@ async def apply_avito_order_transition(
     _ensure_org_access(current_user, org_id)
     
     # Получаем заказ из БД
+    try:
+        avito_order_id_int = int(avito_order_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Некорректный avito_order_id"
+        )
+
     order = db.query(Order).filter(
-        Order.avito_order_id == avito_order_id,
+        Order.avito_order_id == avito_order_id_int,
         Order.source == 'avito'
     ).first()
     
@@ -547,7 +556,12 @@ async def apply_avito_order_transition(
         token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
         
         # Применяем переход в Авито
-        result = await apply_order_transition(token, avito_order_id, body.transition)
+        result = await apply_order_transition(
+            token,
+            avito_order_id_int,
+            body.transition,
+            body.params
+        )
         
         # Обновляем статус в БД
         # Получаем новый статус из результата
@@ -568,7 +582,7 @@ async def apply_avito_order_transition(
             "ok": True,
             "result": result,
             "order_id": order.id,
-            "avito_order_id": avito_order_id,
+            "avito_order_id": avito_order_id_int,
             "new_status": new_avito_status
         }
         
@@ -588,7 +602,7 @@ async def apply_avito_order_transition(
 @router.get("/{org_id}/avito/orders/{avito_order_id}/transitions")
 async def get_order_transitions(
     org_id: str,
-    avito_order_id: int,
+    avito_order_id: str,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
@@ -596,8 +610,16 @@ async def get_order_transitions(
     _ensure_org_access(current_user, org_id)
     
     # Получаем заказ
+    try:
+        avito_order_id_int = int(avito_order_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Некорректный avito_order_id"
+        )
+
     order = db.query(Order).filter(
-        Order.avito_order_id == avito_order_id,
+        Order.avito_order_id == avito_order_id_int,
         Order.source == 'avito'
     ).first()
     
@@ -623,7 +645,7 @@ async def get_order_transitions(
         token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
         avito_user_id = int(integration.avito_user_id)
         
-        transitions = await get_available_transitions(token, avito_user_id, avito_order_id)
+        transitions = await get_available_transitions(token, avito_user_id, avito_order_id_int)
         
         return {"transitions": transitions}
     except Exception as e:

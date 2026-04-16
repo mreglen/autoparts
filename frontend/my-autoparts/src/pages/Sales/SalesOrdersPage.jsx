@@ -151,6 +151,21 @@ export default function SalesOrdersPage() {
     }
   }, [hasPermission]);
 
+  useEffect(() => {
+    const fetchOrderStatuses = async () => {
+      try {
+        const response = await apiAxios.get('/orders/statuses/');
+        setAvailableStatuses(Array.isArray(response.data) ? response.data : []);
+      } catch (error) {
+        console.error('Ошибка загрузки статусов заказов:', error);
+      }
+    };
+
+    if (hasPermission) {
+      fetchOrderStatuses();
+    }
+  }, [hasPermission]);
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -216,6 +231,12 @@ export default function SalesOrdersPage() {
 
 
   const updateOrderStatus = async (orderId, statusCode) => {
+    const allowedCodes = new Set(getOrderStatusOptions().map((status) => status.code));
+    if (!allowedCodes.has(statusCode)) {
+      alert(`Недопустимый статус для заказа "Свой гараж": ${statusCode}`);
+      return;
+    }
+
     try {
       console.log('Updating order status:', { orderId, statusCode });
       const token = localStorage.getItem('token');
@@ -270,6 +291,10 @@ export default function SalesOrdersPage() {
   };
 
   const getStatusName = (statusCode) => {
+    const dynamicStatus = availableStatuses.find((status) => status.code === statusCode);
+    if (dynamicStatus?.name) {
+      return dynamicStatus.name;
+    }
     const statusMap = {
       'pending': 'В ожидании',
       'confirmed': 'Подтверждён',
@@ -293,6 +318,24 @@ export default function SalesOrdersPage() {
       'closed': 'bg-gray-100 text-gray-800'
     };
     return colorMap[statusCode] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getOrderStatusOptions = () => {
+    if (availableStatuses.length > 0) {
+      return availableStatuses.map((status) => ({
+        code: status.code,
+        name: status.name,
+      }));
+    }
+    return [
+      { code: 'pending', name: 'В ожидании' },
+      { code: 'confirmed', name: 'Подтверждён' },
+      { code: 'rejected', name: 'Не подтверждён' },
+      { code: 'assembled', name: 'Сформирован' },
+      { code: 'shipped', name: 'Передан в доставку' },
+      { code: 'delivered', name: 'Получен' },
+      { code: 'closed', name: 'Закрыт' },
+    ];
   };
 
   const formatDate = (dateString) => {
@@ -327,13 +370,50 @@ export default function SalesOrdersPage() {
     return statusMap[statusCode] || statusCode;
   };
 
+  const getAvitoTransitionLabel = (transition) => {
+    const labels = {
+      confirm: 'confirm (подтвердить)',
+      reject: 'reject (отклонить)',
+      perform: 'perform (подтвердить отправку)',
+      receive: 'receive (подтвердить доставку)',
+    };
+    return labels[transition] || transition;
+  };
+
+  const getAvitoTransitionOptions = (order) => {
+    const fallback = ['confirm', 'reject', 'perform', 'receive'];
+    const fromApi = avitoTransitions[order.avito_order_id];
+    const options = Array.isArray(fromApi) && fromApi.length > 0 ? fromApi : fallback;
+    return options.filter(Boolean);
+  };
+
   const handleAvitoTransition = async (avitoOrderId, transition) => {
     if (!userOrgId) return;
-    
+
+    let params;
+    if (transition === 'perform' || transition === 'receive') {
+      const confirmCode = window.prompt('Введите confirmCode (код подтверждения покупателя):', '');
+      if (!confirmCode) {
+        alert('Переход отменён: confirmCode обязателен');
+        return;
+      }
+      const marketplaceId = window.prompt('Введите marketplaceId (номер заказа в новой системе):', '');
+      if (!marketplaceId) {
+        alert('Переход отменён: marketplaceId обязателен');
+        return;
+      }
+      params = {
+        cnc: {
+          confirmCode: String(confirmCode).trim(),
+          marketplaceId: String(marketplaceId).trim(),
+        },
+      };
+    }
+
     try {
       await apiAxios.post(
         `/organizations/${userOrgId}/avito/orders/${avitoOrderId}/transition`,
-        { transition }
+        params ? { transition, params } : { transition }
       );
       
       // Перезагружаем заказы
@@ -532,6 +612,7 @@ export default function SalesOrdersPage() {
                   onUpdateStatus={updateOrderStatus}
                   getStatusColor={getStatusColor}
                   getStatusName={getStatusName}
+                  orderStatusOptions={getOrderStatusOptions()}
                   formatDate={formatDate}
                   formatPrice={formatPrice}
                 />
@@ -565,7 +646,8 @@ export default function SalesOrdersPage() {
                   editingStatus={editingStatus}
                   onEditStatus={setEditingStatus}
                   onAvitoTransition={handleAvitoTransition}
-                  avitoStatuses={avitoStatuses}
+                  getAvitoTransitionOptions={getAvitoTransitionOptions}
+                  getAvitoTransitionLabel={getAvitoTransitionLabel}
                   getAvitoStatusColor={getAvitoStatusColor}
                   getAvitoStatusName={getAvitoStatusName}
                   formatDate={formatDate}
@@ -665,13 +747,11 @@ export default function SalesOrdersPage() {
                         className="text-xs px-2 py-1.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 w-full max-w-full min-w-0"
                         autoFocus
                       >
-                        <option value="pending">В ожидании</option>
-                        <option value="confirmed">Подтверждён</option>
-                        <option value="rejected">Не подтверждён</option>
-                        <option value="assembled">Сформирован</option>
-                        <option value="shipped">Передан в доставку</option>
-                        <option value="delivered">Получен</option>
-                        <option value="closed">Закрыт</option>
+                        {getOrderStatusOptions().map((status) => (
+                          <option key={status.code} value={status.code}>
+                            {status.name}
+                          </option>
+                        ))}
                       </select>
                     ) : null}
                   </div>
@@ -734,15 +814,16 @@ export default function SalesOrdersPage() {
                     </div>
                     {editingStatus?.type === 'avito' && editingStatus?.id === order.id ? (
                       <select
-                        value={order.avito_status_code}
+                        value=""
                         onChange={(e) => handleAvitoTransition(order.avito_order_id, e.target.value)}
                         onBlur={() => setEditingStatus(null)}
                         className="text-xs px-2 py-1.5 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 w-full max-w-full min-w-0"
                         autoFocus
                       >
-                        {avitoStatuses.map(status => (
-                          <option key={status.code} value={status.code}>
-                            {status.name}
+                        <option value="" disabled>Выберите действие</option>
+                        {getAvitoTransitionOptions(order).map((transition) => (
+                          <option key={transition} value={transition}>
+                            {getAvitoTransitionLabel(transition)}
                           </option>
                         ))}
                       </select>

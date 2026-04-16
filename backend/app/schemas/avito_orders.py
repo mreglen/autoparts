@@ -31,7 +31,11 @@ class AvitoOrdersListResponse(BaseModel):
 
 class AvitoOrderTransitionRequest(BaseModel):
     """Запрос на изменение статуса заказа Авито"""
-    transition: str = Field(..., description="Тип перехода: confirm, ship, deliver, cancel, return, close")
+    transition: str = Field(..., description="Тип перехода: confirm, reject, perform, receive")
+    params: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Дополнительные параметры перехода (например params.cnc.confirmCode/marketplaceId)"
+    )
 
 
 class AvitoOrderSyncResponse(BaseModel):

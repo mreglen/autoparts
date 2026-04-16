@@ -16,6 +16,7 @@ export function GarageOrderCard({
   onUpdateStatus,
   getStatusColor,
   getStatusName,
+  orderStatusOptions = [],
   formatDate, 
   formatPrice 
 }) {
@@ -181,13 +182,11 @@ export function GarageOrderCard({
                 className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 autoFocus
               >
-                <option value="pending">В ожидании</option>
-                <option value="confirmed">Подтверждён</option>
-                <option value="rejected">Не подтверждён</option>
-                <option value="assembled">Сформирован</option>
-                <option value="shipped">Передан в доставку</option>
-                <option value="delivered">Получен</option>
-                <option value="closed">Закрыт</option>
+                {orderStatusOptions.map((status) => (
+                  <option key={status.code} value={status.code}>
+                    {status.name}
+                  </option>
+                ))}
               </select>
             ) : (
               <div

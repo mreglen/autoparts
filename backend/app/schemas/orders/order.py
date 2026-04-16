@@ -99,7 +99,8 @@ class OrderResponse(BaseModel):
     items: List[OrderItemResponse]
     new_parts_order: Optional[NewPartsOrderResponse]
     source: Optional[str] = 'garage'
-    avito_order_id: Optional[int] = None
+    # Avito order ids can exceed JS safe integer range, send as string.
+    avito_order_id: Optional[str] = None
     avito_status_code: Optional[str] = None
     avito_data: Optional[dict] = None
     avito_last_name: Optional[str] = None

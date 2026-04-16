@@ -7,7 +7,20 @@ import { fetchAvitoChatProductLink } from '../redux/slices/AvitoChatSlice';
  * Компонент карточки заказа Авито
  * Отображает информацию из avito_data (JSON ответа API Авито)
  */
-export function AvitoOrderCard({ order, isExpanded, onToggle, editingStatus, onEditStatus, onAvitoTransition, avitoStatuses, getAvitoStatusColor, getAvitoStatusName, formatDate, formatPrice }) {
+export function AvitoOrderCard({
+  order,
+  isExpanded,
+  onToggle,
+  editingStatus,
+  onEditStatus,
+  onAvitoTransition,
+  getAvitoTransitionOptions,
+  getAvitoTransitionLabel,
+  getAvitoStatusColor,
+  getAvitoStatusName,
+  formatDate,
+  formatPrice
+}) {
   // Извлекаем данные из avito_data
   const avitoData = order.avito_data || {};
   const delivery = avitoData.delivery || {};
@@ -181,16 +194,17 @@ export function AvitoOrderCard({ order, isExpanded, onToggle, editingStatus, onE
             <div className="text-xs text-gray-500 mb-2">Статус</div>
             {editingStatus?.type === 'avito' && editingStatus?.id === order.id ? (
               <select
-                value={order.avito_status_code}
+                value=""
                 onChange={(e) => onAvitoTransition(order.avito_order_id, e.target.value)}
                 onBlur={() => onEditStatus(null)}
                 onClick={(e) => e.stopPropagation()}
                 className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-gray-400 focus:border-gray-400"
                 autoFocus
               >
-                {avitoStatuses.map(status => (
-                  <option key={status.code} value={status.code}>
-                    {status.name}
+                <option value="" disabled>Выберите действие</option>
+                {getAvitoTransitionOptions(order).map((transition) => (
+                  <option key={transition} value={transition}>
+                    {getAvitoTransitionLabel(transition)}
                   </option>
                 ))}
               </select>
