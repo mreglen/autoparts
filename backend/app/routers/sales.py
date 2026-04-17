@@ -13,6 +13,7 @@ from app.models.garage_new_orders import GarageNewOrder
 from app.models.garage_used_orders import GarageUsedOrder
 from app.models.avito_orders_cache import AvitoOrderCache
 from app.models.organization import Organization
+from app.models.organization_avito_integration import OrganizationAvitoIntegration
 from app.models.permission import Permission
 from app.models.user import User as UserModel
 from app.models.user_permission import UserPermission
@@ -24,6 +25,7 @@ from app.schemas.sales_orders import (
     PurchasedUsedOrderResponse,
     PurchasedNewOrderResponse,
 )
+from app.schemas.avito_orders import AvitoOrderTransitionRequest
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +169,135 @@ async def sync_avito_orders(
 
     result = await sync_avito_orders_for_org(db, organization_id=current_user.organization_id)
     return result
+
+
+@router.post("/avito-orders/{order_id}/transition")
+async def apply_avito_order_transition(
+    order_id: int,
+    payload: AvitoOrderTransitionRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Apply status transition to Avito order via Avito API"""
+    _require_sales_orders_access(db, current_user)
+    
+    order = db.query(AvitoOrderCache).filter(AvitoOrderCache.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ Авито не найден")
+    if not current_user.is_admin and order.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к заказу")
+    
+    # Get Avito integration for the organization
+    integration = db.query(OrganizationAvitoIntegration).filter(
+        OrganizationAvitoIntegration.organization_id == order.organization_id
+    ).first()
+    if not integration or not integration.client_secret_encrypted:
+        raise HTTPException(status_code=400, detail="Интеграция с Авито не настроена")
+    
+    # Get access token and apply transition
+    from app.services import avito_api as avito_api_svc
+    from app.utils.avito_crypto import decrypt_secret
+    from app.services.avito_orders_api import apply_order_transition
+    
+    try:
+        secret = decrypt_secret(integration.client_secret_encrypted)
+        token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
+        
+        # Build params based on order type and transition
+        # For CNC orders, we may need confirmCode and marketplaceId
+        transition_params = payload.params or {}
+        
+        # Extract avito_data to check delivery type
+        avito_data = order.avito_data or {}
+        delivery_info = avito_data.get('delivery', {})
+        delivery_type = delivery_info.get('type', '')
+        
+        # For CNC (Самовывоз) orders with confirm transition, need additional params
+        if delivery_type == 'cnc' and payload.transition == 'confirm':
+            # Check if params are provided, otherwise use defaults from order
+            if not transition_params.get('cnc'):
+                # Try to extract from schedules or other fields
+                marketplace_id = order.marketplace_id or avito_data.get('marketplaceId', '')
+                if marketplace_id:
+                    transition_params['cnc'] = {
+                        'marketplaceId': str(marketplace_id)
+                    }
+        
+        result = await apply_order_transition(
+            token,
+            int(order.avito_order_id),
+            payload.transition,
+            transition_params if transition_params else None
+        )
+        
+        # Update status in database based on transition
+        status_map = {
+            'confirm': 'ready_to_ship',
+            'reject': 'canceled',
+            'perform': 'in_transit',
+            'receive': 'delivered',
+        }
+        order.avito_status_code = status_map.get(payload.transition, order.avito_status_code)
+        db.commit()
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error applying Avito transition for order {order_id}")
+        # Provide more specific error message
+        error_msg = str(e)
+        if 'CNC' in error_msg or 'cnc' in error_msg:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Ошибка для заказа самовывоза (CNC): {error_msg}. Для подтверждения CNC заказа требуется код подтверждения."
+            )
+        raise HTTPException(status_code=502, detail=f"Ошибка вызова API Авито: {error_msg}")
+
+
+@router.get("/avito-orders/{order_id}/transitions")
+async def get_avito_order_transitions(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Get available transitions for an Avito order"""
+    _require_sales_orders_access(db, current_user)
+    
+    order = db.query(AvitoOrderCache).filter(AvitoOrderCache.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ Авито не найден")
+    if not current_user.is_admin and order.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к заказу")
+    
+    # Get Avito integration for the organization
+    integration = db.query(OrganizationAvitoIntegration).filter(
+        OrganizationAvitoIntegration.organization_id == order.organization_id
+    ).first()
+    if not integration or not integration.client_secret_encrypted:
+        raise HTTPException(status_code=400, detail="Интеграция с Авито не настроена")
+    
+    # Get access token and fetch transitions
+    from app.services import avito_api as avito_api_svc
+    from app.utils.avito_crypto import decrypt_secret
+    from app.services.avito_orders_api import get_available_transitions
+    
+    try:
+        secret = decrypt_secret(integration.client_secret_encrypted)
+        token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
+        
+        transitions = await get_available_transitions(
+            token,
+            int(integration.avito_user_id),
+            int(order.avito_order_id)
+        )
+        
+        return {"transitions": transitions}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error fetching Avito transitions for order {order_id}")
+        raise HTTPException(status_code=502, detail=f"Ошибка вызова API Авито: {str(e)}")
 
 
 # Purchase endpoints for buyers

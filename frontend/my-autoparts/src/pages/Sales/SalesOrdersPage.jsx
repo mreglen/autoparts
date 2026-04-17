@@ -36,7 +36,7 @@ export default function SalesOrdersPage() {
   const [expandedNewOrderId, setExpandedNewOrderId] = useState(null);
   const [canViewNewOrders, setCanViewNewOrders] = useState(true);
 
-  const [editingStatus, setEditingStatus] = useState(null); // {type:'used'|'new', id:number} | null
+  const [editingStatus, setEditingStatus] = useState(null); // {type:'used'|'new'|'avito', id:number} | null
   const [availableStatuses, setAvailableStatuses] = useState([]);
 
   const getOrderStatusOptions = useMemo(() => {
@@ -164,6 +164,87 @@ export default function SalesOrdersPage() {
     setNewOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status_code: statusCode } : o)));
   };
 
+  const applyAvitoTransition = async (orderId, transition) => {
+    try {
+      await apiAxios.post(`/sales/avito-orders/${orderId}/transition`, {
+        transition: transition,
+      });
+      
+      // Update status locally
+      const statusMap = {
+        confirm: 'ready_to_ship',
+        reject: 'canceled',
+        perform: 'in_transit',
+        receive: 'delivered',
+      };
+      
+      setAvitoOrders((prev) =>
+        prev.map((o) => {
+          if (o.id === orderId) {
+            return { ...o, avito_status_code: statusMap[transition] || o.avito_status_code };
+          }
+          return o;
+        })
+      );
+      
+      setEditingStatus(null);
+    } catch (error) {
+      console.error('Ошибка изменения статуса Авито:', error);
+      alert(error?.response?.data?.detail || 'Ошибка изменения статуса');
+    }
+  };
+
+  const [availableTransitions, setAvailableTransitions] = useState({}); // {orderId: ['confirm', 'reject', ...]}
+
+  const fetchAvitoTransitions = async (orderId) => {
+    if (availableTransitions[orderId]) {
+      return availableTransitions[orderId];
+    }
+    
+    try {
+      const response = await apiAxios.get(`/sales/avito-orders/${orderId}/transitions`);
+      const transitions = response.data?.transitions || [];
+      setAvailableTransitions(prev => ({ ...prev, [orderId]: transitions }));
+      return transitions;
+    } catch (error) {
+      console.error('Ошибка получения доступных действий:', error);
+      return [];
+    }
+  };
+
+  const getAvitoTransitionOptions = (order) => {
+    // Return cached transitions or fetch them
+    const transitions = availableTransitions[order.id] || [];
+    
+    // If we don't have transitions yet, use fallback logic
+    if (transitions.length === 0) {
+      const status = order.avito_status_code;
+      const options = [];
+      
+      if (status === 'on_confirmation') {
+        options.push('confirm', 'reject');
+      } else if (status === 'ready_to_ship') {
+        options.push('perform');
+      } else if (status === 'in_transit') {
+        options.push('receive');
+      }
+      
+      return options;
+    }
+    
+    return transitions;
+  };
+
+  const getAvitoTransitionLabel = (transition) => {
+    const labels = {
+      confirm: 'Подтвердить заказ',
+      reject: 'Отменить заказ',
+      perform: 'Подтвердить отправку',
+      receive: 'Подтвердить доставку',
+    };
+    return labels[transition] || transition;
+  };
+
   const toggleAvitoOrderExpand = (orderId) => {
     setExpandedAvitoOrderId((prev) => (prev === orderId ? null : orderId));
   };
@@ -172,6 +253,18 @@ export default function SalesOrdersPage() {
   };
   const toggleNewOrderExpand = (orderId) => {
     setExpandedNewOrderId((prev) => (prev === orderId ? null : orderId));
+  };
+
+  // Wrapper for setEditingStatus that handles fetchTransitions
+  const handleEditStatus = async (status) => {
+    if (status?.fetchTransitions) {
+      await fetchAvitoTransitions(status.id);
+      // Remove the fetchTransitions flag
+      const { fetchTransitions, ...rest } = status;
+      setEditingStatus(rest);
+    } else {
+      setEditingStatus(status);
+    }
   };
 
   const getGarageStatusColor = (statusCode) => {
@@ -433,11 +526,11 @@ export default function SalesOrdersPage() {
                   order={o}
                   isExpanded={expandedAvitoOrderId === o.id}
                   onToggle={toggleAvitoOrderExpand}
-                  editingStatus={null}
-                  onEditStatus={() => {}}
-                  onAvitoTransition={() => {}}
-                  getAvitoTransitionOptions={() => []}
-                  getAvitoTransitionLabel={(t) => t}
+                  editingStatus={editingStatus}
+                  onEditStatus={handleEditStatus}
+                  onAvitoTransition={applyAvitoTransition}
+                  getAvitoTransitionOptions={getAvitoTransitionOptions}
+                  getAvitoTransitionLabel={getAvitoTransitionLabel}
                   getAvitoStatusColor={getAvitoStatusColor}
                   getAvitoStatusName={getAvitoStatusName}
                   formatDate={formatDate}
@@ -471,9 +564,38 @@ export default function SalesOrdersPage() {
                               <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${order.is_paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                 {order.is_paid ? 'Оплачен' : 'Не оплачено'}
                               </span>
-                              <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getAvitoStatusColor(order.avito_status_code)}`}>
-                                {getAvitoStatusName(order.avito_status_code)}
-                              </span>
+                              {/* Статус заказа - редактируемый */}
+                              {editingStatus?.type === 'avito' && editingStatus?.id === order.id ? (
+                                <select
+                                  value=""
+                                  onChange={(e) => {
+                                    applyAvitoTransition(order.id, e.target.value);
+                                  }}
+                                  onBlur={() => setEditingStatus(null)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="px-2 py-0.5 text-xs font-medium border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[140px]"
+                                  autoFocus
+                                >
+                                  <option value="" disabled>Выберите действие</option>
+                                  {getAvitoTransitionOptions(order).map((transition) => (
+                                    <option key={transition} value={transition}>
+                                      {getAvitoTransitionLabel(transition)}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span
+                                  className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 ${getAvitoStatusColor(order.avito_status_code)}`}
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    // Fetch available transitions before showing dropdown
+                                    await fetchAvitoTransitions(order.id);
+                                    setEditingStatus({ type: 'avito', id: order.id });
+                                  }}
+                                >
+                                  {getAvitoStatusName(order.avito_status_code)}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>

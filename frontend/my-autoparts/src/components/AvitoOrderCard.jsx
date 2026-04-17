@@ -149,7 +149,7 @@ export function AvitoOrderCard({
             {editingStatus?.type === 'avito' && editingStatus?.id === order.id ? (
               <select
                 value=""
-                onChange={(e) => onAvitoTransition(order.avito_order_id, e.target.value)}
+                onChange={(e) => onAvitoTransition(order.id, e.target.value)}
                 onBlur={() => onEditStatus(null)}
                 onClick={(e) => e.stopPropagation()}
                 className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-gray-400 focus:border-gray-400"
@@ -165,9 +165,15 @@ export function AvitoOrderCard({
             ) : (
               <div
                 className={`inline-flex items-center px-3 py-1.5 rounded cursor-pointer hover:opacity-80 ${getAvitoStatusColor(order.avito_status_code)}`}
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  onEditStatus({ type: 'avito', id: order.id });
+                  // Fetch available transitions if not already loaded
+                  if (getAvitoTransitionOptions(order).length === 0) {
+                    // Trigger a fetch through the parent component
+                    await onEditStatus({ type: 'avito', id: order.id, fetchTransitions: true });
+                  } else {
+                    onEditStatus({ type: 'avito', id: order.id });
+                  }
                 }}
               >
                 <span className="text-sm font-medium">{getAvitoStatusName(order.avito_status_code)}</span>
