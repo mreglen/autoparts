@@ -65,9 +65,21 @@ export const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpande
         className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm cursor-pointer"
         onClick={onToggleExpand}
       >
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${item.sale_price > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-          {item.sale_price > 0 ? 'Продажа' : 'Списание'}
-        </span>
+        <div className="flex flex-col gap-1">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${item.sale_price > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {item.sale_price > 0 ? 'Продажа' : 'Списание'}
+          </span>
+          {item.sale_channel === 'avito' && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              Продано через Авито
+            </span>
+          )}
+          {item.sale_channel === 'drom' && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+              Продано через Drom
+            </span>
+          )}
+        </div>
       </td>
       <td 
         className="px-2 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 cursor-pointer"

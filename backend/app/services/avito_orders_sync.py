@@ -5,15 +5,23 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.avito_orders_cache import AvitoOrderCache
 from app.models.organization_avito_integration import OrganizationAvitoIntegration
+from app.models.stock_out import StockOut
 from app.services.avito_orders_api import AvitoOrdersError, fetch_avito_orders
 from app.utils.avito_crypto import decrypt_secret
 from app.services import avito_api as avito_api_svc
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_status(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip().lower()
 
 
 def _parse_dt(value: Any) -> Optional[datetime]:
@@ -115,6 +123,7 @@ async def sync_avito_orders_for_org(db: Session, *, organization_id: str) -> dic
     created = 0
     updated = 0
     skipped = 0
+    closed_orders_to_process = []  # Список заказов для обработки после коммита
 
     for raw in orders:
         if not isinstance(raw, dict):
@@ -125,6 +134,10 @@ async def sync_avito_orders_for_org(db: Session, *, organization_id: str) -> dic
             skipped += 1
             continue
         avito_order_id = str(raw_id)
+        
+        # Логируем статус заказа
+        status_code = raw.get("status") or raw.get("status_code") or raw.get("statusCode")
+        logger.debug(f"Processing Avito order {avito_order_id}, status={status_code}")
 
         row = (
             db.query(AvitoOrderCache)
@@ -156,13 +169,94 @@ async def sync_avito_orders_for_org(db: Session, *, organization_id: str) -> dic
             db.add(row)
             created += 1
         else:
-            row.avito_status_code = str(status_code) if status_code is not None else row.avito_status_code
+            old_status = row.avito_status_code
+            new_status = str(status_code) if status_code is not None else row.avito_status_code
+            old_status_normalized = _normalize_status(old_status)
+            new_status_normalized = _normalize_status(new_status)
+            
+            row.avito_status_code = new_status
             row.avito_data = raw
             row.total_amount = total_amount
             row.is_paid = is_paid
             row.synced_at = now
             updated += 1
+            
+            # Проверяем, стал ли заказ закрытым (изменение статуса на closed)
+            # Обрабатываем если:
+            # 1. Статус только что изменился на closed (old_status != "closed")
+            # 2. ИЛИ заказ уже был closed но еще не обработан (not row.closed_processed)
+            if new_status_normalized == "closed":
+                if old_status_normalized != "closed" or not row.closed_processed:
+                    closed_orders_to_process.append(row)
 
     db.commit()
+    
+    # Находим все закрытые заказы, которые еще не были обработаны
+    # (страховка на случай если обработка не сработала ранее)
+    unprocessed_closed_orders = (
+        db.query(AvitoOrderCache)
+        .outerjoin(
+            StockOut,
+            and_(
+                StockOut.organization_id == AvitoOrderCache.organization_id,
+                StockOut.avito_order_id == AvitoOrderCache.avito_order_id,
+            ),
+        )
+        .filter(
+            AvitoOrderCache.organization_id == organization_id,
+            func.lower(func.trim(AvitoOrderCache.avito_status_code)) == "closed",
+            or_(
+                AvitoOrderCache.closed_processed == False,
+                StockOut.id.is_(None),
+            ),
+        )
+        .all()
+    )
+    
+    if unprocessed_closed_orders:
+        logger.info(f"Found {len(unprocessed_closed_orders)} unprocessed closed orders in database")
+        for order in unprocessed_closed_orders:
+            logger.info(f"  - Order id={order.id}, avito_order_id={order.avito_order_id}")
+    
+    # Добавляем их в список для обработки, избегая дубликатов
+    existing_ids = {order.id for order in closed_orders_to_process}
+    for order in unprocessed_closed_orders:
+        if order.id not in existing_ids:
+            closed_orders_to_process.append(order)
+            logger.info(f"Found unprocessed/inconsistent closed order {order.id} (avito_order_id={order.avito_order_id})")
+    
+    # Обрабатываем закрытые заказы после коммита
+    if closed_orders_to_process:
+        logger.info(f"Processing {len(closed_orders_to_process)} closed Avito orders")
+        for order in closed_orders_to_process:
+            try:
+                # Импортируем здесь, чтобы избежать циклических зависимостей
+                from app.services.avito_closed_order_processor import process_closed_avito_order
+                process_result = await process_closed_avito_order(
+                    db,
+                    order,
+                    access_token=token,
+                    avito_user_id=int(integration.avito_user_id),
+                )
+                
+                processed_count = int(process_result.get("processed_count", 0))
+                order.closed_processed = processed_count > 0
+                db.commit()  # Коммитим изменения после обработки каждого заказа
+                
+                logger.info(
+                    "Processed closed Avito order %s: processed_count=%s skipped_count=%s closed_processed=%s",
+                    order.id,
+                    processed_count,
+                    process_result.get("skipped_count", 0),
+                    order.closed_processed,
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error processing closed Avito order {order.id}: {e}",
+                    exc_info=True
+                )
+                # Не прерываем обработку остальных заказов
+                db.rollback()
+    
     return {"created": created, "updated": updated, "skipped": skipped, "total": len(orders)}
 

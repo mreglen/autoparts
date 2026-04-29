@@ -673,3 +673,61 @@ def upsert_products_to_avito_autoload(
     wb.close()
     return out.getvalue()
 
+
+def remove_product_from_avito_autoload(
+    existing_xlsx: bytes,
+    internal_code: str,
+    avito_id: Optional[str] = None,
+) -> bytes:
+    """
+    Удалить товар из Avito xlsx по internal_code (Id) и fallback по AvitoId.
+    
+    Args:
+        existing_xlsx: Байты существующего xlsx файла
+        internal_code: Внутренний код товара (internal_code из Product)
+        avito_id: Реальный Avito ID объявления (fallback-поиск по AvitoId)
+    
+    Returns:
+        Обновлённые байты xlsx файла без удалённой строки
+    """
+    wb = load_workbook(BytesIO(existing_xlsx), read_only=False)
+    
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        
+        # Пропускаем не-data sheets
+        if sheet_name.lower() in ("инструкция", "instruction"):
+            continue
+        
+        # Читаем заголовки из Row 1
+        headers = list(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+        if not headers:
+            continue
+        
+        raw_headers = list(headers[0])
+        cm = _find_col_map(raw_headers)
+        
+        # Ищем колонку Id (UNIQUE_AD_ID_HEADER)
+        id_col = cm.get(UNIQUE_AD_ID_HEADER)
+        avito_id_col = cm.get(AVITO_AD_NUMBER_HEADER) or _find_legacy_avito_id_col(cm)
+        if not id_col and not avito_id_col:
+            continue
+        
+        # Ищем строку с matching internal_code
+        row_to_delete = None
+        for row_no in range(DATA_SCAN_START_ROW, ws.max_row + 1):
+            id_value = _cell_str(ws.cell(row=row_no, column=id_col).value) if id_col else ""
+            avito_value = _cell_str(ws.cell(row=row_no, column=avito_id_col).value) if avito_id_col else ""
+            if (internal_code and id_value == internal_code) or (avito_id and avito_value == str(avito_id)):
+                row_to_delete = row_no
+                break
+        
+        # Если нашли строку, удаляем её
+        if row_to_delete:
+            ws.delete_rows(row_to_delete, 1)
+    
+    output = BytesIO()
+    wb.save(output)
+    wb.close()
+    return output.getvalue()
+

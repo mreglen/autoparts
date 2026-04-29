@@ -24,6 +24,7 @@ class AvitoOrderCache(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     synced_at = Column(DateTime(timezone=True), nullable=True)
+    closed_processed = Column(Boolean, nullable=False, server_default="false", default=False)
 
     organization = relationship("Organization")
 

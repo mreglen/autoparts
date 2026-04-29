@@ -462,6 +462,19 @@ export const StockOutList = () => {
                     <div className="text-sm text-gray-600">
                       Дата операции: {item.movement_date}
                     </div>
+                    {/* Метки канала продажи */}
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {item.sale_channel === 'avito' && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          Продано через Авито
+                        </span>
+                      )}
+                      {item.sale_channel === 'drom' && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          Продано через Drom
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <input

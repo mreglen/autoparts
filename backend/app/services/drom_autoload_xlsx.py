@@ -275,3 +275,48 @@ def upsert_products_to_drom_autoload(
     wb.close()
     
     return out.getvalue()
+
+
+def remove_product_from_drom_autoload(
+    existing_xlsx: bytes,
+    article: str,
+) -> bytes:
+    """
+    Удалить товар из Drom xlsx по article (Артикул).
+    
+    Args:
+        existing_xlsx: Байты существующего xlsx файла
+        article: Артикул товара (article из Product)
+    
+    Returns:
+        Обновлённые байты xlsx файла без удалённой строки
+    """
+    wb = load_workbook(BytesIO(existing_xlsx), read_only=False)
+    ws = wb.active
+    
+    # Читаем заголовки из Row 1
+    header_row = list(ws.iter_rows(min_row=1, max_row=1, values_only=True))[0]
+    col_map = _find_col_map(header_row)
+    
+    # Ищем колонку Артикул
+    article_col = col_map.get(ARTICLE_HEADER)
+    if article_col:
+        # Ищем строку с matching article
+        row_to_delete = None
+        max_row = ws.max_row or 0
+        for row_idx in range(DATA_WRITE_START_ROW, max_row + 1):
+            row_values = list(ws.iter_rows(min_row=row_idx, max_row=row_idx, values_only=True))[0]
+            if article_col <= len(row_values):
+                cell_value = _cell_str(row_values[article_col - 1])
+                if cell_value == article:
+                    row_to_delete = row_idx
+                    break
+        
+        # Если нашли строку, удаляем её
+        if row_to_delete:
+            ws.delete_rows(row_to_delete, 1)
+    
+    output = BytesIO()
+    wb.save(output)
+    wb.close()
+    return output.getvalue()

@@ -14,8 +14,10 @@ class StockOut(Base):
     storage_location_id = Column(Integer, ForeignKey("storage_locations.id"))
     product_id = Column(Integer, ForeignKey("products.id"))
     acquired_product_id = Column(Integer, ForeignKey("acquired_products.id"), nullable=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    reason = Column(Text, nullable=True)  
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    reason = Column(Text, nullable=True)
+    sale_channel = Column(String(50), nullable=True)  # 'avito', 'drom', 'warehouse', etc.
+    avito_order_id = Column(String(64), nullable=True)  # ID заказа Авито для связи  
 
     organization = relationship("Organization", back_populates="stock_outs")
     storage_location = relationship("StorageLocation", back_populates="stock_outs")

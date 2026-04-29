@@ -10,6 +10,8 @@ class StockOutBase(BaseModel):
     sale_price: float
     movement_date: date
     reason: Optional[str] = None
+    sale_channel: Optional[str] = None
+    avito_order_id: Optional[str] = None
 
 class StockOutCreate(StockOutBase):
     organization_id: str
@@ -24,7 +26,9 @@ class StockOut(StockOutBase):
     storage_location_id: int
     product_id: int
     acquired_product_id: Optional[int] = None
-    user_id: int
+    user_id: Optional[int] = None
+    sale_channel: Optional[str] = None
+    avito_order_id: Optional[str] = None
 
     product: Optional[Product] = None
     storage_location: Optional[StorageLocation] = None
