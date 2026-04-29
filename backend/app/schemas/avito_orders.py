@@ -38,6 +38,12 @@ class AvitoOrderTransitionRequest(BaseModel):
     )
 
 
+class AvitoCheckConfirmationCodeRequest(BaseModel):
+    """Проверка confirmation code для CNC заказа."""
+    confirm_code: str = Field(..., description="Код подтверждения заказа")
+    marketplace_id: Optional[str] = Field(default=None, description="Marketplace ID из данных заказа")
+
+
 class AvitoOrderSyncResponse(BaseModel):
     """Ответ после синхронизации заказов Авито"""
     synced_count: int = Field(..., description="Количество синхронизированных заказов")

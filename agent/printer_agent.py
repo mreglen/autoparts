@@ -161,6 +161,16 @@ class PrinterAgent:
                             "timestamp": datetime.now().isoformat()
                         })
                     await asyncio.sleep(30)
+                elif e.status_code == 404:
+                    print("Connection error: HTTP 404 (WebSocket endpoint not found)")
+                    print("Use websocket URL ending with /api/printers/ws")
+                    if self.on_connection_updated:
+                        self.on_connection_updated({
+                            "status": "error",
+                            "message": "Connection error: HTTP 404. Use ws://.../api/printers/ws",
+                            "timestamp": datetime.now().isoformat()
+                        })
+                    await asyncio.sleep(5)
                 else:
                     print(f"Connection error: HTTP {e.status_code}, retrying in 5 seconds...")
                     if self.on_connection_updated:

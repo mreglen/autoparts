@@ -15,6 +15,7 @@ export function AvitoOrderCard({
   editingStatus,
   onEditStatus,
   onAvitoTransition,
+  transitionLoadingByOrderId,
   getAvitoTransitionOptions,
   getAvitoTransitionLabel,
   getAvitoStatusColor,
@@ -149,13 +150,16 @@ export function AvitoOrderCard({
             {editingStatus?.type === 'avito' && editingStatus?.id === order.id ? (
               <select
                 value=""
-                onChange={(e) => onAvitoTransition(order.id, e.target.value)}
+                onChange={(e) => onAvitoTransition(order, e.target.value)}
                 onBlur={() => onEditStatus(null)}
                 onClick={(e) => e.stopPropagation()}
+                disabled={Boolean(transitionLoadingByOrderId?.[order.id]) || getAvitoTransitionOptions(order).length === 0}
                 className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-gray-400 focus:border-gray-400"
                 autoFocus
               >
-                <option value="" disabled>Выберите действие</option>
+                <option value="" disabled>
+                  {transitionLoadingByOrderId?.[order.id] ? 'Выполняем...' : 'Выберите действие'}
+                </option>
                 {getAvitoTransitionOptions(order).map((transition) => (
                   <option key={transition} value={transition}>
                     {getAvitoTransitionLabel(transition)}

@@ -3,6 +3,7 @@ import re
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
+from urllib.parse import urlsplit, urlunsplit
 
 import customtkinter as ctk
 import json
@@ -53,6 +54,8 @@ def _localize_connection_message(msg: str) -> str:
         return "Соединение закрыто" + m[len("Connection closed:") :]
     if "Invalid printer token" in m:
         return "Неверный токен принтера или ID организации (HTTP 401)"
+    if "HTTP 404" in m:
+        return "Сервер не нашёл endpoint агента (HTTP 404). Проверьте адрес: ws://.../api/printers/ws"
     if m == "Connection refused":
         return "В соединении отказано"
     return m
@@ -427,7 +430,7 @@ class PrinterAgentUI:
     def _on_connect(self):
         token = self.token_var.get().strip()
         org_id = self.org_var.get().strip()
-        server_uri = self.server_uri_var.get().strip()
+        server_uri = self._normalize_server_uri(self.server_uri_var.get().strip())
 
         if not token or not org_id:
             messagebox.showwarning(
@@ -442,6 +445,7 @@ class PrinterAgentUI:
         if not (server_uri.startswith("ws://") or server_uri.startswith("wss://")):
             messagebox.showwarning("Неверный адрес", "Адрес сервера должен начинаться с ws:// или wss://")
             return
+        self.server_uri_var.set(server_uri)
 
         if self.agent_thread and self.agent_thread.is_alive():
             messagebox.showinfo("Уже запущено", "Агент уже работает. Сначала нажмите «Остановить», чтобы сменить параметры.")
@@ -497,6 +501,33 @@ class PrinterAgentUI:
         uri = self.SERVER_URIS.get(choice_label)
         if uri:
             self.server_uri_var.set(uri)
+
+    def _normalize_server_uri(self, server_uri: str) -> str:
+        """
+        Normalize user input to expected websocket endpoint.
+        Accepts:
+        - ws://127.0.0.1:8000
+        - ws://127.0.0.1:8000/
+        - ws://127.0.0.1:8000/printers/ws
+        and converts to:
+        - ws://127.0.0.1:8000/api/printers/ws
+        """
+        raw = (server_uri or "").strip()
+        if not raw:
+            return raw
+        if not (raw.startswith("ws://") or raw.startswith("wss://")):
+            return raw
+        try:
+            parsed = urlsplit(raw)
+            path = (parsed.path or "").rstrip("/")
+            if path in ("", "/"):
+                path = "/api/printers/ws"
+            elif path.endswith("/printers/ws") and not path.endswith("/api/printers/ws"):
+                path = f"{path[:-len('/printers/ws')]}/api/printers/ws".replace("//", "/")
+            normalized = urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+            return normalized
+        except Exception:
+            return raw
 
     def _format_connection_line(self, payload: dict) -> str:
         status = payload.get("status", "")

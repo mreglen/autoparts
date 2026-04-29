@@ -10,7 +10,10 @@ logger = logging.getLogger(__name__)
 
 class AvitoOrdersError(RuntimeError):
     """Ошибка при работе с API заказов Авито"""
-    pass
+    def __init__(self, message: str, *, status_code: int | None = None, response_body: str | None = None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.response_body = response_body
 
 
 async def fetch_avito_orders(
@@ -188,8 +191,18 @@ async def apply_order_transition(
             response.raise_for_status()
             return response.json()
     except httpx.HTTPStatusError as e:
-        logger.error(f"HTTP error applying transition {transition} to order {order_id}: {e.response.status_code} - {e.response.text}")
-        raise AvitoOrdersError(f"Ошибка API Авито: {e.response.status_code} - {e.response.text}")
+        logger.error(
+            "HTTP error applying transition %s to order %s: %s - %s",
+            transition,
+            order_id,
+            e.response.status_code,
+            e.response.text,
+        )
+        raise AvitoOrdersError(
+            f"Ошибка API Авито: {e.response.status_code}",
+            status_code=e.response.status_code,
+            response_body=e.response.text,
+        )
     except Exception as e:
         logger.exception(f"Error applying transition {transition} to order {order_id}")
         raise AvitoOrdersError(f"Ошибка изменения статуса: {str(e)}")
@@ -229,10 +242,62 @@ async def get_available_transitions(
             return data.get("transitions", [])
     except httpx.HTTPStatusError as e:
         logger.error(f"HTTP error fetching transitions for order {order_id}: {e.response.status_code} - {e.response.text}")
-        raise AvitoOrdersError(f"Ошибка API Авито: {e.response.status_code}")
+        raise AvitoOrdersError(
+            f"Ошибка API Авито: {e.response.status_code}",
+            status_code=e.response.status_code,
+            response_body=e.response.text,
+        )
     except Exception as e:
         logger.exception(f"Error fetching transitions for order {order_id}")
         raise AvitoOrdersError(f"Ошибка получения доступных переходов: {str(e)}")
+
+
+async def check_confirmation_code(
+    access_token: str,
+    *,
+    order_id: int,
+    confirm_code: str,
+    marketplace_id: str,
+) -> dict[str, Any]:
+    """
+    Проверка кода подтверждения для CNC заказа.
+
+    POST https://api.avito.ru/order-management/1/order/checkConfirmationCode
+    """
+    url = f"{AVITO_BASE}/order-management/1/order/checkConfirmationCode"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+    body: dict[str, Any] = {
+        "orderId": str(order_id),
+        "params": {
+            "cnc": {
+                "marketplaceId": str(marketplace_id),
+                "confirmCode": str(confirm_code),
+            }
+        },
+    }
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, json=body, headers=headers)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            "HTTP error checking confirmation code for order %s: %s - %s",
+            order_id,
+            e.response.status_code,
+            e.response.text,
+        )
+        raise AvitoOrdersError(
+            f"Ошибка API Авито: {e.response.status_code}",
+            status_code=e.response.status_code,
+            response_body=e.response.text,
+        )
+    except Exception as e:
+        logger.exception("Error checking confirmation code for order %s", order_id)
+        raise AvitoOrdersError(f"Ошибка проверки кода подтверждения: {str(e)}")
 
 
 async def raw_fetch_avito_orders(

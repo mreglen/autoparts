@@ -38,6 +38,7 @@ export default function SalesOrdersPage() {
 
   const [editingStatus, setEditingStatus] = useState(null); // {type:'used'|'new'|'avito', id:number} | null
   const [availableStatuses, setAvailableStatuses] = useState([]);
+  const [transitionLoadingByOrderId, setTransitionLoadingByOrderId] = useState({});
 
   const getOrderStatusOptions = useMemo(() => {
     if (availableStatuses.length > 0) return availableStatuses;
@@ -164,33 +165,54 @@ export default function SalesOrdersPage() {
     setNewOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status_code: statusCode } : o)));
   };
 
-  const applyAvitoTransition = async (orderId, transition) => {
+  const applyAvitoTransition = async (order, transition) => {
+    const orderId = order.id;
     try {
+      setTransitionLoadingByOrderId((prev) => ({ ...prev, [orderId]: true }));
+      const avitoData = order.avito_data || {};
+      const delivery = avitoData.delivery || {};
+      const deliveryType = String(delivery.type || delivery.serviceType || '').toLowerCase();
+      const marketplaceId = avitoData.marketplaceId ? String(avitoData.marketplaceId) : null;
+      let params;
+
+      if (deliveryType === 'cnc' && transition === 'confirm') {
+        if (!marketplaceId) {
+          alert('Для CNC-заказа не найден marketplaceId. Обновите заказ и повторите.');
+          return;
+        }
+        const confirmCode = window.prompt('Введите код подтверждения для CNC-заказа');
+        if (!confirmCode || !confirmCode.trim()) {
+          alert('Код подтверждения обязателен для CNC-заказа.');
+          return;
+        }
+        await apiAxios.post(`/sales/avito-orders/${orderId}/check-confirmation-code`, {
+          confirm_code: confirmCode.trim(),
+          marketplace_id: marketplaceId,
+        });
+        params = {
+          cnc: {
+            marketplaceId,
+            confirmCode: confirmCode.trim(),
+          },
+        };
+      }
+
       await apiAxios.post(`/sales/avito-orders/${orderId}/transition`, {
-        transition: transition,
+        transition,
+        ...(params ? { params } : {}),
       });
-      
-      // Update status locally
-      const statusMap = {
-        confirm: 'ready_to_ship',
-        reject: 'canceled',
-        perform: 'in_transit',
-        receive: 'delivered',
-      };
-      
-      setAvitoOrders((prev) =>
-        prev.map((o) => {
-          if (o.id === orderId) {
-            return { ...o, avito_status_code: statusMap[transition] || o.avito_status_code };
-          }
-          return o;
-        })
-      );
-      
+      setAvailableTransitions((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
       setEditingStatus(null);
+      await fetchAll();
     } catch (error) {
       console.error('Ошибка изменения статуса Авито:', error);
       alert(error?.response?.data?.detail || 'Ошибка изменения статуса');
+    } finally {
+      setTransitionLoadingByOrderId((prev) => ({ ...prev, [orderId]: false }));
     }
   };
 
@@ -208,6 +230,7 @@ export default function SalesOrdersPage() {
       return transitions;
     } catch (error) {
       console.error('Ошибка получения доступных действий:', error);
+      alert(error?.response?.data?.detail || 'Не удалось получить доступные действия');
       return [];
     }
   };
@@ -215,22 +238,6 @@ export default function SalesOrdersPage() {
   const getAvitoTransitionOptions = (order) => {
     // Return cached transitions or fetch them
     const transitions = availableTransitions[order.id] || [];
-    
-    // If we don't have transitions yet, use fallback logic
-    if (transitions.length === 0) {
-      const status = order.avito_status_code;
-      const options = [];
-      
-      if (status === 'on_confirmation') {
-        options.push('confirm', 'reject');
-      } else if (status === 'ready_to_ship') {
-        options.push('perform');
-      } else if (status === 'in_transit') {
-        options.push('receive');
-      }
-      
-      return options;
-    }
     
     return transitions;
   };
@@ -529,6 +536,7 @@ export default function SalesOrdersPage() {
                   editingStatus={editingStatus}
                   onEditStatus={handleEditStatus}
                   onAvitoTransition={applyAvitoTransition}
+                  transitionLoadingByOrderId={transitionLoadingByOrderId}
                   getAvitoTransitionOptions={getAvitoTransitionOptions}
                   getAvitoTransitionLabel={getAvitoTransitionLabel}
                   getAvitoStatusColor={getAvitoStatusColor}
@@ -569,14 +577,17 @@ export default function SalesOrdersPage() {
                                 <select
                                   value=""
                                   onChange={(e) => {
-                                    applyAvitoTransition(order.id, e.target.value);
+                                    applyAvitoTransition(order, e.target.value);
                                   }}
+                                  disabled={Boolean(transitionLoadingByOrderId[order.id]) || getAvitoTransitionOptions(order).length === 0}
                                   onBlur={() => setEditingStatus(null)}
                                   onClick={(e) => e.stopPropagation()}
                                   className="px-2 py-0.5 text-xs font-medium border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[140px]"
                                   autoFocus
                                 >
-                                  <option value="" disabled>Выберите действие</option>
+                                <option value="" disabled>
+                                  {transitionLoadingByOrderId[order.id] ? 'Выполняем...' : 'Выберите действие'}
+                                </option>
                                   {getAvitoTransitionOptions(order).map((transition) => (
                                     <option key={transition} value={transition}>
                                       {getAvitoTransitionLabel(transition)}
