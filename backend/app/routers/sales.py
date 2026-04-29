@@ -247,6 +247,7 @@ async def apply_avito_order_transition(
             token,
             order_id=int(order.avito_order_id),
             order_status=order.avito_status_code or "",
+            delivery_type=delivery_type,
         )
         if transition not in available_transitions:
             raise HTTPException(
@@ -336,6 +337,7 @@ async def get_avito_order_transitions(
             token,
             order_id=int(order.avito_order_id),
             order_status=order.avito_status_code or "",
+            delivery_type=_extract_avito_delivery_type(order.avito_data or {}),
         )
         
         return {"transitions": transitions}

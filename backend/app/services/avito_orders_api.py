@@ -213,6 +213,7 @@ async def get_available_transitions(
     *,
     order_id: int,
     order_status: str,
+    delivery_type: str = "",
 ) -> list[str]:
     """
     Получение доступных переходов для заказа на основе его статуса.
@@ -224,15 +225,18 @@ async def get_available_transitions(
         access_token: Токен доступа Авито (не используется, оставлен для совместимости)
         order_id: ID заказа в Авито (не используется, оставлен для совместимости)
         order_status: Текущий статус заказа
+        delivery_type: Тип доставки (например cnc/rdbs)
         
     Returns:
         List доступных переходов
     """
     # Определяем доступные переходы на основе статуса
     status = order_status.lower().strip() if order_status else ""
-    
+    normalized_delivery_type = delivery_type.lower().strip() if delivery_type else ""
+
     transitions_map = {
-        'on_confirmation': ['confirm', 'reject'],
+        # Для CNC Avito может не давать action confirm в on_confirmation.
+        'on_confirmation': ['receive', 'reject'] if normalized_delivery_type == "cnc" else ['confirm', 'reject'],
         'ready_to_ship': ['perform'],
         'in_transit': ['receive'],
         'delivered': [],
@@ -243,7 +247,13 @@ async def get_available_transitions(
     }
     
     transitions = transitions_map.get(status, [])
-    logger.info(f"Order {order_id} status={status}, available transitions={transitions}")
+    logger.info(
+        "Order %s status=%s delivery_type=%s available transitions=%s",
+        order_id,
+        status,
+        normalized_delivery_type,
+        transitions,
+    )
     return transitions
 
 
