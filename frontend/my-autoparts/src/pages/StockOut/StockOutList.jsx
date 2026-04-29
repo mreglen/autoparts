@@ -310,29 +310,28 @@ export const StockOutList = () => {
               <div className="relative actions-dropdown">
                 <button
                   onClick={() => setShowBulkActions(!showBulkActions)}
-                  className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
-                  Действия
-                  <img
-                    src="/img/arrow_sm.svg"
-                    alt=""
-                    className={`w-3 h-3 transition-transform duration-200 filter brightness-0 saturate-100 invert-61 sepia-0 saturate-0 hue-rotate-0deg brightness-90 contrast-89 ${showBulkActions ? 'rotate-90' : ''}`}
-                  />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                  </svg>
+                  <span className="hidden sm:inline">Действия</span>
                 </button>
 
                 {showBulkActions && (
-                  <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
-                    <div className="py-1">
-                      <button
-                        onClick={() => {
-                          handleReturnSelected();
-                          setShowBulkActions(false);
-                        }}
-                        className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                      >
-                        Вернуть выбранные
-                      </button>
-                    </div>
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-10 actions-dropdown">
+                    <button
+                      onClick={() => {
+                        handleReturnSelected();
+                        setShowBulkActions(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                      </svg>
+                      Вернуть на склад
+                    </button>
                   </div>
                 )}
               </div>
@@ -344,7 +343,7 @@ export const StockOutList = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <input
                       type="checkbox"
                       checked={selectedItems.length === stockOuts.length && stockOuts.length > 0}
@@ -352,15 +351,11 @@ export const StockOutList = () => {
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                   </th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Бренд</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Номер</th>
-                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Внутр. код</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Наименование</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Тип</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Кол-во</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена, ₽</th>
-                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
-                  <th className="px-2 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Товар</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Кол-во</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Цена</th>
+                  <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Дата</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Действия</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -443,51 +438,84 @@ export const StockOutList = () => {
 
           {/* Мобильная версия - карточки */}
           <div className="md:hidden space-y-2">
-            {sortedStockOuts.map((item) => (
+            {sortedStockOuts.map((item) => {
+              // Get first photo URL
+              const firstPhoto = item.product?.photos?.[0];
+              const photoUrl = firstPhoto?.url || (firstPhoto?.file_path ? `/uploads/${firstPhoto.file_path}` : null);
+              const [imageError, setImageError] = React.useState(false);
+              
+              return (
               <div key={item.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                {/* Заголовок и чекбокс */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1 pr-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-base font-semibold text-gray-900">{item.product?.brand || '—'}</span>
-                      <span className="text-sm text-gray-400">•</span>
-                      <span className="text-sm text-gray-500 font-mono">{item.product?.article || '—'}</span>
+                {/* Фото и основная информация */}
+                <div className="flex items-start gap-4 mb-4">
+                  {/* Product image */}
+                  <div 
+                    className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 cursor-pointer" 
+                    onClick={() => toggleExpand(item.id)}
+                  >
+                    {photoUrl && !imageError ? (
+                      <img 
+                        src={photoUrl} 
+                        alt={item.product?.name || 'Запчасть'}
+                        className="w-full h-full object-cover"
+                        onError={() => setImageError(true)}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Product details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-base font-semibold text-gray-900">{item.product?.brand || '—'}</span>
+                          <span className="text-sm text-gray-400">•</span>
+                          <span className="text-sm text-gray-500 font-mono">{item.product?.article || '—'}</span>
+                        </div>
+                        <h3 className="text-sm font-medium text-gray-800 mb-2 line-clamp-2">{item.product?.name || '—'}</h3>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.includes(item.id)}
+                        onChange={() => handleSelectItem(item.id)}
+                        className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded flex-shrink-0"
+                      />
                     </div>
-                    <h3 className="text-base font-medium text-gray-800 mb-2 leading-tight">{item.product?.name || '—'}</h3>
-                    <div className="flex items-center gap-2 mb-2">
-                      {item.product?.internal_code && (
-                        <span className="text-xs text-gray-500 font-mono">{item.product.internal_code}</span>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Дата операции: {item.movement_date}
-                    </div>
-                    {/* Метки канала продажи */}
-                    <div className="flex flex-wrap gap-1 mt-2">
+                    
+                    {/* Status badges */}
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${item.sale_price > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {item.sale_price > 0 ? 'Продажа' : 'Списание'}
+                      </span>
                       {item.sale_channel === 'avito' && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Продано через Авито
+                          Авито
                         </span>
                       )}
                       {item.sale_channel === 'drom' && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                          Продано через Drom
+                          Drom
                         </span>
                       )}
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedItems.includes(item.id)}
-                      onChange={() => handleSelectItem(item.id)}
-                      className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-gray-900 mb-1">
-                        {item.sale_price != null ? `${item.sale_price.toFixed(2)} ₽` : '—'}
+                    
+                    {/* Price and quantity */}
+                    <div className="flex items-center gap-4">
+                      <div className="text-lg font-bold text-gray-900">
+                        {item.sale_price != null ? `${item.sale_price.toLocaleString('ru-RU')} ₽` : '—'}
                       </div>
                       <div className="text-sm text-gray-600">{item.quantity} шт.</div>
+                    </div>
+                    
+                    {/* Date */}
+                    <div className="text-xs text-gray-500 mt-1">
+                      {item.movement_date}
                     </div>
                   </div>
                 </div>
@@ -497,30 +525,28 @@ export const StockOutList = () => {
                   <div className="relative mobile-actions-dropdown">
                     <button
                       onClick={() => toggleMobileActions(item.id)}
-                      className="w-full text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded-lg px-4 py-3 bg-transparent hover:bg-gray-50 transition-colors min-h-[44px] flex items-center justify-center gap-2"
+                      className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 min-h-[44px]"
                     >
-                      Действия
-                      <img
-                        src="/img/arrow_sm.svg"
-                        alt=""
-                        className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${mobileActionsOpen === item.id ? 'rotate-90' : ''}`}
-                        style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
-                      />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                      </svg>
+                      <span>Действия</span>
                     </button>
 
                     {mobileActionsOpen === item.id && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 mobile-actions-dropdown w-32 mx-auto">
-                        <div className="py-1">
-                          <button
-                            onClick={() => {
-                              handleReturnItem(item);
-                              setMobileActionsOpen(null);
-                            }}
-                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50"
-                          >
-                            Вернуть
-                          </button>
-                        </div>
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-10 mobile-actions-dropdown w-48 mx-auto">
+                        <button
+                          onClick={() => {
+                            handleReturnItem(item);
+                            setMobileActionsOpen(null);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                          </svg>
+                          Вернуть на склад
+                        </button>
                       </div>
                     )}
                   </div>
@@ -652,7 +678,8 @@ export const StockOutList = () => {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
