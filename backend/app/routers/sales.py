@@ -246,6 +246,7 @@ async def apply_avito_order_transition(
         available_transitions = await get_available_transitions(
             token,
             order_id=int(order.avito_order_id),
+            order_status=order.avito_status_code or "",
         )
         if transition not in available_transitions:
             raise HTTPException(
@@ -253,21 +254,22 @@ async def apply_avito_order_transition(
                 detail=f"Переход '{transition}' сейчас недоступен. Доступно: {available_transitions}",
             )
 
-        if delivery_type == "cnc" and transition == "confirm":
+        if delivery_type == "cnc" and transition == "receive":
             cnc_params = transition_params.get("cnc") if isinstance(transition_params.get("cnc"), dict) else {}
             marketplace_id = cnc_params.get("marketplaceId") or _extract_avito_marketplace_id(avito_data)
             if not marketplace_id:
-                raise HTTPException(status_code=422, detail="Для CNC confirm требуется marketplaceId")
+                raise HTTPException(status_code=422, detail="Для CNC receive требуется marketplaceId")
             confirm_code = cnc_params.get("confirmCode")
+            if not confirm_code:
+                raise HTTPException(status_code=422, detail="Для CNC receive требуется confirmCode")
             transition_params["cnc"] = {"marketplaceId": str(marketplace_id)}
-            if confirm_code:
-                transition_params["cnc"]["confirmCode"] = str(confirm_code)
-                await check_confirmation_code(
-                    token,
-                    order_id=int(order.avito_order_id),
-                    confirm_code=str(confirm_code),
-                    marketplace_id=str(marketplace_id),
-                )
+            transition_params["cnc"]["confirmCode"] = str(confirm_code)
+            await check_confirmation_code(
+                token,
+                order_id=int(order.avito_order_id),
+                confirm_code=str(confirm_code),
+                marketplace_id=str(marketplace_id),
+            )
         
         result = await apply_order_transition(
             token,

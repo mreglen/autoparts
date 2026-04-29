@@ -39,6 +39,14 @@ export default function SalesOrdersPage() {
   const [editingStatus, setEditingStatus] = useState(null); // {type:'used'|'new'|'avito', id:number} | null
   const [availableStatuses, setAvailableStatuses] = useState([]);
   const [transitionLoadingByOrderId, setTransitionLoadingByOrderId] = useState({});
+  const [transitionError, setTransitionError] = useState('');
+  const [receiveCodeModal, setReceiveCodeModal] = useState({
+    isOpen: false,
+    order: null,
+    confirmCode: '',
+    error: '',
+    isSubmitting: false,
+  });
 
   const getOrderStatusOptions = useMemo(() => {
     if (availableStatuses.length > 0) return availableStatuses;
@@ -165,9 +173,21 @@ export default function SalesOrdersPage() {
     setNewOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status_code: statusCode } : o)));
   };
 
-  const applyAvitoTransition = async (order, transition) => {
+  const closeReceiveCodeModal = () => {
+    setReceiveCodeModal({
+      isOpen: false,
+      order: null,
+      confirmCode: '',
+      error: '',
+      isSubmitting: false,
+    });
+  };
+
+  const applyAvitoTransition = async (order, transition, options = {}) => {
+    const { confirmCode } = options;
     const orderId = order.id;
     try {
+      setTransitionError('');
       setTransitionLoadingByOrderId((prev) => ({ ...prev, [orderId]: true }));
       const avitoData = order.avito_data || {};
       const delivery = avitoData.delivery || {};
@@ -175,24 +195,22 @@ export default function SalesOrdersPage() {
       const marketplaceId = avitoData.marketplaceId ? String(avitoData.marketplaceId) : null;
       let params;
 
-      if (deliveryType === 'cnc' && transition === 'confirm') {
+      if (deliveryType === 'cnc' && transition === 'receive') {
         if (!marketplaceId) {
-          alert('Для CNC-заказа не найден marketplaceId. Обновите заказ и повторите.');
-          return;
+          throw new Error('Для CNC-заказа не найден marketplaceId. Обновите заказ и повторите.');
         }
-        const confirmCode = window.prompt('Введите код подтверждения для CNC-заказа');
         if (!confirmCode || !confirmCode.trim()) {
-          alert('Код подтверждения обязателен для CNC-заказа.');
-          return;
+          throw new Error('Код подтверждения обязателен для CNC-заказа.');
         }
+        const normalizedCode = confirmCode.trim();
         await apiAxios.post(`/sales/avito-orders/${orderId}/check-confirmation-code`, {
-          confirm_code: confirmCode.trim(),
+          confirm_code: normalizedCode,
           marketplace_id: marketplaceId,
         });
         params = {
           cnc: {
             marketplaceId,
-            confirmCode: confirmCode.trim(),
+            confirmCode: normalizedCode,
           },
         };
       }
@@ -207,13 +225,63 @@ export default function SalesOrdersPage() {
         return next;
       });
       setEditingStatus(null);
+      closeReceiveCodeModal();
       await fetchAll();
     } catch (error) {
       console.error('Ошибка изменения статуса Авито:', error);
-      alert(error?.response?.data?.detail || 'Ошибка изменения статуса');
+      const message = error?.response?.data?.detail || error.message || 'Ошибка изменения статуса';
+      if (receiveCodeModal.isOpen) {
+        setReceiveCodeModal((prev) => ({ ...prev, error: message }));
+      } else {
+        setTransitionError(message);
+      }
     } finally {
       setTransitionLoadingByOrderId((prev) => ({ ...prev, [orderId]: false }));
     }
+  };
+
+  const handleAvitoTransitionSelect = async (order, transition) => {
+    if (!transition) return;
+    setTransitionError('');
+
+    const avitoData = order.avito_data || {};
+    const delivery = avitoData.delivery || {};
+    const deliveryType = String(delivery.type || delivery.serviceType || '').toLowerCase();
+    const marketplaceId = avitoData.marketplaceId ? String(avitoData.marketplaceId) : null;
+
+    if (deliveryType === 'cnc' && transition === 'receive') {
+      if (!marketplaceId) {
+        setTransitionError('Для CNC-заказа не найден marketplaceId. Обновите заказ и повторите.');
+        setEditingStatus(null);
+        return;
+      }
+      setReceiveCodeModal({
+        isOpen: true,
+        order,
+        confirmCode: '',
+        error: '',
+        isSubmitting: false,
+      });
+      return;
+    }
+
+    await applyAvitoTransition(order, transition);
+  };
+
+  const submitReceiveCodeTransition = async () => {
+    const modalOrder = receiveCodeModal.order;
+    if (!modalOrder) {
+      closeReceiveCodeModal();
+      return;
+    }
+    const code = receiveCodeModal.confirmCode.trim();
+    if (!code) {
+      setReceiveCodeModal((prev) => ({ ...prev, error: 'Введите код подтверждения.' }));
+      return;
+    }
+    setReceiveCodeModal((prev) => ({ ...prev, isSubmitting: true, error: '' }));
+    await applyAvitoTransition(modalOrder, 'receive', { confirmCode: code });
+    setReceiveCodeModal((prev) => ({ ...prev, isSubmitting: false }));
   };
 
   const [availableTransitions, setAvailableTransitions] = useState({}); // {orderId: ['confirm', 'reject', ...]}
@@ -230,7 +298,7 @@ export default function SalesOrdersPage() {
       return transitions;
     } catch (error) {
       console.error('Ошибка получения доступных действий:', error);
-      alert(error?.response?.data?.detail || 'Не удалось получить доступные действия');
+      setTransitionError(error?.response?.data?.detail || 'Не удалось получить доступные действия');
       return [];
     }
   };
@@ -343,6 +411,7 @@ export default function SalesOrdersPage() {
 
         {loading && <div className="text-gray-600">Загрузка…</div>}
         {error && <div className="text-red-600">{error}</div>}
+        {!error && transitionError && <div className="text-red-600">{transitionError}</div>}
 
         {!loading && !error && activeTab === 'used' && (
           <div className="space-y-4">
@@ -535,7 +604,7 @@ export default function SalesOrdersPage() {
                   onToggle={toggleAvitoOrderExpand}
                   editingStatus={editingStatus}
                   onEditStatus={handleEditStatus}
-                  onAvitoTransition={applyAvitoTransition}
+                  onAvitoTransition={handleAvitoTransitionSelect}
                   transitionLoadingByOrderId={transitionLoadingByOrderId}
                   getAvitoTransitionOptions={getAvitoTransitionOptions}
                   getAvitoTransitionLabel={getAvitoTransitionLabel}
@@ -577,7 +646,7 @@ export default function SalesOrdersPage() {
                                 <select
                                   value=""
                                   onChange={(e) => {
-                                    applyAvitoTransition(order, e.target.value);
+                                    handleAvitoTransitionSelect(order, e.target.value);
                                   }}
                                   disabled={Boolean(transitionLoadingByOrderId[order.id]) || getAvitoTransitionOptions(order).length === 0}
                                   onBlur={() => setEditingStatus(null)}
@@ -628,6 +697,49 @@ export default function SalesOrdersPage() {
                 </div>
               ))}
               {avitoOrders.length === 0 && <div className="text-gray-600">Заказов Авито нет</div>}
+            </div>
+          </div>
+        )}
+        {receiveCodeModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+              <h3 className="text-lg font-semibold text-gray-900">Подтверждение получения заказа</h3>
+              <p className="mt-2 text-sm text-gray-600">
+                Введите код подтверждения для перехода заказа в статус получения.
+              </p>
+              <label className="mt-4 block text-sm font-medium text-gray-700" htmlFor="receive-confirm-code">
+                Код подтверждения
+              </label>
+              <input
+                id="receive-confirm-code"
+                type="text"
+                value={receiveCodeModal.confirmCode}
+                onChange={(e) => setReceiveCodeModal((prev) => ({ ...prev, confirmCode: e.target.value, error: '' }))}
+                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Введите код"
+                autoFocus
+              />
+              {receiveCodeModal.error && (
+                <div className="mt-2 text-sm text-red-600">{receiveCodeModal.error}</div>
+              )}
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  onClick={closeReceiveCodeModal}
+                  disabled={receiveCodeModal.isSubmitting}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={submitReceiveCodeTransition}
+                  disabled={receiveCodeModal.isSubmitting}
+                >
+                  {receiveCodeModal.isSubmitting ? 'Проверяем...' : 'Подтвердить'}
+                </button>
+              </div>
             </div>
           </div>
         )}
