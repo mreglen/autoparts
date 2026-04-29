@@ -11,17 +11,23 @@ logger = logging.getLogger(__name__)
 AVITO_BASE = "https://api.avito.ru"
 
 
-async def fetch_access_token(client_id: str, client_secret: str, use_cache: bool = True) -> str:
+async def fetch_access_token(client_id: str, client_secret: str, scope: str = None, use_cache: bool = True) -> str:
     """
     OAuth2 client_credentials. Сначала проверяем кэш, затем запрашиваем новый токен.
     Добавлена retry логика для обработки временных сбоев сети.
+    
+    Args:
+        client_id: ID клиента Авито
+        client_secret: Секрет клиента Авито
+        scope: Необязательный параметр scope (например, 'order-management')
+        use_cache: Использовать ли кэш токенов
     """
     # Проверяем кэш
     if use_cache:
-        cache_key = f"{client_id}:{client_secret[:8]}"  # Используем часть secret для ключа
+        cache_key = f"{client_id}:{client_secret[:8]}:{scope or 'default'}"  # Включаем scope в ключ кэша
         cached_token = token_cache.get_token(cache_key)
         if cached_token:
-            logger.info(f"Using cached Avito token for client {client_id}")
+            logger.info(f"Using cached Avito token for client {client_id} (scope: {scope or 'default'})")
             return cached_token
     
     # Retry логика: 3 попытки с экспоненциальной задержкой
@@ -31,14 +37,21 @@ async def fetch_access_token(client_id: str, client_secret: str, use_cache: bool
     for attempt in range(max_retries):
         try:
             async with httpx.AsyncClient(timeout=45.0) as client:
+                # Формируем данные для запроса
+                token_data = {
+                    "grant_type": "client_credentials",
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                }
+                
+                # Добавляем scope если указан
+                if scope:
+                    token_data["scope"] = scope
+                
                 # Пробуем POST
                 r_post = await client.post(
                     f"{AVITO_BASE}/token",
-                    data={
-                        "grant_type": "client_credentials",
-                        "client_id": client_id,
-                        "client_secret": client_secret,
-                    },
+                    data=token_data,
                     headers={"Content-Type": "application/x-www-form-urlencoded"},
                 )
                 
@@ -49,20 +62,25 @@ async def fetch_access_token(client_id: str, client_secret: str, use_cache: bool
                         expires_in = data.get("expires_in", 1800)
                         # Сохраняем в кэш
                         if use_cache:
-                            cache_key = f"{client_id}:{client_secret[:8]}"
+                            cache_key = f"{client_id}:{client_secret[:8]}:{scope or 'default'}"
                             token_cache.set_token(cache_key, token, expires_in)
-                            logger.info(f"Cached new Avito token for client {client_id}, expires in {expires_in}s")
+                            logger.info(f"Cached new Avito token for client {client_id} (scope: {scope or 'default'}), expires in {expires_in}s")
                         return token
                     raise RuntimeError(f"Ответ /token без access_token: {data}")
                 
                 # Если POST не удался, пробуем GET
+                get_params = {
+                    "grant_type": "client_credentials",
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                }
+                
+                if scope:
+                    get_params["scope"] = scope
+                
                 r_get = await client.get(
                     f"{AVITO_BASE}/token/",
-                    params={
-                        "grant_type": "client_credentials",
-                        "client_id": client_id,
-                        "client_secret": client_secret,
-                    },
+                    params=get_params,
                 )
                 
                 if r_get.status_code == 200:
@@ -71,9 +89,9 @@ async def fetch_access_token(client_id: str, client_secret: str, use_cache: bool
                     if token:
                         expires_in = data.get("expires_in", 1800)
                         if use_cache:
-                            cache_key = f"{client_id}:{client_secret[:8]}"
+                            cache_key = f"{client_id}:{client_secret[:8]}:{scope or 'default'}"
                             token_cache.set_token(cache_key, token, expires_in)
-                            logger.info(f"Cached new Avito token for client {client_id}, expires in {expires_in}s")
+                            logger.info(f"Cached new Avito token for client {client_id} (scope: {scope or 'default'}), expires in {expires_in}s")
                         return token
                     raise RuntimeError(f"Ответ /token/ без access_token: {data}")
                 

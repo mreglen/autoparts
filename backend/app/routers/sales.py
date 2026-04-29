@@ -225,7 +225,12 @@ async def apply_avito_order_transition(
     
     try:
         secret = decrypt_secret(integration.client_secret_encrypted)
-        token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
+        # Получаем токен с scope для Order Management API
+        token = await avito_api_svc.fetch_access_token(
+            integration.client_id, 
+            secret,
+            scope="order-management"
+        )
         
         transition = str(payload.transition or "").strip().lower()
         if transition not in ALLOWED_AVITO_TRANSITIONS:
@@ -240,8 +245,7 @@ async def apply_avito_order_transition(
 
         available_transitions = await get_available_transitions(
             token,
-            int(integration.avito_user_id),
-            int(order.avito_order_id),
+            order_id=int(order.avito_order_id),
         )
         if transition not in available_transitions:
             raise HTTPException(
@@ -319,12 +323,17 @@ async def get_avito_order_transitions(
     
     try:
         secret = decrypt_secret(integration.client_secret_encrypted)
-        token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
+        # Получаем токен с scope для Order Management API
+        token = await avito_api_svc.fetch_access_token(
+            integration.client_id, 
+            secret,
+            scope="order-management"
+        )
         
         transitions = await get_available_transitions(
             token,
-            int(integration.avito_user_id),
-            int(order.avito_order_id)
+            order_id=int(order.avito_order_id),
+            order_status=order.avito_status_code or "",
         )
         
         return {"transitions": transitions}
@@ -372,7 +381,12 @@ async def check_avito_confirmation_code(
 
     try:
         secret = decrypt_secret(integration.client_secret_encrypted)
-        token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
+        # Получаем токен с scope для Order Management API
+        token = await avito_api_svc.fetch_access_token(
+            integration.client_id, 
+            secret,
+            scope="order-management"
+        )
         result = await check_confirmation_code(
             token,
             order_id=int(order.avito_order_id),

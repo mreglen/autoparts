@@ -210,46 +210,41 @@ async def apply_order_transition(
 
 async def get_available_transitions(
     access_token: str,
-    user_id: int,
-    order_id: int
+    *,
+    order_id: int,
+    order_status: str,
 ) -> list[str]:
     """
-    Получение доступных переходов для заказа
+    Получение доступных переходов для заказа на основе его статуса.
     
-    GET https://api.avito.ru/order-management/1/orders/{order_id}/transitions
+    Avito API не предоставляет отдельный endpoint для получения transitions.
+    Доступные переходы определяются на основе текущего статуса заказа.
     
     Args:
-        access_token: Токен доступа Авито
-        user_id: ID пользователя Авито
-        order_id: ID заказа в Авито
+        access_token: Токен доступа Авито (не используется, оставлен для совместимости)
+        order_id: ID заказа в Авито (не используется, оставлен для совместимости)
+        order_status: Текущий статус заказа
         
     Returns:
         List доступных переходов
     """
-    url = f"{AVITO_BASE}/order-management/1/orders/{order_id}/transitions"
-    params = {"user_id": user_id}
+    # Определяем доступные переходы на основе статуса
+    status = order_status.lower().strip() if order_status else ""
     
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
+    transitions_map = {
+        'on_confirmation': ['confirm', 'reject'],
+        'ready_to_ship': ['perform'],
+        'in_transit': ['receive'],
+        'delivered': [],
+        'canceled': [],
+        'closed': [],
+        'in_dispute': [],
+        'on_return': [],
     }
     
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url, params=params, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            return data.get("transitions", [])
-    except httpx.HTTPStatusError as e:
-        logger.error(f"HTTP error fetching transitions for order {order_id}: {e.response.status_code} - {e.response.text}")
-        raise AvitoOrdersError(
-            f"Ошибка API Авито: {e.response.status_code}",
-            status_code=e.response.status_code,
-            response_body=e.response.text,
-        )
-    except Exception as e:
-        logger.exception(f"Error fetching transitions for order {order_id}")
-        raise AvitoOrdersError(f"Ошибка получения доступных переходов: {str(e)}")
+    transitions = transitions_map.get(status, [])
+    logger.info(f"Order {order_id} status={status}, available transitions={transitions}")
+    return transitions
 
 
 async def check_confirmation_code(
