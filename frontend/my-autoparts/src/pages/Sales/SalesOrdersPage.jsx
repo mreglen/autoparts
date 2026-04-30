@@ -248,9 +248,6 @@ export default function SalesOrdersPage() {
           throw new Error('Код подтверждения обязателен для CNC-заказа.');
         }
         const normalizedCode = confirmCode.trim();
-        await apiAxios.post(`/sales/avito-orders/${orderId}/check-confirmation-code`, {
-          confirm_code: normalizedCode,
-        });
         params = {
           cnc: {
             marketplaceId,

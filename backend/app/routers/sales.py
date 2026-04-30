@@ -27,7 +27,6 @@ from app.schemas.sales_orders import (
     PurchasedNewOrderResponse,
 )
 from app.schemas.avito_orders import (
-    AvitoCheckConfirmationCodeRequest,
     AvitoCncSetDetailsRequest,
     AvitoOrderTransitionRequest,
 )
@@ -51,10 +50,6 @@ def _extract_avito_marketplace_id(avito_data: dict[str, Any]) -> str | None:
         return None
     marketplace_id_str = str(marketplace_id).strip()
     return marketplace_id_str or None
-
-
-def _extract_avito_parcel_id(order: AvitoOrderCache) -> str:
-    return str(order.avito_order_id).strip()
 
 
 def _map_avito_error_to_http(exc: Exception) -> HTTPException:
@@ -231,7 +226,7 @@ async def apply_avito_order_transition(
     # Get access token and apply transition
     from app.services import avito_api as avito_api_svc
     from app.utils.avito_crypto import decrypt_secret
-    from app.services.avito_orders_api import apply_order_transition, check_confirmation_code, get_available_transitions
+    from app.services.avito_orders_api import apply_order_transition, get_available_transitions
     
     try:
         secret = decrypt_secret(integration.client_secret_encrypted)
@@ -278,11 +273,6 @@ async def apply_avito_order_transition(
                 raise HTTPException(status_code=422, detail="Для CNC receive confirmCode должен состоять из 4 цифр")
             transition_params["cnc"] = {"marketplaceId": str(marketplace_id)}
             transition_params["cnc"]["confirmCode"] = confirm_code
-            await check_confirmation_code(
-                token,
-                parcel_id=_extract_avito_parcel_id(order),
-                confirm_code=confirm_code,
-            )
         
         result = await apply_order_transition(
             token,
@@ -357,62 +347,6 @@ async def get_avito_order_transitions(
         raise
     except Exception as e:
         logger.exception(f"Error fetching Avito transitions for order {order_id}")
-        raise _map_avito_error_to_http(e)
-
-
-@router.post("/avito-orders/{order_id}/check-confirmation-code")
-async def check_avito_confirmation_code(
-    order_id: int,
-    payload: AvitoCheckConfirmationCodeRequest,
-    db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
-):
-    """Проверить confirmation code для CNC заказа через Avito API."""
-    _require_sales_orders_access(db, current_user)
-
-    order = db.query(AvitoOrderCache).filter(AvitoOrderCache.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Заказ Авито не найден")
-    if not current_user.is_admin and order.organization_id != current_user.organization_id:
-        raise HTTPException(status_code=403, detail="Нет доступа к заказу")
-
-    integration = db.query(OrganizationAvitoIntegration).filter(
-        OrganizationAvitoIntegration.organization_id == order.organization_id
-    ).first()
-    if not integration or not integration.client_secret_encrypted:
-        raise HTTPException(status_code=400, detail="Интеграция с Авито не настроена")
-
-    avito_data = order.avito_data or {}
-    delivery_type = _extract_avito_delivery_type(avito_data)
-    if delivery_type != "cnc":
-        raise HTTPException(status_code=422, detail="Проверка кода применима только к CNC заказам")
-
-    confirm_code = str(payload.confirm_code or "").strip()
-    if not CONFIRM_CODE_RE.fullmatch(confirm_code):
-        raise HTTPException(status_code=422, detail="Код подтверждения должен состоять из 4 цифр")
-
-    from app.services import avito_api as avito_api_svc
-    from app.utils.avito_crypto import decrypt_secret
-    from app.services.avito_orders_api import check_confirmation_code
-
-    try:
-        secret = decrypt_secret(integration.client_secret_encrypted)
-        # Получаем токен с scope для Order Management API
-        token = await avito_api_svc.fetch_access_token(
-            integration.client_id, 
-            secret,
-            scope="order-management"
-        )
-        result = await check_confirmation_code(
-            token,
-            parcel_id=_extract_avito_parcel_id(order),
-            confirm_code=confirm_code,
-        )
-        return {"status": "ok", "result": result}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Error checking confirmation code for Avito order %s", order_id)
         raise _map_avito_error_to_http(e)
 
 

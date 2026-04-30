@@ -25,34 +25,23 @@
 
 Это защищает от ошибок после ожидания, когда состояние заказа уже изменилось на стороне Avito.
 
-## 3. CNC-заказы и checkConfirmationCode
+## 3. CNC-заказы и applyTransition
 
-Для CNC (`delivery.type == cnc` или `delivery.serviceType == cnc`) при `confirm`:
+Для CNC (`delivery.type == cnc` или `delivery.serviceType == cnc`) при `receive`:
 
 - обязательный `params.cnc.marketplaceId`;
-- если используется код подтверждения — обязательный `params.cnc.confirmCode`;
-- перед `applyTransition(confirm)` требуется `checkConfirmationCode`.
-
-Backend endpoint:
-
-- `POST /sales/avito-orders/{order_id}/check-confirmation-code`
-  - `confirm_code`
-  - `marketplace_id` (может быть взят из `avito_data.marketplaceId`)
-
-После успешной проверки кода выполняется `applyTransition`.
+- обязательный `params.cnc.confirmCode` (4 цифры);
+- используется только `applyTransition` без отдельного pre-check endpoint.
 
 ## 4. Контракт backend endpoints
 
 - `GET /sales/avito-orders/{order_id}/transitions`  
   Возвращает доступные переходы для текущего состояния заказа.
 
-- `POST /sales/avito-orders/{order_id}/check-confirmation-code`  
-  Проверяет код подтверждения для CNC.
-
 - `POST /sales/avito-orders/{order_id}/transition`  
   Применяет переход:
   - `transition`: `confirm|reject|perform|receive`
-  - `params` (опционально, но обязателен для CNC confirm по правилам выше)
+  - `params` (опционально, но для CNC `receive` обязателен `params.cnc.confirmCode + params.cnc.marketplaceId`)
 
 ## 5. Ошибки и ожидаемое поведение UI
 
@@ -76,8 +65,8 @@ UI должен:
 ## 6. Требования к frontend /sales/orders
 
 1. Не использовать fallback-переходы без ответа backend transitions.
-2. Для CNC confirm запрашивать `confirmCode` у пользователя.
-3. Вызывать check-code endpoint перед applyTransition.
+2. Для CNC receive запрашивать `confirmCode` у пользователя.
+3. Отправлять `confirmCode` и `marketplaceId` сразу в `applyTransition`.
 4. После успеха обновлять данные заказов повторным чтением (`/sales/avito-orders`).
 
 ## 7. Требования к логированию

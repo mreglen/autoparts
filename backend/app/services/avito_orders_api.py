@@ -268,48 +268,6 @@ async def get_available_transitions(
     return transitions
 
 
-async def check_confirmation_code(
-    access_token: str,
-    *,
-    parcel_id: str,
-    confirm_code: str,
-) -> dict[str, Any]:
-    """
-    Проверка кода подтверждения для CNC заказа.
-
-    POST https://api.avito.ru/order-management/1/order/checkConfirmationCode
-    """
-    url = f"{AVITO_BASE}/order-management/1/order/checkConfirmationCode"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-    }
-    body: dict[str, Any] = {
-        "confirmCode": str(confirm_code),
-        "parcelID": str(parcel_id),
-    }
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json=body, headers=headers)
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPStatusError as e:
-        logger.error(
-            "HTTP error checking confirmation code for order %s: %s - %s",
-            parcel_id,
-            e.response.status_code,
-            e.response.text,
-        )
-        raise AvitoOrdersError(
-            f"Ошибка API Авито: {e.response.status_code}",
-            status_code=e.response.status_code,
-            response_body=e.response.text,
-        )
-    except Exception as e:
-        logger.exception("Error checking confirmation code for parcel %s", parcel_id)
-        raise AvitoOrdersError(f"Ошибка проверки кода подтверждения: {str(e)}")
-
-
 async def cnc_set_details(
     access_token: str,
     *,

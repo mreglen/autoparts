@@ -38,11 +38,6 @@ class AvitoOrderTransitionRequest(BaseModel):
     )
 
 
-class AvitoCheckConfirmationCodeRequest(BaseModel):
-    """Проверка confirmation code для CNC заказа."""
-    confirm_code: str = Field(..., description="Код подтверждения заказа")
-
-
 class AvitoCncSetDetailsRequest(BaseModel):
     """Подготовка CNC-заказа перед получением."""
     address: str = Field(..., description="Адрес получения товара")
