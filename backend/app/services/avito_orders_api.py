@@ -234,17 +234,28 @@ async def get_available_transitions(
     status = order_status.lower().strip() if order_status else ""
     normalized_delivery_type = delivery_type.lower().strip() if delivery_type else ""
 
-    transitions_map = {
-        # Для CNC Avito может не давать action confirm в on_confirmation.
-        'on_confirmation': ['receive', 'reject'] if normalized_delivery_type == "cnc" else ['confirm', 'reject'],
-        'ready_to_ship': ['perform'],
-        'in_transit': ['receive'],
-        'delivered': [],
-        'canceled': [],
-        'closed': [],
-        'in_dispute': [],
-        'on_return': [],
-    }
+    if normalized_delivery_type == "cnc":
+        transitions_map = {
+            'on_confirmation': ['receive', 'reject'],
+            'ready_to_ship': ['receive', 'reject'],
+            'in_transit': ['receive'],
+            'delivered': [],
+            'canceled': [],
+            'closed': [],
+            'in_dispute': [],
+            'on_return': [],
+        }
+    else:
+        transitions_map = {
+            'on_confirmation': ['confirm', 'reject'],
+            'ready_to_ship': ['perform'],
+            'in_transit': ['receive'],
+            'delivered': [],
+            'canceled': [],
+            'closed': [],
+            'in_dispute': [],
+            'on_return': [],
+        }
     
     transitions = transitions_map.get(status, [])
     logger.info(
