@@ -177,6 +177,24 @@ export default function SalesOrdersPage() {
     }).catch(() => {});
   }, [hasPermission]);
 
+  useEffect(() => {
+    const preparedMap = {};
+    avitoOrders.forEach((order) => {
+      const prepared = order?.avito_data?.cncPrepared;
+      if (prepared?.prepared) {
+        preparedMap[order.id] = {
+          prepared: true,
+          address: prepared.address || '',
+          details: prepared.details || '',
+          bookingPeriod: prepared.bookingPeriod || 4,
+        };
+      }
+    });
+    if (Object.keys(preparedMap).length > 0) {
+      setCncPreparedByOrderId((prev) => ({ ...preparedMap, ...prev }));
+    }
+  }, [avitoOrders]);
+
   const updateUsedOrderStatus = async (orderId, statusCode) => {
     await apiAxios.put(`/sales/used-parts-orders/${orderId}/status`, { status_code: statusCode });
     setUsedOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status_code: statusCode } : o)));
@@ -300,7 +318,7 @@ export default function SalesOrdersPage() {
         setEditingStatus(null);
         return;
       }
-      if (!cncPreparedByOrderId[order.id]) {
+      if (!cncPreparedByOrderId[order.id]?.prepared) {
         setTransitionError('Сначала подготовьте CNC заказ, затем подтверждайте получение.');
         return;
       }
@@ -371,6 +389,10 @@ export default function SalesOrdersPage() {
     const code = receiveCodeModal.confirmCode.trim();
     if (!code) {
       setReceiveCodeModal((prev) => ({ ...prev, error: 'Введите код подтверждения.' }));
+      return;
+    }
+    if (!/^\d{4}$/.test(code)) {
+      setReceiveCodeModal((prev) => ({ ...prev, error: 'Код должен состоять из 4 цифр.' }));
       return;
     }
     setReceiveCodeModal((prev) => ({ ...prev, isSubmitting: true, error: '' }));

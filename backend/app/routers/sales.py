@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from typing import Any, Optional
 
@@ -32,6 +33,7 @@ from app.schemas.avito_orders import (
 )
 
 logger = logging.getLogger(__name__)
+CONFIRM_CODE_RE = re.compile(r"^\d{4}$")
 
 router = APIRouter(prefix="/sales", tags=["Sales"])
 
@@ -267,12 +269,15 @@ async def apply_avito_order_transition(
             confirm_code = cnc_params.get("confirmCode")
             if not confirm_code:
                 raise HTTPException(status_code=422, detail="Для CNC receive требуется confirmCode")
+            confirm_code = str(confirm_code).strip()
+            if not CONFIRM_CODE_RE.fullmatch(confirm_code):
+                raise HTTPException(status_code=422, detail="Для CNC receive confirmCode должен состоять из 4 цифр")
             transition_params["cnc"] = {"marketplaceId": str(marketplace_id)}
-            transition_params["cnc"]["confirmCode"] = str(confirm_code)
+            transition_params["cnc"]["confirmCode"] = confirm_code
             await check_confirmation_code(
                 token,
                 order_id=int(order.avito_order_id),
-                confirm_code=str(confirm_code),
+                confirm_code=confirm_code,
                 marketplace_id=str(marketplace_id),
             )
         
@@ -382,6 +387,9 @@ async def check_avito_confirmation_code(
     marketplace_id = payload.marketplace_id or _extract_avito_marketplace_id(avito_data)
     if not marketplace_id:
         raise HTTPException(status_code=422, detail="Не удалось определить marketplaceId для заказа")
+    confirm_code = str(payload.confirm_code or "").strip()
+    if not CONFIRM_CODE_RE.fullmatch(confirm_code):
+        raise HTTPException(status_code=422, detail="Код подтверждения должен состоять из 4 цифр")
 
     from app.services import avito_api as avito_api_svc
     from app.utils.avito_crypto import decrypt_secret
@@ -398,7 +406,7 @@ async def check_avito_confirmation_code(
         result = await check_confirmation_code(
             token,
             order_id=int(order.avito_order_id),
-            confirm_code=payload.confirm_code,
+            confirm_code=confirm_code,
             marketplace_id=str(marketplace_id),
         )
         return {"status": "ok", "result": result}
@@ -459,6 +467,20 @@ async def set_avito_cnc_details(
             address=payload.address,
             details=payload.details,
         )
+        # Persist local hint that CNC order has been prepared in this system.
+        avito_data_current = order.avito_data if isinstance(order.avito_data, dict) else {}
+        order.avito_data = {
+            **avito_data_current,
+            "cncPrepared": {
+                "prepared": True,
+                "address": payload.address,
+                "details": payload.details,
+                "bookingPeriod": int(payload.booking_period),
+                "marketplaceId": str(marketplace_id),
+                "preparedAt": datetime.utcnow().isoformat(),
+            },
+        }
+        db.commit()
         return {"status": "ok", "result": result}
     except HTTPException:
         raise
