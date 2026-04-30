@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
+import { stripHtmlTags } from '../../utils/text';
 
 export const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, onReturn }) => {
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
@@ -172,7 +173,7 @@ export const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpande
               <div>
                 <span className="text-xs text-gray-500">Описание</span>
                 <div className="font-medium mt-1">
-                  {item.product?.description || '—'}
+                  {stripHtmlTags(item.product?.description) || '—'}
                 </div>
               </div>
 

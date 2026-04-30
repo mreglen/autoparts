@@ -1,7 +1,7 @@
 // src/components/Search.js
 import React, { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchSearchResults, setSearchQuery as setGlobalSearchQuery } from '../../../redux/slices/RosskoSlice';
 import {
   searchAllProducts,
@@ -15,6 +15,9 @@ function Search() {
   const [lastSearchTerm, setLastSearchTerm] = useState('');
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
+  const autopartsSearchPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
 
   const handleSearch = () => {
     const trimmedTerm = searchTerm.trim();
@@ -34,13 +37,18 @@ function Search() {
       setSearchTerm(trimmedTerm);
     }).finally(() => {
       setIsSearching(false);
-      navigate(`/autoparts/new?q=${encodeURIComponent(trimmedTerm)}`);
+      navigate(`${autopartsSearchPath}?q=${encodeURIComponent(trimmedTerm)}`);
     });
   };
 
   const handleInputChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
+
+    const trimmedValue = value.trim();
+    if (trimmedValue && !location.pathname.startsWith('/autoparts')) {
+      navigate(`${autopartsSearchPath}?q=${encodeURIComponent(trimmedValue)}`);
+    }
   };
 
   const handleKeyPress = (e) => {

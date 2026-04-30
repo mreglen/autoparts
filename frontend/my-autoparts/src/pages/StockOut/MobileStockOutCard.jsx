@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
+import { stripHtmlTags } from '../../utils/text';
 
 export const MobileStockOutCard = ({ 
   item, 
@@ -154,7 +155,7 @@ export const MobileStockOutCard = ({
               <div>
                 <span className="text-sm text-gray-500 block mb-1">Описание</span>
                 <div className="text-base text-gray-900">
-                  {item.product?.description || '—'}
+                  {stripHtmlTags(item.product?.description) || '—'}
                 </div>
               </div>
 

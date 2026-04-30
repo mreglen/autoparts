@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { normalizeImageUrl } from '../../../utils/apiClient';
+import { stripHtmlTags } from '../../../utils/text';
 
 const PendingParts = ({ pendingParts, rejectedParts, loading, error, onImageClick, getStorageAddress, productStorageCells = {} }) => {
   const [expandedPartId, setExpandedPartId] = useState(null);
@@ -85,7 +86,7 @@ const PendingParts = ({ pendingParts, rejectedParts, loading, error, onImageClic
           {part.description && (
             <div className="mb-3 sm:mb-4">
               <p className="text-sm text-gray-600 line-clamp-2">
-                {part.description}
+                {stripHtmlTags(part.description)}
               </p>
             </div>
           )}
@@ -133,7 +134,7 @@ const PendingParts = ({ pendingParts, rejectedParts, loading, error, onImageClic
                 
                 <div>
                   <span className="text-sm font-medium text-gray-500">Полное описание:</span>
-                  <div className="text-sm">{part.description || '—'}</div>
+                  <div className="text-sm">{stripHtmlTags(part.description) || '—'}</div>
                 </div>
                 
                 {/* Rejection Reason - Only in expanded view */}

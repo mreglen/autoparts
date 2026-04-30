@@ -4,6 +4,7 @@ import { Navigate, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import { normalizeImageUrl, apiRequest } from '../../utils/apiClient';
+import { stripHtmlTags } from '../../utils/text';
 import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
@@ -405,7 +406,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
             {part.description && (
               <div>
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Описание</h4>
-                <p className="text-sm text-gray-900 leading-relaxed">{part.description}</p>
+                <p className="text-sm text-gray-900 leading-relaxed">{stripHtmlTags(part.description)}</p>
               </div>
             )}
 
@@ -524,7 +525,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
               {part.description && (
                 <div>
                   <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Описание</h4>
-                  <p className="text-sm text-gray-900 leading-relaxed">{part.description}</p>
+                  <p className="text-sm text-gray-900 leading-relaxed">{stripHtmlTags(part.description)}</p>
                 </div>
               )}
 

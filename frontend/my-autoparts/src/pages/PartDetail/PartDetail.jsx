@@ -6,6 +6,7 @@ import { fetchProduct, searchAllProducts } from '../../redux/slices/ProductSlice
 import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart } from '../../redux/slices/CartSlice';
 import { createOrGetChat } from '../../redux/slices/ChatSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
+import { stripHtmlTags } from '../../utils/text';
 import MediaModal from '../../components/MediaModal/MediaModal';
 
 const PartDetail = () => {
@@ -570,7 +571,7 @@ const PartDetail = () => {
             {currentProduct.description && (
               <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                 <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-                  {currentProduct.description}
+                  {stripHtmlTags(currentProduct.description)}
                 </div>
               </div>
             )}

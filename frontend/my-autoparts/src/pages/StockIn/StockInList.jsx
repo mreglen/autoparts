@@ -4,6 +4,7 @@ import { useNavigate, Navigate, Link } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import { normalizeImageUrl } from '../../utils/apiClient';
+import { stripHtmlTags } from '../../utils/text';
 import { fetchStockIns } from '../../redux/slices/StockInSlice';
 
 const StockInRow = ({ doc, onToggleExpand, isExpanded, onImageClick }) => (
@@ -43,7 +44,7 @@ const StockInRow = ({ doc, onToggleExpand, isExpanded, onImageClick }) => (
               <div>
                 <span className="text-xs text-gray-500">Описание</span>
                 <div className="font-medium mt-1">
-                  {doc.product?.description || '—'}
+                  {stripHtmlTags(doc.product?.description) || '—'}
                 </div>
               </div>
 
@@ -411,7 +412,7 @@ const StockInList = () => {
                         {/* Описание */}
                         <div>
                           <span className="text-sm text-gray-500 block mb-1">Описание</span>
-                          <div className="text-base text-gray-900">{doc.product?.description || '—'}</div>
+                          <div className="text-base text-gray-900">{stripHtmlTags(doc.product?.description) || '—'}</div>
                         </div>
 
                         {/* Дополнительная информация */}

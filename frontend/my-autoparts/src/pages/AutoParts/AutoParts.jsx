@@ -49,24 +49,25 @@ function AutoParts() {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
+  const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
   const partsData = useSelector(selectRosskoItems);
   const status = useSelector(selectRosskoStatus);
   const error = useSelector(selectRosskoError);
   const searchQuery = useSelector(selectSearchQuery);
   
   // Determine active tab from URL path
-  const isUsedTab = location.pathname.includes('/autoparts/used');
+  const isUsedTab = !showNewAutoparts || location.pathname.includes('/autoparts/used');
   const [activeTab, setActiveTab] = useState(isUsedTab ? 'my' : 'rossko');
   
   // Update URL when tab changes
   useEffect(() => {
     const urlQuery = searchParams.get('q');
-    if (activeTab === 'rossko') {
-      navigate('/autoparts/new' + (urlQuery ? `?q=${urlQuery}` : ''), { replace: true });
-    } else {
+    if (!showNewAutoparts || activeTab !== 'rossko') {
       navigate('/autoparts/used' + (urlQuery ? `?q=${urlQuery}` : ''), { replace: true });
+    } else {
+      navigate('/autoparts/new' + (urlQuery ? `?q=${urlQuery}` : ''), { replace: true });
     }
-  }, [activeTab, searchParams, navigate]);
+  }, [activeTab, searchParams, navigate, showNewAutoparts]);
   
   // Состояние для переключения вида карточек в б/у запчастях
   const [usedPartsView, setUsedPartsView] = useState('grid'); // 'grid' or 'list'
@@ -107,8 +108,12 @@ function AutoParts() {
 
   // Sync activeTab with URL on initial load
   useEffect(() => {
+    if (!showNewAutoparts) {
+      setActiveTab('my');
+      return;
+    }
     setActiveTab(isUsedTab ? 'my' : 'rossko');
-  }, [isUsedTab]);
+  }, [isUsedTab, showNewAutoparts]);
 
   // При изменении searchQuery — обновляем б/у запчасти
   useEffect(() => {
@@ -165,15 +170,17 @@ function AutoParts() {
 
       {/* Переключатель вкладок */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
-        <button
-          onClick={() => setActiveTab('rossko')}
-          className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${activeTab === 'rossko'
-              ? 'bg-indigo-500 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-        >
-          Новые запчасти
-        </button>
+        {showNewAutoparts && (
+          <button
+            onClick={() => setActiveTab('rossko')}
+            className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${activeTab === 'rossko'
+                ? 'bg-indigo-500 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+          >
+            Новые запчасти
+          </button>
+        )}
         <button
           onClick={() => {
             if (searchQuery) {
