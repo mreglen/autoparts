@@ -293,6 +293,7 @@ export default function SalesOrdersPage() {
     const delivery = avitoData.delivery || {};
     const deliveryType = String(delivery.type || delivery.serviceType || '').toLowerCase();
     const marketplaceId = avitoData.marketplaceId ? String(avitoData.marketplaceId) : null;
+    const statusCode = String(order.avito_status_code || '').toLowerCase();
 
     if (transition === 'prepare_cnc') {
       if (!marketplaceId) {
@@ -318,7 +319,8 @@ export default function SalesOrdersPage() {
         setEditingStatus(null);
         return;
       }
-      if (!cncPreparedByOrderId[order.id]?.prepared) {
+      const needsPrepareStep = statusCode === 'on_confirmation';
+      if (needsPrepareStep && !cncPreparedByOrderId[order.id]?.prepared) {
         setTransitionError('Сначала подготовьте CNC заказ, затем подтверждайте получение.');
         return;
       }
@@ -424,10 +426,12 @@ export default function SalesOrdersPage() {
     const avitoData = order.avito_data || {};
     const delivery = avitoData.delivery || {};
     const deliveryType = String(delivery.type || delivery.serviceType || '').toLowerCase();
+    const statusCode = String(order.avito_status_code || '').toLowerCase();
     if (deliveryType !== 'cnc') {
       return transitions;
     }
-    if (!transitions.includes('receive') || cncPreparedByOrderId[order.id]?.prepared) {
+    const needsPrepareStep = statusCode === 'on_confirmation';
+    if (!needsPrepareStep || !transitions.includes('receive') || cncPreparedByOrderId[order.id]?.prepared) {
       return transitions;
     }
     return ['prepare_cnc', ...transitions.filter((transition) => transition !== 'receive')];
