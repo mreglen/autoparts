@@ -804,7 +804,7 @@ export default function SalesOrdersPage() {
                 value={cncPrepareModal.address}
                 onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, address: e.target.value, error: '' }))}
                 className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Тверская улица, 3, Москва"
+                placeholder="г екатеринбург фруктовая 17"
                 autoFocus
               />
               <label className="mt-3 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-booking">
