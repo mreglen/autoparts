@@ -53,6 +53,10 @@ def _extract_avito_marketplace_id(avito_data: dict[str, Any]) -> str | None:
     return marketplace_id_str or None
 
 
+def _extract_avito_parcel_id(order: AvitoOrderCache) -> str:
+    return str(order.avito_order_id).strip()
+
+
 def _map_avito_error_to_http(exc: Exception) -> HTTPException:
     status_code = getattr(exc, "status_code", None)
     response_body = getattr(exc, "response_body", None)
@@ -276,9 +280,8 @@ async def apply_avito_order_transition(
             transition_params["cnc"]["confirmCode"] = confirm_code
             await check_confirmation_code(
                 token,
-                order_id=int(order.avito_order_id),
+                parcel_id=_extract_avito_parcel_id(order),
                 confirm_code=confirm_code,
-                marketplace_id=str(marketplace_id),
             )
         
         result = await apply_order_transition(
@@ -384,9 +387,6 @@ async def check_avito_confirmation_code(
     if delivery_type != "cnc":
         raise HTTPException(status_code=422, detail="Проверка кода применима только к CNC заказам")
 
-    marketplace_id = payload.marketplace_id or _extract_avito_marketplace_id(avito_data)
-    if not marketplace_id:
-        raise HTTPException(status_code=422, detail="Не удалось определить marketplaceId для заказа")
     confirm_code = str(payload.confirm_code or "").strip()
     if not CONFIRM_CODE_RE.fullmatch(confirm_code):
         raise HTTPException(status_code=422, detail="Код подтверждения должен состоять из 4 цифр")
@@ -405,9 +405,8 @@ async def check_avito_confirmation_code(
         )
         result = await check_confirmation_code(
             token,
-            order_id=int(order.avito_order_id),
+            parcel_id=_extract_avito_parcel_id(order),
             confirm_code=confirm_code,
-            marketplace_id=str(marketplace_id),
         )
         return {"status": "ok", "result": result}
     except HTTPException:

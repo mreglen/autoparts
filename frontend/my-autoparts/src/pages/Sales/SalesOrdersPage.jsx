@@ -250,7 +250,6 @@ export default function SalesOrdersPage() {
         const normalizedCode = confirmCode.trim();
         await apiAxios.post(`/sales/avito-orders/${orderId}/check-confirmation-code`, {
           confirm_code: normalizedCode,
-          marketplace_id: marketplaceId,
         });
         params = {
           cnc: {

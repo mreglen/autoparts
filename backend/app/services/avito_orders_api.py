@@ -271,9 +271,8 @@ async def get_available_transitions(
 async def check_confirmation_code(
     access_token: str,
     *,
-    order_id: int,
+    parcel_id: str,
     confirm_code: str,
-    marketplace_id: str,
 ) -> dict[str, Any]:
     """
     Проверка кода подтверждения для CNC заказа.
@@ -286,13 +285,8 @@ async def check_confirmation_code(
         "Content-Type": "application/json",
     }
     body: dict[str, Any] = {
-        "orderId": str(order_id),
-        "params": {
-            "cnc": {
-                "marketplaceId": str(marketplace_id),
-                "confirmCode": str(confirm_code),
-            }
-        },
+        "confirmCode": str(confirm_code),
+        "parcelID": str(parcel_id),
     }
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -302,7 +296,7 @@ async def check_confirmation_code(
     except httpx.HTTPStatusError as e:
         logger.error(
             "HTTP error checking confirmation code for order %s: %s - %s",
-            order_id,
+            parcel_id,
             e.response.status_code,
             e.response.text,
         )
@@ -312,7 +306,7 @@ async def check_confirmation_code(
             response_body=e.response.text,
         )
     except Exception as e:
-        logger.exception("Error checking confirmation code for order %s", order_id)
+        logger.exception("Error checking confirmation code for parcel %s", parcel_id)
         raise AvitoOrdersError(f"Ошибка проверки кода подтверждения: {str(e)}")
 
 
