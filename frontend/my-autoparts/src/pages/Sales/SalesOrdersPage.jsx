@@ -40,10 +40,20 @@ export default function SalesOrdersPage() {
   const [availableStatuses, setAvailableStatuses] = useState([]);
   const [transitionLoadingByOrderId, setTransitionLoadingByOrderId] = useState({});
   const [transitionError, setTransitionError] = useState('');
+  const [cncPreparedByOrderId, setCncPreparedByOrderId] = useState({});
   const [receiveCodeModal, setReceiveCodeModal] = useState({
     isOpen: false,
     order: null,
     confirmCode: '',
+    error: '',
+    isSubmitting: false,
+  });
+  const [cncPrepareModal, setCncPrepareModal] = useState({
+    isOpen: false,
+    order: null,
+    address: '',
+    bookingPeriod: '4',
+    details: '',
     error: '',
     isSubmitting: false,
   });
@@ -183,6 +193,18 @@ export default function SalesOrdersPage() {
     });
   };
 
+  const closeCncPrepareModal = () => {
+    setCncPrepareModal({
+      isOpen: false,
+      order: null,
+      address: '',
+      bookingPeriod: '4',
+      details: '',
+      error: '',
+      isSubmitting: false,
+    });
+  };
+
   const applyAvitoTransition = async (order, transition, options = {}) => {
     const { confirmCode } = options;
     const orderId = order.id;
@@ -249,10 +271,32 @@ export default function SalesOrdersPage() {
     const deliveryType = String(delivery.type || delivery.serviceType || '').toLowerCase();
     const marketplaceId = avitoData.marketplaceId ? String(avitoData.marketplaceId) : null;
 
+    if (transition === 'prepare_cnc') {
+      if (!marketplaceId) {
+        setTransitionError('Для CNC-заказа не найден marketplaceId. Обновите заказ и повторите.');
+        setEditingStatus(null);
+        return;
+      }
+      setCncPrepareModal({
+        isOpen: true,
+        order,
+        address: '',
+        bookingPeriod: '4',
+        details: '',
+        error: '',
+        isSubmitting: false,
+      });
+      return;
+    }
+
     if (deliveryType === 'cnc' && transition === 'receive') {
       if (!marketplaceId) {
         setTransitionError('Для CNC-заказа не найден marketplaceId. Обновите заказ и повторите.');
         setEditingStatus(null);
+        return;
+      }
+      if (!cncPreparedByOrderId[order.id]) {
+        setTransitionError('Сначала подготовьте CNC заказ, затем подтверждайте получение.');
         return;
       }
       setReceiveCodeModal({
@@ -266,6 +310,42 @@ export default function SalesOrdersPage() {
     }
 
     await applyAvitoTransition(order, transition);
+  };
+
+  const submitCncPrepare = async () => {
+    const modalOrder = cncPrepareModal.order;
+    if (!modalOrder) {
+      closeCncPrepareModal();
+      return;
+    }
+    const address = cncPrepareModal.address.trim();
+    const bookingPeriod = Number(cncPrepareModal.bookingPeriod);
+    const details = cncPrepareModal.details.trim();
+    if (!address) {
+      setCncPrepareModal((prev) => ({ ...prev, error: 'Укажите адрес получения товара.' }));
+      return;
+    }
+    if (!Number.isInteger(bookingPeriod) || bookingPeriod < 1) {
+      setCncPrepareModal((prev) => ({ ...prev, error: 'Срок бронирования должен быть целым числом больше 0.' }));
+      return;
+    }
+
+    setCncPrepareModal((prev) => ({ ...prev, isSubmitting: true, error: '' }));
+    try {
+      await apiAxios.post(`/sales/avito-orders/${modalOrder.id}/cnc-set-details`, {
+        address,
+        booking_period: bookingPeriod,
+        details: details || null,
+      });
+      setCncPreparedByOrderId((prev) => ({ ...prev, [modalOrder.id]: true }));
+      closeCncPrepareModal();
+      setTransitionError('');
+    } catch (error) {
+      const message = error?.response?.data?.detail || 'Не удалось подготовить CNC заказ';
+      setCncPrepareModal((prev) => ({ ...prev, error: message }));
+    } finally {
+      setCncPrepareModal((prev) => ({ ...prev, isSubmitting: false }));
+    }
   };
 
   const submitReceiveCodeTransition = async () => {
@@ -304,10 +384,17 @@ export default function SalesOrdersPage() {
   };
 
   const getAvitoTransitionOptions = (order) => {
-    // Return cached transitions or fetch them
     const transitions = availableTransitions[order.id] || [];
-    
-    return transitions;
+    const avitoData = order.avito_data || {};
+    const delivery = avitoData.delivery || {};
+    const deliveryType = String(delivery.type || delivery.serviceType || '').toLowerCase();
+    if (deliveryType !== 'cnc') {
+      return transitions;
+    }
+    if (!transitions.includes('receive') || cncPreparedByOrderId[order.id]) {
+      return transitions;
+    }
+    return ['prepare_cnc', ...transitions.filter((transition) => transition !== 'receive')];
   };
 
   const getAvitoTransitionLabel = (transition) => {
@@ -316,6 +403,7 @@ export default function SalesOrdersPage() {
       reject: 'Отменить заказ',
       perform: 'Подтвердить отправку',
       receive: 'Подтвердить доставку',
+      prepare_cnc: 'Подготовить заказ (CNC)',
     };
     return labels[transition] || transition;
   };
@@ -697,6 +785,71 @@ export default function SalesOrdersPage() {
                 </div>
               ))}
               {avitoOrders.length === 0 && <div className="text-gray-600">Заказов Авито нет</div>}
+            </div>
+          </div>
+        )}
+        {cncPrepareModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+              <h3 className="text-lg font-semibold text-gray-900">Подготовка CNC заказа</h3>
+              <p className="mt-2 text-sm text-gray-600">
+                Заполните данные для передачи заказа покупателю перед подтверждением получения.
+              </p>
+              <label className="mt-4 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-address">
+                Адрес получения
+              </label>
+              <input
+                id="cnc-prepare-address"
+                type="text"
+                value={cncPrepareModal.address}
+                onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, address: e.target.value, error: '' }))}
+                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Тверская улица, 3, Москва"
+                autoFocus
+              />
+              <label className="mt-3 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-booking">
+                Срок бронирования (дни)
+              </label>
+              <input
+                id="cnc-prepare-booking"
+                type="number"
+                min="1"
+                value={cncPrepareModal.bookingPeriod}
+                onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, bookingPeriod: e.target.value, error: '' }))}
+                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <label className="mt-3 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-details">
+                Комментарий покупателю
+              </label>
+              <textarea
+                id="cnc-prepare-details"
+                value={cncPrepareModal.details}
+                onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, details: e.target.value, error: '' }))}
+                rows={3}
+                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Могу передать товар с 13:00 до 18:00"
+              />
+              {cncPrepareModal.error && (
+                <div className="mt-2 text-sm text-red-600">{cncPrepareModal.error}</div>
+              )}
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  onClick={closeCncPrepareModal}
+                  disabled={cncPrepareModal.isSubmitting}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={submitCncPrepare}
+                  disabled={cncPrepareModal.isSubmitting}
+                >
+                  {cncPrepareModal.isSubmitting ? 'Сохраняем...' : 'Подготовить'}
+                </button>
+              </div>
             </div>
           </div>
         )}

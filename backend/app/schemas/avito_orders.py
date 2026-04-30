@@ -44,6 +44,14 @@ class AvitoCheckConfirmationCodeRequest(BaseModel):
     marketplace_id: Optional[str] = Field(default=None, description="Marketplace ID из данных заказа")
 
 
+class AvitoCncSetDetailsRequest(BaseModel):
+    """Подготовка CNC-заказа перед получением."""
+    address: str = Field(..., description="Адрес получения товара")
+    booking_period: int = Field(..., ge=1, description="Срок бронирования товара в днях")
+    details: Optional[str] = Field(default=None, description="Комментарий для покупателя")
+    marketplace_id: Optional[str] = Field(default=None, description="Marketplace ID из данных заказа")
+
+
 class AvitoOrderSyncResponse(BaseModel):
     """Ответ после синхронизации заказов Авито"""
     synced_count: int = Field(..., description="Количество синхронизированных заказов")

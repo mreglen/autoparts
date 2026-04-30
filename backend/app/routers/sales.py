@@ -25,7 +25,11 @@ from app.schemas.sales_orders import (
     PurchasedUsedOrderResponse,
     PurchasedNewOrderResponse,
 )
-from app.schemas.avito_orders import AvitoCheckConfirmationCodeRequest, AvitoOrderTransitionRequest
+from app.schemas.avito_orders import (
+    AvitoCheckConfirmationCodeRequest,
+    AvitoCncSetDetailsRequest,
+    AvitoOrderTransitionRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -402,6 +406,64 @@ async def check_avito_confirmation_code(
         raise
     except Exception as e:
         logger.exception("Error checking confirmation code for Avito order %s", order_id)
+        raise _map_avito_error_to_http(e)
+
+
+@router.post("/avito-orders/{order_id}/cnc-set-details")
+async def set_avito_cnc_details(
+    order_id: int,
+    payload: AvitoCncSetDetailsRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Подготовить CNC-заказ перед переходом receive."""
+    _require_sales_orders_access(db, current_user)
+
+    order = db.query(AvitoOrderCache).filter(AvitoOrderCache.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ Авито не найден")
+    if not current_user.is_admin and order.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к заказу")
+
+    integration = db.query(OrganizationAvitoIntegration).filter(
+        OrganizationAvitoIntegration.organization_id == order.organization_id
+    ).first()
+    if not integration or not integration.client_secret_encrypted:
+        raise HTTPException(status_code=400, detail="Интеграция с Авито не настроена")
+
+    avito_data = order.avito_data or {}
+    delivery_type = _extract_avito_delivery_type(avito_data)
+    if delivery_type != "cnc":
+        raise HTTPException(status_code=422, detail="Подготовка заказа доступна только для CNC")
+
+    marketplace_id = payload.marketplace_id or _extract_avito_marketplace_id(avito_data)
+    if not marketplace_id:
+        raise HTTPException(status_code=422, detail="Не удалось определить marketplaceId для заказа")
+
+    from app.services import avito_api as avito_api_svc
+    from app.utils.avito_crypto import decrypt_secret
+    from app.services.avito_orders_api import cnc_set_details
+
+    try:
+        secret = decrypt_secret(integration.client_secret_encrypted)
+        token = await avito_api_svc.fetch_access_token(
+            integration.client_id,
+            secret,
+            scope="order-management"
+        )
+        result = await cnc_set_details(
+            token,
+            order_id=int(order.avito_order_id),
+            marketplace_id=str(marketplace_id),
+            booking_period=int(payload.booking_period),
+            address=payload.address,
+            details=payload.details,
+        )
+        return {"status": "ok", "result": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error setting CNC details for Avito order %s", order_id)
         raise _map_avito_error_to_http(e)
 
 

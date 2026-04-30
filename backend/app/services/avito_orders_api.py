@@ -305,6 +305,56 @@ async def check_confirmation_code(
         raise AvitoOrdersError(f"Ошибка проверки кода подтверждения: {str(e)}")
 
 
+async def cnc_set_details(
+    access_token: str,
+    *,
+    order_id: int,
+    marketplace_id: str,
+    booking_period: int,
+    address: str | None = None,
+    details: str | None = None,
+) -> dict[str, Any]:
+    """
+    Подготовка CNC-заказа перед получением.
+
+    POST https://api.avito.ru/order-management/1/order/cncSetDetails
+    """
+    url = f"{AVITO_BASE}/order-management/1/order/cncSetDetails"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+    body: dict[str, Any] = {
+        "id": str(order_id),
+        "marketplaceId": str(marketplace_id),
+        "bookingPeriod": int(booking_period),
+    }
+    if address:
+        body["address"] = str(address)
+    if details:
+        body["details"] = str(details)
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, json=body, headers=headers)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            "HTTP error setting CNC details for order %s: %s - %s",
+            order_id,
+            e.response.status_code,
+            e.response.text,
+        )
+        raise AvitoOrdersError(
+            f"Ошибка API Авито: {e.response.status_code}",
+            status_code=e.response.status_code,
+            response_body=e.response.text,
+        )
+    except Exception as e:
+        logger.exception("Error setting CNC details for order %s", order_id)
+        raise AvitoOrdersError(f"Ошибка подготовки CNC заказа: {str(e)}")
+
+
 async def raw_fetch_avito_orders(
     access_token: str,
     request_body: dict[str, Any]
