@@ -4,7 +4,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchSearchResults, setSearchQuery as setGlobalSearchQuery } from '../../../redux/slices/RosskoSlice';
 import {
-  searchAllProducts,
   searchUsedParts
 } from '../../../redux/slices/ProductSlice';
 
@@ -28,7 +27,6 @@ function Search() {
 
     // Выполняем все поиски параллельно
     Promise.all([
-      dispatch(searchAllProducts(trimmedTerm)),
       dispatch(searchUsedParts(trimmedTerm)),
       dispatch(fetchSearchResults({ text: trimmedTerm }))
     ]).then(() => {

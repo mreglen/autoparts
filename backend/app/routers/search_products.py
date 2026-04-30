@@ -1,15 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import or_, func
 from sqlalchemy.orm import Session, selectinload
 import re
+import logging
 from app.models.product import Product as ProductModel
-from app.models.vehicle import Vehicle as VehicleModel
 from app.schemas.product import Product as ProductSchema
 from app.db.database import get_db
 from app.routers.rossko_api.rossko_api import rossko_search, rossko_delivery_id, rossko_address_id
 from app.schemas.rossko import SearchRequest
+from app.utils.search_cache import build_cache_key, get_cached_json, set_cached_json
+from app.utils.singleflight import SingleFlight
 
 router = APIRouter(prefix="/search-products", tags=["Search-Products"])
+logger = logging.getLogger(__name__)
+_SEARCH_CACHE_TTL_SECONDS = 120
+_rossko_singleflight = SingleFlight()
 
 def normalize_partnumber(pn: str) -> str:
     """
@@ -48,10 +54,6 @@ def search_local_products_query(db: Session, q: str, is_new: bool = None):
 
     query = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
-        selectinload(ProductModel.compatible_vehicles).options(
-            selectinload(VehicleModel.vin_row),
-            selectinload(VehicleModel.mileage_row),
-        ),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
     ).filter(or_(*conditions), ProductModel.quantity > 0)
@@ -75,6 +77,10 @@ async def search_combined(q: str, db: Session = Depends(get_db)):
     trimmed_query = q.strip()
     if not trimmed_query:
         return {"direct": [], "analogs": [], "rossko_data": None}
+    cache_key = build_cache_key("combined", trimmed_query)
+    cached_payload = await get_cached_json(cache_key)
+    if cached_payload is not None:
+        return cached_payload
 
     # 1. Запрос к ROSSKO API (основной источник для новых запчастей)
     rossko_response = None
@@ -82,13 +88,16 @@ async def search_combined(q: str, db: Session = Depends(get_db)):
     rossko_analogs_normalized = set()
     
     try:
-        rossko_request = SearchRequest(
-            text=trimmed_query,
-            delivery_id=rossko_delivery_id,
-            address_id=rossko_address_id
-        )
-        rossko_response = await rossko_search(rossko_request, db)
-        
+        async def rossko_call():
+            rossko_request = SearchRequest(
+                text=trimmed_query,
+                delivery_id=rossko_delivery_id,
+                address_id=rossko_address_id
+            )
+            return await rossko_search(rossko_request, db)
+
+        rossko_response = await _rossko_singleflight.do(f"rossko:combined:{trimmed_query.lower()}", rossko_call)
+
         def extract_rossko_pns(parts, target_set, is_analog=False):
             if not parts: return
             for part in parts:
@@ -104,7 +113,7 @@ async def search_combined(q: str, db: Session = Depends(get_db)):
         if not isinstance(parts_list, list): parts_list = [parts_list]
         extract_rossko_pns(parts_list, rossko_direct_normalized)
     except Exception as e:
-        print(f"ROSSKO error: {e}")
+        logger.warning("ROSSKO error in combined search: %s", e)
 
     # 2. Поиск в локальной базе (учитываем всё: и новые, и б/у)
     normalized_q = normalize_partnumber(trimmed_query)
@@ -117,10 +126,6 @@ async def search_combined(q: str, db: Session = Depends(get_db)):
     # Ищем в базе: по нормализованному запросу ИЛИ по артикулам из ROSSKO
     db_products = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
-        selectinload(ProductModel.compatible_vehicles).options(
-            selectinload(VehicleModel.vin_row),
-            selectinload(VehicleModel.mileage_row),
-        ),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
     ).filter(
@@ -148,11 +153,13 @@ async def search_combined(q: str, db: Session = Depends(get_db)):
             analog_products.append(p)
         seen_ids.add(p.id)
 
-    return {
+    payload = jsonable_encoder({
         "direct": direct_products,
         "analogs": analog_products,
         "rossko_data": rossko_response
-    }
+    })
+    await set_cached_json(cache_key, payload, _SEARCH_CACHE_TTL_SECONDS)
+    return payload
 
 @router.get("/search-used-parts")
 async def search_used_parts(
@@ -167,6 +174,15 @@ async def search_used_parts(
     trimmed_query = q.strip()
     if not trimmed_query:
         return {"available_parts": [], "analog_parts": [], "rossko_data": None}
+    cache_key = build_cache_key(
+        "used",
+        trimmed_query,
+        only_in_stock=int(only_in_stock),
+        only_analogs=int(only_analogs),
+    )
+    cached_payload = await get_cached_json(cache_key)
+    if cached_payload is not None:
+        return cached_payload
 
     available_parts = []
     analog_parts = []
@@ -182,12 +198,18 @@ async def search_used_parts(
     # --- ШАГ 2: Поиск аналогов (через ROSSKO) ---
     if not only_in_stock:
         try:
-            rossko_request = SearchRequest(
-                text=trimmed_query,
-                delivery_id=rossko_delivery_id,
-                address_id=rossko_address_id
+            async def rossko_call():
+                rossko_request = SearchRequest(
+                    text=trimmed_query,
+                    delivery_id=rossko_delivery_id,
+                    address_id=rossko_address_id
+                )
+                return await rossko_search(rossko_request, db)
+
+            rossko_response = await _rossko_singleflight.do(
+                f"rossko:used:{trimmed_query.lower()}",
+                rossko_call,
             )
-            rossko_response = await rossko_search(rossko_request, db)
             
             # Извлекаем аналоги из ROSSKO
             analog_pns = set()
@@ -209,10 +231,6 @@ async def search_used_parts(
                 # Ищем б/у аналоги в нашей базе (показываем всё наличие, подходящее под аналоги)
                 db_analogs = db.query(ProductModel).options(
                     selectinload(ProductModel.photos),
-                    selectinload(ProductModel.compatible_vehicles).options(
-            selectinload(VehicleModel.vin_row),
-            selectinload(VehicleModel.mileage_row),
-        ),
                     selectinload(ProductModel.storage_location),
                     selectinload(ProductModel.organization)
                 ).filter(
@@ -227,10 +245,12 @@ async def search_used_parts(
                         analog_parts.append(a)
                         seen_ids.add(a.id)
         except Exception as e:
-            print(f"ROSSKO error in used search: {e}")
+            logger.warning("ROSSKO error in used search: %s", e)
 
-    return {
+    payload = jsonable_encoder({
         "available_parts": available_parts,
         "analog_parts": analog_parts,
         "rossko_data": rossko_response
-    }
+    })
+    await set_cached_json(cache_key, payload, _SEARCH_CACHE_TTL_SECONDS)
+    return payload
