@@ -180,7 +180,7 @@ export function AvitoOrderCard({
                   }
                 }}
               >
-                <span className="text-sm font-medium">{getAvitoStatusName(order.avito_status_code)}</span>
+                <span className="text-sm font-medium">{getAvitoStatusName(order.avito_status_code, order)}</span>
               </div>
             )}
             <div className="mt-2">
