@@ -502,7 +502,20 @@ export const fetchCatalogProducts = createAsyncThunk(
     'products/fetchCatalogProducts',
     async (params = {}, { rejectWithValue }) => {
         try {
-            const response = await apiAxiosUnauth.get('/catalog/products', { params });
+            const queryParams = new URLSearchParams();
+            Object.entries(params).forEach(([key, value]) => {
+                if (value === null || value === undefined || value === '') return;
+                if (Array.isArray(value)) {
+                    value.forEach((item) => {
+                        if (item !== null && item !== undefined && item !== '') {
+                            queryParams.append(key, String(item));
+                        }
+                    });
+                    return;
+                }
+                queryParams.set(key, String(value));
+            });
+            const response = await apiAxiosUnauth.get('/catalog/products', { params: queryParams });
             return response.data;
         } catch (error) {
             return rejectWithValue(

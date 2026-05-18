@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { normalizeImageUrl } from '../../utils/apiClient';
 
-const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantity = false, showAddToCart = false }) => {
+const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantity = false }) => {
   // Function to check if the file is a video
   const isVideo = (item) => {
     if (typeof item === 'string') {
@@ -266,20 +266,6 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
               </div>
             )}
 
-            {showAddToCart && (
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleTitleClick();
-                  }}
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg"
-                >
-                  В корзину
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>

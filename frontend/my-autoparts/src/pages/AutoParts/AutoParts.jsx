@@ -1,12 +1,13 @@
 // src/components/AutoParts.js
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-  selectRosskoItems,
   selectRosskoStatus,
   selectRosskoError,
-  selectSearchQuery
+  selectSearchQuery,
+  fetchSearchResults,
+  setSearchQuery,
 } from '../../redux/slices/RosskoSlice';
 import {
   searchUsedParts,
@@ -15,8 +16,11 @@ import {
   fetchPublicPartTypes,
 } from '../../redux/slices/ProductSlice';
 import { fetchCart } from '../../redux/slices/CartSlice';
-import CardPart from './CardPart/CardPart';
 import UsedPartsList from './UsedParts/UsedPartsList';
+import NewPartsLanding from './NewParts/NewPartsLanding';
+import NewPartsResults from './NewParts/NewPartsResults';
+
+const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs'];
 
 const apiSortToUi = (sort) => {
   if (sort === 'price_asc' || sort === 'price_desc') return sort;
@@ -25,56 +29,12 @@ const apiSortToUi = (sort) => {
 
 const uiSortToApi = (sort) => (sort === 'date' ? 'created_at_desc' : sort);
 
-const getRosskoStockCount = (part) => {
-  const stocks = part?.stocks?.stock;
-  if (!stocks) return 0;
-  const arr = Array.isArray(stocks) ? stocks : [stocks];
-  return arr.reduce((sum, s) => sum + (parseInt(s?.count, 10) || 0), 0);
-};
-
-const getRosskoMinPrice = (part) => {
-  const stocks = part?.stocks?.stock;
-  if (!stocks) return 0;
-  const arr = Array.isArray(stocks) ? stocks : [stocks];
-  return arr.reduce((min, s) => {
-    const p = parseFloat(s?.price) || 0;
-    if (!p) return min;
-    return min === 0 ? p : Math.min(min, p);
-  }, 0);
-};
-
-const EmptySearchState = ({ query }) => (
-  <div className="mt-12 sm:mt-16 flex flex-col items-center text-center max-w-2xl mx-auto px-4">
-    <div className="bg-gray-100 p-6 rounded-full mb-8">
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 sm:h-12 sm:w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-      </svg>
-    </div>
-    <h2 className="text-2xl sm:text-2xl font-bold text-gray-800 mb-3">Ничего не найдено</h2>
-    {query ? (
-      <p className="text-gray-600 text-base sm:text-base leading-relaxed">
-        По запросу <span className="font-semibold text-indigo-600">«{query}»</span> не найдено ни одной запчасти.
-      </p>
-    ) : (
-      <p className="text-gray-600 text-base sm:text-base leading-relaxed">
-        Введите артикул, бренд или наименование запчасти в строку поиска.
-      </p>
-    )}
-    <p className="text-sm text-gray-500 mt-4 max-w-md">
-      Попробуйте изменить поисковый запрос или проверьте правильность написания.
-    </p>
-  </div>
-);
-
-
-
 function AutoParts() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch();
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
-  const partsData = useSelector(selectRosskoItems);
   const status = useSelector(selectRosskoStatus);
   const error = useSelector(selectRosskoError);
   const searchQuery = useSelector(selectSearchQuery);
@@ -88,10 +48,18 @@ function AutoParts() {
     if (!showNewAutoparts || activeTab !== 'rossko') {
       navigate(`/autoparts/used${qs ? `?${qs}` : ''}`, { replace: true });
     } else {
-      const qOnly = searchParams.get('q');
-      navigate(`/autoparts/new${qOnly ? `?q=${encodeURIComponent(qOnly)}` : ''}`, { replace: true });
+      const params = new URLSearchParams();
+      NEW_PARTS_URL_KEYS.forEach((key) => {
+        if (key === 'brand') {
+          searchParams.getAll('brand').forEach((v) => params.append('brand', v));
+        } else if (searchParams.has(key)) {
+          params.set(key, searchParams.get(key));
+        }
+      });
+      const qs = params.toString();
+      navigate(`/autoparts/new${qs ? `?${qs}` : ''}`, { replace: true });
     }
-  }, [activeTab, navigate, showNewAutoparts]);
+  }, [activeTab, navigate, searchParams, showNewAutoparts]);
   
   // Состояние для переключения вида карточек в б/у запчастях
   const [usedPartsView, setUsedPartsView] = useState('grid'); // 'grid' or 'list'
@@ -101,17 +69,19 @@ function AutoParts() {
   );
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
-  const [rosskoBrandFilter, setRosskoBrandFilter] = useState('');
-  const [rosskoPriceMin, setRosskoPriceMin] = useState('');
-  const [rosskoPriceMax, setRosskoPriceMax] = useState('');
-  const [rosskoInStockOnly, setRosskoInStockOnly] = useState(false);
-  const [rosskoSort, setRosskoSort] = useState('price_asc');
-
   const updateCatalogUrl = useCallback((updates) => {
     const params = new URLSearchParams(searchParams);
     Object.entries(updates).forEach(([key, value]) => {
+      params.delete(key);
       if (value === null || value === undefined || value === '') {
-        params.delete(key);
+        return;
+      }
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (item !== null && item !== undefined && item !== '') {
+            params.append(key, String(item));
+          }
+        });
       } else {
         params.set(key, String(value));
       }
@@ -119,6 +89,41 @@ function AutoParts() {
     const qs = params.toString();
     navigate(`${location.pathname}${qs ? `?${qs}` : ''}`, { replace: true });
   }, [searchParams, navigate, location.pathname]);
+
+  const updateNewPartsUrl = useCallback((updates) => {
+    const params = new URLSearchParams();
+    const current = new URLSearchParams(searchParams);
+    NEW_PARTS_URL_KEYS.forEach((key) => {
+      if (key === 'brand') {
+        current.getAll('brand').forEach((v) => params.append('brand', v));
+      } else if (current.has(key)) {
+        params.set(key, current.get(key));
+      }
+    });
+    Object.entries(updates).forEach(([key, value]) => {
+      params.delete(key);
+      if (value === null || value === undefined || value === '') return;
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (item !== null && item !== undefined && item !== '') {
+            params.append(key, String(item));
+          }
+        });
+      } else {
+        params.set(key, String(value));
+      }
+    });
+    const qs = params.toString();
+    navigate(`/autoparts/new${qs ? `?${qs}` : ''}`, { replace: true });
+  }, [searchParams, navigate]);
+
+  const handleNewPartsSearch = useCallback(async (text) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    dispatch(setSearchQuery(trimmed));
+    await dispatch(fetchSearchResults({ text: trimmed }));
+    navigate(`/autoparts/new?q=${encodeURIComponent(trimmed)}`);
+  }, [dispatch, navigate]);
 
   const applyUsedSort = useCallback((uiSort) => {
     setUsedPartsSort(uiSort);
@@ -148,13 +153,8 @@ function AutoParts() {
     setExpandedPartId(expandedPartId === partId ? null : partId);
   };
 
-  // Initialize search query from URL if present and not already set
-  useEffect(() => {
-    const urlQuery = searchParams.get('q');
-    if (urlQuery && !searchQuery) {
-      dispatch({ type: 'rossko/setSearchQuery', payload: decodeURIComponent(urlQuery) });
-    }
-  }, [searchParams, searchQuery, dispatch]);
+  const urlQuery = searchParams.get('q');
+  const effectiveQuery = (urlQuery ? decodeURIComponent(urlQuery) : searchQuery || '').trim();
 
   // Sync activeTab with URL on initial load
   useEffect(() => {
@@ -170,12 +170,16 @@ function AutoParts() {
   }, [searchParams]);
 
   useEffect(() => {
+    if (activeTab !== 'my') return;
+
+    dispatch(fetchCatalogFacets({ is_new: false }));
+    dispatch(fetchPublicPartTypes());
+
     const trimmed = (searchQuery || '').trim();
     if (trimmed) {
       dispatch(searchUsedParts(trimmed));
       return;
     }
-    if (activeTab !== 'my') return;
 
     const params = {
       page: parseInt(searchParams.get('page') || '1', 10),
@@ -183,95 +187,39 @@ function AutoParts() {
       sort: searchParams.get('sort') || 'created_at_desc',
       is_new: false,
     };
-    const partType = searchParams.get('part_type');
-    if (partType) params.part_type_id = parseInt(partType, 10);
-    const brand = searchParams.get('brand');
-    if (brand) params.brand = brand;
+    const partTypes = searchParams.getAll('part_type').map((value) => parseInt(value, 10)).filter(Number.isFinite);
+    if (partTypes.length) params.part_type_id = partTypes;
+    const brands = searchParams.getAll('brand').filter(Boolean);
+    if (brands.length) params.brand = brands;
     const vmin = searchParams.get('vmin');
     if (vmin) params.price_min = parseFloat(vmin);
     const vmax = searchParams.get('vmax');
     if (vmax) params.price_max = parseFloat(vmax);
-    const vb = searchParams.get('vb');
-    if (vb) params.vehicle_brand = vb;
-    const vm = searchParams.get('vm');
-    if (vm) params.vehicle_model = vm;
+    const vehicleBrands = searchParams.getAll('vb').filter(Boolean);
+    if (vehicleBrands.length) params.vehicle_brand = vehicleBrands;
+    const vehicleModels = searchParams.getAll('vm').filter(Boolean);
+    if (vehicleModels.length) params.vehicle_model = vehicleModels;
     const vehicleId = searchParams.get('vehicle_id');
     if (vehicleId) params.vehicle_id = parseInt(vehicleId, 10);
     if (searchParams.get('has_photos') === '1') params.has_photos = true;
 
     dispatch(fetchCatalogProducts(params));
-    dispatch(fetchCatalogFacets({ is_new: false, vehicle_brand: vb || undefined }));
-    dispatch(fetchPublicPartTypes());
   }, [searchQuery, activeTab, searchParams, dispatch]);
+
+  useEffect(() => {
+    if (activeTab !== 'rossko') return;
+    const trimmed = (urlQuery ? decodeURIComponent(urlQuery) : '').trim();
+    if (!trimmed) return;
+    dispatch(setSearchQuery(trimmed));
+    dispatch(fetchSearchResults({ text: trimmed }));
+  }, [activeTab, urlQuery, dispatch]);
 
   // Загружаем корзину при монтировании компонента
   useEffect(() => {
     dispatch(fetchCart());
   }, [dispatch]);
 
-  // Нормализация Rossko
-  let rawParts = partsData?.PartsList?.Part;
-  if (!Array.isArray(rawParts)) {
-    rawParts = rawParts ? [rawParts] : [];
-  }
-  const allParts = rawParts;
-
-  const rosskoBrands = useMemo(() => {
-    const brands = new Set();
-    allParts.forEach((p) => {
-      if (p?.brand) brands.add(p.brand);
-    });
-    return Array.from(brands).sort();
-  }, [allParts]);
-
-  const filterRosskoPart = useCallback((part) => {
-    if (rosskoBrandFilter && part?.brand !== rosskoBrandFilter) return false;
-    const price = getRosskoMinPrice(part);
-    if (rosskoPriceMin && price < parseFloat(rosskoPriceMin)) return false;
-    if (rosskoPriceMax && price > parseFloat(rosskoPriceMax)) return false;
-    if (rosskoInStockOnly && getRosskoStockCount(part) <= 0) return false;
-    return true;
-  }, [rosskoBrandFilter, rosskoPriceMin, rosskoPriceMax, rosskoInStockOnly]);
-
-  const sortRosskoParts = useCallback((parts) => {
-    const sorted = [...parts];
-    sorted.sort((a, b) => {
-      if (rosskoSort === 'price_desc') {
-        return getRosskoMinPrice(b) - getRosskoMinPrice(a);
-      }
-      if (rosskoSort === 'brand') {
-        return String(a?.brand || '').localeCompare(String(b?.brand || ''), 'ru');
-      }
-      return getRosskoMinPrice(a) - getRosskoMinPrice(b);
-    });
-    return sorted;
-  }, [rosskoSort]);
-
-  const filteredRosskoParts = useMemo(
-    () => sortRosskoParts(allParts.filter(filterRosskoPart)),
-    [allParts, filterRosskoPart, sortRosskoParts]
-  );
-
-  const allCrossParts = useMemo(() => {
-    const crosses = [];
-    allParts.forEach((part) => {
-      let crossParts = part?.crosses?.Part;
-      if (crossParts) {
-        if (!Array.isArray(crossParts)) crossParts = [crossParts];
-        crosses.push(...crossParts);
-      }
-    });
-    return crosses;
-  }, [allParts]);
-
-  const filteredCrossParts = useMemo(
-    () => sortRosskoParts(allCrossParts.filter(filterRosskoPart)),
-    [allCrossParts, filterRosskoPart, sortRosskoParts]
-  );
-
-  const hasRosskoResults = filteredRosskoParts.length > 0 || filteredCrossParts.length > 0;
-
-  if (status === 'loading' && activeTab === 'rossko') {
+  if (status === 'loading' && activeTab === 'rossko' && effectiveQuery) {
     return (
       <div className="mt-5 text-center py-10 px-4">
         <p className="text-base sm:text-lg text-gray-600">Загрузка данных...</p>
@@ -279,7 +227,7 @@ function AutoParts() {
     );
   }
 
-  if (status === 'failed' && activeTab === 'rossko') {
+  if (status === 'failed' && activeTab === 'rossko' && effectiveQuery) {
     return (
       <div className="mt-5 text-center py-10 px-4">
         <p className="text-base sm:text-lg text-red-600">Ошибка загрузки данных</p>
@@ -414,227 +362,15 @@ function AutoParts() {
           sortBy={usedPartsSort}
           updateCatalogUrl={updateCatalogUrl}
         />
+      ) : !effectiveQuery ? (
+        <NewPartsLanding onSearch={handleNewPartsSearch} />
       ) : (
-        <>
-
-          {hasRosskoResults ? (
-            <>
-              <div className="mb-4 p-4 bg-white rounded-lg border border-gray-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                <select
-                  value={rosskoBrandFilter}
-                  onChange={(e) => setRosskoBrandFilter(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="">Все бренды</option>
-                  {rosskoBrands.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  placeholder="Цена от"
-                  value={rosskoPriceMin}
-                  onChange={(e) => setRosskoPriceMin(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-                <input
-                  type="number"
-                  placeholder="Цена до"
-                  value={rosskoPriceMax}
-                  onChange={(e) => setRosskoPriceMax(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                />
-                <select
-                  value={rosskoSort}
-                  onChange={(e) => setRosskoSort(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="price_asc">Дешевле</option>
-                  <option value="price_desc">Дороже</option>
-                  <option value="brand">По бренду</option>
-                </select>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={rosskoInStockOnly}
-                    onChange={(e) => setRosskoInStockOnly(e.target.checked)}
-                  />
-                  Только в наличии
-                </label>
-              </div>
-
-              {/* Десктопная версия - таблица */}
-              <div className="hidden md:block">
-                <table className="min-w-full divide-y divide-gray-200 table-fixed">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-20">Бренд</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">Номер</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-64">Наименование</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-36">Поставка</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">Остаток</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-20">Цена, ₽</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">К заказу</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredRosskoParts.map((part, idx) => {
-                      const uniqueId = `available-${part.guid || part.id || idx}`;
-                      // Преобразуем данные складов из API формата в формат для CardPart
-                      let stocksData = [];
-                      if (part.stocks && part.stocks.stock) {
-                        const stocksArray = Array.isArray(part.stocks.stock) ? part.stocks.stock : [part.stocks.stock];
-                        stocksData = stocksArray.filter(stock => stock && typeof stock === 'object').map(stock => ({
-                          stock_id: stock.id,
-                          price: parseFloat(stock.price) || 0,
-                          available_count: parseInt(stock.count) || 0,
-                          delivery_start: stock.deliveryStart,
-                          delivery_end: stock.deliveryEnd,
-                          description: stock.description
-                        }));
-                      }
-
-                      return (
-                        <CardPart
-                          key={uniqueId}
-                          part={part}
-                          stocksData={stocksData}
-                          showAllStocks
-                          sectionType="available"
-                          uniqueId={uniqueId}
-                          expandedPartId={expandedPartId}
-                          onToggleExpand={handleToggleExpand}
-                        />
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              {/* Мобильная версия - карточки */}
-              <div className="md:hidden space-y-5">
-                {filteredRosskoParts.map((part, idx) => {
-                  const uniqueId = `mobile-available-${part.guid || part.id || idx}`;
-                  let stocksData = [];
-                  if (part.stocks && part.stocks.stock) {
-                    const stocksArray = Array.isArray(part.stocks.stock) ? part.stocks.stock : [part.stocks.stock];
-                    stocksData = stocksArray.filter(stock => stock && typeof stock === 'object').map(stock => ({
-                      stock_id: stock.id,
-                      price: parseFloat(stock.price) || 0,
-                      available_count: parseInt(stock.count) || 0,
-                      delivery_start: stock.deliveryStart,
-                      delivery_end: stock.deliveryEnd,
-                      description: stock.description
-                    }));
-                  }
-
-                  return (
-                    <CardPart
-                      key={uniqueId}
-                      part={part}
-                      stocksData={stocksData}
-                      showAllStocks
-                      sectionType="available"
-                      uniqueId={uniqueId}
-                      expandedPartId={expandedPartId}
-                      onToggleExpand={handleToggleExpand}
-                      isMobile={true}
-                    />
-                  );
-                })}
-              </div>
-
-              {filteredCrossParts.length > 0 && (
-                <>
-                  <div className="font-medium text-xl sm:text-xl my-6 sm:my-10 px-4 sm:px-0">
-                    <h2 className="border-b-4 border-blue-500 pb-2 inline-block">Аналоги</h2>
-                  </div>
-
-                  {/* Десктопная версия аналогов */}
-                  <div className="hidden md:block">
-                    <table className="min-w-full divide-y divide-gray-200 table-fixed">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-20">Бренд</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">Номер</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-64">Наименование</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-36">Поставка</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">Остаток</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-20">Цена, ₽</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase tracking-wider w-24">К заказу</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredCrossParts.map((part, idx) => {
-                          const uniqueId = `analog-${part.guid || part.id || idx}`;
-                          let stocksData = [];
-                          if (part.stocks && part.stocks.stock) {
-                            const stocksArray = Array.isArray(part.stocks.stock) ? part.stocks.stock : [part.stocks.stock];
-                            stocksData = stocksArray.filter(stock => stock && typeof stock === 'object').map(stock => ({
-                              stock_id: stock.id,
-                              price: parseFloat(stock.price) || 0,
-                              available_count: parseInt(stock.count) || 0,
-                              delivery_start: stock.deliveryStart,
-                              delivery_end: stock.deliveryEnd,
-                              description: stock.description
-                            }));
-                          }
-
-                          return (
-                            <CardPart
-                              key={uniqueId}
-                              part={part}
-                              stocksData={stocksData}
-                              showAllStocks
-                              sectionType="analog"
-                              uniqueId={uniqueId}
-                              expandedPartId={expandedPartId}
-                              onToggleExpand={handleToggleExpand}
-                            />
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Мобильная версия аналогов */}
-                  <div className="md:hidden space-y-5">
-                    {filteredCrossParts.map((part, idx) => {
-                      const uniqueId = `mobile-analog-${part.guid || part.id || idx}`;
-                      let stocksData = [];
-                      if (part.stocks && part.stocks.stock) {
-                        const stocksArray = Array.isArray(part.stocks.stock) ? part.stocks.stock : [part.stocks.stock];
-                        stocksData = stocksArray.filter(stock => stock && typeof stock === 'object').map(stock => ({
-                          stock_id: stock.id,
-                          price: parseFloat(stock.price) || 0,
-                          available_count: parseInt(stock.count) || 0,
-                          delivery_start: stock.deliveryStart,
-                          delivery_end: stock.deliveryEnd,
-                          description: stock.description
-                        }));
-                      }
-
-                      return (
-                        <CardPart
-                          key={uniqueId}
-                          part={part}
-                          stocksData={stocksData}
-                          showAllStocks
-                          sectionType="analog"
-                          uniqueId={uniqueId}
-                          expandedPartId={expandedPartId}
-                          onToggleExpand={handleToggleExpand}
-                          isMobile={true}
-                        />
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </>
-          ) : (
-            <EmptySearchState query={searchQuery} />
-          )}
-        </>
+        <NewPartsResults
+          updateNewPartsUrl={updateNewPartsUrl}
+          onSearch={handleNewPartsSearch}
+          expandedPartId={expandedPartId}
+          onToggleExpand={handleToggleExpand}
+        />
       )}
     </div>
   );

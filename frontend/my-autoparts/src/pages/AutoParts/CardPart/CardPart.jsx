@@ -2,6 +2,7 @@ import React, { useState, Fragment, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { addNewPartsToCart, selectCartLoading, selectCart, updateCartItemQuantity, removeFromCart } from '../../../redux/slices/CartSlice';
+import { isRosskoFastDelivery } from '../NewParts/rosskoHelpers';
 
 
 const formatDeliveryTime = (deliveryStart, deliveryEnd) => {
@@ -90,6 +91,32 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
     const brand = part.brand || '—';
     const number = part.partnumber || '—';
     const title = part.name || '—';
+
+    const renderSectionBadges = () => {
+        const showDirect = sectionType === 'available';
+        const showAnalog = sectionType === 'analog';
+        const fastDelivery = isRosskoFastDelivery(part);
+        if (!showDirect && !showAnalog && !fastDelivery) return null;
+        return (
+            <div className="flex flex-wrap gap-1 mb-1">
+                {showDirect && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+                        Прямое
+                    </span>
+                )}
+                {showAnalog && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                        Аналог
+                    </span>
+                )}
+                {fastDelivery && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                        Быстрая поставка
+                    </span>
+                )}
+            </div>
+        );
+    };
 
     const [expanded, setExpanded] = useState(false);
     const [addingToCart, setAddingToCart] = useState(false);
@@ -422,6 +449,7 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 w-20">{brand}</td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 w-24">{number}</td>
                 <td className="px-4 py-2 text-sm text-gray-500 w-64">
+                    {renderSectionBadges()}
                     {isLongTitle && !expanded ? (
                         <>
                             {title.slice(0, 100)}...
@@ -577,15 +605,13 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
                                 {number}
                             </span>
                         </div>
+                        {renderSectionBadges()}
                         <h3 
                             className="text-base font-medium text-gray-800 mb-2 leading-tight cursor-pointer hover:text-indigo-800"
                             onClick={handleNavigateToDetail}
                         >
                             {title}
                         </h3>
-                        {sectionType === 'analog' && (
-                            <div className="text-sm text-orange-600 font-semibold mb-2">Аналог</div>
-                        )}
                     </div>
                     <div className="text-right flex-shrink-0">
                         <div className="text-lg font-bold text-gray-900 mb-1">

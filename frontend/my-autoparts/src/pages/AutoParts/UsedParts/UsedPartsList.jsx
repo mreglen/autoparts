@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import ProductCard from '../ProductCard';
 import {
   selectCatalogItems,
@@ -18,7 +18,6 @@ import { normalizeImageUrl } from '../../../utils/apiClient';
 // Селекторы для б/у запчастей
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 const selectUsedPartsLoading = (state) => state.products.loading;
-const selectAnalogsLoading = (state) => state.products.analogsLoading;
 
 // Функция форматирования телефона
 const formatPhoneNumber = (phone) => {
@@ -50,11 +49,13 @@ const formatPhoneNumber = (phone) => {
   return formatted;
 };
 
+const COLLAPSED_FILTER_LIMIT = 3;
+
 const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl }) => {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [expandedFilterGroups, setExpandedFilterGroups] = useState({});
 
   const usedPartsData = useSelector(selectUsedPartsData);
   const catalogItems = useSelector(selectCatalogItems);
@@ -72,21 +73,113 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     : (usedPartsLoading ? 'loading' : 'idle');
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
-  const purchaseMode = useSelector((state) => state.publicInfo.usedPartsPurchaseMode || 'both');
-  const showCartInList = purchaseMode === 'cart_only' || purchaseMode === 'both';
 
-  const availableParts = isCatalogMode
-    ? catalogItems
-    : (usedPartsData?.available_parts || []);
-  const analogParts = isCatalogMode ? [] : (usedPartsData?.analog_parts || []);
+  const availableParts = useMemo(
+    () => (isCatalogMode ? catalogItems : (usedPartsData?.available_parts || [])),
+    [isCatalogMode, catalogItems, usedPartsData]
+  );
+  const analogParts = useMemo(
+    () => (isCatalogMode ? [] : (usedPartsData?.analog_parts || [])),
+    [isCatalogMode, usedPartsData]
+  );
 
   const totalPages = Math.max(1, Math.ceil(catalogTotal / catalogPageSize));
+
+  const activeFilters = useMemo(() => ({
+    partTypes: searchParams.getAll('part_type'),
+    brands: searchParams.getAll('brand'),
+    priceMin: searchParams.get('vmin') || '',
+    priceMax: searchParams.get('vmax') || '',
+    vehicleBrands: searchParams.getAll('vb'),
+    vehicleModels: searchParams.getAll('vm'),
+    hasPhotos: searchParams.get('has_photos') === '1',
+  }), [searchParams]);
+
+  const searchFacets = useMemo(() => {
+    const countValues = (values) => {
+      const counts = new Map();
+      values.filter(Boolean).forEach((value) => {
+        counts.set(value, (counts.get(value) || 0) + 1);
+      });
+      return Array.from(counts.entries())
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => String(a.value).localeCompare(String(b.value), 'ru'));
+    };
+
+    const parts = [...availableParts, ...analogParts];
+    const vehicleBrands = [];
+    const vehicleModels = [];
+
+    parts.forEach((part) => {
+      (part.compatible_vehicles || []).forEach((vehicle) => {
+        vehicleBrands.push(vehicle.brand);
+        vehicleModels.push(vehicle.model);
+      });
+    });
+
+    return {
+      brands: countValues(parts.map((part) => part.brand)),
+      vehicle_brands: countValues(vehicleBrands),
+      vehicle_models: countValues(vehicleModels),
+    };
+  }, [availableParts, analogParts]);
+
+  const brandOptions = isCatalogMode ? (catalogFacets?.brands || []) : searchFacets.brands;
+  const vehicleBrandOptions = isCatalogMode ? (catalogFacets?.vehicle_brands || []) : searchFacets.vehicle_brands;
+  const vehicleModelOptions = isCatalogMode ? (catalogFacets?.vehicle_models || []) : searchFacets.vehicle_models;
+
+  const matchesActiveFilters = useCallback((part) => {
+    if (
+      activeFilters.partTypes.length > 0
+      && !activeFilters.partTypes.includes(String(part.part_type_id || part.part_type?.id || ''))
+    ) {
+      return false;
+    }
+    if (activeFilters.brands.length > 0 && !activeFilters.brands.includes(part.brand)) {
+      return false;
+    }
+
+    const price = parseFloat(part.price || 0);
+    if (activeFilters.priceMin && price < parseFloat(activeFilters.priceMin)) {
+      return false;
+    }
+    if (activeFilters.priceMax && price > parseFloat(activeFilters.priceMax)) {
+      return false;
+    }
+    if (activeFilters.hasPhotos && !(part.photos || []).length) {
+      return false;
+    }
+
+    const vehicles = part.compatible_vehicles || [];
+    if (
+      activeFilters.vehicleBrands.length > 0
+      && !vehicles.some((vehicle) => activeFilters.vehicleBrands.includes(vehicle.brand))
+    ) {
+      return false;
+    }
+    if (
+      activeFilters.vehicleModels.length > 0
+      && !vehicles.some((vehicle) => activeFilters.vehicleModels.includes(vehicle.model))
+    ) {
+      return false;
+    }
+
+    return true;
+  }, [activeFilters]);
 
   const setFilter = (key, value) => {
     if (!updateCatalogUrl) return;
     const updates = { [key]: value };
     if (key !== 'page') updates.page = 1;
     updateCatalogUrl(updates);
+  };
+
+  const toggleMultiFilter = (key, value) => {
+    const currentValues = searchParams.getAll(key);
+    const nextValues = currentValues.includes(String(value))
+      ? currentValues.filter((item) => item !== String(value))
+      : [...currentValues, String(value)];
+    setFilter(key, nextValues);
   };
 
   const clearFilters = () => {
@@ -104,13 +197,16 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     });
   };
 
-  const [expandedPartId, setExpandedPartId] = useState(null);
-  
   // Sort parts based on selected option
   const sortedAvailableParts = useMemo(() => {
-    if (isCatalogMode) return availableParts;
-    let sorted = [...availableParts];
+    let sorted = isCatalogMode
+      ? [...availableParts]
+      : availableParts.filter(matchesActiveFilters);
     
+    if (isCatalogMode) {
+      return sorted;
+    }
+
     if (sortBy === 'price_asc') {
       sorted.sort((a, b) => (a.price || 0) - (b.price || 0));
     } else if (sortBy === 'price_desc') {
@@ -121,10 +217,12 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     }
     
     return sorted;
-  }, [availableParts, sortBy, isCatalogMode]);
+  }, [availableParts, sortBy, isCatalogMode, matchesActiveFilters]);
   
   const sortedAnalogParts = useMemo(() => {
-    let sorted = [...analogParts];
+    let sorted = isCatalogMode
+      ? [...analogParts]
+      : analogParts.filter(matchesActiveFilters);
     
     if (sortBy === 'price_asc') {
       sorted.sort((a, b) => (a.price || 0) - (b.price || 0));
@@ -136,7 +234,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     }
     
     return sorted;
-  }, [analogParts, sortBy]);
+  }, [analogParts, sortBy, isCatalogMode, matchesActiveFilters]);
   
   useEffect(() => {
     // Загружаем информацию об организации только для авторизованных продавцов и сотрудников
@@ -266,81 +364,126 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
 
 
-  if (status === 'loading') {
-    return (
-      <div className="mt-5 text-center py-10">
-        <p className="text-lg text-gray-600">Загрузка запчастей...</p>
-      </div>
-    );
-  }
-
-
-
   const hasAvailableParts = sortedAvailableParts.length > 0;
   const hasAnalogParts = sortedAnalogParts.length > 0;
+  const visibleTotal = isCatalogMode ? catalogTotal : sortedAvailableParts.length + sortedAnalogParts.length;
 
-  if (!hasAvailableParts && !hasAnalogParts) {
+  const toggleFilterGroup = (groupKey) => {
+    setExpandedFilterGroups((prev) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey],
+    }));
+  };
+
+  const getVisibleFilterOptions = (options, selectedValues, groupKey) => {
+    const selectedSet = new Set(selectedValues.map(String));
+    const withSelectedValues = [...options];
+    const knownValues = new Set(options.map((option) => String(option.value)));
+
+    selectedSet.forEach((value) => {
+      if (!knownValues.has(value)) {
+        withSelectedValues.push({ value, label: value });
+      }
+    });
+
+    if (expandedFilterGroups[groupKey]) return withSelectedValues;
+
+    const visible = [];
+    const seen = new Set();
+
+    withSelectedValues.forEach((option) => {
+      const optionValue = String(option.value);
+      if ((visible.length < COLLAPSED_FILTER_LIMIT || selectedSet.has(optionValue)) && !seen.has(optionValue)) {
+        visible.push(option);
+        seen.add(optionValue);
+      }
+    });
+
+    return visible;
+  };
+
+  const renderCheckboxGroup = ({ title, groupKey, options, selectedValues, urlKey }) => {
+    const visibleOptions = getVisibleFilterOptions(options, selectedValues, groupKey);
+    const hasMore = options.length > visibleOptions.length;
+
     return (
-      <div className="mt-16 flex flex-col items-center text-center max-w-2xl mx-auto px-4">
-        <div className="bg-gray-100 p-6 rounded-full mb-8">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 sm:h-12 sm:w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+      <div>
+        <p className="block text-xs font-medium text-gray-600 mb-2">{title}</p>
+        <div className="space-y-2">
+          {visibleOptions.length > 0 ? (
+            visibleOptions.map((option) => {
+              const value = String(option.value);
+              return (
+                <label key={value} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={selectedValues.includes(value)}
+                    onChange={() => toggleMultiFilter(urlKey, value)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="min-w-0 flex-1 truncate">{option.label || option.value}</span>
+                  {typeof option.count === 'number' && (
+                    <span className="text-xs text-gray-400">{option.count}</span>
+                  )}
+                </label>
+              );
+            })
+          ) : (
+            <p className="text-xs text-gray-400">Нет вариантов</p>
+          )}
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-3">Нет б/у запчастей</h2>
-        <p className="text-gray-600 text-base leading-relaxed">Б/у запчасти по данному поисковому запросу не найдены.</p>
-        <p className="text-sm text-gray-500 mt-4">Попробуйте изменить поисковый запрос или проверьте правильность написания.</p>
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => toggleFilterGroup(groupKey)}
+            className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+          >
+            {expandedFilterGroups[groupKey] ? 'Скрыть' : 'Показать больше'}
+          </button>
+        )}
       </div>
     );
-  }
+  };
 
+  const partTypeOptions = publicPartTypes.map((partType) => ({
+    value: String(partType.id),
+    label: partType.name,
+  }));
 
   const filtersPanel = (
     <div className="space-y-4">
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Категория</label>
-        <select
-          value={searchParams.get('part_type') || ''}
-          onChange={(e) => setFilter('part_type', e.target.value || null)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="">Все категории</option>
-          {publicPartTypes.map((pt) => (
-            <option key={pt.id} value={pt.id}>{pt.name}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Бренд</label>
-        <select
-          value={searchParams.get('brand') || ''}
-          onChange={(e) => setFilter('brand', e.target.value || null)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="">Все бренды</option>
-          {(catalogFacets?.brands || []).map((b) => (
-            <option key={b.value} value={b.value}>{b.value} ({b.count})</option>
-          ))}
-        </select>
-      </div>
+      {renderCheckboxGroup({
+        title: 'Категории',
+        groupKey: 'partTypes',
+        options: partTypeOptions,
+        selectedValues: activeFilters.partTypes,
+        urlKey: 'part_type',
+      })}
+      {renderCheckboxGroup({
+        title: 'Бренды',
+        groupKey: 'brands',
+        options: brandOptions,
+        selectedValues: activeFilters.brands,
+        urlKey: 'brand',
+      })}
       <div className="grid grid-cols-2 gap-2">
         <input type="number" placeholder="Цена от" value={searchParams.get('vmin') || ''} onChange={(e) => setFilter('vmin', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
         <input type="number" placeholder="Цена до" value={searchParams.get('vmax') || ''} onChange={(e) => setFilter('vmax', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
       </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Марка авто</label>
-        <select value={searchParams.get('vb') || ''} onChange={(e) => setFilter('vb', e.target.value || null)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          <option value="">Любая</option>
-          {(catalogFacets?.vehicle_brands || []).map((b) => (<option key={b.value} value={b.value}>{b.value}</option>))}
-        </select>
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">Модель</label>
-        <select value={searchParams.get('vm') || ''} onChange={(e) => setFilter('vm', e.target.value || null)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-          <option value="">Любая</option>
-          {(catalogFacets?.vehicle_models || []).map((m) => (<option key={m.value} value={m.value}>{m.value}</option>))}
-        </select>
-      </div>
+      {renderCheckboxGroup({
+        title: 'Марки авто',
+        groupKey: 'vehicleBrands',
+        options: vehicleBrandOptions,
+        selectedValues: activeFilters.vehicleBrands,
+        urlKey: 'vb',
+      })}
+      {renderCheckboxGroup({
+        title: 'Модели',
+        groupKey: 'vehicleModels',
+        options: vehicleModelOptions,
+        selectedValues: activeFilters.vehicleModels,
+        urlKey: 'vm',
+      })}
       <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" checked={searchParams.get('has_photos') === '1'} onChange={(e) => setFilter('has_photos', e.target.checked ? '1' : null)} />
         Только с фото
@@ -351,24 +494,39 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
   return (
     <div className="mt-4 sm:mt-5 px-0 w-full">
-      {isCatalogMode && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-gray-600">Найдено: <span className="font-semibold text-gray-900">{catalogTotal}</span></p>
-          <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} className="lg:hidden px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-medium">
-            {filtersOpen ? 'Скрыть фильтры' : 'Фильтры'}
-          </button>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-gray-600">Найдено: <span className="font-semibold text-gray-900">{visibleTotal}</span></p>
+        <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} className="lg:hidden px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-medium">
+          {filtersOpen ? 'Скрыть фильтры' : 'Фильтры'}
+        </button>
+      </div>
+      <div className="flex flex-col lg:flex-row gap-6">
+        <aside className={`${filtersOpen ? 'block' : 'hidden'} lg:block w-full lg:w-64 flex-shrink-0`}>
+          <div className="bg-white rounded-lg border border-gray-200 p-4 lg:sticky lg:top-4">
+            <h3 className="font-semibold text-gray-900 mb-3 hidden lg:block">Фильтры</h3>
+            {filtersPanel}
+          </div>
+        </aside>
+        <div className="flex-1 min-w-0">
+      {status === 'loading' && (
+        <div className="mt-5 text-center py-10">
+          <p className="text-lg text-gray-600">Загрузка запчастей...</p>
         </div>
       )}
-      <div className="flex gap-6">
-        {isCatalogMode && (
-          <aside className={`${filtersOpen ? 'block' : 'hidden'} lg:block w-full lg:w-64 flex-shrink-0`}>
-            <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-4">
-              <h3 className="font-semibold text-gray-900 mb-3 hidden lg:block">Фильтры</h3>
-              {filtersPanel}
-            </div>
-          </aside>
-        )}
-        <div className="flex-1 min-w-0">
+      {status !== 'loading' && !hasAvailableParts && !hasAnalogParts && (
+        <div className="mt-16 flex flex-col items-center text-center max-w-2xl mx-auto px-4">
+          <div className="bg-gray-100 p-6 rounded-full mb-8">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 sm:h-12 sm:w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-3">Нет б/у запчастей</h2>
+          <p className="text-gray-600 text-base leading-relaxed">Б/у запчасти по данному поисковому запросу не найдены.</p>
+          <p className="text-sm text-gray-500 mt-4">Попробуйте изменить поисковый запрос или фильтры.</p>
+        </div>
+      )}
+      {status !== 'loading' && (
+        <>
       {hasAvailableParts && (
         <>
 
@@ -404,7 +562,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   }}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
-                  showAddToCart={showCartInList && !part.is_new}
                 />
               ))}
             </div>
@@ -643,6 +800,8 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
               })}
             </div>
           )}
+        </>
+      )}
         </>
       )}
         </div>

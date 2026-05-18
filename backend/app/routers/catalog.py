@@ -49,21 +49,23 @@ def _apply_catalog_filters(
     query,
     *,
     is_new: Optional[bool],
-    part_type_id: Optional[int],
+    part_type_id: Optional[List[int]],
     brand: Optional[List[str]],
     price_min: Optional[float],
     price_max: Optional[float],
     storage_location_id: Optional[int],
     organization_id: Optional[str],
     has_photos: Optional[bool],
-    vehicle_brand: Optional[str],
-    vehicle_model: Optional[str],
+    vehicle_brand: Optional[List[str]],
+    vehicle_model: Optional[List[str]],
     vehicle_id: Optional[int],
 ):
     if is_new is not None:
         query = query.filter(ProductModel.is_new == is_new)
-    if part_type_id is not None:
-        query = query.filter(ProductModel.part_type_id == part_type_id)
+    if part_type_id:
+        part_type_ids = [pt for pt in part_type_id if pt is not None]
+        if part_type_ids:
+            query = query.filter(ProductModel.part_type_id.in_(part_type_ids))
     if brand:
         brands = [b.strip() for b in brand if b and b.strip()]
         if brands:
@@ -84,10 +86,12 @@ def _apply_catalog_filters(
         query = query.join(ProductModel.compatible_vehicles)
         if vehicle_id is not None:
             query = query.filter(VehicleModel.id == vehicle_id)
-        if vehicle_brand and vehicle_brand.strip():
-            query = query.filter(VehicleModel.brand.ilike(f"%{vehicle_brand.strip()}%"))
-        if vehicle_model and vehicle_model.strip():
-            query = query.filter(VehicleModel.model.ilike(f"%{vehicle_model.strip()}%"))
+        vehicle_brands = [b.strip() for b in (vehicle_brand or []) if b and b.strip()]
+        if vehicle_brands:
+            query = query.filter(VehicleModel.brand.in_(vehicle_brands))
+        vehicle_models = [m.strip() for m in (vehicle_model or []) if m and m.strip()]
+        if vehicle_models:
+            query = query.filter(VehicleModel.model.in_(vehicle_models))
         query = query.distinct()
     return query
 
@@ -107,15 +111,15 @@ def list_catalog_products(
     sort: str = Query("created_at_desc"),
     q: Optional[str] = None,
     is_new: Optional[bool] = None,
-    part_type_id: Optional[int] = None,
+    part_type_id: Optional[List[int]] = Query(None),
     brand: Optional[List[str]] = Query(None),
     price_min: Optional[float] = None,
     price_max: Optional[float] = None,
     storage_location_id: Optional[int] = None,
     organization_id: Optional[str] = None,
     has_photos: Optional[bool] = None,
-    vehicle_brand: Optional[str] = None,
-    vehicle_model: Optional[str] = None,
+    vehicle_brand: Optional[List[str]] = Query(None),
+    vehicle_model: Optional[List[str]] = Query(None),
     vehicle_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
