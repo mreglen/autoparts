@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import ProductCard from '../ProductCard';
 import {
-  addUsedPartsToCart,
-  selectCart
-} from '../../../redux/slices/CartSlice';
-import {
-  selectMyParts as selectMyPartsItems
+  selectCatalogItems,
+  selectCatalogTotal,
+  selectCatalogPage,
+  selectCatalogPageSize,
+  selectCatalogLoading,
+  selectCatalogFacets,
+  selectPublicPartTypes,
 } from '../../../redux/slices/ProductSlice';
 import { selectSearchQuery } from '../../../redux/slices/RosskoSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
@@ -48,27 +50,65 @@ const formatPhoneNumber = (phone) => {
   return formatted;
 };
 
-const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
+const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const usedPartsData = useSelector(selectUsedPartsData);
-  const myPartsItems = useSelector(selectMyPartsItems);
+  const catalogItems = useSelector(selectCatalogItems);
+  const catalogTotal = useSelector(selectCatalogTotal);
+  const catalogPage = useSelector(selectCatalogPage);
+  const catalogPageSize = useSelector(selectCatalogPageSize);
+  const catalogFacets = useSelector(selectCatalogFacets);
+  const publicPartTypes = useSelector(selectPublicPartTypes);
   const searchQuery = useSelector(selectSearchQuery);
-  const status = useSelector(selectUsedPartsLoading) ? 'loading' : 'idle';
+  const isCatalogMode = !(searchQuery || '').trim();
+  const catalogLoading = useSelector(selectCatalogLoading);
+  const usedPartsLoading = useSelector(selectUsedPartsLoading);
+  const status = isCatalogMode
+    ? (catalogLoading ? 'loading' : 'idle')
+    : (usedPartsLoading ? 'loading' : 'idle');
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
-  const cart = useSelector(selectCart);
-  const [addingToCartId, setAddingToCartId] = useState(null);
-  const availableParts = searchQuery
-    ? (usedPartsData?.available_parts || [])
-    : (myPartsItems || []);
-  const analogParts = usedPartsData?.analog_parts || [];
+  const purchaseMode = useSelector((state) => state.publicInfo.usedPartsPurchaseMode || 'both');
+  const showCartInList = purchaseMode === 'cart_only' || purchaseMode === 'both';
+
+  const availableParts = isCatalogMode
+    ? catalogItems
+    : (usedPartsData?.available_parts || []);
+  const analogParts = isCatalogMode ? [] : (usedPartsData?.analog_parts || []);
+
+  const totalPages = Math.max(1, Math.ceil(catalogTotal / catalogPageSize));
+
+  const setFilter = (key, value) => {
+    if (!updateCatalogUrl) return;
+    const updates = { [key]: value };
+    if (key !== 'page') updates.page = 1;
+    updateCatalogUrl(updates);
+  };
+
+  const clearFilters = () => {
+    if (!updateCatalogUrl) return;
+    updateCatalogUrl({
+      part_type: null,
+      brand: null,
+      vmin: null,
+      vmax: null,
+      vb: null,
+      vm: null,
+      vehicle_id: null,
+      has_photos: null,
+      page: 1,
+    });
+  };
 
   const [expandedPartId, setExpandedPartId] = useState(null);
   
   // Sort parts based on selected option
-  const sortedAvailableParts = React.useMemo(() => {
+  const sortedAvailableParts = useMemo(() => {
+    if (isCatalogMode) return availableParts;
     let sorted = [...availableParts];
     
     if (sortBy === 'price_asc') {
@@ -81,10 +121,9 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
     }
     
     return sorted;
-  }, [availableParts, sortBy]);
+  }, [availableParts, sortBy, isCatalogMode]);
   
-  // Sort analog parts
-  const sortedAnalogParts = React.useMemo(() => {
+  const sortedAnalogParts = useMemo(() => {
     let sorted = [...analogParts];
     
     if (sortBy === 'price_asc') {
@@ -112,33 +151,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
     if (!locationId) return '—';
     const loc = storageLocations.find(l => l.id === locationId);
     return loc ? (loc.address || `Склад #${locationId}`) : `Склад #${locationId}`;
-  };
-
-  // Получаем количество товара в корзине
-  const getCartQuantity = (partId) => {
-    if (!cart?.used_parts_items) return 0;
-    const cartItem = cart.used_parts_items.find(item => item.product_id === partId);
-    return cartItem ? cartItem.quantity : 0;
-  };
-
-  // Функция добавления в корзину
-  const handleAddToCart = async (part) => {
-    setAddingToCartId(part.id);
-    try {
-      const currentCartQuantity = getCartQuantity(part.id);
-      const availableStock = part.quantity || 0;
-
-      if (availableStock <= currentCartQuantity) {
-        setAddingToCartId(null);
-        return;
-      }
-
-      await dispatch(addUsedPartsToCart({ product_id: part.id, quantity: 1 })).unwrap();
-    } catch (error) {
-      console.error('Ошибка добавления в корзину:', error);
-    } finally {
-      setAddingToCartId(null);
-    }
   };
 
   // Component for displaying media with navigation
@@ -283,9 +295,80 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
   }
 
 
+  const filtersPanel = (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Категория</label>
+        <select
+          value={searchParams.get('part_type') || ''}
+          onChange={(e) => setFilter('part_type', e.target.value || null)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">Все категории</option>
+          {publicPartTypes.map((pt) => (
+            <option key={pt.id} value={pt.id}>{pt.name}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Бренд</label>
+        <select
+          value={searchParams.get('brand') || ''}
+          onChange={(e) => setFilter('brand', e.target.value || null)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">Все бренды</option>
+          {(catalogFacets?.brands || []).map((b) => (
+            <option key={b.value} value={b.value}>{b.value} ({b.count})</option>
+          ))}
+        </select>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <input type="number" placeholder="Цена от" value={searchParams.get('vmin') || ''} onChange={(e) => setFilter('vmin', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        <input type="number" placeholder="Цена до" value={searchParams.get('vmax') || ''} onChange={(e) => setFilter('vmax', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Марка авто</label>
+        <select value={searchParams.get('vb') || ''} onChange={(e) => setFilter('vb', e.target.value || null)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="">Любая</option>
+          {(catalogFacets?.vehicle_brands || []).map((b) => (<option key={b.value} value={b.value}>{b.value}</option>))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Модель</label>
+        <select value={searchParams.get('vm') || ''} onChange={(e) => setFilter('vm', e.target.value || null)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="">Любая</option>
+          {(catalogFacets?.vehicle_models || []).map((m) => (<option key={m.value} value={m.value}>{m.value}</option>))}
+        </select>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox" checked={searchParams.get('has_photos') === '1'} onChange={(e) => setFilter('has_photos', e.target.checked ? '1' : null)} />
+        Только с фото
+      </label>
+      <button type="button" onClick={clearFilters} className="w-full text-sm text-indigo-600 hover:text-indigo-800 font-medium">Сбросить фильтры</button>
+    </div>
+  );
+
   return (
     <div className="mt-4 sm:mt-5 px-0 w-full">
-      {/* В наличии */}
+      {isCatalogMode && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-gray-600">Найдено: <span className="font-semibold text-gray-900">{catalogTotal}</span></p>
+          <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} className="lg:hidden px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-medium">
+            {filtersOpen ? 'Скрыть фильтры' : 'Фильтры'}
+          </button>
+        </div>
+      )}
+      <div className="flex gap-6">
+        {isCatalogMode && (
+          <aside className={`${filtersOpen ? 'block' : 'hidden'} lg:block w-full lg:w-64 flex-shrink-0`}>
+            <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-4">
+              <h3 className="font-semibold text-gray-900 mb-3 hidden lg:block">Фильтры</h3>
+              {filtersPanel}
+            </div>
+          </aside>
+        )}
+        <div className="flex-1 min-w-0">
       {hasAvailableParts && (
         <>
 
@@ -293,7 +376,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
           {viewMode === 'grid' && (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {sortedAvailableParts.map((part) => (
-                <ProductCard 
+                <ProductCard
                   key={part.id}
                   part={{
                     id: part.id,
@@ -321,8 +404,17 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
                   }}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
+                  showAddToCart={showCartInList && !part.is_new}
                 />
               ))}
+            </div>
+          )}
+
+          {isCatalogMode && totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-center gap-2 flex-wrap">
+              <button type="button" disabled={catalogPage <= 1} onClick={() => setFilter('page', catalogPage - 1)} className="px-3 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40">Назад</button>
+              <span className="text-sm text-gray-600 px-2">Стр. {catalogPage} из {totalPages}</span>
+              <button type="button" disabled={catalogPage >= totalPages} onClick={() => setFilter('page', catalogPage + 1)} className="px-3 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40">Вперёд</button>
             </div>
           )}
           
@@ -330,7 +422,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
           {viewMode === 'list' && (
             <div className="space-y-3">
               {sortedAvailableParts.map((part) => {
-                const cartQuantity = getCartQuantity(part.id);
                 const availableQty = part.quantity || part.available_count || 0;
                 const sellerOrg = part.organization || organization;
                 
@@ -379,41 +470,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
                             </div>
                           </div>
                           
-                          <div className="mt-auto flex items-center gap-3">
-                            {cartQuantity > 0 ? (
-                              <>
-                                <div className="text-sm text-gray-600">
-                                  В корзине: <span className="font-semibold">{cartQuantity} шт.</span>
-                                </div>
-                                <button
-                                  onClick={() => handleAddToCart(part)}
-                                  disabled={addingToCartId === part.id || availableQty <= cartQuantity}
-                                  className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                                    addingToCartId === part.id || availableQty <= cartQuantity
-                                      ? 'bg-gray-300 cursor-not-allowed'
-                                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                  }`}
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                  </svg>
-                                  {addingToCartId === part.id ? 'Добавление...' : 'Ещё +1'}
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                onClick={() => handleAddToCart(part)}
-                                disabled={addingToCartId === part.id || availableQty === 0}
-                                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                                  addingToCartId === part.id || availableQty === 0
-                                    ? 'bg-gray-300 cursor-not-allowed'
-                                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                                }`}
-                              >
-                                {addingToCartId === part.id ? 'Добавление...' : 'В корзину'}
-                              </button>
-                            )}
-                          </div>
                         </div>
                         
                         {/* Seller Info - Right Side */}
@@ -502,7 +558,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
           {viewMode === 'list' && (
             <div className="space-y-3">
               {sortedAnalogParts.map((part) => {
-                const cartQuantity = getCartQuantity(part.id);
                 const availableQty = part.quantity || part.available_count || 0;
                 const sellerOrg = part.organization || organization;
                 
@@ -551,41 +606,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
                             </div>
                           </div>
                           
-                          <div className="mt-auto flex items-center gap-3">
-                            {cartQuantity > 0 ? (
-                              <>
-                                <div className="text-sm text-gray-600">
-                                  В корзине: <span className="font-semibold">{cartQuantity} шт.</span>
-                                </div>
-                                <button
-                                  onClick={() => handleAddToCart(part)}
-                                  disabled={addingToCartId === part.id || availableQty <= cartQuantity}
-                                  className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                                    addingToCartId === part.id || availableQty <= cartQuantity
-                                      ? 'bg-gray-300 cursor-not-allowed'
-                                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                  }`}
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                  </svg>
-                                  {addingToCartId === part.id ? 'Добавление...' : 'Ещё +1'}
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                onClick={() => handleAddToCart(part)}
-                                disabled={addingToCartId === part.id || availableQty === 0}
-                                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                                  addingToCartId === part.id || availableQty === 0
-                                    ? 'bg-gray-300 cursor-not-allowed'
-                                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                                }`}
-                              >
-                                {addingToCartId === part.id ? 'Добавление...' : 'В корзину'}
-                              </button>
-                            )}
-                          </div>
                         </div>
                         
                         {/* Seller Info - Right Side */}
@@ -625,6 +645,8 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date' }) => {
           )}
         </>
       )}
+        </div>
+      </div>
     </div>
   );
 };

@@ -24,6 +24,7 @@ const publicInfoSlice = createSlice({
     adminOrganizationPhone: null,
     showNewAutoparts: true,
     newPartsMarkupPercent: 15,
+    usedPartsPurchaseMode: 'both',
     loading: false,
     error: null,
   },
@@ -32,6 +33,7 @@ const publicInfoSlice = createSlice({
       state.adminOrganizationPhone = null;
       state.showNewAutoparts = true;
       state.newPartsMarkupPercent = 15;
+      state.usedPartsPurchaseMode = 'both';
       state.error = null;
     },
     setShowNewAutoparts: (state, action) => {
@@ -56,6 +58,9 @@ const publicInfoSlice = createSlice({
         const m = Number(p?.new_parts_markup_percent);
         state.newPartsMarkupPercent =
           Number.isFinite(m) && m >= 0 ? m : 15;
+        const mode = p?.used_parts_purchase_mode;
+        state.usedPartsPurchaseMode =
+          mode === 'cart_only' || mode === 'cta_only' || mode === 'both' ? mode : 'both';
         if (p?.organization_phone) {
           state.adminOrganizationPhone = {
             organization_name: p.organization_name ?? null,

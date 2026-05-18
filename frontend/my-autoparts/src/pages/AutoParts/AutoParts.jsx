@@ -1,5 +1,5 @@
 // src/components/AutoParts.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -9,15 +9,39 @@ import {
   selectSearchQuery
 } from '../../redux/slices/RosskoSlice';
 import {
-  selectItems as selectMyParts,
-  selectStatus as selectMyPartsStatus,
-  selectError as selectMyPartsError,
-  selectMyParts as selectMyPartsItems
+  searchUsedParts,
+  fetchCatalogProducts,
+  fetchCatalogFacets,
+  fetchPublicPartTypes,
 } from '../../redux/slices/ProductSlice';
-import { searchAllProducts, searchUsedParts, fetchAllProducts } from '../../redux/slices/ProductSlice';
 import { fetchCart } from '../../redux/slices/CartSlice';
 import CardPart from './CardPart/CardPart';
 import UsedPartsList from './UsedParts/UsedPartsList';
+
+const apiSortToUi = (sort) => {
+  if (sort === 'price_asc' || sort === 'price_desc') return sort;
+  return 'date';
+};
+
+const uiSortToApi = (sort) => (sort === 'date' ? 'created_at_desc' : sort);
+
+const getRosskoStockCount = (part) => {
+  const stocks = part?.stocks?.stock;
+  if (!stocks) return 0;
+  const arr = Array.isArray(stocks) ? stocks : [stocks];
+  return arr.reduce((sum, s) => sum + (parseInt(s?.count, 10) || 0), 0);
+};
+
+const getRosskoMinPrice = (part) => {
+  const stocks = part?.stocks?.stock;
+  if (!stocks) return 0;
+  const arr = Array.isArray(stocks) ? stocks : [stocks];
+  return arr.reduce((min, s) => {
+    const p = parseFloat(s?.price) || 0;
+    if (!p) return min;
+    return min === 0 ? p : Math.min(min, p);
+  }, 0);
+};
 
 const EmptySearchState = ({ query }) => (
   <div className="mt-12 sm:mt-16 flex flex-col items-center text-center max-w-2xl mx-auto px-4">
@@ -59,22 +83,48 @@ function AutoParts() {
   const isUsedTab = !showNewAutoparts || location.pathname.includes('/autoparts/used');
   const [activeTab, setActiveTab] = useState(isUsedTab ? 'my' : 'rossko');
   
-  // Update URL when tab changes
   useEffect(() => {
-    const urlQuery = searchParams.get('q');
+    const qs = searchParams.toString();
     if (!showNewAutoparts || activeTab !== 'rossko') {
-      navigate('/autoparts/used' + (urlQuery ? `?q=${urlQuery}` : ''), { replace: true });
+      navigate(`/autoparts/used${qs ? `?${qs}` : ''}`, { replace: true });
     } else {
-      navigate('/autoparts/new' + (urlQuery ? `?q=${urlQuery}` : ''), { replace: true });
+      const qOnly = searchParams.get('q');
+      navigate(`/autoparts/new${qOnly ? `?q=${encodeURIComponent(qOnly)}` : ''}`, { replace: true });
     }
-  }, [activeTab, searchParams, navigate, showNewAutoparts]);
+  }, [activeTab, navigate, showNewAutoparts]);
   
   // Состояние для переключения вида карточек в б/у запчастях
   const [usedPartsView, setUsedPartsView] = useState('grid'); // 'grid' or 'list'
   
-  // Состояние для сортировки б/у запчастей
-  const [usedPartsSort, setUsedPartsSort] = useState('date'); // 'date', 'price_asc', 'price_desc'
+  const [usedPartsSort, setUsedPartsSort] = useState(
+    () => apiSortToUi(searchParams.get('sort') || 'created_at_desc')
+  );
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+
+  const [rosskoBrandFilter, setRosskoBrandFilter] = useState('');
+  const [rosskoPriceMin, setRosskoPriceMin] = useState('');
+  const [rosskoPriceMax, setRosskoPriceMax] = useState('');
+  const [rosskoInStockOnly, setRosskoInStockOnly] = useState(false);
+  const [rosskoSort, setRosskoSort] = useState('price_asc');
+
+  const updateCatalogUrl = useCallback((updates) => {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '') {
+        params.delete(key);
+      } else {
+        params.set(key, String(value));
+      }
+    });
+    const qs = params.toString();
+    navigate(`${location.pathname}${qs ? `?${qs}` : ''}`, { replace: true });
+  }, [searchParams, navigate, location.pathname]);
+
+  const applyUsedSort = useCallback((uiSort) => {
+    setUsedPartsSort(uiSort);
+    updateCatalogUrl({ sort: uiSortToApi(uiSort), page: 1 });
+    setShowSortDropdown(false);
+  }, [updateCatalogUrl]);
   
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -115,15 +165,44 @@ function AutoParts() {
     setActiveTab(isUsedTab ? 'my' : 'rossko');
   }, [isUsedTab, showNewAutoparts]);
 
-  // При изменении searchQuery — обновляем б/у запчасти
   useEffect(() => {
-    if (searchQuery) {
-      dispatch(searchUsedParts(searchQuery));
-    } else {
-      // Для б/у запчастей без поискового запроса показываем все б/у запчасти
-      dispatch(fetchAllProducts());
+    setUsedPartsSort(apiSortToUi(searchParams.get('sort') || 'created_at_desc'));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const trimmed = (searchQuery || '').trim();
+    if (trimmed) {
+      dispatch(searchUsedParts(trimmed));
+      return;
     }
-  }, [searchQuery, dispatch]);
+    if (activeTab !== 'my') return;
+
+    const params = {
+      page: parseInt(searchParams.get('page') || '1', 10),
+      page_size: 20,
+      sort: searchParams.get('sort') || 'created_at_desc',
+      is_new: false,
+    };
+    const partType = searchParams.get('part_type');
+    if (partType) params.part_type_id = parseInt(partType, 10);
+    const brand = searchParams.get('brand');
+    if (brand) params.brand = brand;
+    const vmin = searchParams.get('vmin');
+    if (vmin) params.price_min = parseFloat(vmin);
+    const vmax = searchParams.get('vmax');
+    if (vmax) params.price_max = parseFloat(vmax);
+    const vb = searchParams.get('vb');
+    if (vb) params.vehicle_brand = vb;
+    const vm = searchParams.get('vm');
+    if (vm) params.vehicle_model = vm;
+    const vehicleId = searchParams.get('vehicle_id');
+    if (vehicleId) params.vehicle_id = parseInt(vehicleId, 10);
+    if (searchParams.get('has_photos') === '1') params.has_photos = true;
+
+    dispatch(fetchCatalogProducts(params));
+    dispatch(fetchCatalogFacets({ is_new: false, vehicle_brand: vb || undefined }));
+    dispatch(fetchPublicPartTypes());
+  }, [searchQuery, activeTab, searchParams, dispatch]);
 
   // Загружаем корзину при монтировании компонента
   useEffect(() => {
@@ -137,14 +216,60 @@ function AutoParts() {
   }
   const allParts = rawParts;
 
-  const allCrossParts = [];
-  allParts.forEach(part => {
-    let crosses = part?.crosses?.Part;
-    if (crosses) {
-      if (!Array.isArray(crosses)) crosses = [crosses];
-      allCrossParts.push(...crosses);
-    }
-  });
+  const rosskoBrands = useMemo(() => {
+    const brands = new Set();
+    allParts.forEach((p) => {
+      if (p?.brand) brands.add(p.brand);
+    });
+    return Array.from(brands).sort();
+  }, [allParts]);
+
+  const filterRosskoPart = useCallback((part) => {
+    if (rosskoBrandFilter && part?.brand !== rosskoBrandFilter) return false;
+    const price = getRosskoMinPrice(part);
+    if (rosskoPriceMin && price < parseFloat(rosskoPriceMin)) return false;
+    if (rosskoPriceMax && price > parseFloat(rosskoPriceMax)) return false;
+    if (rosskoInStockOnly && getRosskoStockCount(part) <= 0) return false;
+    return true;
+  }, [rosskoBrandFilter, rosskoPriceMin, rosskoPriceMax, rosskoInStockOnly]);
+
+  const sortRosskoParts = useCallback((parts) => {
+    const sorted = [...parts];
+    sorted.sort((a, b) => {
+      if (rosskoSort === 'price_desc') {
+        return getRosskoMinPrice(b) - getRosskoMinPrice(a);
+      }
+      if (rosskoSort === 'brand') {
+        return String(a?.brand || '').localeCompare(String(b?.brand || ''), 'ru');
+      }
+      return getRosskoMinPrice(a) - getRosskoMinPrice(b);
+    });
+    return sorted;
+  }, [rosskoSort]);
+
+  const filteredRosskoParts = useMemo(
+    () => sortRosskoParts(allParts.filter(filterRosskoPart)),
+    [allParts, filterRosskoPart, sortRosskoParts]
+  );
+
+  const allCrossParts = useMemo(() => {
+    const crosses = [];
+    allParts.forEach((part) => {
+      let crossParts = part?.crosses?.Part;
+      if (crossParts) {
+        if (!Array.isArray(crossParts)) crossParts = [crossParts];
+        crosses.push(...crossParts);
+      }
+    });
+    return crosses;
+  }, [allParts]);
+
+  const filteredCrossParts = useMemo(
+    () => sortRosskoParts(allCrossParts.filter(filterRosskoPart)),
+    [allCrossParts, filterRosskoPart, sortRosskoParts]
+  );
+
+  const hasRosskoResults = filteredRosskoParts.length > 0 || filteredCrossParts.length > 0;
 
   if (status === 'loading' && activeTab === 'rossko') {
     return (
@@ -163,8 +288,6 @@ function AutoParts() {
     );
   }
 
-  const hasRosskoResults = allParts.length > 0 || allCrossParts.length > 0;
-
   return (
     <div className="mt-4 sm:mt-5 px-0 w-full">
 
@@ -182,15 +305,7 @@ function AutoParts() {
           </button>
         )}
         <button
-          onClick={() => {
-            if (searchQuery) {
-              dispatch(searchUsedParts(searchQuery));
-            } else {
-              // Для б/у запчастей без поискового запроса показываем все б/у запчасти
-              dispatch(fetchAllProducts());
-            }
-            setActiveTab('my');
-          }}
+          onClick={() => setActiveTab('my')}
           className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${activeTab === 'my'
               ? 'bg-indigo-500 text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -221,10 +336,7 @@ function AutoParts() {
               {showSortDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-30">
                   <button
-                    onClick={() => {
-                      setUsedPartsSort('price_asc');
-                      setShowSortDropdown(false);
-                    }}
+                    onClick={() => applyUsedSort('price_asc')}
                     className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${usedPartsSort === 'price_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
                   >
                     <div className="flex items-center justify-between">
@@ -237,10 +349,7 @@ function AutoParts() {
                     </div>
                   </button>
                   <button
-                    onClick={() => {
-                      setUsedPartsSort('price_desc');
-                      setShowSortDropdown(false);
-                    }}
+                    onClick={() => applyUsedSort('price_desc')}
                     className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${usedPartsSort === 'price_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
                   >
                     <div className="flex items-center justify-between">
@@ -253,10 +362,7 @@ function AutoParts() {
                     </div>
                   </button>
                   <button
-                    onClick={() => {
-                      setUsedPartsSort('date');
-                      setShowSortDropdown(false);
-                    }}
+                    onClick={() => applyUsedSort('date')}
                     className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${usedPartsSort === 'date' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
                   >
                     <div className="flex items-center justify-between">
@@ -303,12 +409,59 @@ function AutoParts() {
 
       {/* Отображение контента в зависимости от вкладки */}
       {activeTab === 'my' ? (
-        <UsedPartsList viewMode={usedPartsView} sortBy={usedPartsSort} />
+        <UsedPartsList
+          viewMode={usedPartsView}
+          sortBy={usedPartsSort}
+          updateCatalogUrl={updateCatalogUrl}
+        />
       ) : (
         <>
 
           {hasRosskoResults ? (
             <>
+              <div className="mb-4 p-4 bg-white rounded-lg border border-gray-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <select
+                  value={rosskoBrandFilter}
+                  onChange={(e) => setRosskoBrandFilter(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">Все бренды</option>
+                  {rosskoBrands.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  placeholder="Цена от"
+                  value={rosskoPriceMin}
+                  onChange={(e) => setRosskoPriceMin(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <input
+                  type="number"
+                  placeholder="Цена до"
+                  value={rosskoPriceMax}
+                  onChange={(e) => setRosskoPriceMax(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                />
+                <select
+                  value={rosskoSort}
+                  onChange={(e) => setRosskoSort(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="price_asc">Дешевле</option>
+                  <option value="price_desc">Дороже</option>
+                  <option value="brand">По бренду</option>
+                </select>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={rosskoInStockOnly}
+                    onChange={(e) => setRosskoInStockOnly(e.target.checked)}
+                  />
+                  Только в наличии
+                </label>
+              </div>
 
               {/* Десктопная версия - таблица */}
               <div className="hidden md:block">
@@ -325,7 +478,7 @@ function AutoParts() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {allParts.map((part, idx) => {
+                    {filteredRosskoParts.map((part, idx) => {
                       const uniqueId = `available-${part.guid || part.id || idx}`;
                       // Преобразуем данные складов из API формата в формат для CardPart
                       let stocksData = [];
@@ -359,7 +512,7 @@ function AutoParts() {
               </div>
               {/* Мобильная версия - карточки */}
               <div className="md:hidden space-y-5">
-                {allParts.map((part, idx) => {
+                {filteredRosskoParts.map((part, idx) => {
                   const uniqueId = `mobile-available-${part.guid || part.id || idx}`;
                   let stocksData = [];
                   if (part.stocks && part.stocks.stock) {
@@ -390,7 +543,7 @@ function AutoParts() {
                 })}
               </div>
 
-              {allCrossParts.length > 0 && (
+              {filteredCrossParts.length > 0 && (
                 <>
                   <div className="font-medium text-xl sm:text-xl my-6 sm:my-10 px-4 sm:px-0">
                     <h2 className="border-b-4 border-blue-500 pb-2 inline-block">Аналоги</h2>
@@ -411,7 +564,7 @@ function AutoParts() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {allCrossParts.map((part, idx) => {
+                        {filteredCrossParts.map((part, idx) => {
                           const uniqueId = `analog-${part.guid || part.id || idx}`;
                           let stocksData = [];
                           if (part.stocks && part.stocks.stock) {
@@ -445,7 +598,7 @@ function AutoParts() {
 
                   {/* Мобильная версия аналогов */}
                   <div className="md:hidden space-y-5">
-                    {allCrossParts.map((part, idx) => {
+                    {filteredCrossParts.map((part, idx) => {
                       const uniqueId = `mobile-analog-${part.guid || part.id || idx}`;
                       let stocksData = [];
                       if (part.stocks && part.stocks.stock) {

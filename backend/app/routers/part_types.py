@@ -8,6 +8,12 @@ from app.models.user import User
 
 router = APIRouter(prefix="/part-types", tags=["Part Types"])
 
+@router.get("/public", response_model=list[PartTypeSchema])
+def get_public_part_types(db: Session = Depends(get_db)):
+    """Публичный список видов запчастей (без авторизации)"""
+    return db.query(PartTypeModel).order_by(PartTypeModel.name).all()
+
+
 @router.get("/", response_model=list[PartTypeSchema])
 def get_part_types(
     db: Session = Depends(get_db),

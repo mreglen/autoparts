@@ -45,6 +45,9 @@ const PartDetail = () => {
   const { organization } = useSelector((state) => state.organization);
   const { user } = useSelector((state) => state.auth);
   const cart = useSelector(selectCart);
+  const purchaseMode = useSelector((state) => state.publicInfo.usedPartsPurchaseMode || 'both');
+  const showCartForUsed =
+    purchaseMode === 'cart_only' || purchaseMode === 'both';
 
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
@@ -577,6 +580,7 @@ const PartDetail = () => {
             )}
 
             {/* Add to Cart */}
+            {(currentProduct?.is_new || showCartForUsed) && (
             <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
               {(() => {
                 const cartQuantity = getCartQuantity(currentProduct.id);
@@ -637,6 +641,7 @@ const PartDetail = () => {
                 );
               })()}
             </div>
+            )}
 
             {/* Seller */}
             {(sellerOrg?.phone || sellerOrg?.contact_person) && (

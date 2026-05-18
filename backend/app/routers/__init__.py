@@ -20,6 +20,7 @@ from app.routers.vehicle_catalog import router as vehicle_catalog_router
 from app.routers.transmissions import router as transmissions_router
 from app.routers.upload import router as upload_router
 from app.routers.search_products import router as search_products_router
+from app.routers.catalog import router as catalog_router
 from app.routers.tecdoc_parts import router as tecdoc_parts_router
 from app.routers.carts import router as carts_router
 from app.routers.checkout import router as checkout_router
@@ -41,6 +42,7 @@ api_router = APIRouter(prefix="/api")
 
 
 api_router.include_router(search_products_router)
+api_router.include_router(catalog_router)
 api_router.include_router(rossko_router)
 api_router.include_router(upload_router)
 api_router.include_router(vehicles_router)

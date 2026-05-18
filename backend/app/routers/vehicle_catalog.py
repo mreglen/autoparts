@@ -32,13 +32,7 @@ _DISPLAY_OK = or_(
 )
 
 
-@router.get("/manufacturers", response_model=list[TecdocManufacturerOut])
-def search_manufacturers(
-    q: str = "",
-    limit: int = 80,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def _search_manufacturers(db: Session, q: str = "", limit: int = 80):
     qry = db.query(TecdocManufacturer).filter(_PASSENGER_FILTER, _DISPLAY_OK)
     if q and q.strip():
         term = f"%{q.strip()}%"
@@ -59,16 +53,21 @@ def search_manufacturers(
     ]
 
 
+@router.get("/manufacturers", response_model=list[TecdocManufacturerOut])
+def search_manufacturers(
+    q: str = "",
+    limit: int = 80,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return _search_manufacturers(db, q=q, limit=limit)
+
+
 _MODEL_PAX = or_(TecdocModel.IsPassengerCar == True, TecdocModel.IsPassengerCar.is_(None))
 _MODEL_DIS = or_(TecdocModel.CanBeDisplayed == True, TecdocModel.CanBeDisplayed.is_(None))
 
 
-@router.get("/manufacturers/{manufacturer_id}/models", response_model=list[TecdocModelOut])
-def list_models_for_manufacturer(
-    manufacturer_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def _list_models_for_manufacturer(db: Session, manufacturer_id: int):
     rows = (
         db.query(TecdocModel)
         .filter(
@@ -80,6 +79,15 @@ def list_models_for_manufacturer(
         .all()
     )
     return [TecdocModelOut.from_row(r) for r in rows]
+
+
+@router.get("/manufacturers/{manufacturer_id}/models", response_model=list[TecdocModelOut])
+def list_models_for_manufacturer(
+    manufacturer_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return _list_models_for_manufacturer(db, manufacturer_id)
 
 
 @router.get("/models/{model_id}/passengercars", response_model=list[TecdocPassengercarOut])
@@ -222,3 +230,23 @@ def list_transmissions_for_passengercar(
     ids = _item_ids_for_transmission_attributes(db, pc)
     rows = db.execute(_TRANSMISSION_SQL, {"ids": ids}).mappings().all()
     return [TecdocTransmissionOut(title=r["title"] or None, value=r["val"]) for r in rows]
+
+
+# --- Public (no auth) endpoints for storefront filters ---
+
+
+@router.get("/public/manufacturers", response_model=list[TecdocManufacturerOut])
+def search_manufacturers_public(
+    q: str = "",
+    limit: int = 80,
+    db: Session = Depends(get_db),
+):
+    return _search_manufacturers(db, q=q, limit=limit)
+
+
+@router.get("/public/manufacturers/{manufacturer_id}/models", response_model=list[TecdocModelOut])
+def list_models_for_manufacturer_public(
+    manufacturer_id: int,
+    db: Session = Depends(get_db),
+):
+    return _list_models_for_manufacturer(db, manufacturer_id)

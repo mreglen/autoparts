@@ -34,11 +34,13 @@ def _new_parts_markup_percent_value(row) -> float:
 class SiteSettingsResponse(BaseModel):
     show_new_autoparts: bool
     new_parts_markup_percent: float
+    used_parts_purchase_mode: str = "both"
 
 
 class SiteSettingsPatch(BaseModel):
     show_new_autoparts: Optional[bool] = None
     new_parts_markup_percent: Optional[float] = Field(None, ge=0, le=500)
+    used_parts_purchase_mode: Optional[str] = None
 
 
 class OrdersV2MigrationResponse(BaseModel):
@@ -54,9 +56,11 @@ def get_site_settings_admin(
     db: Session = Depends(get_db),
 ):
     row = get_or_create_site_settings(db)
+    mode = getattr(row, "used_parts_purchase_mode", None) or "both"
     return SiteSettingsResponse(
         show_new_autoparts=row.show_new_autoparts,
         new_parts_markup_percent=_new_parts_markup_percent_value(row),
+        used_parts_purchase_mode=mode,
     )
 
 
@@ -77,11 +81,21 @@ def patch_site_settings_admin(
         row.show_new_autoparts = data["show_new_autoparts"]
     if "new_parts_markup_percent" in data:
         row.new_parts_markup_percent = float(data["new_parts_markup_percent"])
+    if "used_parts_purchase_mode" in data:
+        mode = data["used_parts_purchase_mode"]
+        if mode not in ("cart_only", "cta_only", "both"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="used_parts_purchase_mode must be cart_only, cta_only, or both",
+            )
+        row.used_parts_purchase_mode = mode
     db.commit()
     db.refresh(row)
+    mode = getattr(row, "used_parts_purchase_mode", None) or "both"
     return SiteSettingsResponse(
         show_new_autoparts=row.show_new_autoparts,
         new_parts_markup_percent=_new_parts_markup_percent_value(row),
+        used_parts_purchase_mode=mode,
     )
 
 

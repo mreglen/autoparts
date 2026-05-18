@@ -498,6 +498,48 @@ export const fetchVehicleCatalogTransmissions = createAsyncThunk(
     }
 );
 
+export const fetchCatalogProducts = createAsyncThunk(
+    'products/fetchCatalogProducts',
+    async (params = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiAxiosUnauth.get('/catalog/products', { params });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки каталога'
+            );
+        }
+    }
+);
+
+export const fetchCatalogFacets = createAsyncThunk(
+    'products/fetchCatalogFacets',
+    async (params = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiAxiosUnauth.get('/catalog/facets', { params });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки фильтров'
+            );
+        }
+    }
+);
+
+export const fetchPublicPartTypes = createAsyncThunk(
+    'products/fetchPublicPartTypes',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiAxiosUnauth.get('/part-types/public');
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки категорий'
+            );
+        }
+    }
+);
+
 // Получить все продукты (без поиска)
 const fetchAllProducts = createAsyncThunk(
     'products/fetchAllProducts',
@@ -633,6 +675,13 @@ const productSlice = createSlice({
         searchCache: {}, // Кэш результатов поиска: {query: {data, timestamp}}
         usedPartsData: null, // Данные поиска б/у запчастей: {available_parts, analog_parts, rossko_data}
         usedPartsCache: {}, // Кэш результатов поиска б/у запчастей: {query: {data, timestamp}}
+        catalogItems: [],
+        catalogTotal: 0,
+        catalogPage: 1,
+        catalogPageSize: 20,
+        catalogLoading: false,
+        catalogFacets: null,
+        publicPartTypes: [],
     },
     reducers: {
         clearProductError: (state) => {
@@ -756,6 +805,29 @@ const productSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
                 state.items = [];
+            })
+            .addCase(fetchCatalogProducts.pending, (state) => {
+                state.catalogLoading = true;
+                state.error = null;
+            })
+            .addCase(fetchCatalogProducts.fulfilled, (state, action) => {
+                state.catalogLoading = false;
+                state.catalogItems = action.payload.items || [];
+                state.catalogTotal = action.payload.total ?? 0;
+                state.catalogPage = action.payload.page ?? 1;
+                state.catalogPageSize = action.payload.page_size ?? 20;
+            })
+            .addCase(fetchCatalogProducts.rejected, (state, action) => {
+                state.catalogLoading = false;
+                state.error = action.payload;
+                state.catalogItems = [];
+                state.catalogTotal = 0;
+            })
+            .addCase(fetchCatalogFacets.fulfilled, (state, action) => {
+                state.catalogFacets = action.payload;
+            })
+            .addCase(fetchPublicPartTypes.fulfilled, (state, action) => {
+                state.publicPartTypes = action.payload || [];
             })
             .addCase(fetchAllProducts.pending, (state) => {
                 state.loading = true;
@@ -1009,4 +1081,11 @@ export { fetchAllProducts };
 export const selectMyParts = (state) => state.products.items;
 export const selectMyPartsStatus = (state) => state.products.loading ? 'loading' : 'idle';
 export const selectMyPartsError = (state) => state.products.error;
+export const selectCatalogItems = (state) => state.products.catalogItems;
+export const selectCatalogTotal = (state) => state.products.catalogTotal;
+export const selectCatalogPage = (state) => state.products.catalogPage;
+export const selectCatalogPageSize = (state) => state.products.catalogPageSize;
+export const selectCatalogLoading = (state) => state.products.catalogLoading;
+export const selectCatalogFacets = (state) => state.products.catalogFacets;
+export const selectPublicPartTypes = (state) => state.products.publicPartTypes;
 export default productSlice.reducer;

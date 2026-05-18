@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart } from '../../redux/slices/CartSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
 
-const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantity = false }) => {
+const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantity = false, showAddToCart = false }) => {
   // Function to check if the file is a video
   const isVideo = (item) => {
     if (typeof item === 'string') {
@@ -46,12 +44,9 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
     }
     return false;
   };
-  const [isAdding, setIsAdding] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [hoverSide, setHoverSide] = useState(null); // 'left' or 'right'
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const cart = useSelector(selectCart);
   
   // Combine photos and videos into a single media array
   const allMedia = React.useMemo(() => {
@@ -81,54 +76,6 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
   }, [allMedia, currentImageIndex]);
 
   const product = part;
-
-  // Get current cart quantity for this product
-  const cartItem = cart?.used_parts_items?.find(item => item.product_id === product.id);
-  const currentQuantity = cartItem ? cartItem.quantity : 0;
-  
-  // Check if adding to cart would exceed available stock
-  const availableStock = product.quantity || product.available_count || 0;
-  const isStockLimited = currentQuantity >= availableStock && availableStock > 0;
-
-  const handleAddToCart = async (e) => {
-    e.stopPropagation();
-    if (isAdding || isStockLimited) return;
-    
-    const availableStock = product.quantity || product.available_count || 0;
-    if (availableStock > 0 && currentQuantity >= availableStock) {
-      return; // Already at stock limit
-    }
-    
-    setIsAdding(true);
-    try {
-      await dispatch(addUsedPartsToCart({ 
-        product_id: product.id, 
-        quantity: 1 
-      })).unwrap();
-    } catch (error) {
-      console.error('Error adding to cart:', error);
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
-  const handleRemoveFromCart = async (e) => {
-    e.stopPropagation();
-    setIsAdding(true);
-    try {
-      if (cartItem) {
-        if (cartItem.quantity > 1) {
-          await dispatch(updateUsedCartItemQuantity({ itemId: cartItem.id, quantity: cartItem.quantity - 1 })).unwrap();
-        } else {
-          await dispatch(removeUsedFromCart(cartItem.id)).unwrap();
-        }
-      }
-    } catch (error) {
-      console.error('Error changing quantity in cart:', error);
-    } finally {
-      setIsAdding(false);
-    }
-  };
 
   const handleTitleClick = () => {
     const productId = product.id || 'unknown';
@@ -318,58 +265,20 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
                 )}
               </div>
             )}
-          </div>
 
-          {/* Add to Cart Button - Stays at bottom */}
-          <div className="p-1.5 pt-0">
-            {currentQuantity > 0 ? (
-              <div className="flex items-center justify-center space-x-1">
+            {showAddToCart && (
+              <div className="pt-2">
                 <button
-                  onClick={handleRemoveFromCart}
-                  disabled={isAdding}
-                  className="w-6 h-8 flex items-center justify-center text-base font-medium rounded border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTitleClick();
+                  }}
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg"
                 >
-                  −
+                  В корзину
                 </button>
-                <span className="text-[14px] font-semibold w-5 text-center">
-                  {currentQuantity}
-                </span>
-                <button
-                  onClick={handleAddToCart}
-                  disabled={isAdding || isStockLimited}
-                  className="w-6 h-8 flex items-center justify-center text-base font-medium rounded border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                  +
-                </button>
-                {isStockLimited && (
-                  <div className="text-[14px] text-orange-600 ml-1">Нет в наличии</div>
-                )}
               </div>
-            ) : (
-              <button 
-                className={`w-full py-3 px-1.5 rounded-xl text-[14px] font-medium text-white transition-all duration-200 flex items-center justify-center ${
-                  isAdding 
-                    ? 'bg-green-600 hover:bg-green-700' 
-                    : 'bg-indigo-600 hover:bg-indigo-700'
-                }`}
-                onClick={handleAddToCart}
-                disabled={isAdding || isStockLimited}
-              >
-                {isAdding ? (
-                  <>
-                    <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>...</span>
-                  </>
-                ) : (
-                  'В корзину'
-                )}
-                {isStockLimited && !isAdding && currentQuantity === 0 && (
-                  <div className="ml-0.5 text-[14px] text-orange-600">Нет в н</div>
-                )}
-              </button>
             )}
           </div>
         </div>

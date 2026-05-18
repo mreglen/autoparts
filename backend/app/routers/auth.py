@@ -600,6 +600,9 @@ def get_public_site_config(db: Session = Depends(get_db)):
         if organization:
             org_name = organization.name
             org_phone = organization.phone
+    purchase_mode = getattr(settings_row, "used_parts_purchase_mode", None) or "both"
+    if purchase_mode not in ("cart_only", "cta_only", "both"):
+        purchase_mode = "both"
     return {
         "organization_name": org_name,
         "organization_phone": org_phone,
@@ -609,4 +612,5 @@ def get_public_site_config(db: Session = Depends(get_db)):
             if (m := getattr(settings_row, "new_parts_markup_percent", None)) is not None
             else 15.0
         ),
+        "used_parts_purchase_mode": purchase_mode,
     }
