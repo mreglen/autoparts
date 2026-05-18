@@ -28,9 +28,17 @@ const ConfirmModal = ({ isOpen, onClose, title, message, onConfirm, confirmText 
                         {/* Buttons */}
                         <div className="flex gap-3">
                             <button
-                                onClick={() => {
-                                    onConfirm();
-                                    onClose();
+                                onClick={async () => {
+                                    if (!onConfirm) {
+                                        onClose();
+                                        return;
+                                    }
+                                    try {
+                                        await Promise.resolve(onConfirm());
+                                        onClose();
+                                    } catch {
+                                        // Родитель обрабатывает ошибку (например через unwrap/)
+                                    }
                                 }}
                                 className={`flex-1 ${confirmButtonClass} text-white py-2 px-4 rounded-md transition-colors`}
                             >

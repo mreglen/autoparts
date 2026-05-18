@@ -2,6 +2,21 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiAxios } from '../../utils/apiClient';
 
+function apiErrorDetail(error) {
+    const raw = error?.response?.data?.detail;
+    if (raw == null) return null;
+    if (typeof raw === 'string') return raw;
+    if (Array.isArray(raw)) {
+        return raw.map((item) => (typeof item?.msg === 'string' ? item.msg : JSON.stringify(item))).join('; ');
+    }
+    if (typeof raw === 'object' && typeof raw.message === 'string') return raw.message;
+    try {
+        return JSON.stringify(raw);
+    } catch {
+        return String(raw);
+    }
+}
+
 // Получить запчасти в ожидании модерации
 export const fetchPendingProducts = createAsyncThunk(
     'moderationProducts/fetchPendingProducts',
@@ -10,9 +25,7 @@ export const fetchPendingProducts = createAsyncThunk(
             const response = await apiAxios.get('/moderation/products/pending');
             return response.data;
         } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка загрузки запчастей'
-            );
+            return rejectWithValue(apiErrorDetail(error) || 'Ошибка загрузки запчастей');
         }
     }
 );
@@ -25,9 +38,7 @@ export const approveProduct = createAsyncThunk(
             const response = await apiAxios.post(`/moderation/products/${productId}/approve`);
             return response.data;
         } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка одобрения запчасти'
-            );
+            return rejectWithValue(apiErrorDetail(error) || 'Ошибка одобрения запчасти');
         }
     }
 );
@@ -42,9 +53,7 @@ export const rejectProduct = createAsyncThunk(
             });
             return response.data;
         } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка отклонения запчасти'
-            );
+            return rejectWithValue(apiErrorDetail(error) || 'Ошибка отклонения запчасти');
         }
     }
 );
@@ -57,9 +66,7 @@ export const fetchRejectedProducts = createAsyncThunk(
             const response = await apiAxios.get('/moderation/products/rejected');
             return response.data;
         } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка загрузки отклоненных запчастей'
-            );
+            return rejectWithValue(apiErrorDetail(error) || 'Ошибка загрузки отклоненных запчастей');
         }
     }
 );
@@ -105,9 +112,10 @@ const moderationProductsSlice = createSlice({
             })
             .addCase(approveProduct.fulfilled, (state, action) => {
                 state.loading = false;
-                // Удаляем одобренную запчасть из списка ожидающих
+                // API возвращает id товара в каталоге, а в списке — id pending_products
+                const pendingId = action.meta.arg;
                 state.pendingProducts = state.pendingProducts.filter(
-                    product => product.id !== action.payload.product_id
+                    (product) => product.id !== pendingId
                 );
             })
             .addCase(approveProduct.rejected, (state, action) => {
@@ -121,9 +129,9 @@ const moderationProductsSlice = createSlice({
             })
             .addCase(rejectProduct.fulfilled, (state, action) => {
                 state.loading = false;
-                // Удаляем отклоненную запчасть из списка ожидающих
+                const pendingId = action.meta.arg.productId;
                 state.pendingProducts = state.pendingProducts.filter(
-                    product => product.id !== action.payload.product_id
+                    (product) => product.id !== pendingId
                 );
             })
             .addCase(rejectProduct.rejected, (state, action) => {

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime
 from typing import Any, Optional
 
@@ -26,13 +25,9 @@ from app.schemas.sales_orders import (
     PurchasedUsedOrderResponse,
     PurchasedNewOrderResponse,
 )
-from app.schemas.avito_orders import (
-    AvitoCncSetDetailsRequest,
-    AvitoOrderTransitionRequest,
-)
+from app.schemas.avito_orders import AvitoCheckConfirmationCodeRequest, AvitoOrderTransitionRequest
 
 logger = logging.getLogger(__name__)
-CONFIRM_CODE_RE = re.compile(r"^\d{4}$")
 
 router = APIRouter(prefix="/sales", tags=["Sales"])
 
@@ -226,7 +221,7 @@ async def apply_avito_order_transition(
     # Get access token and apply transition
     from app.services import avito_api as avito_api_svc
     from app.utils.avito_crypto import decrypt_secret
-    from app.services.avito_orders_api import apply_order_transition, get_available_transitions
+    from app.services.avito_orders_api import apply_order_transition, check_confirmation_code, get_available_transitions
     
     try:
         secret = decrypt_secret(integration.client_secret_encrypted)
@@ -268,11 +263,14 @@ async def apply_avito_order_transition(
             confirm_code = cnc_params.get("confirmCode")
             if not confirm_code:
                 raise HTTPException(status_code=422, detail="Для CNC receive требуется confirmCode")
-            confirm_code = str(confirm_code).strip()
-            if not CONFIRM_CODE_RE.fullmatch(confirm_code):
-                raise HTTPException(status_code=422, detail="Для CNC receive confirmCode должен состоять из 4 цифр")
             transition_params["cnc"] = {"marketplaceId": str(marketplace_id)}
-            transition_params["cnc"]["confirmCode"] = confirm_code
+            transition_params["cnc"]["confirmCode"] = str(confirm_code)
+            await check_confirmation_code(
+                token,
+                order_id=int(order.avito_order_id),
+                confirm_code=str(confirm_code),
+                marketplace_id=str(marketplace_id),
+            )
         
         result = await apply_order_transition(
             token,
@@ -350,14 +348,14 @@ async def get_avito_order_transitions(
         raise _map_avito_error_to_http(e)
 
 
-@router.post("/avito-orders/{order_id}/cnc-set-details")
-async def set_avito_cnc_details(
+@router.post("/avito-orders/{order_id}/check-confirmation-code")
+async def check_avito_confirmation_code(
     order_id: int,
-    payload: AvitoCncSetDetailsRequest,
+    payload: AvitoCheckConfirmationCodeRequest,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Подготовить CNC-заказ перед переходом receive."""
+    """Проверить confirmation code для CNC заказа через Avito API."""
     _require_sales_orders_access(db, current_user)
 
     order = db.query(AvitoOrderCache).filter(AvitoOrderCache.id == order_id).first()
@@ -375,7 +373,7 @@ async def set_avito_cnc_details(
     avito_data = order.avito_data or {}
     delivery_type = _extract_avito_delivery_type(avito_data)
     if delivery_type != "cnc":
-        raise HTTPException(status_code=422, detail="Подготовка заказа доступна только для CNC")
+        raise HTTPException(status_code=422, detail="Проверка кода применима только к CNC заказам")
 
     marketplace_id = payload.marketplace_id or _extract_avito_marketplace_id(avito_data)
     if not marketplace_id:
@@ -383,42 +381,27 @@ async def set_avito_cnc_details(
 
     from app.services import avito_api as avito_api_svc
     from app.utils.avito_crypto import decrypt_secret
-    from app.services.avito_orders_api import cnc_set_details
+    from app.services.avito_orders_api import check_confirmation_code
 
     try:
         secret = decrypt_secret(integration.client_secret_encrypted)
+        # Получаем токен с scope для Order Management API
         token = await avito_api_svc.fetch_access_token(
-            integration.client_id,
+            integration.client_id, 
             secret,
             scope="order-management"
         )
-        result = await cnc_set_details(
+        result = await check_confirmation_code(
             token,
             order_id=int(order.avito_order_id),
+            confirm_code=payload.confirm_code,
             marketplace_id=str(marketplace_id),
-            booking_period=int(payload.booking_period),
-            address=payload.address,
-            details=payload.details,
         )
-        # Persist local hint that CNC order has been prepared in this system.
-        avito_data_current = order.avito_data if isinstance(order.avito_data, dict) else {}
-        order.avito_data = {
-            **avito_data_current,
-            "cncPrepared": {
-                "prepared": True,
-                "address": payload.address,
-                "details": payload.details,
-                "bookingPeriod": int(payload.booking_period),
-                "marketplaceId": str(marketplace_id),
-                "preparedAt": datetime.utcnow().isoformat(),
-            },
-        }
-        db.commit()
         return {"status": "ok", "result": result}
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Error setting CNC details for Avito order %s", order_id)
+        logger.exception("Error checking confirmation code for Avito order %s", order_id)
         raise _map_avito_error_to_http(e)
 
 

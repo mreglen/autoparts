@@ -141,6 +141,7 @@ const ProductModerationCard = ({ product, onApprove, onReject }) => {
                     )}
 
                     {/* Action Buttons */}
+                    {(onApprove || onReject) && (
                     <div className="flex gap-3 pt-4 border-t border-gray-100">
                         {onApprove && (
                             <button
@@ -159,6 +160,7 @@ const ProductModerationCard = ({ product, onApprove, onReject }) => {
                             </button>
                         )}
                     </div>
+                    )}
                 </div>
             </div>
         </>

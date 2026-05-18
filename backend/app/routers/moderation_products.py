@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 import json
 
@@ -11,6 +12,7 @@ from app.models.product_vehicle import ProductVehicleAssociation
 from app.models.stock_in import StockIn as StockInModel
 from app.models.user import User
 
+from app.models.part_type import PartType as PartTypeModel
 from app.models.product_storage_cell import ProductStorageCell
 from app.models.pending_product_storage_cell import PendingProductStorageCell
 from app.schemas.moderation import ModerateProductRequest, ModerateProductResponse
@@ -72,8 +74,8 @@ def get_pending_products(
 
         product_dict.pop('_sa_instance_state', None)
         result.append(product_dict)
-    
-    return result
+
+    return jsonable_encoder(result)
 
 
 @router.get("/rejected/my", response_model=list)
@@ -114,8 +116,8 @@ def get_my_rejected_products(
 
         product_dict.pop('_sa_instance_state', None)
         result.append(product_dict)
-    
-    return result
+
+    return jsonable_encoder(result)
 
 
 @router.post("/{product_id}/approve", response_model=ModerateProductResponse)
@@ -135,6 +137,22 @@ def approve_product(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Запчасть не найдена"
+        )
+
+    if pending_product.part_type_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="У заявки не указан тип запчасти. Уточните у продавца или отклоните заявку.",
+        )
+    part_type = (
+        db.query(PartTypeModel)
+        .filter(PartTypeModel.id == pending_product.part_type_id)
+        .first()
+    )
+    if not part_type:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Тип запчасти из заявки отсутствует в справочнике.",
         )
     
     # Генерируем последовательный числовой внутренний код для продуктов
@@ -165,7 +183,8 @@ def approve_product(
         quantity=pending_product.quantity,
         organization_id=pending_product.organization_id,
         storage_location_id=pending_product.storage_location_id,
-        created_by=pending_product.created_by
+        created_by=pending_product.created_by,
+        part_type_id=pending_product.part_type_id,
     )
     
     db.add(db_product)
@@ -379,5 +398,5 @@ def get_rejected_products(
         # Удаляем SQLAlchemy состояние
         product_dict.pop('_sa_instance_state', None)
         result.append(product_dict)
-    
-    return result
+
+    return jsonable_encoder(result)

@@ -234,28 +234,17 @@ async def get_available_transitions(
     status = order_status.lower().strip() if order_status else ""
     normalized_delivery_type = delivery_type.lower().strip() if delivery_type else ""
 
-    if normalized_delivery_type == "cnc":
-        transitions_map = {
-            'on_confirmation': ['receive', 'reject'],
-            'ready_to_ship': ['receive', 'reject'],
-            'in_transit': ['receive'],
-            'delivered': [],
-            'canceled': [],
-            'closed': [],
-            'in_dispute': [],
-            'on_return': [],
-        }
-    else:
-        transitions_map = {
-            'on_confirmation': ['confirm', 'reject'],
-            'ready_to_ship': ['perform'],
-            'in_transit': ['receive'],
-            'delivered': [],
-            'canceled': [],
-            'closed': [],
-            'in_dispute': [],
-            'on_return': [],
-        }
+    transitions_map = {
+        # Для CNC Avito может не давать action confirm в on_confirmation.
+        'on_confirmation': ['receive', 'reject'] if normalized_delivery_type == "cnc" else ['confirm', 'reject'],
+        'ready_to_ship': ['perform'],
+        'in_transit': ['receive'],
+        'delivered': [],
+        'canceled': [],
+        'closed': [],
+        'in_dispute': [],
+        'on_return': [],
+    }
     
     transitions = transitions_map.get(status, [])
     logger.info(
@@ -268,34 +257,32 @@ async def get_available_transitions(
     return transitions
 
 
-async def cnc_set_details(
+async def check_confirmation_code(
     access_token: str,
     *,
     order_id: int,
+    confirm_code: str,
     marketplace_id: str,
-    booking_period: int,
-    address: str | None = None,
-    details: str | None = None,
 ) -> dict[str, Any]:
     """
-    Подготовка CNC-заказа перед получением.
+    Проверка кода подтверждения для CNC заказа.
 
-    POST https://api.avito.ru/order-management/1/order/cncSetDetails
+    POST https://api.avito.ru/order-management/1/order/checkConfirmationCode
     """
-    url = f"{AVITO_BASE}/order-management/1/order/cncSetDetails"
+    url = f"{AVITO_BASE}/order-management/1/order/checkConfirmationCode"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
     }
     body: dict[str, Any] = {
-        "id": str(order_id),
-        "marketplaceId": str(marketplace_id),
-        "bookingPeriod": int(booking_period),
+        "orderId": str(order_id),
+        "params": {
+            "cnc": {
+                "marketplaceId": str(marketplace_id),
+                "confirmCode": str(confirm_code),
+            }
+        },
     }
-    if address:
-        body["address"] = str(address)
-    if details:
-        body["details"] = str(details)
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(url, json=body, headers=headers)
@@ -303,7 +290,7 @@ async def cnc_set_details(
             return response.json()
     except httpx.HTTPStatusError as e:
         logger.error(
-            "HTTP error setting CNC details for order %s: %s - %s",
+            "HTTP error checking confirmation code for order %s: %s - %s",
             order_id,
             e.response.status_code,
             e.response.text,
@@ -314,8 +301,8 @@ async def cnc_set_details(
             response_body=e.response.text,
         )
     except Exception as e:
-        logger.exception("Error setting CNC details for order %s", order_id)
-        raise AvitoOrdersError(f"Ошибка подготовки CNC заказа: {str(e)}")
+        logger.exception("Error checking confirmation code for order %s", order_id)
+        raise AvitoOrdersError(f"Ошибка проверки кода подтверждения: {str(e)}")
 
 
 async def raw_fetch_avito_orders(

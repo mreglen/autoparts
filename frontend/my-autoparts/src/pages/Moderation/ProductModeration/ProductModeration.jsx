@@ -7,7 +7,6 @@ import {
     approveProduct,
     rejectProduct,
     clearModerationError,
-    resetModeration
 } from '../../../redux/slices/ModerationProductsSlice.js';
 import ProductModerationCard from '../../../components/ProductModerationCard/ProductModerationCard.jsx';
 import RejectProductModal from '../../../components/RejectProductModal/RejectProductModal.jsx';
@@ -49,17 +48,14 @@ const ProductModeration = () => {
 
     // Загрузка данных
     useEffect(() => {
-        if (user?.is_admin) {
-            if (!showRejected) {
-                dispatch(fetchPendingProducts());
-            } else {
-                dispatch(fetchRejectedProducts());
-            }
+        if (!user?.is_admin) {
+            return;
         }
-        
-        return () => {
-            dispatch(resetModeration());
-        };
+        if (!showRejected) {
+            dispatch(fetchPendingProducts());
+        } else {
+            dispatch(fetchRejectedProducts());
+        }
     }, [dispatch, user?.is_admin, showRejected]);
 
     // Обработка ошибок
@@ -119,9 +115,6 @@ const ProductModeration = () => {
 
     const handleTabChange = (showRejectedTab) => {
         setShowRejected(showRejectedTab);
-        if (showRejectedTab) {
-            // TODO: Загрузить отклоненные запчасти
-        }
     };
 
     if (!user || !user.is_admin) {

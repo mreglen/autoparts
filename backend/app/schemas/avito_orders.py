@@ -46,6 +46,15 @@ class AvitoCncSetDetailsRequest(BaseModel):
     marketplace_id: Optional[str] = Field(default=None, description="Marketplace ID из данных заказа")
 
 
+class AvitoCheckConfirmationCodeRequest(BaseModel):
+    """Проверка кода подтверждения для CNC заказа."""
+    confirm_code: str = Field(..., description="Код подтверждения, который назвал покупатель")
+    marketplace_id: Optional[str] = Field(
+        default=None,
+        description="Marketplace ID из данных заказа (если не передан — берётся из кэша)",
+    )
+
+
 class AvitoOrderSyncResponse(BaseModel):
     """Ответ после синхронизации заказов Авито"""
     synced_count: int = Field(..., description="Количество синхронизированных заказов")
