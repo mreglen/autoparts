@@ -375,7 +375,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     }));
   };
 
-  const getVisibleFilterOptions = (options, selectedValues, groupKey) => {
+  const buildFilterOptionsList = (options, selectedValues) => {
     const selectedSet = new Set(selectedValues.map(String));
     const withSelectedValues = [...options];
     const knownValues = new Set(options.map((option) => String(option.value)));
@@ -386,12 +386,15 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
       }
     });
 
-    if (expandedFilterGroups[groupKey]) return withSelectedValues;
+    return withSelectedValues;
+  };
 
+  const getCollapsedFilterOptions = (allOptions, selectedValues) => {
+    const selectedSet = new Set(selectedValues.map(String));
     const visible = [];
     const seen = new Set();
 
-    withSelectedValues.forEach((option) => {
+    allOptions.forEach((option) => {
       const optionValue = String(option.value);
       if ((visible.length < COLLAPSED_FILTER_LIMIT || selectedSet.has(optionValue)) && !seen.has(optionValue)) {
         visible.push(option);
@@ -403,8 +406,11 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   };
 
   const renderCheckboxGroup = ({ title, groupKey, options, selectedValues, urlKey }) => {
-    const visibleOptions = getVisibleFilterOptions(options, selectedValues, groupKey);
-    const hasMore = options.length > visibleOptions.length;
+    const allOptions = buildFilterOptionsList(options, selectedValues);
+    const collapsedOptions = getCollapsedFilterOptions(allOptions, selectedValues);
+    const isExpanded = Boolean(expandedFilterGroups[groupKey]);
+    const visibleOptions = isExpanded ? allOptions : collapsedOptions;
+    const showToggle = allOptions.length > collapsedOptions.length || isExpanded;
 
     return (
       <div>
@@ -432,13 +438,13 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             <p className="text-xs text-gray-400">Нет вариантов</p>
           )}
         </div>
-        {hasMore && (
+        {showToggle && (
           <button
             type="button"
             onClick={() => toggleFilterGroup(groupKey)}
             className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
           >
-            {expandedFilterGroups[groupKey] ? 'Скрыть' : 'Показать больше'}
+            {isExpanded ? 'Скрыть' : 'Показать больше'}
           </button>
         )}
       </div>
