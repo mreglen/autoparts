@@ -24,6 +24,40 @@ from app.core.auth import get_current_admin_user, get_current_user
 router = APIRouter(prefix="/moderation/products", tags=["Moderation Products"])
 
 
+def _safe_json_list(raw):
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        return []
+
+
+def _organization_payload(organization):
+    if not organization:
+        return None
+    return {
+        "id": organization.id,
+        "name": organization.name,
+        "phone": organization.phone,
+        "logo_organization": organization.logo_organization,
+    }
+
+
+def _serialize_moderation_product(product):
+    product_dict = product.__dict__.copy()
+    product_dict["photos"] = _safe_json_list(product_dict.get("photos"))
+    product_dict["videos"] = _safe_json_list(product_dict.get("videos"))
+    product_dict["vehicle_ids"] = _safe_json_list(product_dict.get("vehicle_ids"))
+    product_dict["storage_location_address"] = (
+        product.storage_location.address if product.storage_location else None
+    )
+    product_dict["organization"] = _organization_payload(product.organization)
+    product_dict.pop("_sa_instance_state", None)
+    return product_dict
+
+
 @router.get("/pending", response_model=list)
 def get_pending_products(
     skip: int = 0,
@@ -38,42 +72,7 @@ def get_pending_products(
         .limit(limit)\
         .all()
     
-    # Преобразуем JSON строки обратно в списки
-    result = []
-    for product in products:
-        product_dict = product.__dict__.copy()
-        if product_dict.get('photos'):
-            try:
-                product_dict['photos'] = json.loads(product_dict['photos'])
-            except:
-                product_dict['photos'] = []
-        else:
-            product_dict['photos'] = []
-            
-        if product_dict.get('videos'):
-            try:
-                product_dict['videos'] = json.loads(product_dict['videos'])
-            except:
-                product_dict['videos'] = []
-        else:
-            product_dict['videos'] = []
-            
-        if product_dict.get('vehicle_ids'):
-            try:
-                product_dict['vehicle_ids'] = json.loads(product_dict['vehicle_ids'])
-            except:
-                product_dict['vehicle_ids'] = []
-        else:
-            product_dict['vehicle_ids'] = []
-        
-        # Add storage location address
-        if product.storage_location:
-            product_dict['storage_location_address'] = product.storage_location.address
-        else:
-            product_dict['storage_location_address'] = None
-
-        product_dict.pop('_sa_instance_state', None)
-        result.append(product_dict)
+    result = [_serialize_moderation_product(product) for product in products]
 
     return jsonable_encoder(result)
 
@@ -361,42 +360,6 @@ def get_rejected_products(
         .limit(limit)\
         .all()
     
-    # Преобразуем JSON строки обратно в списки
-    result = []
-    for product in products:
-        product_dict = product.__dict__.copy()
-        if product_dict.get('photos'):
-            try:
-                product_dict['photos'] = json.loads(product_dict['photos'])
-            except:
-                product_dict['photos'] = []
-        else:
-            product_dict['photos'] = []
-            
-        if product_dict.get('videos'):
-            try:
-                product_dict['videos'] = json.loads(product_dict['videos'])
-            except:
-                product_dict['videos'] = []
-        else:
-            product_dict['videos'] = []
-            
-        if product_dict.get('vehicle_ids'):
-            try:
-                product_dict['vehicle_ids'] = json.loads(product_dict['vehicle_ids'])
-            except:
-                product_dict['vehicle_ids'] = []
-        else:
-            product_dict['vehicle_ids'] = []
-        
-        # Add storage location address
-        if product.storage_location:
-            product_dict['storage_location_address'] = product.storage_location.address
-        else:
-            product_dict['storage_location_address'] = None
-            
-        # Удаляем SQLAlchemy состояние
-        product_dict.pop('_sa_instance_state', None)
-        result.append(product_dict)
+    result = [_serialize_moderation_product(product) for product in products]
 
     return jsonable_encoder(result)
