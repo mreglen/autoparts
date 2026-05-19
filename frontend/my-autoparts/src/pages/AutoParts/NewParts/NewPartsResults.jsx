@@ -188,10 +188,10 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch, expandedPartId, onToggle
               </label>
             ))}
           </div>
-          {rosskoBrands.length > visibleBrands.length && (
+          {rosskoBrands.length > COLLAPSED_FILTER_LIMIT && (
             <button
               type="button"
-              onClick={() => setExpandedBrandFilters(!expandedBrandFilters)}
+              onClick={() => setExpandedBrandFilters((prev) => !prev)}
               className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
             >
               {expandedBrandFilters ? 'Скрыть' : 'Показать больше'}

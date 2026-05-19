@@ -70,9 +70,9 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
     const navigate = useNavigate();
     const cartLoading = useSelector(selectCartLoading);
     const cart = useSelector(selectCart);
-    const newPartsMarkupPercent = useSelector(
-        (state) => state.publicInfo.newPartsMarkupPercent ?? 15
-    );
+    const adminSellerMarkupContext = useSelector((state) => state.publicInfo.adminSellerMarkupContext);
+    const globalMarkupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 15);
+    const newPartsMarkupPercent = adminSellerMarkupContext?.markupPercent ?? globalMarkupPercent;
     // Используем только переданные данные складов
     const partStockData = stocksData ? { stocks: stocksData } : null;
 

@@ -2,9 +2,11 @@ import PrinterTokenSection from './PrinterTokenSection';
 import LabelPrintSection from './LabelPrintSection';
 import { useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
+import { useAuthReady } from '../../hooks/useAuthReady';
+import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 
 export default function PrintSettings() {
-  const user = useSelector((state) => state.auth.user);
+  const { isReady, user } = useAuthReady();
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
 
   const hasPermission = (code) => permissionCodes && permissionCodes.includes(code);
@@ -14,6 +16,10 @@ export default function PrintSettings() {
     user?.is_director ||
     user?.is_seller ||
     (user?.is_employee && hasPermission('settings.printers'));
+
+  if (!isReady) {
+    return <AuthLoadingScreen />;
+  }
 
   if (!canAccess) {
     return <Navigate to="/" replace />;

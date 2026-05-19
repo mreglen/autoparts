@@ -202,8 +202,8 @@ const authSlice = createSlice({
             return null;
         })(), // Stores permission codes for employees (from JWT token) - e.g., ['sellers', 'orders.view']
 
-        // Общее
-        loading: false,
+        // Общее — при наличии токена ждём fetchProfile перед проверками доступа
+        loading: Boolean(localStorage.getItem('token')),
         error: null,
     },
     reducers: {

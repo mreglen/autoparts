@@ -20,14 +20,15 @@ export const fetchAdminOrganizationPhone = fetchPublicSiteConfig;
 
 const publicInfoSlice = createSlice({
   name: 'publicInfo',
-  initialState: {
-    adminOrganizationPhone: null,
-    showNewAutoparts: true,
-    newPartsMarkupPercent: 15,
-    usedPartsPurchaseMode: 'both',
-    loading: false,
-    error: null,
-  },
+    initialState: {
+        adminOrganizationPhone: null,
+        showNewAutoparts: true,
+        newPartsMarkupPercent: 15,
+        usedPartsPurchaseMode: 'both',
+        adminSellerMarkupContext: null,
+        loading: false,
+        error: null,
+    },
   reducers: {
     clearPublicInfo: (state) => {
       state.adminOrganizationPhone = null;
@@ -43,6 +44,9 @@ const publicInfoSlice = createSlice({
       const n = Number(action.payload);
       state.newPartsMarkupPercent =
         Number.isFinite(n) && n >= 0 ? n : 15;
+    },
+    setAdminSellerMarkupContext: (state, action) => {
+      state.adminSellerMarkupContext = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -83,5 +87,6 @@ export const {
   clearPublicInfo,
   setShowNewAutoparts,
   setNewPartsMarkupPercent,
+  setAdminSellerMarkupContext,
 } = publicInfoSlice.actions;
 export default publicInfoSlice.reducer;

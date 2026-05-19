@@ -7,10 +7,12 @@ import { fetchPendingSellers } from '../redux/slices/ModerationSlice';
 import Navigation from '../pages/Navigation/Navigation';
 import MobileBottomNav from '../components/MobileBottomNav/MobileBottomNav';
 import ProfileMenuTabs from '../pages/Profile/menu/ProfileMenuTabs';
+import { useAuthReady } from '../hooks/useAuthReady';
+import AuthLoadingScreen from '../components/AuthLoadingScreen/AuthLoadingScreen';
 
 export default function ProfileWithMenuLayout() {
     const dispatch = useDispatch();
-    const user = useSelector((state) => state.auth.user);
+    const { isReady, user } = useAuthReady();
     const permissionCodes = useSelector((state) => state.auth.permissionCodes);
     const moderationProducts = useSelector((state) => state.moderationProducts);
     const moderation = useSelector((state) => state.moderation);
@@ -30,6 +32,8 @@ export default function ProfileWithMenuLayout() {
     const [activeTab, setActiveTab] = useState(() => {
         const path = location.pathname;
         if (path.startsWith('/vehicles/edit')) return 'vehicles';
+        if (path.startsWith('/sellers')) return 'sellers';
+        if (path.startsWith('/moderation/products')) return 'product-moderation';
         const pathMap = {
             '/dashboard': 'dashboard',
             '/admin': 'admin-panel',
@@ -64,6 +68,8 @@ export default function ProfileWithMenuLayout() {
     useEffect(() => {
         const getActiveTabFromPath = (path) => {
             if (path.startsWith('/vehicles/edit')) return 'vehicles';
+            if (path.startsWith('/sellers')) return 'sellers';
+            if (path.startsWith('/moderation/products')) return 'product-moderation';
             const pathMap = {
                 '/dashboard': 'dashboard',
                 '/admin': 'admin-panel',
@@ -389,13 +395,22 @@ export default function ProfileWithMenuLayout() {
 
     const tabs = getAvailableTabs();
 
-    // Load pending products and pending sellers count when component mounts and user is admin
     useEffect(() => {
-        if (user?.is_admin) {
-            dispatch(fetchPendingProducts());
-            dispatch(fetchPendingSellers());
-        }
-    }, [dispatch, user?.is_admin]);
+        if (!isReady || !user?.is_admin) return;
+        dispatch(fetchPendingProducts());
+        dispatch(fetchPendingSellers());
+    }, [dispatch, isReady, user?.is_admin]);
+
+    if (!isReady) {
+        return (
+            <div className="min-h-screen bg-gray-50">
+                <Navigation />
+                <main className="max-w-7xl mx-auto px-3 py-12">
+                    <AuthLoadingScreen className="h-48" />
+                </main>
+            </div>
+        );
+    }
 
     const handleTabChange = (tabId) => {
         setActiveTab(tabId);

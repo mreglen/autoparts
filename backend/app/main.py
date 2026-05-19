@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
 from app.db.database import Base, engine
+from app.db.schema_patches import ensure_organization_markup_columns
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
 from app.routers import chats as chats_router
@@ -53,6 +54,12 @@ try:
         logger.info("All tables created successfully")
 except Exception as e:
     logger.error(f"Error creating tables: {e}")
+    raise
+
+try:
+    ensure_organization_markup_columns()
+except Exception as e:
+    logger.error(f"Error applying schema patches: {e}")
     raise
 
 app = FastAPI(title="Автозапчасти")

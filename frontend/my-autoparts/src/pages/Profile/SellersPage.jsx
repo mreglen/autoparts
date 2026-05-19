@@ -1,81 +1,81 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { fetchSellers } from '../../redux/slices/SellerSlice';
-import { apiRequest } from '../../utils/apiClient';
-import SellerDashboardModal from './SellerDashboardModal';
+import { useAuthReady } from '../../hooks/useAuthReady';
+import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 
 export default function SellersPage() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const { user } = useSelector((state) => state.auth);
-    const [showActionsPopup, setShowActionsPopup] = useState(null);
-    const [selectedSeller, setSelectedSeller] = useState(null);
-    const [showDashboardModal, setShowDashboardModal] = useState(false);
-    const [sellerStats, setSellerStats] = useState(null);
-    const [loadingStats, setLoadingStats] = useState(false);
-    
-    // Select data from Redux store
+    const { isReady, user } = useAuthReady();
     const allSellers = useSelector((state) => state.sellers.sellers);
-    
-    // Filter sellers to only show those who are not employees
-    const sellers = allSellers.filter(seller => !seller.is_employees || seller.is_employees === false);
     const loading = useSelector((state) => state.sellers.loading);
     const error = useSelector((state) => state.sellers.error);
-    
-    // Check admin rights and fetch data
+
+    const [showActionsPopup, setShowActionsPopup] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortOrder, setSortOrder] = useState('name_asc');
+    const [showSortDropdown, setShowSortDropdown] = useState(false);
+
+    const sellers = useMemo(
+        () => allSellers.filter((seller) => !seller.is_employee),
+        [allSellers]
+    );
+
+    const filteredSellers = useMemo(() => {
+        let list = [...sellers];
+        const q = searchQuery.trim().toLowerCase();
+        if (q) {
+            list = list.filter((seller) => {
+                const fullName = `${seller.last_name || ''} ${seller.first_name || ''} ${seller.patronymic || ''}`.toLowerCase();
+                return (
+                    fullName.includes(q)
+                    || (seller.email || '').toLowerCase().includes(q)
+                    || (seller.phone || '').toLowerCase().includes(q)
+                    || (seller.organization_name || '').toLowerCase().includes(q)
+                );
+            });
+        }
+        if (sortOrder === 'name_asc' || sortOrder === 'name_desc') {
+            list.sort((a, b) => {
+                const aName = `${a.last_name || ''} ${a.first_name || ''}`.trim().toLowerCase();
+                const bName = `${b.last_name || ''} ${b.first_name || ''}`.trim().toLowerCase();
+                if (aName < bName) return sortOrder === 'name_asc' ? -1 : 1;
+                if (aName > bName) return sortOrder === 'name_asc' ? 1 : -1;
+                return 0;
+            });
+        } else if (sortOrder === 'org_asc') {
+            list.sort((a, b) => String(a.organization_name || '').localeCompare(String(b.organization_name || ''), 'ru'));
+        }
+        return list;
+    }, [sellers, searchQuery, sortOrder]);
+
     useEffect(() => {
+        if (!isReady) return;
         if (!user?.is_admin) {
             navigate('/', { replace: true });
-        } else {
-            dispatch(fetchSellers());
+            return;
         }
-    }, [user, navigate, dispatch]);
+        dispatch(fetchSellers());
+    }, [isReady, user, navigate, dispatch]);
 
-    const handleActionsClick = (sellerId) => {
-        setShowActionsPopup(showActionsPopup === sellerId ? null : sellerId);
-    };
-
-    const handleViewDashboard = async (seller) => {
-        setSelectedSeller(seller);
-        setShowDashboardModal(true);
-        setLoadingStats(true);
-        setShowActionsPopup(null);
-        
-        try {
-            const stats = await apiRequest(`/admin/sellers/${seller.id}/dashboard`);
-            setSellerStats(stats);
-        } catch (err) {
-            console.error('Failed to load seller dashboard:', err);
-        } finally {
-            setLoadingStats(false);
-        }
-    };
-
-    const handleCloseModal = () => {
-        setShowDashboardModal(false);
-        setSelectedSeller(null);
-        setSellerStats(null);
-    };
-
-    // Close popup when clicking outside
     useEffect(() => {
         const handleClickOutside = (e) => {
-            if (showActionsPopup && !e.target.closest('.actions-popup-container')) {
+            if (!e.target.closest('.actions-dropdown')) {
                 setShowActionsPopup(null);
             }
         };
-
         if (showActionsPopup) {
-            document.addEventListener('click', handleClickOutside);
+            document.addEventListener('mousedown', handleClickOutside);
         }
-
-        return () => {
-            document.removeEventListener('click', handleClickOutside);
-        };
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showActionsPopup]);
-    
-    // If not admin, show access denied
+
+    if (!isReady) {
+        return <AuthLoadingScreen className="min-h-[16rem]" />;
+    }
+
     if (!user?.is_admin) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -90,162 +90,201 @@ export default function SellersPage() {
     if (loading && sellers.length === 0) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
             </div>
         );
     }
 
+    const sellerFullName = (seller) =>
+        `${seller.last_name} ${seller.first_name}${seller.patronymic ? ` ${seller.patronymic}` : ''}`;
+
     return (
-        <div className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Продавцы</h2>
+        <div className="mt-4 sm:mt-5 px-4 sm:px-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+                <h1 className="text-2xl font-bold text-gray-800">Продавцы</h1>
+                <div className="text-left sm:text-right text-sm text-gray-500">
+                    Всего: <span className="font-semibold text-gray-900">{sellers.length}</span>
+                </div>
+            </div>
+
+            <div className="mb-6 flex flex-col md:flex-row gap-4 md:items-end">
+                <div className="flex-1 max-w-md">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Поиск</label>
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="ФИО, email, телефон, организация..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        />
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div className="md:w-64 relative">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Сортировка</label>
+                    <button
+                        type="button"
+                        onClick={() => setShowSortDropdown(!showSortDropdown)}
+                        className="w-full px-4 py-2 rounded-lg font-medium bg-gray-200 text-gray-700 hover:bg-gray-300 flex items-center justify-between"
+                    >
+                        <span>Выбор порядка</span>
+                        <svg className={`w-4 h-4 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {showSortDropdown && (
+                        <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-30">
+                            {[
+                                { id: 'name_asc', label: 'По ФИО (А–Я)' },
+                                { id: 'name_desc', label: 'По ФИО (Я–А)' },
+                                { id: 'org_asc', label: 'По организации' },
+                            ].map((opt) => (
+                                <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => { setSortOrder(opt.id); setShowSortDropdown(false); }}
+                                    className={`w-full text-left px-4 py-2 hover:bg-gray-100 ${sortOrder === opt.id ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {error && (
-                <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
-                    {error}
+                <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 flex items-center justify-between gap-3">
+                    <span>{error}</span>
+                    <button type="button" onClick={() => dispatch(fetchSellers())} className="text-sm font-medium text-red-800 underline">
+                        Повторить
+                    </button>
                 </div>
             )}
 
-            {sellers.length === 0 ? (
-                <div className="text-center py-12">
-                    <p className="text-gray-500">Нет зарегистрированных продавцов</p>
+            {filteredSellers.length === 0 ? (
+                <div className="mt-12 text-center py-16 px-6">
+                    <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                        <svg className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                        {searchQuery ? 'Ничего не найдено' : 'Нет зарегистрированных продавцов'}
+                    </h2>
                 </div>
             ) : (
-                <div className="w-full">
-                    {/* Desktop table view */}
-                    <table className="hidden sm:table w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    ФИО
-                                </th>
-                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Организация
-                                </th>
-                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Email
-                                </th>
-                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Телефон
-                                </th>
-                                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Действия
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {sellers.map((seller) => (
-                                <tr key={seller.id}>
-                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                                        <div className="text-sm font-medium text-gray-900">
-                                            {seller.last_name} {seller.first_name}{seller.patronymic ? ` ${seller.patronymic}` : ''}
-                                        </div>
-                                    </td>
-                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">
-                                            {seller.organization_name || 'Не указана'}
-                                        </div>
-                                    </td>
-                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">{seller.email}</div>
-                                    </td>
-                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">{seller.phone}</div>
-                                    </td>
-                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <div className="relative inline-block text-left actions-popup-container">
-                                            <button
-                                                onClick={() => handleActionsClick(seller.id)}
-                                                className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
-                                            >
-                                                Действия
-                                                <img
-                                                    src="/img/arrow_sm.svg"
-                                                    alt=""
-                                                    className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${showActionsPopup === seller.id ? 'rotate-90' : ''}`}
-                                                    style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
-                                                />
-                                            </button>
-                                            
-                                            {/* Popup with View button */}
-                                            {showActionsPopup === seller.id && (
-                                                <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
-                                                    <div className="py-1">
+                <>
+                    <div className={`hidden md:block w-full ${showActionsPopup ? 'overflow-visible' : 'overflow-x-auto'}`}>
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Продавец</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Организация</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Контакты</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Наценка новые</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-100">
+                                {filteredSellers.map((seller, index) => {
+                                    const isLastRow = index === filteredSellers.length - 1;
+                                    const isMenuOpen = showActionsPopup === seller.id;
+                                    return (
+                                    <tr
+                                        key={seller.id}
+                                        className={`hover:bg-gray-50/50 ${isMenuOpen ? 'relative z-30' : ''}`}
+                                    >
+                                        <td className="px-4 py-4">
+                                            <div className="text-sm font-semibold text-gray-900">{sellerFullName(seller)}</div>
+                                            {seller.is_director && (
+                                                <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">Директор</span>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-4 text-sm text-gray-700">{seller.organization_name || '—'}</td>
+                                        <td className="px-4 py-4 text-sm text-gray-600">
+                                            <div>{seller.email}</div>
+                                            <div className="text-gray-500">{seller.phone}</div>
+                                        </td>
+                                        <td className="px-4 py-4 text-sm">
+                                            <span className="font-medium text-gray-900">{seller.new_parts_markup_percent ?? '—'}%</span>
+                                            {seller.new_parts_markup_manual && (
+                                                <span className="ml-2 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">ручная</span>
+                                            )}
+                                        </td>
+                                        <td className={`px-4 py-4 text-right ${isMenuOpen ? 'relative z-30' : ''}`}>
+                                            <div className="relative inline-block actions-dropdown">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowActionsPopup(showActionsPopup === seller.id ? null : seller.id)}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                                    </svg>
+                                                    Действия
+                                                </button>
+                                                {isMenuOpen && (
+                                                    <div
+                                                        className={`absolute right-0 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 actions-dropdown ${
+                                                            isLastRow ? 'bottom-full mb-2' : 'top-full mt-2'
+                                                        }`}
+                                                    >
                                                         <button
-                                                            onClick={(e) => { e.stopPropagation(); handleViewDashboard(seller); }}
-                                                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setShowActionsPopup(null);
+                                                                navigate(`/sellers/${seller.id}/workspace`);
+                                                            }}
+                                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                                                         >
-                                                            Просмотреть
+                                                            Рабочий стол
                                                         </button>
                                                     </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    
-                    {/* Mobile card view */}
-                    <div className="sm:hidden space-y-4">
-                        {sellers.map((seller) => (
-                            <div key={seller.id} className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm">
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-medium text-gray-900 truncate">
-                                            {seller.last_name} {seller.first_name}{seller.patronymic ? ` ${seller.patronymic}` : ''}
-                                        </h3>
-                                        <p className="text-sm text-gray-600 mt-1 truncate">
-                                            Организация: {seller.organization_name || 'Не указана'}
-                                        </p>
-                                        <p className="text-sm text-gray-500 mt-1 truncate">{seller.email}</p>
-                                        <p className="text-sm text-gray-500 truncate">{seller.phone}</p>
-                                    </div>
-                                    <div className="relative actions-popup-container flex-shrink-0">
-                                        <button
-                                            onClick={() => handleActionsClick(seller.id)}
-                                            className="text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-3 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
-                                        >
-                                            Действия
-                                            <img
-                                                src="/img/arrow_sm.svg"
-                                                alt=""
-                                                className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${showActionsPopup === seller.id ? 'rotate-90' : ''}`}
-                                                style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
-                                            />
-                                        </button>
-                                        
-                                        {/* Mobile popup - positioned below button */}
-                                        {showActionsPopup === seller.id && (
-                                            <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
-                                                <div className="py-1">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleViewDashboard(seller); }}
-                                                        className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                                                    >
-                                                        Просмотреть
-                                                    </button>
-                                                </div>
+                                                )}
                                             </div>
-                                        )}
+                                        </td>
+                                    </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="md:hidden space-y-3">
+                        {filteredSellers.map((seller) => (
+                            <div key={seller.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                                <div className="flex justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="font-semibold text-gray-900 truncate">{sellerFullName(seller)}</h3>
+                                        <p className="text-sm text-gray-600 mt-1">{seller.organization_name || 'Организация не указана'}</p>
+                                        <p className="text-sm text-gray-500 mt-1">{seller.email}</p>
+                                        <p className="text-sm text-gray-500">{seller.phone}</p>
+                                        <p className="text-sm mt-2">
+                                            Наценка: <span className="font-medium">{seller.new_parts_markup_percent}%</span>
+                                            {seller.new_parts_markup_manual && (
+                                                <span className="ml-1 text-xs text-amber-700">(ручная)</span>
+                                            )}
+                                        </p>
                                     </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate(`/sellers/${seller.id}/workspace`)}
+                                        className="flex-shrink-0 px-3 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50"
+                                    >
+                                        Открыть
+                                    </button>
                                 </div>
                             </div>
                         ))}
                     </div>
-                </div>
+                </>
             )}
-
-            {/* Dashboard Modal */}
-            <SellerDashboardModal
-                isOpen={showDashboardModal}
-                onClose={handleCloseModal}
-                seller={selectedSeller}
-                stats={sellerStats}
-                loading={loadingStats}
-            />
         </div>
     );
 }

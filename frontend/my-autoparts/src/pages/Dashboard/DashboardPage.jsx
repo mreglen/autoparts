@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useAuthReady } from '../../hooks/useAuthReady';
+import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiAxios } from '../../utils/apiClient';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const { isReady, user } = useAuthReady();
   const [stats, setStats] = useState({
     activeOrders: 0,
     totalProducts: 0,
@@ -19,18 +20,28 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  // Проверка прав продавца или сотрудника
-  useEffect(() => {
-    if (!user?.is_seller && !user?.is_employee) {
-      navigate('/', { replace: true });
-    }
-  }, [user, navigate]);
+  const canAccess = Boolean(user?.is_admin || user?.is_seller || user?.is_employee);
 
   useEffect(() => {
-    if (user?.is_seller || user?.is_employee) {
+    if (!isReady) return;
+    if (!canAccess) {
+      navigate('/', { replace: true });
+    }
+  }, [isReady, canAccess, navigate]);
+
+  useEffect(() => {
+    if (isReady && canAccess) {
       fetchDashboardStats();
     }
-  }, [user]);
+  }, [isReady, canAccess, user]);
+
+  if (!isReady) {
+    return <AuthLoadingScreen />;
+  }
+
+  if (!canAccess) {
+    return null;
+  }
 
   const fetchDashboardStats = async () => {
     try {

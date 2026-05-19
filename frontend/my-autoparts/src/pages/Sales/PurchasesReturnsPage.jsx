@@ -1,20 +1,23 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useAuthReady } from '../../hooks/useAuthReady';
 
 export default function PurchasesReturnsPage() {
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const { isReady, isAuthenticated } = useAuthReady();
 
-  // Проверка авторизации - доступно всем зарегистрированным пользователям
   React.useEffect(() => {
-    if (!user) {
-      navigate('/', { replace: true });
+    if (!isReady) return;
+    if (!isAuthenticated) {
+      navigate('/auth', { replace: true });
     }
-  }, [user, navigate]);
+  }, [isReady, isAuthenticated, navigate]);
 
-  // Если пользователь не авторизован, не показываем страницу
-  if (!user) {
+  if (!isReady) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

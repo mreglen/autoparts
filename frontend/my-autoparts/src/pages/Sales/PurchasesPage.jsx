@@ -1,23 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 import PurchasesOrdersTab from './PurchasesOrdersTab';
 import PurchasesReturnsTab from './PurchasesReturnsTab';
+import { useAuthReady } from '../../hooks/useAuthReady';
 
 export default function PurchasesPage() {
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const { isReady, user, isAuthenticated } = useAuthReady();
   const [activeTab, setActiveTab] = useState('orders');
 
-  // Проверка авторизации - доступно всем зарегистрированным пользователям
   useEffect(() => {
-    if (!user) {
-      navigate('/', { replace: true });
+    if (!isReady) return;
+    if (!isAuthenticated) {
+      navigate('/auth', { replace: true });
     }
-  }, [user, navigate]);
+  }, [isReady, isAuthenticated, navigate]);
 
-  // Если пользователь не авторизован, не показываем страницу
-  if (!user) {
+  if (!isReady) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

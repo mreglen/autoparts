@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 import { GarageOrderCard } from '../../components/GarageOrderCard';
+import { useAuthReady } from '../../hooks/useAuthReady';
 
 export default function PurchasesOrdersPage() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useSelector((state) => state.auth);
+  const { isReady, user, isAuthenticated } = useAuthReady();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -18,18 +18,18 @@ export default function PurchasesOrdersPage() {
 
   const [activeTab, setActiveTab] = useState('used'); // used | new
 
-  // Проверка авторизации - ждем завершения загрузки auth
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/', { replace: true });
+    if (!isReady) return;
+    if (!isAuthenticated) {
+      navigate('/auth', { replace: true });
     }
-  }, [user, authLoading, navigate]);
+  }, [isReady, isAuthenticated, navigate]);
 
   useEffect(() => {
-    if (user && !authLoading) {
+    if (isReady && isAuthenticated) {
       fetchAll();
     }
-  }, [user, authLoading]);
+  }, [isReady, isAuthenticated]);
 
   const formatDate = (dateString) => new Date(dateString).toLocaleDateString('ru-RU');
   const formatPrice = (amount) => `${Number(amount || 0).toLocaleString('ru-RU')} ₽`;
@@ -149,7 +149,7 @@ export default function PurchasesOrdersPage() {
   };
 
   // Показываем загрузку пока не загрузился auth
-  if (authLoading || !user) {
+  if (!isReady || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

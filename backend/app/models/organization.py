@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, Float, Boolean
 from sqlalchemy.orm import relationship
 from ..db.database import Base
 
@@ -12,7 +12,9 @@ class Organization(Base):
     phone = Column(String(20))
     logo_organization = Column(Text)
     description = Column(Text)
-    watermark = Column(Integer, default=1) 
+    watermark = Column(Integer, default=1)
+    new_parts_markup_percent = Column(Float, nullable=True)
+    new_parts_markup_manual = Column(Boolean, nullable=False, default=False)
     users = relationship("User", back_populates="organization")
     avito_integration = relationship(
         "OrganizationAvitoIntegration",

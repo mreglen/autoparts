@@ -1,22 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useAuthReady } from '../../hooks/useAuthReady';
 import OrdersTab from './OrdersTab';
 import ReturnsTab from './ReturnsTab';
 
 export default function SalesPage() {
   const navigate = useNavigate();
-  const { user } = useSelector((state) => state.auth);
+  const { isReady, user } = useAuthReady();
   const [activeTab, setActiveTab] = useState('orders');
 
-  // Проверка прав администратора
   useEffect(() => {
+    if (!isReady) return;
     if (!user?.is_admin) {
       navigate('/', { replace: true });
     }
-  }, [user, navigate]);
+  }, [isReady, user, navigate]);
 
-  // Если пользователь не админ, не показываем страницу
+  if (!isReady) {
+    return null;
+  }
+
   if (!user?.is_admin) {
     return (
       <div className="min-h-screen flex items-center justify-center">

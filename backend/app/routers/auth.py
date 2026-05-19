@@ -1,5 +1,5 @@
 # app/routers/auth.py
-from fastapi import APIRouter, Depends, Form, HTTPException, status, Request, Response
+from fastapi import APIRouter, Depends, Form, HTTPException, status, Request, Response, Query
 from sqlalchemy.orm import Session, joinedload
 from app.models.organization import Organization
 from app.models.password_reset_token import PasswordResetToken
@@ -31,6 +31,7 @@ from app.utils.id_generator import random_id
 from app.utils.phone import normalize_to_storage_format  
 from app.utils.guest_cart import merge_guest_cart_from_request
 from app.utils.site_settings_db import get_or_create_site_settings
+from app.utils.org_markup import effective_markup_percent, global_markup_percent
 import logging
 
 logger = logging.getLogger(__name__)
@@ -589,7 +590,10 @@ def get_admin_organization_phone(db: Session = Depends(get_db)):
 
 
 @router.get("/public-site-config")
-def get_public_site_config(db: Session = Depends(get_db)):
+def get_public_site_config(
+    organization_id: str | None = Query(None, description="Опционально: наценка для организации продавца"),
+    db: Session = Depends(get_db),
+):
     """Публичная конфигурация: телефон админ-организации (если есть), флаг «новые запчасти», наценка на новые %. Всегда 200."""
     settings_row = get_or_create_site_settings(db)
     org_name = None
@@ -603,14 +607,16 @@ def get_public_site_config(db: Session = Depends(get_db)):
     purchase_mode = getattr(settings_row, "used_parts_purchase_mode", None) or "both"
     if purchase_mode not in ("cart_only", "cta_only", "both"):
         purchase_mode = "both"
+    markup = global_markup_percent(settings_row)
+    if organization_id:
+        org = db.query(Organization).filter(Organization.id == organization_id).first()
+        if org:
+            markup = effective_markup_percent(org, settings_row)
+
     return {
         "organization_name": org_name,
         "organization_phone": org_phone,
         "show_new_autoparts": settings_row.show_new_autoparts,
-        "new_parts_markup_percent": (
-            float(m)
-            if (m := getattr(settings_row, "new_parts_markup_percent", None)) is not None
-            else 15.0
-        ),
+        "new_parts_markup_percent": markup,
         "used_parts_purchase_mode": purchase_mode,
     }

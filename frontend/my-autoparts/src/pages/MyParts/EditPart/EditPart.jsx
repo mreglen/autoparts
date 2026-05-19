@@ -10,12 +10,14 @@ import PhotoGallery from '../../../components/PhotoGallery/PhotoGallery';
 import MediaModal from '../../../components/MediaModal/MediaModal';
 import PrintReceiptModal from '../PrintReceiptModal/PrintReceiptModal';
 import { normalizeImageUrl, apiRequest, apiRequestFormData } from '../../../utils/apiClient';
+import { useAuthReady } from '../../../hooks/useAuthReady';
+import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
 
 const EditPart = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const dispatch = useDispatch();
-  const user = useSelector((state) => state.auth.user);
+  const { isReady, user } = useAuthReady();
   const productStatus = useSelector((state) => state.products.loading);
   const productError = useSelector((state) => state.products.error);
   const currentProduct = useSelector((state) => state.products.currentProduct);
@@ -963,9 +965,29 @@ const EditPart = () => {
     }
   };
 
-  if (!user || (!user.is_seller && !user.is_employee)) {
-    navigate('/');
-    return null;
+  const canAccess = Boolean(user?.is_seller || user?.is_employee || user?.is_admin);
+
+  useEffect(() => {
+    if (!isReady) return;
+    if (!canAccess) {
+      navigate('/', { replace: true });
+    }
+  }, [isReady, canAccess, navigate]);
+
+  if (!isReady) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <AuthLoadingScreen />
+      </div>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="text-center py-8 text-gray-500">Перенаправление...</div>
+      </div>
+    );
   }
 
   if (!currentProduct) {

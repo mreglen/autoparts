@@ -410,7 +410,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     const collapsedOptions = getCollapsedFilterOptions(allOptions, selectedValues);
     const isExpanded = Boolean(expandedFilterGroups[groupKey]);
     const visibleOptions = isExpanded ? allOptions : collapsedOptions;
-    const showToggle = allOptions.length > collapsedOptions.length || isExpanded;
+    const showToggle = allOptions.length > COLLAPSED_FILTER_LIMIT;
 
     return (
       <div>

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { Navigate } from 'react-router-dom';
+import { useAuthReady } from '../../hooks/useAuthReady';
+import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiRequest } from '../../utils/apiClient';
 import {
   fetchPublicSiteConfig,
@@ -8,18 +10,17 @@ import {
   setNewPartsMarkupPercent,
 } from '../../redux/slices/PublicInfoSlice';
 
-/**
- * Страница «Настройки» в разделе админа (только is_admin), маршрут /admin-settings.
- */
 function AdminPanelPage() {
   const dispatch = useDispatch();
-  const user = useSelector((state) => state.auth.user);
+  const { isReady, user, isAuthenticated } = useAuthReady();
   const [showNewAutoparts, setShowNewLocal] = useState(true);
   const [markupPercent, setMarkupPercent] = useState('15');
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingMarkup, setSavingMarkup] = useState(false);
   const [error, setError] = useState(null);
+  const [markupDialogOpen, setMarkupDialogOpen] = useState(false);
+  const [pendingMarkupValue, setPendingMarkupValue] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,7 +49,11 @@ function AdminPanelPage() {
     };
   }, []);
 
-  if (!user) {
+  if (!isReady) {
+    return <AuthLoadingScreen />;
+  }
+
+  if (!isAuthenticated) {
     return <Navigate to="/auth" replace />;
   }
   if (!user.is_admin) {
@@ -73,25 +78,36 @@ function AdminPanelPage() {
     }
   };
 
-  const handleSaveMarkup = async () => {
+  const requestSaveMarkup = () => {
     const n = parseFloat(String(markupPercent).replace(',', '.'));
     if (!Number.isFinite(n) || n < 0 || n > 500) {
       setError('Наценка: введите число от 0 до 500 %');
       return;
     }
+    setPendingMarkupValue(n);
+    setMarkupDialogOpen(true);
+  };
+
+  const applyGlobalMarkup = async (applyMode) => {
+    if (pendingMarkupValue == null) return;
     setSavingMarkup(true);
     setError(null);
+    setMarkupDialogOpen(false);
     try {
       await apiRequest('/admin/site-settings', {
         method: 'PATCH',
-        body: JSON.stringify({ new_parts_markup_percent: n }),
+        body: JSON.stringify({
+          new_parts_markup_percent: pendingMarkupValue,
+          global_markup_apply_mode: applyMode,
+        }),
       });
-      dispatch(setNewPartsMarkupPercent(n));
+      dispatch(setNewPartsMarkupPercent(pendingMarkupValue));
       dispatch(fetchPublicSiteConfig());
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения наценки');
     } finally {
       setSavingMarkup(false);
+      setPendingMarkupValue(null);
     }
   };
 
@@ -120,8 +136,7 @@ function AdminPanelPage() {
           <span>
             <span className="font-medium text-gray-900 block">Отображать новые запчасти</span>
             <span className="text-sm text-gray-500 block mt-1">
-              Если включено, в каталоге есть вкладки «Новые» и «Б/У». Если выключено — только б/у, раздел новых недоступен,
-              поиск ведёт сразу в б/у (аналоги по-прежнему подбираются через поставщика на сервере).
+              Если включено, в каталоге есть вкладки «Новые» и «Б/У». Если выключено — только б/у.
             </span>
           </span>
         </label>
@@ -135,10 +150,10 @@ function AdminPanelPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-1">
-          Наценка на новые запчасти
+          Наценка на новые запчасти (глобальная)
         </h2>
         <p className="text-sm text-gray-500 mb-4">
-          Процент к цене поставщика в каталоге «Новые запчасти» и при добавлении в корзину.
+          Процент к цене поставщика в каталоге «Новые запчасти». При сохранении можно применить ко всем продавцам или пропустить тех, у кого наценка задана вручную.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div>
@@ -162,7 +177,7 @@ function AdminPanelPage() {
           </div>
           <button
             type="button"
-            onClick={handleSaveMarkup}
+            onClick={requestSaveMarkup}
             disabled={loadingSettings || savingMarkup}
             className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
           >
@@ -170,6 +185,59 @@ function AdminPanelPage() {
           </button>
         </div>
       </div>
+
+      {markupDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => !savingMarkup && setMarkupDialogOpen(false)}
+            aria-hidden
+          />
+          <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Применить глобальную наценку {pendingMarkupValue}%
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              Выберите, как обновить наценку у продавцов.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                disabled={savingMarkup}
+                onClick={() => applyGlobalMarkup('all')}
+                className="w-full px-4 py-3 text-left rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <span className="block font-medium text-gray-900">Для всех продавцов</span>
+                <span className="block text-sm text-gray-500 mt-1">
+                  Перезаписать наценку у всех, включая ручные настройки
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={savingMarkup}
+                onClick={() => applyGlobalMarkup('skip_manual')}
+                className="w-full px-4 py-3 text-left rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50"
+              >
+                <span className="block font-medium text-gray-900">Пропустить с ручной наценкой</span>
+                <span className="block text-sm text-gray-600 mt-1">
+                  Обновить только тех, у кого наценка не задана вручную в рабочем столе продавца
+                </span>
+              </button>
+              <button
+                type="button"
+                disabled={savingMarkup}
+                onClick={() => {
+                  setMarkupDialogOpen(false);
+                  setPendingMarkupValue(null);
+                }}
+                className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

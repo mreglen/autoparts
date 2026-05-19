@@ -1,409 +1,334 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchClients, createClient, deleteClient, selectClients, selectClientsLoading, selectClientsError, selectCreatingClient, selectDeletingClient, clearError } from '../../redux/slices/ClientSlice';
+import {
+    fetchClients,
+    fetchClientBuyerOrders,
+    deleteClient,
+    clearError,
+    clearBuyerOrders,
+    selectClients,
+    selectClientsLoading,
+    selectClientsError,
+    selectDeletingClient,
+    selectBuyerOrders,
+    selectBuyerOrdersLoading,
+} from '../../redux/slices/ClientSlice';
+import ClientOrdersModal from './ClientOrdersModal';
+import MediaModal from '../../components/MediaModal/MediaModal';
+import { apiAxios, normalizeImageUrl } from '../../utils/apiClient';
+
+function clientFullName(client) {
+    return `${client.last_name || ''} ${client.first_name || ''}${client.patronymic ? ` ${client.patronymic}` : ''}`.trim();
+}
+
+function itemToPartSnapshot(item) {
+    return {
+        id: item.product_id,
+        brand: item.brand || '—',
+        article: item.partnumber || '—',
+        name: item.name || '—',
+        price: item.price,
+        quantity: item.quantity,
+        photos: [],
+        videos: [],
+        is_new: item.order_type === 'new',
+    };
+}
 
 export default function ClientsPage() {
     const dispatch = useDispatch();
-    const [showAddForm, setShowAddForm] = useState(false);
-    const [showDeletePopup, setShowDeletePopup] = useState(null); // Store client ID for popup
-    const [formData, setFormData] = useState({
-        last_name: '',
-        first_name: '',
-        patronymic: '',
-        email: '',
-        phone: ''
-    });
-    const [errors, setErrors] = useState({});
-    
-    // Select data from Redux store
     const clients = useSelector(selectClients);
     const loading = useSelector(selectClientsLoading);
     const error = useSelector(selectClientsError);
-    const creating = useSelector(selectCreatingClient);
     const deleting = useSelector(selectDeletingClient);
+    const buyerOrders = useSelector(selectBuyerOrders);
+    const buyerOrdersLoading = useSelector(selectBuyerOrdersLoading);
     const user = useSelector((state) => state.auth.user);
 
-    useEffect(() => {
-        dispatch(fetchClients());
-    }, [dispatch]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [openActionsId, setOpenActionsId] = useState(null);
+    const [ordersClient, setOrdersClient] = useState(null);
+    const [selectedPart, setSelectedPart] = useState(null);
+    const [mediaModalOpen, setMediaModalOpen] = useState(false);
+    const [currentMediaItems, setCurrentMediaItems] = useState([]);
+    const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
 
-    // Handle error messages
     useEffect(() => {
-        if (error) {
-            // Error will be shown in modal now
-            dispatch(clearError());
+        if (user?.organization_id) {
+            dispatch(fetchClients());
         }
+    }, [dispatch, user?.organization_id]);
+
+    useEffect(() => {
+        if (error) dispatch(clearError());
     }, [error, dispatch]);
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
-        
-        // Clear error when user starts typing
-        if (errors[name]) {
-            setErrors(prev => ({
-                ...prev,
-                [name]: ''
-            }));
-        }
-    };
-
-    const validateForm = () => {
-        const newErrors = {};
-        
-        if (!formData.last_name.trim()) {
-            newErrors.last_name = 'Фамилия обязательна';
-        }
-        
-        if (!formData.first_name.trim()) {
-            newErrors.first_name = 'Имя обязательно';
-        }
-        
-        if (!formData.email.trim()) {
-            newErrors.email = 'Email обязателен';
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-            newErrors.email = 'Неверный формат email';
-        }
-        
-        if (!formData.phone.trim()) {
-            newErrors.phone = 'Телефон обязателен';
-        }
-        
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        
-        if (!validateForm()) {
-            return;
-        }
-        
-        const clientData = {
-            ...formData,
-            organization_id: user.organization_id
-        };
-        
-        dispatch(createClient(clientData)).then((result) => {
-            if (createClient.fulfilled.match(result)) {
-                // Reset form on success
-                setFormData({
-                    last_name: '',
-                    first_name: '',
-                    patronymic: '',
-                    email: '',
-                    phone: ''
-                });
-                setShowAddForm(false);
-                setErrors({});
-            }
-        });
-    };
-
-    const handleDeleteClick = (clientId) => {
-        setShowDeletePopup(clientId);
-    };
-
-    const confirmDelete = () => {
-        if (showDeletePopup) {
-            dispatch(deleteClient(showDeletePopup));
-            setShowDeletePopup(null);
-        }
-    };
-
-    const cancelDelete = () => {
-        setShowDeletePopup(null);
-    };
-
-    // Close popup when clicking outside
     useEffect(() => {
         const handleClickOutside = (e) => {
-            if (showDeletePopup && !e.target.closest('.delete-popup-container')) {
-                setShowDeletePopup(null);
+            if (!e.target.closest('.actions-dropdown')) {
+                setOpenActionsId(null);
             }
         };
-
-        if (showDeletePopup) {
-            document.addEventListener('click', handleClickOutside);
+        if (openActionsId) {
+            document.addEventListener('mousedown', handleClickOutside);
         }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [openActionsId]);
 
-        return () => {
-            document.removeEventListener('click', handleClickOutside);
-        };
-    }, [showDeletePopup]);
+    const filteredClients = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return clients;
+        return clients.filter((client) => {
+            const fullName = clientFullName(client).toLowerCase();
+            return (
+                fullName.includes(q)
+                || (client.email || '').toLowerCase().includes(q)
+                || (client.phone || '').toLowerCase().includes(q)
+            );
+        });
+    }, [clients, searchQuery]);
+
+    const clientRowKey = (client) => client.id ?? `${client.email}-${client.phone}`;
+
+    const handleOpenOrders = (client) => {
+        setOpenActionsId(null);
+        setOrdersClient(client);
+        dispatch(fetchClientBuyerOrders({
+            clientId: client.id ?? undefined,
+            email: client.email,
+            phone: client.phone,
+        }));
+    };
+
+    const handleCloseOrders = () => {
+        setOrdersClient(null);
+        setSelectedPart(null);
+        dispatch(clearBuyerOrders());
+    };
+
+    const handleDelete = (client) => {
+        if (!client.id) return;
+        setOpenActionsId(null);
+        if (window.confirm('Удалить карточку клиента из справочника? Заказы сохранятся.')) {
+            dispatch(deleteClient(client.id)).then((result) => {
+                if (deleteClient.fulfilled.match(result)) {
+                    dispatch(fetchClients());
+                }
+            });
+        }
+    };
+
+    const handleOpenMediaModal = (mediaItems, initialIndex = 0) => {
+        const formattedMedia = mediaItems.map((item) => {
+            const url = typeof item === 'string' ? item : (item.full_url || item.photo_url || item.video_url || '');
+            const normalizedUrl = normalizeImageUrl(url);
+            const isVideo = normalizedUrl.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+            return { type: isVideo ? 'video' : 'image', src: normalizedUrl };
+        });
+        setCurrentMediaItems(formattedMedia);
+        setCurrentMediaIndex(initialIndex);
+        setMediaModalOpen(true);
+    };
+
+    const handleOpenItem = async (item) => {
+        if (item.product_id) {
+            try {
+                const response = await apiAxios.get(`/products/${item.product_id}`);
+                setSelectedPart(response.data);
+                return;
+            } catch {
+                /* fallback to snapshot */
+            }
+        }
+        setSelectedPart(itemToPartSnapshot(item));
+    };
+
+    if (!user?.organization_id) {
+        return (
+            <div className="mt-4 px-4 sm:px-0">
+                <p className="text-gray-600">Раздел доступен только для организации продавца.</p>
+            </div>
+        );
+    }
 
     if (loading && clients.length === 0) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
             </div>
         );
     }
 
     return (
-        <div className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Клиенты</h2>
-                <button
-                    onClick={() => setShowAddForm(!showAddForm)}
-                    disabled={creating}
-                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                    {creating ? 'Создание...' : (showAddForm ? 'Отмена' : 'Добавить клиента')}
-                </button>
+        <div className="mt-4 sm:mt-5 px-4 sm:px-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+                <h1 className="text-2xl font-bold text-gray-800">Клиенты</h1>
+                <p className="text-sm text-gray-500">
+                    Покупатели с заказами: <span className="font-semibold text-gray-900">{clients.length}</span>
+                </p>
             </div>
 
-            {showAddForm && (
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                    <h3 className="text-lg font-semibold mb-4">Добавить нового клиента</h3>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Фамилия *
-                            </label>
-                            <input
-                                type="text"
-                                name="last_name"
-                                value={formData.last_name}
-                                onChange={handleInputChange}
-                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.last_name ? 'border-red-500' : 'border-gray-300'}`}
-                                placeholder="Введите фамилию"
-                            />
-                            {errors.last_name && (
-                                <p className="mt-1 text-sm text-red-600">{errors.last_name}</p>
-                            )}
-                        </div>
+            <div className="mb-6 flex-1 max-w-md">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Поиск</label>
+                <div className="relative">
+                    <input
+                        type="text"
+                        placeholder="ФИО, email, телефон..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Имя *
-                            </label>
-                            <input
-                                type="text"
-                                name="first_name"
-                                value={formData.first_name}
-                                onChange={handleInputChange}
-                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.first_name ? 'border-red-500' : 'border-gray-300'}`}
-                                placeholder="Введите имя"
-                            />
-                            {errors.first_name && (
-                                <p className="mt-1 text-sm text-red-600">{errors.first_name}</p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Отчество
-                            </label>
-                            <input
-                                type="text"
-                                name="patronymic"
-                                value={formData.patronymic}
-                                onChange={handleInputChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Введите отчество"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Email *
-                            </label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleInputChange}
-                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
-                                placeholder="Введите email"
-                            />
-                            {errors.email && (
-                                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Телефон *
-                            </label>
-                            <input
-                                type="tel"
-                                name="phone"
-                                value={formData.phone}
-                                onChange={handleInputChange}
-                                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.phone ? 'border-red-500' : 'border-gray-300'}`}
-                                placeholder="Введите телефон"
-                            />
-                            {errors.phone && (
-                                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
-                            )}
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowAddForm(false);
-                                    setFormData({
-                                        last_name: '',
-                                        first_name: '',
-                                        patronymic: '',
-                                        email: '',
-                                        phone: ''
-                                    });
-                                    setErrors({});
-                                }}
-                                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                Отмена
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={creating}
-                                className="w-full sm:w-auto px-4 py-2 bg-blue-600 disabled:opacity-50 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                {creating ? 'Создание...' : 'Добавить клиента'}
-                            </button>
-                        </div>
-                    </form>
+            {error && (
+                <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 text-sm">
+                    {typeof error === 'string' ? error : 'Ошибка загрузки'}
                 </div>
             )}
 
-            {clients.length === 0 ? (
-                <div className="text-center py-12">
-                    <p className="text-gray-500">Нет клиентов</p>
-                    {!showAddForm && (
-                        <button
-                            onClick={() => setShowAddForm(true)}
-                            className="mt-4 text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                            Добавить первого клиента
-                        </button>
-                    )}
+            {filteredClients.length === 0 ? (
+                <div className="mt-12 text-center py-16 px-6">
+                    <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+                        <svg className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                        {searchQuery ? 'Ничего не найдено' : 'Пока нет клиентов с заказами'}
+                    </h2>
+                    <p className="text-gray-600 text-sm">
+                        Здесь отображаются только покупатели, оформившие заказ у вашей организации.
+                    </p>
                 </div>
             ) : (
-                <div className="w-full">
-                    {/* Desktop table view */}
-                    <table className="hidden sm:table w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    ФИО
-                                </th>
-                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Email
-                                </th>
-                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Телефон
-                                </th>
-                                <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Действия
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {clients.map((client) => (
-                                <tr key={client.id}>
-                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                                        <div className="text-sm font-medium text-gray-900">
-                                            {client.last_name} {client.first_name}{client.patronymic ? ` ${client.patronymic}` : ''}
-                                        </div>
-                                    </td>
-                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">{client.email}</div>
-                                    </td>
-                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">{client.phone}</div>
-                                    </td>
-                                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <div className="relative inline-block text-left delete-popup-container">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(client.id); }}
-                                                disabled={deleting}
-                                                className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
-                                            >
-                                                Действия
-                                                <img
-                                                    src="/img/arrow_sm.svg"
-                                                    alt=""
-                                                    className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${showDeletePopup === client.id ? 'rotate-90' : ''}`}
-                                                    style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
-                                                />
-                                            </button>
-                                            
-                                            {/* Popup confirmation */}
-                                            {showDeletePopup === client.id && (
-                                                <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
-                                                    <div className="py-1">
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); confirmDelete(); setShowDeletePopup(null); }}
-                                                            disabled={deleting}
-                                                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50"
-                                                        >
-                                                            {deleting ? 'Удаление...' : 'Удалить'}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </td>
+                <>
+                    <div className={`hidden md:block w-full ${openActionsId ? 'overflow-visible' : 'overflow-x-auto'}`}>
+                        <table className="min-w-full divide-y divide-gray-200 bg-white border border-gray-200 rounded-xl overflow-hidden">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Клиент</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Контакты</th>
+                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Заказов</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Действия</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    
-                    {/* Mobile card view */}
-                    <div className="sm:hidden space-y-4">
-                        {clients.map((client) => (
-                            <div key={client.id} className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm">
-                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-medium text-gray-900 truncate">
-                                            {client.last_name} {client.first_name}{client.patronymic ? ` ${client.patronymic}` : ''}
-                                        </h3>
-                                        <p className="text-sm text-gray-500 mt-1 truncate">{client.email}</p>
-                                        <p className="text-sm text-gray-500 truncate">{client.phone}</p>
-                                    </div>
-                                    <div className="relative delete-popup-container flex-shrink-0">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(client.id); }}
-                                            disabled={deleting}
-                                            className="text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-3 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50"
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {filteredClients.map((client, index) => {
+                                    const rowKey = clientRowKey(client);
+                                    const isLastRow = index === filteredClients.length - 1;
+                                    const isMenuOpen = openActionsId === rowKey;
+                                    return (
+                                        <tr
+                                            key={rowKey}
+                                            className={`hover:bg-gray-50/50 ${isMenuOpen ? 'relative z-30' : ''}`}
                                         >
-                                            Действия
-                                            <img
-                                                src="/img/arrow_sm.svg"
-                                                alt=""
-                                                className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${showDeletePopup === client.id ? 'rotate-90' : ''}`}
-                                                style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
-                                            />
-                                        </button>
-                                        
-                                        {/* Mobile popup - positioned below button */}
-                                        {showDeletePopup === client.id && (
-                                            <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
-                                                <div className="py-1">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); confirmDelete(); setShowDeletePopup(null); }}
-                                                        disabled={deleting}
-                                                        className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50"
-                                                    >
-                                                        {deleting ? 'Удаление...' : 'Удалить'}
-                                                    </button>
+                                            <td className="px-4 py-4">
+                                                <div className="text-sm font-semibold text-gray-900">
+                                                    {clientFullName(client) || '—'}
                                                 </div>
-                                            </div>
-                                        )}
+                                            </td>
+                                            <td className="px-4 py-4 text-sm text-gray-600">
+                                                <div>{client.email}</div>
+                                                <div className="text-gray-500">{client.phone}</div>
+                                            </td>
+                                            <td className="px-4 py-4 text-center text-sm font-medium text-gray-900">
+                                                {client.orders_count ?? 0}
+                                            </td>
+                                            <td className={`px-4 py-4 text-right ${isMenuOpen ? 'relative z-30' : ''}`}>
+                                                <div className="relative inline-block actions-dropdown">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setOpenActionsId(isMenuOpen ? null : rowKey)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                                        </svg>
+                                                        Действия
+                                                    </button>
+                                                    {isMenuOpen && (
+                                                        <div
+                                                            className={`absolute right-0 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 actions-dropdown ${
+                                                                isLastRow ? 'bottom-full mb-2' : 'top-full mt-2'
+                                                            }`}
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenOrders(client)}
+                                                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                                                            >
+                                                                Просмотреть заказы
+                                                            </button>
+                                                            {client.id && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDelete(client)}
+                                                                    disabled={deleting}
+                                                                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                                                >
+                                                                    Удалить из справочника
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="md:hidden space-y-3">
+                        {filteredClients.map((client) => (
+                            <div key={clientRowKey(client)} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                                <div className="flex justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="font-semibold text-gray-900">{clientFullName(client) || '—'}</h3>
+                                        <p className="text-sm text-gray-500 mt-1">{client.email}</p>
+                                        <p className="text-sm text-gray-500">{client.phone}</p>
+                                        <p className="text-sm mt-2 text-gray-700">
+                                            Заказов: <span className="font-medium">{client.orders_count ?? 0}</span>
+                                        </p>
                                     </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleOpenOrders(client)}
+                                        className="flex-shrink-0 px-3 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50"
+                                    >
+                                        Заказы
+                                    </button>
                                 </div>
                             </div>
                         ))}
                     </div>
-                </div>
+                </>
             )}
+
+            <ClientOrdersModal
+                isOpen={Boolean(ordersClient)}
+                onClose={handleCloseOrders}
+                buyerOrders={buyerOrders}
+                loading={buyerOrdersLoading}
+                onOpenItem={handleOpenItem}
+                selectedPart={selectedPart}
+                onClosePart={() => setSelectedPart(null)}
+                onImageClick={handleOpenMediaModal}
+            />
+
+            <MediaModal
+                isOpen={mediaModalOpen}
+                onClose={() => setMediaModalOpen(false)}
+                mediaItems={currentMediaItems}
+                initialIndex={currentMediaIndex}
+            />
         </div>
     );
 }

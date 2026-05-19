@@ -3,11 +3,12 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { fetchPendingSellers, approveSeller, rejectSeller } from '../../redux/slices/ModerationSlice';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+import { useAuthReady } from '../../hooks/useAuthReady';
 
 export default function PendingSellersPage() {
     const navigate = useNavigate();
     const dispatch = useDispatch();
-    const { user } = useSelector((state) => state.auth);
+    const { isReady, user } = useAuthReady();
     const { pendingSellers, loading, error } = useSelector((state) => state.moderation);
     
     const [showApproveModal, setShowApproveModal] = useState(false);
@@ -15,21 +16,23 @@ export default function PendingSellersPage() {
     const [selectedSellerId, setSelectedSellerId] = useState(null);
     const [rejectReason, setRejectReason] = useState('');
 
-    // Check admin rights
     useEffect(() => {
+        if (!isReady) return;
         if (!user?.is_admin) {
             navigate('/', { replace: true });
         }
-    }, [user, navigate]);
+    }, [isReady, user, navigate]);
 
-    // Fetch pending sellers
     useEffect(() => {
-        if (user?.is_admin) {
+        if (isReady && user?.is_admin) {
             dispatch(fetchPendingSellers());
         }
-    }, [dispatch, user]);
+    }, [dispatch, isReady, user?.is_admin]);
 
-    // If not admin, show access denied
+    if (!isReady) {
+        return null;
+    }
+
     if (!user?.is_admin) {
         return (
             <div className="min-h-screen flex items-center justify-center">

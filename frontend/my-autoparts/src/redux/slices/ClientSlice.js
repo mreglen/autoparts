@@ -38,6 +38,24 @@ export const updateClient = createAsyncThunk(
   }
 );
 
+export const fetchClientBuyerOrders = createAsyncThunk(
+  'clients/fetchClientBuyerOrders',
+  async ({ clientId, email, phone }, { rejectWithValue }) => {
+    try {
+      const params = new URLSearchParams();
+      if (clientId != null) params.set('client_id', String(clientId));
+      else {
+        if (email) params.set('email', email);
+        if (phone) params.set('phone', phone);
+      }
+      const response = await apiAxios.get(`/clients/buyer-orders?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.detail || 'Не удалось загрузить заказы');
+    }
+  }
+);
+
 export const deleteClient = createAsyncThunk(
   'clients/deleteClient',
   async (id, { rejectWithValue }) => {
@@ -57,7 +75,9 @@ const initialState = {
   error: null,
   creating: false,
   updating: false,
-  deleting: false
+  deleting: false,
+  buyerOrders: null,
+  buyerOrdersLoading: false,
 };
 
 // Slice
@@ -70,7 +90,10 @@ const clientSlice = createSlice({
     },
     clearClients: (state) => {
       state.clients = [];
-    }
+    },
+    clearBuyerOrders: (state) => {
+      state.buyerOrders = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -131,12 +154,25 @@ const clientSlice = createSlice({
       .addCase(deleteClient.rejected, (state, action) => {
         state.deleting = false;
         state.error = action.payload;
+      })
+
+      .addCase(fetchClientBuyerOrders.pending, (state) => {
+        state.buyerOrdersLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchClientBuyerOrders.fulfilled, (state, action) => {
+        state.buyerOrdersLoading = false;
+        state.buyerOrders = action.payload;
+      })
+      .addCase(fetchClientBuyerOrders.rejected, (state, action) => {
+        state.buyerOrdersLoading = false;
+        state.error = action.payload;
       });
   }
 });
 
 // Export actions
-export const { clearError, clearClients } = clientSlice.actions;
+export const { clearError, clearClients, clearBuyerOrders } = clientSlice.actions;
 
 // Export selectors
 export const selectClients = (state) => state.clients.clients;
@@ -145,5 +181,7 @@ export const selectClientsError = (state) => state.clients.error;
 export const selectCreatingClient = (state) => state.clients.creating;
 export const selectUpdatingClient = (state) => state.clients.updating;
 export const selectDeletingClient = (state) => state.clients.deleting;
+export const selectBuyerOrders = (state) => state.clients.buyerOrders;
+export const selectBuyerOrdersLoading = (state) => state.clients.buyerOrdersLoading;
 
 export default clientSlice.reducer;

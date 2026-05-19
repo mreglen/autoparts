@@ -1,6 +1,6 @@
 # app/routers/admin.py
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from app.models.event_log import EventLog
 from app.models.user import User
 from app.models.organization import Organization
@@ -9,6 +9,15 @@ from app.models.product import Product
 from app.models.stock_out import StockOut
 from app.db.database import get_db
 from app.utils.site_settings_db import get_or_create_site_settings
+from app.utils.admin_org_access import get_seller_organization
+from app.utils.org_markup import (
+    apply_global_markup_to_organizations,
+    effective_markup_percent,
+    global_markup_percent,
+)
+from app.models.client import Client as ClientModel
+from app.models.vehicle import Vehicle as VehicleModel
+from app.models.storage_location import StorageLocation as StorageLocationModel
 from app.schemas.event_log import EventLogResponse
 from app.schemas.user import UserResponse, UserUpdate
 from app.schemas.organization import Organization as OrganizationSchema, OrganizationCreate, OrganizationUpdate
@@ -41,6 +50,10 @@ class SiteSettingsPatch(BaseModel):
     show_new_autoparts: Optional[bool] = None
     new_parts_markup_percent: Optional[float] = Field(None, ge=0, le=500)
     used_parts_purchase_mode: Optional[str] = None
+    global_markup_apply_mode: Optional[str] = Field(
+        None,
+        description="all — применить глобальную наценку ко всем организациям; skip_manual — пропустить организации с ручной наценкой",
+    )
 
 
 class OrdersV2MigrationResponse(BaseModel):
@@ -79,8 +92,16 @@ def patch_site_settings_admin(
     row = get_or_create_site_settings(db)
     if "show_new_autoparts" in data:
         row.show_new_autoparts = data["show_new_autoparts"]
+    apply_mode = data.pop("global_markup_apply_mode", None)
     if "new_parts_markup_percent" in data:
-        row.new_parts_markup_percent = float(data["new_parts_markup_percent"])
+        new_global = float(data["new_parts_markup_percent"])
+        row.new_parts_markup_percent = new_global
+        if apply_mode in ("all", "skip_manual"):
+            apply_global_markup_to_organizations(
+                db,
+                new_global,
+                skip_manual=(apply_mode == "skip_manual"),
+            )
     if "used_parts_purchase_mode" in data:
         mode = data["used_parts_purchase_mode"]
         if mode not in ("cart_only", "cta_only", "both"):
@@ -182,9 +203,11 @@ def get_all_sellers(
     db: Session = Depends(get_db)
 ):
     sellers = db.query(User).filter(User.is_seller == True).all()
+    settings_row = get_or_create_site_settings(db)
     # Convert to dict format with organization names
     sellers_data = []
     for seller in sellers:
+        org = seller.organization
         seller_dict = {
             "id": seller.id,
             "last_name": seller.last_name,
@@ -192,8 +215,14 @@ def get_all_sellers(
             "patronymic": seller.patronymic,
             "email": seller.email,
             "phone": seller.phone,
-            "organization_name": seller.organization.name if seller.organization else None,
-            "organization_id": seller.organization_id
+            "organization_name": org.name if org else None,
+            "organization_id": seller.organization_id,
+            "is_director": bool(seller.is_director),
+            "is_employee": bool(seller.is_employee),
+            "is_seller": bool(seller.is_seller),
+            "new_parts_markup_percent": effective_markup_percent(org, settings_row),
+            "new_parts_markup_manual": bool(getattr(org, "new_parts_markup_manual", False)) if org else False,
+            "global_new_parts_markup_percent": global_markup_percent(settings_row),
         }
         sellers_data.append(seller_dict)
     return sellers_data
@@ -438,3 +467,313 @@ def reject_pending_seller(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Ошибка при отклонении заявки")
+
+
+class SellerMarkupPatch(BaseModel):
+    new_parts_markup_percent: float = Field(..., ge=0, le=500)
+
+
+class SellerWorkspaceResponse(BaseModel):
+    seller_id: int
+    seller_name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    is_director: bool = False
+    is_employee: bool = False
+    organization_id: Optional[str] = None
+    organization_name: Optional[str] = None
+    organization_address: Optional[str] = None
+    organization_phone: Optional[str] = None
+    organization_description: Optional[str] = None
+    global_new_parts_markup_percent: float
+    new_parts_markup_percent: float
+    new_parts_markup_manual: bool
+    stats: SellerDashboardStats
+    employees_count: int = 0
+    clients_count: int = 0
+    vehicles_count: int = 0
+    storage_locations_count: int = 0
+
+
+@router.get("/sellers/{seller_id}", response_model=SellerWorkspaceResponse)
+def get_seller_workspace(
+    seller_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    seller, org = get_seller_organization(db, seller_id)
+    settings_row = get_or_create_site_settings(db)
+    stats = get_seller_dashboard_stats(seller_id, current_user, db)
+
+    seller_name = f"{seller.last_name} {seller.first_name}".strip()
+    if seller.patronymic:
+        seller_name += f" {seller.patronymic}"
+
+    employees_count = db.query(User).filter(
+        User.organization_id == org.id,
+        User.is_employee.is_(True),
+    ).count()
+    clients_count = db.query(ClientModel).filter(ClientModel.organization_id == org.id).count()
+    vehicles_count = db.query(VehicleModel).filter(VehicleModel.organization_id == org.id).count()
+    storage_locations_count = db.query(StorageLocationModel).filter(
+        StorageLocationModel.organization_id == org.id
+    ).count()
+
+    return SellerWorkspaceResponse(
+        seller_id=seller.id,
+        seller_name=seller_name,
+        email=seller.email,
+        phone=seller.phone,
+        is_director=bool(seller.is_director),
+        is_employee=bool(seller.is_employee),
+        organization_id=org.id,
+        organization_name=org.name,
+        organization_address=org.address,
+        organization_phone=org.phone,
+        organization_description=org.description,
+        global_new_parts_markup_percent=global_markup_percent(settings_row),
+        new_parts_markup_percent=effective_markup_percent(org, settings_row),
+        new_parts_markup_manual=bool(getattr(org, "new_parts_markup_manual", False)),
+        stats=stats,
+        employees_count=employees_count,
+        clients_count=clients_count,
+        vehicles_count=vehicles_count,
+        storage_locations_count=storage_locations_count,
+    )
+
+
+@router.patch("/sellers/{seller_id}/markup")
+def patch_seller_markup(
+    seller_id: int,
+    payload: SellerMarkupPatch,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    _seller, org = get_seller_organization(db, seller_id)
+    org.new_parts_markup_percent = float(payload.new_parts_markup_percent)
+    org.new_parts_markup_manual = True
+    db.commit()
+    db.refresh(org)
+    settings_row = get_or_create_site_settings(db)
+    return {
+        "organization_id": org.id,
+        "new_parts_markup_percent": effective_markup_percent(org, settings_row),
+        "new_parts_markup_manual": True,
+        "global_new_parts_markup_percent": global_markup_percent(settings_row),
+    }
+
+
+@router.post("/sellers/{seller_id}/markup/reset")
+def reset_seller_markup(
+    seller_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    _seller, org = get_seller_organization(db, seller_id)
+    settings_row = get_or_create_site_settings(db)
+    global_value = global_markup_percent(settings_row)
+    org.new_parts_markup_percent = global_value
+    org.new_parts_markup_manual = False
+    db.commit()
+    db.refresh(org)
+    return {
+        "organization_id": org.id,
+        "new_parts_markup_percent": global_value,
+        "new_parts_markup_manual": False,
+        "global_new_parts_markup_percent": global_value,
+    }
+
+
+def _org_id_from_seller(db: Session, seller_id: int) -> str:
+    _seller, org = get_seller_organization(db, seller_id)
+    return org.id
+
+
+def _seller_product_query_options():
+    from app.models.product import Product as ProductModel
+
+    return (
+        selectinload(ProductModel.photos),
+        selectinload(ProductModel.videos),
+        selectinload(ProductModel.compatible_vehicles).options(
+            selectinload(VehicleModel.vin_row),
+            selectinload(VehicleModel.mileage_row),
+        ),
+        selectinload(ProductModel.storage_location),
+        selectinload(ProductModel.organization),
+        selectinload(ProductModel.avito_listing_links),
+        selectinload(ProductModel.drom_listing_links),
+    )
+
+
+def _apply_product_flags(product) -> None:
+    if product is None:
+        return
+    product.is_on_avito = len(product.avito_listing_links or []) > 0
+    product.is_on_drom = len(product.drom_listing_links or []) > 0
+
+
+@router.get("/sellers/{seller_id}/products")
+def get_seller_products(
+    seller_id: int,
+    storage_location_id: Optional[int] = None,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    from app.models.product import Product as ProductModel
+
+    org_id = _org_id_from_seller(db, seller_id)
+    query = (
+        db.query(ProductModel)
+        .options(*_seller_product_query_options())
+        .filter(ProductModel.organization_id == org_id)
+    )
+    if storage_location_id is not None:
+        query = query.filter(ProductModel.storage_location_id == storage_location_id)
+    products = query.all()
+    for product in products:
+        _apply_product_flags(product)
+    return products
+
+
+@router.get("/sellers/{seller_id}/products/{product_id}")
+def get_seller_product(
+    seller_id: int,
+    product_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    from app.models.product import Product as ProductModel
+
+    org_id = _org_id_from_seller(db, seller_id)
+    product = (
+        db.query(ProductModel)
+        .options(*_seller_product_query_options())
+        .filter(
+            ProductModel.id == product_id,
+            ProductModel.organization_id == org_id,
+        )
+        .first()
+    )
+    if not product:
+        raise HTTPException(status_code=404, detail="Запчасть не найдена")
+    _apply_product_flags(product)
+    return product
+
+
+@router.get("/sellers/{seller_id}/clients")
+def get_seller_clients(
+    seller_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    org_id = _org_id_from_seller(db, seller_id)
+    return db.query(ClientModel).filter(ClientModel.organization_id == org_id).all()
+
+
+@router.get("/sellers/{seller_id}/vehicles")
+def get_seller_vehicles(
+    seller_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    org_id = _org_id_from_seller(db, seller_id)
+    return (
+        db.query(VehicleModel)
+        .options(
+            selectinload(VehicleModel.vin_row),
+            selectinload(VehicleModel.mileage_row),
+            selectinload(VehicleModel.photos),
+        )
+        .filter(VehicleModel.organization_id == org_id)
+        .all()
+    )
+
+
+@router.get("/sellers/{seller_id}/storage-locations")
+def get_seller_storage_locations(
+    seller_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    org_id = _org_id_from_seller(db, seller_id)
+    return db.query(StorageLocationModel).filter(StorageLocationModel.organization_id == org_id).all()
+
+
+@router.get("/sellers/{seller_id}/stock-ins")
+def get_seller_stock_ins(
+    seller_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    from app.models.stock_in import StockIn as StockInModel
+
+    org_id = _org_id_from_seller(db, seller_id)
+    rows = (
+        db.query(StockInModel)
+        .options(
+            joinedload(StockInModel.product).options(*_seller_product_query_options()),
+            joinedload(StockInModel.storage_location),
+            joinedload(StockInModel.creator),
+        )
+        .filter(StockInModel.organization_id == org_id)
+        .all()
+    )
+    for row in rows:
+        _apply_product_flags(row.product)
+    return rows
+
+
+@router.get("/sellers/{seller_id}/stock-outs")
+def get_seller_stock_outs(
+    seller_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    org_id = _org_id_from_seller(db, seller_id)
+    rows = (
+        db.query(StockOut)
+        .options(
+            joinedload(StockOut.product).options(*_seller_product_query_options()),
+            joinedload(StockOut.storage_location),
+            joinedload(StockOut.user),
+        )
+        .filter(StockOut.organization_id == org_id)
+        .all()
+    )
+    for row in rows:
+        _apply_product_flags(row.product)
+    return rows
+
+
+@router.get("/sellers/{seller_id}/warehouse-sales")
+def get_seller_warehouse_sales(
+    seller_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    org_id = _org_id_from_seller(db, seller_id)
+    rows = (
+        db.query(StockOut)
+        .options(
+            joinedload(StockOut.product).options(*_seller_product_query_options()),
+            joinedload(StockOut.storage_location),
+            joinedload(StockOut.user),
+        )
+        .filter(StockOut.organization_id == org_id, StockOut.sale_price > 0)
+        .order_by(StockOut.movement_date.desc())
+        .all()
+    )
+    for row in rows:
+        _apply_product_flags(row.product)
+    return rows
+
+
+@router.get("/sellers/{seller_id}/employees")
+def get_seller_employees(
+    seller_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    org_id = _org_id_from_seller(db, seller_id)
+    return db.query(User).filter(User.organization_id == org_id).all()

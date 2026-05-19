@@ -8,6 +8,8 @@ class OrganizationBase(BaseModel):
     logo_organization: Optional[str] = None
     description: Optional[str] = None
     watermark: Optional[int] = 1  # 1=my garage (default), 0=none, 2=my organization
+    new_parts_markup_percent: Optional[float] = None
+    new_parts_markup_manual: Optional[bool] = False
 
 class OrganizationCreate(OrganizationBase):
     pass
@@ -19,6 +21,8 @@ class OrganizationUpdate(BaseModel):
     logo_organization: Optional[str] = None
     description: Optional[str] = None
     watermark: Optional[int] = None
+    new_parts_markup_percent: Optional[float] = None
+    new_parts_markup_manual: Optional[bool] = None
 
 class Organization(OrganizationBase):
     id: str

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 const MediaModal = ({ isOpen, onClose, mediaItems, initialIndex = 0 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -56,9 +57,9 @@ const MediaModal = ({ isOpen, onClose, mediaItems, initialIndex = 0 }) => {
     }
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center"
+      className="fixed inset-0 bg-black bg-opacity-90 z-[150] flex items-center justify-center"
       onClick={handleBackdropClick}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -131,7 +132,8 @@ const MediaModal = ({ isOpen, onClose, mediaItems, initialIndex = 0 }) => {
           {currentIndex + 1} / {mediaItems.length}
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
 

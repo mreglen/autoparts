@@ -1,11 +1,16 @@
 // src/components/ProtectedRoute.jsx
-import { useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
+import { useAuthReady } from '../../hooks/useAuthReady';
+import AuthLoadingScreen from '../AuthLoadingScreen/AuthLoadingScreen';
 
 export default function ProtectedRoute({ children }) {
-    const { token } = useSelector((state) => state.auth);
+    const { isReady, token, isAuthenticated } = useAuthReady();
 
-    if (!token) {
+    if (!isReady) {
+        return <AuthLoadingScreen />;
+    }
+
+    if (!token || !isAuthenticated) {
         return <Navigate to="/auth" replace />;
     }
 

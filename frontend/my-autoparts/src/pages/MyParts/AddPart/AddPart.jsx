@@ -8,6 +8,8 @@ import { fetchStorageCells, createStorageCell } from '../../../redux/slices/Stor
 import { createPendingProductStorageCellsBatch } from '../../../redux/slices/PendingProductStorageCellsSlice';
 import { fetchPartTypes } from '../../../redux/slices/PartTypeSlice';
 import { normalizeImageUrl, apiRequest, apiRequestFormData } from '../../../utils/apiClient';
+import { useAuthReady } from '../../../hooks/useAuthReady';
+import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
 
 import VehicleModal from './VehicleModal';
 
@@ -684,13 +686,25 @@ const AddPart = () => {
     }
   };
 
-  useEffect(() => {
-    if (!user || (!user.is_seller && !user.is_employee)) {
-      navigate('/');
-    }
-  }, [user, navigate]);
+  const { isReady } = useAuthReady();
+  const canAccess = Boolean(user?.is_seller || user?.is_employee || user?.is_admin);
 
-  if (!user || (!user.is_seller && !user.is_employee)) {
+  useEffect(() => {
+    if (!isReady) return;
+    if (!canAccess) {
+      navigate('/', { replace: true });
+    }
+  }, [isReady, canAccess, navigate]);
+
+  if (!isReady) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <AuthLoadingScreen />
+      </div>
+    );
+  }
+
+  if (!canAccess) {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="text-center py-8 text-gray-500">Перенаправление...</div>

@@ -32,7 +32,9 @@ import ClientsPage from './pages/Profile/ClientsPage';
 import StorageAddressesPage from './pages/Profile/StorageAddressesPage';
 import PendingSellersPage from './pages/Moderation/PendingSellersPage';
 import ProductModeration from './pages/Moderation/ProductModeration/ProductModeration';
+import OrganizationProductModerationPage from './pages/Moderation/ProductModeration/OrganizationProductModerationPage';
 import SellersPage from './pages/Profile/SellersPage';
+import SellerWorkspacePage from './pages/Profile/SellerWorkspacePage';
 import Organization from './pages/Settings/Organization';
 import PrintSettings from './pages/Settings/PrintSettings';
 import IntegrationPage from './pages/Settings/IntegrationPage';
@@ -164,7 +166,9 @@ function App() {
           <Route path="/settings/integration/drom/nomenclature" element={<DromNomenclaturePage />} />
           <Route path="/moderation/pending-sellers" element={<PendingSellersPage />} />
           <Route path="/moderation/products" element={<ProductModeration />} />
+          <Route path="/moderation/products/:organizationId" element={<OrganizationProductModerationPage />} />
           <Route path="/sellers" element={<SellersPage />} />
+          <Route path="/sellers/:sellerId/workspace" element={<SellerWorkspacePage />} />
           <Route path="/admin-settings" element={<AdminPanelPage />} />
         </Route>
       </Routes>
