@@ -1,5 +1,5 @@
 # app/routers/admin.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload, selectinload
 from app.models.event_log import EventLog
 from app.models.user import User
@@ -26,6 +26,11 @@ from pydantic import BaseModel, Field
 from app.core.auth import get_current_admin_user
 from app.core.security import get_password_hash
 from app.utils.id_generator import random_id
+from app.services.organization_clients import (
+    get_buyer_orders_for_organization,
+    list_buyers_for_organization,
+)
+from app.schemas.client import ClientBuyerOrdersResponse, ClientListItemResponse
 from app.utils.event_logger import log_event
 from app.utils.email import send_verification_email, send_welcome_email
 import secrets
@@ -661,14 +666,35 @@ def get_seller_product(
     return product
 
 
-@router.get("/sellers/{seller_id}/clients")
+@router.get("/sellers/{seller_id}/clients", response_model=List[ClientListItemResponse])
 def get_seller_clients(
     seller_id: int,
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
-    org_id = _org_id_from_seller(db, seller_id)
-    return db.query(ClientModel).filter(ClientModel.organization_id == org_id).all()
+    """Buyers with orders for the seller's organization."""
+    _, org = get_seller_organization(db, seller_id)
+    return list_buyers_for_organization(db, org.id, org.name)
+
+
+@router.get("/sellers/{seller_id}/clients/buyer-orders", response_model=ClientBuyerOrdersResponse)
+def get_seller_client_buyer_orders(
+    seller_id: int,
+    client_id: Optional[int] = Query(None),
+    email: Optional[str] = Query(None),
+    phone: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Orders of a buyer for the seller's organization."""
+    _, org = get_seller_organization(db, seller_id)
+    return get_buyer_orders_for_organization(
+        db,
+        org.id,
+        client_id=client_id,
+        email=email,
+        phone=phone,
+    )
 
 
 @router.get("/sellers/{seller_id}/vehicles")

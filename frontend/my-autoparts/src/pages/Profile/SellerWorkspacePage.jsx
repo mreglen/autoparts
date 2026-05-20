@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
     clearWorkspace,
-    fetchSellerClients,
     fetchSellerEmployees,
     fetchSellerProducts,
     fetchSellerProduct,
@@ -20,6 +19,7 @@ import { setAdminSellerMarkupContext } from '../../redux/slices/PublicInfoSlice'
 import MediaModal from '../../components/MediaModal/MediaModal';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import { SellerPartDetailModal, SellerVehicleDetailModal } from './SellerWorkspaceDetailModals';
+import SellerWorkspaceClientsTab from './SellerWorkspaceClientsTab';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 
@@ -59,8 +59,6 @@ export default function SellerWorkspacePage() {
         workspaceError,
         products,
         productsLoading,
-        clients,
-        clientsLoading,
         vehicles,
         vehiclesLoading,
         storageLocations,
@@ -113,8 +111,6 @@ export default function SellerWorkspacePage() {
                 sellerId: numericSellerId,
                 storageLocationId: storageFilter || undefined,
             }));
-        } else if (activeTab === 'clients') {
-            dispatch(fetchSellerClients(numericSellerId));
         } else if (activeTab === 'vehicles') {
             dispatch(fetchSellerVehicles(numericSellerId));
         } else if (activeTab === 'stock-in') {
@@ -131,6 +127,40 @@ export default function SellerWorkspacePage() {
     const getStorageAddress = (storageLocationId) => {
         const loc = storageLocations.find((l) => l.id === storageLocationId);
         return loc?.address || null;
+    };
+
+    const itemToPartSnapshot = (item) => ({
+        id: item.product_id,
+        brand: item.brand || '—',
+        article: item.partnumber || '—',
+        name: item.name || '—',
+        price: item.price,
+        quantity: item.quantity,
+        photos: [],
+        videos: [],
+        is_new: item.order_type === 'new',
+    });
+
+    const handleOpenClientOrderItem = async (item) => {
+        const productId = item?.product_id;
+        if (!productId) {
+            setSelectedPart(itemToPartSnapshot(item));
+            return;
+        }
+        const fromWarehouse = products.find((p) => p.id === productId);
+        if (fromWarehouse) {
+            setSelectedPart(fromWarehouse);
+            return;
+        }
+        try {
+            const full = await dispatch(fetchSellerProduct({
+                sellerId: numericSellerId,
+                productId,
+            })).unwrap();
+            setSelectedPart(full);
+        } catch {
+            setSelectedPart(itemToPartSnapshot(item));
+        }
     };
 
     const openProductModal = async (row) => {
@@ -456,17 +486,13 @@ export default function SellerWorkspacePage() {
                     )}
 
                     {activeTab === 'clients' && (
-                        clientsLoading ? <LoadingBlock /> : (
-                            <SimpleTable
-                                rows={clients}
-                                columns={[
-                                    { key: 'name', render: (r) => `${r.last_name || ''} ${r.first_name || ''}`.trim() },
-                                    { key: 'email', render: (r) => r.email },
-                                    { key: 'phone', render: (r) => r.phone },
-                                ]}
-                                emptyText="Нет клиентов"
-                            />
-                        )
+                        <SellerWorkspaceClientsTab
+                            sellerId={numericSellerId}
+                            onOpenItem={handleOpenClientOrderItem}
+                            onImageClick={handleOpenMediaModal}
+                            selectedPart={selectedPart}
+                            onClosePart={() => setSelectedPart(null)}
+                        />
                     )}
 
                     {activeTab === 'vehicles' && (

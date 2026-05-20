@@ -70,6 +70,23 @@ export const fetchSellerClients = createAsyncThunk(
     }
 );
 
+export const fetchSellerClientBuyerOrders = createAsyncThunk(
+    'sellers/fetchSellerClientBuyerOrders',
+    async ({ sellerId, clientId, email, phone }, { rejectWithValue }) => {
+        try {
+            const params = new URLSearchParams();
+            if (clientId != null) params.set('client_id', String(clientId));
+            else {
+                if (email) params.set('email', email);
+                if (phone) params.set('phone', phone);
+            }
+            return await apiRequest(`/admin/sellers/${sellerId}/clients/buyer-orders?${params.toString()}`);
+        } catch (err) {
+            return rejectWithValue(err?.message || 'Не удалось загрузить заказы клиента');
+        }
+    }
+);
+
 export const fetchSellerVehicles = createAsyncThunk(
     'sellers/fetchSellerVehicles',
     async (sellerId, { rejectWithValue }) => {
@@ -174,6 +191,8 @@ const sellersSlice = createSlice({
         productsLoading: false,
         clients: [],
         clientsLoading: false,
+        sellerBuyerOrders: null,
+        sellerBuyerOrdersLoading: false,
         vehicles: [],
         vehiclesLoading: false,
         storageLocations: [],
@@ -196,6 +215,8 @@ const sellersSlice = createSlice({
             state.workspaceError = null;
             state.products = [];
             state.clients = [];
+            state.sellerBuyerOrders = null;
+            state.sellerBuyerOrdersLoading = false;
             state.vehicles = [];
             state.storageLocations = [];
             state.stockIns = [];
@@ -209,6 +230,9 @@ const sellersSlice = createSlice({
                 state.workspace.new_parts_markup_manual = action.payload.new_parts_markup_manual;
                 state.workspace.global_new_parts_markup_percent = action.payload.global_new_parts_markup_percent;
             }
+        },
+        clearSellerBuyerOrders: (state) => {
+            state.sellerBuyerOrders = null;
         },
     },
     extraReducers: (builder) => {
@@ -268,6 +292,16 @@ const sellersSlice = createSlice({
             })
             .addCase(fetchSellerClients.rejected, (state) => {
                 state.clientsLoading = false;
+            })
+            .addCase(fetchSellerClientBuyerOrders.pending, (state) => {
+                state.sellerBuyerOrdersLoading = true;
+            })
+            .addCase(fetchSellerClientBuyerOrders.fulfilled, (state, action) => {
+                state.sellerBuyerOrdersLoading = false;
+                state.sellerBuyerOrders = action.payload;
+            })
+            .addCase(fetchSellerClientBuyerOrders.rejected, (state) => {
+                state.sellerBuyerOrdersLoading = false;
             })
             .addCase(fetchSellerVehicles.pending, (state) => {
                 state.vehiclesLoading = true;
@@ -353,5 +387,10 @@ const sellersSlice = createSlice({
     },
 });
 
-export const { clearError, clearWorkspace, applyWorkspaceMarkup } = sellersSlice.actions;
+export const {
+    clearError,
+    clearWorkspace,
+    applyWorkspaceMarkup,
+    clearSellerBuyerOrders,
+} = sellersSlice.actions;
 export default sellersSlice.reducer;
