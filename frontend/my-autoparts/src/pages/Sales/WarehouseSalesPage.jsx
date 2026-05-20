@@ -89,7 +89,10 @@ const WarehouseSalesPage = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
                 <div className="mb-6 sm:mb-8">
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Продажи со склада</h1>
-                    <p className="mt-2 text-gray-600 text-base sm:text-base">Продажи со склада проведённые через страницу "Мои запчасти"</p>
+                    <p className="mt-2 text-gray-600 text-base sm:text-base">
+                        Фактические продажи: ручные списания из «Мои запчасти» и Авито после закрытия заказа и списания со склада.
+                        Активные заказы Авито — в разделе «Продажи → заказы».
+                    </p>
                 </div>
                 <div className="text-left sm:text-right">
                     <div className="text-xl sm:text-2xl font-bold text-gray-700">

@@ -99,12 +99,12 @@ export default function SellerDashboardModal({ isOpen, onClose, seller, stats, l
                                             </svg>
                                         </div>
                                         <p className="text-xs sm:text-sm font-medium text-indigo-100 flex-1 min-w-0">
-                                            Общая сумма продаж
+                                            Фактические продажи со склада
                                         </p>
                                     </div>
                                     <p className="text-xl sm:text-2xl md:text-3xl font-bold leading-tight break-all">{formatCurrency(stats.totalSales)}</p>
                                     <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-indigo-500 border-opacity-30">
-                                        <p className="text-xs sm:text-sm text-indigo-100 opacity-80">За всё время работы</p>
+                                        <p className="text-xs sm:text-sm text-indigo-100 opacity-80">Включая Авито после закрытия заказа</p>
                                     </div>
                                 </div>
 

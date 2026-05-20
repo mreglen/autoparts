@@ -299,8 +299,9 @@ export default function SellerWorkspacePage() {
                                     <p className="text-2xl font-bold mt-1">{stats?.totalWarehouseQuantity ?? 0} шт.</p>
                                 </div>
                                 <div className="bg-white rounded-xl border p-4">
-                                    <p className="text-xs text-gray-500 uppercase">Продажи со склада</p>
+                                    <p className="text-xs text-gray-500 uppercase">Фактические продажи со склада</p>
                                     <p className="text-2xl font-bold mt-1">{formatCurrency(stats?.totalSales)}</p>
+                                    <p className="text-xs text-gray-500 mt-1">Включая Авито после закрытия заказа</p>
                                 </div>
                             </div>
 
@@ -463,7 +464,11 @@ export default function SellerWorkspacePage() {
                     )}
 
                     {activeTab === 'sales' && (
-                        warehouseSalesLoading ? <LoadingBlock /> : (
+                        <>
+                            <p className="text-sm text-gray-600 mb-4">
+                                Только движения с ценой продажи (ручные и Авито после списания). Журнал всех движений — вкладка «Расходы».
+                            </p>
+                        {warehouseSalesLoading ? <LoadingBlock /> : (
                             <SimpleTable
                                 rows={warehouseSales}
                                 columns={[
@@ -482,7 +487,8 @@ export default function SellerWorkspacePage() {
                                 emptyText="Нет продаж"
                                 onRowClick={openProductModal}
                             />
-                        )
+                        )}
+                        </>
                     )}
 
                     {activeTab === 'clients' && (

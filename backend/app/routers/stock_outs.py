@@ -36,8 +36,12 @@ def create_stock_out(
     # Уменьшаем количество
     product.quantity -= stock_out.quantity
 
+    payload = stock_out.dict()
+    if payload.get("sale_price", 0) > 0 and not payload.get("sale_channel"):
+        payload["sale_channel"] = "warehouse"
+
     # Создаём запись расхода
-    db_stock_out = StockOutModel(**stock_out.dict())
+    db_stock_out = StockOutModel(**payload)
     db.add(db_stock_out)
     db.commit()
     db.refresh(db_stock_out)

@@ -26,6 +26,15 @@ from app.models.organization_drom_autoload_cache import OrganizationDromAutoload
 from app.services.avito_autoload_xlsx import remove_product_from_avito_autoload
 from app.services.drom_autoload_xlsx import remove_product_from_drom_autoload
 from app.services.avito_orders_api import get_avito_order
+from app.services.avito_order_pricing import (
+    avito_line_item_qty,
+    avito_order_items,
+    unit_price_for_stock_out,
+)
+from app.services.avito_order_item_match import (
+    avito_item_identifiers,
+    resolve_product_id_from_avito_item,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +70,7 @@ async def process_closed_avito_order(
     
     # Извлекаем товары из заказа
     avito_data = order.avito_data or {}
-    items = avito_data.get("items") or avito_data.get("products") or []
+    items = avito_order_items(avito_data)
     if not items and access_token and avito_user_id and avito_order_id:
         try:
             details = await get_avito_order(access_token, int(avito_user_id), int(avito_order_id))
@@ -69,9 +78,9 @@ async def process_closed_avito_order(
                 detailed_order = details.get("order") if isinstance(details.get("order"), dict) else details
                 detailed_items = detailed_order.get("items") or detailed_order.get("products") or []
                 if detailed_items:
-                    items = detailed_items
                     avito_data = detailed_order
                     order.avito_data = detailed_order
+                    items = avito_order_items(avito_data)
                     logger.info("Loaded %s items from order details for avito_order_id=%s", len(items), avito_order_id)
         except Exception as exc:
             logger.warning("Failed to fetch order details for avito_order_id=%s: %s", avito_order_id, exc)
@@ -99,52 +108,11 @@ async def process_closed_avito_order(
             continue
         
         try:
-            # Извлекаем данные товара из заказа
-            item_quantity = int(item.get("quantity") or item.get("count") or 1)
-            item_price = float(item.get("price") or item.get("total_price") or 0)
-            
-            # Извлекаем идентификаторы из заказа
-            avito_item_id = (
-                item.get("avitoId")
-                or item.get("avito_id")
-                or item.get("avitoItemId")
-                or item.get("itemId")
-                or item.get("id")
-                or item.get("offerId")
-            )
-            internal_code = (
-                item.get("internal_code")
-                or item.get("internalCode")
-                or item.get("article")
-                or item.get("partnumber")
-                or item.get("partNumber")
-                or item.get("sku")
-            )
-            
-            listing_link = None
-            
-            # Сначала пробуем найти по avito_id (реальный ID объявления)
-            if avito_item_id:
-                listing_link = db.query(ProductAvitoListingLink).filter_by(
-                    organization_id=organization_id,
-                    avito_id=str(avito_item_id)
-                ).first()
-                
-                if listing_link:
-                    logger.info(f"Found product by avito_id={avito_item_id}, product_id={listing_link.product_id}")
-            
-            # Если не нашли, пробуем по avito_ad_id (internal_code)
-            if not listing_link and internal_code:
-                listing_link = db.query(ProductAvitoListingLink).filter_by(
-                    organization_id=organization_id,
-                    avito_ad_id=str(internal_code)
-                ).first()
-                
-                if listing_link:
-                    logger.info(f"Found product by internal_code={internal_code}, product_id={listing_link.product_id}")
+            item_quantity = avito_line_item_qty(item)
+            avito_item_id, internal_code = avito_item_identifiers(item)
 
-            # Если всё еще не нашли, логируем все доступные ключи
-            if not listing_link:
+            product_id = resolve_product_id_from_avito_item(db, organization_id, item)
+            if not product_id:
                 logger.warning(
                     f"ProductAvitoListingLink not found for order {order_id}. "
                     f"avitoId={avito_item_id}, internal_code={internal_code}, "
@@ -152,10 +120,20 @@ async def process_closed_avito_order(
                 )
                 skipped_reasons.append("listing_not_found")
                 continue
-            
-            product = listing_link.product
+
+            listing_link = (
+                db.query(ProductAvitoListingLink)
+                .filter_by(organization_id=organization_id, product_id=product_id)
+                .first()
+            )
+
+            product = listing_link.product if listing_link else None
             if not product:
-                logger.warning(f"Product not found for listing link {listing_link.id}")
+                from app.models.product import Product
+
+                product = db.query(Product).filter(Product.id == product_id).first()
+            if not product:
+                logger.warning(f"Product not found for product_id={product_id}")
                 skipped_reasons.append("product_not_found")
                 continue
             
@@ -167,7 +145,19 @@ async def process_closed_avito_order(
                 )
                 skipped_reasons.append("insufficient_quantity")
                 continue
-            
+
+            item_unit_price = unit_price_for_stock_out(
+                item,
+                product_price=float(product.price or 0),
+            )
+            if item_unit_price <= 0:
+                logger.warning(
+                    "Avito order %s item has no price in API and product %s has no price; "
+                    "stock_out will have sale_price=0",
+                    order_id,
+                    product.id,
+                )
+
             # Создаём запись StockOut
             stock_out = StockOut(
                 organization_id=organization_id,
@@ -176,7 +166,7 @@ async def process_closed_avito_order(
                 storage_location_id=product.storage_location_id,
                 user_id=None,  # Системная операция
                 quantity=item_quantity,
-                sale_price=item_price,
+                sale_price=item_unit_price,
                 movement_date=date.today(),
                 reason="Продано через Авито",
                 sale_channel="avito",
@@ -191,14 +181,14 @@ async def process_closed_avito_order(
                 "product_id": product.id,
                 "internal_code": product.internal_code,
                 "article": product.article,
-                "avito_id": listing_link.avito_id,
+                "avito_id": (listing_link.avito_id if listing_link else None) or avito_item_id,
                 "quantity": item_quantity,
-                "price": item_price,
+                "price": item_unit_price,
             })
             
             logger.info(
                 f"Created StockOut for product {product.id}, "
-                f"quantity={item_quantity}, price={item_price}"
+                f"quantity={item_quantity}, unit_price={item_unit_price}"
             )
             
         except Exception as e:
