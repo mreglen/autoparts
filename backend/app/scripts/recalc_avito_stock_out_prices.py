@@ -23,8 +23,7 @@ from app.db.database import SessionLocal
 from app.models.avito_orders_cache import AvitoOrderCache
 from app.models.product import Product
 from app.models.stock_out import StockOut
-from app.services.avito_order_item_match import find_avito_item_for_product_id
-from app.services.avito_order_pricing import avito_order_items, unit_price_for_stock_out
+from app.services.stock_out_sales import resolve_effective_unit_price
 
 
 def _needs_recalc(sale_price) -> bool:
@@ -74,24 +73,12 @@ def recalc_avito_stock_out_prices(*, apply: bool) -> dict[str, int]:
                 )
                 continue
 
-            items = avito_order_items(order.avito_data)
-            item = find_avito_item_for_product_id(
-                items, db, so.organization_id, so.product_id
-            )
-            if not item:
-                stats["not_found"] += 1
-                print(
-                    f"  [skip] stock_out id={so.id}: позиция для product_id={so.product_id} "
-                    f"не найдена в avito_data"
-                )
-                continue
-
             product = db.query(Product).filter(Product.id == so.product_id).first()
-            product_price = float(product.price or 0) if product else 0.0
-            new_unit = unit_price_for_stock_out(item, product_price=product_price)
+            new_unit = resolve_effective_unit_price(db, so)
 
             if new_unit <= 0:
                 stats["skipped"] += 1
+                product_price = float(product.price or 0) if product else 0.0
                 print(
                     f"  [skip] stock_out id={so.id}: не удалось вычислить цену "
                     f"(product.price={product_price})"

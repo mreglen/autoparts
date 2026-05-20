@@ -65,8 +65,8 @@ export const MobileStockOutCard = ({
           
           {/* Status badges */}
           <div className="flex items-center gap-2 flex-wrap mb-2">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${item.sale_price > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-              {item.sale_price > 0 ? 'Продажа' : 'Списание'}
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${(item.sale_price > 0 || item.sale_channel === 'avito' || item.avito_order_id) ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+              {(item.sale_price > 0 || item.sale_channel === 'avito' || item.avito_order_id) ? 'Продажа' : 'Списание'}
             </span>
             {item.sale_channel === 'avito' && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">

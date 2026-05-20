@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
+from app.models.product import Product
 from app.models.product_avito_listing_link import ProductAvitoListingLink
 
 
@@ -70,10 +71,42 @@ def find_avito_item_for_product_id(
     organization_id: str,
     product_id: int,
 ) -> Optional[dict]:
-    for item in items:
-        if not isinstance(item, dict):
-            continue
+    return find_avito_item_for_product(items, db, organization_id, product_id)
+
+
+def find_avito_item_for_product(
+    items: list,
+    db: Session,
+    organization_id: str,
+    product_id: int,
+    *,
+    product: Product | None = None,
+) -> Optional[dict]:
+    """
+    Найти позицию заказа для товара. Listing-ссылки могут быть уже удалены после closed.
+    """
+    valid_items = [x for x in items if isinstance(x, dict)]
+
+    for item in valid_items:
         pid = resolve_product_id_from_avito_item(db, organization_id, item)
         if pid == product_id:
             return item
+
+    if product is None:
+        product = db.query(Product).filter(Product.id == product_id).first()
+
+    if len(valid_items) == 1:
+        return valid_items[0]
+
+    if product:
+        for item in valid_items:
+            _, internal_code = avito_item_identifiers(item)
+            if not internal_code:
+                continue
+            code = str(internal_code)
+            if product.internal_code and code == str(product.internal_code):
+                return item
+            if product.article and code == str(product.article):
+                return item
+
     return None

@@ -1,307 +1,299 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiAxios } from '../../utils/apiClient';
+import {
+  computeProductStats,
+  computeWarehouseSalesStats,
+  computeStockOutStats,
+  computeStockInStats,
+  formatCurrency,
+  formatShortDate,
+  saleLineTotal,
+  isAvitoSale,
+} from './dashboardUtils';
+
+function KpiCard({ label, value, sub, accent = 'indigo', onClick }) {
+  const accents = {
+    indigo: 'from-indigo-600 to-blue-700',
+    emerald: 'from-emerald-600 to-teal-700',
+    amber: 'from-amber-500 to-orange-600',
+    slate: 'from-slate-700 to-slate-900',
+  };
+  const inner = (
+    <div
+      className={`rounded-xl bg-gradient-to-br ${accents[accent] || accents.indigo} p-5 text-white shadow-lg ${
+        onClick ? 'cursor-pointer hover:shadow-xl transition-shadow' : ''
+      }`}
+    >
+      <p className="text-xs font-medium uppercase tracking-wide text-white/80">{label}</p>
+      <p className="mt-2 text-2xl sm:text-3xl font-bold leading-tight break-words">{value}</p>
+      {sub ? <p className="mt-2 text-sm text-white/75">{sub}</p> : null}
+    </div>
+  );
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="w-full text-left">
+        {inner}
+      </button>
+    );
+  }
+  return inner;
+}
+
+function MetricTile({ label, value, hint, color = 'gray' }) {
+  const colors = {
+    blue: 'bg-blue-50 border-blue-100 text-blue-700',
+    yellow: 'bg-amber-50 border-amber-100 text-amber-800',
+    green: 'bg-green-50 border-green-100 text-green-800',
+    purple: 'bg-purple-50 border-purple-100 text-purple-800',
+    red: 'bg-red-50 border-red-100 text-red-800',
+    gray: 'bg-gray-50 border-gray-100 text-gray-700',
+  };
+  return (
+    <div className={`rounded-xl border p-4 ${colors[color] || colors.gray}`}>
+      <p className="text-xs font-semibold uppercase opacity-80">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
+      {hint ? <p className="mt-1 text-xs text-gray-600">{hint}</p> : null}
+    </div>
+  );
+}
+
+function Section({ title, icon, children, action }) {
+  return (
+    <section className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          {icon ? <div className="p-2 rounded-lg bg-gray-100 text-gray-600">{icon}</div> : null}
+          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+        </div>
+        {action}
+      </div>
+      <div className="p-5">{children}</div>
+    </section>
+  );
+}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { isReady, user } = useAuthReady();
-  const [stats, setStats] = useState({
-    activeOrders: 0,
-    totalProducts: 0,
-    totalWarehouseValue: 0,
-    totalWarehouseQuantity: 0,
-    totalSales: 0,
-    newOrders: 0,
-    pendingOrders: 0,
-    completedOrders: 0,
-    warehouseSalesCount: 0
-  });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [data, setData] = useState(null);
 
   const canAccess = Boolean(user?.is_admin || user?.is_seller || user?.is_employee);
 
   useEffect(() => {
     if (!isReady) return;
-    if (!canAccess) {
-      navigate('/', { replace: true });
-    }
+    if (!canAccess) navigate('/', { replace: true });
   }, [isReady, canAccess, navigate]);
 
-  useEffect(() => {
-    if (isReady && canAccess) {
-      fetchDashboardStats();
-    }
-  }, [isReady, canAccess, user]);
+  const loadDashboard = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
 
-  if (!isReady) {
-    return <AuthLoadingScreen />;
-  }
-
-  if (!canAccess) {
-    return null;
-  }
-
-  const fetchDashboardStats = async () => {
     try {
-      setLoading(true);
+      const results = await Promise.allSettled([
+        apiAxios.get('/products/'),
+        apiAxios.get('/stock-outs/sales'),
+        apiAxios.get('/stock-outs/'),
+        apiAxios.get('/stock-ins/'),
+      ]);
 
-      // Получаем статистику заказов
-      // Для админов - все заказы, для сотрудников - заказы организации, для продавцов - свои заказы
-      let ordersEndpoint;
-      if (user?.is_admin) {
-        ordersEndpoint = '/orders/';
-      } else if (user?.is_employee) {
-        ordersEndpoint = '/orders/organization/my';
-      } else {
-        ordersEndpoint = '/orders/my';
-      }
-      const ordersResponse = await apiAxios.get(ordersEndpoint);
-      const orders = ordersResponse.data;
+      const pick = (idx, fallback = []) =>
+        results[idx].status === 'fulfilled' ? results[idx].value.data : fallback;
 
-      // Фильтруем заказы
-      const filteredOrders = orders.filter(order => {
-        // Заказы из новых автозапчастей фильтруем по организации
-        if (order.new_parts_order) {
-          return user?.is_admin;
-        }
-        // Для обычных заказов проверяем связь с организацией
-        return order.organization_id === user.organization_id || !order.organization_id;
+      const products = pick(0);
+      const sales = pick(1);
+      const stockOuts = pick(2);
+      const stockIns = pick(3);
+
+      setData({
+        products,
+        ...computeProductStats(products),
+        sales: computeWarehouseSalesStats(sales),
+        stockOuts: computeStockOutStats(stockOuts),
+        stockIns: computeStockInStats(stockIns),
       });
-
-      // Фильтруем заказы: заказы из новых автозапчастей показываем только админам
-      const finalOrders = user?.is_admin
-        ? filteredOrders
-        : filteredOrders.filter(order => !order.new_parts_order);
-
-      // Активные заказы (не закрытые и не отмененные)
-      const activeOrders = finalOrders.filter(order =>
-        !['closed', 'cancelled'].includes(order.status.code)
-      );
-
-      // Новые заказы (за последние 7 дней)
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const newOrders = finalOrders.filter(order =>
-        new Date(order.created_at) > sevenDaysAgo
-      );
-
-      // Ожидающие заказы
-      const pendingOrders = finalOrders.filter(order =>
-        order.status.code === 'pending'
-      );
-
-      // Завершенные заказы
-      const completedOrders = finalOrders.filter(order =>
-        ['delivered', 'closed'].includes(order.status.code)
-      );
-
-      // Получаем товары организации
-      let totalProducts = 0;
-      let totalWarehouseValue = 0;
-      let totalWarehouseQuantity = 0;
-      try {
-        const productsResponse = await apiAxios.get('/products/');
-        const products = productsResponse.data;
-        totalProducts = products.length;
-        totalWarehouseValue = products.reduce((sum, part) => sum + ((part.price || 0) * (part.quantity || 0)), 0);
-        totalWarehouseQuantity = products.reduce((sum, part) => sum + (part.quantity || 0), 0);
-      } catch (error) {
-        console.log('Products endpoint not available');
-      }
-
-      // Получаем продажи со склада
-      let warehouseSalesCount = 0;
-      let warehouseSalesAmount = 0;
-      try {
-        const warehouseSalesResponse = await apiAxios.get('/stock-outs/sales');
-        const warehouseSales = warehouseSalesResponse.data;
-        warehouseSalesCount = warehouseSales.length;
-        // Рассчитываем общую сумму продаж со склада
-        warehouseSalesAmount = warehouseSales.reduce((sum, sale) => 
-          sum + (parseFloat(sale.sale_price || 0) * parseInt(sale.quantity || 0)), 0
-        );
-      } catch (error) {
-        console.log('Warehouse sales endpoint not available');
-      }
-
-      setStats({
-        activeOrders: activeOrders.length,
-        totalProducts,
-        totalWarehouseValue,
-        totalWarehouseQuantity,
-        totalSales: warehouseSalesAmount,
-        newOrders: newOrders.length,
-        pendingOrders: pendingOrders.length,
-        completedOrders: completedOrders.length,
-        warehouseSalesCount
-      });
-    } catch (error) {
-      console.error('Ошибка загрузки статистики:', error);
+    } catch (e) {
+      console.error(e);
+      setError('Не удалось загрузить данные дашборда');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'RUB'
-    }).format(amount);
-  };
+  useEffect(() => {
+    if (isReady && canAccess) loadDashboard();
+  }, [isReady, canAccess, loadDashboard]);
 
-  // Если пользователь не продавец и не сотрудник, не показываем страницу
-  if (!user?.is_seller && !user?.is_employee) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Доступ запрещен</h2>
-          <p className="text-gray-600">У вас нет прав для просмотра этой страницы</p>
-        </div>
-      </div>
-    );
-  }
+  if (!isReady) return <AuthLoadingScreen />;
+  if (!canAccess) return null;
 
   if (loading) {
     return (
-      <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-              <div className="animate-pulse">
-                <div className="flex items-center mb-4">
-                  <div className="w-12 h-12 bg-gray-200 rounded-lg mr-4"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
+      <div className="mt-4 sm:mt-5 px-4 sm:px-0 space-y-6">
+        <div className="h-10 w-48 bg-gray-200 rounded-lg animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-28 bg-gray-200 rounded-xl animate-pulse" />
           ))}
         </div>
+        <div className="h-64 bg-gray-200 rounded-xl animate-pulse" />
       </div>
     );
   }
 
+  if (error || !data) {
+    return (
+      <div className="mt-8 text-center">
+        <p className="text-red-600 mb-4">{error || 'Нет данных'}</p>
+        <button
+          type="button"
+          onClick={loadDashboard}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >
+          Повторить
+        </button>
+      </div>
+    );
+  }
+
+  const { sales, stockOuts, stockIns } = data;
+
   return (
-    <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Панель заказов */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-gray-900">Статистика заказов</h3>
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-            <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
-              <p className="text-xs font-medium text-blue-600 uppercase mb-1">Активные</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.activeOrders}</p>
-            </div>
-            <div className="p-3 bg-yellow-50 rounded-xl border border-yellow-100">
-              <p className="text-xs font-medium text-yellow-600 uppercase mb-1">Ожидают</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.pendingOrders}</p>
-            </div>
-            <div className="p-3 bg-green-50 rounded-xl border border-green-100">
-              <p className="text-xs font-medium text-green-600 uppercase mb-1">Новые</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.newOrders}</p>
-            </div>
-            <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-              <p className="text-xs font-medium text-indigo-600 uppercase mb-1">Завершенные</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.completedOrders}</p>
-            </div>
-            <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
-              <p className="text-xs font-medium text-purple-600 uppercase mb-1">Продажи</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.warehouseSalesCount}</p>
-            </div>
-          </div>
+    <div className="mt-4 sm:mt-5 px-4 sm:px-0 pb-10 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Обзор</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">
+            Склад и фактические продажи
+          </p>
         </div>
-
-        {/* Общая сумма продаж */}
-        <div className="lg:col-span-1 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow text-white">
-          <div className="flex items-center mb-4">
-            <div className="p-3 bg-white bg-opacity-20 rounded-lg mr-4 text-white">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium text-indigo-100">Фактические продажи со склада</p>
-          </div>
-          <p className="text-3xl font-bold leading-tight">{formatCurrency(stats.totalSales)}</p>
-          <div className="mt-4 pt-4 border-t border-indigo-500 border-opacity-30">
-            <p className="text-sm text-indigo-100 opacity-80">Ручные продажи и Авито после закрытия заказа. Активные заказы Авито — в разделе «Продажи».</p>
-          </div>
-        </div>
-
-        {/* Складской обзор */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-gray-900">Обзор склада</h3>
-            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="flex items-center p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-              <div className="p-3 bg-white rounded-lg shadow-sm mr-4 text-emerald-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-emerald-700">Стоимость товаров</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalWarehouseValue.toLocaleString('ru-RU')} ₽</p>
-              </div>
-            </div>
-            <div className="flex items-center p-4 bg-orange-50 rounded-xl border border-orange-100">
-              <div className="p-3 bg-white rounded-lg shadow-sm mr-4 text-orange-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-orange-700">Общее количество</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalWarehouseQuantity.toLocaleString('ru-RU')} шт.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Виды товаров */}
-        <div className="lg:col-span-1 bg-white rounded-xl shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-          <div className="flex flex-col h-full justify-between">
-            <div className="flex items-center mb-4">
-              <div className="p-3 bg-purple-100 rounded-lg mr-4 text-purple-600">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600">Номенклатура</p>
-                <p className="text-xs text-gray-400">Уникальных позиций</p>
-              </div>
-            </div>
-            <div className="mt-auto">
-              <p className="text-4xl font-black text-gray-900">{stats.totalProducts}</p>
-              <p className="text-sm text-gray-500 mt-2">Наименований запчастей</p>
-            </div>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={loadDashboard}
+          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100"
+        >
+          Обновить
+        </button>
       </div>
 
-      {/* Кнопка обновления данных была убрана */}
+      {/* KPI */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <KpiCard
+          label="Выручка, всего"
+          value={formatCurrency(sales.totalSales)}
+          sub={`${sales.warehouseSalesCount} продаж · в т.ч. Авито ${sales.avitoCount}`}
+          accent="indigo"
+          onClick={() => navigate('/warehouse-sales')}
+        />
+        <KpiCard
+          label="За 30 дней"
+          value={formatCurrency(sales.revenue30d)}
+          sub={`За 7 дней: ${formatCurrency(sales.revenue7d)} (${sales.count7d} продаж)`}
+          accent="emerald"
+        />
+        <KpiCard
+          label="Склад"
+          value={formatCurrency(data.totalWarehouseValue)}
+          sub={`${data.totalWarehouseQuantity.toLocaleString('ru-RU')} шт. · ${data.totalProducts} позиций`}
+          accent="amber"
+          onClick={() => navigate('/my-parts')}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Продажи по каналам */}
+        <div className="lg:col-span-2">
+          <Section
+            title="Продажи со склада"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+              </svg>
+            }
+            action={
+              <Link to="/warehouse-sales" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+                Все продажи →
+              </Link>
+            }
+          >
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+              <MetricTile label="Ручные" value={formatCurrency(sales.warehouseRevenue)} hint={`${sales.warehouseCount} операций`} color="green" />
+              <MetricTile label="Авито" value={formatCurrency(sales.avitoRevenue)} hint={`${sales.avitoCount} в журнале`} color="blue" />
+              <MetricTile label="7 дней" value={formatCurrency(sales.revenue7d)} hint={`${sales.count7d} продаж`} color="purple" />
+              <MetricTile label="Списания 30д" value={stockOuts.writeoffs30d} hint="без продажи" color="red" />
+            </div>
+
+            {sales.recentSales.length === 0 ? (
+              <p className="text-gray-500 text-sm py-4 text-center">Пока нет зафиксированных продаж</p>
+            ) : (
+              <div className="overflow-x-auto -mx-1">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 uppercase border-b">
+                      <th className="pb-2 pr-3 font-semibold">Дата</th>
+                      <th className="pb-2 pr-3 font-semibold">Запчасть</th>
+                      <th className="pb-2 pr-3 font-semibold text-center">Кол-во</th>
+                      <th className="pb-2 pr-3 font-semibold">Канал</th>
+                      <th className="pb-2 font-semibold text-right">Сумма</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {sales.recentSales.map((sale) => (
+                      <tr key={sale.id} className="hover:bg-gray-50">
+                        <td className="py-2.5 pr-3 text-gray-600 whitespace-nowrap">{formatShortDate(sale.movement_date)}</td>
+                        <td className="py-2.5 pr-3">
+                          <div className="font-medium text-gray-900 line-clamp-1">
+                            {sale.product?.brand ? `${sale.product.brand} · ` : ''}
+                            {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
+                          </div>
+                        </td>
+                        <td className="py-2.5 pr-3 text-center">{sale.quantity}</td>
+                        <td className="py-2.5 pr-3">
+                          {isAvitoSale(sale) ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Авито</span>
+                          ) : (
+                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Склад</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 text-right font-semibold text-gray-900 whitespace-nowrap">
+                          {formatCurrency(saleLineTotal(sale))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
+        </div>
+
+        {/* Склад */}
+        <Section
+          title="Склад"
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          }
+          action={
+            <Link to="/stock-out" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+              Расходы →
+            </Link>
+          }
+        >
+          <div className="space-y-3">
+            <MetricTile label="Позиций" value={data.totalProducts} color="gray" />
+            <MetricTile label="Единиц на складе" value={data.totalWarehouseQuantity.toLocaleString('ru-RU')} color="green" />
+            <MetricTile label="Поступления за 30 д" value={stockIns.count30d} hint={`${stockIns.qty30d} шт. принято`} color="blue" />
+            <MetricTile label="Нулевой остаток" value={data.zeroStock} hint="нужно пополнить или списать" color="red" />
+          </div>
+        </Section>
+      </div>
     </div>
   );
 }
-

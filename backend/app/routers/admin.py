@@ -7,6 +7,7 @@ from app.models.organization import Organization
 from app.models.pending_seller import PendingSeller
 from app.models.product import Product
 from app.models.stock_out import StockOut
+from app.services.stock_out_sales import list_warehouse_sales, warehouse_sales_totals
 from app.db.database import get_db
 from app.utils.site_settings_db import get_or_create_site_settings
 from app.utils.admin_org_access import get_seller_organization
@@ -298,13 +299,8 @@ def get_seller_dashboard_stats(
     total_warehouse_value = sum((p.price or 0) * (p.quantity or 0) for p in products)
     total_warehouse_quantity = sum(p.quantity or 0 for p in products)
     
-    # Get warehouse sales for this organization
-    warehouse_sales = db.query(StockOut).filter(
-        StockOut.organization_id == organization_id,
-        StockOut.sale_price > 0
-    ).all()
-    warehouse_sales_count = len(warehouse_sales)
-    total_sales = sum(float(s.sale_price or 0) * int(s.quantity or 0) for s in warehouse_sales)
+    warehouse_sales = list_warehouse_sales(db, organization_id)
+    warehouse_sales_count, total_sales = warehouse_sales_totals(warehouse_sales)
     
     seller_name = f"{seller.last_name} {seller.first_name}".strip()
     if seller.patronymic:
@@ -779,17 +775,7 @@ def get_seller_warehouse_sales(
     db: Session = Depends(get_db),
 ):
     org_id = _org_id_from_seller(db, seller_id)
-    rows = (
-        db.query(StockOut)
-        .options(
-            joinedload(StockOut.product).options(*_seller_product_query_options()),
-            joinedload(StockOut.storage_location),
-            joinedload(StockOut.user),
-        )
-        .filter(StockOut.organization_id == org_id, StockOut.sale_price > 0)
-        .order_by(StockOut.movement_date.desc())
-        .all()
-    )
+    rows = list_warehouse_sales(db, org_id)
     for row in rows:
         _apply_product_flags(row.product)
     return rows

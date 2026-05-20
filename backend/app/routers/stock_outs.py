@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Session, joinedload
 from datetime import date
 from app.core.auth import get_current_user
 from app.models.product import Product
-from app.models.vehicle import Vehicle as VehicleModel
 from app.models.stock_out import StockOut as StockOutModel
 from app.models.user import User
 from app.schemas.stock_out import StockOut as StockOutSchema, StockOutCreate, ReturnCreate
 from app.db.database import get_db
+from app.services.stock_out_sales import list_warehouse_sales
 
 router = APIRouter(prefix="/stock-outs", tags=["Stock Out"])
 
@@ -53,31 +53,12 @@ def get_warehouse_sales(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get all warehouse sales (stock outs with sale_price > 0)
+    Фактические продажи: sale_price > 0, продажи Авито (в т.ч. с восстановленной ценой из заказа).
     """
     if not current_user.organization_id:
         raise HTTPException(status_code=403, detail="Организация не указана")
-    
-    sales = (
-        db.query(StockOutModel)
-        .options(
-            joinedload(StockOutModel.product).options(
-                selectinload(Product.compatible_vehicles).options(
-                    selectinload(VehicleModel.vin_row),
-                    selectinload(VehicleModel.mileage_row),
-                ),
-            ),
-            joinedload(StockOutModel.storage_location),
-            joinedload(StockOutModel.user)
-        )
-        .filter(
-            StockOutModel.organization_id == current_user.organization_id,
-            StockOutModel.sale_price > 0
-        )
-        .order_by(StockOutModel.movement_date.desc())
-        .all()
-    )
-    return sales
+
+    return list_warehouse_sales(db, current_user.organization_id)
 
 @router.get("/{stock_out_id}", response_model=StockOutSchema)
 def read_stock_out(stock_out_id: int, db: Session = Depends(get_db)):

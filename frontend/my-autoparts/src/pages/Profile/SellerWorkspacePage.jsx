@@ -455,7 +455,7 @@ export default function SellerWorkspacePage() {
                                         ),
                                     },
                                     { key: 'quantity', render: (r) => r.quantity },
-                                    { key: 'reason', render: (r) => r.reason || (r.sale_price > 0 ? 'Продажа' : '—') },
+                                    { key: 'reason', render: (r) => r.reason || ((r.sale_price > 0 || r.sale_channel === 'avito') ? 'Продажа' : '—') },
                                 ]}
                                 emptyText="Нет расходов"
                                 onRowClick={openProductModal}
