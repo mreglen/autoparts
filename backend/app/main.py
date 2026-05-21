@@ -1,7 +1,12 @@
 from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
 from app.db.database import Base, engine
-from app.db.schema_patches import ensure_organization_markup_columns, ensure_stock_out_source_columns
+from app.db.schema_patches import (
+    ensure_avito_order_fulfillment_columns,
+    ensure_garage_used_order_item_fulfillment_columns,
+    ensure_organization_markup_columns,
+    ensure_stock_out_source_columns,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
 from app.routers import chats as chats_router
@@ -59,6 +64,8 @@ except Exception as e:
 try:
     ensure_organization_markup_columns()
     ensure_stock_out_source_columns()
+    ensure_garage_used_order_item_fulfillment_columns()
+    ensure_avito_order_fulfillment_columns()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise

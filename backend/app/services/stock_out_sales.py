@@ -33,6 +33,13 @@ def is_warehouse_sale(stock_out: StockOut) -> bool:
     if stock_out.avito_order_id:
         return True
 
+    if (stock_out.sale_channel or "").lower() == "marketplace_used":
+        return True
+    if (getattr(stock_out, "source_kind", None) or "").lower() == "marketplace_used":
+        return True
+    if getattr(stock_out, "garage_used_order_item_id", None):
+        return True
+
     reason = (stock_out.reason or "").lower()
     if "авито" in reason:
         return True
@@ -48,6 +55,9 @@ def _warehouse_sale_filters(organization_id: str):
             StockOut.source_kind == "avito",
             StockOut.avito_order_id.isnot(None),
             func.coalesce(func.lower(StockOut.reason), "").like("%авито%"),
+            StockOut.sale_channel == "marketplace_used",
+            StockOut.source_kind == "marketplace_used",
+            StockOut.garage_used_order_item_id.isnot(None),
         ),
     )
 

@@ -14,6 +14,9 @@ import {
   getAvitoLineItemTitle,
   getAvitoLineItemTotal,
   getAvitoLineItemQty,
+  getAvitoWarehouseCanRetry,
+  getAvitoWarehouseMismatch,
+  getAvitoSkipReasonsForDisplay,
 } from './avitoOrderDisplay';
 
 export default function SalesOrdersPage() {
@@ -39,7 +42,10 @@ export default function SalesOrdersPage() {
   const [editingStatus, setEditingStatus] = useState(null); // {type:'used'|'new'|'avito', id:number} | null
   const [availableStatuses, setAvailableStatuses] = useState([]);
   const [transitionLoadingByOrderId, setTransitionLoadingByOrderId] = useState({});
+  const [warehouseRetryLoadingByOrderId, setWarehouseRetryLoadingByOrderId] = useState({});
   const [transitionError, setTransitionError] = useState('');
+  const [avitoWarehouseMessage, setAvitoWarehouseMessage] = useState(null);
+  const [usedOrderStatusMessage, setUsedOrderStatusMessage] = useState(null);
   const [cncPreparedByOrderId, setCncPreparedByOrderId] = useState({});
   const [receiveCodeModal, setReceiveCodeModal] = useState({
     isOpen: false,
@@ -195,9 +201,58 @@ export default function SalesOrdersPage() {
     }
   }, [avitoOrders]);
 
+  const formatStatusErrorDetail = (detail) => {
+    if (!detail) return 'Не удалось обновить статус заказа';
+    if (typeof detail === 'string') return detail;
+    if (typeof detail === 'object' && detail.message) {
+      const extra = detail.product_id != null
+        ? ` (товар №${detail.product_id}, запрошено: ${detail.requested}, доступно: ${detail.available})`
+        : '';
+      return `${detail.message}${extra}`;
+    }
+    return 'Не удалось обновить статус заказа';
+  };
+
   const updateUsedOrderStatus = async (orderId, statusCode) => {
-    await apiAxios.put(`/sales/used-parts-orders/${orderId}/status`, { status_code: statusCode });
-    setUsedOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status_code: statusCode } : o)));
+    setUsedOrderStatusMessage(null);
+    try {
+      const response = await apiAxios.put(
+        `/sales/used-parts-orders/${orderId}/status`,
+        { status_code: statusCode }
+      );
+      const fulfilled = Array.isArray(response.data?.fulfilled_items)
+        ? response.data.fulfilled_items
+        : [];
+      const createdCount = fulfilled.filter((item) => item.created).length;
+      setUsedOrders((prev) =>
+        prev.map((o) => {
+          if (o.id !== orderId) return o;
+          const nextItems = (o.items || []).map((item) => {
+            const match = fulfilled.find((f) => f.order_item_id === item.id);
+            if (!match) return item;
+            return {
+              ...item,
+              stock_out_id: match.stock_out_id,
+              status_code: statusCode,
+            };
+          });
+          return { ...o, status_code: statusCode, items: nextItems };
+        })
+      );
+      setEditingStatus(null);
+      if (createdCount > 0) {
+        setUsedOrderStatusMessage({
+          type: 'success',
+          text: `Списано со склада: ${createdCount} поз.`,
+        });
+      }
+    } catch (error) {
+      const detail = error?.response?.data?.detail;
+      setUsedOrderStatusMessage({
+        type: 'error',
+        text: formatStatusErrorDetail(detail),
+      });
+    }
   };
 
   const updateNewOrderStatus = async (orderId, statusCode) => {
@@ -458,6 +513,56 @@ export default function SalesOrdersPage() {
     return labels[transition] || transition;
   };
 
+  const retryAvitoWarehouse = async (order) => {
+    const orderId = order.id;
+    setWarehouseRetryLoadingByOrderId((prev) => ({ ...prev, [orderId]: true }));
+    setAvitoWarehouseMessage(null);
+    try {
+      const response = await apiAxios.post(`/sales/avito-orders/${orderId}/retry-warehouse`);
+      const wf = response.data?.warehouse_fulfillment;
+      setAvitoOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                closed_processed: wf?.status === 'fulfilled',
+                warehouse_fulfillment: wf || o.warehouse_fulfillment,
+              }
+            : o
+        )
+      );
+      const created = response.data?.created_count ?? 0;
+      if (wf?.status === 'fulfilled') {
+        setAvitoWarehouseMessage({
+          type: 'success',
+          text: `Склад проведён${created > 0 ? ` (новых списаний: ${created})` : ''}.`,
+        });
+      } else if (created > 0) {
+        setAvitoWarehouseMessage({
+          type: 'success',
+          text: `Частично проведено (новых списаний: ${created}). Проверьте причины ниже.`,
+        });
+      } else {
+        setAvitoWarehouseMessage({
+          type: 'error',
+          text: 'Склад не проведён. Исправьте причины и повторите.',
+        });
+      }
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setAvitoWarehouseMessage({
+        type: 'error',
+        text: typeof detail === 'string' ? detail : 'Не удалось провести склад',
+      });
+    } finally {
+      setWarehouseRetryLoadingByOrderId((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+    }
+  };
+
   const toggleAvitoOrderExpand = (orderId) => {
     setExpandedAvitoOrderId((prev) => (prev === orderId ? null : orderId));
   };
@@ -550,6 +655,17 @@ export default function SalesOrdersPage() {
         {loading && <div className="text-gray-600">Загрузка…</div>}
         {error && <div className="text-red-600">{error}</div>}
         {!error && transitionError && <div className="text-red-600">{transitionError}</div>}
+        {!error && usedOrderStatusMessage && (
+          <div
+            className={`mb-4 rounded-md px-4 py-3 text-sm ${
+              usedOrderStatusMessage.type === 'success'
+                ? 'bg-green-50 text-green-800 border border-green-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
+            }`}
+          >
+            {usedOrderStatusMessage.text}
+          </div>
+        )}
 
         {!loading && !error && activeTab === 'used' && (
           <div className="space-y-4">
@@ -733,6 +849,17 @@ export default function SalesOrdersPage() {
 
         {!loading && !error && activeTab === 'avito' && (
           <div className="space-y-4">
+            {avitoWarehouseMessage && (
+              <div
+                className={`rounded-lg px-4 py-3 text-sm ${
+                  avitoWarehouseMessage.type === 'success'
+                    ? 'bg-green-50 text-green-800 border border-green-200'
+                    : 'bg-red-50 text-red-800 border border-red-200'
+                }`}
+              >
+                {avitoWarehouseMessage.text}
+              </div>
+            )}
             <div className="hidden md:block space-y-4">
               {avitoOrders.map((o) => (
                 <AvitoOrderCard
@@ -744,12 +871,17 @@ export default function SalesOrdersPage() {
                   onEditStatus={handleEditStatus}
                   onAvitoTransition={handleAvitoTransitionSelect}
                   transitionLoadingByOrderId={transitionLoadingByOrderId}
+                  warehouseRetryLoadingByOrderId={warehouseRetryLoadingByOrderId}
+                  onRetryWarehouse={retryAvitoWarehouse}
                   getAvitoTransitionOptions={getAvitoTransitionOptions}
                   getAvitoTransitionLabel={getAvitoTransitionLabel}
                   getAvitoStatusColor={getAvitoStatusColor}
                   getAvitoStatusName={getAvitoStatusName}
                   formatDate={formatDate}
                   formatPrice={formatPrice}
+                  getAvitoWarehouseMismatch={getAvitoWarehouseMismatch}
+                  getAvitoWarehouseCanRetry={getAvitoWarehouseCanRetry}
+                  getAvitoSkipReasonsForDisplay={getAvitoSkipReasonsForDisplay}
                 />
               ))}
             </div>
@@ -773,6 +905,26 @@ export default function SalesOrdersPage() {
                           <div className="text-sm text-gray-800 break-words">{buyerName}</div>
                           <div className="text-sm text-gray-600 break-all">{buyerPhone}</div>
                           <div className="text-sm text-gray-600 break-words">{deliveryText}</div>
+                          {getAvitoWarehouseMismatch(order) && (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                              <div className="font-medium">Склад не проведён полностью</div>
+                              {getAvitoSkipReasonsForDisplay(order).slice(0, 2).map((r, idx) => (
+                                <div key={`${r.code}-${idx}`} className="mt-1">{r.label}</div>
+                              ))}
+                              {getAvitoWarehouseCanRetry(order) && (
+                                <button
+                                  type="button"
+                                  onClick={() => retryAvitoWarehouse(order)}
+                                  disabled={Boolean(warehouseRetryLoadingByOrderId[order.id])}
+                                  className="mt-2 text-amber-800 underline disabled:opacity-50"
+                                >
+                                  {warehouseRetryLoadingByOrderId[order.id]
+                                    ? 'Проводим...'
+                                    : 'Повторить проводку'}
+                                </button>
+                              )}
+                            </div>
+                          )}
                           <div className="pt-3 border-t border-gray-100 flex flex-col gap-2 min-w-0">
                             <div className="text-lg font-bold text-gray-900">{formatPrice(displayTotal)}</div>
                             <div className="flex flex-wrap gap-2 items-center">

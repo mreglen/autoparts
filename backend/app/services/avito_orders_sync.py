@@ -5,12 +5,12 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.avito_orders_cache import AvitoOrderCache
 from app.models.organization_avito_integration import OrganizationAvitoIntegration
-from app.models.stock_out import StockOut
+from app.services.avito_warehouse_fulfillment import FULFILLMENT_FULFILLED
 from app.services.avito_orders_api import AvitoOrdersError, fetch_avito_orders
 from app.utils.avito_crypto import decrypt_secret
 from app.services import avito_api as avito_api_svc
@@ -181,33 +181,23 @@ async def sync_avito_orders_for_org(db: Session, *, organization_id: str) -> dic
             row.synced_at = now
             updated += 1
             
-            # Проверяем, стал ли заказ закрытым (изменение статуса на closed)
-            # Обрабатываем если:
-            # 1. Статус только что изменился на closed (old_status != "closed")
-            # 2. ИЛИ заказ уже был closed но еще не обработан (not row.closed_processed)
             if new_status_normalized == "closed":
-                if old_status_normalized != "closed" or not row.closed_processed:
+                if (
+                    old_status_normalized != "closed"
+                    or row.stock_fulfillment_status != FULFILLMENT_FULFILLED
+                ):
                     closed_orders_to_process.append(row)
 
     db.commit()
     
-    # Находим все закрытые заказы, которые еще не были обработаны
-    # (страховка на случай если обработка не сработала ранее)
     unprocessed_closed_orders = (
         db.query(AvitoOrderCache)
-        .outerjoin(
-            StockOut,
-            and_(
-                StockOut.organization_id == AvitoOrderCache.organization_id,
-                StockOut.avito_order_id == AvitoOrderCache.avito_order_id,
-            ),
-        )
         .filter(
             AvitoOrderCache.organization_id == organization_id,
             func.lower(func.trim(AvitoOrderCache.avito_status_code)) == "closed",
             or_(
-                AvitoOrderCache.closed_processed == False,
-                StockOut.id.is_(None),
+                AvitoOrderCache.stock_fulfillment_status.is_(None),
+                AvitoOrderCache.stock_fulfillment_status != FULFILLMENT_FULFILLED,
             ),
         )
         .all()
@@ -238,17 +228,13 @@ async def sync_avito_orders_for_org(db: Session, *, organization_id: str) -> dic
                     access_token=token,
                     avito_user_id=int(integration.avito_user_id),
                 )
-                
-                processed_count = int(process_result.get("processed_count", 0))
-                order.closed_processed = processed_count > 0
-                db.commit()  # Коммитим изменения после обработки каждого заказа
-                
+
                 logger.info(
-                    "Processed closed Avito order %s: processed_count=%s skipped_count=%s closed_processed=%s",
+                    "Processed closed Avito order %s: processed=%s skipped=%s status=%s",
                     order.id,
-                    processed_count,
+                    process_result.get("processed_count", 0),
                     process_result.get("skipped_count", 0),
-                    order.closed_processed,
+                    order.stock_fulfillment_status,
                 )
             except Exception as e:
                 logger.error(

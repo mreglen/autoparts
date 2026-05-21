@@ -150,6 +150,23 @@ class StockSaleFulfillmentTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             fulfill_stock_out(self.db, self._request(quantity=2))
 
+    def test_marketplace_used_fulfill_idempotent(self):
+        product = self._product(quantity=5)
+        request = self._request(
+            source_kind=StockOutSourceKind.MARKETPLACE_USED,
+            sale_channel="marketplace_used",
+            garage_used_order_item_id=101,
+            user_id=1,
+        )
+        first = fulfill_stock_out(self.db, request)
+        second = fulfill_stock_out(self.db, request)
+
+        self.assertTrue(first.created)
+        self.assertFalse(second.created)
+        self.assertEqual(first.stock_out.id, second.stock_out.id)
+        self.assertEqual(product.quantity, 4)
+        self.assertEqual(self.db.query(StockOut).count(), 1)
+
     def test_source_kind_mapping_writeoff(self):
         self._product(quantity=3)
         result = fulfill_stock_out(

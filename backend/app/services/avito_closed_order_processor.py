@@ -1,10 +1,10 @@
 """
 Сервис для обработки закрытых заказов Авито.
 
-При изменении статуса заказа на "closed" автоматически:
-1. Создаёт запись в stock-out
+При статусе closed:
+1. Создаёт запись в stock-out (через fulfill_stock_out, идемпотентно по позиции)
 2. Уменьшает количество товара
-3. Удаляет товар из Avito и Drom xlsx номенклатуры
+3. Удаляет товар из Avito и Drom xlsx номенклатуры (только для новых списаний)
 4. Удаляет связи listing
 """
 
@@ -18,13 +18,13 @@ from typing import Any, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.models.product import Product
 from app.models.product_avito_listing_link import ProductAvitoListingLink
 from app.models.product_drom_listing_link import ProductDromListingLink
 from app.models.avito_orders_cache import AvitoOrderCache
 from app.models.organization_avito_autoload_cache import OrganizationAvitoAutoloadCache
 from app.models.organization_drom_autoload_cache import OrganizationDromAutoloadCache
-from app.services.avito_autoload_xlsx import remove_product_from_avito_autoload
-from app.services.drom_autoload_xlsx import remove_product_from_drom_autoload
+from app.models.stock_out import StockOut
 from app.services.avito_orders_api import get_avito_order
 from app.services.avito_order_pricing import (
     avito_line_item_qty,
@@ -35,6 +35,10 @@ from app.services.avito_order_item_match import (
     avito_item_identifiers,
     resolve_product_id_from_avito_item,
 )
+from app.services.avito_warehouse_fulfillment import (
+    make_skip_reason,
+    update_fulfillment_fields,
+)
 from app.services.stock_sale_fulfillment import (
     FulfillStockOutRequest,
     StockOutSourceKind,
@@ -42,6 +46,23 @@ from app.services.stock_sale_fulfillment import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _existing_avito_stock_out(
+    db: Session,
+    organization_id: str,
+    avito_order_id: str,
+    product_id: int,
+) -> Optional[StockOut]:
+    return (
+        db.query(StockOut)
+        .filter(
+            StockOut.organization_id == organization_id,
+            StockOut.product_id == product_id,
+            StockOut.avito_order_id == str(avito_order_id),
+        )
+        .first()
+    )
 
 
 async def process_closed_avito_order(
@@ -53,27 +74,20 @@ async def process_closed_avito_order(
 ) -> dict[str, Any]:
     """
     Обработать закрытый заказ Авито.
-    Идемпотентная функция - можно вызывать многократно.
-    
-    Args:
-        db: Сессия базы данных
-        order: Объект заказа Авито со статусом "closed"
+    Идемпотентна по позициям — повторный вызов не дублирует stock_out.
     """
-    # Проверяем, не был ли заказ уже обработан
-    if order.closed_processed:
-        logger.info(f"Avito order {order.id} already processed, skipping")
-        return {"processed_count": 0, "skipped_count": 0, "skipped_reasons": ["already_processed"]}
-    
     order_id = order.id
     organization_id = order.organization_id
     avito_order_id = order.avito_order_id
-    
-    logger.info(f"Processing closed Avito order {order_id} (avito_order_id={avito_order_id})")
-    
-    # Логируем статус заказа из БД
-    logger.info(f"Order status: {order.avito_status_code}, closed_processed: {order.closed_processed}")
-    
-    # Извлекаем товары из заказа
+
+    logger.info(
+        "Processing closed Avito order %s (avito_order_id=%s, status=%s, fulfillment=%s)",
+        order_id,
+        avito_order_id,
+        order.avito_status_code,
+        order.stock_fulfillment_status,
+    )
+
     avito_data = order.avito_data or {}
     items = avito_order_items(avito_data)
     if not items and access_token and avito_user_id and avito_order_id:
@@ -86,44 +100,81 @@ async def process_closed_avito_order(
                     avito_data = detailed_order
                     order.avito_data = detailed_order
                     items = avito_order_items(avito_data)
-                    logger.info("Loaded %s items from order details for avito_order_id=%s", len(items), avito_order_id)
+                    logger.info(
+                        "Loaded %s items from order details for avito_order_id=%s",
+                        len(items),
+                        avito_order_id,
+                    )
         except Exception as exc:
-            logger.warning("Failed to fetch order details for avito_order_id=%s: %s", avito_order_id, exc)
-    
-    logger.info(f"Found {len(items)} items in order {order_id}")
-    
+            logger.warning(
+                "Failed to fetch order details for avito_order_id=%s: %s",
+                avito_order_id,
+                exc,
+            )
+
+    skipped_reasons: list[dict[str, Any]] = []
+    processed_products: list[dict[str, Any]] = []
+    reused_count = 0
+    created_count = 0
+
     if not items:
-        logger.warning(f"No items found in Avito order {order_id}")
-        return {"processed_count": 0, "skipped_count": 1, "skipped_reasons": ["no_items"]}
-    
-    # Логируем первый item для отладки
-    if items:
-        first_item = items[0] if isinstance(items, list) else items
-        if isinstance(first_item, dict):
-            logger.info(f"First item keys: {list(first_item.keys())}")
-            logger.info(f"First item avitoId: {first_item.get('avitoId')}")
-            logger.info(f"First item count: {first_item.get('count')}")
-            logger.info(f"First item prices: {first_item.get('prices')}")
-    
-    processed_products = []
-    skipped_reasons: list[str] = []
-    
+        logger.warning("No items found in Avito order %s", order_id)
+        skipped_reasons.append(make_skip_reason("no_items", message="Позиции заказа не найдены"))
+        result = {
+            "processed_count": 0,
+            "reused_count": 0,
+            "created_count": 0,
+            "skipped_count": len(skipped_reasons),
+            "skipped_reasons": skipped_reasons,
+        }
+        update_fulfillment_fields(order, result, db=db)
+        db.commit()
+        return result
+
     for item in items:
         if not isinstance(item, dict):
             continue
-        
+
+        avito_item_id, internal_code = avito_item_identifiers(item)
+
         try:
             item_quantity = avito_line_item_qty(item)
-            avito_item_id, internal_code = avito_item_identifiers(item)
-
             product_id = resolve_product_id_from_avito_item(db, organization_id, item)
             if not product_id:
                 logger.warning(
-                    f"ProductAvitoListingLink not found for order {order_id}. "
-                    f"avitoId={avito_item_id}, internal_code={internal_code}, "
-                    f"Item keys: {list(item.keys())}"
+                    "ProductAvitoListingLink not found for order %s. avitoId=%s internal_code=%s",
+                    order_id,
+                    avito_item_id,
+                    internal_code,
                 )
-                skipped_reasons.append("listing_not_found")
+                skipped_reasons.append(
+                    make_skip_reason(
+                        "listing_not_found",
+                        avito_item_id=avito_item_id,
+                        message="Не найдена привязка объявления к товару",
+                    )
+                )
+                continue
+
+            existing = _existing_avito_stock_out(
+                db, organization_id, str(avito_order_id), product_id
+            )
+            if existing:
+                reused_count += 1
+                processed_products.append(
+                    {
+                        "product_id": product_id,
+                        "quantity": item_quantity,
+                        "reused": True,
+                        "stock_out_id": existing.id,
+                    }
+                )
+                logger.info(
+                    "Reused existing StockOut id=%s for product %s order %s",
+                    existing.id,
+                    product_id,
+                    order_id,
+                )
                 continue
 
             listing_link = (
@@ -134,25 +185,47 @@ async def process_closed_avito_order(
 
             product = listing_link.product if listing_link else None
             if not product:
-                from app.models.product import Product
-
                 product = db.query(Product).filter(Product.id == product_id).first()
             if not product:
-                logger.warning(f"Product not found for product_id={product_id}")
-                skipped_reasons.append("product_not_found")
+                skipped_reasons.append(
+                    make_skip_reason(
+                        "product_not_found",
+                        product_id=product_id,
+                        avito_item_id=avito_item_id,
+                    )
+                )
                 continue
-            
+
+            if product.storage_location_id is None:
+                skipped_reasons.append(
+                    make_skip_reason(
+                        "missing_storage_location",
+                        product_id=product.id,
+                        avito_item_id=avito_item_id,
+                        message="Укажите ячейку склада у товара",
+                    )
+                )
+                continue
+
             item_unit_price = unit_price_for_stock_out(
                 item,
                 product_price=float(product.price or 0),
             )
             if item_unit_price <= 0:
                 logger.warning(
-                    "Avito order %s item has no price in API and product %s has no price; "
-                    "stock_out will have sale_price=0",
+                    "Avito order %s item skipped: zero price (product %s)",
                     order_id,
                     product.id,
                 )
+                skipped_reasons.append(
+                    make_skip_reason(
+                        "zero_price",
+                        product_id=product.id,
+                        avito_item_id=avito_item_id,
+                        message="Запустите пересчёт цен или укажите цену в карточке",
+                    )
+                )
+                continue
 
             fulfill_result = fulfill_stock_out(
                 db,
@@ -161,7 +234,7 @@ async def process_closed_avito_order(
                     product_id=product.id,
                     acquired_product_id=None,
                     storage_location_id=product.storage_location_id,
-                    user_id=None,  # Системная операция
+                    user_id=None,
                     quantity=item_quantity,
                     sale_price=item_unit_price,
                     movement_date=date.today(),
@@ -172,16 +245,25 @@ async def process_closed_avito_order(
                 ),
                 commit=False,
             )
-            
-            processed_products.append({
-                "product_id": product.id,
-                "internal_code": product.internal_code,
-                "article": product.article,
-                "avito_id": (listing_link.avito_id if listing_link else None) or avito_item_id,
-                "quantity": item_quantity,
-                "price": item_unit_price,
-            })
-            
+
+            if fulfill_result.created:
+                created_count += 1
+            else:
+                reused_count += 1
+
+            processed_products.append(
+                {
+                    "product_id": product.id,
+                    "internal_code": product.internal_code,
+                    "article": product.article,
+                    "avito_id": (listing_link.avito_id if listing_link else None) or avito_item_id,
+                    "quantity": item_quantity,
+                    "price": item_unit_price,
+                    "reused": not fulfill_result.created,
+                    "stock_out_id": fulfill_result.stock_out.id,
+                }
+            )
+
             logger.info(
                 "%s StockOut for product %s, quantity=%s, unit_price=%s",
                 "Created" if fulfill_result.created else "Reused",
@@ -189,77 +271,103 @@ async def process_closed_avito_order(
                 item_quantity,
                 item_unit_price,
             )
-            
+
         except HTTPException as e:
+            code = "insufficient_quantity" if e.status_code == 400 else "stock_out_error"
             logger.error(
-                "Failed to create StockOut for product in Avito order %s: %s",
+                "Failed to create StockOut for Avito order %s product: %s",
                 order_id,
                 e.detail,
             )
-            skipped_reasons.append("insufficient_quantity" if e.status_code == 400 else "stock_out_error")
+            skipped_reasons.append(
+                make_skip_reason(
+                    code,
+                    avito_item_id=avito_item_id,
+                    message=str(e.detail) if e.detail else None,
+                )
+            )
             continue
         except Exception as e:
-            logger.error(f"Error processing item in order {order_id}: {e}", exc_info=True)
-            skipped_reasons.append("item_processing_error")
+            logger.error("Error processing item in order %s: %s", order_id, e, exc_info=True)
+            skipped_reasons.append(
+                make_skip_reason(
+                    "item_processing_error",
+                    avito_item_id=avito_item_id,
+                    message=str(e),
+                )
+            )
             continue
-    
-    # Если были обработаны товары, удаляем их из xlsx и связей
-    if processed_products:
+
+    newly_created = [p for p in processed_products if not p.get("reused")]
+
+    if newly_created:
         try:
-            # Удаляем товары из Avito xlsx номенклатуры
-            _remove_from_avito_xlsx(db, organization_id, processed_products)
-            
-            # Удаляем товары из Drom xlsx номенклатуры
-            _remove_from_drom_xlsx(db, organization_id, processed_products)
-            
-            # Удаляем связи listing для всех обработанных товаров
-            product_ids = [p["product_id"] for p in processed_products]
+            _remove_from_avito_xlsx(db, organization_id, newly_created)
+            _remove_from_drom_xlsx(db, organization_id, newly_created)
+            product_ids = [p["product_id"] for p in newly_created]
             _delete_listing_links(db, organization_id, product_ids)
-            
-            # Коммитим все изменения
             db.commit()
-            
             logger.info(
-                f"Successfully processed {len(processed_products)} products "
-                f"from Avito order {order_id}"
+                "Successfully processed %s new product lines from Avito order %s",
+                len(newly_created),
+                order_id,
             )
-            
         except Exception as e:
-            logger.error(
-                f"Error committing changes for order {order_id}: {e}",
-                exc_info=True
-            )
+            logger.error("Error committing changes for order %s: %s", order_id, e, exc_info=True)
             db.rollback()
             raise
+    elif processed_products or skipped_reasons:
+        result_pre = {
+            "processed_count": len(processed_products),
+            "reused_count": reused_count,
+            "created_count": created_count,
+            "skipped_count": len(skipped_reasons),
+            "skipped_reasons": skipped_reasons,
+        }
+        update_fulfillment_fields(order, result_pre, db=db)
+        db.commit()
     else:
         logger.warning("No products were processed for closed Avito order %s", order_id)
 
-    return {
+    result = {
         "processed_count": len(processed_products),
+        "reused_count": reused_count,
+        "created_count": created_count,
         "skipped_count": len(skipped_reasons),
         "skipped_reasons": skipped_reasons,
     }
+    update_fulfillment_fields(order, result, db=db)
+    db.commit()
+
+    logger.info(
+        "Avito order %s fulfillment done: status=%s processed=%s reused=%s created=%s skipped=%s",
+        order_id,
+        order.stock_fulfillment_status,
+        len(processed_products),
+        reused_count,
+        created_count,
+        len(skipped_reasons),
+    )
+    return result
 
 
 def _remove_from_avito_xlsx(
     db: Session,
     organization_id: str,
-    processed_products: list[dict[str, Any]]
+    processed_products: list[dict[str, Any]],
 ) -> None:
     """Удалить товары из Avito xlsx файла номенклатуры."""
+    from app.services.avito_autoload_xlsx import remove_product_from_avito_autoload
+
     try:
-        # Путь к файлу
         avito_dir = Path(__file__).resolve().parents[2] / "uploads" / "avito" / organization_id
         xlsx_path = avito_dir / "autoload.xlsx"
-        
+
         if not xlsx_path.exists():
-            logger.warning(f"Avito xlsx file not found: {xlsx_path}")
+            logger.warning("Avito xlsx file not found: %s", xlsx_path)
             return
-        
-        # Загружаем существующий файл
+
         existing_bytes = xlsx_path.read_bytes()
-        
-        # Удаляем каждый товар
         current_bytes = existing_bytes
         for product_info in processed_products:
             internal_code = product_info["internal_code"]
@@ -270,26 +378,25 @@ def _remove_from_avito_xlsx(
                     internal_code,
                     avito_id=avito_id,
                 )
-                logger.info(f"Removed product {internal_code} from Avito xlsx")
+                logger.info("Removed product %s from Avito xlsx", internal_code)
             except Exception as e:
-                logger.error(f"Error removing product {internal_code} from Avito xlsx: {e}")
-        
-        # Сохраняем обновлённый файл
+                logger.error("Error removing product %s from Avito xlsx: %s", internal_code, e)
+
         xlsx_path.write_bytes(current_bytes)
-        
-        # Обновляем кеш
         _update_avito_cache(db, organization_id, current_bytes)
-        
+
     except Exception as e:
-        logger.error(f"Error removing products from Avito xlsx: {e}", exc_info=True)
+        logger.error("Error removing products from Avito xlsx: %s", e, exc_info=True)
 
 
 def _remove_from_drom_xlsx(
     db: Session,
     organization_id: str,
-    processed_products: list[dict[str, Any]]
+    processed_products: list[dict[str, Any]],
 ) -> None:
     """Удалить товары из Drom xlsx файла номенклатуры."""
+    from app.services.drom_autoload_xlsx import remove_product_from_drom_autoload
+
     try:
         cache = db.query(OrganizationDromAutoloadCache).filter_by(organization_id=organization_id).first()
         xlsx_path = None
@@ -303,124 +410,107 @@ def _remove_from_drom_xlsx(
             export_path = drom_dir / "export.xlsx"
             autoload_path = drom_dir / "autoload.xlsx"
             xlsx_path = export_path if export_path.exists() else autoload_path
-        
+
         if not xlsx_path.exists():
-            logger.warning(f"Drom xlsx file not found: {xlsx_path}")
+            logger.warning("Drom xlsx file not found: %s", xlsx_path)
             return
-        
-        # Загружаем существующий файл
+
         existing_bytes = xlsx_path.read_bytes()
-        
-        # Удаляем каждый товар
         current_bytes = existing_bytes
         for product_info in processed_products:
-            article = product_info["article"]
+            article = product_info.get("article")
             if not article:
                 continue
             try:
-                current_bytes = remove_product_from_drom_autoload(
-                    current_bytes,
-                    article
-                )
-                logger.info(f"Removed product {article} from Drom xlsx")
+                current_bytes = remove_product_from_drom_autoload(current_bytes, article)
+                logger.info("Removed product %s from Drom xlsx", article)
             except Exception as e:
-                logger.error(f"Error removing product {article} from Drom xlsx: {e}")
-        
-        # Сохраняем обновлённый файл
+                logger.error("Error removing product %s from Drom xlsx: %s", article, e)
+
         xlsx_path.write_bytes(current_bytes)
-        
-        # Обновляем кеш
         _update_drom_cache(db, organization_id, current_bytes)
-        
+
     except Exception as e:
-        logger.error(f"Error removing products from Drom xlsx: {e}", exc_info=True)
+        logger.error("Error removing products from Drom xlsx: %s", e, exc_info=True)
 
 
 def _delete_listing_links(
     db: Session,
     organization_id: str,
-    product_ids: list[int]
+    product_ids: list[int],
 ) -> None:
     """Удалить связи listing для товаров."""
     try:
-        # Удаляем Avito listing links
         avito_deleted = db.query(ProductAvitoListingLink).filter(
             ProductAvitoListingLink.organization_id == organization_id,
-            ProductAvitoListingLink.product_id.in_(product_ids)
+            ProductAvitoListingLink.product_id.in_(product_ids),
         ).delete(synchronize_session=False)
-        
-        # Удаляем Drom listing links
+
         drom_deleted = db.query(ProductDromListingLink).filter(
             ProductDromListingLink.organization_id == organization_id,
-            ProductDromListingLink.product_id.in_(product_ids)
+            ProductDromListingLink.product_id.in_(product_ids),
         ).delete(synchronize_session=False)
-        
-        logger.info(
-            f"Deleted listing links: {avito_deleted} Avito, {drom_deleted} Drom"
-        )
-        
+
+        logger.info("Deleted listing links: %s Avito, %s Drom", avito_deleted, drom_deleted)
+
     except Exception as e:
-        logger.error(f"Error deleting listing links: {e}", exc_info=True)
+        logger.error("Error deleting listing links: %s", e, exc_info=True)
 
 
 def _update_avito_cache(
     db: Session,
     organization_id: str,
-    xlsx_bytes: bytes
+    xlsx_bytes: bytes,
 ) -> None:
     """Обновить кеш Avito autoload после изменения xlsx файла."""
     try:
+        import json
+
         from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload
-        
+
         cache = db.query(OrganizationAvitoAutoloadCache).filter_by(
             organization_id=organization_id
         ).first()
-        
+
         if not cache:
             return
-        
-        # Парсим обновлённый файл
+
         parsed = parse_and_validate_avito_autoload(xlsx_bytes)
-        
-        # Обновляем кеш
-        import json
         cache.items_json = json.dumps(parsed.items, ensure_ascii=False)
         cache.local_validation_ok = parsed.local_ok
         cache.local_errors_json = json.dumps(parsed.local_errors, ensure_ascii=False)
         cache.sheets_parsed_json = json.dumps(parsed.sheets_parsed, ensure_ascii=False)
-        
-        logger.info(f"Updated Avito autoload cache for org {organization_id}")
-        
+
+        logger.info("Updated Avito autoload cache for org %s", organization_id)
+
     except Exception as e:
-        logger.error(f"Error updating Avito cache: {e}", exc_info=True)
+        logger.error("Error updating Avito cache: %s", e, exc_info=True)
 
 
 def _update_drom_cache(
     db: Session,
     organization_id: str,
-    xlsx_bytes: bytes
+    xlsx_bytes: bytes,
 ) -> None:
     """Обновить кеш Drom autoload после изменения xlsx файла."""
     try:
+        import json
+
         from app.services.drom_autoload_xlsx import parse_and_validate_drom_autoload
-        
+
         cache = db.query(OrganizationDromAutoloadCache).filter_by(
             organization_id=organization_id
         ).first()
-        
+
         if not cache:
             return
-        
-        # Парсим обновлённый файл
+
         parsed = parse_and_validate_drom_autoload(xlsx_bytes)
-        
-        # Обновляем кеш
-        import json
         cache.items_json = json.dumps(parsed.items, ensure_ascii=False)
         cache.local_validation_ok = parsed.local_ok
         cache.local_errors_json = json.dumps(parsed.local_errors, ensure_ascii=False)
-        
-        logger.info(f"Updated Drom autoload cache for org {organization_id}")
-        
+
+        logger.info("Updated Drom autoload cache for org %s", organization_id)
+
     except Exception as e:
-        logger.error(f"Error updating Drom cache: {e}", exc_info=True)
+        logger.error("Error updating Drom cache: %s", e, exc_info=True)

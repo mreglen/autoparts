@@ -46,6 +46,7 @@ def _ensure_default_permissions(db: Session) -> None:
         {"code": "settings.printers", "name": "Печать"},
         {"code": "vehicles", "name": "Автомобили"},
         {"code": "sales.orders", "name": "Заказы"},
+        {"code": "finance.reports", "name": "Финансовые отчёты"},
     ]
     for perm in defaults:
         existing = db.query(Permission).filter(Permission.code == perm["code"]).first()

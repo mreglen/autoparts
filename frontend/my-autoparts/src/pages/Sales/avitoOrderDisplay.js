@@ -78,3 +78,48 @@ export function getAvitoLineItemTotal(item) {
   const unit = Number(item.price ?? item.prices?.price ?? 0);
   return unit * getAvitoLineItemQty(item);
 }
+
+const AVITO_SKIP_REASON_LABELS = {
+  already_processed: 'Заказ уже полностью проведён на складе',
+  no_items: 'В заказе нет позиций',
+  listing_not_found: 'Товар не привязан к объявлению Авито',
+  product_not_found: 'Товар не найден в каталоге',
+  missing_storage_location: 'У товара не указана ячейка склада',
+  zero_price: 'Нет цены в заказе Авито и в карточке товара',
+  insufficient_quantity: 'Недостаточно товара на складе',
+  stock_out_error: 'Ошибка списания со склада',
+  item_processing_error: 'Ошибка обработки позиции',
+};
+
+export function getAvitoSkipReasonLabel(code) {
+  if (!code) return 'Неизвестная причина';
+  return AVITO_SKIP_REASON_LABELS[code] || code;
+}
+
+export function getAvitoWarehouseFulfillment(order) {
+  return order?.warehouse_fulfillment || null;
+}
+
+export function getAvitoWarehouseMismatch(order) {
+  return Boolean(getAvitoWarehouseFulfillment(order)?.mismatch);
+}
+
+export function getAvitoWarehouseCanRetry(order) {
+  return Boolean(getAvitoWarehouseFulfillment(order)?.can_retry);
+}
+
+export function getAvitoSkipReasonsForDisplay(order) {
+  const wf = getAvitoWarehouseFulfillment(order);
+  const reasons = wf?.skip_reasons;
+  if (!Array.isArray(reasons) || reasons.length === 0) return [];
+  return reasons.map((r) => {
+    if (typeof r === 'string') {
+      return { code: r, label: getAvitoSkipReasonLabel(r) };
+    }
+    const code = r?.code || 'unknown';
+    return {
+      code,
+      label: r?.message || getAvitoSkipReasonLabel(code),
+    };
+  });
+}

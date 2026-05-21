@@ -19,12 +19,21 @@ from app.models.user import User as UserModel
 from app.models.user_permission import UserPermission
 from app.schemas.sales_orders import (
     AvitoOrderResponseV2,
+    AvitoRetryWarehouseResponse,
+    AvitoWarehouseFulfillmentInfo,
+    FulfilledOrderItemOut,
     NewPartsOrderResponse,
     UpdateStatusRequest,
+    UpdateUsedOrderStatusResponse,
     UsedPartsOrderResponse,
     PurchasedUsedOrderResponse,
     PurchasedNewOrderResponse,
 )
+from app.services.avito_warehouse_fulfillment import (
+    compute_warehouse_fulfillment,
+    enrich_avito_orders_response,
+)
+from app.services.marketplace_used_fulfillment import fulfill_used_order_on_status_change
 from app.schemas.avito_orders import AvitoCheckConfirmationCodeRequest, AvitoOrderTransitionRequest
 
 logger = logging.getLogger(__name__)
@@ -104,7 +113,7 @@ def list_used_parts_orders(
     return q.all()
 
 
-@router.put("/used-parts-orders/{order_id}/status")
+@router.put("/used-parts-orders/{order_id}/status", response_model=UpdateUsedOrderStatusResponse)
 def update_used_parts_order_status(
     order_id: int,
     payload: UpdateStatusRequest,
@@ -112,14 +121,46 @@ def update_used_parts_order_status(
     current_user: UserModel = Depends(get_current_user),
 ):
     _require_sales_orders_access(db, current_user)
-    order = db.query(GarageUsedOrder).filter(GarageUsedOrder.id == order_id).first()
+    order = (
+        db.query(GarageUsedOrder)
+        .options(selectinload(GarageUsedOrder.items))
+        .filter(GarageUsedOrder.id == order_id)
+        .first()
+    )
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
     if not current_user.is_admin and order.organization_id != current_user.organization_id:
         raise HTTPException(status_code=403, detail="Нет доступа к заказу")
-    order.status_code = payload.status_code
-    db.commit()
-    return {"status": "ok"}
+
+    previous_status_code = order.status_code
+    try:
+        summaries = fulfill_used_order_on_status_change(
+            db,
+            order=order,
+            new_status_code=payload.status_code,
+            previous_status_code=previous_status_code,
+            acting_user_id=current_user.id,
+        )
+        order.status_code = payload.status_code
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
+
+    return UpdateUsedOrderStatusResponse(
+        status="ok",
+        fulfilled_items=[
+            FulfilledOrderItemOut(
+                order_item_id=s.order_item_id,
+                stock_out_id=s.stock_out_id,
+                created=s.created,
+            )
+            for s in summaries
+        ],
+    )
 
 
 @router.get("/new-parts-orders", response_model=list[NewPartsOrderResponse])
@@ -177,7 +218,8 @@ def list_avito_orders(
     q = db.query(AvitoOrderCache).order_by(AvitoOrderCache.created_at.desc())
     if not current_user.is_admin:
         q = q.filter(AvitoOrderCache.organization_id == current_user.organization_id)
-    return q.all()
+    orders = q.all()
+    return enrich_avito_orders_response(db, orders)
 
 
 @router.post("/avito-orders/sync")
@@ -193,6 +235,73 @@ async def sync_avito_orders(
 
     result = await sync_avito_orders_for_org(db, organization_id=current_user.organization_id)
     return result
+
+
+@router.post("/avito-orders/{order_id}/retry-warehouse", response_model=AvitoRetryWarehouseResponse)
+async def retry_avito_warehouse(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Повторная проводка склада для закрытого заказа Авито."""
+    _require_sales_orders_access(db, current_user)
+
+    order = db.query(AvitoOrderCache).filter(AvitoOrderCache.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ Авито не найден")
+    if not current_user.is_admin and order.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к заказу")
+
+    status_code = str(order.avito_status_code or "").strip().lower()
+    if status_code != "closed":
+        raise HTTPException(
+            status_code=400,
+            detail="Проводка склада доступна только для заказов со статусом closed",
+        )
+
+    wf_preview = compute_warehouse_fulfillment(db, order)
+    if not wf_preview.get("can_retry"):
+        raise HTTPException(
+            status_code=400,
+            detail="Склад по этому заказу уже проведён полностью",
+        )
+
+    integration = (
+        db.query(OrganizationAvitoIntegration)
+        .filter(OrganizationAvitoIntegration.organization_id == order.organization_id)
+        .first()
+    )
+    if not integration or not integration.client_secret_encrypted or not integration.avito_user_id:
+        raise HTTPException(status_code=400, detail="Интеграция с Авито не настроена")
+
+    from app.services import avito_api as avito_api_svc
+    from app.services.avito_closed_order_processor import process_closed_avito_order
+    from app.utils.avito_crypto import decrypt_secret
+
+    try:
+        secret = decrypt_secret(integration.client_secret_encrypted)
+        token = await avito_api_svc.fetch_access_token(integration.client_id, secret)
+        process_result = await process_closed_avito_order(
+            db,
+            order,
+            access_token=token,
+            avito_user_id=int(integration.avito_user_id),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error retrying Avito warehouse for order %s", order_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    db.refresh(order)
+    wf = compute_warehouse_fulfillment(db, order)
+    return AvitoRetryWarehouseResponse(
+        processed_count=int(process_result.get("processed_count", 0)),
+        reused_count=int(process_result.get("reused_count", 0)),
+        created_count=int(process_result.get("created_count", 0)),
+        skipped_count=int(process_result.get("skipped_count", 0)),
+        warehouse_fulfillment=AvitoWarehouseFulfillmentInfo(**wf),
+    )
 
 
 @router.post("/avito-orders/{order_id}/transition")

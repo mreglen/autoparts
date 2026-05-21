@@ -32,6 +32,7 @@ from app.routers.avito_integration import router as avito_integration_router
 from app.routers.avito_messenger import router as avito_messenger_router
 from app.routers.drom_integration import router as drom_integration_router
 from app.routers.sales import router as sales_router
+from app.routers.finance import router as finance_router
 from app.routers.orders_meta import router as orders_meta_router
 from app.routers.orders_legacy import router as orders_legacy_router
 
@@ -75,6 +76,7 @@ api_router.include_router(avito_integration_router)
 api_router.include_router(avito_messenger_router)
 api_router.include_router(drom_integration_router)
 api_router.include_router(sales_router)
+api_router.include_router(finance_router)
 api_router.include_router(orders_meta_router)
 api_router.include_router(orders_legacy_router)
 

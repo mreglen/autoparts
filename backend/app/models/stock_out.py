@@ -30,4 +30,7 @@ class StockOut(Base):
     product = relationship("Product", back_populates="stock_outs")
     acquired_product = relationship("AcquiredProduct", back_populates="stock_outs")
     user = relationship("User", back_populates="stock_outs")
-    garage_used_order_item = relationship("GarageUsedOrderItem")
+    garage_used_order_item = relationship(
+        "GarageUsedOrderItem",
+        foreign_keys=[garage_used_order_item_id],
+    )

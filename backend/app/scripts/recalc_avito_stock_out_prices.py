@@ -20,6 +20,8 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.db.database import SessionLocal
+import app.models  # noqa: F401 — register ORM mappers for relationships
+import app.models.organization_avito_integration  # noqa: F401
 from app.models.avito_orders_cache import AvitoOrderCache
 from app.models.product import Product
 from app.models.stock_out import StockOut

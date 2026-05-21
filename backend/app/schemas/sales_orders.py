@@ -15,9 +15,22 @@ class UsedPartsOrderItemResponse(BaseModel):
     quantity: int
     price: float
     status_code: str
+    stock_out_id: Optional[int] = None
+    fulfilled_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+class FulfilledOrderItemOut(BaseModel):
+    order_item_id: int
+    stock_out_id: int
+    created: bool
+
+
+class UpdateUsedOrderStatusResponse(BaseModel):
+    status: str = "ok"
+    fulfilled_items: list[FulfilledOrderItemOut] = Field(default_factory=list)
 
 
 class UsedPartsOrderResponse(BaseModel):
@@ -75,6 +88,24 @@ class NewPartsOrderResponse(BaseModel):
         from_attributes = True
 
 
+class AvitoSkipReasonOut(BaseModel):
+    code: str
+    message: Optional[str] = None
+    avito_item_id: Optional[Any] = None
+    product_id: Optional[int] = None
+
+
+class AvitoWarehouseFulfillmentInfo(BaseModel):
+    status: str
+    expected_item_count: int = 0
+    stock_out_count: int = 0
+    stock_out_total_amount: float = 0.0
+    mismatch: bool = False
+    can_retry: bool = False
+    skip_reasons: list[AvitoSkipReasonOut] = Field(default_factory=list)
+    last_fulfillment_at: Optional[datetime] = None
+
+
 class AvitoOrderResponseV2(BaseModel):
     id: int
     organization_id: str
@@ -84,9 +115,20 @@ class AvitoOrderResponseV2(BaseModel):
     total_amount: float
     is_paid: bool
     created_at: datetime
+    closed_processed: bool = False
+    warehouse_fulfillment: AvitoWarehouseFulfillmentInfo
 
     class Config:
         from_attributes = True
+
+
+class AvitoRetryWarehouseResponse(BaseModel):
+    status: str = "ok"
+    processed_count: int = 0
+    reused_count: int = 0
+    created_count: int = 0
+    skipped_count: int = 0
+    warehouse_fulfillment: AvitoWarehouseFulfillmentInfo
 
 
 class UpdateStatusRequest(BaseModel):

@@ -261,6 +261,15 @@ export function GarageOrderCard({
                         <span className="text-gray-500 ml-2">× </span>
                         <span className="text-gray-900">{formatPrice(item.price)}</span>
                       </div>
+
+                      {(item.stock_out_id || item.fulfilled_at) && (
+                        <div>
+                          <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                            Списано со склада
+                            {item.stock_out_id ? ` (#${item.stock_out_id})` : ''}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Ячейка хранения */}

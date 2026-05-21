@@ -46,6 +46,7 @@ export default function ProfileWithMenuLayout() {
             '/sales/orders': 'sales-orders',
             '/sales/returns': 'sales-returns',
             '/warehouse-sales': 'warehouse-sales',
+            '/finance': 'finance',
             '/my-parts': 'parts',
             '/vehicles': 'vehicles',
             '/vehicles/add': 'vehicles',
@@ -82,6 +83,7 @@ export default function ProfileWithMenuLayout() {
                 '/sales/orders': 'sales-orders',
                 '/sales/returns': 'sales-returns',
                 '/warehouse-sales': 'warehouse-sales',
+                '/finance': 'finance',
                 '/my-parts': 'parts',
                 '/vehicles': 'vehicles',
                 '/vehicles/add': 'vehicles',
@@ -189,6 +191,10 @@ export default function ProfileWithMenuLayout() {
                     submenu: salesSubmenu
                 });
             }
+        }
+
+        if (user?.is_seller || user?.is_admin || hasPermission('finance.reports')) {
+            baseTabs.push({ id: 'finance', label: 'Финансы' });
         }
 
         // Для продавцов, админов и сотрудников добавляем вкладку склад с подменю
@@ -425,6 +431,7 @@ export default function ProfileWithMenuLayout() {
             'sales-orders': '/sales/orders',
             'sales-returns': '/sales/returns',
             'warehouse-sales': '/warehouse-sales',
+            'finance': '/finance',
             'parts': '/my-parts',
             'vehicles': '/vehicles',
             'receipts': '/stock-in',

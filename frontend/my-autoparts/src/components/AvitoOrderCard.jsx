@@ -16,12 +16,17 @@ export function AvitoOrderCard({
   onEditStatus,
   onAvitoTransition,
   transitionLoadingByOrderId,
+  warehouseRetryLoadingByOrderId,
+  onRetryWarehouse,
   getAvitoTransitionOptions,
   getAvitoTransitionLabel,
   getAvitoStatusColor,
   getAvitoStatusName,
   formatDate,
-  formatPrice
+  formatPrice,
+  getAvitoWarehouseMismatch,
+  getAvitoWarehouseCanRetry,
+  getAvitoSkipReasonsForDisplay,
 }) {
   // Извлекаем данные из avito_data
   const avitoData = order.avito_data || {};
@@ -121,6 +126,36 @@ export function AvitoOrderCard({
           </div>
         </div>
       </div>
+
+      {getAvitoWarehouseMismatch?.(order) && (
+        <div className="mx-6 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="font-medium">
+            Заказ закрыт на Авито, склад не проведён полностью
+          </div>
+          {getAvitoSkipReasonsForDisplay?.(order)?.length > 0 && (
+            <ul className="mt-2 list-disc pl-5 space-y-1 text-amber-800">
+              {getAvitoSkipReasonsForDisplay(order).map((reason, idx) => (
+                <li key={`${reason.code}-${idx}`}>{reason.label}</li>
+              ))}
+            </ul>
+          )}
+          {getAvitoWarehouseCanRetry?.(order) && onRetryWarehouse && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRetryWarehouse(order);
+              }}
+              disabled={Boolean(warehouseRetryLoadingByOrderId?.[order.id])}
+              className="mt-3 inline-flex items-center rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+            >
+              {warehouseRetryLoadingByOrderId?.[order.id]
+                ? 'Проводим склад...'
+                : 'Повторить проводку склада'}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Основная информация */}
       <div className="px-6 py-4">

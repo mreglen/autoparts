@@ -26,6 +26,7 @@ import SalesReturnsPage from './pages/Sales/SalesReturnsPage';
 import PurchasesOrdersPage from './pages/Sales/PurchasesOrdersPage';
 import PurchasesReturnsPage from './pages/Sales/PurchasesReturnsPage';
 import WarehouseSalesPage from './pages/Sales/WarehouseSalesPage';
+import FinancePage from './pages/Finance/FinancePage';
 import DashboardPage from './pages/Dashboard/DashboardPage';
 import EmployeesPage from './pages/Profile/EmployeesPage';
 import ClientsPage from './pages/Profile/ClientsPage';
@@ -153,6 +154,7 @@ function App() {
           <Route path="/stock-in" element={<StockInList />} />
           <Route path="/stock-out" element={<StockOutList />} />
           <Route path="/warehouse-sales" element={<WarehouseSalesPage />} />
+          <Route path="/finance" element={<FinancePage />} />
           <Route path="/settings/employees" element={<EmployeesPage />} />
           <Route path="/chats" element={<ChatsHubPage />} />
           <Route path="/chats/:chatId" element={<ChatsHubPage />} />

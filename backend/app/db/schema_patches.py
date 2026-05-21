@@ -157,3 +157,100 @@ def ensure_stock_out_source_columns() -> None:
 
     if statements:
         logger.info("Applied stock_out source column patches: %s", statements)
+
+
+def ensure_garage_used_order_item_fulfillment_columns() -> None:
+    """Link marketplace order lines to stock_out after assembled fulfillment."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "garage_used_order_items" not in table_names:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("garage_used_order_items")}
+    statements = []
+
+    if "stock_out_id" not in columns:
+        statements.append(
+            "ALTER TABLE garage_used_order_items ADD COLUMN stock_out_id INTEGER"
+        )
+    if "fulfilled_at" not in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append(
+                "ALTER TABLE garage_used_order_items ADD COLUMN fulfilled_at TIMESTAMPTZ"
+            )
+        else:
+            statements.append(
+                "ALTER TABLE garage_used_order_items ADD COLUMN fulfilled_at DATETIME"
+            )
+
+    fk_name = "fk_garage_used_order_item_stock_out"
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+        inspector = inspect(engine)
+        if (
+            engine.dialect.name == "postgresql"
+            and "stock_out" in table_names
+            and not _fk_exists(inspector, "garage_used_order_items", fk_name)
+        ):
+            conn.execute(
+                text(
+                    f"""
+                    ALTER TABLE garage_used_order_items
+                    ADD CONSTRAINT {fk_name}
+                    FOREIGN KEY (stock_out_id)
+                    REFERENCES stock_out(id)
+                    ON DELETE SET NULL
+                    """
+                )
+            )
+
+    if statements:
+        logger.info(
+            "Applied garage_used_order_items fulfillment column patches: %s",
+            statements,
+        )
+
+
+def ensure_avito_order_fulfillment_columns() -> None:
+    """Persist warehouse fulfillment status and skip reasons for Avito orders."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "avito_orders_cache" not in table_names:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("avito_orders_cache")}
+    statements = []
+
+    if "stock_fulfillment_status" not in columns:
+        statements.append(
+            "ALTER TABLE avito_orders_cache ADD COLUMN stock_fulfillment_status VARCHAR(20)"
+        )
+    if "last_skip_reasons" not in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append(
+                "ALTER TABLE avito_orders_cache ADD COLUMN last_skip_reasons JSONB"
+            )
+        else:
+            statements.append(
+                "ALTER TABLE avito_orders_cache ADD COLUMN last_skip_reasons JSON"
+            )
+    if "last_fulfillment_at" not in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append(
+                "ALTER TABLE avito_orders_cache ADD COLUMN last_fulfillment_at TIMESTAMPTZ"
+            )
+        else:
+            statements.append(
+                "ALTER TABLE avito_orders_cache ADD COLUMN last_fulfillment_at DATETIME"
+            )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied avito_orders_cache fulfillment column patches: %s", statements)

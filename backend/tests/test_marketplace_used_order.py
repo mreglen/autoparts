@@ -135,7 +135,9 @@ class MarketplaceUsedOrderTests(unittest.TestCase):
                         partnumber VARCHAR(100),
                         quantity INTEGER NOT NULL DEFAULT 1,
                         price FLOAT NOT NULL DEFAULT 0.0,
-                        status_code VARCHAR(50) NOT NULL DEFAULT 'pending'
+                        status_code VARCHAR(50) NOT NULL DEFAULT 'pending',
+                        stock_out_id INTEGER,
+                        fulfilled_at DATETIME
                     )
                     """
                 )

@@ -26,5 +26,9 @@ class AvitoOrderCache(Base):
     synced_at = Column(DateTime(timezone=True), nullable=True)
     closed_processed = Column(Boolean, nullable=False, server_default="false", default=False)
 
+    stock_fulfillment_status = Column(String(20), nullable=True, index=True)
+    last_skip_reasons = Column(JSON, nullable=True)
+    last_fulfillment_at = Column(DateTime(timezone=True), nullable=True)
+
     organization = relationship("Organization")
 

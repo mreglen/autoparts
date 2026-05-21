@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
     fetchClients,

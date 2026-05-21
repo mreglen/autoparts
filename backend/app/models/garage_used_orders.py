@@ -49,6 +49,18 @@ class GarageUsedOrderItem(Base):
     quantity = Column(Integer, nullable=False, default=1)
     price = Column(Float, nullable=False, default=0.0)
     status_code = Column(String(50), nullable=False, default="pending", index=True)
+    stock_out_id = Column(
+        Integer,
+        ForeignKey("stock_out.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    fulfilled_at = Column(DateTime(timezone=True), nullable=True)
 
     order = relationship("GarageUsedOrder", back_populates="items")
+    stock_out = relationship(
+        "StockOut",
+        foreign_keys=[stock_out_id],
+        uselist=False,
+    )
 
