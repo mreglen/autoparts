@@ -1,6 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchStorageLocations, createStorageLocation, updateStorageLocation, deleteStorageLocation } from '../../redux/slices/OrganizationSlice';
+import {
+    SettingsCard,
+    SettingsSectionHeader,
+    SettingsActionsDropdown,
+    settingsInputClass,
+    settingsBtnSmPrimary,
+    settingsBtnSmSecondary,
+} from './settingsUi';
 
 const StorageLocationsSection = ({ orgId }) => {
   const dispatch = useDispatch();
@@ -16,7 +24,6 @@ const StorageLocationsSection = ({ orgId }) => {
   const [editLocation, setEditLocation] = useState('');
   const [editSuggestions, setEditSuggestions] = useState([]);
   const [editHighlightedIndex, setEditHighlightedIndex] = useState(-1);
-  const [openDropdownId, setOpenDropdownId] = useState(null);
   const dropdownRef = useRef(null);
   const inputRef = useRef(null);
   const editInputRef = useRef(null);
@@ -146,7 +153,6 @@ const StorageLocationsSection = ({ orgId }) => {
       
       setEditingId(null);
       setEditLocation('');
-      setOpenDropdownId(null);
     } catch (error) {
       console.error('Error updating storage location:', error);
     }
@@ -156,7 +162,6 @@ const StorageLocationsSection = ({ orgId }) => {
     if (window.confirm('Вы уверены, что хотите удалить этот склад?')) {
       try {
         await dispatch(deleteStorageLocation(id)).unwrap();
-        setOpenDropdownId(null);
       } catch (error) {
         console.error('Error deleting storage location:', error);
       }
@@ -169,21 +174,32 @@ const StorageLocationsSection = ({ orgId }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 w-full min-h-[350px]">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+    <SettingsCard className="min-h-[350px]">
+      <SettingsSectionHeader
+        title="Склады"
+        subtitle="Адреса мест хранения"
+        icon={
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
-          Склады
-        </h3>
-        <button
-          onClick={() => setIsAdding(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-        >
-          + Добавить склад
-        </button>
-      </div>
+        }
+        action={
+          <SettingsActionsDropdown
+            items={[
+              {
+                label: 'Добавить склад',
+                onClick: () => setIsAdding(true),
+                icon: (
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                ),
+              },
+            ]}
+            menuWidth="w-52"
+          />
+        }
+      />
       
       {/* Add new location form */}
       {isAdding ? (
@@ -213,7 +229,7 @@ const StorageLocationsSection = ({ orgId }) => {
                 }
               }}
               placeholder="Введите адрес склада"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`flex-1 ${settingsInputClass}`}
               required
             />
             {suggestions.length > 0 && (
@@ -224,7 +240,7 @@ const StorageLocationsSection = ({ orgId }) => {
                     onClick={() => selectAddress(s)}
                     onMouseEnter={() => setHighlightedIndex(i)}
                     className={`px-4 py-2 cursor-pointer ${i === highlightedIndex
-                      ? 'bg-blue-100 text-blue-800'
+                      ? 'bg-indigo-100 text-indigo-800'
                       : 'hover:bg-gray-100'
                       }`}
                   >
@@ -235,7 +251,7 @@ const StorageLocationsSection = ({ orgId }) => {
             )}
             <button
               type="submit"
-              className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className={settingsBtnSmPrimary}
             >
               Добавить
             </button>
@@ -247,7 +263,7 @@ const StorageLocationsSection = ({ orgId }) => {
                 setSuggestions([]);
                 setHighlightedIndex(-1);
               }}
-              className="px-3 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+              className={settingsBtnSmSecondary}
             >
               Отмена
             </button>
@@ -267,7 +283,7 @@ const StorageLocationsSection = ({ orgId }) => {
           {storageLocations && storageLocations.length > 0 ? (
             storageLocations.map(location => (
               editingId === location.id ? (
-                <form key={location.id} onSubmit={handleUpdateLocation} className="flex gap-2 p-2 bg-blue-50 rounded border">
+                <form key={location.id} onSubmit={handleUpdateLocation} className="flex gap-2 rounded-xl border border-indigo-100 bg-indigo-50/40 p-2">
                   <div className="relative" ref={editDropdownRef}>
                     <input
                       ref={editInputRef}
@@ -303,7 +319,7 @@ const StorageLocationsSection = ({ orgId }) => {
                             onClick={() => selectEditAddress(s)}
                             onMouseEnter={() => setEditHighlightedIndex(i)}
                             className={`px-4 py-2 cursor-pointer ${i === editHighlightedIndex
-                              ? 'bg-blue-100 text-blue-800'
+                              ? 'bg-indigo-100 text-indigo-800'
                               : 'hover:bg-gray-100'
                               }`}
                           >
@@ -315,7 +331,7 @@ const StorageLocationsSection = ({ orgId }) => {
                   </div>
                   <button
                     type="submit"
-                    className="px-2 py-1 bg-blue-600 text-white rounded text-sm"
+                    className={settingsBtnSmPrimary}
                   >
                     Сохранить
                   </button>
@@ -333,47 +349,31 @@ const StorageLocationsSection = ({ orgId }) => {
                   </button>
                 </form>
               ) : (
-                <div key={location.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border min-h-[52px]">
+                <div key={location.id} className="flex min-h-[52px] items-center justify-between rounded-xl border border-gray-100 bg-gray-50/60 p-3">
                   <span className="flex-1 truncate pr-2">{location.address}</span>
-                  <div className="relative inline-block text-left">
-                    <button
-                      onClick={() => setOpenDropdownId(openDropdownId === location.id ? null : location.id)}
-                      className="text-gray-600 hover:text-gray-800 text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
-                    >
-                      Действия
-                      <img
-                        src="/img/arrow_sm.svg"
-                        alt=""
-                        className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${openDropdownId === location.id ? 'rotate-90' : ''}`}
-                        style={{ filter: 'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)' }}
-                      />
-                    </button>
-                    
-                    {openDropdownId === location.id && (
-                      <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10">
-                        <div className="py-1">
-                          <button
-                            onClick={() => {
-                              startEditing(location);
-                              setOpenDropdownId(null);
-                            }}
-                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                          >
-                            Редактировать
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleDeleteLocation(location.id);
-                              setOpenDropdownId(null);
-                            }}
-                            className="block w-full text-left px-3 py-2 text-sm text-black hover:bg-gray-50 hover:text-gray-900"
-                          >
-                            Удалить
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <SettingsActionsDropdown
+                    items={[
+                      {
+                        label: 'Редактировать',
+                        onClick: () => startEditing(location),
+                        icon: (
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        ),
+                      },
+                      {
+                        label: 'Удалить',
+                        onClick: () => handleDeleteLocation(location.id),
+                        danger: true,
+                        icon: (
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        ),
+                      },
+                    ]}
+                  />
                 </div>
               )
             ))
@@ -382,7 +382,7 @@ const StorageLocationsSection = ({ orgId }) => {
           )}
         </div>
       )}
-    </div>
+    </SettingsCard>
   );
 };
 

@@ -1,6 +1,7 @@
 // src/redux/slices/AuthSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
+import { updateProfile } from './UserSlice';
 
 // Helper function to decode JWT token
 const decodeToken = (token) => {
@@ -396,6 +397,16 @@ const authSlice = createSlice({
             .addCase(confirmPasswordReset.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
+            })
+            .addCase(updateProfile.fulfilled, (state, action) => {
+                if (state.user && action.payload) {
+                    const fields = ['last_name', 'first_name', 'patronymic', 'email', 'phone', 'public_code'];
+                    fields.forEach((key) => {
+                        if (action.payload[key] !== undefined) {
+                            state.user[key] = action.payload[key];
+                        }
+                    });
+                }
             });
     },
 });

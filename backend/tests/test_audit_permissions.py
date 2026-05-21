@@ -110,7 +110,7 @@ class AuditPermissionsTests(unittest.TestCase):
 
         self.admin_director = UserModel(
             id=1,
-            public_code="1000001",
+            public_code="A482917",
             email="dir@test.ru",
             is_director=True,
             is_admin=True,
@@ -118,7 +118,7 @@ class AuditPermissionsTests(unittest.TestCase):
         )
         self.director_plain = UserModel(
             id=2,
-            public_code="1000002",
+            public_code="B193846",
             email="plain@test.ru",
             is_director=True,
             is_admin=False,
@@ -126,7 +126,7 @@ class AuditPermissionsTests(unittest.TestCase):
         )
         self.employee = UserModel(
             id=3,
-            public_code="1000003",
+            public_code="C572019",
             email="emp@test.ru",
             is_employee=True,
             organization_id="ORG_PLAIN",

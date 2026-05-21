@@ -98,21 +98,21 @@ class AuditApiTests(unittest.TestCase):
     def _seed(self):
         self.admin = UserModel(
             id=1,
-            public_code="1000001",
+            public_code="A482917",
             email="admin@test.ru",
             is_admin=True,
             organization_id="ORG1",
         )
         self.auditor = UserModel(
             id=2,
-            public_code="1000002",
+            public_code="B193846",
             email="auditor@test.ru",
             is_employee=True,
             organization_id="ORG1",
         )
         self.other = UserModel(
             id=3,
-            public_code="1000003",
+            public_code="C572019",
             email="other@test.ru",
             is_employee=True,
             organization_id="ORG1",

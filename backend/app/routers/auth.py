@@ -273,6 +273,7 @@ def get_profile(current_user: User = Depends(get_current_user), db: Session = De
     # Создаем объект ответа с названием и телефоном организации
     response_data = {
         "id": user_data.id,
+        "public_code": user_data.public_code,
         "last_name": user_data.last_name,
         "first_name": user_data.first_name,
         "patronymic": user_data.patronymic,

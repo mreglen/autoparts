@@ -301,7 +301,7 @@ def ensure_event_log_audit_columns() -> None:
 
 
 def ensure_user_public_code() -> None:
-    """Add users.public_code and backfill sequential codes."""
+    """Add users.public_code column and unique index (values via remigrate script)."""
     inspector = inspect(engine)
     table_names = set(inspector.get_table_names())
     if "users" not in table_names:
@@ -311,29 +311,15 @@ def ensure_user_public_code() -> None:
     if "public_code" not in columns:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE users ADD COLUMN public_code VARCHAR(10)"))
-        columns.add("public_code")
 
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                """
-                UPDATE users
-                SET public_code = CAST(1000000 + id AS VARCHAR)
-                WHERE public_code IS NULL OR TRIM(public_code) = ''
-                """
-            )
-        )
+    if not _index_exists(inspector, "users", "ix_users_public_code"):
         try:
-            conn.execute(text("ALTER TABLE users ALTER COLUMN public_code SET NOT NULL"))
-        except Exception:
-            pass
-        if not _index_exists(inspector, "users", "ix_users_public_code"):
-            try:
+            with engine.begin() as conn:
                 conn.execute(
                     text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_public_code ON users (public_code)")
                 )
-            except Exception:
-                pass
+        except Exception:
+            pass
 
-    logger.info("Applied users.public_code patch")
+    logger.info("Applied users.public_code column patch (run remigrate_user_public_codes.py to assign codes)")
 

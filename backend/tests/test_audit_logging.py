@@ -60,7 +60,7 @@ class AuditLoggingTests(unittest.TestCase):
         self.db = self.Session()
         self.user = UserModel(
             id=1,
-            public_code="1000001",
+            public_code="A482917",
             last_name="Test",
             first_name="User",
             email="u@test.ru",

@@ -1,561 +1,129 @@
-// src/components/OrganizationCard.jsx
-import { useEffect, useState, useRef } from 'react';
+import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchOrganization, fetchStorageLocations, clearOrganization, updateOrganization } from '../../redux/slices/OrganizationSlice';
-import StorageLocationsSection from './StorageLocationsSection';
+import { fetchOrganization, clearOrganization } from '../../redux/slices/OrganizationSlice';
+import { normalizeImageUrl } from '../../utils/apiClient';
 
-// Функция форматирования телефона
 const formatPhoneNumber = (value) => {
     if (!value) return '';
-
-    // Удаляем все нецифровые символы
     let digits = value.replace(/\D/g, '');
-
-    // Если начинается с 7 или 8, заменяем на 7
     if (digits.startsWith('7') || digits.startsWith('8')) {
         digits = '7' + digits.slice(1);
     }
-
-    // Форматируем как +7 (XXX) XXX-XX-XX
     let formatted = '+7 ';
-    if (digits.length > 1) {
-        formatted += '(' + digits.slice(1, 4);
-    }
-    if (digits.length > 4) {
-        formatted += ') ' + digits.slice(4, 7);
-    }
-    if (digits.length > 7) {
-        formatted += '-' + digits.slice(7, 9);
-    }
-    if (digits.length > 9) {
-        formatted += '-' + digits.slice(9, 11);
-    }
-
+    if (digits.length > 1) formatted += '(' + digits.slice(1, 4);
+    if (digits.length > 4) formatted += ') ' + digits.slice(4, 7);
+    if (digits.length > 7) formatted += '-' + digits.slice(7, 9);
+    if (digits.length > 9) formatted += '-' + digits.slice(9, 11);
     return formatted;
 };
 
-// Функция для получения только цифр из отформатированного номера
-const getDigitsFromFormatted = (formatted) => {
-    return formatted.replace(/\D/g, '');
-};
+function OrgInfoRow({ icon, label, value, mono }) {
+    return (
+        <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-indigo-600 shadow-sm ring-1 ring-gray-100">
+                {icon}
+            </div>
+            <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
+                <p className={`mt-0.5 text-sm font-medium text-gray-900 break-words ${mono ? 'font-mono' : ''}`}>
+                    {value || '—'}
+                </p>
+            </div>
+        </div>
+    );
+}
 
-export default function OrganizationCard({ orgId }) {
+const OrgNameIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3 21h18M9 21V9a1 1 0 011-1h4a1 1 0 011 1v12M9 21H5a1 1 0 01-1-1v-4a1 1 0 011-1h2M15 21h4a1 1 0 001-1v-4a1 1 0 00-1-1h-2M7 7h.01M12 7h.01M17 7h.01M7 11h.01M12 11h.01M17 11h.01"
+        />
+    </svg>
+);
+
+const AddressIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+);
+
+const PhoneIcon = () => (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+        />
+    </svg>
+);
+
+export default function OrganizationCard({ orgId, className = '' }) {
     const dispatch = useDispatch();
-    const {
-        data: org,
-        storageLocations,
-        loading,
-        loadingLocations,
-        error,
-        locationsError,
-    } = useSelector((state) => state.organization);
-
-    // 👇 Добавляем получение user из auth slice
-    const user = useSelector((state) => state.auth.user);
-
-    // Ref to track if initial data has been loaded for this orgId
-    const initialLoadRef = useRef({});
-
-    // Состояние для редактирования телефона
-    const [isEditingPhone, setIsEditingPhone] = useState(false);
-    const [phoneValue, setPhoneValue] = useState('');
-
-    // Состояние для редактирования имени организации
-    const [isEditingName, setIsEditingName] = useState(false);
-    const [nameValue, setNameValue] = useState('');
-
-    // Состояние для редактирования адреса
-    const [isEditingAddress, setIsEditingAddress] = useState(false);
-    const [addressValue, setAddressValue] = useState('');
-
-    // Состояние для подсказок Dadata
-    const [suggestions, setSuggestions] = useState([]);
-    const [highlightedIndex, setHighlightedIndex] = useState(-1);
-    const dropdownRef = useRef(null);
-    const inputRef = useRef(null);
+    const { data: org, loading, error } = useSelector((state) => state.organization);
 
     useEffect(() => {
-        if (orgId) {
-            // Check if we've already loaded data for this orgId
-            const hasLoadedOrg = initialLoadRef.current[`org_${orgId}`];
-            const hasLoadedLocations = initialLoadRef.current[`locs_${orgId}`];
-            
-            // Only fetch organization if not already loaded
-            if (!hasLoadedOrg && (!org || org.id !== orgId)) {
-                dispatch(fetchOrganization(orgId));
-                initialLoadRef.current[`org_${orgId}`] = true;
-            }
-            
-            // Only fetch storage locations if not already loaded
-            if (!hasLoadedLocations) {
-                dispatch(fetchStorageLocations(orgId));
-                initialLoadRef.current[`locs_${orgId}`] = true;
-            }
-        }
-
-        return () => {
-            dispatch(clearOrganization());
-            // Clear the load flags when component unmounts
-            if (orgId) {
-                delete initialLoadRef.current[`org_${orgId}`];
-                delete initialLoadRef.current[`locs_${orgId}`];
-            }
-        };
-    }, [dispatch, orgId, org, storageLocations]);
-
-    // Инициализируем значения при загрузке организации
-    useEffect(() => {
-        if (org?.name) {
-            setNameValue(org.name);
-        }
-        if (org?.address) {
-            setAddressValue(org.address);
-        }
-        if (org?.phone) {
-            // Если телефон уже есть в базе, форматируем его для отображения
-            setPhoneValue(formatPhoneNumber(org.phone));
-        } else if (org && !org.phone) {
-            setPhoneValue('');
-        }
-    }, [org?.name, org?.address, org?.phone, org]);
-
-    // Закрывать выпадающий список при клике вне его
-    useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target) && inputRef.current !== e.target) {
-                setSuggestions([]);
-                setHighlightedIndex(-1);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    // Обработчики для телефона
-    const handlePhoneEdit = () => {
-        setIsEditingPhone(true);
-        setPhoneValue(org?.phone ? formatPhoneNumber(org.phone) : '');
-    };
-
-    const handlePhoneSave = async () => {
-        try {
-            // Отправляем на сервер только цифры, или null если пусто
-            const digitsOnly = getDigitsFromFormatted(phoneValue);
-            const phoneToSend = digitsOnly && digitsOnly.length >= 10 ? digitsOnly : null;
-
-            await dispatch(updateOrganization({
-                id: orgId,
-                phone: phoneToSend
-            })).unwrap();
-            setIsEditingPhone(false);
-        } catch (error) {
-            console.error('Ошибка обновления телефона:', error);
-        }
-    };
-
-    const handlePhoneCancel = () => {
-        setIsEditingPhone(false);
-        setPhoneValue(org?.phone ? formatPhoneNumber(org.phone) : '');
-    };
-
-    const handlePhoneChange = (e) => {
-        const input = e.target.value;
-        const formatted = formatPhoneNumber(input);
-        setPhoneValue(formatted);
-    };
-
-    const handlePhoneKeyDown = (e) => {
-        // Разрешаем специальные клавиши
-        if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Tab' || e.key === 'Enter' ||
-            e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-            return;
-        }
-
-        // Разрешаем только цифры
-        if (!/\d/.test(e.key)) {
-            e.preventDefault();
-        }
-    };
-
-    // Обработчики для имени организации
-    const handleNameEdit = () => {
-        setIsEditingName(true);
-        setNameValue(org?.name || '');
-    };
-
-    const handleNameSave = async () => {
-        try {
-            const trimmedName = nameValue.trim();
-            if (!trimmedName) {
-                alert('Название организации не может быть пустым');
-                return;
-            }
-
-            await dispatch(updateOrganization({
-                id: orgId,
-                name: trimmedName
-            })).unwrap();
-            setIsEditingName(false);
-        } catch (error) {
-            console.error('Ошибка обновления имени организации:', error);
-        }
-    };
-
-    const handleNameCancel = () => {
-        setIsEditingName(false);
-        setNameValue(org?.name || '');
-    };
-
-    const handleNameChange = (e) => {
-        setNameValue(e.target.value);
-    };
-
-    const handleNameKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            handleNameSave();
-        } else if (e.key === 'Escape') {
-            handleNameCancel();
-        }
-    };
-
-    // Обработчики для адреса
-    const handleAddressEdit = () => {
-        setIsEditingAddress(true);
-        setAddressValue(org?.address || '');
-        setSuggestions([]);
-        setHighlightedIndex(-1);
-    };
-
-    const handleAddressSave = async () => {
-        try {
-            const trimmedAddress = addressValue.trim();
-            if (!trimmedAddress) {
-                alert('Адрес не может быть пустым');
-                return;
-            }
-
-            // Проверяем формат адреса (город, улица, дом)
-            const addressParts = trimmedAddress.split(',').map(part => part.trim());
-            if (addressParts.length < 3) {
-                alert('Адрес должен содержать: город, улица, дом (разделенные запятыми)');
-                return;
-            }
-
-            await dispatch(updateOrganization({
-                id: orgId,
-                address: trimmedAddress
-            })).unwrap();
-            setIsEditingAddress(false);
-        } catch (error) {
-            console.error('Ошибка обновления адреса:', error);
-        }
-    };
-
-    const handleAddressCancel = () => {
-        setIsEditingAddress(false);
-        setAddressValue(org?.address || '');
-        setSuggestions([]);
-        setHighlightedIndex(-1);
-    };
-
-
-    const handleAddressKeyDown = (e) => {
-        // Обработка навигации по подсказкам
-        if (suggestions.length > 0) {
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                setHighlightedIndex(prev =>
-                    prev < suggestions.length - 1 ? prev + 1 : prev
-                );
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setHighlightedIndex(prev =>
-                    prev > 0 ? prev - 1 : -1
-                );
-            } else if (e.key === 'Enter' && highlightedIndex >= 0) {
-                e.preventDefault();
-                selectAddress(suggestions[highlightedIndex]);
-            } else if (e.key === 'Escape') {
-                setSuggestions([]);
-                setHighlightedIndex(-1);
-            }
-            return;
-        }
-
-        // Обычная обработка для сохранения/отмены
-        if (e.key === 'Enter') {
-            handleAddressSave();
-        } else if (e.key === 'Escape') {
-            handleAddressCancel();
-        }
-    };
-
-    // Функция для обработки изменения адреса с подсказками Dadata
-    const handleAddressInputChange = async (value) => {
-        setAddressValue(value);
-        setHighlightedIndex(-1);
-
-        if (!value || value.length < 3) {
-            setSuggestions([]);
-            return;
-        }
-
-        try {
-            const response = await fetch('https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'Authorization': 'Token a1a8fbcf263bb8a2e549b1aa7fe56c08c1a2da1d',
-                },
-                body: JSON.stringify({ query: value, count: 5 }),
-            });
-
-            if (!response.ok) {
-                setSuggestions([]);
-                return;
-            }
-
-            const result = await response.json();
-            setSuggestions(Array.isArray(result.suggestions) ? result.suggestions : []);
-        } catch (err) {
-            setSuggestions([]);
-        }
-    };
-
-    // Функция выбора адреса из подсказок
-    const selectAddress = (suggestion) => {
-        setAddressValue(suggestion.value);
-        setSuggestions([]);
-        setHighlightedIndex(-1);
-        inputRef.current?.focus();
-    };
+        if (!orgId) return undefined;
+        dispatch(fetchOrganization(orgId));
+        return () => dispatch(clearOrganization());
+    }, [dispatch, orgId]);
 
     if (!orgId) return null;
 
     if (loading) {
         return (
-            <div className="w-full bg-white rounded-xl shadow-md border border-gray-200 p-6">
-                <div className="animate-pulse space-y-4">
-                    <div className="h-5 bg-gray-200 rounded w-1/3"></div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <div className="h-4 bg-gray-200 rounded"></div>
-                            <div className="h-4 bg-gray-200 rounded w-4/5"></div>
-                        </div>
-                        <div className="space-y-2">
-                            <div className="h-4 bg-gray-200 rounded"></div>
-                            <div className="h-4 bg-gray-200 rounded w-4/5"></div>
-                        </div>
+            <section className={`rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 ${className}`.trim()}>
+                <div className="flex animate-pulse gap-4">
+                    <div className="h-16 w-16 rounded-xl bg-gray-200" />
+                    <div className="flex-1 space-y-3">
+                        <div className="h-5 w-1/3 rounded bg-gray-200" />
+                        <div className="h-12 rounded-xl bg-gray-100" />
+                        <div className="h-12 rounded-xl bg-gray-100" />
                     </div>
                 </div>
-            </div>
+            </section>
         );
     }
 
     if (error || !org) {
         return (
-            <div className="w-full bg-white rounded-xl shadow-md border border-red-200 p-6">
-                <p className="text-red-600">{error || 'Организация не найдена'}</p>
-            </div>
+            <section className={`rounded-2xl border border-red-200 bg-white p-5 shadow-sm sm:p-6 ${className}`.trim()}>
+                <p className="text-sm text-red-600">{error || 'Организация не найдена'}</p>
+            </section>
         );
     }
 
+    const logoUrl = org.logo_organization ? normalizeImageUrl(org.logo_organization) : null;
+    const orgInitials = (org.name || 'Ор').slice(0, 2).toUpperCase();
+
     return (
-        <div className="w-full bg-white rounded-xl shadow-md border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-5 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-2m-2 0h-2M7 19h2m-2 0h-2" />
-                </svg>
-                Организация и склады
-            </h2>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Информация об организации */}
-                <div>
-                    <h3 className="text-md font-medium text-gray-800 mb-3">Информация</h3>
-                    <div className="space-y-3">
-                        <div>
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm text-gray-500">Название</p>
-                                {user?.is_director && !isEditingName && (
-                                    <button
-                                        onClick={handleNameEdit}
-                                        className="text-blue-500 hover:text-blue-700 text-sm"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                    </button>
-                                )}
-                            </div>
-                            {isEditingName ? (
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="text"
-                                        value={nameValue}
-                                        onChange={handleNameChange}
-                                        onKeyDown={handleNameKeyDown}
-                                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                                        placeholder="Введите название организации"
-                                        autoFocus
-                                    />
-                                    <button
-                                        onClick={handleNameSave}
-                                        className="text-green-500 hover:text-green-700"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        onClick={handleNameCancel}
-                                        className="text-red-500 hover:text-red-700"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            ) : (
-                                <p className="font-medium text-gray-900">{org.name || '—'}</p>
-                            )}
-                        </div>
-                        <div>
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm text-gray-500">Адрес</p>
-                                {user?.is_director && !isEditingAddress && (
-                                    <button
-                                        onClick={handleAddressEdit}
-                                        className="text-blue-500 hover:text-blue-700 text-sm"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                    </button>
-                                )}
-                            </div>
-                            {isEditingAddress ? (
-                                <div className="space-y-2">
-                                    <div className="relative" ref={dropdownRef}>
-                                        <input
-                                            ref={inputRef}
-                                            type="text"
-                                            value={addressValue}
-                                            onChange={(e) => handleAddressInputChange(e.target.value)}
-                                            onKeyDown={handleAddressKeyDown}
-                                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                            placeholder="г. Москва, ул. Ленина, д. 15"
-                                            autoFocus
-                                        />
-                                        {suggestions.length > 0 && (
-                                            <ul className="absolute z-10 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-60 overflow-auto">
-                                                {suggestions.map((s, i) => (
-                                                    <li
-                                                        key={i}
-                                                        onClick={() => selectAddress(s)}
-                                                        onMouseEnter={() => setHighlightedIndex(i)}
-                                                        className={`px-4 py-2 cursor-pointer ${
-                                                            i === highlightedIndex
-                                                                ? 'bg-indigo-100 text-indigo-800'
-                                                                : 'hover:bg-gray-100'
-                                                        }`}
-                                                    >
-                                                        {s.value}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <p className="text-xs text-gray-500">Формат: город, улица, дом</p>
-                                        <button
-                                            onClick={handleAddressSave}
-                                            className="text-green-500 hover:text-green-700"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        </button>
-                                        <button
-                                            onClick={handleAddressCancel}
-                                            className="text-red-500 hover:text-red-700"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <p className="font-medium text-gray-900">{org.address || '—'}</p>
-                            )}
-                        </div>
-                        <div>
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm text-gray-500">Телефон</p>
-                                {user?.is_director && !isEditingPhone && (
-                                    <button
-                                        onClick={handlePhoneEdit}
-                                        className="text-blue-500 hover:text-blue-700 text-sm"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                        </svg>
-                                    </button>
-                                )}
-                            </div>
-                            {isEditingPhone ? (
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="text"
-                                        value={phoneValue}
-                                        onChange={handlePhoneChange}
-                                        onKeyDown={handlePhoneKeyDown}
-                                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                                        placeholder="+7 (XXX) XXX-XX-XX"
-                                        maxLength={18}
-                                    />
-                                    <button
-                                        onClick={handlePhoneSave}
-                                        className="text-green-500 hover:text-green-700"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        onClick={handlePhoneCancel}
-                                        className="text-red-500 hover:text-red-700"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            ) : (
-                                <p className="font-medium text-gray-900">{org.phone ? formatPhoneNumber(org.phone) : '—'}</p>
-                            )}
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500">ID</p>
-                            <p className="font-mono text-sm text-gray-700 bg-gray-50 px-2 py-1 rounded">{org.id}</p>
-                        </div>
-                    </div>
+        <section className={`rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6 ${className}`.trim()}>
+            <div className="flex gap-4 border-b border-gray-100 pb-5">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-sm">
+                    {logoUrl ? (
+                        <img src={logoUrl} alt={org.name || 'Логотип'} className="h-full w-full object-cover" />
+                    ) : (
+                        <span className="text-lg font-bold text-indigo-600">{orgInitials}</span>
+                    )}
                 </div>
-
-                {/* Склады */}
-                <StorageLocationsSection
-                    orgId={orgId}
-                    storageLocations={storageLocations}
-                    loadingLocations={loadingLocations}
-                    locationsError={locationsError}
-                />
+                <div className="min-w-0 flex-1">
+                    <h3 className="text-base font-semibold text-gray-900">Организация</h3>
+                    <p className="mt-0.5 truncate text-sm font-medium text-gray-700">{org.name || 'Без названия'}</p>
+                    <p className="mt-1 font-mono text-xs text-gray-500">ID {org.id}</p>
+                </div>
             </div>
 
-            {/* Сотрудники — отдельно под основным блоком */}
-
-        </div>
+            <div className="mt-5 space-y-3">
+                <OrgInfoRow label="Название" value={org.name} icon={<OrgNameIcon />} />
+                <OrgInfoRow label="Адрес" value={org.address} icon={<AddressIcon />} />
+                <OrgInfoRow
+                    label="Телефон"
+                    value={org.phone ? formatPhoneNumber(org.phone) : null}
+                    icon={<PhoneIcon />}
+                />
+            </div>
+        </section>
     );
 }

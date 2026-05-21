@@ -3,6 +3,9 @@ import unittest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
+import app.models  # noqa: F401
+import app.models.organization_avito_integration  # noqa: F401
+import app.models.organization_drom_integration  # noqa: F401
 from app.models.event_log import EventLog
 from app.models.organization import Organization
 from app.models.user import User as UserModel
@@ -83,7 +86,7 @@ class AuditUxTests(unittest.TestCase):
         self.db.add(Organization(id="ORG2", name="Запчасти Плюс"))
         self.user = UserModel(
             id=1,
-            public_code="1000001",
+            public_code="A482917",
             last_name="Иванов",
             first_name="Иван",
             patronymic="Иванович",
@@ -100,7 +103,7 @@ class AuditUxTests(unittest.TestCase):
             summary="Вход в систему",
             user=self.user,
             organization_id="ORG1",
-            details={"public_code": "1000001"},
+            details={"public_code": "A482917"},
         )
 
     def tearDown(self):
@@ -113,16 +116,16 @@ class AuditUxTests(unittest.TestCase):
         self.assertEqual(items[0]["id"], "ORG1")
 
     def test_search_users_by_public_code(self):
-        items = search_users_for_audit(self.db, "1000001")
+        items = search_users_for_audit(self.db, "A482917")
         self.assertEqual(len(items), 1)
-        self.assertEqual(items[0]["public_code"], "1000001")
+        self.assertEqual(items[0]["public_code"], "A482917")
 
     def test_resolve_user_by_fio(self):
         ids = resolve_user_ids_for_filter(self.db, "Иванов")
         self.assertEqual(ids, [1])
 
     def test_filter_events_by_public_code(self):
-        ids = resolve_user_ids_for_filter(self.db, "1000001")
+        ids = resolve_user_ids_for_filter(self.db, "A482917")
         self.assertEqual(ids, [1])
         rows, total = list_audit_events(
             self.db,
@@ -135,7 +138,7 @@ class AuditUxTests(unittest.TestCase):
     def test_events_enriched_with_public_code_and_org_name(self):
         rows, _ = list_audit_events(self.db, AuditListFilters(), page=1, limit=10)
         enriched = events_to_dicts(self.db, rows)
-        self.assertEqual(enriched[0]["user_public_code"], "1000001")
+        self.assertEqual(enriched[0]["user_public_code"], "A482917")
         self.assertEqual(enriched[0]["organization_name"], "Авто Сервис")
 
     def test_search_hints_summary(self):

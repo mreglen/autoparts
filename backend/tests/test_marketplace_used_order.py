@@ -147,7 +147,7 @@ class MarketplaceUsedOrderTests(unittest.TestCase):
     def _buyer_without_org(self, user_id=1):
         user = UserModel(
             id=user_id,
-            public_code=str(1_000_000 + user_id),
+            public_code=f"K{100000 + user_id:06d}",
             last_name="Покупатель",
             first_name="Иван",
             email="buyer@test.ru",
@@ -307,7 +307,7 @@ class MarketplaceUsedOrderTests(unittest.TestCase):
         buyer = self._buyer_without_org()
         other = UserModel(
             id=2,
-            public_code="1000002",
+            public_code="M384729",
             last_name="Other",
             first_name="User",
             email="other@test.ru",

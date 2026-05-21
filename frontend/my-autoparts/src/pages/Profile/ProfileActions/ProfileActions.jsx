@@ -1,16 +1,41 @@
-// src/components/ProfileActions.jsx
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { requestPasswordReset, confirmPasswordReset, logout } from '../../../redux/slices/AuthSlice';
 import ConfirmationModal from '../../../components/ConfirmationModal/ConfirmationModal';
 
-export default function ProfileActions({ onEditProfile }) {
+const inputClass =
+    'w-full rounded-lg border border-gray-300 px-3 py-2.5 pr-10 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+
+function ActionButton({ onClick, icon, title, subtitle, variant = 'default' }) {
+    const variants = {
+        default: 'border-gray-200 bg-white hover:bg-gray-50 text-gray-800',
+        primary: 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-800',
+        danger: 'border-red-200 bg-red-50 hover:bg-red-100 text-red-800',
+    };
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${variants[variant]}`}
+        >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ring-1 ring-gray-100">
+                {icon}
+            </span>
+            <span className="min-w-0">
+                <span className="block text-sm font-medium">{title}</span>
+                {subtitle && <span className="block text-xs text-gray-500 mt-0.5">{subtitle}</span>}
+            </span>
+        </button>
+    );
+}
+
+export default function ProfileActions({ onEditProfile, isEditingProfile }) {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { user, loading, error } = useSelector((state) => state.auth);
 
-    const [action, setAction] = useState('idle'); // 'idle' | 'changePassword' | 'verifyCode'
+    const [action, setAction] = useState('idle');
     const [formData, setFormData] = useState({
         password: '',
         password_repeat: '',
@@ -29,20 +54,12 @@ export default function ProfileActions({ onEditProfile }) {
 
     const handleSendCode = async (e) => {
         e.preventDefault();
-        if (formData.password !== formData.password_repeat) {
-            return;
-        }
-        if (formData.password.length < 6) {
-            return;
-        }
+        if (formData.password !== formData.password_repeat || formData.password.length < 6) return;
 
-        const result = await dispatch(
-            requestPasswordReset(user.email)
-        );
-
+        const result = await dispatch(requestPasswordReset(user.email));
         if (requestPasswordReset.fulfilled.match(result)) {
             setAction('verifyCode');
-            setSuccess('Код подтверждения отправлен на ваш email');
+            setSuccess('Код отправлен на email');
         }
     };
 
@@ -75,68 +92,69 @@ export default function ProfileActions({ onEditProfile }) {
         setShowPasswordRepeat(false);
     };
 
-    const handleLogout = () => {
-        dispatch(logout());
-        navigate('/', { replace: true });
-    };
-
-    const handleLogoutClick = () => {
-        setShowLogoutModal(true);
-    };
-
-    const handleLogoutConfirm = () => {
-        setShowLogoutModal(false);
-        handleLogout();
-    };
-
-    const handleLogoutCancel = () => {
-        setShowLogoutModal(false);
-    };
-
-    // Локальные проверки ошибок
     const hasPasswordMismatch = formData.password !== formData.password_repeat;
     const hasShortPassword = formData.password.length > 0 && formData.password.length < 6;
     const hasCodeEmpty = action === 'verifyCode' && !formData.code.trim();
 
     return (
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Действия</h2>
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+            <h3 className="text-base font-semibold text-gray-900">Безопасность</h3>
+            <p className="mt-1 text-sm text-gray-500">Пароль и выход из аккаунта</p>
 
-            {action === 'idle' ? (
-                <div className="space-y-3">
-                    <button
-                        onClick={() => {
-                            setAction('idle');
-                            onEditProfile?.();
-                        }}
-                        className="block w-full text-center px-4 py-2.5 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
-                    >
-                        Редактировать профиль
-                    </button>
-                    <button
+            {action === 'idle' && (
+                <div className="mt-5 space-y-3">
+                    {!isEditingProfile && (
+                        <ActionButton
+                            variant="primary"
+                            title="Изменить ФИО"
+                            subtitle="Фамилия, имя, отчество"
+                            onClick={() => onEditProfile?.()}
+                            icon={
+                                <svg className="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            }
+                        />
+                    )}
+                    <ActionButton
+                        title="Сменить пароль"
+                        subtitle="Подтверждение по email"
                         onClick={() => setAction('changePassword')}
-                        className="block w-full text-center px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                    >
-                        Сменить пароль
-                    </button>
-                    <button
-                        onClick={handleLogoutClick}
-                        className="block w-full text-center px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
-                    >
-                        Выход
-                    </button>
+                        icon={
+                            <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                        }
+                    />
+                    <div className="border-t border-gray-100 pt-3">
+                        <ActionButton
+                            variant="danger"
+                            title="Выйти из аккаунта"
+                            onClick={() => setShowLogoutModal(true)}
+                            icon={
+                                <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                            }
+                        />
+                    </div>
                 </div>
-            ) : action === 'changePassword' ? (
-                <div>
-                    <h3 className="text-md font-medium text-gray-800 mb-3">Новый пароль</h3>
+            )}
+
+            {action === 'changePassword' && (
+                <div className="mt-5">
+                    <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">1</span>
+                        Новый пароль
+                    </div>
                     {(hasPasswordMismatch || hasShortPassword) && (
-                        <p className="text-sm text-red-600 mb-3">
-                            {hasPasswordMismatch && "Пароли не совпадают"}
-                            {hasShortPassword && "Пароль должен быть не менее 6 символов"}
+                        <p className="mb-3 text-sm text-red-600">
+                            {hasPasswordMismatch && 'Пароли не совпадают. '}
+                            {hasShortPassword && 'Минимум 6 символов.'}
                         </p>
                     )}
-                    {success && <p className="text-sm text-green-600 mb-3">{success}</p>}
-                    {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+                    {success && <p className="mb-3 text-sm text-emerald-600">{success}</p>}
+                    {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
                     <form onSubmit={handleSendCode} className="space-y-3">
                         <div className="relative">
                             <input
@@ -145,20 +163,16 @@ export default function ProfileActions({ onEditProfile }) {
                                 placeholder="Новый пароль"
                                 value={formData.password}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm"
+                                className={inputClass}
                                 disabled={loading}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                                aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                                aria-label={showPassword ? 'Скрыть' : 'Показать'}
                             >
-                                {showPassword ? (
-                                    <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                                ) : (
-                                    <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                                )}
+                                <img src={showPassword ? '/img/hide.svg' : '/img/show.svg'} alt="" className="h-4 w-4 opacity-60" />
                             </button>
                         </div>
                         <div className="relative">
@@ -168,93 +182,94 @@ export default function ProfileActions({ onEditProfile }) {
                                 placeholder="Повторите пароль"
                                 value={formData.password_repeat}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm"
+                                className={inputClass}
                                 disabled={loading}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPasswordRepeat(!showPasswordRepeat)}
-                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                                aria-label={showPasswordRepeat ? "Скрыть пароль" : "Показать пароль"}
+                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                                aria-label={showPasswordRepeat ? 'Скрыть' : 'Показать'}
                             >
-                                {showPasswordRepeat ? (
-                                    <img src="/img/hide.svg" alt="Скрыть пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                                ) : (
-                                    <img src="/img/show.svg" alt="Показать пароль" className="w-4 h-4 filter brightness-0 saturate-100 invert-45 sepia-0 saturate-0 hue-rotate-0deg brightness-60 contrast-105 transition-opacity duration-300 ease-in-out" />
-                                )}
+                                <img src={showPasswordRepeat ? '/img/hide.svg' : '/img/show.svg'} alt="" className="h-4 w-4 opacity-60" />
                             </button>
                         </div>
                         <div className="flex gap-2">
                             <button
                                 type="submit"
-                                className="flex-1 px-3 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-50"
                                 disabled={loading || hasPasswordMismatch || hasShortPassword}
+                                className="flex-1 rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                             >
-                                {loading ? 'Отправка...' : 'Отправить код'}
+                                {loading ? 'Отправка...' : 'Получить код'}
                             </button>
                             <button
                                 type="button"
                                 onClick={reset}
-                                className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50"
+                                className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                             >
                                 Отмена
                             </button>
                         </div>
                     </form>
                 </div>
-            ) : action === 'verifyCode' ? (
-                <div>
-                    <h3 className="text-md font-medium text-gray-800 mb-3">Подтверждение</h3>
-                    {hasCodeEmpty && (
-                        <p className="text-sm text-red-600 mb-3">Введите код подтверждения</p>
-                    )}
-                    {success && <p className="text-sm text-green-600 mb-3">{success}</p>}
-                    {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
-                    <p className="text-sm text-gray-600 mb-3">
-                        Код отправлен на ваш email. Введите его ниже.
-                    </p>
+            )}
+
+            {action === 'verifyCode' && (
+                <div className="mt-5">
+                    <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">2</span>
+                        Код из письма
+                    </div>
+                    {hasCodeEmpty && <p className="mb-3 text-sm text-red-600">Введите код</p>}
+                    {success && <p className="mb-3 text-sm text-emerald-600">{success}</p>}
+                    {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+                    <p className="mb-3 text-sm text-gray-500">Код отправлен на {user.email}</p>
                     <form onSubmit={handleVerifyCode} className="space-y-3">
-                        <div>
-                            <input
-                                type="text"
-                                name="code"
-                                placeholder="Код подтверждения"
-                                value={formData.code}
-                                onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                disabled={loading}
-                            />
-                        </div>
+                        <input
+                            type="text"
+                            name="code"
+                            placeholder="000000"
+                            value={formData.code}
+                            onChange={handleChange}
+                            className={inputClass}
+                            disabled={loading}
+                            autoComplete="one-time-code"
+                            inputMode="numeric"
+                        />
                         <div className="flex gap-2">
                             <button
                                 type="submit"
-                                className="flex-1 px-3 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-50"
                                 disabled={loading || hasCodeEmpty}
+                                className="flex-1 rounded-lg bg-indigo-600 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                             >
                                 {loading ? 'Проверка...' : 'Подтвердить'}
                             </button>
                             <button
                                 type="button"
                                 onClick={reset}
-                                className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50"
+                                className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                             >
                                 Отмена
                             </button>
                         </div>
                     </form>
                 </div>
-            ) : null}
-            
+            )}
+
             <ConfirmationModal
                 isOpen={showLogoutModal}
-                onClose={handleLogoutCancel}
-                onConfirm={handleLogoutConfirm}
+                onClose={() => setShowLogoutModal(false)}
+                onConfirm={() => {
+                    setShowLogoutModal(false);
+                    dispatch(logout());
+                    navigate('/', { replace: true });
+                }}
                 title="Выход из аккаунта"
-                message="Вы действительно хотите выйти из своего аккаунта?"
+                message="Вы действительно хотите выйти?"
                 confirmText="Выйти"
                 cancelText="Отмена"
-                danger={true}
+                danger
             />
-        </div>
+        </section>
     );
 }
