@@ -1,12 +1,42 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { clearCart } from '../../redux/slices/CartSlice';
 import { apiAxios } from '../../utils/apiClient';
+import { useAuthReady } from '../../hooks/useAuthReady';
+
+function formatApiErrorDetail(detail) {
+  if (!detail) return 'Ошибка при оформлении заказа. Попробуйте еще раз.';
+  if (typeof detail === 'string') return detail;
+  if (typeof detail === 'object' && detail.message) {
+    const extra = detail.product_id != null
+      ? ` (товар №${detail.product_id}, запрошено: ${detail.requested}, доступно: ${detail.available})`
+      : '';
+    return `${detail.message}${extra}`;
+  }
+  return 'Ошибка при оформлении заказа. Попробуйте еще раз.';
+}
+
+function buildSuccessMessage(data) {
+  const usedOrders = Array.isArray(data?.used_orders) ? data.used_orders : [];
+  if (usedOrders.length > 1) {
+    const ids = usedOrders.map((o) => o.id).join(', ');
+    return `Создано заказов: ${usedOrders.length} (№${ids})`;
+  }
+  const orderId = data?.used_order_id ?? usedOrders[0]?.id;
+  if (orderId) {
+    return `Заказ №${orderId} успешно оформлен`;
+  }
+  if (data?.new_order_id) {
+    return `Заказ №${data.new_order_id} успешно оформлен`;
+  }
+  return 'Заказ успешно оформлен';
+}
 
 export default function OrderRegistration() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { user, isReady } = useAuthReady();
 
   // Получаем данные из localStorage
   const orderData = JSON.parse(localStorage.getItem('orderData') || '{}');
@@ -37,6 +67,12 @@ export default function OrderRegistration() {
 
   // Состояние для уведомлений
   const [notification, setNotification] = useState(null);
+  const [orderSuccess, setOrderSuccess] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const hasNewItems = selectedItems.some((item) => item.type === 'new');
+  const hasUsedItems = selectedItems.some((item) => item.type === 'used');
+  const isUsedOnlyCheckout = hasUsedItems && !hasNewItems;
 
   // Данные транспортных компаний
   const transportCompanies = [
@@ -84,6 +120,21 @@ export default function OrderRegistration() {
     }
   }, [deliveryType, seller, adminOrgAddress, pickupAddresses]);
 
+  useEffect(() => {
+    if (!isReady || !user) return;
+    setRecipient((prev) => {
+      const fullName = [user.last_name, user.first_name, user.patronymic]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+      return {
+        fullName: prev.fullName || fullName,
+        phone: prev.phone || user.phone || '',
+        email: prev.email || user.email || '',
+      };
+    });
+  }, [isReady, user]);
+
   // Проверка заполненности всех полей
   const isFormValid = () => {
     const recipientValid = recipient.fullName && recipient.phone && recipient.email;
@@ -113,26 +164,41 @@ export default function OrderRegistration() {
   };
 
   const handleSubmitOrder = async () => {
+    if (submitting || orderSuccess) return;
+
+    const usedItemsWithoutProduct = selectedItems.filter(
+      (item) => item.type === 'used' && !item.product_id
+    );
+    if (usedItemsWithoutProduct.length > 0) {
+      setNotification({
+        type: 'error',
+        message: 'Для б/у товаров не указан product_id. Обновите корзину и попробуйте снова.',
+      });
+      return;
+    }
+
     try {
+      setSubmitting(true);
+      setNotification(null);
       const token = localStorage.getItem('token');
 
-      // Преобразуем данные в формат API
-      const orderData = {
-        items: selectedItems.map(item => ({
+      const newCartItemIds = selectedItems
+        .filter((item) => item.type === 'new')
+        .map((item) => item.id);
+      const usedCartItemIds = selectedItems
+        .filter((item) => item.type === 'used')
+        .map((item) => item.id);
+
+      const orderPayload = {
+        items: selectedItems.map((item) => ({
           name: item.name,
           brand: item.brand,
           partnumber: item.number,
           quantity: item.quantity,
           price: item.price,
-          product_id: item.product_id, // Добавляем product_id если он есть
-          status_id: 1  // В ожидании
+          product_id: item.product_id,
         })),
-        cart_item_ids: selectedItems.filter(item => item.type === 'new').map(item => item.id), // IDs новых товаров
-        used_cart_item_ids: selectedItems.filter(item => item.type === 'used').map(item => item.id), // IDs б/у товаров
-        new_parts_order: {
-          seller: seller,
-          deliver_in_parts: deliverInParts
-        },
+        used_cart_item_ids: usedCartItemIds,
         recipient_name: recipient.fullName,
         recipient_phone: recipient.phone,
         recipient_email: recipient.email,
@@ -140,44 +206,51 @@ export default function OrderRegistration() {
         ...(deliveryType === 'pickup' && { pickup_address: pickupAddress }),
         ...(deliveryType === 'transport' && {
           transport_company: selectedTransportCompany,
-          delivery_address: deliveryAddress
+          delivery_address: deliveryAddress,
         }),
-        total_amount: calculateTotal()
+        total_amount: calculateTotal(),
       };
 
-      const response = await apiAxios.post(
-        '/orders/',
-        orderData,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        }
-      );
+      if (!isUsedOnlyCheckout) {
+        orderPayload.cart_item_ids = newCartItemIds;
+        orderPayload.new_parts_order = {
+          seller: seller,
+          deliver_in_parts: deliverInParts,
+        };
+      }
 
-      console.log('Заказ создан:', response.data);
-
-      // Очищаем корзину в Redux состоянии
-      dispatch(clearCart());
-
-      // Очищаем данные из localStorage
-      localStorage.removeItem('orderData');
-
-      // Перенаправляем на страницу корзины сразу
-      navigate('/cart');
-
-    } catch (error) {
-      console.error('Ошибка при оформлении заказа:', error);
-
-      // Показываем уведомление об ошибке
-      setNotification({
-        type: 'error',
-        message: 'Ошибка при оформлении заказа. Попробуйте еще раз.'
+      const response = await apiAxios.post('/orders/', orderPayload, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
-      // Автоматически скрываем уведомление через 5 секунд
+      dispatch(clearCart());
+      localStorage.removeItem('orderData');
+
+      setOrderSuccess({
+        message: buildSuccessMessage(response.data),
+        usedOrders: response.data?.used_orders || [],
+      });
+      setNotification({
+        type: 'success',
+        message: buildSuccessMessage(response.data),
+      });
+    } catch (error) {
+      console.error('Ошибка при оформлении заказа:', error);
+      const detail = error?.response?.data?.detail;
+      setNotification({
+        type: 'error',
+        message: formatApiErrorDetail(detail),
+      });
       setTimeout(() => {
         setNotification(null);
-      }, 5000);
+      }, 8000);
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const handleSuccessDismiss = () => {
+    navigate('/cart');
   };
 
   return (
@@ -211,10 +284,27 @@ export default function OrderRegistration() {
                 </svg>
               )}
             </div>
-            <div className="ml-3">
+            <div className="ml-3 flex-1">
               <p className={`text-sm font-medium ${notification.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
                 {notification.message}
               </p>
+              {notification.type === 'success' && orderSuccess && (
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <Link
+                    to="/purchases/orders"
+                    className="text-sm font-medium text-green-700 underline hover:text-green-900"
+                  >
+                    Мои покупки
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={handleSuccessDismiss}
+                    className="text-sm font-medium text-green-700 underline hover:text-green-900"
+                  >
+                    Вернуться в корзину
+                  </button>
+                </div>
+              )}
             </div>
             <div className="ml-auto pl-3">
               <div className="-mx-1.5 -my-1.5">
@@ -448,7 +538,7 @@ export default function OrderRegistration() {
       </div>
 
       {/* Порядок оплаты заказа */}
-      {isFormValid() && (
+      {isFormValid() && !orderSuccess && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
           <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Порядок оплаты заказа</h2>
@@ -485,12 +575,13 @@ export default function OrderRegistration() {
                   </h3>
                   <button
                     onClick={handleSubmitOrder}
-                    className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    disabled={submitting}
+                    className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Подтвердить заказ
+                    {submitting ? 'Оформление...' : 'Подтвердить заказ'}
                   </button>
                 </div>
               </div>

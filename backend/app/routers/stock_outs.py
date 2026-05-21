@@ -8,6 +8,11 @@ from app.models.user import User
 from app.schemas.stock_out import StockOut as StockOutSchema, StockOutCreate, ReturnCreate
 from app.db.database import get_db
 from app.services.stock_out_sales import list_warehouse_sales
+from app.services.stock_sale_fulfillment import (
+    FulfillStockOutRequest,
+    StockOutSourceKind,
+    fulfill_stock_out,
+)
 
 router = APIRouter(prefix="/stock-outs", tags=["Stock Out"])
 
@@ -21,31 +26,25 @@ def create_stock_out(
     if not current_user.organization_id:
         raise HTTPException(status_code=403, detail="Организация не указана")
 
-    # Проверка, что продукт принадлежит организации
-    product = db.query(Product).filter(
-        Product.id == stock_out.product_id,
-        Product.organization_id == current_user.organization_id
-    ).first()
-    if not product:
-        raise HTTPException(status_code=400, detail="Продукт не найден или недоступен")
-
-    # Проверка остатка
-    if product.quantity < stock_out.quantity:
-        raise HTTPException(status_code=400, detail="Недостаточно товара на складе")
-
-    # Уменьшаем количество
-    product.quantity -= stock_out.quantity
-
-    payload = stock_out.dict()
-    if payload.get("sale_price", 0) > 0 and not payload.get("sale_channel"):
-        payload["sale_channel"] = "warehouse"
-
-    # Создаём запись расхода
-    db_stock_out = StockOutModel(**payload)
-    db.add(db_stock_out)
-    db.commit()
-    db.refresh(db_stock_out)
-    return db_stock_out
+    sale_price = float(stock_out.sale_price or 0)
+    is_sale = sale_price > 0
+    result = fulfill_stock_out(
+        db,
+        FulfillStockOutRequest(
+            organization_id=current_user.organization_id,
+            product_id=stock_out.product_id,
+            quantity=stock_out.quantity,
+            storage_location_id=stock_out.storage_location_id,
+            acquired_product_id=stock_out.acquired_product_id,
+            user_id=stock_out.user_id,
+            movement_date=stock_out.movement_date,
+            sale_price=sale_price,
+            reason=stock_out.reason,
+            sale_channel=stock_out.sale_channel or ("warehouse" if is_sale else None),
+            source_kind=StockOutSourceKind.WAREHOUSE_MANUAL if is_sale else StockOutSourceKind.WRITEOFF,
+        ),
+    )
+    return result.stock_out
 
 @router.get("/sales", response_model=list[StockOutSchema])
 def get_warehouse_sales(

@@ -15,9 +15,9 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Optional
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.stock_out import StockOut
 from app.models.product_avito_listing_link import ProductAvitoListingLink
 from app.models.product_drom_listing_link import ProductDromListingLink
 from app.models.avito_orders_cache import AvitoOrderCache
@@ -34,6 +34,11 @@ from app.services.avito_order_pricing import (
 from app.services.avito_order_item_match import (
     avito_item_identifiers,
     resolve_product_id_from_avito_item,
+)
+from app.services.stock_sale_fulfillment import (
+    FulfillStockOutRequest,
+    StockOutSourceKind,
+    fulfill_stock_out,
 )
 
 logger = logging.getLogger(__name__)
@@ -137,15 +142,6 @@ async def process_closed_avito_order(
                 skipped_reasons.append("product_not_found")
                 continue
             
-            # Проверяем наличие товара
-            if product.quantity < item_quantity:
-                logger.error(
-                    f"Insufficient quantity for product {product.id}: "
-                    f"have {product.quantity}, need {item_quantity}"
-                )
-                skipped_reasons.append("insufficient_quantity")
-                continue
-
             item_unit_price = unit_price_for_stock_out(
                 item,
                 product_price=float(product.price or 0),
@@ -158,24 +154,24 @@ async def process_closed_avito_order(
                     product.id,
                 )
 
-            # Создаём запись StockOut
-            stock_out = StockOut(
-                organization_id=organization_id,
-                product_id=product.id,
-                acquired_product_id=None,
-                storage_location_id=product.storage_location_id,
-                user_id=None,  # Системная операция
-                quantity=item_quantity,
-                sale_price=item_unit_price,
-                movement_date=date.today(),
-                reason="Продано через Авито",
-                sale_channel="avito",
-                avito_order_id=avito_order_id,
+            fulfill_result = fulfill_stock_out(
+                db,
+                FulfillStockOutRequest(
+                    organization_id=organization_id,
+                    product_id=product.id,
+                    acquired_product_id=None,
+                    storage_location_id=product.storage_location_id,
+                    user_id=None,  # Системная операция
+                    quantity=item_quantity,
+                    sale_price=item_unit_price,
+                    movement_date=date.today(),
+                    reason="Продано через Авито",
+                    sale_channel="avito",
+                    avito_order_id=avito_order_id,
+                    source_kind=StockOutSourceKind.AVITO,
+                ),
+                commit=False,
             )
-            db.add(stock_out)
-            
-            # Уменьшаем количество товара
-            product.quantity -= item_quantity
             
             processed_products.append({
                 "product_id": product.id,
@@ -187,10 +183,21 @@ async def process_closed_avito_order(
             })
             
             logger.info(
-                f"Created StockOut for product {product.id}, "
-                f"quantity={item_quantity}, unit_price={item_unit_price}"
+                "%s StockOut for product %s, quantity=%s, unit_price=%s",
+                "Created" if fulfill_result.created else "Reused",
+                product.id,
+                item_quantity,
+                item_unit_price,
             )
             
+        except HTTPException as e:
+            logger.error(
+                "Failed to create StockOut for product in Avito order %s: %s",
+                order_id,
+                e.detail,
+            )
+            skipped_reasons.append("insufficient_quantity" if e.status_code == 400 else "stock_out_error")
+            continue
         except Exception as e:
             logger.error(f"Error processing item in order {order_id}: {e}", exc_info=True)
             skipped_reasons.append("item_processing_error")

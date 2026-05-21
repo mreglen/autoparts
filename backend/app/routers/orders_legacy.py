@@ -8,11 +8,14 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
-from app.models.carts import NewPartsCart, UsedPartsCart
+from app.models.carts import NewPartsCart
 from app.models.garage_new_orders import GarageNewOrder, GarageNewOrderItem
-from app.models.garage_used_orders import GarageUsedOrder, GarageUsedOrderItem
 from app.models.user import User as UserModel
-
+from app.services.marketplace_used_order import (
+    UsedOrderDeliveryInput,
+    UsedOrderItemInput,
+    create_used_orders_from_payload,
+)
 
 router = APIRouter(prefix="/orders", tags=["Orders Legacy"])
 
@@ -46,7 +49,46 @@ class LegacyCreateOrderIn(BaseModel):
     total_amount: float = Field(default=0, ge=0)
 
 
-@router.post("/")
+class CreatedUsedOrderOut(BaseModel):
+    id: int
+    organization_id: str
+    total_amount: float
+
+
+class LegacyCreateOrderOut(BaseModel):
+    ok: bool = True
+    new_order_id: Optional[int] = None
+    used_order_id: Optional[int] = None
+    used_orders: list[CreatedUsedOrderOut] = Field(default_factory=list)
+
+
+def _to_used_item_inputs(items: list[LegacyOrderItemIn]) -> list[UsedOrderItemInput]:
+    return [
+        UsedOrderItemInput(
+            name=item.name,
+            brand=item.brand,
+            partnumber=item.partnumber,
+            quantity=item.quantity,
+            price=float(item.price),
+            product_id=item.product_id,
+        )
+        for item in items
+    ]
+
+
+def _delivery_from_payload(payload: LegacyCreateOrderIn) -> UsedOrderDeliveryInput:
+    return UsedOrderDeliveryInput(
+        buyer_name=payload.recipient_name,
+        buyer_phone=payload.recipient_phone,
+        buyer_email=payload.recipient_email or "",
+        delivery_type=payload.delivery_type,
+        delivery_address=payload.delivery_address,
+        transport_company=payload.transport_company,
+        pickup_address=payload.pickup_address,
+    )
+
+
+@router.post("/", response_model=LegacyCreateOrderOut)
 def create_order_legacy(
     payload: LegacyCreateOrderIn,
     db: Session = Depends(get_db),
@@ -56,25 +98,23 @@ def create_order_legacy(
     Compatibility endpoint for old frontend OrderRegistration page.
     Saves orders into new garage_* tables so /sales pages can display them.
     """
-    if not current_user.organization_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Пользователь не привязан к организации",
-        )
     if not payload.items:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Список товаров пуст",
         )
 
-    # Heuristic split:
-    # - if cart_item_ids exists -> create New order
-    # - if used_cart_item_ids exists -> create Used order
-    # - if both empty -> fallback to Used order
     create_new = len(payload.cart_item_ids) > 0
     create_used = len(payload.used_cart_item_ids) > 0 or not create_new
 
-    created = {"new_order_id": None, "used_order_id": None}
+    if create_new and not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Пользователь не привязан к организации",
+        )
+
+    created_new_id: Optional[int] = None
+    used_orders_out: list[CreatedUsedOrderOut] = []
 
     if create_new:
         new_order = GarageNewOrder(
@@ -106,52 +146,38 @@ def create_order_legacy(
                     status_code="pending",
                 )
             )
-        created["new_order_id"] = new_order.id
+        created_new_id = new_order.id
 
-    if create_used:
-        used_order = GarageUsedOrder(
-            organization_id=current_user.organization_id,
-            buyer_name=payload.recipient_name,
-            buyer_phone=payload.recipient_phone,
-            buyer_email=payload.recipient_email or "",
-            delivery_type=payload.delivery_type,
-            delivery_address=payload.delivery_address,
-            transport_company=payload.transport_company,
-            pickup_address=payload.pickup_address,
-            total_amount=float(payload.total_amount or 0),
-            is_paid=False,
-            status_code="pending",
-        )
-        db.add(used_order)
-        db.flush()
-        for item in payload.items:
-            db.add(
-                GarageUsedOrderItem(
-                    order_id=used_order.id,
-                    product_id=item.product_id,
-                    name=item.name,
-                    brand=item.brand,
-                    partnumber=item.partnumber,
-                    quantity=item.quantity,
-                    price=float(item.price),
-                    status_code="pending",
-                )
-            )
-        created["used_order_id"] = used_order.id
-
-    # Remove ordered positions from cart (only current user's rows).
-    if payload.cart_item_ids:
         db.query(NewPartsCart).filter(
             NewPartsCart.user_id == current_user.id,
             NewPartsCart.id.in_(payload.cart_item_ids),
         ).delete(synchronize_session=False)
 
-    if payload.used_cart_item_ids:
-        db.query(UsedPartsCart).filter(
-            UsedPartsCart.user_id == current_user.id,
-            UsedPartsCart.id.in_(payload.used_cart_item_ids),
-        ).delete(synchronize_session=False)
+    if create_used:
+        used_items = _to_used_item_inputs(payload.items)
+        summaries = create_used_orders_from_payload(
+            db,
+            current_user=current_user,
+            items=used_items,
+            delivery=_delivery_from_payload(payload),
+            used_cart_item_ids=payload.used_cart_item_ids,
+        )
+        used_orders_out = [
+            CreatedUsedOrderOut(
+                id=s.id,
+                organization_id=s.organization_id,
+                total_amount=s.total_amount,
+            )
+            for s in summaries
+        ]
 
     db.commit()
-    return {"ok": True, **created}
 
+    used_order_id = used_orders_out[0].id if used_orders_out else None
+
+    return LegacyCreateOrderOut(
+        ok=True,
+        new_order_id=created_new_id,
+        used_order_id=used_order_id,
+        used_orders=used_orders_out,
+    )

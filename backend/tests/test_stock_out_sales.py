@@ -17,11 +17,28 @@ class StockOutSalesTests(unittest.TestCase):
             sale_channel="avito",
             avito_order_id="123",
             reason="Продано через Авито",
+            source_kind=None,
+        )
+        self.assertTrue(is_warehouse_sale(row))
+
+    def test_avito_source_kind_zero_price(self):
+        row = SimpleNamespace(
+            sale_price=0,
+            sale_channel=None,
+            avito_order_id=None,
+            reason=None,
+            source_kind="avito",
         )
         self.assertTrue(is_warehouse_sale(row))
 
     def test_writeoff(self):
-        row = SimpleNamespace(sale_price=0, sale_channel=None, avito_order_id=None, reason="Брак")
+        row = SimpleNamespace(
+            sale_price=0,
+            sale_channel=None,
+            avito_order_id=None,
+            reason="Брак",
+            source_kind="writeoff",
+        )
         self.assertFalse(is_warehouse_sale(row))
 
 
