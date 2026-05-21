@@ -6,6 +6,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    public_code = Column(String(10), unique=True, nullable=False, index=True)
     last_name = Column(String(100))          
     first_name = Column(String(100))         
     patronymic = Column(String(100), nullable=True)  

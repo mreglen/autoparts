@@ -19,6 +19,7 @@ from app.schemas.moderation import ModerateProductRequest, ModerateProductRespon
 from app.schemas.rejected_product import RejectedProductCreate
 from app.schemas.product import ProductCreate
 from app.core.auth import get_current_admin_user, get_current_user
+from app.services.audit_service import log_audit
 
 
 router = APIRouter(prefix="/moderation/products", tags=["Moderation Products"])
@@ -279,7 +280,16 @@ def approve_product(
     
     db.commit()
     db.refresh(db_product)
-    
+    log_audit(
+        db,
+        event_type="product_moderation_approved",
+        category="moderation",
+        summary=f"Товар одобрен модерацией #{db_product.id}",
+        user=current_user,
+        organization_id=db_product.organization_id,
+        entity_type="product",
+        entity_id=db_product.id,
+    )
     return ModerateProductResponse(
         message="Запчасть одобрена и добавлена в каталог",
         product_id=db_product.id
@@ -333,13 +343,22 @@ def reject_product(
     
     db_rejected = RejectedProductModel(**rejected_data.dict())
     db.add(db_rejected)
-    
+    pending_org_id = pending_product.organization_id
+
     # Удалить из pending
     db.delete(pending_product)
-    
+
     db.commit()
     db.refresh(db_rejected)
-    
+    log_audit(
+        db,
+        event_type="product_moderation_rejected",
+        category="moderation",
+        summary=f"Товар отклонён модерацией (pending #{product_id})",
+        user=current_user,
+        organization_id=pending_org_id,
+        details={"pending_product_id": product_id, "reason": moderation_data.rejection_reason},
+    )
     return ModerateProductResponse(
         message="Запчасть отклонена",
         product_id=db_rejected.id

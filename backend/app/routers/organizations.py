@@ -10,6 +10,8 @@ from app.schemas.user import EmployeeCreate, UserResponse, UserUpdate
 from app.utils.id_generator import random_id
 from app.utils.phone import normalize_to_storage_format
 from app.utils.event_logger import log_event
+from app.services.audit_service import log_audit
+from app.utils.user_public_code import assign_public_code
 import logging
 
 logger = logging.getLogger(__name__)
@@ -154,7 +156,7 @@ def add_employee(org_id: str, employee: EmployeeCreate, db: Session = Depends(ge
         is_director=False,         
         organization_id=org_id,
     )
-    
+    assign_public_code(new_user, db)
     try:
         db.add(new_user)
         db.commit()
@@ -287,6 +289,17 @@ def update_organization(
 
     db.commit()
     db.refresh(db_org)
+    log_audit(
+        db,
+        event_type="organization_updated",
+        category="settings",
+        summary=f"Организация обновлена: {db_org.name or org_id}",
+        user=current_user,
+        organization_id=org_id,
+        details={"organization_id": org_id, "updated_fields": list(update_data.keys())},
+        entity_type="organization",
+        entity_id=org_id,
+    )
     print(f"After update - logo_organization value: {getattr(db_org, 'logo_organization', 'NOT_FOUND')}")
     print(f"Full updated organization: {db_org.__dict__}")
     print("=== END UPDATE ORGANIZATION DEBUG ===")

@@ -11,6 +11,7 @@ from app.models.vehicle import Vehicle as VehicleModel
 from app.db.database import get_db
 from app.core.auth import get_current_user
 from app.models.user import User
+from app.services.audit_service import log_audit
 from sqlalchemy.orm import selectinload
 
 
@@ -185,6 +186,16 @@ def create_product(
         db.commit()
 
     db.refresh(db_product)
+    log_audit(
+        db,
+        event_type="product_created",
+        category="products",
+        summary=f"Создан товар #{db_product.id}: {db_product.name}",
+        user=current_user,
+        organization_id=current_user.organization_id,
+        entity_type="product",
+        entity_id=db_product.id,
+    )
     return db_product
 
 @router.get("/{product_id}", response_model=ProductSchema)
@@ -469,6 +480,16 @@ def update_product(
     db.commit()
     
     db.refresh(db_product)
+    log_audit(
+        db,
+        event_type="product_updated",
+        category="products",
+        summary=f"Обновлён товар #{db_product.id}: {db_product.name}",
+        user=current_user,
+        organization_id=current_user.organization_id,
+        entity_type="product",
+        entity_id=db_product.id,
+    )
     return db_product
 
 @router.patch("/{product_id}/quantity", response_model=ProductSchema)
@@ -490,6 +511,17 @@ def update_product_quantity(
 
     db.commit()
     db.refresh(db_product)
+    log_audit(
+        db,
+        event_type="product_quantity_changed",
+        category="products",
+        summary=f"Количество товара #{db_product.id}: {quantity_update.quantity} шт.",
+        user=current_user,
+        organization_id=current_user.organization_id,
+        details={"product_id": db_product.id, "quantity": quantity_update.quantity},
+        entity_type="product",
+        entity_id=db_product.id,
+    )
     return db_product
 
 @router.delete("/{product_id}", status_code=204)
@@ -505,8 +537,20 @@ def delete_product(
     if not db_product:
         raise HTTPException(status_code=404, detail="Продукт не найден или недоступен")
 
+    product_name = db_product.name
+    product_id_val = db_product.id
     db.delete(db_product)
     db.commit()
+    log_audit(
+        db,
+        event_type="product_deleted",
+        category="products",
+        summary=f"Удалён товар #{product_id_val}: {product_name}",
+        user=current_user,
+        organization_id=current_user.organization_id,
+        entity_type="product",
+        entity_id=product_id_val,
+    )
     return
 
 # Bulk delete endpoints MUST come before single delete endpoints for proper routing

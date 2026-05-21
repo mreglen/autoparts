@@ -35,6 +35,7 @@ class MarketplaceUsedOrderTests(unittest.TestCase):
                     """
                     CREATE TABLE users (
                         id INTEGER PRIMARY KEY,
+                        public_code VARCHAR(10) NOT NULL UNIQUE,
                         last_name VARCHAR(100),
                         first_name VARCHAR(100),
                         patronymic VARCHAR(100),
@@ -146,6 +147,7 @@ class MarketplaceUsedOrderTests(unittest.TestCase):
     def _buyer_without_org(self, user_id=1):
         user = UserModel(
             id=user_id,
+            public_code=str(1_000_000 + user_id),
             last_name="Покупатель",
             first_name="Иван",
             email="buyer@test.ru",
@@ -305,6 +307,7 @@ class MarketplaceUsedOrderTests(unittest.TestCase):
         buyer = self._buyer_without_org()
         other = UserModel(
             id=2,
+            public_code="1000002",
             last_name="Other",
             first_name="User",
             email="other@test.ru",

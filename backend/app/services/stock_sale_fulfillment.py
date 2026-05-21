@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models.product import Product
 from app.models.stock_out import StockOut
+from app.services.audit_service import log_audit
 
 
 class StockOutSourceKind(str, Enum):
@@ -149,5 +150,28 @@ def fulfill_stock_out(
         if existing:
             return FulfillStockOutResult(stock_out=existing, created=False)
         raise
+
+    kind_label = request.source_kind.value
+    is_writeoff = request.source_kind == StockOutSourceKind.WRITEOFF
+    log_audit(
+        db,
+        event_type="stock_out_created",
+        category="warehouse",
+        summary=(
+            f"{'Списание' if is_writeoff else 'Расход'}: product #{request.product_id}, "
+            f"{request.quantity} шт., источник {kind_label}"
+        ),
+        user_id=request.user_id,
+        organization_id=request.organization_id,
+        details={
+            "stock_out_id": stock_out.id,
+            "product_id": request.product_id,
+            "quantity": request.quantity,
+            "sale_price": request.sale_price,
+            "source_kind": kind_label,
+        },
+        entity_type="stock_out",
+        entity_id=stock_out.id,
+    )
 
     return FulfillStockOutResult(stock_out=stock_out, created=True)

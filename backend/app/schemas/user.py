@@ -17,6 +17,7 @@ class UserCreate(UserBase):
 
 class User(UserBase):
     id: int
+    public_code: str
     organization_id: str
 
     class Config:
@@ -35,6 +36,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
+    public_code: Optional[str] = None
     last_name: Optional[str] = None
     first_name: Optional[str] = None
     patronymic: Optional[str] = None

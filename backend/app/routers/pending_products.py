@@ -9,6 +9,7 @@ from app.models.pending_product import PendingProduct as PendingProductModel
 from app.models.user import User
 from app.schemas.pending_product import PendingProductCreate, PendingProduct, PendingProductUpdate
 from app.core.auth import get_current_user
+from app.services.audit_service import log_audit
 from app.tasks.photo_tasks import process_and_upload_photo
 from app.tasks.video_tasks import process_and_upload_video
 from app.models.organization import Organization
@@ -89,6 +90,17 @@ def create_pending_product(
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
+    log_audit(
+        db,
+        event_type="pending_product_created",
+        category="products",
+        summary=f"Черновик товара: {db_product.name or db_product.article or db_product.id}",
+        user=current_user,
+        organization_id=current_user.organization_id,
+        details={"pending_product_id": db_product.id, "internal_code": internal_code},
+        entity_type="pending_product",
+        entity_id=db_product.id,
+    )
 
     # Queue photo/video processing for pending workflow.
     # We process media immediately, but we store results in `pending_products.photos/videos`
@@ -365,6 +377,17 @@ def update_pending_product(
     
     db.commit()
     db.refresh(product)
+    log_audit(
+        db,
+        event_type="pending_product_updated",
+        category="products",
+        summary=f"Черновик обновлён: {product.name or product.article or product_id}",
+        user=current_user,
+        organization_id=current_user.organization_id,
+        details={"pending_product_id": product_id, "updated_fields": list(update_data.keys())},
+        entity_type="pending_product",
+        entity_id=product_id,
+    )
     
     # Преобразуем JSON строки обратно в списки для ответа
     product_dict = product.__dict__.copy()
@@ -411,7 +434,20 @@ def delete_pending_product(
             detail="Запчасть не найдена"
         )
     
+    product_name = product.name or product.article
+    org_id = product.organization_id
     db.delete(product)
     db.commit()
+    log_audit(
+        db,
+        event_type="pending_product_deleted",
+        category="products",
+        summary=f"Черновик удалён: {product_name or product_id}",
+        user=current_user,
+        organization_id=org_id,
+        details={"pending_product_id": product_id},
+        entity_type="pending_product",
+        entity_id=product_id,
+    )
     
     return {"message": "Запчасть успешно удалена"}

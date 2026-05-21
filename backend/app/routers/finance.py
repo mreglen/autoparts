@@ -37,6 +37,7 @@ from app.services.finance_reports import (
     list_finance_writeoffs,
 )
 from app.services.finance_xlsx_export import build_finance_workbook_bytes
+from app.services.audit_service import log_audit
 
 router = APIRouter(prefix="/finance", tags=["Finance"])
 
@@ -209,6 +210,15 @@ def export_finance_xlsx(
     filters = _parse_filters(date_from, date_to, as_of_date, channel)
     content = build_finance_workbook_bytes(db, org_id, filters)
     filename = f"finance_{filters.date_from.isoformat()}_{filters.date_to.isoformat()}.xlsx"
+    log_audit(
+        db,
+        event_type="finance_export",
+        category="finance",
+        summary=f"Экспорт финансов XLSX за {filters.date_from} — {filters.date_to}",
+        user=current_user,
+        organization_id=org_id,
+        details={"date_from": str(filters.date_from), "date_to": str(filters.date_to)},
+    )
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

@@ -16,23 +16,29 @@ from app.schemas.employee import (
     PermissionAssignRequest, 
     PermissionResponse
 )
+from app.schemas.audit import PermissionsContextResponse
 from app.db.database import get_db
+from app.services.audit_service import log_audit
+from app.utils.user_public_code import assign_public_code
+from app.utils.org_access import ADMIN_AUDIT_PERMISSION_CODE, org_has_admin_director
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
 def _ensure_default_permissions(db: Session) -> None:
-    # Keep Postgres sequence in sync with existing IDs to avoid duplicate PK on INSERT.
-    db.execute(
-        text(
-            """
-            SELECT setval(
-                pg_get_serial_sequence('permissions', 'id'),
-                COALESCE((SELECT MAX(id) FROM permissions), 1),
-                true
+    try:
+        db.execute(
+            text(
+                """
+                SELECT setval(
+                    pg_get_serial_sequence('permissions', 'id'),
+                    COALESCE((SELECT MAX(id) FROM permissions), 1),
+                    true
+                )
+                """
             )
-            """
         )
-    )
+    except Exception:
+        db.rollback()
 
     # Backward compatibility: migrate old print permission code if present.
     legacy_print_perm = db.query(Permission).filter(Permission.code == "printers").first()
@@ -47,6 +53,7 @@ def _ensure_default_permissions(db: Session) -> None:
         {"code": "vehicles", "name": "Автомобили"},
         {"code": "sales.orders", "name": "Заказы"},
         {"code": "finance.reports", "name": "Финансовые отчёты"},
+        {"code": ADMIN_AUDIT_PERMISSION_CODE, "name": "Журнал событий"},
     ]
     for perm in defaults:
         existing = db.query(Permission).filter(Permission.code == perm["code"]).first()
@@ -113,11 +120,23 @@ def create_employee(
         organization_id=org_id,
         hashed_password=hashed_password
     )
-    
+    assign_public_code(db_employee, db)
     db.add(db_employee)
     db.commit()
     db.refresh(db_employee)
-    
+
+    log_audit(
+        db,
+        event_type="employee_created",
+        category="employees",
+        summary=f"Создан сотрудник {db_employee.email}",
+        user=current_user,
+        organization_id=org_id,
+        details={"employee_id": db_employee.id, "employee_email": db_employee.email},
+        entity_type="user",
+        entity_id=db_employee.id,
+    )
+
     return db_employee
 
 
@@ -169,7 +188,16 @@ def assign_permissions_to_employee(
     
     if not employee:
         raise HTTPException(status_code=404, detail="Сотрудник не найден")
-    
+
+    audit_perm = db.query(Permission).filter(Permission.code == ADMIN_AUDIT_PERMISSION_CODE).first()
+    if audit_perm and audit_perm.id in permission_request.permission_ids:
+        if not org_has_admin_director(db, current_user.organization_id):
+            raise HTTPException(
+                status_code=403,
+                detail="Право «Журнал событий» доступно только в организациях с admin-директором",
+            )
+
+    assigned_codes: list[str] = []
     # Remove existing permissions
     db.query(UserPermission).filter(UserPermission.user_id == employee_id).delete()
     
@@ -179,7 +207,8 @@ def assign_permissions_to_employee(
         if permission_exists:
             user_perm = UserPermission(user_id=employee_id, permission_id=perm_id)
             db.add(user_perm)
-    
+            assigned_codes.append(permission_exists.code)
+
     db.commit()
     
     # Deactivate all active sessions for this employee to force re-login
@@ -189,7 +218,22 @@ def assign_permissions_to_employee(
         UserSession.is_active == True
     ).update({"is_active": False})
     db.commit()
-    
+
+    log_audit(
+        db,
+        event_type="employee_permissions_changed",
+        category="employees",
+        summary=f"Изменены права сотрудника {employee.email}",
+        user=current_user,
+        organization_id=current_user.organization_id,
+        details={
+            "employee_id": employee_id,
+            "permission_codes": assigned_codes,
+        },
+        entity_type="user",
+        entity_id=employee_id,
+    )
+
     return {"message": "Permissions assigned successfully"}
 
 
@@ -201,7 +245,21 @@ def get_all_permissions(
     """Get all available permissions"""
     _ensure_default_permissions(db)
     permissions = db.query(Permission).all()
+    if current_user.is_admin:
+        return permissions
+    if not org_has_admin_director(db, current_user.organization_id):
+        permissions = [p for p in permissions if p.code != ADMIN_AUDIT_PERMISSION_CODE]
     return permissions
+
+
+@router.get("/permissions/context", response_model=PermissionsContextResponse)
+def get_permissions_context(
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return PermissionsContextResponse(
+        org_has_admin_director=org_has_admin_director(db, current_user.organization_id),
+    )
 
 
 @router.post("/permissions/init")

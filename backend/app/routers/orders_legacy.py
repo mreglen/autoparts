@@ -16,6 +16,7 @@ from app.services.marketplace_used_order import (
     UsedOrderItemInput,
     create_used_orders_from_payload,
 )
+from app.services.audit_service import log_audit
 
 router = APIRouter(prefix="/orders", tags=["Orders Legacy"])
 
@@ -172,6 +173,32 @@ def create_order_legacy(
         ]
 
     db.commit()
+
+    if used_orders_out:
+        for o in used_orders_out:
+            log_audit(
+                db,
+                event_type="order_created",
+                category="orders",
+                summary=f"Создан заказ Б/У #{o.id}, org {o.organization_id}",
+                user=current_user,
+                organization_id=o.organization_id,
+                details={"order_id": o.id, "total_amount": o.total_amount},
+                entity_type="garage_used_order",
+                entity_id=o.id,
+            )
+    if created_new_id:
+        log_audit(
+            db,
+            event_type="order_created",
+            category="orders",
+            summary=f"Создан заказ новых запчастей #{created_new_id}",
+            user=current_user,
+            organization_id=current_user.organization_id,
+            details={"order_id": created_new_id},
+            entity_type="garage_new_order",
+            entity_id=created_new_id,
+        )
 
     used_order_id = used_orders_out[0].id if used_orders_out else None
 

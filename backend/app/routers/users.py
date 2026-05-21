@@ -4,6 +4,7 @@ from app.core.auth import get_current_user
 from app.models.user import User as UserModel 
 from app.schemas.user import User as UserSchema, UserCreate, UserUpdate  
 from app.db.database import get_db
+from app.utils.user_public_code import assign_public_code
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -19,6 +20,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
             )
 
     db_user = UserModel(**user.dict())
+    assign_public_code(db_user, db)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)

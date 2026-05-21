@@ -1,7 +1,6 @@
 # app/routers/admin.py
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload, selectinload
-from app.models.event_log import EventLog
 from app.models.user import User
 from app.models.organization import Organization
 from app.models.pending_seller import PendingSeller
@@ -24,7 +23,7 @@ from app.schemas.user import UserResponse, UserUpdate
 from app.schemas.organization import Organization as OrganizationSchema, OrganizationCreate, OrganizationUpdate
 from typing import List, Optional
 from pydantic import BaseModel, Field
-from app.core.auth import get_current_admin_user
+from app.core.auth import get_current_admin_user, get_current_user
 from app.core.security import get_password_hash
 from app.utils.id_generator import random_id
 from app.services.organization_clients import (
@@ -33,6 +32,13 @@ from app.services.organization_clients import (
 )
 from app.schemas.client import ClientBuyerOrdersResponse, ClientListItemResponse
 from app.utils.event_logger import log_event
+from app.utils.user_public_code import assign_public_code
+from app.services.audit_service import (
+    AuditListFilters,
+    list_audit_events,
+    log_audit,
+    require_audit_access,
+)
 from app.utils.email import send_verification_email, send_welcome_email
 import secrets
 import string 
@@ -118,6 +124,14 @@ def patch_site_settings_admin(
         row.used_parts_purchase_mode = mode
     db.commit()
     db.refresh(row)
+    log_audit(
+        db,
+        event_type="site_settings_updated",
+        category="settings",
+        summary="Настройки сайта обновлены",
+        user=current_user,
+        details={"updated_fields": list(data.keys())},
+    )
     mode = getattr(row, "used_parts_purchase_mode", None) or "both"
     return SiteSettingsResponse(
         show_new_autoparts=row.show_new_autoparts,
@@ -159,11 +173,14 @@ def get_all_users(
 
 @router.get("/events", response_model=List[EventLogResponse])
 def get_event_log(
-    current_user: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    limit: int = Query(200, ge=1, le=500),
 ):
-    events = db.query(EventLog).order_by(EventLog.created_at.desc()).all()
-    return events
+    """Legacy endpoint; prefer GET /audit/events."""
+    require_audit_access(db, current_user)
+    rows, _total = list_audit_events(db, AuditListFilters(), page=1, limit=limit)
+    return rows
 
 @router.get("/organizations", response_model=List[OrganizationSchema])
 def get_all_organizations(
@@ -191,6 +208,17 @@ def update_organization_admin(
 
     db.commit()
     db.refresh(org)
+    log_audit(
+        db,
+        event_type="organization_updated",
+        category="settings",
+        summary=f"Организация обновлена (админ): {org.name or org_id}",
+        user=current_user,
+        organization_id=org_id,
+        details={"organization_id": org_id, "updated_fields": list(update_data.keys())},
+        entity_type="organization",
+        entity_id=org_id,
+    )
     return org
 
 
@@ -366,6 +394,7 @@ def approve_pending_seller(
             organization_id=org_id,
             hashed_password=hashed_password
         )
+        assign_public_code(user, db)
         db.add(user)
         
         # Remove from pending sellers

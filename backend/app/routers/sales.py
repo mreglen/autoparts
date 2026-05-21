@@ -17,6 +17,7 @@ from app.models.organization_avito_integration import OrganizationAvitoIntegrati
 from app.models.permission import Permission
 from app.models.user import User as UserModel
 from app.models.user_permission import UserPermission
+from app.utils.org_access import org_has_admin_director
 from app.schemas.sales_orders import (
     AvitoOrderResponseV2,
     AvitoRetryWarehouseResponse,
@@ -34,6 +35,7 @@ from app.services.avito_warehouse_fulfillment import (
     enrich_avito_orders_response,
 )
 from app.services.marketplace_used_fulfillment import fulfill_used_order_on_status_change
+from app.services.audit_service import log_audit
 from app.schemas.avito_orders import AvitoCheckConfirmationCodeRequest, AvitoOrderTransitionRequest
 
 logger = logging.getLogger(__name__)
@@ -83,15 +85,11 @@ def _require_sales_orders_access(db: Session, user: UserModel) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нет доступа к заказам")
 
 
+from app.utils.org_access import org_has_admin_director
+
+
 def _org_has_admin_director(db: Session, org_id: Optional[str]) -> bool:
-    if not org_id:
-        return False
-    q = db.query(UserModel.id).filter(
-        UserModel.organization_id == org_id,
-        UserModel.is_director == True,  # noqa: E712
-        UserModel.is_admin == True,  # noqa: E712
-    )
-    return db.query(q.exists()).scalar() is True
+    return org_has_admin_director(db, org_id)
 
 
 @router.get("/used-parts-orders", response_model=list[UsedPartsOrderResponse])
@@ -143,6 +141,37 @@ def update_used_parts_order_status(
         )
         order.status_code = payload.status_code
         db.commit()
+        log_audit(
+            db,
+            event_type="order_status_changed",
+            category="orders",
+            summary=f"Заказ Б/У #{order_id}: {previous_status_code} → {payload.status_code}",
+            user=current_user,
+            organization_id=order.organization_id,
+            details={
+                "order_id": order_id,
+                "previous_status": previous_status_code,
+                "new_status": payload.status_code,
+                "fulfilled_count": len(summaries),
+            },
+            entity_type="garage_used_order",
+            entity_id=order_id,
+        )
+        if summaries:
+            log_audit(
+                db,
+                event_type="order_fulfilled",
+                category="orders",
+                summary=f"Проведено на склад: заказ #{order_id}, {len(summaries)} поз.",
+                user=current_user,
+                organization_id=order.organization_id,
+                details={"order_id": order_id, "items": [
+                    {"order_item_id": s.order_item_id, "stock_out_id": s.stock_out_id, "created": s.created}
+                    for s in summaries
+                ]},
+                entity_type="garage_used_order",
+                entity_id=order_id,
+            )
     except HTTPException:
         db.rollback()
         raise
@@ -295,6 +324,21 @@ async def retry_avito_warehouse(
 
     db.refresh(order)
     wf = compute_warehouse_fulfillment(db, order)
+    log_audit(
+        db,
+        event_type="avito_warehouse_retry",
+        category="sales",
+        summary=f"Повтор проведения Авито: заказ #{order_id}",
+        user=current_user,
+        organization_id=order.organization_id,
+        details={
+            "order_id": order_id,
+            "processed_count": int(process_result.get("processed_count", 0)),
+            "created_count": int(process_result.get("created_count", 0)),
+        },
+        entity_type="avito_order",
+        entity_id=order_id,
+    )
     return AvitoRetryWarehouseResponse(
         processed_count=int(process_result.get("processed_count", 0)),
         reused_count=int(process_result.get("reused_count", 0)),

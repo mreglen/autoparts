@@ -32,6 +32,7 @@ from app.utils.phone import normalize_to_storage_format
 from app.utils.guest_cart import merge_guest_cart_from_request
 from app.utils.site_settings_db import get_or_create_site_settings
 from app.utils.org_markup import effective_markup_percent, global_markup_percent
+from app.utils.user_public_code import assign_public_code
 import logging
 
 logger = logging.getLogger(__name__)
@@ -146,6 +147,7 @@ def register_confirm(data: VerifyCode, request: Request, response: Response, db:
         hashed_password=pending.hashed_password,
         is_director=pending.is_seller,
     )
+    assign_public_code(user, db)
     db.add(user)
     db.delete(pending)
     db.commit()
@@ -163,6 +165,7 @@ def register_confirm(data: VerifyCode, request: Request, response: Response, db:
             "is_buyer": user.is_buyer,
             "is_seller": user.is_seller,
             "phone": user.phone,
+            "public_code": user.public_code,
         }
     )
 
@@ -366,6 +369,7 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
             hashed_password=get_password_hash(data.password),
             is_director=data.is_seller, 
         )
+        assign_public_code(user, db)
         db.add(user)
         db.delete(pending)
         db.commit()
@@ -382,6 +386,7 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
             details={
                 "is_buyer": user.is_buyer,
                 "is_seller": user.is_seller,
+                "public_code": user.public_code,
                 "phone": user.phone,
             }
         )

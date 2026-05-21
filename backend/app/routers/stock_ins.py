@@ -8,6 +8,7 @@ from app.core.auth import get_current_user
 from app.models.user import User
 from app.models.product import Product as ProductModel
 from app.models.vehicle import Vehicle as VehicleModel
+from app.services.audit_service import log_audit
 
 router = APIRouter(prefix="/stock-ins", tags=["Stock In"])
 
@@ -65,6 +66,21 @@ def create_stock_in(
     db.add(db_stock_in)
     db.commit()
     db.refresh(db_stock_in)
+    log_audit(
+        db,
+        event_type="stock_in_created",
+        category="warehouse",
+        summary=f"Поступление: product #{db_stock_in.product_id}, {db_stock_in.quantity} шт.",
+        user=current_user,
+        organization_id=current_user.organization_id,
+        details={
+            "stock_in_id": db_stock_in.id,
+            "product_id": db_stock_in.product_id,
+            "quantity": db_stock_in.quantity,
+        },
+        entity_type="stock_in",
+        entity_id=db_stock_in.id,
+    )
     return db_stock_in
 
 @router.get("/{stock_in_id}", response_model=StockInSchema)

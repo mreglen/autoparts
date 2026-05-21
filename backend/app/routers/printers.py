@@ -19,6 +19,7 @@ from app.models.printer_agent import PrinterAgent
 from app.models.printer_agent_printer import PrinterAgentPrinter
 from app.models.printer_permission import PrinterPermission
 from app.db.database import get_db
+from app.services.audit_service import log_audit
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 import asyncio
@@ -868,6 +869,17 @@ async def update_label_settings_for_printer(
     perm.label_width_mm = w_int
     perm.label_height_mm = h_int
     db.commit()
+    log_audit(
+        db,
+        event_type="printer_label_settings_updated",
+        category="settings",
+        summary=f"Этикетка принтера #{printer_id_int}: {w_int}×{h_int} мм",
+        user=current_user,
+        organization_id=current_user.organization_id,
+        details={"printer_id": printer_id_int, "label_width_mm": w_int, "label_height_mm": h_int},
+        entity_type="printer",
+        entity_id=printer_id_int,
+    )
 
     return {
         "printer_id": perm.printer_id,

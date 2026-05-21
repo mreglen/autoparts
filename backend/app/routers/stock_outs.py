@@ -13,6 +13,7 @@ from app.services.stock_sale_fulfillment import (
     StockOutSourceKind,
     fulfill_stock_out,
 )
+from app.services.audit_service import log_audit
 
 router = APIRouter(prefix="/stock-outs", tags=["Stock Out"])
 
@@ -185,6 +186,16 @@ def create_return(
         })
 
     db.commit()
+
+    log_audit(
+        db,
+        event_type="stock_out_return",
+        category="warehouse",
+        summary=f"Возврат на склад: {len(processed_returns)} поз.",
+        user=current_user,
+        organization_id=current_user.organization_id,
+        details={"returns": processed_returns},
+    )
 
     # Refresh для получения ID новых записей
     for stock_in in created_stock_ins:

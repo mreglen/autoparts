@@ -142,8 +142,7 @@ export default function FinancePage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Финансы</h1>
           <p className="mt-2 text-gray-600 text-sm sm:text-base max-w-2xl">
-            Отчёты по данным платформы: продажи (как на странице «Продажи со склада»), списания,
-            поступления и остатки на дату. Суммы продаж совпадают с фильтром по тем же датам.
+            Отчёты по данным платформы.
           </p>
         </div>
         <button

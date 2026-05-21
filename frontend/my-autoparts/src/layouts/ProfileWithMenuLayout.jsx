@@ -60,6 +60,7 @@ export default function ProfileWithMenuLayout() {
             '/settings/employees': 'settings-employees',
             '/moderation/products': 'product-moderation',
             '/moderation/pending-sellers': 'pending-sellers',
+            '/admin/audit-log': 'audit-log',
             '/chats': 'chats'
         };
         return pathMap[path] || (user?.is_seller ? 'dashboard' : 'profile');
@@ -95,9 +96,10 @@ export default function ProfileWithMenuLayout() {
                 '/settings/integration': 'settings-integration',
                 '/settings/label': 'settings-label',
                 '/settings/employees': 'settings-employees',
-                '/moderation/products': 'product-moderation',
-                '/moderation/pending-sellers': 'pending-sellers',
-                '/chats': 'chats'
+            '/moderation/products': 'product-moderation',
+            '/moderation/pending-sellers': 'pending-sellers',
+            '/admin/audit-log': 'audit-log',
+            '/chats': 'chats'
             };
             return pathMap[path] || (user?.is_seller ? 'dashboard' : 'profile');
         };
@@ -384,6 +386,7 @@ export default function ProfileWithMenuLayout() {
         }
 
         // Для админов: «Админка» (модерация + настройки /admin-settings)
+        const auditSubmenuItem = { id: 'audit-log', label: 'Журнал событий' };
         if (user?.is_admin) {
             baseTabs.push({
                 id: 'administration',
@@ -392,7 +395,14 @@ export default function ProfileWithMenuLayout() {
                     { id: 'pending-sellers', label: 'Регистрация продавцов' },
                     { id: 'product-moderation', label: 'Проверка запчастей' },
                     { id: 'admin-panel', label: 'Настройки' },
+                    auditSubmenuItem,
                 ],
+            });
+        } else if (hasPermission('admin.audit')) {
+            baseTabs.push({
+                id: 'administration',
+                label: 'Админка',
+                submenu: [auditSubmenuItem],
             });
         }
 
@@ -446,6 +456,7 @@ export default function ProfileWithMenuLayout() {
             'settings-employees': '/settings/employees',
             'pending-sellers': '/moderation/pending-sellers',
             'product-moderation': '/moderation/products',
+            'audit-log': '/admin/audit-log',
             'chats': '/chats'
         };
 

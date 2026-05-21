@@ -24,6 +24,7 @@ from app.models.product_avito_listing_link import ProductAvitoListingLink
 from app.models.stock_in import StockIn as StockInModel
 from app.models.storage_location import StorageLocation as StorageLocationModel
 from app.models.user import User as UserModel
+from app.services.audit_service import log_audit
 from app.schemas.avito_integration import (
     AvitoAutoloadImportRequest,
     AvitoAutoloadImportResponse,
@@ -592,6 +593,15 @@ async def sync_avito_ad_ids(
             db.rollback()
     
     print(f"✅ Final sync stats: synced={synced}, updated={updated}, total_links={len(query_ids)}")
+    log_audit(
+        db,
+        event_type="avito_sync",
+        category="integrations",
+        summary=f"Синхронизация Avito ID: +{synced}, обновлено {updated}",
+        user=current_user,
+        organization_id=org_id,
+        details={"synced": synced, "updated": updated, "created": created_links},
+    )
     return {
         "status": "ok",
         "message": f"Создано: {created_links}, Синхронизировано: {synced} новых, {updated} обновлено",
@@ -850,6 +860,15 @@ async def export_products_to_avito_autoload(
         avito_report=None,
         avito_token_error=None,
     )
+    log_audit(
+        db,
+        event_type="avito_export",
+        category="integrations",
+        summary=f"Экспорт в Авито: {len(export_rows)} товар(ов)",
+        user=current_user,
+        organization_id=org_id,
+        details={"product_ids": requested_ids, "exported_count": len(export_rows)},
+    )
     return AvitoAutoloadExportResponse(
         saved_path=rel_path,
         items=parsed.items,
@@ -912,6 +931,15 @@ def put_avito_credentials(
 
     db.commit()
     db.refresh(row)
+    log_audit(
+        db,
+        event_type="integration_updated",
+        category="integrations",
+        summary="Настройки интеграции Авито обновлены",
+        user=current_user,
+        organization_id=org_id,
+        details={"avito_user_id": row.avito_user_id, "client_id": row.client_id},
+    )
     last = _get_last_autoload(db, org_id)
     return AvitoCredentialsResponse(
         client_id=row.client_id,
@@ -946,6 +974,15 @@ def toggle_avito_integration_enabled(
     row.enabled = not row.enabled
     db.commit()
     db.refresh(row)
+    log_audit(
+        db,
+        event_type="integration_updated",
+        category="integrations",
+        summary=f"Интеграция Авито {'включена' if row.enabled else 'отключена'}",
+        user=current_user,
+        organization_id=org_id,
+        details={"enabled": row.enabled},
+    )
 
     last = _get_last_autoload(db, org_id)
     return AvitoCredentialsResponse(

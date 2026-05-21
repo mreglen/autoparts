@@ -51,6 +51,7 @@ import EditVehiclePage from './pages/Vehicles/EditVehiclePage';
 import ChatsHubPage from './pages/Chat/ChatsHubPage';
 import ProductNotFound from './pages/Chat/ProductNotFound';
 import AdminPanelPage from './pages/Admin/AdminPanelPage';
+import AuditLogPage from './pages/Admin/AuditLogPage';
 
 
 
@@ -172,6 +173,7 @@ function App() {
           <Route path="/sellers" element={<SellersPage />} />
           <Route path="/sellers/:sellerId/workspace" element={<SellerWorkspacePage />} />
           <Route path="/admin-settings" element={<AdminPanelPage />} />
+          <Route path="/admin/audit-log" element={<AuditLogPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

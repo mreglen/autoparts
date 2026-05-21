@@ -16,6 +16,7 @@ from app.models.product import Product as ProductModel
 from app.models.product_drom_listing_link import ProductDromListingLink
 from app.models.storage_location import StorageLocation as StorageLocationModel
 from app.models.user import User as UserModel
+from app.services.audit_service import log_audit
 from app.schemas.drom_integration import (
     DromAutoloadExportRequest,
     DromAutoloadExportResponse,
@@ -172,6 +173,15 @@ def put_drom_credentials(
     
     db.commit()
     db.refresh(row)
+    log_audit(
+        db,
+        event_type="integration_updated",
+        category="integrations",
+        summary=f"Интеграция Drom {'включена' if row.is_enabled else 'отключена'}",
+        user=current_user,
+        organization_id=org_id,
+        details={"is_enabled": row.is_enabled},
+    )
     
     last = _get_last_autoload(db, org_id)
     
@@ -294,6 +304,15 @@ async def export_products_to_drom_autoload(
             db.add(link)
     
     db.commit()
+    log_audit(
+        db,
+        event_type="drom_export",
+        category="integrations",
+        summary=f"Экспорт в Drom: {len(export_rows)} товар(ов)",
+        user=current_user,
+        organization_id=org_id,
+        details={"product_ids": requested_ids, "exported_count": len(export_rows)},
+    )
     
     return DromAutoloadExportResponse(
         saved_path=rel_path,

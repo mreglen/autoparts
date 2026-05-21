@@ -254,3 +254,86 @@ def ensure_avito_order_fulfillment_columns() -> None:
             conn.execute(text(stmt))
 
     logger.info("Applied avito_orders_cache fulfillment column patches: %s", statements)
+
+
+def ensure_event_log_audit_columns() -> None:
+    """Extend event_log for audit journal."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "event_log" not in table_names:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("event_log")}
+    statements = []
+
+    col_defs = [
+        ("organization_id", "VARCHAR(10)"),
+        ("category", "VARCHAR(50)"),
+        ("summary", "VARCHAR(500)"),
+        ("actor_name", "VARCHAR(255)"),
+        ("ip_address", "VARCHAR(45)"),
+        ("entity_type", "VARCHAR(50)"),
+        ("entity_id", "VARCHAR(64)"),
+    ]
+    for name, col_type in col_defs:
+        if name not in columns:
+            statements.append(f"ALTER TABLE event_log ADD COLUMN {name} {col_type}")
+
+    if statements:
+        with engine.begin() as conn:
+            for stmt in statements:
+                conn.execute(text(stmt))
+        logger.info("Applied event_log audit column patches: %s", statements)
+
+    index_defs = [
+        ("ix_event_log_category", "category"),
+        ("ix_event_log_organization_id", "organization_id"),
+    ]
+    with engine.begin() as conn:
+        for index_name, col_name in index_defs:
+            if not _index_exists(inspector, "event_log", index_name):
+                try:
+                    conn.execute(
+                        text(f"CREATE INDEX IF NOT EXISTS {index_name} ON event_log ({col_name})")
+                    )
+                except Exception:
+                    pass
+
+
+def ensure_user_public_code() -> None:
+    """Add users.public_code and backfill sequential codes."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "users" not in table_names:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("users")}
+    if "public_code" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN public_code VARCHAR(10)"))
+        columns.add("public_code")
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                UPDATE users
+                SET public_code = CAST(1000000 + id AS VARCHAR)
+                WHERE public_code IS NULL OR TRIM(public_code) = ''
+                """
+            )
+        )
+        try:
+            conn.execute(text("ALTER TABLE users ALTER COLUMN public_code SET NOT NULL"))
+        except Exception:
+            pass
+        if not _index_exists(inspector, "users", "ix_users_public_code"):
+            try:
+                conn.execute(
+                    text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_public_code ON users (public_code)")
+                )
+            except Exception:
+                pass
+
+    logger.info("Applied users.public_code patch")
+
