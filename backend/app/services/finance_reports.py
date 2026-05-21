@@ -37,12 +37,6 @@ CHANNEL_LABELS = {
     CHANNEL_WAREHOUSE: "Склад",
 }
 
-INVENTORY_NOTE = (
-    "Остатки рассчитаны по движениям stock_in и stock_out на дату. "
-    "Ручные правки quantity вне движений могут не отражаться."
-)
-
-
 @dataclass(frozen=True)
 class FinanceFilters:
     date_from: date
@@ -301,7 +295,6 @@ def list_finance_inventory(
             "products_count": 0,
             "total_qty": 0,
             "total_value": 0.0,
-            "note": INVENTORY_NOTE,
         }
 
     products = (
@@ -351,7 +344,6 @@ def list_finance_inventory(
         "products_count": len(result_rows),
         "total_qty": total_qty,
         "total_value": total_value,
-        "note": INVENTORY_NOTE,
     }
 
 
@@ -380,5 +372,4 @@ def build_finance_summary(
         "inventory_products": inventory_totals["products_count"],
         "inventory_qty": inventory_totals["total_qty"],
         "inventory_value": inventory_totals["total_value"],
-        "inventory_note": inventory_totals.get("note", INVENTORY_NOTE),
     }

@@ -50,7 +50,7 @@ export default function FinancePage() {
   const [sales, setSales] = useState({ rows: [], totals: {} });
   const [writeoffs, setWriteoffs] = useState({ rows: [], count: 0, total_qty: 0 });
   const [stockIns, setStockIns] = useState({ rows: [], count: 0, total_qty: 0, total_value: 0 });
-  const [inventory, setInventory] = useState({ rows: [], note: '', products_count: 0, total_qty: 0, total_value: 0 });
+  const [inventory, setInventory] = useState({ rows: [], products_count: 0, total_qty: 0, total_value: 0 });
 
   const queryParams = useMemo(
     () => buildFinanceQueryParams({ dateFrom, dateTo, asOfDate, channel }),
@@ -282,9 +282,6 @@ export default function FinancePage() {
                   </div>
                 </div>
               )}
-              {summary.inventory_note && (
-                <p className="text-xs text-gray-500">{summary.inventory_note}</p>
-              )}
             </div>
           )}
 
@@ -391,11 +388,6 @@ export default function FinancePage() {
 
           {activeTab === 'inventory' && (
             <div className="space-y-3">
-              {inventory.note && (
-                <p className="text-xs text-gray-500 rounded-lg bg-gray-50 p-3 border border-gray-100">
-                  {inventory.note}
-                </p>
-              )}
               <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">

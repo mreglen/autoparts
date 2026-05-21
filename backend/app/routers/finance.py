@@ -192,7 +192,6 @@ def get_finance_inventory(
         products_count=totals["products_count"],
         total_qty=totals["total_qty"],
         total_value=totals["total_value"],
-        note=totals.get("note", ""),
     )
 
 

@@ -80,8 +80,6 @@ def _sheet_summary(wb: Workbook, summary: dict) -> None:
         ws.cell(row=row, column=3, value=ch_data.get("total", 0))
         row += 1
 
-    row += 1
-    ws.cell(row=row, column=1, value=summary.get("inventory_note", ""))
     _autosize_columns(ws)
 
 
@@ -161,11 +159,10 @@ def _sheet_stock_ins(wb: Workbook, rows: list[dict]) -> None:
     _autosize_columns(ws)
 
 
-def _sheet_inventory(wb: Workbook, rows: list[dict], as_of: date, note: str) -> None:
+def _sheet_inventory(wb: Workbook, rows: list[dict], as_of: date) -> None:
     ws = wb.create_sheet("Остатки")
     ws["A1"] = f"Остатки на {as_of.isoformat()}"
     ws["A1"].font = HEADER_FONT
-    ws["A2"] = note
     headers = [
         "Артикул",
         "Внутр. код",
@@ -177,7 +174,7 @@ def _sheet_inventory(wb: Workbook, rows: list[dict], as_of: date, note: str) -> 
         "Приход",
         "Расход",
     ]
-    start_row = 4
+    start_row = 2
     for col, title in enumerate(headers, start=1):
         cell = ws.cell(row=start_row, column=col, value=title)
         cell.font = HEADER_FONT
@@ -203,19 +200,14 @@ def build_finance_workbook_bytes(
     sales_rows, _ = list_finance_sales(db, organization_id, filters)
     writeoff_rows, _ = list_finance_writeoffs(db, organization_id, filters)
     stock_in_rows, _ = list_finance_stock_ins(db, organization_id, filters)
-    inventory_rows, inventory_meta = list_finance_inventory(db, organization_id, filters)
+    inventory_rows, _ = list_finance_inventory(db, organization_id, filters)
 
     wb = Workbook()
     _sheet_summary(wb, summary)
     _sheet_sales(wb, sales_rows)
     _sheet_writeoffs(wb, writeoff_rows)
     _sheet_stock_ins(wb, stock_in_rows)
-    _sheet_inventory(
-        wb,
-        inventory_rows,
-        filters.as_of_date,
-        inventory_meta.get("note", ""),
-    )
+    _sheet_inventory(wb, inventory_rows, filters.as_of_date)
 
     buffer = BytesIO()
     wb.save(buffer)

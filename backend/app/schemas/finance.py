@@ -27,7 +27,6 @@ class FinanceSummaryResponse(BaseModel):
     inventory_products: int = 0
     inventory_qty: int = 0
     inventory_value: float = 0.0
-    inventory_note: str = ""
 
 
 class FinanceSalesRow(BaseModel):
@@ -124,4 +123,3 @@ class FinanceInventoryResponse(BaseModel):
     products_count: int = 0
     total_qty: int = 0
     total_value: float = 0.0
-    note: str = ""
