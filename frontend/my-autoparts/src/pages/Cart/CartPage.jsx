@@ -344,8 +344,8 @@ export default function CartPage() {
   };
 
   return (
-    <div className="mt-5">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Корзина</h1>
+    <div className="max-md:mt-0 mt-5">
+      <h1 className="max-md:hidden text-3xl font-bold text-gray-900 mb-8">Корзина</h1>
 
       {loading ? (
         <div className="text-center py-16">
@@ -392,8 +392,8 @@ export default function CartPage() {
           {Object.entries(groupedItems).map(([seller, items]) => (
             <div key={seller} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
               {/* Заголовок продавца */}
-              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
+              <div className="bg-gray-50 max-md:px-4 max-md:py-3 px-6 py-4 border-b border-gray-200">
+                <div className="flex max-md:flex-col max-md:items-start max-md:gap-3 items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <input
                       type="checkbox"
@@ -401,9 +401,9 @@ export default function CartPage() {
                       onChange={() => handleSelectAllSellerItems(seller)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
-                    <h2 className="text-xl font-semibold text-gray-900">{seller}</h2>
+                    <h2 className="max-md:text-lg text-xl font-semibold text-gray-900">{seller}</h2>
                   </div>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex max-md:w-full max-md:flex-col max-md:gap-2 items-center space-x-4">
                     <div className="flex items-center space-x-2">
                       <input
                         id={`deliverParts-${seller}`}
@@ -429,8 +429,66 @@ export default function CartPage() {
                 </div>
               </div>
 
-              {/* Таблица товаров - десктоп версия */}
-              <div className="overflow-x-auto">
+              {/* Карточки товаров — mobile */}
+              <div className="md:hidden divide-y divide-gray-100">
+                {items.map((item) => (
+                  <div key={`mobile-${item.id}`} className="space-y-3 p-4">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.has(item.id)}
+                        onChange={() => handleItemSelect(item.id)}
+                        className="mt-1 h-4 w-4 shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900">{item.name}</p>
+                        <p className="text-sm text-gray-500">{item.brand} · {item.number}</p>
+                        <p className="mt-1 text-sm text-gray-600">
+                          Поставка: {item.deliveryDate ? formatDeliveryTime(item.deliveryDate) : 'Не указана'}
+                        </p>
+                      </div>
+                      <p className="shrink-0 font-semibold text-gray-900">{formatPrice(item.price)}</p>
+                    </div>
+                    <div className="flex items-center justify-between pl-7">
+                      <div className="flex items-center gap-3 rounded-full border border-gray-200 bg-gray-50 px-2 py-1">
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-gray-600 active:bg-white disabled:opacity-40"
+                          disabled={item.quantity <= 1}
+                          aria-label="Уменьшить количество"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                          </svg>
+                        </button>
+                        <span className="min-w-[24px] text-center text-sm font-semibold">{item.quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-gray-600 active:bg-white disabled:opacity-40"
+                          disabled={item.quantity >= getMaxAllowedQuantity(item)}
+                          aria-label="Увеличить количество"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="text-sm font-medium text-red-600"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Таблица товаров — desktop */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
                     <tr>
@@ -525,14 +583,14 @@ export default function CartPage() {
               </div>
 
               {/* Итого и оформление заказа для продавца */}
-              <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
+              <div className="bg-gray-50 max-md:px-4 max-md:py-4 px-6 py-4 border-t border-gray-200">
+                <div className="flex max-md:flex-col max-md:gap-4 items-center justify-between">
+                  <div className="text-sm text-gray-600 max-md:w-full">
                     Итого товаров: {items.reduce((sum, item) => sum + item.quantity, 0)} шт.
                   </div>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex max-md:w-full max-md:flex-col max-md:gap-3 items-center space-x-4">
 
-                    <div className="flex space-x-2">
+                    <div className="flex max-md:w-full max-md:flex-wrap gap-2 space-x-2">
                       {/* Кнопки для выбранных товаров этого продавца */}
                       {items.some(item => selectedItems.has(item.id)) && (
                         <>
@@ -557,7 +615,7 @@ export default function CartPage() {
                           </button>
                         </>
                       )}
-                      <div className="text-right">
+                      <div className="text-right max-md:text-left max-md:w-full">
                         <div className="text-sm text-gray-600">Итого к оплате:</div>
                         <div className="text-lg font-bold text-gray-900">
                           {formatPrice(calculateSellerTotal(items))}
@@ -576,7 +634,7 @@ export default function CartPage() {
                       </button>
                       <button
                         onClick={() => handleCheckout(seller)}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        className="inline-flex max-md:w-full max-md:justify-center items-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
                         {isAuthorized ? 'Оформить заказ' : 'Авторизироваться'}
                       </button>

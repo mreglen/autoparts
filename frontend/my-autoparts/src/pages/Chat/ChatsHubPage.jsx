@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import MobileBottomNav from '../../components/MobileBottomNav/MobileBottomNav';
 import {
   connectWebSocket,
   disconnectWebSocket,
@@ -156,18 +155,14 @@ const ChatsHubPage = () => {
     : null;
 
   return (
-    <div className="max-md:fixed max-md:inset-0 max-md:z-[60] max-md:flex max-md:min-h-0 max-md:flex-col max-md:bg-white max-md:pt-[env(safe-area-inset-top,0px)] md:static md:z-auto md:min-h-0 md:inset-auto md:bg-transparent md:pt-0">
-      <div className="flex min-h-0 w-full flex-1 flex-row bg-white max-md:min-h-0 max-md:pb-[env(safe-area-inset-bottom,0px)] md:h-[calc(100vh-200px)] md:overflow-hidden md:rounded-lg md:border md:border-gray-200 md:shadow-sm">
+    <div className="flex w-full min-h-0 flex-col max-md:min-h-[calc(100dvh-7rem)] md:static md:min-h-0">
+      <div className="flex min-h-0 w-full flex-1 flex-row bg-white md:h-[calc(100vh-200px)] md:overflow-hidden md:rounded-lg md:border md:border-gray-200 md:shadow-sm">
         {/* Левая панель - Список чатов */}
         <div
           className={`${
             activeChatId ? 'hidden md:flex' : 'flex'
           } min-h-0 w-full min-w-0 flex-col border-gray-200 md:w-96 md:border-r`}
         >
-          <div className="flex flex-shrink-0 items-center border-b border-gray-200 bg-white px-4 py-3 md:hidden">
-            <h1 className="text-lg font-semibold text-gray-900">Сообщения</h1>
-          </div>
-
           {/* Список чатов */}
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
             {(garageLoading || avitoLoading) && unifiedChats.length === 0 ? (
@@ -264,9 +259,6 @@ const ChatsHubPage = () => {
           )}
         </div>
       </div>
-      
-      {/* Мобильное нижнее меню - показывается только в списке чатов */}
-      {!activeChatId && <MobileBottomNav />}
     </div>
   );
 };

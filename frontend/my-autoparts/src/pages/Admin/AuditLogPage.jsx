@@ -212,7 +212,7 @@ export default function AuditLogPage() {
     <div className="mt-4 sm:mt-5 px-4 sm:px-0">
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Журнал событий</h1>
+          <h1 className="max-md:hidden text-2xl font-bold text-gray-800">Журнал событий</h1>
           <p className="text-sm text-gray-500">Все события платформы</p>
         </div>
         {!loading && (
@@ -353,7 +353,38 @@ export default function AuditLogPage() {
           События не найдены
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <>
+        <div className="md:hidden space-y-3">
+          {rows.map((row) => (
+            <button
+              key={row.id}
+              type="button"
+              onClick={() => setSelected(row)}
+              className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm active:bg-indigo-50/40"
+            >
+              <p className="text-xs text-gray-500">{formatAuditDate(row.created_at)}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                  {labelCategory(row.category, meta)}
+                </span>
+                <span className="text-sm font-medium text-gray-900">
+                  {row.event_type_label || labelEventType(row.event_type, meta)}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-gray-700 break-words">
+                {row.actor_name || row.email || '—'}
+              </p>
+              <p className="mt-1 text-sm text-gray-600 break-words">
+                {row.organization_name || row.organization_id || '—'}
+              </p>
+              {row.summary && (
+                <p className="mt-2 line-clamp-2 text-sm text-gray-500">{row.summary}</p>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="hidden md:block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="border-b border-gray-100 bg-gray-50/80 text-left text-xs uppercase text-gray-500">
@@ -405,6 +436,7 @@ export default function AuditLogPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {pages > 1 && (

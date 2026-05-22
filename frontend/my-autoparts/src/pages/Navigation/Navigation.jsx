@@ -376,37 +376,6 @@ export default function Navigation() {
                     </div>
                 </div>
             </div>
-
-            {/* Мобильная версия - локация и телефон над поиском */}
-            <div className="md:hidden bg-white border-b border-gray-200 px-4 py-3">
-                <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center gap-1">
-                        <img
-                            src="/img/location_on_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg"
-                            alt="Локация"
-                            className="filter invert w-4 h-4"
-                        />
-                        <p className="text-sm">г. Екатеринбург</p>
-                    </div>
-                    {adminOrganizationPhone?.organization_phone && (
-                        <a
-                            href={`tel:${adminOrganizationPhone.organization_phone.replace(/\D/g, '')}`}
-                            className="flex items-center gap-1 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
-                        >
-                            <img
-                                src="/img/telephone-1.svg"
-                                alt="Телефон"
-                                className="w-4 h-4"
-                            />
-                            <span>{formatPhoneNumber(adminOrganizationPhone.organization_phone)}</span>
-                        </a>
-                    )}
-                </div>
-                <Search />
-            </div>
-
-            {/* Мобильная нижняя навигация */}
-            <MobileBottomNav />
         </header>
     );
 }

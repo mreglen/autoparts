@@ -386,35 +386,56 @@ export default function SellerWorkspacePage() {
                             ) : filteredProducts.length === 0 ? (
                                 <p className="text-gray-500 py-8 text-center">Нет запчастей</p>
                             ) : (
-                                <div className="bg-white border rounded-xl overflow-hidden">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
-                                            <tr>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Запчасть</th>
-                                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Остаток</th>
-                                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Цена</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {filteredProducts.map((part) => (
-                                                <tr
-                                                    key={part.id}
-                                                    className="hover:bg-gray-50 cursor-pointer"
-                                                    onClick={() => setSelectedPart(part)}
-                                                >
-                                                    <td className="px-4 py-3">
-                                                        <div className="font-medium text-gray-900">{part.brand} · {part.article}</div>
-                                                        <div className="text-sm text-gray-600 line-clamp-1">{part.name}</div>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center text-sm">{part.quantity ?? 0}</td>
-                                                    <td className="px-4 py-3 text-sm font-medium">
+                                <>
+                                    <div className="md:hidden space-y-3">
+                                        {filteredProducts.map((part) => (
+                                            <button
+                                                key={part.id}
+                                                type="button"
+                                                onClick={() => setSelectedPart(part)}
+                                                className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm active:bg-gray-50"
+                                            >
+                                                <p className="font-medium text-gray-900">{part.brand} · {part.article}</p>
+                                                <p className="mt-1 text-sm text-gray-600">{part.name}</p>
+                                                <div className="mt-2 flex justify-between text-sm">
+                                                    <span className="text-gray-500">Остаток: <span className="font-medium text-gray-900">{part.quantity ?? 0}</span></span>
+                                                    <span className="font-semibold text-gray-900">
                                                         {part.price != null ? `${Number(part.price).toLocaleString('ru-RU')} ₽` : '—'}
-                                                    </td>
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="hidden md:block bg-white border rounded-xl overflow-hidden">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Запчасть</th>
+                                                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Остаток</th>
+                                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Цена</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100">
+                                                {filteredProducts.map((part) => (
+                                                    <tr
+                                                        key={part.id}
+                                                        className="hover:bg-gray-50 cursor-pointer"
+                                                        onClick={() => setSelectedPart(part)}
+                                                    >
+                                                        <td className="px-4 py-3">
+                                                            <div className="font-medium text-gray-900">{part.brand} · {part.article}</div>
+                                                            <div className="text-sm text-gray-600 line-clamp-1">{part.name}</div>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center text-sm">{part.quantity ?? 0}</td>
+                                                        <td className="px-4 py-3 text-sm font-medium">
+                                                            {part.price != null ? `${Number(part.price).toLocaleString('ru-RU')} ₽` : '—'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
                             )}
                         </div>
                     )}
@@ -426,14 +447,15 @@ export default function SellerWorkspacePage() {
                                 columns={[
                                     {
                                         key: 'product',
+                                        label: 'Товар',
                                         render: (r) => (
                                             r.product?.brand
                                                 ? `${r.product.brand} · ${r.product.article || ''} — ${r.product.name || ''}`
                                                 : (r.product?.name || r.product_id)
                                         ),
                                     },
-                                    { key: 'quantity', render: (r) => r.quantity },
-                                    { key: 'price', render: (r) => formatCurrency(r.sale_price) },
+                                    { key: 'quantity', label: 'Кол-во', render: (r) => r.quantity },
+                                    { key: 'price', label: 'Цена', render: (r) => formatCurrency(r.sale_price) },
                                 ]}
                                 emptyText="Нет поступлений"
                                 onRowClick={openProductModal}
@@ -448,14 +470,15 @@ export default function SellerWorkspacePage() {
                                 columns={[
                                     {
                                         key: 'product',
+                                        label: 'Товар',
                                         render: (r) => (
                                             r.product?.brand
                                                 ? `${r.product.brand} · ${r.product.article || ''} — ${r.product.name || ''}`
                                                 : (r.product?.name || r.product_id)
                                         ),
                                     },
-                                    { key: 'quantity', render: (r) => r.quantity },
-                                    { key: 'reason', render: (r) => r.reason || ((r.sale_price > 0 || r.sale_channel === 'avito') ? 'Продажа' : '—') },
+                                    { key: 'quantity', label: 'Кол-во', render: (r) => r.quantity },
+                                    { key: 'reason', label: 'Причина', render: (r) => r.reason || ((r.sale_price > 0 || r.sale_channel === 'avito') ? 'Продажа' : '—') },
                                 ]}
                                 emptyText="Нет расходов"
                                 onRowClick={openProductModal}
@@ -474,15 +497,16 @@ export default function SellerWorkspacePage() {
                                 columns={[
                                     {
                                         key: 'product',
+                                        label: 'Товар',
                                         render: (r) => (
                                             r.product?.brand
                                                 ? `${r.product.brand} · ${r.product.article || ''} — ${r.product.name || ''}`
                                                 : r.product_id
                                         ),
                                     },
-                                    { key: 'quantity', render: (r) => r.quantity },
-                                    { key: 'price', render: (r) => formatCurrency(r.sale_price) },
-                                    { key: 'date', render: (r) => r.movement_date || '—' },
+                                    { key: 'quantity', label: 'Кол-во', render: (r) => r.quantity },
+                                    { key: 'price', label: 'Цена', render: (r) => formatCurrency(r.sale_price) },
+                                    { key: 'date', label: 'Дата', render: (r) => r.movement_date || '—' },
                                 ]}
                                 emptyText="Нет продаж"
                                 onRowClick={openProductModal}
@@ -506,9 +530,9 @@ export default function SellerWorkspacePage() {
                             <SimpleTable
                                 rows={vehicles}
                                 columns={[
-                                    { key: 'brand', render: (r) => r.brand },
-                                    { key: 'model', render: (r) => r.model },
-                                    { key: 'generation', render: (r) => r.generation || '—' },
+                                    { key: 'brand', label: 'Марка', render: (r) => r.brand },
+                                    { key: 'model', label: 'Модель', render: (r) => r.model },
+                                    { key: 'generation', label: 'Поколение', render: (r) => r.generation || '—' },
                                 ]}
                                 emptyText="Нет автомобилей"
                                 onRowClick={(row) => setSelectedVehicle(row)}
@@ -598,25 +622,53 @@ function SimpleTable({ rows, columns, emptyText, onRowClick }) {
     if (!rows?.length) {
         return <p className="text-gray-500 py-8 text-center">{emptyText}</p>;
     }
+
+    const CardWrapper = onRowClick ? 'button' : 'div';
+    const cardProps = onRowClick
+        ? { type: 'button', className: 'w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm active:bg-gray-50' }
+        : { className: 'rounded-xl border border-gray-200 bg-white p-4 shadow-sm' };
+
     return (
-        <div className="bg-white border rounded-xl overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-                <tbody className="divide-y divide-gray-100">
-                    {rows.map((row, idx) => (
-                        <tr
-                            key={row.id ?? idx}
-                            className={`hover:bg-gray-50 ${onRowClick ? 'cursor-pointer' : ''}`}
-                            onClick={onRowClick ? () => onRowClick(row) : undefined}
-                        >
+        <>
+            <div className="md:hidden space-y-3">
+                {rows.map((row, idx) => (
+                    <CardWrapper
+                        key={row.id ?? idx}
+                        {...cardProps}
+                        onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    >
+                        <div className="space-y-2">
                             {columns.map((col) => (
-                                <td key={col.key} className="px-4 py-3 text-sm text-gray-800">
-                                    {col.render(row)}
-                                </td>
+                                <div key={col.key} className="flex justify-between gap-3 text-sm">
+                                    <span className="shrink-0 text-gray-500">{col.label || col.key}</span>
+                                    <span className="min-w-0 text-right font-medium text-gray-900 break-words">
+                                        {col.render(row)}
+                                    </span>
+                                </div>
                             ))}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+                        </div>
+                    </CardWrapper>
+                ))}
+            </div>
+            <div className="hidden md:block bg-white border rounded-xl overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <tbody className="divide-y divide-gray-100">
+                        {rows.map((row, idx) => (
+                            <tr
+                                key={row.id ?? idx}
+                                className={`hover:bg-gray-50 ${onRowClick ? 'cursor-pointer' : ''}`}
+                                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                            >
+                                {columns.map((col) => (
+                                    <td key={col.key} className="px-4 py-3 text-sm text-gray-800">
+                                        {col.render(row)}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </>
     );
 }

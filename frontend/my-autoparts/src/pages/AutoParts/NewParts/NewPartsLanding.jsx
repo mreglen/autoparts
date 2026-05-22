@@ -18,14 +18,14 @@ const NewPartsLanding = ({ onSearch }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-2 sm:px-0">
-      <section className="text-center mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+    <div className="mx-auto w-full max-w-4xl px-3 sm:px-0">
+      <section className="mb-6 text-center sm:mb-8">
+        <h1 className="text-xl font-bold text-gray-900 sm:text-3xl">
           Новые запчасти с доставкой
         </h1>
       </section>
 
-      <section className="mb-8">
+      <section className="mb-6 hidden sm:mb-8 sm:block">
         <div className="flex gap-2">
           <input
             type="text"
@@ -33,14 +33,14 @@ const NewPartsLanding = ({ onSearch }) => {
             onChange={(e) => setTerm(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && runSearch()}
             placeholder="Артикул, бренд или наименование"
-            className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-base focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-base focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
             disabled={searching}
           />
           <button
             type="button"
             onClick={() => runSearch()}
             disabled={searching || !term.trim()}
-            className="px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            className="rounded-lg bg-indigo-600 px-6 py-3 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
           >
             {searching ? 'Поиск...' : 'Найти'}
           </button>

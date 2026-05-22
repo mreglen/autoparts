@@ -499,16 +499,16 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   );
 
   return (
-    <div className="mt-4 sm:mt-5 px-0 w-full">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="mt-0 w-full px-0 max-md:pb-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0">
         <p className="text-sm text-gray-600">Найдено: <span className="font-semibold text-gray-900">{visibleTotal}</span></p>
-        <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} className="lg:hidden px-4 py-2 rounded-lg bg-gray-200 text-gray-800 text-sm font-medium">
+        <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} className="rounded-full bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 lg:hidden">
           {filtersOpen ? 'Скрыть фильтры' : 'Фильтры'}
         </button>
       </div>
-      <div className="flex flex-col lg:flex-row gap-6">
-        <aside className={`${filtersOpen ? 'block' : 'hidden'} lg:block w-full lg:w-64 flex-shrink-0`}>
-          <div className="bg-white rounded-lg border border-gray-200 p-4 lg:sticky lg:top-4">
+      <div className="flex flex-col gap-4 px-3 sm:gap-6 sm:px-0 lg:flex-row">
+        <aside className={`${filtersOpen ? 'block' : 'hidden'} w-full flex-shrink-0 lg:block lg:w-64`}>
+          <div className="rounded-lg border border-gray-200 bg-white p-4 lg:sticky lg:top-4">
             <h3 className="font-semibold text-gray-900 mb-3 hidden lg:block">Фильтры</h3>
             {filtersPanel}
           </div>

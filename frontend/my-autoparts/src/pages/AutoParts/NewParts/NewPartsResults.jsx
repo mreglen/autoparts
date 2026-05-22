@@ -165,14 +165,14 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch, expandedPartId, onToggle
 
   return (
     <>
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="mb-4 px-3 text-sm text-gray-600 sm:px-0">
         Найдено: <span className="font-semibold text-gray-900">{filteredRosskoParts.length}</span>
         {showAnalogs && filteredCrossParts.length > 0 && (
           <span className="text-gray-500"> · аналогов: {filteredCrossParts.length}</span>
         )}
       </p>
 
-      <div className="mb-4 p-4 bg-white rounded-lg border border-gray-200 space-y-4">
+      <div className="mx-3 mb-4 space-y-4 rounded-lg border border-gray-200 bg-white p-4 sm:mx-0">
         <div>
           <p className="text-xs font-medium text-gray-600 mb-2">Бренды</p>
           <div className="space-y-2 max-h-40 overflow-y-auto">

@@ -6,7 +6,7 @@ function Main() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative pt-24 pb-32 overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50">
+      <section className="relative max-md:pt-6 md:pt-24 pb-16 md:pb-32 overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="absolute inset-0">
           <div className="absolute top-0 right-0 w-1/3 h-1/2 bg-gradient-to-bl from-blue-100/30 to-transparent"></div>
           <div className="absolute bottom-0 left-0 w-1/3 h-1/2 bg-gradient-to-tr from-indigo-100/30 to-transparent"></div>

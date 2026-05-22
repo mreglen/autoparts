@@ -28,6 +28,23 @@ function KpiCard({ label, value, sub }) {
   );
 }
 
+function FinanceField({ label, children }) {
+  return (
+    <div className="flex justify-between gap-3 text-sm">
+      <span className="shrink-0 text-gray-500">{label}</span>
+      <span className="min-w-0 text-right font-medium text-gray-900 break-words">{children}</span>
+    </div>
+  );
+}
+
+function FinanceMobileCard({ children }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-2">
+      {children}
+    </div>
+  );
+}
+
 export default function FinancePage() {
   const navigate = useNavigate();
   const { user, permissionCodes } = useSelector((state) => state.auth);
@@ -140,7 +157,7 @@ export default function FinancePage() {
     <div className="mt-4 sm:mt-5 space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Финансы</h1>
+          <h1 className="max-md:hidden text-2xl sm:text-3xl font-bold text-gray-900">Финансы</h1>
           <p className="mt-2 text-gray-600 text-sm sm:text-base max-w-2xl">
             Отчёты по данным платформы.
           </p>
@@ -201,12 +218,12 @@ export default function FinancePage() {
             </label>
           )}
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-col max-md:gap-2 sm:flex-row sm:flex-wrap gap-2">
           <button
             type="button"
             onClick={loadData}
             disabled={loading}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="max-md:w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
             {loading ? 'Загрузка...' : 'Обновить'}
           </button>
@@ -289,7 +306,29 @@ export default function FinancePage() {
               <div className="text-sm text-gray-600">
                 Итого: {formatFinanceCurrency(sales.totals?.total)} · {sales.totals?.count ?? 0} строк
               </div>
-              <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+              <div className="md:hidden space-y-3">
+                {!sales.rows?.length ? (
+                  <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+                    Нет продаж за период
+                  </p>
+                ) : (
+                  sales.rows.map((row) => (
+                    <FinanceMobileCard key={row.id}>
+                      <FinanceField label="Дата">{formatFinanceDate(row.movement_date)}</FinanceField>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{row.name || '—'}</p>
+                        <p className="text-xs text-gray-500 break-words">
+                          {[row.article, row.internal_code].filter(Boolean).join(' · ')}
+                        </p>
+                      </div>
+                      <FinanceField label="Канал">{row.channel_label}</FinanceField>
+                      <FinanceField label="Кол-во">{row.quantity}</FinanceField>
+                      <FinanceField label="Сумма">{formatFinanceCurrency(row.line_total)}</FinanceField>
+                    </FinanceMobileCard>
+                  ))
+                )}
+              </div>
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>
@@ -334,7 +373,24 @@ export default function FinancePage() {
           )}
 
           {activeTab === 'writeoffs' && (
-            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <>
+            <div className="md:hidden space-y-3 mb-3">
+              {!writeoffs.rows?.length ? (
+                <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+                  Нет списаний за период
+                </p>
+              ) : (
+                writeoffs.rows.map((row) => (
+                  <FinanceMobileCard key={row.id}>
+                    <FinanceField label="Дата">{formatFinanceDate(row.movement_date)}</FinanceField>
+                    <FinanceField label="Товар">{row.name || row.article || '—'}</FinanceField>
+                    <FinanceField label="Кол-во">{row.quantity}</FinanceField>
+                    <FinanceField label="Причина">{row.reason || '—'}</FinanceField>
+                  </FinanceMobileCard>
+                ))
+              )}
+            </div>
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
                   <tr>
@@ -356,10 +412,28 @@ export default function FinancePage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
 
           {activeTab === 'stock_ins' && (
-            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <>
+            <div className="md:hidden space-y-3 mb-3">
+              {!stockIns.rows?.length ? (
+                <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+                  Нет поступлений за период
+                </p>
+              ) : (
+                stockIns.rows.map((row) => (
+                  <FinanceMobileCard key={row.id}>
+                    <FinanceField label="Дата">{formatFinanceDate(row.created_at)}</FinanceField>
+                    <FinanceField label="Товар">{row.name || row.article || '—'}</FinanceField>
+                    <FinanceField label="Кол-во">{row.quantity}</FinanceField>
+                    <FinanceField label="Сумма">{formatFinanceCurrency(row.line_total)}</FinanceField>
+                  </FinanceMobileCard>
+                ))
+              )}
+            </div>
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
                   <tr>
@@ -383,11 +457,28 @@ export default function FinancePage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
 
           {activeTab === 'inventory' && (
             <div className="space-y-3">
-              <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+              <div className="md:hidden space-y-3">
+                {!inventory.rows?.length ? (
+                  <p className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+                    Нет остатков на выбранную дату
+                  </p>
+                ) : (
+                  inventory.rows.map((row, idx) => (
+                    <FinanceMobileCard key={`${row.product_id}-${idx}`}>
+                      <FinanceField label="Товар">{row.name || row.article || '—'}</FinanceField>
+                      <FinanceField label="Остаток">{row.quantity}</FinanceField>
+                      <FinanceField label="Цена">{formatFinanceCurrency(row.unit_price)}</FinanceField>
+                      <FinanceField label="Оценка">{formatFinanceCurrency(row.line_total)}</FinanceField>
+                    </FinanceMobileCard>
+                  ))
+                )}
+              </div>
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 bg-white">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
                     <tr>

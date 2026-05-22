@@ -257,7 +257,7 @@ export default function OrderRegistration() {
     <div className="mt-5">
       {/* Заголовок */}
       <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Заказ у {seller}</h1>
+        <h1 className="max-md:hidden text-3xl font-bold text-gray-900">Заказ у {seller}</h1>
         <button
           onClick={() => navigate('/cart')}
           className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -333,7 +333,25 @@ export default function OrderRegistration() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="md:hidden divide-y divide-gray-100">
+          {selectedItems.map((item) => (
+            <div key={item.id} className="space-y-2 p-4">
+              <p className="font-medium text-gray-900">{item.name}</p>
+              <p className="text-sm text-gray-500">{item.brand} · {item.number}</p>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">{item.quantity} шт.</span>
+                <span className="font-semibold text-gray-900">{formatPrice(item.price * item.quantity)}</span>
+              </div>
+              <p className="text-xs text-gray-500">Цена: {formatPrice(item.price)}</p>
+            </div>
+          ))}
+          <div className="flex justify-between border-t border-gray-200 bg-gray-50 p-4 text-sm font-bold text-gray-900">
+            <span>Итого</span>
+            <span>{formatPrice(calculateTotal())}</span>
+          </div>
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>

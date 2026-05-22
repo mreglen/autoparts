@@ -19,6 +19,7 @@ import { fetchCart } from '../../redux/slices/CartSlice';
 import UsedPartsList from './UsedParts/UsedPartsList';
 import NewPartsLanding from './NewParts/NewPartsLanding';
 import NewPartsResults from './NewParts/NewPartsResults';
+import MobileCompactSearch from '../../components/MobileCompactSearch/MobileCompactSearch';
 
 const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs'];
 
@@ -123,6 +124,17 @@ function AutoParts() {
     dispatch(setSearchQuery(trimmed));
     await dispatch(fetchSearchResults({ text: trimmed }));
     navigate(`/autoparts/new?q=${encodeURIComponent(trimmed)}`);
+  }, [dispatch, navigate]);
+
+  const handleUsedPartsSearch = useCallback(async (text) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    dispatch(setSearchQuery(trimmed));
+    await Promise.all([
+      dispatch(searchUsedParts(trimmed)),
+      dispatch(fetchSearchResults({ text: trimmed })),
+    ]);
+    navigate(`/autoparts/used?q=${encodeURIComponent(trimmed)}`);
   }, [dispatch, navigate]);
 
   const applyUsedSort = useCallback((uiSort) => {
@@ -237,52 +249,58 @@ function AutoParts() {
   }
 
   return (
-    <div className="mt-4 sm:mt-5 px-0 w-full">
+    <div className="mt-0 sm:mt-5 px-0 w-full">
+      <div className="max-md:sticky max-md:top-0 max-md:z-20 max-md:bg-gray-50">
+        {activeTab === 'my' && (
+          <MobileCompactSearch onSearch={handleUsedPartsSearch} sticky={false} />
+        )}
+        {activeTab === 'rossko' && (
+          <MobileCompactSearch
+            onSearch={handleNewPartsSearch}
+            sticky={false}
+            placeholder="Артикул, бренд или наименование"
+          />
+        )}
 
-      {/* Переключатель вкладок */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-6">
-        {showNewAutoparts && (
+        {/* Переключатель вкладок */}
+        <div className="mb-3 sm:mb-6 max-md:px-3 max-md:py-2">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {showNewAutoparts && (
+            <button
+              onClick={() => setActiveTab('rossko')}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'rossko'
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+            >
+              Новые
+            </button>
+          )}
           <button
-            onClick={() => setActiveTab('rossko')}
-            className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${activeTab === 'rossko'
+            onClick={() => setActiveTab('my')}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'my'
                 ? 'bg-indigo-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
           >
-            Новые запчасти
+            Б/У
           </button>
-        )}
-        <button
-          onClick={() => setActiveTab('my')}
-          className={`px-6 py-4 sm:px-4 sm:py-2 rounded-lg font-medium text-base sm:text-sm md:text-base transition-colors min-h-[48px] sm:min-h-0 ${activeTab === 'my'
-              ? 'bg-indigo-500 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-        >
-          Б/У запчасти
-        </button>
-        
-        {/* View toggle buttons - only show when on Used Parts tab */}
-        {activeTab === 'my' && (
-          <div className="flex gap-2 ml-auto items-center">
-            {/* Sort dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-gray-200 text-gray-700 hover:bg-gray-300"
-                title="Сортировка"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                </svg>
-                <span className="hidden sm:inline">Сортировка</span>
-                <svg className={`w-4 h-4 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              
-              {showSortDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-30">
+
+          {activeTab === 'my' && (
+            <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+              <div className="relative">
+                <button
+                  onClick={() => setShowSortDropdown(!showSortDropdown)}
+                  className="flex items-center justify-center rounded-lg bg-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-300 sm:px-4 sm:py-2"
+                  title="Сортировка"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                  </svg>
+                </button>
+
+                {showSortDropdown && (
+                  <div className="absolute right-0 z-30 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
                   <button
                     onClick={() => applyUsedSort('price_asc')}
                     className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${usedPartsSort === 'price_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
@@ -326,33 +344,34 @@ function AutoParts() {
               )}
             </div>
             
-            {/* View mode toggle */}
             <button
               onClick={() => setUsedPartsView('grid')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center ${usedPartsView === 'grid'
+              className={`rounded-lg p-2 transition-colors sm:px-4 sm:py-2 ${usedPartsView === 'grid'
                   ? 'bg-indigo-500 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               title="Вид карточками"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2v-2z" />
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
               </svg>
             </button>
             <button
               onClick={() => setUsedPartsView('list')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center ${usedPartsView === 'list'
+              className={`rounded-lg p-2 transition-colors sm:px-4 sm:py-2 ${usedPartsView === 'list'
                   ? 'bg-indigo-500 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               title="Вид списком"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
           </div>
-        )}
+          )}
+        </div>
+      </div>
       </div>
 
       {/* Отображение контента в зависимости от вкладки */}

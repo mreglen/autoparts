@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 
 // Icon mapping for menu items
 const getMenuIcon = (menuId) => {
     const icons = {
-        // Main menu items
         'dashboard': (
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -62,7 +60,6 @@ const getMenuIcon = (menuId) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
         ),
-        // Submenu items
         'purchases-orders': (
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -118,12 +115,6 @@ const getMenuIcon = (menuId) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
         ),
-        'settings': (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-        ),
         'settings-employees': (
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -159,78 +150,118 @@ const getMenuIcon = (menuId) => {
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
-        )
+        ),
     };
     return icons[menuId] || null;
 };
 
-export default function ProfileMenuTabs({ tabs, activeTab, onTabChange, badgeCounts = {} }) {
-    const [expandedMenus, setExpandedMenus] = useState({});
-    const location = useLocation();
+const getInitialExpandedMenus = (tabs, activeTab, isDrawer) => {
+    if (!isDrawer) return {};
+    const expanded = {};
+    tabs.forEach((tab) => {
+        if (tab.submenu?.some((sub) => sub.id === activeTab)) {
+            expanded[tab.id] = true;
+        }
+    });
+    return expanded;
+};
+
+export default function ProfileMenuTabs({
+    tabs,
+    activeTab,
+    onTabChange,
+    badgeCounts = {},
+    variant = 'sidebar',
+}) {
+    const isDrawer = variant === 'drawer';
+    const [expandedMenus, setExpandedMenus] = useState(() =>
+        getInitialExpandedMenus(tabs, activeTab, isDrawer)
+    );
+
+    useEffect(() => {
+        if (!isDrawer) return;
+        setExpandedMenus((prev) => {
+            const next = { ...prev };
+            tabs.forEach((tab) => {
+                if (tab.submenu?.some((sub) => sub.id === activeTab)) {
+                    next[tab.id] = true;
+                }
+            });
+            return next;
+        });
+    }, [activeTab, tabs, isDrawer]);
 
     const toggleSubmenu = (menuId) => {
-        setExpandedMenus(prev => ({
+        setExpandedMenus((prev) => ({
             ...prev,
-            [menuId]: !prev[menuId]
+            [menuId]: !prev[menuId],
         }));
     };
 
-    // Function to handle tab change with scroll to top on mobile
     const handleTabChange = (tabId) => {
         onTabChange(tabId);
-        // Scroll to top of content area on mobile (below the sticky menu)
-        if (window.innerWidth < 1024) { // lg breakpoint
-            // Small delay to allow page content to update
+        if (isDrawer) return;
+        if (window.innerWidth < 1024) {
             setTimeout(() => {
-                // Scroll to the main content area (below the sticky top menu)
                 const mainContent = document.querySelector('main');
                 if (mainContent) {
-                    const headerOffset = 80; // Account for sticky header
+                    const headerOffset = 80;
                     const elementPosition = mainContent.getBoundingClientRect().top;
                     const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-                    
                     window.scrollTo({
                         top: offsetPosition,
-                        behavior: 'smooth'
+                        behavior: 'smooth',
                     });
                 } else {
-                    // Fallback: scroll to top
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
             }, 100);
         }
     };
 
+    const itemBase = isDrawer
+        ? 'min-h-[44px] w-full rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors flex items-center gap-3 active:scale-[0.99]'
+        : 'w-full px-4 py-3 text-left text-sm font-medium border-l-4 transition-colors flex items-center gap-3';
+
+    const itemActive = isDrawer
+        ? 'bg-indigo-50 text-indigo-700'
+        : 'border-indigo-500 text-indigo-600 bg-indigo-50';
+
+    const itemInactive = isDrawer
+        ? 'text-gray-700 active:bg-gray-50'
+        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50';
+
+    const submenuItemBase = isDrawer
+        ? 'min-h-[40px] w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors flex items-center gap-3 ml-2'
+        : 'w-full px-4 py-2 text-left text-sm font-medium border-l-4 transition-colors flex items-center gap-3';
+
     const renderMenuItem = (tab) => {
         if (tab.submenu) {
             const isExpanded = expandedMenus[tab.id];
-            const hasActiveSubmenu = tab.submenu.some(subTab => activeTab === subTab.id);
+            const hasActiveSubmenu = tab.submenu.some((subTab) => activeTab === subTab.id);
 
             return (
-                <div key={tab.id}>
+                <div key={tab.id} className={isDrawer ? 'mb-1' : ''}>
                     <button
+                        type="button"
                         onClick={() => toggleSubmenu(tab.id)}
-                        className={`w-full px-4 py-3 text-left text-sm font-medium border-l-4 transition-colors flex items-center justify-between ${
-                            hasActiveSubmenu
-                                ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                        className={`${itemBase} ${hasActiveSubmenu ? itemActive : itemInactive} ${
+                            isDrawer ? 'justify-between' : 'justify-between'
                         }`}
                     >
-                        <div className="flex items-center gap-3">
-                            <div className="flex-shrink-0">
-                                {getMenuIcon(tab.id)}
-                            </div>
-                            <span className="flex items-center gap-2 flex-grow">
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                            <div className="flex-shrink-0">{getMenuIcon(tab.id)}</div>
+                            <span className={`flex flex-grow items-center gap-2 ${isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'}`}>
                                 {tab.label}
                                 {badgeCounts[tab.id] !== undefined && badgeCounts[tab.id] > 0 && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 flex-shrink-0">
+                                    <span className="inline-flex shrink-0 items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
                                         {badgeCounts[tab.id] > 99 ? '99+' : badgeCounts[tab.id]}
                                     </span>
                                 )}
                             </span>
                         </div>
                         <svg
-                            className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                            className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -239,24 +270,21 @@ export default function ProfileMenuTabs({ tabs, activeTab, onTabChange, badgeCou
                         </svg>
                     </button>
                     {isExpanded && (
-                        <div className="ml-4 border-l border-gray-200">
+                        <div className={isDrawer ? 'mt-1 space-y-0.5 pl-2' : 'ml-4 border-l border-gray-200'}>
                             {tab.submenu.map((subTab) => (
                                 <button
                                     key={subTab.id}
+                                    type="button"
                                     onClick={() => handleTabChange(subTab.id)}
-                                    className={`w-full px-4 py-2 text-left text-sm font-medium border-l-4 transition-colors flex items-center gap-3 ${
-                                        activeTab === subTab.id
-                                            ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                    className={`${submenuItemBase} ${
+                                        activeTab === subTab.id ? itemActive : itemInactive
                                     }`}
                                 >
-                                    <div className="flex-shrink-0">
-                                        {getMenuIcon(subTab.id)}
-                                    </div>
-                                    <span className="flex items-center gap-2 flex-grow">
+                                    <div className="flex-shrink-0">{getMenuIcon(subTab.id)}</div>
+                                    <span className={`flex flex-grow items-center gap-2 ${isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'}`}>
                                         {subTab.label}
                                         {badgeCounts[subTab.id] !== undefined && badgeCounts[subTab.id] > 0 && (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 flex-shrink-0">
+                                            <span className="inline-flex shrink-0 items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
                                                 {badgeCounts[subTab.id] > 99 ? '99+' : badgeCounts[subTab.id]}
                                             </span>
                                         )}
@@ -272,20 +300,17 @@ export default function ProfileMenuTabs({ tabs, activeTab, onTabChange, badgeCou
         return (
             <button
                 key={tab.id}
+                type="button"
                 onClick={() => handleTabChange(tab.id)}
-                className={`px-4 py-3 text-left text-sm font-medium border-l-4 transition-colors flex items-center gap-3 ${
-                    activeTab === tab.id
-                        ? 'border-indigo-500 text-indigo-600 bg-indigo-50'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                className={`${itemBase} ${activeTab === tab.id ? itemActive : itemInactive} ${
+                    isDrawer ? 'mb-1' : ''
                 }`}
             >
-                <div className="flex-shrink-0">
-                    {getMenuIcon(tab.id)}
-                </div>
-                <span className="flex items-center gap-2 flex-grow">
+                <div className="flex-shrink-0">{getMenuIcon(tab.id)}</div>
+                <span className={`flex flex-grow items-center gap-2 ${isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'}`}>
                     {tab.label}
                     {badgeCounts[tab.id] !== undefined && badgeCounts[tab.id] > 0 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 flex-shrink-0">
+                        <span className="inline-flex shrink-0 items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
                             {badgeCounts[tab.id] > 99 ? '99+' : badgeCounts[tab.id]}
                         </span>
                     )}
@@ -294,11 +319,13 @@ export default function ProfileMenuTabs({ tabs, activeTab, onTabChange, badgeCou
         );
     };
 
+    if (isDrawer) {
+        return <div className="flex flex-col gap-0.5">{tabs.map(renderMenuItem)}</div>;
+    }
+
     return (
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 sticky top-4">
-            <div className="flex flex-col">
-                {tabs.map(renderMenuItem)}
-            </div>
+        <div className="w-full min-w-[15.5rem] bg-white rounded-xl shadow-md border border-gray-200 sticky top-4">
+            <div className="flex flex-col">{tabs.map(renderMenuItem)}</div>
         </div>
     );
 }
