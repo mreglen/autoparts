@@ -162,12 +162,16 @@ class PrinterAgent:
                         })
                     await asyncio.sleep(30)
                 elif e.status_code == 404:
-                    print("Connection error: HTTP 404 (WebSocket endpoint not found)")
-                    print("Use websocket URL ending with /api/printers/ws")
+                    print("Connection error: HTTP 404 during WebSocket handshake")
+                    print("The URL must be proxied as WebSocket with Upgrade headers.")
+                    print("Production URL: wss://svoygarage.ru/server/api/printers/ws")
                     if self.on_connection_updated:
                         self.on_connection_updated({
                             "status": "error",
-                            "message": "Connection error: HTTP 404. Use ws://.../api/printers/ws",
+                            "message": (
+                                "Connection error: HTTP 404 during WebSocket handshake. "
+                                "Check nginx WebSocket proxy for /server/api/printers/ws."
+                            ),
                             "timestamp": datetime.now().isoformat()
                         })
                     await asyncio.sleep(5)

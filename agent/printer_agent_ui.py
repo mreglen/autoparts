@@ -55,7 +55,10 @@ def _localize_connection_message(msg: str) -> str:
     if "Invalid printer token" in m:
         return "Неверный токен принтера или ID организации (HTTP 401)"
     if "HTTP 404" in m:
-        return "Сервер не нашёл endpoint агента (HTTP 404). Проверьте адрес: ws://.../api/printers/ws"
+        return (
+            "Сервер вернул HTTP 404 при WebSocket-подключении. "
+            "Проверьте nginx proxy Upgrade для /server/api/printers/ws."
+        )
     if m == "Connection refused":
         return "В соединении отказано"
     return m
@@ -509,8 +512,11 @@ class PrinterAgentUI:
         - ws://127.0.0.1:8000
         - ws://127.0.0.1:8000/
         - ws://127.0.0.1:8000/printers/ws
+        - wss://svoygarage.ru/server
+        - wss://svoygarage.ru/server/printers/ws
         and converts to:
         - ws://127.0.0.1:8000/api/printers/ws
+        - wss://svoygarage.ru/server/api/printers/ws
         """
         raw = (server_uri or "").strip()
         if not raw:
@@ -523,7 +529,12 @@ class PrinterAgentUI:
             if path in ("", "/"):
                 path = "/api/printers/ws"
             elif path.endswith("/printers/ws") and not path.endswith("/api/printers/ws"):
-                path = f"{path[:-len('/printers/ws')]}/api/printers/ws".replace("//", "/")
+                base_path = path[: -len("/printers/ws")]
+                path = f"{base_path}/api/printers/ws"
+            elif path.endswith("/server"):
+                path = f"{path}/api/printers/ws"
+            elif path.endswith("/server/"):
+                path = f"{path.rstrip('/')}/api/printers/ws"
             normalized = urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
             return normalized
         except Exception:
