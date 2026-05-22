@@ -9,7 +9,11 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true }) {
     const { user, token } = useSelector((state) => state.auth);
 
     const pageTitle = getPageTitle(location.pathname);
-    const showBack = location.pathname !== '/' && !location.pathname.startsWith('/autoparts/new');
+    const isAutopartsListRoot =
+        location.pathname === '/autoparts' ||
+        location.pathname === '/autoparts/new' ||
+        location.pathname === '/autoparts/used';
+    const showBack = location.pathname !== '/' && !isAutopartsListRoot;
 
     const firstName = user?.first_name || user?.name?.split?.(' ')?.[0] || 'П';
     const profilePath = user?.is_seller || user?.is_admin ? '/dashboard' : '/profile';

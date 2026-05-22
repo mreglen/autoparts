@@ -20,7 +20,7 @@ const navItems = [
     },
     {
         id: 'catalog',
-        label: 'Каталог',
+        label: 'Поиск',
         to: '/autoparts/new',
         match: (path) => path.startsWith('/autoparts'),
         icon: (

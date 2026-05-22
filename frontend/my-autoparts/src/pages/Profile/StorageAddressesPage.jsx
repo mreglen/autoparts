@@ -475,9 +475,9 @@ const StorageAddressesPage = () => {
                     <p className="mt-1 text-sm text-gray-500">В этом складе пока нет созданных адресов.</p>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
                     {location.cells.map(cell => (
-                      <div key={cell.id} className="border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-all duration-200 hover:border-indigo-300 group min-w-[200px] max-w-[250px] flex-shrink-0">
+                      <div key={cell.id} className="group w-full flex-shrink-0 rounded-lg border border-gray-200 p-3 transition-all duration-200 hover:border-indigo-300 hover:shadow-sm md:min-w-[200px] md:max-w-[250px]">
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold text-gray-900 truncate text-base">{cell.name}</h4>

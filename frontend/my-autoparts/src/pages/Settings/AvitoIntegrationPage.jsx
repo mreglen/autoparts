@@ -835,8 +835,15 @@ export default function AvitoIntegrationPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Интеграция с Авито</h1>
+        <h1 className="text-2xl font-bold text-gray-900 max-md:hidden">Интеграция с Авито</h1>
       </div>
+
+      <p className="md:hidden mb-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+        Массовые действия и широкая таблица удобнее на ПК.{' '}
+        <Link to="/settings/integration/avito/nomenclature" className="font-medium text-indigo-700 underline">
+          Номенклатура
+        </Link>
+      </p>
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm whitespace-pre-wrap">

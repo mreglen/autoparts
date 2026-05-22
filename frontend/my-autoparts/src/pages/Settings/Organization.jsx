@@ -139,7 +139,7 @@ export default function Organization() {
         return (
             <div className="mt-4 space-y-6 px-4 sm:mt-5 sm:px-0">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Организация</h1>
+                    <h1 className="text-2xl font-bold text-gray-800 max-md:hidden">Организация</h1>
                     <p className="mt-1 text-sm text-gray-500">Настройки компании</p>
                 </div>
                 <SettingsEmptyState title="Организация не найдена" message="У вас пока нет связанной организации." />
@@ -151,7 +151,7 @@ export default function Organization() {
         return (
             <div className="mt-4 space-y-6 px-4 sm:mt-5 sm:px-0">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Организация</h1>
+                    <h1 className="text-2xl font-bold text-gray-800 max-md:hidden">Организация</h1>
                     <p className="mt-1 text-sm text-gray-500">Настройки компании</p>
                 </div>
                 <SettingsCard>
@@ -169,7 +169,7 @@ export default function Organization() {
         return (
             <div className="mt-4 space-y-6 px-4 sm:mt-5 sm:px-0">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Организация</h1>
+                    <h1 className="text-2xl font-bold text-gray-800 max-md:hidden">Организация</h1>
                 </div>
                 <SettingsCard>
                     <p className="text-sm text-red-600">Ошибка: {error}</p>
@@ -181,7 +181,7 @@ export default function Organization() {
     return (
         <div className="mt-4 space-y-6 px-4 sm:mt-5 sm:px-0">
             <div>
-                <h1 className="text-2xl font-bold text-gray-800">Организация</h1>
+                <h1 className="text-2xl font-bold text-gray-800 max-md:hidden">Организация</h1>
                 <p className="mt-1 text-sm text-gray-500">Основные данные, склады и доставка</p>
             </div>
 

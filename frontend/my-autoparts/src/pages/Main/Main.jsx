@@ -1,72 +1,204 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import Search from '../Navigation/Search/Search';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchSearchResults, setSearchQuery as setGlobalSearchQuery } from '../../redux/slices/RosskoSlice';
+import { searchUsedParts } from '../../redux/slices/ProductSlice';
+
+const featureItems = [
+  {
+    title: 'Умный поиск',
+    text: 'По артикулу, бренду, названию и кроссам поставщиков.',
+    icon: (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    ),
+    tone: 'from-blue-500 to-indigo-600',
+  },
+  {
+    title: 'Чаты с продавцом',
+    text: 'Уточняйте детали и договаривайтесь без лишних звонков.',
+    icon: (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+    ),
+    tone: 'from-indigo-500 to-violet-600',
+  },
+  {
+    title: 'Склад и продажи',
+    text: 'Учёт, заказы и инструменты для магазинов в одном кабинете.',
+    icon: (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+    ),
+    tone: 'from-sky-500 to-blue-600',
+  },
+];
 
 function Main() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
+  const [query, setQuery] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const autopartsPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
+
+  const runSearch = (e) => {
+    e?.preventDefault();
+    const trimmed = query.trim();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    dispatch(setGlobalSearchQuery(trimmed));
+    Promise.all([
+      dispatch(searchUsedParts(trimmed)),
+      dispatch(fetchSearchResults({ text: trimmed })),
+    ])
+      .catch(() => {})
+      .finally(() => {
+        setBusy(false);
+        navigate(`${autopartsPath}?q=${encodeURIComponent(trimmed)}`);
+      });
+  };
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Hero Section */}
-      <section className="relative max-md:pt-6 md:pt-24 pb-16 md:pb-32 overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-1/3 h-1/2 bg-gradient-to-bl from-blue-100/30 to-transparent"></div>
-          <div className="absolute bottom-0 left-0 w-1/3 h-1/2 bg-gradient-to-tr from-indigo-100/30 to-transparent"></div>
-        </div>
-        
-        <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            <div className="space-y-8">
+    <div className="min-h-screen bg-[#f4f6fb] text-gray-900">
+      {/* Фон: мягкие пятна + лёгкая сетка */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute -left-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-blue-400/20 blur-3xl" />
+        <div className="absolute -bottom-40 -right-24 h-[32rem] w-[32rem] rounded-full bg-indigo-500/15 blur-3xl" />
+        <div className="absolute left-1/2 top-1/3 h-64 w-64 -translate-x-1/2 rounded-full bg-violet-400/10 blur-3xl" />
+        <div
+          className="absolute inset-0 opacity-[0.35]"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 1px 1px, rgb(148 163 184 / 0.35) 1px, transparent 0)',
+            backgroundSize: '28px 28px',
+          }}
+        />
+      </div>
+
+      {/* Герой */}
+      <section className="relative overflow-hidden pt-14 pb-20 sm:pt-16 sm:pb-24 md:pt-20 md:pb-28">
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-10 xl:gap-14">
+            <div className="space-y-10 lg:col-span-6 xl:col-span-6">
               <div className="space-y-6">
-                <div className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-sm font-medium border border-blue-100">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                  Добро пожаловать в "Свой Гараж"
+                <div className="inline-flex items-center gap-2 rounded-full border border-blue-100/80 bg-white/90 px-4 py-2 text-sm font-medium text-blue-800 shadow-sm shadow-blue-500/5 backdrop-blur-sm">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+                  </span>
+                  Добро пожаловать в «Свой Гараж»
                 </div>
-                
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
+                <h1 className="text-balance text-4xl font-extrabold leading-[1.12] tracking-tight text-gray-900 sm:text-5xl lg:text-[3.25rem] lg:leading-[1.08] xl:text-6xl">
                   Найдите любую
-                  <span className="block text-gray-900 mt-2">
+                  <span className="mt-1 block bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 bg-clip-text text-transparent sm:mt-0 sm:inline sm:pl-2">
                     автозапчасть
                   </span>
                 </h1>
-                
-                <p className="text-xl text-gray-600 max-w-2xl leading-relaxed">
-                  Быстро, надежно и по лучшим ценам. От частных лиц и проверенных магазинов.
-                  Экономьте время и деньги с нашей платформой.
+                <p className="max-w-xl text-pretty text-lg leading-relaxed text-gray-600 sm:text-xl">
+                  Новые и б/у детали, честные цены и прозрачные продавцы. Каталог, переписка и складской учёт — в одной
+                  экосистеме для покупателей и магазинов.
                 </p>
               </div>
-              
-              <div className="pt-4">
-                <Search />
+
+              <div className="max-w-xl rounded-2xl border border-white/60 bg-white/80 p-1 shadow-xl shadow-indigo-950/10 ring-1 ring-gray-200/60 backdrop-blur-md">
+                <form onSubmit={runSearch} className="rounded-[0.9rem] bg-white/95 p-4 sm:p-5">
+                  <label htmlFor="main-search" className="sr-only">
+                    Поиск запчастей
+                  </label>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+                    <div className="relative min-w-0 flex-1">
+                      <span className="pointer-events-none absolute inset-y-0 left-0 flex w-11 items-center justify-center text-gray-400">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </span>
+                      <input
+                        id="main-search"
+                        type="search"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Артикул, бренд, название или VIN"
+                        disabled={busy}
+                        className="min-h-[3rem] w-full rounded-xl border border-gray-200 bg-gray-50/80 py-2.5 pl-11 pr-4 text-base text-gray-900 shadow-inner placeholder:text-gray-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/25 disabled:opacity-60"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={busy || !query.trim()}
+                      className="inline-flex min-h-[3rem] shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-7 text-base font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:from-blue-700 hover:to-indigo-700 hover:shadow-indigo-600/35 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none disabled:active:scale-100"
+                    >
+                      {busy ? (
+                        <span className="flex items-center gap-2">
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                          Поиск…
+                        </span>
+                      ) : (
+                        'Найти'
+                      )}
+                    </button>
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-gray-500 sm:text-sm">
+                    Откроется раздел автозапчастей с запросом: новые (поставщики) и б/у (каталог продавцов).
+                  </p>
+                </form>
               </div>
-              
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Link 
-                  to="/autoparts/new" 
-                  className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 text-center shadow-lg"
+
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200/80 shadow-sm">
+                  Новые и б/у
+                </span>
+                <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200/80 shadow-sm">
+                  Чаты на платформе
+                </span>
+                <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200/80 shadow-sm">
+                  Для бизнеса
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <Link
+                  to={autopartsPath}
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-3 text-center text-base font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl"
                 >
-                  Найти запчасти
+                  Открыть каталог
                 </Link>
-                <Link 
-                  to="/auth" 
-                  className="px-8 py-4 bg-white text-gray-900 font-semibold rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300 text-center shadow-sm"
+                <Link
+                  to="/auth"
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl border border-gray-300/90 bg-white px-8 py-3 text-center text-base font-semibold text-gray-800 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50/60 hover:text-indigo-900 hover:shadow-md"
                 >
-                  Войти в аккаунт
+                  Войти или зарегистрироваться
                 </Link>
               </div>
             </div>
-            
-            <div className="relative">
-              <div className="absolute -top-8 -right-8 w-64 h-64 bg-blue-200 rounded-full mix-blend-multiply filter blur-2xl opacity-30"></div>
-              <div className="absolute -bottom-8 -left-8 w-64 h-64 bg-indigo-200 rounded-full mix-blend-multiply filter blur-2xl opacity-30"></div>
-              
-              <div className="relative bg-white rounded-2xl shadow-xl p-2 border border-gray-100 overflow-hidden">
-                <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <div className="w-16 h-16 bg-gray-300 rounded-full mx-auto mb-4 flex items-center justify-center">
-                      <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-                      </svg>
+
+            <div className="relative lg:col-span-6">
+              <div className="pointer-events-none absolute -right-6 top-0 h-64 w-64 rounded-full bg-gradient-to-br from-blue-400/30 to-indigo-500/20 blur-2xl sm:h-80 sm:w-80 lg:right-0" />
+              <div className="pointer-events-none absolute bottom-4 left-0 h-48 w-48 rounded-full bg-gradient-to-tr from-violet-400/25 to-transparent blur-2xl lg:-left-4" />
+              <div className="relative mx-auto max-w-md lg:max-w-none">
+                <div className="absolute -inset-1 rounded-[1.35rem] bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 opacity-[0.22] blur-sm" />
+                <div className="relative rotate-[0.5deg] rounded-2xl border border-white/70 bg-white p-4 shadow-2xl shadow-indigo-950/15 ring-1 ring-gray-200/50 sm:p-6 lg:rotate-1">
+                  <div className="overflow-hidden rounded-xl bg-gradient-to-br from-indigo-50/95 via-white to-blue-50/90 ring-1 ring-indigo-100/70">
+                    <div className="flex min-h-[min(48vh,13rem)] flex-col items-center justify-center gap-5 px-6 py-12 sm:min-h-[15rem] sm:py-14">
+                      <div className="flex h-28 w-28 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-lg shadow-indigo-600/35 sm:h-32 sm:w-32">
+                        <svg className="h-14 w-14 text-white sm:h-16 sm:w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                      <p className="max-w-xs text-center text-sm font-medium leading-snug text-gray-600">
+                        Поиск по каталогу новых и б/у запчастей
+                      </p>
                     </div>
-                    <p className="text-gray-500 font-medium">Изображение запчастей</p>
+                  </div>
+                  <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-slate-50 to-indigo-50/40 px-4 py-3 ring-1 ring-indigo-100/60">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-gray-900">Каталог в один клик</p>
+                      <p className="truncate text-xs text-gray-500">Новые и б/у — с телефона и с компьютера</p>
+                    </div>
+                    <Link
+                      to={autopartsPath}
+                      className="shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-indigo-700 shadow ring-1 ring-indigo-100 transition hover:bg-indigo-50"
+                    >
+                      Смотреть
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -75,139 +207,102 @@ function Main() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="text-center mb-20">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-              Почему выбирают нас?
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Мы создали лучшую платформу для поиска автозапчастей
+      {/* Преимущества */}
+      <section className="relative border-y border-gray-200/80 bg-white/90 py-14 shadow-[0_-12px_40px_-24px_rgba(30,27,75,0.12)] backdrop-blur-sm md:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">Почему удобно на «Свой Гараж»</h2>
+            <p className="mt-3 text-pretty text-gray-600 md:text-lg">
+              Всё, что нужно для поиска запчастей и работы магазина — без лишних вкладок и сервисов.
             </p>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            <div className="group bg-white p-8 rounded-2xl border border-gray-100 hover:border-blue-200 hover:shadow-xl transition-all duration-300">
-              <div className="w-16 h-16 bg-blue-50 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-100 transition-colors duration-300">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Быстрая доставка</h3>
-              <p className="text-gray-600 leading-relaxed">Получите запчасти в кратчайшие сроки благодаря нашей сети партнеров</p>
-            </div>
-            
-            <div className="group bg-white p-8 rounded-2xl border border-gray-100 hover:border-green-200 hover:shadow-xl transition-all duration-300">
-              <div className="w-16 h-16 bg-green-50 rounded-xl flex items-center justify-center mb-6 group-hover:bg-green-100 transition-colors duration-300">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Гарантия качества</h3>
-              <p className="text-gray-600 leading-relaxed">Все товары проходят строгую проверку перед продажей</p>
-            </div>
-            
-            <div className="group bg-white p-8 rounded-2xl border border-gray-100 hover:border-purple-200 hover:shadow-xl transition-all duration-300">
-              <div className="w-16 h-16 bg-purple-50 rounded-xl flex items-center justify-center mb-6 group-hover:bg-purple-100 transition-colors duration-300">
-                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Лучшие цены</h3>
-              <p className="text-gray-600 leading-relaxed">Конкурентные цены от прямых поставщиков без наценок</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Categories Preview */}
-      <section className="py-24 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="text-center mb-20">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-              Популярные категории
-            </h2>
-            <p className="text-xl text-gray-600 leading-relaxed">
-              Широкий ассортимент запчастей для вашего автомобиля
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { name: 'Двигатель', icon: 'engine' },
-              { name: 'Тормоза', icon: 'brake' },
-              { name: 'Подвеска', icon: 'suspension' },
-              { name: 'Электрика', icon: 'electric' },
-              { name: 'Кузов', icon: 'body' },
-              { name: 'Трансмиссия', icon: 'transmission' },
-              { name: 'Охлаждение', icon: 'cooling' },
-              { name: 'Выхлоп', icon: 'exhaust' }
-            ].map((category, index) => (
-              <Link 
-                key={index}
-                to="/autoparts/new"
-                className="bg-white rounded-xl p-6 text-center hover:shadow-lg transition-all duration-300 border border-gray-100 hover:border-blue-200 group"
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+            {featureItems.map((item) => (
+              <div
+                key={item.title}
+                className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-gradient-to-b from-white to-gray-50/90 p-6 shadow-md shadow-gray-900/5 transition duration-300 hover:-translate-y-0.5 hover:border-indigo-100 hover:shadow-lg hover:shadow-indigo-900/10"
               >
-                <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-50 transition-colors duration-300">
-                  <svg className="w-8 h-8 text-gray-400 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                <div
+                  className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${item.tone} text-white shadow-md`}
+                >
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    {item.icon}
                   </svg>
                 </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                  {category.name}
-                </h3>
-              </Link>
+                <h3 className="text-lg font-semibold text-gray-900">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">{item.text}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Statistics Section */}
-      <section className="py-24 bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl md:text-5xl font-bold mb-2">500K+</div>
-              <div className="text-blue-100">Запчастей в каталоге</div>
+      {/* Платформа */}
+      <section className="py-16 md:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">Платформа продажи и учёта</h2>
+            <p className="mt-3 text-pretty text-lg text-gray-600">
+              Покупайте запчасти и ведите складской учёт в одном месте — с чатами и ролями для команды.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-8 md:grid-cols-2 md:gap-10">
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/90 bg-white p-8 shadow-xl shadow-gray-900/5 ring-1 ring-gray-100 transition hover:ring-indigo-200/80">
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-indigo-500/10 blur-2xl" />
+              <div className="relative">
+                <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-800">
+                  Покупатель
+                </div>
+                <h3 className="mt-4 text-xl font-bold text-gray-900">Каталог и заказы</h3>
+                <p className="mt-3 leading-relaxed text-gray-600">
+                  После регистрации доступны новые и б/у позиции, фильтры и карточки товара. Уточнить детали можно в чате
+                  с продавцом прямо на платформе.
+                </p>
+              </div>
             </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold mb-2">15K+</div>
-              <div className="text-blue-100">Довольных клиентов</div>
-            </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold mb-2">24/7</div>
-              <div className="text-blue-100">Поддержка</div>
-            </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold mb-2">5 лет</div>
-              <div className="text-blue-100">На рынке</div>
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/90 bg-white p-8 shadow-xl shadow-gray-900/5 ring-1 ring-gray-100 transition hover:ring-blue-200/80">
+              <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-blue-500/10 blur-2xl" />
+              <div className="relative">
+                <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-800">
+                  Продавец
+                </div>
+                <h3 className="mt-4 text-xl font-bold text-gray-900">Склад и выгода</h3>
+                <p className="mt-3 leading-relaxed text-gray-600">
+                  Продавайте свои позиции, ведите остатки и операции. Для продавцов действует{' '}
+                  <span className="font-semibold text-gray-900">скидка на покупку новых запчастей</span> — удобно
+                  пополнять склад через ту же экосистему.
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-24 bg-white">
-        <div className="max-w-4xl mx-auto text-center px-6 lg:px-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-            Готовы найти нужные запчасти?
+      {/* CTA */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 py-16 md:py-20">
+        <div className="pointer-events-none absolute inset-0 opacity-40">
+          <div className="absolute left-0 top-0 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white blur-3xl" />
+          <div className="absolute bottom-0 right-0 h-96 w-96 translate-x-1/3 translate-y-1/3 rounded-full bg-indigo-400 blur-3xl" />
+        </div>
+        <div className="relative mx-auto max-w-3xl px-4 text-center sm:px-6">
+          <h2 className="text-2xl font-bold tracking-tight text-white drop-shadow-sm md:text-3xl">
+            Готовы найти нужную деталь?
           </h2>
-          <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed">
-            Присоединяйтесь к тысячам довольных клиентов уже сегодня
+          <p className="mt-4 text-pretty text-lg text-indigo-100 md:text-xl">
+            Начните с поиска или каталога. Тип аккаунта можно выбрать при регистрации.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link 
-              to="/autoparts/new"
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 text-center"
+          <div className="mt-10 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:justify-center">
+            <Link
+              to={autopartsPath}
+              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-8 py-3 text-center text-base font-semibold text-indigo-700 shadow-lg shadow-indigo-950/20 transition hover:bg-indigo-50 hover:shadow-xl"
             >
-              Начать поиск
+              Перейти в каталог
             </Link>
-            <Link 
+            <Link
               to="/auth"
-              className="px-8 py-4 bg-white text-gray-900 font-semibold rounded-lg border-2 border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-300 text-center"
+              className="inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-white/80 bg-white/10 px-8 py-3 text-center text-base font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
             >
-              Создать аккаунт
+              Зарегистрироваться
             </Link>
           </div>
         </div>

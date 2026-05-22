@@ -46,8 +46,16 @@ function AutoParts() {
   
   useEffect(() => {
     const qs = searchParams.toString();
+    const filtersSuffix = location.pathname.endsWith('/filters') ? '/filters' : '';
+    const onUsedPath = location.pathname.includes('/autoparts/used');
+    const onNewPath = location.pathname.includes('/autoparts/new');
+    const keepFiltersPath = Boolean(filtersSuffix) && (
+      (!showNewAutoparts || activeTab !== 'rossko') ? onUsedPath : onNewPath
+    );
+    const suffix = keepFiltersPath ? '/filters' : '';
+
     if (!showNewAutoparts || activeTab !== 'rossko') {
-      navigate(`/autoparts/used${qs ? `?${qs}` : ''}`, { replace: true });
+      navigate(`/autoparts/used${suffix}${qs ? `?${qs}` : ''}`, { replace: true });
     } else {
       const params = new URLSearchParams();
       NEW_PARTS_URL_KEYS.forEach((key) => {
@@ -57,10 +65,10 @@ function AutoParts() {
           params.set(key, searchParams.get(key));
         }
       });
-      const qs = params.toString();
-      navigate(`/autoparts/new${qs ? `?${qs}` : ''}`, { replace: true });
+      const nextQs = params.toString();
+      navigate(`/autoparts/new${suffix}${nextQs ? `?${nextQs}` : ''}`, { replace: true });
     }
-  }, [activeTab, navigate, searchParams, showNewAutoparts]);
+  }, [activeTab, navigate, searchParams, showNewAutoparts, location.pathname]);
   
   // Состояние для переключения вида карточек в б/у запчастях
   const [usedPartsView, setUsedPartsView] = useState('grid'); // 'grid' or 'list'
@@ -115,8 +123,11 @@ function AutoParts() {
       }
     });
     const qs = params.toString();
-    navigate(`/autoparts/new${qs ? `?${qs}` : ''}`, { replace: true });
-  }, [searchParams, navigate]);
+    const basePath = location.pathname.includes('/new/filters')
+      ? '/autoparts/new/filters'
+      : '/autoparts/new';
+    navigate(`${basePath}${qs ? `?${qs}` : ''}`, { replace: true });
+  }, [searchParams, navigate, location.pathname]);
 
   const handleNewPartsSearch = useCallback(async (text) => {
     const trimmed = text.trim();
@@ -264,11 +275,11 @@ function AutoParts() {
 
         {/* Переключатель вкладок */}
         <div className="mb-3 sm:mb-6 max-md:px-3 max-md:py-2">
-        <div className="flex items-center gap-2 overflow-x-auto">
+        <div className="flex snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {showNewAutoparts && (
             <button
               onClick={() => setActiveTab('rossko')}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'rossko'
+              className={`min-h-11 shrink-0 snap-start rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'rossko'
                   ? 'bg-indigo-500 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
@@ -278,7 +289,7 @@ function AutoParts() {
           )}
           <button
             onClick={() => setActiveTab('my')}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'my'
+            className={`min-h-11 shrink-0 snap-start rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'my'
                 ? 'bg-indigo-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}

@@ -13,6 +13,7 @@ import {
   saleLineTotal,
   isAvitoSale,
 } from './dashboardUtils';
+import ResponsiveDataView from '../../components/ResponsiveDataView/ResponsiveDataView';
 
 function KpiCard({ label, value, sub, accent = 'indigo', onClick }) {
   const accents = {
@@ -231,6 +232,9 @@ export default function DashboardPage() {
             {sales.recentSales.length === 0 ? (
               <p className="text-gray-500 text-sm py-4 text-center">Пока нет зафиксированных продаж</p>
             ) : (
+              <ResponsiveDataView
+                isEmpty={false}
+                renderDesktop={() => (
               <div className="overflow-x-auto -mx-1">
                 <table className="min-w-full text-sm">
                   <thead>
@@ -268,6 +272,41 @@ export default function DashboardPage() {
                   </tbody>
                 </table>
               </div>
+                )}
+                renderMobile={() =>
+                  sales.recentSales.map((sale) => (
+                    <div
+                      key={sale.id}
+                      className="rounded-xl border border-gray-100 bg-gray-50/80 p-4 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-500">{formatShortDate(sale.movement_date)}</p>
+                          <p className="mt-1 font-semibold text-gray-900">
+                            {sale.product?.brand ? `${sale.product.brand} · ` : ''}
+                            {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-base font-bold text-gray-900">
+                          {formatCurrency(saleLineTotal(sale))}
+                        </p>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between text-sm">
+                        <span className="text-gray-600">{sale.quantity} шт.</span>
+                        {isAvitoSale(sale) ? (
+                          <span className="inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                            Авито
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                            Склад
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                }
+              />
             )}
           </Section>
         </div>

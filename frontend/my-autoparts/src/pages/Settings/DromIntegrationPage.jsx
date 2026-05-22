@@ -93,7 +93,7 @@ export default function DromIntegrationPage() {
         >
           ← Назад к интеграциям
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Интеграция Drom</h1>
+        <h1 className="text-2xl font-bold text-gray-900 max-md:hidden">Интеграция Drom</h1>
         <p className="text-sm text-gray-600 mt-1">Управление интеграцией с площадкой Drom.ru</p>
       </div>
 
@@ -113,7 +113,7 @@ export default function DromIntegrationPage() {
       <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Подключение к Drom API</h2>
         
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex max-md:flex-col max-md:items-stretch max-md:gap-3 items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -148,7 +148,7 @@ export default function DromIntegrationPage() {
             type="button"
             disabled={saving || loading}
             onClick={handleSave}
-            className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors max-md:min-h-11"
           >
             {saving ? 'Сохранение…' : 'Сохранить'}
           </button>

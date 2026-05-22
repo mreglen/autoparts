@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import ProductCard from '../ProductCard';
+import UsedPartsFiltersForm from './UsedPartsFiltersForm';
 import {
   selectCatalogItems,
   selectCatalogTotal,
   selectCatalogPage,
   selectCatalogPageSize,
   selectCatalogLoading,
-  selectCatalogFacets,
-  selectPublicPartTypes,
 } from '../../../redux/slices/ProductSlice';
 import { selectSearchQuery } from '../../../redux/slices/RosskoSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
@@ -49,21 +48,16 @@ const formatPhoneNumber = (phone) => {
   return formatted;
 };
 
-const COLLAPSED_FILTER_LIMIT = 3;
-
 const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl }) => {
   const dispatch = useDispatch();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [expandedFilterGroups, setExpandedFilterGroups] = useState({});
 
   const usedPartsData = useSelector(selectUsedPartsData);
   const catalogItems = useSelector(selectCatalogItems);
   const catalogTotal = useSelector(selectCatalogTotal);
   const catalogPage = useSelector(selectCatalogPage);
   const catalogPageSize = useSelector(selectCatalogPageSize);
-  const catalogFacets = useSelector(selectCatalogFacets);
-  const publicPartTypes = useSelector(selectPublicPartTypes);
   const searchQuery = useSelector(selectSearchQuery);
   const isCatalogMode = !(searchQuery || '').trim();
   const catalogLoading = useSelector(selectCatalogLoading);
@@ -94,39 +88,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     vehicleModels: searchParams.getAll('vm'),
     hasPhotos: searchParams.get('has_photos') === '1',
   }), [searchParams]);
-
-  const searchFacets = useMemo(() => {
-    const countValues = (values) => {
-      const counts = new Map();
-      values.filter(Boolean).forEach((value) => {
-        counts.set(value, (counts.get(value) || 0) + 1);
-      });
-      return Array.from(counts.entries())
-        .map(([value, count]) => ({ value, count }))
-        .sort((a, b) => String(a.value).localeCompare(String(b.value), 'ru'));
-    };
-
-    const parts = [...availableParts, ...analogParts];
-    const vehicleBrands = [];
-    const vehicleModels = [];
-
-    parts.forEach((part) => {
-      (part.compatible_vehicles || []).forEach((vehicle) => {
-        vehicleBrands.push(vehicle.brand);
-        vehicleModels.push(vehicle.model);
-      });
-    });
-
-    return {
-      brands: countValues(parts.map((part) => part.brand)),
-      vehicle_brands: countValues(vehicleBrands),
-      vehicle_models: countValues(vehicleModels),
-    };
-  }, [availableParts, analogParts]);
-
-  const brandOptions = isCatalogMode ? (catalogFacets?.brands || []) : searchFacets.brands;
-  const vehicleBrandOptions = isCatalogMode ? (catalogFacets?.vehicle_brands || []) : searchFacets.vehicle_brands;
-  const vehicleModelOptions = isCatalogMode ? (catalogFacets?.vehicle_models || []) : searchFacets.vehicle_models;
 
   const matchesActiveFilters = useCallback((part) => {
     if (
@@ -172,29 +133,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     const updates = { [key]: value };
     if (key !== 'page') updates.page = 1;
     updateCatalogUrl(updates);
-  };
-
-  const toggleMultiFilter = (key, value) => {
-    const currentValues = searchParams.getAll(key);
-    const nextValues = currentValues.includes(String(value))
-      ? currentValues.filter((item) => item !== String(value))
-      : [...currentValues, String(value)];
-    setFilter(key, nextValues);
-  };
-
-  const clearFilters = () => {
-    if (!updateCatalogUrl) return;
-    updateCatalogUrl({
-      part_type: null,
-      brand: null,
-      vmin: null,
-      vmax: null,
-      vb: null,
-      vm: null,
-      vehicle_id: null,
-      has_photos: null,
-      page: 1,
-    });
   };
 
   // Sort parts based on selected option
@@ -361,6 +299,82 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     );
   };
 
+  const renderPartListCard = (part, listKey) => {
+    const availableQty = part.quantity || part.available_count || 0;
+    const sellerOrg = part.organization || organization;
+    return (
+      <div
+        key={listKey}
+        className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+      >
+        <div className="flex flex-row gap-3 p-3 sm:gap-4 sm:p-4">
+          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-40 sm:w-40 lg:h-44 lg:w-44">
+            <MediaDisplay part={part} />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div className="min-w-0 flex-1">
+                <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-gray-900 sm:text-base sm:leading-normal lg:text-lg">
+                  {part.brand} {part.name || part.article}
+                </h3>
+                <p className="mt-0.5 text-xs text-gray-500 sm:text-sm">
+                  Артикул: <span className="font-medium text-gray-700">{part.article || '—'}</span>
+                </p>
+              </div>
+              <div className="shrink-0 text-base font-bold text-indigo-600 sm:text-right sm:text-xl lg:text-2xl">
+                {part.price ? `${Number(part.price).toLocaleString('ru-RU')} ₽` : '—'}
+              </div>
+            </div>
+            {part.description ? (
+              <p className="line-clamp-2 text-xs text-gray-600 sm:text-sm">{part.description}</p>
+            ) : null}
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 sm:text-sm">
+              <div className="flex min-w-0 max-w-full items-start gap-1">
+                <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                </svg>
+                <span className="min-w-0 break-words">{getStorageAddress(part.storage_location_id, part.storage_location)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className={availableQty > 0 ? 'font-medium text-green-600' : 'font-medium text-red-600'}>
+                  {availableQty > 0 ? `В наличии: ${availableQty} шт.` : 'Нет в наличии'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-slate-50/80 px-3 py-2.5 sm:px-4">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+              {(sellerOrg?.name || 'Продавец').substring(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-gray-900">{sellerOrg?.name || 'Продавец'}</p>
+              {sellerOrg?.contact_person ? (
+                <p className="truncate text-xs text-gray-600">{sellerOrg.contact_person}</p>
+              ) : null}
+            </div>
+          </div>
+          {sellerOrg?.phone ? (
+            <a
+              href={`tel:${sellerOrg.phone.replace(/\D/g, '')}`}
+              className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600"
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              <span className="hidden sm:inline">{formatPhoneNumber(sellerOrg.phone)}</span>
+              <span className="sm:hidden">Позвонить</span>
+            </a>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
+
 
 
 
@@ -368,149 +382,22 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const hasAnalogParts = sortedAnalogParts.length > 0;
   const visibleTotal = isCatalogMode ? catalogTotal : sortedAvailableParts.length + sortedAnalogParts.length;
 
-  const toggleFilterGroup = (groupKey) => {
-    setExpandedFilterGroups((prev) => ({
-      ...prev,
-      [groupKey]: !prev[groupKey],
-    }));
-  };
-
-  const buildFilterOptionsList = (options, selectedValues) => {
-    const selectedSet = new Set(selectedValues.map(String));
-    const withSelectedValues = [...options];
-    const knownValues = new Set(options.map((option) => String(option.value)));
-
-    selectedSet.forEach((value) => {
-      if (!knownValues.has(value)) {
-        withSelectedValues.push({ value, label: value });
-      }
-    });
-
-    return withSelectedValues;
-  };
-
-  const getCollapsedFilterOptions = (allOptions, selectedValues) => {
-    const selectedSet = new Set(selectedValues.map(String));
-    const visible = [];
-    const seen = new Set();
-
-    allOptions.forEach((option) => {
-      const optionValue = String(option.value);
-      if ((visible.length < COLLAPSED_FILTER_LIMIT || selectedSet.has(optionValue)) && !seen.has(optionValue)) {
-        visible.push(option);
-        seen.add(optionValue);
-      }
-    });
-
-    return visible;
-  };
-
-  const renderCheckboxGroup = ({ title, groupKey, options, selectedValues, urlKey }) => {
-    const allOptions = buildFilterOptionsList(options, selectedValues);
-    const collapsedOptions = getCollapsedFilterOptions(allOptions, selectedValues);
-    const isExpanded = Boolean(expandedFilterGroups[groupKey]);
-    const visibleOptions = isExpanded ? allOptions : collapsedOptions;
-    const showToggle = allOptions.length > COLLAPSED_FILTER_LIMIT;
-
-    return (
-      <div>
-        <p className="block text-xs font-medium text-gray-600 mb-2">{title}</p>
-        <div className="space-y-2">
-          {visibleOptions.length > 0 ? (
-            visibleOptions.map((option) => {
-              const value = String(option.value);
-              return (
-                <label key={value} className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={selectedValues.includes(value)}
-                    onChange={() => toggleMultiFilter(urlKey, value)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className="min-w-0 flex-1 truncate">{option.label || option.value}</span>
-                  {typeof option.count === 'number' && (
-                    <span className="text-xs text-gray-400">{option.count}</span>
-                  )}
-                </label>
-              );
-            })
-          ) : (
-            <p className="text-xs text-gray-400">Нет вариантов</p>
-          )}
-        </div>
-        {showToggle && (
-          <button
-            type="button"
-            onClick={() => toggleFilterGroup(groupKey)}
-            className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
-          >
-            {isExpanded ? 'Скрыть' : 'Показать больше'}
-          </button>
-        )}
-      </div>
-    );
-  };
-
-  const partTypeOptions = publicPartTypes.map((partType) => ({
-    value: String(partType.id),
-    label: partType.name,
-  }));
-
-  const filtersPanel = (
-    <div className="space-y-4">
-      {renderCheckboxGroup({
-        title: 'Категории',
-        groupKey: 'partTypes',
-        options: partTypeOptions,
-        selectedValues: activeFilters.partTypes,
-        urlKey: 'part_type',
-      })}
-      {renderCheckboxGroup({
-        title: 'Бренды',
-        groupKey: 'brands',
-        options: brandOptions,
-        selectedValues: activeFilters.brands,
-        urlKey: 'brand',
-      })}
-      <div className="grid grid-cols-2 gap-2">
-        <input type="number" placeholder="Цена от" value={searchParams.get('vmin') || ''} onChange={(e) => setFilter('vmin', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-        <input type="number" placeholder="Цена до" value={searchParams.get('vmax') || ''} onChange={(e) => setFilter('vmax', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-      </div>
-      {renderCheckboxGroup({
-        title: 'Марки авто',
-        groupKey: 'vehicleBrands',
-        options: vehicleBrandOptions,
-        selectedValues: activeFilters.vehicleBrands,
-        urlKey: 'vb',
-      })}
-      {renderCheckboxGroup({
-        title: 'Модели',
-        groupKey: 'vehicleModels',
-        options: vehicleModelOptions,
-        selectedValues: activeFilters.vehicleModels,
-        urlKey: 'vm',
-      })}
-      <label className="flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" checked={searchParams.get('has_photos') === '1'} onChange={(e) => setFilter('has_photos', e.target.checked ? '1' : null)} />
-        Только с фото
-      </label>
-      <button type="button" onClick={clearFilters} className="w-full text-sm text-indigo-600 hover:text-indigo-800 font-medium">Сбросить фильтры</button>
-    </div>
-  );
-
   return (
     <div className="mt-0 w-full px-0 max-md:pb-2">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0">
         <p className="text-sm text-gray-600">Найдено: <span className="font-semibold text-gray-900">{visibleTotal}</span></p>
-        <button type="button" onClick={() => setFiltersOpen(!filtersOpen)} className="rounded-full bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 lg:hidden">
-          {filtersOpen ? 'Скрыть фильтры' : 'Фильтры'}
-        </button>
+        <Link
+          to={{ pathname: '/autoparts/used/filters', search: location.search }}
+          className="rounded-full bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 lg:hidden"
+        >
+          Фильтры
+        </Link>
       </div>
       <div className="flex flex-col gap-4 px-3 sm:gap-6 sm:px-0 lg:flex-row">
-        <aside className={`${filtersOpen ? 'block' : 'hidden'} w-full flex-shrink-0 lg:block lg:w-64`}>
+        <aside className="hidden w-full flex-shrink-0 lg:block lg:w-64">
           <div className="rounded-lg border border-gray-200 bg-white p-4 lg:sticky lg:top-4">
-            <h3 className="font-semibold text-gray-900 mb-3 hidden lg:block">Фильтры</h3>
-            {filtersPanel}
+            <h3 className="font-semibold text-gray-900 mb-3">Фильтры</h3>
+            <UsedPartsFiltersForm updateCatalogUrl={updateCatalogUrl} showClearInPanel />
           </div>
         </aside>
         <div className="flex-1 min-w-0">
@@ -573,101 +460,18 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             </div>
           )}
 
+          {/* List view — компактная строка: превью + данные, продавец снизу */}
+          {viewMode === 'list' && (
+            <div className="space-y-3">
+              {sortedAvailableParts.map((part) => renderPartListCard(part, part.id))}
+            </div>
+          )}
+
           {isCatalogMode && totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-2 flex-wrap">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
               <button type="button" disabled={catalogPage <= 1} onClick={() => setFilter('page', catalogPage - 1)} className="px-3 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40">Назад</button>
               <span className="text-sm text-gray-600 px-2">Стр. {catalogPage} из {totalPages}</span>
               <button type="button" disabled={catalogPage >= totalPages} onClick={() => setFilter('page', catalogPage + 1)} className="px-3 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40">Вперёд</button>
-            </div>
-          )}
-          
-          {/* List view - список */}
-          {viewMode === 'list' && (
-            <div className="space-y-3">
-              {sortedAvailableParts.map((part) => {
-                const availableQty = part.quantity || part.available_count || 0;
-                const sellerOrg = part.organization || organization;
-                
-                return (
-                  <div 
-                    key={part.id}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
-                  >
-                    <div className="p-4">
-                      <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Photo/Video with navigation */}
-                        <div className="w-full sm:w-48 h-48 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
-                          <MediaDisplay part={part} />
-                        </div>
-                        
-                        {/* Info */}
-                        <div className="flex-1 flex flex-col">
-                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
-                            <div className="flex-1">
-                              <h3 className="text-base sm:text-lg font-semibold text-gray-900">{part.brand} {part.name || part.article}</h3>
-                              <p className="text-xs sm:text-sm text-gray-500 mt-1">Артикул: <span className="font-medium">{part.article || '—'}</span></p>
-                            </div>
-                            <div className="text-xl sm:text-2xl font-bold text-indigo-600 whitespace-nowrap">
-                              {part.price ? `${part.price.toLocaleString()} ₽` : '—'}
-                            </div>
-                          </div>
-                          
-                          {part.description && (
-                            <p className="text-xs sm:text-sm text-gray-600 mb-3 line-clamp-2">{part.description}</p>
-                          )}
-                          
-                          <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-3">
-                            <div className="flex items-center gap-1">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              </svg>
-                              <span>{getStorageAddress(part.storage_location_id, part.storage_location)}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span className={availableQty > 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                                {availableQty > 0 ? `В наличии: ${availableQty} шт.` : 'Нет в наличии'}
-                              </span>
-                            </div>
-                          </div>
-                          
-                        </div>
-                        
-                        {/* Seller Info - Right Side */}
-                        <div className="flex-shrink-0 w-full sm:w-80">
-                          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-3 border border-gray-200">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                                {(sellerOrg?.name || 'Продавец').substring(0, 2).toUpperCase()}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold text-gray-900 truncate">{sellerOrg?.name || 'Продавец'}</p>
-                                {sellerOrg?.contact_person && (
-                                  <p className="text-xs text-gray-600 truncate">{sellerOrg.contact_person}</p>
-                                )}
-                              </div>
-                            </div>
-                            {sellerOrg?.phone && (
-                              <a
-                                href={`tel:${sellerOrg.phone.replace(/\D/g, '')}`}
-                                className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                </svg>
-                                <span className="hidden sm:inline">{formatPhoneNumber(sellerOrg.phone)}</span>
-                                <span className="sm:hidden">Позвонить</span>
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           )}
         </>
@@ -717,93 +521,10 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             </div>
           )}
           
-          {/* List view - список */}
+          {/* List view — аналоги */}
           {viewMode === 'list' && (
             <div className="space-y-3">
-              {sortedAnalogParts.map((part) => {
-                const availableQty = part.quantity || part.available_count || 0;
-                const sellerOrg = part.organization || organization;
-                
-                return (
-                  <div 
-                    key={`analog-${part.id}`}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
-                  >
-                    <div className="p-4">
-                      <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Photo/Video with navigation */}
-                        <div className="w-full sm:w-48 h-48 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
-                          <MediaDisplay part={part} />
-                        </div>
-                        
-                        {/* Info */}
-                        <div className="flex-1 flex flex-col">
-                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
-                            <div className="flex-1">
-                              <h3 className="text-base sm:text-lg font-semibold text-gray-900">{part.brand} {part.name || part.article}</h3>
-                              <p className="text-xs sm:text-sm text-gray-500 mt-1">Артикул: <span className="font-medium">{part.article || '—'}</span></p>
-                            </div>
-                            <div className="text-xl sm:text-2xl font-bold text-indigo-600 whitespace-nowrap">
-                              {part.price ? `${part.price.toLocaleString()} ₽` : '—'}
-                            </div>
-                          </div>
-                          
-                          {part.description && (
-                            <p className="text-xs sm:text-sm text-gray-600 mb-3 line-clamp-2">{part.description}</p>
-                          )}
-                          
-                          <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-3">
-                            <div className="flex items-center gap-1">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              </svg>
-                              <span>{getStorageAddress(part.storage_location_id, part.storage_location)}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span className={availableQty > 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                                {availableQty > 0 ? `В наличии: ${availableQty} шт.` : 'Нет в наличии'}
-                              </span>
-                            </div>
-                          </div>
-                          
-                        </div>
-                        
-                        {/* Seller Info - Right Side */}
-                        <div className="flex-shrink-0 w-full sm:w-80">
-                          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-3 border border-gray-200">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                                {(sellerOrg?.name || 'Продавец').substring(0, 2).toUpperCase()}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold text-gray-900 truncate">{sellerOrg?.name || 'Продавец'}</p>
-                                {sellerOrg?.contact_person && (
-                                  <p className="text-xs text-gray-600 truncate">{sellerOrg.contact_person}</p>
-                                )}
-                              </div>
-                            </div>
-                            {sellerOrg?.phone && (
-                              <a
-                                href={`tel:${sellerOrg.phone.replace(/\D/g, '')}`}
-                                className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                </svg>
-                                <span className="hidden sm:inline">{formatPhoneNumber(sellerOrg.phone)}</span>
-                                <span className="sm:hidden">Позвонить</span>
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {sortedAnalogParts.map((part) => renderPartListCard(part, `analog-${part.id}`))}
             </div>
           )}
         </>

@@ -13,6 +13,7 @@ import {
   labelEventType,
   parseDetails,
 } from './auditDisplay';
+import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 
 function AuditDetailModal({ event, meta, onClose }) {
   if (!event) return null;
@@ -222,6 +223,7 @@ export default function AuditLogPage() {
         )}
       </div>
 
+      <MobileCollapsibleFilters title="Фильтры журнала">
       <div className="mb-6 grid grid-cols-1 gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-2 lg:grid-cols-4">
         <div>
           <label className="mb-1 block text-xs font-medium text-gray-600">С даты</label>
@@ -338,6 +340,7 @@ export default function AuditLogPage() {
           onApply={() => setPage(1)}
         />
       </div>
+      </MobileCollapsibleFilters>
 
       {error && (
         <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>

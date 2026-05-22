@@ -5,6 +5,7 @@ import MobileHeader from '../components/MobileHeader/MobileHeader';
 import MobileBottomNav from '../components/MobileBottomNav/MobileBottomNav';
 import MobileSideMenu from '../components/MobileSideMenu/MobileSideMenu';
 import { useMobileMenuShell } from '../hooks/useMobileMenuShell';
+import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
 
 export default function MainLayout() {
     const location = useLocation();
@@ -50,6 +51,7 @@ export default function MainLayout() {
                 <Outlet />
             </main>
 
+            <InstallPwaPrompt />
             <MobileBottomNav />
         </div>
     );

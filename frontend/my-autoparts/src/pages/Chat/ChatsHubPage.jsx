@@ -155,7 +155,7 @@ const ChatsHubPage = () => {
     : null;
 
   return (
-    <div className="flex w-full min-h-0 flex-col max-md:min-h-[calc(100dvh-7rem)] md:static md:min-h-0">
+    <div className="flex w-full min-h-0 flex-col max-md:min-h-[calc(100dvh-7rem)] max-md:pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] md:static md:min-h-0">
       <div className="flex min-h-0 w-full flex-1 flex-row bg-white md:h-[calc(100vh-200px)] md:overflow-hidden md:rounded-lg md:border md:border-gray-200 md:shadow-sm">
         {/* Левая панель - Список чатов */}
         <div

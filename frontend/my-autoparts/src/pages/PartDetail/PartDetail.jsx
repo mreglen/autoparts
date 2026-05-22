@@ -329,7 +329,7 @@ const PartDetail = () => {
   const sellerOrg = currentProduct.organization || organization;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 max-md:pb-28">
       {/* Back Button */}
       <div className="max-w-6xl mx-auto px-4 py-4">
         <button
@@ -344,13 +344,13 @@ const PartDetail = () => {
       </div>
 
       {/* Main Product Card */}
-      <div className="max-w-6xl mx-auto px-4 pb-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="max-w-6xl mx-auto px-4 pb-8 max-md:pb-32">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden max-md:rounded-none max-md:border-x-0 max-md:border-t-0">
           {/* Header with Product Info */}
           <div className="p-5 border-b border-gray-100">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="flex-1">
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 leading-tight">
+                <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 max-md:hidden sm:text-3xl">
                   {currentProduct.name || '—'}
                 </h1>
                 <div className="flex flex-wrap gap-2 items-center">
@@ -394,7 +394,7 @@ const PartDetail = () => {
           {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
             {/* Left - Media Gallery (2 columns) */}
-            <div className="lg:col-span-2 p-5 border-r border-gray-100">
+            <div className="border-r border-gray-100 p-5 max-md:border-r-0 max-md:px-0 max-md:pt-0 lg:col-span-2">
               {(currentProduct.photos && currentProduct.photos.length > 0) || (currentProduct.videos && currentProduct.videos.length > 0) ? (
                 <div>
                   {(() => {
@@ -553,7 +553,7 @@ const PartDetail = () => {
           {/* Right - Info & Actions (1 column) */}
           <div className="p-5 space-y-4">
             {/* Stock & Location */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-100">
                 <div className="text-2xl font-bold text-emerald-700">{currentProduct.quantity || 0} шт.</div>
               </div>
@@ -577,7 +577,7 @@ const PartDetail = () => {
 
             {/* Add to Cart */}
             {currentProduct && (
-            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <div className="hidden rounded-xl border border-gray-200 bg-gray-50 p-4 md:block">
               {(() => {
                 const cartQuantity = getCartQuantity(currentProduct.id);
                 const stockInfo = getStockAvailability(currentProduct);
@@ -806,6 +806,70 @@ const PartDetail = () => {
         </div>
       )}
     </div>
+
+      {currentProduct ? (
+        <div
+          className="md:hidden fixed inset-x-0 z-[44] border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/90 shadow-[0_-6px_24px_rgba(0,0,0,0.08)]"
+          style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
+        >
+          <div className="mx-auto flex max-w-6xl items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs text-gray-500">Цена</div>
+              <div className="truncate text-lg font-bold text-gray-900">
+                {currentProduct.price ? `${currentProduct.price.toLocaleString()} ₽` : '—'}
+              </div>
+            </div>
+            {(() => {
+              const cartQuantity = getCartQuantity(currentProduct.id);
+              const stockInfo = getStockAvailability(currentProduct);
+              const isAdding = addingToCartId === currentProduct.id;
+              if (cartQuantity > 0) {
+                return (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFromCart(currentProduct)}
+                      disabled={isAdding}
+                      className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 bg-white text-xl font-bold disabled:opacity-50"
+                    >
+                      −
+                    </button>
+                    <span className="w-10 text-center text-lg font-bold">{cartQuantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleAddToCart(currentProduct)}
+                      disabled={isAdding || stockInfo.noStock}
+                      className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 bg-white text-xl font-bold disabled:opacity-50"
+                    >
+                      +
+                    </button>
+                  </div>
+                );
+              }
+              return (
+                <button
+                  type="button"
+                  onClick={() => handleAddToCart(currentProduct)}
+                  disabled={isAdding || stockInfo.noStock}
+                  className="min-h-11 shrink-0 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isAdding ? '…' : 'В корзину'}
+                </button>
+              );
+            })()}
+            {(sellerOrg?.phone || sellerOrg?.contact_person) ? (
+              <button
+                type="button"
+                onClick={handleWriteToSeller}
+                disabled={creatingChat}
+                className="min-h-11 shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-800 disabled:opacity-50"
+              >
+                {creatingChat ? '…' : 'Чат'}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

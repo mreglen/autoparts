@@ -12,6 +12,7 @@ import ProfileMenuTabs from '../pages/Profile/menu/ProfileMenuTabs';
 import { useAuthReady } from '../hooks/useAuthReady';
 import { useMobileMenuShell } from '../hooks/useMobileMenuShell';
 import AuthLoadingScreen from '../components/AuthLoadingScreen/AuthLoadingScreen';
+import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
 
 export default function ProfileWithMenuLayout() {
     const dispatch = useDispatch();
@@ -100,6 +101,7 @@ export default function ProfileWithMenuLayout() {
                 </div>
             </main>
 
+            <InstallPwaPrompt />
             <MobileBottomNav />
         </div>
     );

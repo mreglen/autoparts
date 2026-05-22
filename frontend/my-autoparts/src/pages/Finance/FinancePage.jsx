@@ -9,6 +9,7 @@ import {
   formatFinanceDate,
   getMonthRangeDefaults,
 } from './financeDisplay';
+import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
 
 const TABS = [
   { id: 'summary', label: 'Сводка' },
@@ -173,6 +174,7 @@ export default function FinancePage() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+        <MobileCollapsibleFilters title="Период и параметры">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <label className="block text-sm">
             <span className="text-gray-600">Период с</span>
@@ -228,6 +230,7 @@ export default function FinancePage() {
             {loading ? 'Загрузка...' : 'Обновить'}
           </button>
         </div>
+        </MobileCollapsibleFilters>
       </div>
 
       {error && (

@@ -13,6 +13,8 @@ import ProfilePage from './pages/Profile/ProfilePage';
 import PasswordReset from './pages/Autorization/PasswordReset/PasswordReset';
 import Home from './pages/Home/Home';
 import AutoParts from './pages/AutoParts/AutoParts';
+import UsedPartsFiltersPage from './pages/AutoParts/UsedParts/UsedPartsFiltersPage';
+import NewPartsFiltersPage from './pages/AutoParts/NewParts/NewPartsFiltersPage';
 import Main from './pages/Main/Main';
 import MyParts from './pages/MyParts/MyParts';
 import AddPart from './pages/MyParts/AddPart/AddPart';
@@ -126,7 +128,9 @@ function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Main />} />
           <Route path="/autoparts" element={<Navigate to="/autoparts/new" replace />} />
+          <Route path="/autoparts/new/filters" element={<NewPartsFiltersPage />} />
           <Route path="/autoparts/new" element={<AutoParts />} />
+          <Route path="/autoparts/used/filters" element={<UsedPartsFiltersPage />} />
           <Route path="/autoparts/used" element={<AutoParts />} />
           <Route path="/autoservice" element={<Home />} />
           <Route path="/cart" element={<CartPage />} />

@@ -12,6 +12,8 @@ import PrintReceiptModal from '../PrintReceiptModal/PrintReceiptModal';
 import { normalizeImageUrl, apiRequest, apiRequestFormData } from '../../../utils/apiClient';
 import { useAuthReady } from '../../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
+import MobilePageSection from '../../../components/MobilePageSection/MobilePageSection';
+import MobileStickyFooter from '../../../components/MobileStickyFooter/MobileStickyFooter';
 
 const EditPart = () => {
   const navigate = useNavigate();
@@ -999,13 +1001,13 @@ const EditPart = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Редактировать запчасть</h1>
+    <div className="max-w-4xl mx-auto p-6 max-md:pb-32">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold max-md:hidden">Редактировать запчасть</h1>
         <button
           type="button"
           onClick={() => setIsPrintModalOpen(true)}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md flex items-center gap-2 transition-colors"
+          className="flex min-h-11 shrink-0 items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-white transition-colors hover:bg-indigo-700"
           title="Распечатать этикетку"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1014,7 +1016,8 @@ const EditPart = () => {
           Печать
         </button>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form id="edit-part-form" onSubmit={handleSubmit} className="space-y-6 md:space-y-6">
+        <MobilePageSection title="Основное">
         {/* Артикул */}
         <div>
           <label className="block text-sm font-medium">Артикул *</label>
@@ -1097,7 +1100,9 @@ const EditPart = () => {
             placeholder="Введите описание запчасти..."
           />
         </div>
+        </MobilePageSection>
 
+        <MobilePageSection title="Фото и видео">
         {/* Медиа */}
         <div>
           <label className="block text-sm font-medium">Медиа *</label>
@@ -1350,7 +1355,9 @@ const EditPart = () => {
             </div>
           )}
         </div>
+        </MobilePageSection>
 
+        <MobilePageSection title="Состояние">
         {/* Состояние */}
         <div>
           <label className="block text-sm font-medium">Состояние</label>
@@ -1364,7 +1371,9 @@ const EditPart = () => {
             <option value="б/у">Б/у</option>
           </select>
         </div>
+        </MobilePageSection>
 
+        <MobilePageSection title="Автомобиль">
         {/* Автомобиль */}
         {selectedVehicle && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
@@ -1406,11 +1415,13 @@ const EditPart = () => {
         <button
           type="button"
           onClick={() => setIsVehicleModalOpen(true)}
-          className="text-indigo-600 underline"
+          className="min-h-11 text-left text-base font-medium text-indigo-600 underline"
         >
           {selectedVehicle ? 'Изменить автомобиль' : 'Выбрать или добавить автомобиль'}
         </button>
+        </MobilePageSection>
 
+        <MobilePageSection title="Остаток и склад">
         {/* Количество */}
         <div>
           <label className="block text-sm font-medium">Количество *</label>
@@ -1458,12 +1469,14 @@ const EditPart = () => {
             ))}
           </select>
         </div>
+        </MobilePageSection>
 
         {/* Адресное хранение - выбор ячеек */}
         {formData.storage_location_id && (
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-lg font-medium text-gray-900">Адресное хранение</h3>
+          <MobilePageSection title="Адресное хранение">
+          <div className="rounded-lg bg-gray-50 p-4 max-md:bg-white max-md:p-0 md:bg-gray-50 md:p-4">
+            <div className="mb-3 flex flex-col gap-2 max-md:gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="hidden text-lg font-medium text-gray-900 md:block">Адресное хранение</h3>
               <button
                 type="button"
                 onClick={() => setShowNewCellForm(!showNewCellForm)}
@@ -1507,39 +1520,56 @@ const EditPart = () => {
             )}
             
             {locationCells.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border border-gray-300 border-collapse rounded-lg">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      {locationCells.map((cell) => (
-                        <th key={cell.id} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 last:border-r-0">
-                          {cell.name}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      {locationCells.map((cell) => (
-                        <td key={cell.id} className="px-4 py-3 border-r border-gray-300 last:border-r-0">
-                          <input
-                            type="text"
-                            value={cellValues[cell.id] || ''}
-                            onChange={(e) => handleCellValueChange(cell.id, e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="Введите значение"
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="min-w-full border border-gray-300 border-collapse rounded-lg">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        {locationCells.map((cell) => (
+                          <th key={cell.id} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase border-r border-gray-300 last:border-r-0">
+                            {cell.name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        {locationCells.map((cell) => (
+                          <td key={cell.id} className="px-4 py-3 border-r border-gray-300 last:border-r-0">
+                            <input
+                              type="text"
+                              value={cellValues[cell.id] || ''}
+                              onChange={(e) => handleCellValueChange(cell.id, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              placeholder="Введите значение"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <ul className="space-y-3 md:hidden">
+                  {locationCells.map((cell) => (
+                    <li key={cell.id} className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
+                      <label className="mb-1 block text-sm font-semibold text-gray-800">{cell.name}</label>
+                      <input
+                        type="text"
+                        value={cellValues[cell.id] || ''}
+                        onChange={(e) => handleCellValueChange(cell.id, e.target.value)}
+                        className="min-h-11 w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Введите значение"
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
+          </MobilePageSection>
         )}
 
-        <div className="flex gap-3">
+        <div className="hidden gap-3 md:flex">
           <button
             type="submit"
             disabled={productStatus || isUploadingMedia}
@@ -1565,6 +1595,19 @@ const EditPart = () => {
           </button>
         </div>
       </form>
+
+      <MobileStickyFooter
+        formId="edit-part-form"
+        primaryLabel={productStatus || isUploadingMedia ? 'Обновление...' : 'Обновить запчасть'}
+        primaryDisabled={productStatus || isUploadingMedia}
+        secondaryLabel="Отмена"
+        onSecondary={async () => {
+          await cleanupTempFiles();
+          setPhotos([]);
+          setVideos([]);
+          navigate('/my-parts');
+        }}
+      />
 
       <VehicleModal
         isOpen={isVehicleModalOpen}
