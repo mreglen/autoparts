@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.user import User as UserModel
 
 ADMIN_AUDIT_PERMISSION_CODE = "admin.audit"
+SETTINGS_INTEGRATION_AVITO_PERMISSION_CODE = "settings.integration.avito"
 
 
 def org_has_admin_director(db: Session, org_id: Optional[str]) -> bool:

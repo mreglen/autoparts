@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { apiRequest, apiRequestFormData, API_BASE, BACKEND_BASE } from '../../utils/apiClient';
+import { useAuthReady } from '../../hooks/useAuthReady';
+import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { canAccessAvitoIntegration } from './integrationAccess';
 
 const AD_TYPE_NOT_SPECIFIED = '__NOT_SPECIFIED__';
 
@@ -350,8 +353,10 @@ function mapLastAutoloadToState(last) {
 }
 
 export default function AvitoIntegrationPage() {
-  const { user } = useSelector((s) => s.auth);
+  const { isReady, user } = useAuthReady();
+  const permissionCodes = useSelector((s) => s.auth.permissionCodes);
   const orgId = user?.organization_id;
+  const canAccess = canAccessAvitoIntegration(user, permissionCodes);
 
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
@@ -823,6 +828,14 @@ export default function AvitoIntegrationPage() {
       setUploading(false);
     }
   };
+
+  if (!isReady) {
+    return <AuthLoadingScreen />;
+  }
+
+  if (!canAccess) {
+    return <Navigate to="/" replace />;
+  }
 
   if (!orgId) {
     return (

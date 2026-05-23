@@ -20,7 +20,11 @@ from app.schemas.audit import PermissionsContextResponse
 from app.db.database import get_db
 from app.services.audit_service import log_audit
 from app.utils.user_public_code import assign_public_code
-from app.utils.org_access import ADMIN_AUDIT_PERMISSION_CODE, org_has_admin_director
+from app.utils.org_access import (
+    ADMIN_AUDIT_PERMISSION_CODE,
+    SETTINGS_INTEGRATION_AVITO_PERMISSION_CODE,
+    org_has_admin_director,
+)
 
 router = APIRouter(prefix="/employees", tags=["Employees"])
 
@@ -53,6 +57,10 @@ def _ensure_default_permissions(db: Session) -> None:
         {"code": "vehicles", "name": "Автомобили"},
         {"code": "sales.orders", "name": "Заказы"},
         {"code": "finance.reports", "name": "Финансовые отчёты"},
+        {
+            "code": SETTINGS_INTEGRATION_AVITO_PERMISSION_CODE,
+            "name": "Интеграция Авито",
+        },
         {"code": ADMIN_AUDIT_PERMISSION_CODE, "name": "Журнал событий"},
     ]
     for perm in defaults:

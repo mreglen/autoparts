@@ -48,6 +48,7 @@ from app.services import avito_api as avito_api_svc
 from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload, upsert_products_to_avito_autoload
 from app.services.avito_media import ensure_local_pictures, normalize_for_xlsx
 from app.utils.avito_crypto import decrypt_secret, encrypt_secret
+from app.utils.integration_access import ensure_avito_integration_access
 
 logger = logging.getLogger(__name__)
 
@@ -116,11 +117,6 @@ def _remove_existing_avito_xlsx_files(base_dir: Path) -> None:
                 p.unlink()
             except OSError as e:
                 logger.warning("Не удалось удалить старый файл автозагрузки %s: %s", p, e)
-
-
-def _ensure_org_access(user: UserModel, org_id: str) -> None:
-    if user.organization_id != org_id and not user.is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нет доступа к организации")
 
 
 def _org_exists(db: Session, org_id: str) -> OrganizationModel:
@@ -332,7 +328,7 @@ async def get_avito_autoload_category_tree(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
 
     now = time.time()
@@ -364,7 +360,7 @@ def get_avito_credentials(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
     row = db.query(OrganizationAvitoIntegration).filter(
         OrganizationAvitoIntegration.organization_id == org_id
@@ -394,7 +390,7 @@ async def download_avito_autoload(
     current_user: UserModel = Depends(get_current_user),
 ):
     """Скачать файл автозагрузки без кэширования."""
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
     
     cache = (
@@ -434,7 +430,7 @@ async def sync_avito_ad_ids(
     current_user: UserModel = Depends(get_current_user),
 ):
     """Sync Avito ad IDs using autoload API - fast batch sync."""
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
     
     # Get Avito integration
@@ -618,7 +614,7 @@ async def export_products_to_avito_autoload_async(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
     if not _has_avito_integration(db, org_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Авито не настроена")
@@ -660,7 +656,7 @@ async def publish_avito_autoload_async(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
     cache = db.query(OrganizationAvitoAutoloadCache).filter(
         OrganizationAvitoAutoloadCache.organization_id == org_id
@@ -694,7 +690,7 @@ async def get_avito_autoload_job_status(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     job = db.query(AvitoAutoloadJob).filter(
         AvitoAutoloadJob.id == job_id,
         AvitoAutoloadJob.organization_id == org_id,
@@ -765,7 +761,7 @@ async def export_products_to_avito_autoload(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     org = _org_exists(db, org_id)
     if not _has_avito_integration(db, org_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Авито не настроена")
@@ -901,7 +897,7 @@ def put_avito_credentials(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
 
     row = db.query(OrganizationAvitoIntegration).filter(
@@ -957,7 +953,7 @@ def toggle_avito_integration_enabled(
     current_user: UserModel = Depends(get_current_user),
 ):
     """Toggle Avito integration enabled/disabled state."""
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
 
     row = db.query(OrganizationAvitoIntegration).filter(
@@ -1001,7 +997,7 @@ async def upload_avito_autoload(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
 
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
@@ -1215,7 +1211,7 @@ async def set_avito_autoload_category(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
 
     cache = db.query(OrganizationAvitoAutoloadCache).filter(
@@ -1293,7 +1289,7 @@ async def set_avito_autoload_ad_type(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
 
     cache = db.query(OrganizationAvitoAutoloadCache).filter(
@@ -1378,7 +1374,7 @@ async def import_avito_autoload_rows(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
 
     if not current_user.is_seller:
@@ -1719,7 +1715,7 @@ async def publish_avito_autoload(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
     if not _has_avito_integration(db, org_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Авито не настроена")
@@ -1770,7 +1766,7 @@ async def apply_avito_autoload_actions(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
 
     cache = (
@@ -1871,7 +1867,7 @@ async def remove_avito_autoload_rows(
     current_user: UserModel = Depends(get_current_user),
 ):
     """Удаляет строки из XLSX файла и обновляет кэш."""
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
 
     cache = (
@@ -1971,7 +1967,7 @@ async def debug_avito_item_detail(
     DEBUG ENDPOINT - temporarily exposed for testing.
     Fetches first item from Avito API and returns full detail response.
     """
-    _ensure_org_access(current_user, org_id)
+    ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
     
     # Get Avito integration

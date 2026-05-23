@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { apiRequest, apiRequestFormData, BACKEND_BASE, normalizeImageUrl } from '../../utils/apiClient';
+import { useAuthReady } from '../../hooks/useAuthReady';
+import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { canAccessAvitoIntegration } from './integrationAccess';
 
 const AD_TYPE_NOT_SPECIFIED = '__NOT_SPECIFIED__';
 const AD_TYPE_OPTIONS = [
@@ -397,9 +400,11 @@ function ImportModal({
 }
 
 export default function AvitoNomenclaturePage() {
-  const { user } = useSelector((s) => s.auth);
+  const { isReady, user } = useAuthReady();
+  const permissionCodes = useSelector((s) => s.auth.permissionCodes);
   const orgId = user?.organization_id;
   const navigate = useNavigate();
+  const canAccess = canAccessAvitoIntegration(user, permissionCodes);
 
   const [items, setItems] = useState([]);
   const [uploadResult, setUploadResult] = useState(null);
@@ -699,6 +704,14 @@ export default function AvitoNomenclaturePage() {
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [loadCredentials, loading]);
+
+  if (!isReady) {
+    return <AuthLoadingScreen />;
+  }
+
+  if (!canAccess) {
+    return <Navigate to="/" replace />;
+  }
 
   if (!orgId) {
     return (
