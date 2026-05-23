@@ -1,9 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 export default function NotFoundPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-center justify-center px-4 sm:px-6 lg:px-8">
+      <Helmet>
+        <title>404 — страница не найдена | Свой Гараж</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       <div className="max-w-md w-full text-center">
         <div className="mb-8">
           <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-indigo-100 mb-6">
@@ -31,6 +36,12 @@ export default function NotFoundPage() {
                 className="px-4 py-2 text-indigo-600 hover:text-indigo-800 font-medium text-sm rounded-lg hover:bg-indigo-50 transition-colors"
               >
                 Автозапчасти
+              </Link>
+              <Link
+                to="/catalog"
+                className="px-4 py-2 text-indigo-600 hover:text-indigo-800 font-medium text-sm rounded-lg hover:bg-indigo-50 transition-colors"
+              >
+                Каталог
               </Link>
             </div>
           </div>

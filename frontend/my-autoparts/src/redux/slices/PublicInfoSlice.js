@@ -18,6 +18,18 @@ export const fetchPublicSiteConfig = createAsyncThunk(
 /** @deprecated используйте fetchPublicSiteConfig */
 export const fetchAdminOrganizationPhone = fetchPublicSiteConfig;
 
+export const fetchSiteQuickLinks = createAsyncThunk(
+  'publicInfo/fetchSiteQuickLinks',
+  async (_, { rejectWithValue }) => {
+    try {
+      const result = await apiRequestUnauth('/public/site-quick-links');
+      return Array.isArray(result) ? result : [];
+    } catch (err) {
+      return rejectWithValue(err?.message || 'Ошибка загрузки быстрых ссылок');
+    }
+  }
+);
+
 const publicInfoSlice = createSlice({
   name: 'publicInfo',
     initialState: {
@@ -26,6 +38,8 @@ const publicInfoSlice = createSlice({
         newPartsMarkupPercent: 15,
         usedPartsPurchaseMode: 'both',
         adminSellerMarkupContext: null,
+        quickLinks: [],
+        quickLinksLoading: false,
         loading: false,
         error: null,
     },
@@ -79,6 +93,17 @@ const publicInfoSlice = createSlice({
         state.error = action.payload;
         state.showNewAutoparts = true;
         state.newPartsMarkupPercent = 15;
+      })
+      .addCase(fetchSiteQuickLinks.pending, (state) => {
+        state.quickLinksLoading = true;
+      })
+      .addCase(fetchSiteQuickLinks.fulfilled, (state, action) => {
+        state.quickLinksLoading = false;
+        state.quickLinks = action.payload || [];
+      })
+      .addCase(fetchSiteQuickLinks.rejected, (state) => {
+        state.quickLinksLoading = false;
+        state.quickLinks = [];
       });
   },
 });

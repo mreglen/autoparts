@@ -6,10 +6,14 @@ import MobileBottomNav from '../components/MobileBottomNav/MobileBottomNav';
 import MobileSideMenu from '../components/MobileSideMenu/MobileSideMenu';
 import { useMobileMenuShell } from '../hooks/useMobileMenuShell';
 import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
+import Breadcrumbs from '../components/Breadcrumbs/Breadcrumbs';
+import { usePageBreadcrumbs } from '../hooks/usePageBreadcrumbs';
 
 export default function MainLayout() {
     const location = useLocation();
     const { user } = useSelector((state) => state.auth);
+    const breadcrumbItems = usePageBreadcrumbs();
+    const isPartPage = location.pathname.startsWith('/part/');
 
     const isAutopartsPage = location.pathname.startsWith('/autoparts');
 
@@ -48,6 +52,9 @@ export default function MainLayout() {
                         : 'max-w-7xl max-md:px-3 max-md:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                 }`}
             >
+                {breadcrumbItems.length > 0 ? (
+                    <Breadcrumbs items={breadcrumbItems} includeJsonLd={!isPartPage} />
+                ) : null}
                 <Outlet />
             </main>
 

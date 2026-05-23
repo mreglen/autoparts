@@ -187,6 +187,8 @@ export default function Navigation() {
               <DesktopNavLink to="/autoparts/new">Новые запчасти</DesktopNavLink>
             )}
             <DesktopNavLink to="/autoparts/used">Б/У</DesktopNavLink>
+            <DesktopNavLink to="/delivery">Доставка</DesktopNavLink>
+            <DesktopNavLink to="/payment">Оплата</DesktopNavLink>
             <DesktopNavLink to="/about">О компании</DesktopNavLink>
           </nav>
         </div>

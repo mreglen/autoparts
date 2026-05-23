@@ -60,6 +60,15 @@ function AdminPanelPage() {
   const [siteDeliveryOptions, setSiteDeliveryOptions] = useState([]);
   const [siteDeliveryLoading, setSiteDeliveryLoading] = useState(true);
   const [siteDeliverySaving, setSiteDeliverySaving] = useState(false);
+  const [siteQuickLinks, setSiteQuickLinks] = useState([]);
+  const [siteQuickLinksLoading, setSiteQuickLinksLoading] = useState(true);
+  const [siteQuickLinksSaving, setSiteQuickLinksSaving] = useState(false);
+  const [newQuickLinkRow, setNewQuickLinkRow] = useState({
+    title: '',
+    url: '/catalog',
+    sort_order: '100',
+    enabled: true,
+  });
   const [newDeliveryRow, setNewDeliveryRow] = useState({
     region_id: '11162',
     region_name: 'Урал',
@@ -93,6 +102,11 @@ function AdminPanelPage() {
   const loadSiteDelivery = async () => {
     const rows = await apiRequest('/admin/site-delivery');
     setSiteDeliveryOptions(Array.isArray(rows) ? rows : []);
+  };
+
+  const loadSiteQuickLinks = async () => {
+    const rows = await apiRequest('/admin/site-quick-links');
+    setSiteQuickLinks(Array.isArray(rows) ? rows : []);
   };
 
   const loadYandex = async () => {
@@ -154,6 +168,7 @@ function AdminPanelPage() {
         await loadYandex();
         await loadYandexDiagnostics();
         await loadSiteDelivery();
+        await loadSiteQuickLinks();
       } catch (e) {
         if (!cancelled) {
           setError(e?.message || 'Не удалось загрузить настройки Яндекс');
@@ -161,6 +176,7 @@ function AdminPanelPage() {
       } finally {
         if (!cancelled) setYandexLoading(false);
         if (!cancelled) setSiteDeliveryLoading(false);
+        if (!cancelled) setSiteQuickLinksLoading(false);
       }
     })();
     return () => {
@@ -593,6 +609,59 @@ function AdminPanelPage() {
       setError(e?.message || 'Ошибка добавления способа доставки');
     } finally {
       setSiteDeliverySaving(false);
+    }
+  };
+
+  const toggleSiteQuickLink = async (row) => {
+    setSiteQuickLinksSaving(true);
+    setError(null);
+    try {
+      await apiRequest(`/admin/site-quick-links/${row.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled: !row.enabled }),
+      });
+      await loadSiteQuickLinks();
+    } catch (e) {
+      setError(e?.message || 'Ошибка обновления быстрой ссылки');
+    } finally {
+      setSiteQuickLinksSaving(false);
+    }
+  };
+
+  const createSiteQuickLink = async () => {
+    setSiteQuickLinksSaving(true);
+    setError(null);
+    try {
+      await apiRequest('/admin/site-quick-links', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: newQuickLinkRow.title.trim(),
+          url: newQuickLinkRow.url.trim(),
+          sort_order: Number(newQuickLinkRow.sort_order || 0),
+          enabled: Boolean(newQuickLinkRow.enabled),
+        }),
+      });
+      await loadSiteQuickLinks();
+      setNewQuickLinkRow({ title: '', url: '/catalog', sort_order: '100', enabled: true });
+      setYandexNotice('Быстрая ссылка добавлена');
+    } catch (e) {
+      setError(e?.message || 'Ошибка добавления быстрой ссылки');
+    } finally {
+      setSiteQuickLinksSaving(false);
+    }
+  };
+
+  const deleteSiteQuickLink = async (row) => {
+    if (!window.confirm(`Удалить быструю ссылку «${row.title}»?`)) return;
+    setSiteQuickLinksSaving(true);
+    setError(null);
+    try {
+      await apiRequest(`/admin/site-quick-links/${row.id}`, { method: 'DELETE' });
+      await loadSiteQuickLinks();
+    } catch (e) {
+      setError(e?.message || 'Ошибка удаления быстрой ссылки');
+    } finally {
+      setSiteQuickLinksSaving(false);
     }
   };
 
@@ -1080,6 +1149,95 @@ function AdminPanelPage() {
                   {JSON.stringify(yandexFeedsList, null, 2)}
                 </pre>
               )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">
+          Быстрые ссылки (для сниппета Яндекса)
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Яндекс формирует быстрые ссылки автоматически из популярных разделов сайта.
+          Здесь вы управляете блоком «Популярные разделы» на главной и навигацией.
+          Проверка и правка сниппета — в Вебмастере → Представление в поиске → Быстрые ссылки.
+        </p>
+
+        {siteQuickLinksLoading ? (
+          <p className="text-sm text-gray-500">Загрузка быстрых ссылок…</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 text-left text-gray-500">
+                  <tr>
+                    <th className="px-3 py-2">Название</th>
+                    <th className="px-3 py-2">URL</th>
+                    <th className="px-3 py-2">Порядок</th>
+                    <th className="px-3 py-2">Вкл.</th>
+                    <th className="px-3 py-2">Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {siteQuickLinks.map((row) => (
+                    <tr key={row.id} className="border-t border-gray-100">
+                      <td className="px-3 py-2">{row.title}</td>
+                      <td className="px-3 py-2 font-mono text-xs">{row.url}</td>
+                      <td className="px-3 py-2">{row.sort_order}</td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleSiteQuickLink(row)}
+                          disabled={siteQuickLinksSaving}
+                          className={`rounded px-2 py-1 text-xs ${row.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+                        >
+                          {row.enabled ? 'вкл' : 'выкл'}
+                        </button>
+                      </td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => deleteSiteQuickLink(row)}
+                          disabled={siteQuickLinksSaving}
+                          className="text-xs text-red-600 hover:underline disabled:opacity-50"
+                        >
+                          Удалить
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <input
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                placeholder="Название"
+                value={newQuickLinkRow.title}
+                onChange={(e) => setNewQuickLinkRow((prev) => ({ ...prev, title: e.target.value }))}
+              />
+              <input
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
+                placeholder="/catalog"
+                value={newQuickLinkRow.url}
+                onChange={(e) => setNewQuickLinkRow((prev) => ({ ...prev, url: e.target.value }))}
+              />
+              <input
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                placeholder="sort_order"
+                value={newQuickLinkRow.sort_order}
+                onChange={(e) => setNewQuickLinkRow((prev) => ({ ...prev, sort_order: e.target.value }))}
+              />
+              <button
+                type="button"
+                onClick={createSiteQuickLink}
+                disabled={siteQuickLinksSaving || !newQuickLinkRow.title.trim() || !newQuickLinkRow.url.trim()}
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Добавить ссылку
+              </button>
             </div>
           </div>
         )}

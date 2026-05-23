@@ -39,6 +39,8 @@ from app.routers.orders_legacy import router as orders_legacy_router
 from app.routers.yandex_feeds import router as yandex_feeds_router
 from app.routers.public_feeds import router as public_feeds_router
 from app.routers.site_delivery import router as site_delivery_router
+from app.routers.site_quick_links import router as site_quick_links_router
+from app.routers.public_pages import router as public_pages_router
 
 
 
@@ -87,4 +89,6 @@ api_router.include_router(orders_legacy_router)
 api_router.include_router(yandex_feeds_router)
 api_router.include_router(public_feeds_router)
 api_router.include_router(site_delivery_router)
+api_router.include_router(site_quick_links_router)
+api_router.include_router(public_pages_router)
 

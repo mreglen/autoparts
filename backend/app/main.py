@@ -31,6 +31,7 @@ import app.models.site_yandex_integration  # noqa: F401 — yandex integration
 import app.models.yandex_feed_sync_state  # noqa: F401 — yandex feed sync state
 import app.models.yandex_oauth_state  # noqa: F401 — yandex oauth state
 import app.models.site_delivery_option  # noqa: F401 — site delivery matrix
+import app.models.site_quick_link  # noqa: F401 — site quick links
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings

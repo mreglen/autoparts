@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
 import { fetchProduct, searchAllProducts } from '../../redux/slices/ProductSlice';
@@ -8,6 +8,7 @@ import { createOrGetChat } from '../../redux/slices/ChatSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
 import { buildPartDetailPath } from '../../utils/partRoutes';
+import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
 
 const SITE_ORIGIN = 'https://svoygarage.ru';
@@ -81,6 +82,7 @@ const PartDetail = () => {
   }
   
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
@@ -339,6 +341,10 @@ const PartDetail = () => {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
+        <Helmet>
+          <title>Запчасть не найдена | Свой Гараж</title>
+          <meta name="robots" content="noindex, nofollow" />
+        </Helmet>
         <div className="text-center">
           <p className="text-lg text-red-600">Ошибка загрузки информации о запчасти</p>
           <p className="text-sm text-gray-500 mt-2">{error}</p>
@@ -356,6 +362,10 @@ const PartDetail = () => {
   if (!currentProduct) {
     return (
       <div className="min-h-screen flex items-center justify-center">
+        <Helmet>
+          <title>Запчасть не найдена | Свой Гараж</title>
+          <meta name="robots" content="noindex, nofollow" />
+        </Helmet>
         <div className="text-center">
           <p className="text-lg text-gray-600">Запчасть не найдена</p>
           <button 
@@ -371,6 +381,11 @@ const PartDetail = () => {
 
   const sellerOrg = currentProduct.organization || organization;
   const seo = buildProductSeo(currentProduct);
+  const breadcrumbItems = buildBreadcrumbsForPath(location.pathname, { product: currentProduct });
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
+  const structuredData = breadcrumbJsonLd
+    ? { '@context': 'https://schema.org', '@graph': [seo.jsonLd, breadcrumbJsonLd] }
+    : seo.jsonLd;
 
   return (
     <div className="min-h-screen bg-gray-50 max-md:pb-28">
@@ -391,7 +406,7 @@ const PartDetail = () => {
             <meta property="product:price:currency" content="RUB" />
           </>
         ) : null}
-        <script type="application/ld+json">{JSON.stringify(seo.jsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
       </Helmet>
       {/* Back Button */}
       <div className="max-w-6xl mx-auto px-4 py-4">

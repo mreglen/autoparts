@@ -1,0 +1,94 @@
+export const SITE_ORIGIN = 'https://svoygarage.ru';
+
+function absoluteUrl(path) {
+  if (!path || path === '/') return `${SITE_ORIGIN}/`;
+  return `${SITE_ORIGIN}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+export function buildBreadcrumbJsonLd(items) {
+  if (!items?.length) return null;
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => {
+      const entry = {
+        '@type': 'ListItem',
+        position: index + 1,
+        name: item.label,
+      };
+      if (item.href) {
+        entry.item = absoluteUrl(item.href);
+      }
+      return entry;
+    }),
+  };
+}
+
+export function buildBreadcrumbsForPath(pathname, context = {}) {
+  const path = (pathname || '/').split('?')[0];
+
+  if (path === '/') {
+    return [];
+  }
+
+  const items = [{ label: 'Главная', href: '/' }];
+
+  if (path === '/catalog') {
+    items.push({ label: 'Каталог' });
+    return items;
+  }
+
+  if (path === '/about') {
+    items.push({ label: 'О компании' });
+    return items;
+  }
+
+  if (path === '/delivery') {
+    items.push({ label: 'Доставка' });
+    return items;
+  }
+
+  if (path === '/payment') {
+    items.push({ label: 'Оплата' });
+    return items;
+  }
+
+  if (path === '/autoparts/new') {
+    items.push({ label: 'Новые запчасти' });
+    return items;
+  }
+
+  if (path === '/autoparts/new/filters') {
+    items.push({ label: 'Новые запчасти', href: '/autoparts/new' });
+    items.push({ label: 'Фильтры' });
+    return items;
+  }
+
+  if (path === '/autoparts/used') {
+    items.push({ label: 'Б/у запчасти' });
+    return items;
+  }
+
+  if (path === '/autoparts/used/filters') {
+    items.push({ label: 'Б/у запчасти', href: '/autoparts/used' });
+    items.push({ label: 'Фильтры' });
+    return items;
+  }
+
+  if (path.startsWith('/part/')) {
+    const product = context.product;
+    const sectionLabel = product?.is_new ? 'Новые запчасти' : 'Б/у запчасти';
+    const sectionHref = product?.is_new ? '/autoparts/new' : '/autoparts/used';
+    items.push({ label: sectionLabel, href: sectionHref });
+
+    const brand = (product?.brand || '').trim();
+    const article = (product?.article || '').trim();
+    const name = (product?.name || '').trim();
+    const leafLabel = brand && article ? `${brand} ${article}` : name || 'Карточка товара';
+    items.push({ label: leafLabel });
+    return items;
+  }
+
+  return [];
+}
