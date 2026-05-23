@@ -49,6 +49,11 @@ function AdminPanelPage() {
   const [debounceSeconds, setDebounceSeconds] = useState('300');
   const [controlSyncIntervalMinutes, setControlSyncIntervalMinutes] = useState('720');
   const [yandexEnabled, setYandexEnabled] = useState(true);
+  const [yandexAccessToken, setYandexAccessToken] = useState('');
+  const [yandexStatusBusy, setYandexStatusBusy] = useState(false);
+  const [yandexEnableBusy, setYandexEnableBusy] = useState(false);
+  const [yandexWebmasterStatus, setYandexWebmasterStatus] = useState(null);
+  const [yandexEnableResult, setYandexEnableResult] = useState(null);
 
   const yandexConnected = Boolean(yandexIntegration?.connected);
   const callbackParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
@@ -401,6 +406,121 @@ function AdminPanelPage() {
     }
   };
 
+  const saveYandexManualToken = async () => {
+    const token = yandexAccessToken.trim();
+    if (!token) {
+      setError('Введите OAuth access token');
+      return;
+    }
+    setYandexSaving(true);
+    setError(null);
+    setYandexNotice(null);
+    try {
+      const res = await apiRequest('/admin/yandex/oauth/token', {
+        method: 'POST',
+        body: JSON.stringify({ access_token: token }),
+      });
+      setYandexIntegration(res);
+      hydrateYandexForm(res);
+      setYandexAccessToken('');
+      setYandexNotice('OAuth токен сохранен, user_id получен из API');
+      await loadYandex();
+    } catch (e) {
+      setError(e?.message || 'Не удалось сохранить OAuth токен');
+    } finally {
+      setYandexSaving(false);
+    }
+  };
+
+  const checkYandexWebmasterStatus = async () => {
+    setYandexStatusBusy(true);
+    setError(null);
+    try {
+      const res = await apiRequest('/admin/yandex/webmaster/status');
+      setYandexWebmasterStatus(res);
+      await loadYandex();
+      if (res.feeds) {
+        setYandexFeedsList(res);
+      }
+    } catch (e) {
+      setError(e?.message || 'Ошибка проверки состояния API Яндекс Вебмастера');
+    } finally {
+      setYandexStatusBusy(false);
+    }
+  };
+
+  const enableYandexIntegration = async () => {
+    setYandexEnableBusy(true);
+    setError(null);
+    setYandexNotice(null);
+    setYandexEnableResult(null);
+    try {
+      const res = await apiRequest('/admin/yandex/setup/enable', {
+        method: 'POST',
+        body: JSON.stringify({
+          host_url: hostUrl.trim() || 'https://svoygarage.ru',
+          trigger_sync: true,
+        }),
+      });
+      setYandexEnableResult(res);
+      setYandexIntegration(res.integration);
+      hydrateYandexForm(res.integration);
+      setYandexEnabled(true);
+      if (res.ok) {
+        setYandexNotice('Интеграция включена: сайт проверен, загрузка фида запущена');
+      } else {
+        setError(
+          res.host?.note ||
+            'Интеграция включена, но права на сайт не подтверждены. Подтвердите сайт в Вебмастере.'
+        );
+      }
+      await loadYandex();
+      await checkYandexWebmasterStatus();
+    } catch (e) {
+      setError(e?.message || 'Ошибка включения интеграции Яндекс');
+    } finally {
+      setYandexEnableBusy(false);
+    }
+  };
+
+  const yandexSetupSteps = [
+    {
+      id: 'oauth',
+      label: 'OAuth подключен',
+      done: yandexConnected,
+    },
+    {
+      id: 'user',
+      label: 'user_id получен',
+      done: Boolean(yandexIntegration?.yandex_user_id || yandexWebmasterStatus?.user_id),
+    },
+    {
+      id: 'host',
+      label: 'Сайт добавлен в Вебмастер',
+      done: Boolean(yandexIntegration?.host_id),
+    },
+    {
+      id: 'verified',
+      label: 'Права на сайт подтверждены',
+      done: Boolean(
+        yandexWebmasterStatus?.verified ||
+          yandexHostResult?.verified ||
+          yandexEnableResult?.host?.verified
+      ),
+    },
+    {
+      id: 'feed',
+      label: 'Фид загружен в Яндекс',
+      done: Boolean(
+        yandexSyncStatus?.last_process_status === 'OK' ||
+          (Array.isArray(yandexFeedsList?.feeds) &&
+            yandexFeedsList.feeds.some((f) =>
+              String(f.url || '').includes('/api/feeds/yandex/used.yml')
+            ))
+      ),
+    },
+  ];
+
   return (
     <div className="max-w-4xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Настройки</h1>
@@ -487,13 +607,70 @@ function AdminPanelPage() {
           Яндекс Товары / Вебмастер
         </h2>
         <p className="text-sm text-gray-500 mb-4">
-          OAuth, проверка сайта и асинхронная загрузка товарного YML-фида.
+          OAuth, проверка сайта и асинхронная загрузка товарного YML-фида. Все шаги выполняются здесь, в `/admin-settings`.
         </p>
 
         {yandexLoading ? (
           <p className="text-sm text-gray-500">Загрузка настроек Яндекс…</p>
         ) : (
           <div className="space-y-6">
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
+              <h3 className="font-medium text-gray-900 mb-3">Быстрое включение</h3>
+              <ol className="space-y-2 mb-4">
+                {yandexSetupSteps.map((step) => (
+                  <li key={step.id} className="flex items-center gap-2 text-sm">
+                    <span
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold ${
+                        step.done
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {step.done ? '✓' : '•'}
+                    </span>
+                    <span className={step.done ? 'text-gray-900' : 'text-gray-600'}>
+                      {step.label}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={enableYandexIntegration}
+                  disabled={yandexEnableBusy || !yandexConnected}
+                  className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {yandexEnableBusy ? 'Включение…' : 'Включить интеграцию'}
+                </button>
+                <button
+                  type="button"
+                  onClick={checkYandexWebmasterStatus}
+                  disabled={yandexStatusBusy || !yandexConnected}
+                  className="inline-flex items-center rounded-md border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+                >
+                  {yandexStatusBusy ? 'Проверка…' : 'Проверить состояние API'}
+                </button>
+              </div>
+              {yandexWebmasterStatus && (
+                <div className="mt-3 text-xs text-gray-600 space-y-1">
+                  <p>user_id: {yandexWebmasterStatus.user_id || '—'}</p>
+                  <p>verified: {String(Boolean(yandexWebmasterStatus.verified))}</p>
+                  <p>ready_for_sync: {String(Boolean(yandexWebmasterStatus.ready_for_sync))}</p>
+                  {yandexWebmasterStatus.verification?.verification_uin && (
+                    <p>
+                      meta verification code: {yandexWebmasterStatus.verification.verification_uin}
+                    </p>
+                  )}
+                </div>
+              )}
+              {yandexEnableResult && (
+                <pre className="mt-3 rounded-md bg-white p-3 text-xs text-gray-700 overflow-auto border border-indigo-100">
+                  {JSON.stringify(yandexEnableResult, null, 2)}
+                </pre>
+              )}
+            </div>
+
             <div className="rounded-lg border border-gray-200 p-4">
               <h3 className="font-medium text-gray-900 mb-3">OAuth приложение</h3>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -560,6 +737,31 @@ function AdminPanelPage() {
                 {yandexIntegration?.yandex_user_id && (
                   <p>Yandex user_id: {yandexIntegration.yandex_user_id}</p>
                 )}
+              </div>
+              <div className="mt-4 border-t border-gray-100 pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  OAuth access token (ручной ввод)
+                </label>
+                <div className="grid sm:grid-cols-[1fr_auto] gap-3">
+                  <input
+                    type="password"
+                    value={yandexAccessToken}
+                    onChange={(e) => setYandexAccessToken(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="y0__..."
+                  />
+                  <button
+                    type="button"
+                    onClick={saveYandexManualToken}
+                    disabled={yandexSaving || !yandexAccessToken.trim()}
+                    className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Сохранить токен
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Альтернатива OAuth code flow: токен проверяется через `GET /v4/user`, затем сохраняется в БД.
+                </p>
               </div>
             </div>
 

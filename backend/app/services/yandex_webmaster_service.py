@@ -174,6 +174,14 @@ def list_hosts(user_id: int, token: str) -> dict:
     return _request_json("GET", f"{_api_base()}/user/{user_id}/hosts", token=token)
 
 
+def get_host_verification(user_id: int, host_id: str, token: str) -> dict:
+    return _request_json(
+        "GET",
+        f"{_api_base()}/user/{user_id}/hosts/{host_id}/verification",
+        token=token,
+    )
+
+
 def add_host(user_id: int, token: str, host_url: str) -> dict:
     body = {"host_url": host_url}
     return _request_json("POST", f"{_api_base()}/user/{user_id}/hosts", token=token, json=body)

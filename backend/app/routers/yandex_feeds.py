@@ -28,9 +28,11 @@ from app.services.yandex_feed_sync_service import (
 from app.services.yandex_feed_xml_service import generate_used_yml_feed
 from app.services.yandex_webmaster_service import (
     YandexApiError,
+    YandexTokens,
     add_host,
     exchange_code_for_tokens,
     feeds_list,
+    get_host_verification,
     get_user,
     get_valid_access_token,
     get_plain_client_secret,
@@ -79,6 +81,15 @@ class YandexFeedSettingsPayload(BaseModel):
 
 class YandexHostEnsurePayload(BaseModel):
     host_url: str = "https://svoygarage.ru"
+
+
+class YandexManualTokenPayload(BaseModel):
+    access_token: str = Field(..., min_length=10, max_length=4096)
+
+
+class YandexEnableSetupPayload(BaseModel):
+    host_url: str = "https://svoygarage.ru"
+    trigger_sync: bool = True
 
 
 class YandexIntegrationView(BaseModel):
@@ -305,6 +316,204 @@ def oauth_disconnect(
     return _integration_view(db, row)
 
 
+def _ensure_host_bindings(
+    db: Session,
+    row: SiteYandexIntegration,
+    target_host_url: str,
+) -> dict:
+    token = get_valid_access_token(db, row)
+    user_payload = get_user(token)
+    user_id = int(user_payload.get("user_id"))
+    row.yandex_user_id = user_id
+
+    hosts_payload = list_hosts(user_id, token)
+    hosts = hosts_payload.get("hosts") or []
+    target_host = _host_name_only(target_host_url)
+    found = None
+    for host in hosts:
+        h_url = host.get("ascii_host_url") or host.get("unicode_host_url") or host.get("host_url") or ""
+        if _host_name_only(h_url) == target_host:
+            found = host
+            break
+
+    added = False
+    if not found:
+        add_payload = add_host(user_id, token, target_host_url)
+        added = True
+        found = {"host_id": add_payload.get("host_id"), "ascii_host_url": target_host_url}
+
+    host_id = found.get("host_id")
+    if not host_id:
+        raise YandexApiError("Не удалось определить host_id после проверки/добавления сайта")
+
+    row.host_id = str(host_id)
+    row.host_url = target_host_url
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+
+    verification = get_host_verification(user_id, row.host_id, token)
+    verification_state = str(verification.get("verification_state") or "").upper()
+    verified = verification_state == "VERIFIED"
+
+    return {
+        "ok": verified,
+        "added": added,
+        "host_id": row.host_id,
+        "host_url": row.host_url,
+        "user_id": row.yandex_user_id,
+        "verified": verified,
+        "verification_state": verification_state or None,
+        "verification_type": verification.get("verification_type"),
+        "verification_uin": verification.get("verification_uin"),
+        "note": (
+            "Сайт добавлен в Вебмастер. Подтвердите права на сайт и повторите проверку."
+            if added and not verified
+            else "Сайт найден в Вебмастере."
+            if not added
+            else "Сайт добавлен и права подтверждены."
+        ),
+    }
+
+
+@router.post("/oauth/token", response_model=YandexIntegrationView)
+def oauth_save_manual_token(
+    payload: YandexManualTokenPayload,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    access_token = payload.access_token.strip()
+    if not access_token:
+        raise HTTPException(status_code=400, detail="access_token обязателен")
+
+    try:
+        user_payload = get_user(access_token)
+        user_id = int(user_payload.get("user_id"))
+    except YandexApiError as exc:
+        raise HTTPException(status_code=400, detail=f"Токен недействителен: {exc}") from exc
+
+    row = get_or_create_yandex_integration(db)
+    save_tokens(
+        db,
+        row,
+        YandexTokens(access_token=access_token, refresh_token=None, expires_at=None),
+    )
+    row.yandex_user_id = user_id
+    row.oauth_connected_at = datetime.now(timezone.utc)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    log_audit(
+        db,
+        event_type="yandex_oauth_token_saved",
+        category="settings",
+        summary="Сохранен OAuth access_token Яндекс вручную",
+        user=current_user,
+    )
+    return _integration_view(db, row)
+
+
+@router.get("/webmaster/status")
+def get_webmaster_status(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = get_or_create_yandex_integration(db)
+    if not row.access_token_encrypted:
+        raise HTTPException(status_code=400, detail="Сначала подключите OAuth Яндекса")
+
+    token = get_valid_access_token(db, row)
+    user_payload = get_user(token)
+    user_id = int(user_payload.get("user_id"))
+    row.yandex_user_id = user_id
+    db.commit()
+
+    hosts_payload = list_hosts(user_id, token)
+    hosts = hosts_payload.get("hosts") or []
+
+    verification = None
+    verified = False
+    feeds = None
+    if row.host_id:
+        try:
+            verification = get_host_verification(user_id, row.host_id, token)
+            verified = str(verification.get("verification_state") or "").upper() == "VERIFIED"
+            feeds = feeds_list(user_id=user_id, host_id=row.host_id, token=token)
+        except YandexApiError as exc:
+            verification = {"error": str(exc), "error_code": getattr(exc, "code", None)}
+
+    return {
+        "user_id": user_id,
+        "host_id": row.host_id,
+        "host_url": row.host_url,
+        "enabled": bool(row.enabled),
+        "connected": True,
+        "verified": verified,
+        "verification": verification,
+        "hosts": hosts,
+        "feeds": feeds,
+        "feed_url": build_public_feed_url(row.host_url),
+        "ready_for_sync": bool(row.host_id and verified and row.enabled),
+    }
+
+
+@router.post("/setup/enable")
+def enable_yandex_integration(
+    payload: YandexEnableSetupPayload,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = get_or_create_yandex_integration(db)
+    if not row.access_token_encrypted:
+        raise HTTPException(status_code=400, detail="Сначала подключите OAuth Яндекса")
+
+    target_host_url = payload.host_url.strip() or "https://svoygarage.ru"
+    row.enabled = True
+    db.add(row)
+    db.commit()
+
+    try:
+        host_result = _ensure_host_bindings(db, row, target_host_url)
+    except YandexApiError as exc:
+        code = getattr(exc, "code", None)
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": str(exc),
+                "error_code": code,
+                "step": "host_ensure",
+            },
+        ) from exc
+
+    sync_task_id = None
+    if payload.trigger_sync and host_result.get("verified"):
+        state = get_or_create_yandex_feed_sync_state(db)
+        state.pending_sync = True
+        state.last_change_reason = "setup_enable"
+        state.last_enqueued_at = datetime.now(timezone.utc)
+        db.add(state)
+        db.commit()
+        task = run_yandex_feed_sync.delay(trigger="manual", force=True)
+        sync_task_id = task.id
+
+    log_audit(
+        db,
+        event_type="yandex_integration_enabled",
+        category="settings",
+        summary="Включена интеграция Яндекс через /admin-settings",
+        user=current_user,
+    )
+
+    return {
+        "ok": bool(host_result.get("verified")),
+        "integration_enabled": True,
+        "host": host_result,
+        "sync_queued": bool(sync_task_id),
+        "sync_task_id": sync_task_id,
+        "integration": _integration_view(db, row),
+    }
+
+
 @router.post("/host/ensure")
 def host_ensure(
     payload: YandexHostEnsurePayload,
@@ -320,47 +529,16 @@ def host_ensure(
         raise HTTPException(status_code=400, detail="host_url обязателен")
 
     try:
-        token = get_valid_access_token(db, row)
-        user_payload = get_user(token)
-        user_id = int(user_payload.get("user_id"))
-        row.yandex_user_id = user_id
-
-        hosts_payload = list_hosts(user_id, token)
-        hosts = hosts_payload.get("hosts") or []
-        target_host = _host_name_only(target_host_url)
-        found = None
-        for host in hosts:
-            h_url = host.get("ascii_host_url") or host.get("unicode_host_url") or host.get("host_url") or ""
-            if _host_name_only(h_url) == target_host:
-                found = host
-                break
-
-        added = False
-        if not found:
-            add_payload = add_host(user_id, token, target_host_url)
-            added = True
-            found = {"host_id": add_payload.get("host_id"), "ascii_host_url": target_host_url}
-
-        host_id = found.get("host_id")
-        if not host_id:
-            raise YandexApiError("Не удалось определить host_id после проверки/добавления сайта")
-        row.host_id = str(host_id)
-        row.host_url = target_host_url
-        db.add(row)
-        db.commit()
-
-        return {
-            "ok": True,
-            "added": added,
-            "host_id": row.host_id,
-            "host_url": row.host_url,
-            "user_id": row.yandex_user_id,
-            "note": (
-                "Сайт добавлен в Вебмастер. Если права не подтверждены, подтвердите их в интерфейсе Яндекса."
-                if added
-                else "Сайт найден в Вебмастере."
-            ),
-        }
+        result = _ensure_host_bindings(db, row, target_host_url)
+        if not result.get("verified"):
+            return {
+                **result,
+                "ok": False,
+                "error_code": "HOST_NOT_VERIFIED",
+                "message": "Права на сайт не подтверждены",
+                "manual_steps_url": "https://yandex.ru/dev/webmaster/doc/ru/concepts/verification",
+            }
+        return result
     except YandexApiError as exc:
         code = getattr(exc, "code", None)
         if code == "HOST_NOT_VERIFIED":
