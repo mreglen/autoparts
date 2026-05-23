@@ -32,6 +32,8 @@ class UsedOrderDeliveryInput:
     delivery_address: Optional[str]
     transport_company: Optional[str]
     pickup_address: Optional[str]
+    delivery_region_id: Optional[int] = None
+    delivery_region_name: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -155,6 +157,8 @@ def create_used_orders_from_payload(
             delivery_address=delivery.delivery_address,
             transport_company=delivery.transport_company,
             pickup_address=delivery.pickup_address,
+            delivery_region_id=delivery.delivery_region_id,
+            delivery_region_name=delivery.delivery_region_name,
             total_amount=total_amount,
             is_paid=False,
             status_code="pending",

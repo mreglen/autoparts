@@ -55,6 +55,20 @@ function AdminPanelPage() {
   const [yandexWebmasterStatus, setYandexWebmasterStatus] = useState(null);
   const [yandexEnableResult, setYandexEnableResult] = useState(null);
 
+  const [siteDeliveryOptions, setSiteDeliveryOptions] = useState([]);
+  const [siteDeliveryLoading, setSiteDeliveryLoading] = useState(true);
+  const [siteDeliverySaving, setSiteDeliverySaving] = useState(false);
+  const [newDeliveryRow, setNewDeliveryRow] = useState({
+    region_id: '11162',
+    region_name: 'Урал',
+    delivery_type: 'courier',
+    carrier: 'СДЭК',
+    pickup_point: '',
+    min_order_amount: '1000',
+    sort_order: '100',
+    enabled: true,
+  });
+
   const yandexConnected = Boolean(yandexIntegration?.connected);
   const callbackParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
 
@@ -72,6 +86,11 @@ function AdminPanelPage() {
     setControlSyncIntervalMinutes(String(row.control_sync_interval_minutes ?? 720));
     setYandexEnabled(row.enabled !== false);
     setHostUrl(row.host_url || 'https://svoygarage.ru');
+  };
+
+  const loadSiteDelivery = async () => {
+    const rows = await apiRequest('/admin/site-delivery');
+    setSiteDeliveryOptions(Array.isArray(rows) ? rows : []);
   };
 
   const loadYandex = async () => {
@@ -132,12 +151,14 @@ function AdminPanelPage() {
       try {
         await loadYandex();
         await loadYandexDiagnostics();
+        await loadSiteDelivery();
       } catch (e) {
         if (!cancelled) {
           setError(e?.message || 'Не удалось загрузить настройки Яндекс');
         }
       } finally {
         if (!cancelled) setYandexLoading(false);
+        if (!cancelled) setSiteDeliveryLoading(false);
       }
     })();
     return () => {
@@ -480,6 +501,63 @@ function AdminPanelPage() {
       setError(e?.message || 'Ошибка включения интеграции Яндекс');
     } finally {
       setYandexEnableBusy(false);
+    }
+  };
+
+  const syncYandexRegionsFromDelivery = async () => {
+    setSiteDeliverySaving(true);
+    setError(null);
+    setYandexNotice(null);
+    try {
+      const res = await apiRequest('/admin/site-delivery/sync-yandex-regions', { method: 'POST' });
+      setYandexNotice(`regionIds синхронизированы: ${res.region_ids_csv}`);
+      await loadYandex();
+    } catch (e) {
+      setError(e?.message || 'Ошибка синхронизации regionIds');
+    } finally {
+      setSiteDeliverySaving(false);
+    }
+  };
+
+  const toggleSiteDeliveryOption = async (row) => {
+    setSiteDeliverySaving(true);
+    setError(null);
+    try {
+      await apiRequest(`/admin/site-delivery/${row.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled: !row.enabled }),
+      });
+      await loadSiteDelivery();
+    } catch (e) {
+      setError(e?.message || 'Ошибка обновления способа доставки');
+    } finally {
+      setSiteDeliverySaving(false);
+    }
+  };
+
+  const createSiteDeliveryOption = async () => {
+    setSiteDeliverySaving(true);
+    setError(null);
+    try {
+      await apiRequest('/admin/site-delivery', {
+        method: 'POST',
+        body: JSON.stringify({
+          region_id: Number(newDeliveryRow.region_id),
+          region_name: newDeliveryRow.region_name.trim(),
+          delivery_type: newDeliveryRow.delivery_type,
+          carrier: newDeliveryRow.carrier.trim() || null,
+          pickup_point: newDeliveryRow.pickup_point.trim() || null,
+          min_order_amount: Number(newDeliveryRow.min_order_amount || 0),
+          sort_order: Number(newDeliveryRow.sort_order || 0),
+          enabled: Boolean(newDeliveryRow.enabled),
+        }),
+      });
+      await loadSiteDelivery();
+      setYandexNotice('Способ доставки добавлен');
+    } catch (e) {
+      setError(e?.message || 'Ошибка добавления способа доставки');
+    } finally {
+      setSiteDeliverySaving(false);
     }
   };
 
@@ -916,7 +994,7 @@ function AdminPanelPage() {
                 <p>Feed URL: {yandexIntegration?.feed_url || '—'}</p>
                 {yandexPreview && (
                   <p>
-                    preview: offers={yandexPreview.offers_count}, categories={yandexPreview.categories_count}, checksum={yandexPreview.checksum}
+                    preview: offers={yandexPreview.offers_count} (new={yandexPreview.new_offers_count || 0}, used={yandexPreview.used_offers_count || 0}), categories={yandexPreview.categories_count}, checksum={yandexPreview.checksum}
                   </p>
                 )}
               </div>
@@ -967,6 +1045,105 @@ function AdminPanelPage() {
                   {JSON.stringify(yandexFeedsList, null, 2)}
                 </pre>
               )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">
+          Доставка для Яндекс Товаров
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Матрица должна совпадать с разделом «Магазин → Доставка» в merchants.yandex.ru и
+          отображаться на странице <a href="/delivery" className="text-indigo-600 underline">/delivery</a>.
+        </p>
+
+        {siteDeliveryLoading ? (
+          <p className="text-sm text-gray-500">Загрузка матрицы доставки…</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50 text-left text-gray-500">
+                  <tr>
+                    <th className="px-3 py-2">Регион</th>
+                    <th className="px-3 py-2">Тип</th>
+                    <th className="px-3 py-2">Служба</th>
+                    <th className="px-3 py-2">Мин. сумма</th>
+                    <th className="px-3 py-2">Вкл.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {siteDeliveryOptions.map((row) => (
+                    <tr key={row.id} className="border-t border-gray-100">
+                      <td className="px-3 py-2">{row.region_name}</td>
+                      <td className="px-3 py-2">{row.delivery_type}</td>
+                      <td className="px-3 py-2">{row.carrier || '—'}</td>
+                      <td className="px-3 py-2">{row.min_order_amount}</td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleSiteDeliveryOption(row)}
+                          disabled={siteDeliverySaving}
+                          className={`rounded px-2 py-1 text-xs ${row.enabled ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+                        >
+                          {row.enabled ? 'вкл' : 'выкл'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <input
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                placeholder="region_id"
+                value={newDeliveryRow.region_id}
+                onChange={(e) => setNewDeliveryRow((prev) => ({ ...prev, region_id: e.target.value }))}
+              />
+              <input
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                placeholder="region_name"
+                value={newDeliveryRow.region_name}
+                onChange={(e) => setNewDeliveryRow((prev) => ({ ...prev, region_name: e.target.value }))}
+              />
+              <select
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                value={newDeliveryRow.delivery_type}
+                onChange={(e) => setNewDeliveryRow((prev) => ({ ...prev, delivery_type: e.target.value }))}
+              >
+                <option value="pickup">pickup</option>
+                <option value="pvz">pvz</option>
+                <option value="courier">courier</option>
+              </select>
+              <input
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                placeholder="carrier"
+                value={newDeliveryRow.carrier}
+                onChange={(e) => setNewDeliveryRow((prev) => ({ ...prev, carrier: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={createSiteDeliveryOption}
+                disabled={siteDeliverySaving}
+                className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Добавить способ доставки
+              </button>
+              <button
+                type="button"
+                onClick={syncYandexRegionsFromDelivery}
+                disabled={siteDeliverySaving}
+                className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+              >
+                Синхронизировать regionIds фида
+              </button>
             </div>
           </div>
         )}

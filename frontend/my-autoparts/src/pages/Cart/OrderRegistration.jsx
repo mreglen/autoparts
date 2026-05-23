@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { clearCart } from '../../redux/slices/CartSlice';
-import { apiAxios } from '../../utils/apiClient';
+import { apiAxios, apiAxiosUnauth } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import MobileFormField from '../../components/MobileFormField/MobileFormField';
 import {
@@ -67,7 +67,7 @@ function SectionCard({ step, title, subtitle, children, className = '' }) {
   );
 }
 
-function DeliveryOption({ id, checked, onChange, title, description, icon }) {
+function DeliveryOption({ id, checked, onChange, title, description, icon, value }) {
   return (
     <label
       htmlFor={id}
@@ -79,9 +79,9 @@ function DeliveryOption({ id, checked, onChange, title, description, icon }) {
     >
       <input
         id={id}
-        name="deliveryType"
+        name="deliveryOption"
         type="radio"
-        value={id === 'pickup' ? 'pickup' : 'transport'}
+        value={value || id}
         checked={checked}
         onChange={onChange}
         className="mt-1 h-4 w-4 shrink-0 border-gray-300 text-indigo-600 focus:ring-indigo-500"
@@ -117,9 +117,10 @@ export default function OrderRegistration() {
     if (!selectedItems.length) navigate('/cart');
   }, [selectedItems.length, navigate]);
 
-  const [deliveryType, setDeliveryType] = useState('');
-  const [selectedTransportCompany, setSelectedTransportCompany] = useState('');
-  const [pickupAddress, setPickupAddress] = useState('');
+  const [deliveryOptions, setDeliveryOptions] = useState([]);
+  const [deliveryOptionsLoading, setDeliveryOptionsLoading] = useState(true);
+  const [selectedRegionId, setSelectedRegionId] = useState('');
+  const [selectedDeliveryOptionId, setSelectedDeliveryOptionId] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [adminOrgAddress, setAdminOrgAddress] = useState('');
 
@@ -140,7 +141,47 @@ export default function OrderRegistration() {
   const hasUsedItems = selectedItems.some((item) => item.type === 'used');
   const isUsedOnlyCheckout = hasUsedItems && !hasNewItems;
 
-  const transportCompanies = ['СДЭК', 'Boxberry', 'Почта России', 'DHL', 'FedEx'];
+
+  const deliveryTypeLabels = {
+    pickup: 'Самовывоз из магазина',
+    pvz: 'ПВЗ',
+    courier: 'Курьер',
+  };
+
+  const regions = useMemo(() => {
+    const map = new Map();
+    deliveryOptions.forEach((opt) => {
+      const key = String(opt.region_id);
+      if (!map.has(key)) {
+        map.set(key, { id: opt.region_id, name: opt.region_name });
+      }
+    });
+    return [...map.values()];
+  }, [deliveryOptions]);
+
+  const optionsForRegion = useMemo(
+    () => deliveryOptions.filter((opt) => String(opt.region_id) === String(selectedRegionId)),
+    [deliveryOptions, selectedRegionId]
+  );
+
+  const selectedDeliveryOption = useMemo(
+    () => optionsForRegion.find((opt) => String(opt.id) === String(selectedDeliveryOptionId)) || null,
+    [optionsForRegion, selectedDeliveryOptionId]
+  );
+
+  const orderTotal = useMemo(
+    () => selectedItems.reduce((total, item) => total + item.price * item.quantity, 0),
+    [selectedItems]
+  );
+
+  const minOrderError = useMemo(() => {
+    if (!selectedDeliveryOption) return '';
+    const minAmount = Number(selectedDeliveryOption.min_order_amount || 0);
+    if (minAmount > 0 && orderTotal < minAmount) {
+      return `Минимальная сумма заказа для выбранного способа: ${minAmount.toLocaleString('ru-RU')} ₽`;
+    }
+    return '';
+  }, [selectedDeliveryOption, orderTotal]);
 
   const pickupAddresses = useMemo(
     () => ({
@@ -168,9 +209,20 @@ export default function OrderRegistration() {
   const recipientValid =
     !fieldErrors.fullName && !fieldErrors.phone && !fieldErrors.email && recipient.fullName.trim();
 
-  const deliveryValid =
-    deliveryType === 'pickup' ||
-    (deliveryType === 'transport' && selectedTransportCompany && deliveryAddress.trim());
+  const deliveryValid = Boolean(
+    selectedDeliveryOption &&
+      !minOrderError &&
+      (selectedDeliveryOption.delivery_type === 'pickup' ||
+        deliveryAddress.trim())
+  );
+
+  const deliveryType = selectedDeliveryOption?.delivery_type || '';
+  const selectedTransportCompany = selectedDeliveryOption?.carrier || '';
+  const pickupAddress =
+    selectedDeliveryOption?.pickup_point ||
+    adminOrgAddress ||
+    pickupAddresses[seller] ||
+    'Адрес самовывоза не указан';
 
   const isFormValid = recipientValid && deliveryValid;
 
@@ -190,12 +242,44 @@ export default function OrderRegistration() {
   }, [seller, pickupAddresses]);
 
   useEffect(() => {
-    if (deliveryType === 'pickup') {
-      setPickupAddress(
-        adminOrgAddress || pickupAddresses[seller] || 'Адрес самовывоза не указан'
-      );
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiAxiosUnauth.get('/public/site-delivery');
+        const rows = Array.isArray(res.data) ? res.data : [];
+        if (!cancelled) {
+          setDeliveryOptions(rows);
+          if (rows.length > 0) {
+            setSelectedRegionId(String(rows[0].region_id));
+            setSelectedDeliveryOptionId(String(rows[0].id));
+          }
+        }
+      } catch {
+        if (!cancelled) setDeliveryOptions([]);
+      } finally {
+        if (!cancelled) setDeliveryOptionsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedRegionId || optionsForRegion.length === 0) return;
+    const stillValid = optionsForRegion.some(
+      (opt) => String(opt.id) === String(selectedDeliveryOptionId)
+    );
+    if (!stillValid) {
+      setSelectedDeliveryOptionId(String(optionsForRegion[0].id));
     }
-  }, [deliveryType, seller, adminOrgAddress, pickupAddresses]);
+  }, [selectedRegionId, optionsForRegion, selectedDeliveryOptionId]);
+
+  useEffect(() => {
+    if (selectedDeliveryOption?.delivery_type === 'pickup') {
+      setDeliveryAddress('');
+    }
+  }, [selectedDeliveryOption]);
 
   useEffect(() => {
     if (!isReady || !user) return;
@@ -292,9 +376,12 @@ export default function OrderRegistration() {
         recipient_name: normalizeFullName(recipient.fullName),
         recipient_phone: recipient.phone,
         recipient_email: normalizeEmail(recipient.email),
-        delivery_type: deliveryType,
+        delivery_type: deliveryType || 'pickup',
+        delivery_region_id: selectedDeliveryOption ? Number(selectedDeliveryOption.region_id) : null,
+        delivery_region_name: selectedDeliveryOption?.region_name || null,
+        delivery_option_id: selectedDeliveryOption ? Number(selectedDeliveryOption.id) : null,
         ...(deliveryType === 'pickup' && { pickup_address: pickupAddress }),
-        ...(deliveryType === 'transport' && {
+        ...((deliveryType === 'pvz' || deliveryType === 'courier') && {
           transport_company: selectedTransportCompany,
           delivery_address: deliveryAddress.trim(),
         }),
@@ -610,90 +697,110 @@ export default function OrderRegistration() {
           <SectionCard
             step={2}
             title="Доставка"
-            subtitle="Выберите удобный способ получения"
+            subtitle="Выберите регион и способ доставки как на странице «Доставка»"
           >
-            <div className="space-y-3">
-              <DeliveryOption
-                id="pickup"
-                checked={deliveryType === 'pickup'}
-                onChange={(e) => setDeliveryType(e.target.value)}
-                title="Самовывоз"
-                description="Заберёте заказ по адресу продавца"
-                icon={
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                }
-              />
-              <DeliveryOption
-                id="transport"
-                checked={deliveryType === 'transport'}
-                onChange={(e) => setDeliveryType(e.target.value)}
-                title="Транспортная компания"
-                description="Доставка до пункта выдачи ТК"
-                icon={
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                  </svg>
-                }
-              />
-            </div>
-
-            {deliveryType === 'pickup' && (
-              <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/40 px-4 py-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-indigo-700">
-                  Адрес самовывоза
-                </p>
-                <p className="mt-1 text-sm text-gray-900">{pickupAddress}</p>
-              </div>
-            )}
-
-            {deliveryType === 'transport' && (
-              <div className="mt-4 space-y-4">
-                <MobileFormField label="Транспортная компания" htmlFor="transport-company" required>
+            {deliveryOptionsLoading ? (
+              <p className="text-sm text-gray-500">Загрузка способов доставки…</p>
+            ) : deliveryOptions.length === 0 ? (
+              <p className="text-sm text-red-600">
+                Способы доставки не настроены. Смотрите{' '}
+                <Link to="/delivery" className="text-indigo-600 underline">страницу доставки</Link>.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <MobileFormField label="Регион доставки" htmlFor="delivery-region" required>
                   <select
-                    id="transport-company"
-                    value={selectedTransportCompany}
-                    onChange={(e) => setSelectedTransportCompany(e.target.value)}
-                    className={inputClass(
-                      submitAttempted && deliveryType === 'transport' && !selectedTransportCompany
-                    )}
+                    id="delivery-region"
+                    value={selectedRegionId}
+                    onChange={(e) => setSelectedRegionId(e.target.value)}
+                    className={inputClass(false)}
                   >
-                    <option value="">Выберите компанию</option>
-                    {transportCompanies.map((company) => (
-                      <option key={company} value={company}>
-                        {company}
+                    {regions.map((region) => (
+                      <option key={region.id} value={String(region.id)}>
+                        {region.name}
                       </option>
                     ))}
                   </select>
                 </MobileFormField>
 
-                <MobileFormField
-                  label="Адрес пункта выдачи"
-                  htmlFor="delivery-address"
-                  required
-                  error={
-                    submitAttempted && deliveryType === 'transport' && !deliveryAddress.trim()
-                      ? 'Укажите адрес пункта выдачи'
-                      : ''
-                  }
-                >
-                  <textarea
-                    id="delivery-address"
-                    value={deliveryAddress}
-                    onChange={(e) => setDeliveryAddress(e.target.value)}
-                    rows={3}
-                    className={inputClass(
-                      submitAttempted && deliveryType === 'transport' && !deliveryAddress.trim()
-                    )}
-                    placeholder="Город, улица, пункт выдачи ТК"
-                  />
-                </MobileFormField>
+                <div className="space-y-3">
+                  {optionsForRegion.map((option) => (
+                    <DeliveryOption
+                      key={option.id}
+                      id={`delivery-option-${option.id}`}
+                      value={String(option.id)}
+                      checked={String(selectedDeliveryOptionId) === String(option.id)}
+                      onChange={() => setSelectedDeliveryOptionId(String(option.id))}
+                      title={`${deliveryTypeLabels[option.delivery_type] || option.delivery_type}${
+                        option.carrier ? ` — ${option.carrier}` : ''
+                      }`}
+                      description={
+                        option.min_order_amount && Number(option.min_order_amount) > 0
+                          ? `Мин. сумма заказа: ${Number(option.min_order_amount).toLocaleString('ru-RU')} ₽`
+                          : option.notes || 'Доступно для выбранного региона'
+                      }
+                      icon={
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                      }
+                    />
+                  ))}
+                </div>
+
+                {selectedDeliveryOption?.delivery_type === 'pickup' && (
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 px-4 py-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-indigo-700">
+                      Адрес самовывоза
+                    </p>
+                    <p className="mt-1 text-sm text-gray-900">{pickupAddress}</p>
+                  </div>
+                )}
+
+                {(selectedDeliveryOption?.delivery_type === 'pvz' ||
+                  selectedDeliveryOption?.delivery_type === 'courier') && (
+                  <MobileFormField
+                    label={
+                      selectedDeliveryOption.delivery_type === 'pvz'
+                        ? 'Адрес пункта выдачи'
+                        : 'Адрес доставки'
+                    }
+                    htmlFor="delivery-address"
+                    required
+                    error={
+                      submitAttempted && !deliveryAddress.trim()
+                        ? 'Укажите адрес доставки или ПВЗ'
+                        : ''
+                    }
+                  >
+                    <textarea
+                      id="delivery-address"
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      rows={3}
+                      className={inputClass(submitAttempted && !deliveryAddress.trim())}
+                      placeholder={
+                        selectedDeliveryOption.delivery_type === 'pvz'
+                          ? 'Город, улица, пункт выдачи'
+                          : 'Город, улица, дом, квартира'
+                      }
+                    />
+                  </MobileFormField>
+                )}
+
+                {minOrderError && (
+                  <p className="text-sm text-red-600">{minOrderError}</p>
+                )}
+
+                <p className="text-xs text-gray-500">
+                  Подробные условия — на странице{' '}
+                  <Link to="/delivery" className="text-indigo-600 underline">Доставка</Link>.
+                </p>
               </div>
             )}
 
-            {submitAttempted && !deliveryType && (
-              <p className="mt-3 text-sm text-red-600">Выберите способ доставки</p>
+            {submitAttempted && !deliveryValid && !deliveryOptionsLoading && deliveryOptions.length > 0 && (
+              <p className="mt-3 text-sm text-red-600">Выберите способ доставки и заполните адрес</p>
             )}
           </SectionCard>
         </div>

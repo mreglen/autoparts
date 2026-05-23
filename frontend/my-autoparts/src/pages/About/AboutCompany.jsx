@@ -85,6 +85,14 @@ export default function AboutCompany() {
                         label="Режим работы"
                         value="Пн–Пт: 10:00–18:00 (местное время). В праздничные дни — по объявлению на сайте."
                     />
+                    <div className="py-3 border-b border-gray-100">
+                        <dt className="text-sm text-gray-500 mb-0.5">Доставка и оплата</dt>
+                        <dd className="text-gray-900">
+                            <Link to="/delivery" className="text-indigo-600 hover:underline">Условия доставки</Link>
+                            {' · '}
+                            <Link to="/payment" className="text-indigo-600 hover:underline">Способы оплаты</Link>
+                        </dd>
+                    </div>
                 </dl>
             </section>
 

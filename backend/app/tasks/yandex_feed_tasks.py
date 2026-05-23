@@ -8,6 +8,7 @@ import requests
 from app.celery_app import celery_app
 from app.db.database import SessionLocal
 from app.models.site_yandex_integration import SiteYandexIntegration
+from app.services.site_delivery_service import region_ids_csv_from_delivery
 from app.services.yandex_feed_sync_service import (
     build_public_feed_url,
     normalize_feed_type,
@@ -61,6 +62,10 @@ def run_yandex_feed_sync(self, trigger: str = "manual", force: bool = False):
 
         feed_url = build_public_feed_url(integration.host_url)
         feed_type = normalize_feed_type(integration.feed_type)
+        synced_regions = region_ids_csv_from_delivery(db)
+        if synced_regions:
+            integration.region_ids_csv = synced_regions
+            db.commit()
         region_ids = parse_region_ids_csv(integration.region_ids_csv)
 
         feed_preview = generate_used_yml_feed(

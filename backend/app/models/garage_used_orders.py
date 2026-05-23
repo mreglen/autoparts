@@ -20,6 +20,8 @@ class GarageUsedOrder(Base):
     delivery_address = Column(Text, nullable=True)
     transport_company = Column(String(255), nullable=True)
     pickup_address = Column(Text, nullable=True)
+    delivery_region_id = Column(Integer, nullable=True)
+    delivery_region_name = Column(String(255), nullable=True)
 
     total_amount = Column(Float, nullable=False, default=0.0)
     is_paid = Column(Boolean, nullable=False, default=False)

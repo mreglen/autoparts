@@ -21,6 +21,8 @@ class YandexUsedFeedResult:
     checksum: str
     offers_count: int
     categories_count: int
+    new_offers_count: int
+    used_offers_count: int
 
 
 def _resolve_site_origin(preferred_host_url: str | None = None) -> str:
@@ -65,18 +67,106 @@ def _absolute_photo_url(photo_url: str | None, site_origin: str) -> str | None:
     return f"{site_origin}/{url}"
 
 
-def _iter_used_products(db: Session) -> Iterable[Product]:
+def _iter_catalog_products(db: Session) -> Iterable[Product]:
     return (
         db.query(Product)
         .options(
             selectinload(Product.photos),
             selectinload(Product.part_type),
+            selectinload(Product.compatible_vehicles),
         )
-        .filter(Product.is_new == False)  # noqa: E712
         .filter(Product.quantity > 0)
         .order_by(Product.id.desc())
         .all()
     )
+
+
+def _vehicle_params(product: Product) -> list[tuple[str, str]]:
+    params: list[tuple[str, str]] = []
+    vehicles = product.compatible_vehicles or []
+    if not vehicles:
+        return params
+    brands = sorted({(v.brand or "").strip() for v in vehicles if (v.brand or "").strip()})
+    models = sorted({(v.model or "").strip() for v in vehicles if (v.model or "").strip()})
+    if brands:
+        params.append(("Марка авто", ", ".join(brands[:5])))
+    if models:
+        params.append(("Модель авто", ", ".join(models[:5])))
+    generations = sorted(
+        {(v.generation or "").strip() for v in vehicles if (v.generation or "").strip()}
+    )
+    if generations:
+        params.append(("Поколение", ", ".join(generations[:5])))
+    return params
+
+
+def _offer_lines(
+    product: Product,
+    *,
+    site_origin: str,
+    used_condition_reason: str,
+) -> list[str] | None:
+    category_id = int(product.part_type_id or 1)
+    title = (product.name or "").strip() or f"{(product.brand or '').strip()} {(product.article or '').strip()}".strip()
+    title = title or f"Запчасть #{product.id}"
+    product_url = f"{site_origin}/part/{product.id}"
+    price_value = _format_price(product.price)
+    available = "true" if (product.quantity or 0) > 0 else "false"
+    is_new_item = bool(product.is_new)
+
+    photos = product.photos or []
+    primary_photo = None
+    for ph in photos:
+        primary_photo = _absolute_photo_url(getattr(ph, "photo_url", None), site_origin)
+        if primary_photo:
+            break
+    if not primary_photo:
+        return None
+
+    type_prefix = (product.part_type.name if product.part_type else "Автозапчасти") or "Автозапчасти"
+    vendor = (product.brand or "Unknown")[:255]
+    model = title[:255]
+    if is_new_item:
+        desc = (product.description or "").strip() or f"Новая автозапчасть {title}"
+        condition_label = "Новая"
+    else:
+        desc = (product.description or "").strip() or f"Б/у автозапчасть {title}"
+        condition_label = "Б/у"
+
+    lines = [
+        f'      <offer id="{product.id}" available="{available}" type="vendor.model">',
+        f"        <typePrefix>{escape(type_prefix)}</typePrefix>",
+        f"        <vendor>{escape(vendor)}</vendor>",
+        f"        <model>{escape(model)}</model>",
+        f"        <url>{escape(product_url)}</url>",
+        f"        <price>{price_value}</price>",
+        "        <currencyId>RUR</currencyId>",
+        f"        <categoryId>{category_id}</categoryId>",
+        f"        <picture>{escape(primary_photo)}</picture>",
+        f"        <description><![CDATA[{desc}]]></description>",
+        f'        <param name="Состояние">{escape(condition_label)}</param>',
+    ]
+
+    if product.article:
+        lines.append(f'        <param name="Артикул">{escape(str(product.article)[:255])}</param>')
+
+    for param_name, param_value in _vehicle_params(product):
+        lines.append(f'        <param name="{escape(param_name)}">{escape(param_value)}</param>')
+
+    if not is_new_item:
+        reason = (used_condition_reason or "Товар бывший в употреблении, проверен продавцом").strip()
+        lines.extend(
+            [
+                '        <condition type="preowned">',
+                "          <reason>",
+                f"            {escape(reason)}",
+                "          </reason>",
+                "        </condition>",
+            ]
+        )
+
+    lines.append("      </offer>")
+    return lines
 
 
 def generate_used_yml_feed(
@@ -86,8 +176,10 @@ def generate_used_yml_feed(
     condition_type: str = "preowned",
     condition_reason: str = "Товар бывший в употреблении, проверен продавцом",
 ) -> YandexUsedFeedResult:
+    del condition_type  # состояние определяется per-offer по product.is_new
+
     site_origin = _resolve_site_origin(preferred_host_url)
-    products = list(_iter_used_products(db))
+    products = list(_iter_catalog_products(db))
 
     categories_map: dict[int, str] = {}
     for p in products:
@@ -115,53 +207,25 @@ def generate_used_yml_feed(
         lines.append(
             f'      <category id="{int(category_id)}">{escape(category_name)}</category>'
         )
-    lines.extend(
-        [
-            "    </categories>",
-            "    <offers>",
-        ]
-    )
+    lines.extend(["    </categories>", "    <offers>"])
 
     offers_count = 0
+    new_offers_count = 0
+    used_offers_count = 0
     for p in products:
-        category_id = int(p.part_type_id or 1)
-        title = (p.name or "").strip() or f"{(p.brand or '').strip()} {(p.article or '').strip()}".strip()
-        title = title or f"Запчасть #{p.id}"
-        product_url = f"{site_origin}/part/{p.id}"
-        price_value = _format_price(p.price)
-        desc = (p.description or "").strip() or f"Б/У автозапчасть {title}"
-        available = "true" if (p.quantity or 0) > 0 else "false"
-
-        photos = p.photos or []
-        primary_photo = None
-        for ph in photos:
-            primary_photo = _absolute_photo_url(getattr(ph, "photo_url", None), site_origin)
-            if primary_photo:
-                break
-        if not primary_photo:
-            continue
-
-        offers_count += 1
-        lines.extend(
-            [
-                f'      <offer id="{p.id}" available="{available}" type="vendor.model">',
-                f"        <typePrefix>{escape((p.part_type.name if p.part_type else 'Автозапчасти') or 'Автозапчасти')}</typePrefix>",
-                f"        <vendor>{escape((p.brand or 'Unknown')[:255])}</vendor>",
-                f"        <model>{escape(title[:255])}</model>",
-                f"        <url>{escape(product_url)}</url>",
-                f"        <price>{price_value}</price>",
-                "        <currencyId>RUR</currencyId>",
-                f"        <categoryId>{category_id}</categoryId>",
-                f"        <picture>{escape(primary_photo)}</picture>",
-                f"        <description><![CDATA[{desc}]]></description>",
-                f'        <condition type="{escape(condition_type or "preowned")}">',
-                "          <reason>",
-                f"            {escape(condition_reason or 'Товар бывший в употреблении')}",
-                "          </reason>",
-                "        </condition>",
-                "      </offer>",
-            ]
+        offer_lines = _offer_lines(
+            p,
+            site_origin=site_origin,
+            used_condition_reason=condition_reason,
         )
+        if not offer_lines:
+            continue
+        offers_count += 1
+        if p.is_new:
+            new_offers_count += 1
+        else:
+            used_offers_count += 1
+        lines.extend(offer_lines)
 
     lines.extend(["    </offers>", "  </shop>", "</yml_catalog>"])
     xml_payload = "\n".join(lines)
@@ -171,4 +235,6 @@ def generate_used_yml_feed(
         checksum=checksum,
         offers_count=offers_count,
         categories_count=len(categories_map),
+        new_offers_count=new_offers_count,
+        used_offers_count=used_offers_count,
     )

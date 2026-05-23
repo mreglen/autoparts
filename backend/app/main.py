@@ -6,6 +6,7 @@ from app.db.schema_patches import (
     ensure_event_log_audit_columns,
     ensure_user_public_code,
     ensure_garage_used_order_item_fulfillment_columns,
+    ensure_garage_order_delivery_columns,
     ensure_organization_markup_columns,
     ensure_stock_out_source_columns,
 )
@@ -29,6 +30,7 @@ import app.models.transmission  # noqa: F401 — transmissions, vehicle_transmis
 import app.models.site_yandex_integration  # noqa: F401 — yandex integration
 import app.models.yandex_feed_sync_state  # noqa: F401 — yandex feed sync state
 import app.models.yandex_oauth_state  # noqa: F401 — yandex oauth state
+import app.models.site_delivery_option  # noqa: F401 — site delivery matrix
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings
@@ -76,6 +78,7 @@ try:
     ensure_organization_markup_columns()
     ensure_stock_out_source_columns()
     ensure_garage_used_order_item_fulfillment_columns()
+    ensure_garage_order_delivery_columns()
     ensure_avito_order_fulfillment_columns()
     ensure_event_log_audit_columns()
     ensure_user_public_code()

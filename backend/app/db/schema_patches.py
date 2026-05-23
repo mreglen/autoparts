@@ -323,3 +323,23 @@ def ensure_user_public_code() -> None:
 
     logger.info("Applied users.public_code column patch (run remigrate_user_public_codes.py to assign codes)")
 
+
+def ensure_garage_order_delivery_columns() -> None:
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    statements: list[str] = []
+    for table in ("garage_used_orders", "garage_new_orders"):
+        if table not in table_names:
+            continue
+        columns = {col["name"] for col in inspector.get_columns(table)}
+        if "delivery_region_id" not in columns:
+            statements.append(f"ALTER TABLE {table} ADD COLUMN delivery_region_id INTEGER")
+        if "delivery_region_name" not in columns:
+            statements.append(f"ALTER TABLE {table} ADD COLUMN delivery_region_name VARCHAR(255)")
+    if not statements:
+        return
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.info("Applied garage order delivery column patches: %s", statements)
+

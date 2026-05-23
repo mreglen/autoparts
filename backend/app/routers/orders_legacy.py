@@ -47,6 +47,9 @@ class LegacyCreateOrderIn(BaseModel):
     delivery_address: Optional[str] = None
     transport_company: Optional[str] = None
     pickup_address: Optional[str] = None
+    delivery_region_id: Optional[int] = None
+    delivery_region_name: Optional[str] = None
+    delivery_option_id: Optional[int] = None
     total_amount: float = Field(default=0, ge=0)
 
 
@@ -86,6 +89,8 @@ def _delivery_from_payload(payload: LegacyCreateOrderIn) -> UsedOrderDeliveryInp
         delivery_address=payload.delivery_address,
         transport_company=payload.transport_company,
         pickup_address=payload.pickup_address,
+        delivery_region_id=payload.delivery_region_id,
+        delivery_region_name=payload.delivery_region_name,
     )
 
 
@@ -127,6 +132,8 @@ def create_order_legacy(
             delivery_address=payload.delivery_address,
             transport_company=payload.transport_company,
             pickup_address=payload.pickup_address,
+            delivery_region_id=payload.delivery_region_id,
+            delivery_region_name=payload.delivery_region_name,
             total_amount=float(payload.total_amount or 0),
             is_paid=False,
             status_code="pending",

@@ -18,6 +18,7 @@ from app.models.site_yandex_integration import SiteYandexIntegration
 from app.models.yandex_oauth_state import YandexOAuthState
 from app.models.user import User
 from app.services.audit_service import log_audit
+from app.services.site_delivery_service import region_ids_csv_from_delivery
 from app.services.yandex_feed_sync_service import (
     build_public_feed_url,
     mark_yandex_feed_dirty,
@@ -469,6 +470,7 @@ def enable_yandex_integration(
 
     target_host_url = payload.host_url.strip() or "https://svoygarage.ru"
     row.enabled = True
+    row.region_ids_csv = normalize_region_ids_csv(region_ids_csv_from_delivery(db))
     db.add(row)
     db.commit()
 
@@ -622,6 +624,8 @@ def preview_public_feed(
         "feed_url": build_public_feed_url(row.host_url),
         "offers_count": feed.offers_count,
         "categories_count": feed.categories_count,
+        "new_offers_count": feed.new_offers_count,
+        "used_offers_count": feed.used_offers_count,
         "checksum": feed.checksum,
     }
 
