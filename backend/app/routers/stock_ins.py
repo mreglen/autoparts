@@ -9,6 +9,7 @@ from app.models.user import User
 from app.models.product import Product as ProductModel
 from app.models.vehicle import Vehicle as VehicleModel
 from app.services.audit_service import log_audit
+from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty
 
 router = APIRouter(prefix="/stock-ins", tags=["Stock In"])
 
@@ -81,6 +82,8 @@ def create_stock_in(
         entity_type="stock_in",
         entity_id=db_stock_in.id,
     )
+    if product.is_new is False:
+        mark_yandex_feed_dirty(db, "stock_in_created_used")
     return db_stock_in
 
 @router.get("/{stock_in_id}", response_model=StockInSchema)
@@ -116,6 +119,9 @@ def update_stock_in(
 
     db.commit()
     db.refresh(db_stock_in)
+    product = db.query(ProductModel).filter(ProductModel.id == db_stock_in.product_id).first()
+    if product and product.is_new is False:
+        mark_yandex_feed_dirty(db, "stock_in_updated_used")
     return db_stock_in
 
 @router.delete("/{stock_in_id}", status_code=204)
@@ -131,6 +137,9 @@ def delete_stock_in(
     if not db_stock_in:
         raise HTTPException(status_code=404, detail="Запись поступления не найдена")
 
+    product = db.query(ProductModel).filter(ProductModel.id == db_stock_in.product_id).first()
     db.delete(db_stock_in)
     db.commit()
+    if product and product.is_new is False:
+        mark_yandex_feed_dirty(db, "stock_in_deleted_used")
     return

@@ -12,6 +12,7 @@ from app.db.database import get_db
 from app.core.auth import get_current_user
 from app.models.user import User
 from app.services.audit_service import log_audit
+from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty
 from sqlalchemy.orm import selectinload
 
 
@@ -196,6 +197,8 @@ def create_product(
         entity_type="product",
         entity_id=db_product.id,
     )
+    if db_product.is_new is False:
+        mark_yandex_feed_dirty(db, "product_created_used")
     return db_product
 
 @router.get("/{product_id}", response_model=ProductSchema)
@@ -490,6 +493,8 @@ def update_product(
         entity_type="product",
         entity_id=db_product.id,
     )
+    if db_product.is_new is False or ("is_new" in update_data):
+        mark_yandex_feed_dirty(db, "product_updated")
     return db_product
 
 @router.patch("/{product_id}/quantity", response_model=ProductSchema)
@@ -522,6 +527,8 @@ def update_product_quantity(
         entity_type="product",
         entity_id=db_product.id,
     )
+    if db_product.is_new is False:
+        mark_yandex_feed_dirty(db, "product_quantity_changed")
     return db_product
 
 @router.delete("/{product_id}", status_code=204)
@@ -541,6 +548,8 @@ def delete_product(
     product_id_val = db_product.id
     db.delete(db_product)
     db.commit()
+    if db_product.is_new is False:
+        mark_yandex_feed_dirty(db, "product_deleted_used")
     log_audit(
         db,
         event_type="product_deleted",

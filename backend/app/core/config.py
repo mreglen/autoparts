@@ -32,6 +32,15 @@ class Settings(BaseSettings):
     # Ключ для Fernet-шифрования client_secret Авито (32+ байт лучше; иначе берётся SHA256 от строки).
     # Если не задан — используется SECRET_KEY (менее желательно для прода).
     AVITO_CREDENTIALS_SECRET: Optional[str] = None
+    # Ключ для шифрования секретов и токенов интеграции Яндекс.
+    # Если не задан — используется SECRET_KEY.
+    YANDEX_CREDENTIALS_SECRET: Optional[str] = None
+    # Redirect URI, зарегистрированный в OAuth приложении Яндекса.
+    # Если не задан — формируется как {PUBLIC_BASE_URL}/api/admin/yandex/oauth/callback.
+    YANDEX_OAUTH_REDIRECT_URI: Optional[str] = None
+    YANDEX_OAUTH_AUTHORIZE_URL: str = "https://oauth.yandex.ru/authorize"
+    YANDEX_OAUTH_TOKEN_URL: str = "https://oauth.yandex.ru/token"
+    YANDEX_WEBMASTER_API_BASE: str = "https://api.webmaster.yandex.net/v4"
     
     # Пути к FFmpeg для обработки видео
     FFPROBE_PATH: Optional[str] = r"C:\ffmpeg\bin\ffprobe.exe"

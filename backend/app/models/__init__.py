@@ -37,6 +37,9 @@ from app.models.avito_orders_cache import AvitoOrderCache
 from app.models.organization_drom_integration import OrganizationDromIntegration
 from app.models.organization_drom_autoload_cache import OrganizationDromAutoloadCache
 from app.models.product_drom_listing_link import ProductDromListingLink
+from app.models.site_yandex_integration import SiteYandexIntegration
+from app.models.yandex_feed_sync_state import YandexFeedSyncState
+from app.models.yandex_oauth_state import YandexOAuthState
 from app.models.chat import Chat, Message
 from app.models.part_type import PartType
 

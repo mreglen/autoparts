@@ -36,6 +36,8 @@ from app.routers.finance import router as finance_router
 from app.routers.audit import router as audit_router
 from app.routers.orders_meta import router as orders_meta_router
 from app.routers.orders_legacy import router as orders_legacy_router
+from app.routers.yandex_feeds import router as yandex_feeds_router
+from app.routers.public_feeds import router as public_feeds_router
 
 
 
@@ -81,4 +83,6 @@ api_router.include_router(finance_router)
 api_router.include_router(audit_router)
 api_router.include_router(orders_meta_router)
 api_router.include_router(orders_legacy_router)
+api_router.include_router(yandex_feeds_router)
+api_router.include_router(public_feeds_router)
 

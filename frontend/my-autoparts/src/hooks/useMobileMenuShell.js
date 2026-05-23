@@ -90,6 +90,7 @@ export function useMobileMenuShell(userOverride) {
 export function getPageTitle(pathname) {
     if (pathname === '/') return 'Главная';
     if (pathname.endsWith('/filters') && pathname.startsWith('/autoparts')) return 'Фильтры';
+    if (pathname === '/catalog') return 'Каталог';
     if (pathname.startsWith('/autoparts')) return 'Поиск';
     if (pathname === '/about') return 'О компании';
     if (pathname === '/cart') return 'Корзина';

@@ -15,12 +15,20 @@ from app.routers import chats as chats_router
 from app.routers import websocket as websocket_router
 from app.routers import notifications as notifications_router
 from app.routers import avito_messenger_webhook as avito_messenger_webhook_router
+from app.tasks.yandex_feed_tasks import run_yandex_feed_sync
+from app.utils.yandex_integration_db import (
+    get_or_create_yandex_feed_sync_state,
+    get_or_create_yandex_integration,
+)
 from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, carts
 from app.models import chat  # noqa: F401 — chat models в metadata
 import app.models.site_settings  # noqa: F401 — site_settings в metadata
 import app.models.organization_avito_integration  # noqa: F401 — avito integration
 import app.models.organization_avito_autoload_cache  # noqa: F401 — avito autoload cache
 import app.models.transmission  # noqa: F401 — transmissions, vehicle_transmissions в metadata
+import app.models.site_yandex_integration  # noqa: F401 — yandex integration
+import app.models.yandex_feed_sync_state  # noqa: F401 — yandex feed sync state
+import app.models.yandex_oauth_state  # noqa: F401 — yandex oauth state
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings
@@ -34,6 +42,7 @@ import logging
 import os
 import sys
 import asyncio
+from datetime import datetime, timezone
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -139,6 +148,13 @@ async def startup_event():
         name='Clean up expired guest carts every hour',
         replace_existing=True
     )
+    scheduler.add_job(
+        func=run_yandex_feed_scheduler_tick,
+        trigger=IntervalTrigger(minutes=5),
+        id='yandex_feed_sync_tick',
+        name='Yandex feed event-driven sync tick',
+        replace_existing=True,
+    )
     
     scheduler.start()
     logger.info("Scheduler started. Expired session cleanup job scheduled.")
@@ -220,6 +236,57 @@ async def run_cleanup_expired_guest_carts():
             db.close()
     except Exception as e:
         logger.error(f"Ошибка при очистке гостевых корзин: {str(e)}")
+
+
+async def run_yandex_feed_scheduler_tick():
+    """
+    Проверяет pending_sync и запускает синхронизацию в Celery с учетом дебаунса.
+    Плюс выполняет контрольный прогон по интервалу.
+    """
+    try:
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            integration = get_or_create_yandex_integration(db)
+            state = get_or_create_yandex_feed_sync_state(db)
+            if not integration.enabled:
+                return
+
+            now = datetime.now(timezone.utc)
+            should_enqueue = False
+
+            if state.sync_in_progress:
+                return
+
+            if state.pending_sync and integration.event_driven_enabled:
+                debounce = int(integration.debounce_seconds or 300)
+                event_at = state.last_event_at
+                if event_at and event_at.tzinfo is None:
+                    event_at = event_at.replace(tzinfo=timezone.utc)
+                if event_at is None:
+                    should_enqueue = True
+                else:
+                    should_enqueue = (now - event_at).total_seconds() >= debounce
+
+            control_interval = int(integration.control_sync_interval_minutes or 720)
+            last_finished = state.last_sync_finished_at
+            if last_finished and last_finished.tzinfo is None:
+                last_finished = last_finished.replace(tzinfo=timezone.utc)
+            if not should_enqueue:
+                if last_finished is None:
+                    should_enqueue = True
+                else:
+                    should_enqueue = (now - last_finished).total_seconds() >= control_interval * 60
+
+            if should_enqueue:
+                state.last_enqueued_at = now
+                db.add(state)
+                db.commit()
+                run_yandex_feed_sync.delay(trigger="scheduler", force=False)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Ошибка в scheduler tick Yandex feed: {str(e)}")
 
 
 app.include_router(api_router)

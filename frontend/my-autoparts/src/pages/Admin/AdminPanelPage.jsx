@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import { apiRequest } from '../../utils/apiClient';
+import { API_BASE, apiRequest } from '../../utils/apiClient';
 import {
   fetchPublicSiteConfig,
   setShowNewAutoparts,
@@ -24,12 +24,81 @@ function AdminPanelPage() {
   const [photoMigrationBusy, setPhotoMigrationBusy] = useState(false);
   const [photoMigrationResult, setPhotoMigrationResult] = useState(null);
   const [photoMigrationOrgId, setPhotoMigrationOrgId] = useState('');
+  const location = useLocation();
+
+  const [yandexLoading, setYandexLoading] = useState(true);
+  const [yandexSaving, setYandexSaving] = useState(false);
+  const [yandexSyncBusy, setYandexSyncBusy] = useState(false);
+  const [yandexHeadCheckBusy, setYandexHeadCheckBusy] = useState(false);
+  const [yandexEnsureHostBusy, setYandexEnsureHostBusy] = useState(false);
+  const [yandexNotice, setYandexNotice] = useState(null);
+  const [yandexHostResult, setYandexHostResult] = useState(null);
+  const [yandexHeadCheckResult, setYandexHeadCheckResult] = useState(null);
+  const [yandexPreview, setYandexPreview] = useState(null);
+  const [yandexFeedsList, setYandexFeedsList] = useState(null);
+  const [yandexIntegration, setYandexIntegration] = useState(null);
+  const [yandexSyncStatus, setYandexSyncStatus] = useState(null);
+  const [yandexClientId, setYandexClientId] = useState('');
+  const [yandexClientSecret, setYandexClientSecret] = useState('');
+  const [hostUrl, setHostUrl] = useState('https://svoygarage.ru');
+  const [feedType, setFeedType] = useState('GOODS');
+  const [regionIdsCsv, setRegionIdsCsv] = useState('225');
+  const [usedConditionType, setUsedConditionType] = useState('preowned');
+  const [usedConditionReason, setUsedConditionReason] = useState('Товар бывший в употреблении, проверен продавцом');
+  const [eventDrivenEnabled, setEventDrivenEnabled] = useState(true);
+  const [debounceSeconds, setDebounceSeconds] = useState('300');
+  const [controlSyncIntervalMinutes, setControlSyncIntervalMinutes] = useState('720');
+  const [yandexEnabled, setYandexEnabled] = useState(true);
+
+  const yandexConnected = Boolean(yandexIntegration?.connected);
+  const callbackParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+
+  const hydrateYandexForm = (row) => {
+    if (!row) return;
+    setYandexClientId(row.client_id || '');
+    setFeedType(row.feed_type || 'GOODS');
+    setRegionIdsCsv(row.region_ids_csv || '225');
+    setUsedConditionType(row.used_condition_type || 'preowned');
+    setUsedConditionReason(
+      row.used_condition_reason || 'Товар бывший в употреблении, проверен продавцом'
+    );
+    setEventDrivenEnabled(row.event_driven_enabled !== false);
+    setDebounceSeconds(String(row.debounce_seconds ?? 300));
+    setControlSyncIntervalMinutes(String(row.control_sync_interval_minutes ?? 720));
+    setYandexEnabled(row.enabled !== false);
+    setHostUrl(row.host_url || 'https://svoygarage.ru');
+  };
+
+  const loadYandex = async () => {
+    const [integration, status] = await Promise.all([
+      apiRequest('/admin/yandex/integration'),
+      apiRequest('/admin/yandex/feeds/sync-status'),
+    ]);
+    setYandexIntegration(integration);
+    setYandexSyncStatus(status);
+    hydrateYandexForm(integration);
+  };
+
+  const loadYandexDiagnostics = async () => {
+    try {
+      const [preview, headCheck] = await Promise.all([
+        apiRequest('/admin/yandex/feeds/public-preview'),
+        apiRequest('/admin/yandex/feeds/public-head-check'),
+      ]);
+      setYandexPreview(preview);
+      setYandexHeadCheckResult(headCheck);
+    } catch {
+      // optional diagnostics, errors shown via explicit actions
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiRequest('/admin/site-settings');
+        const [data] = await Promise.all([
+          apiRequest('/admin/site-settings'),
+        ]);
         if (!cancelled) {
           setShowNewLocal(data.show_new_autoparts !== false);
           const m = Number(data.new_parts_markup_percent);
@@ -51,6 +120,44 @@ function AdminPanelPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        await loadYandex();
+        await loadYandexDiagnostics();
+      } catch (e) {
+        if (!cancelled) {
+          setError(e?.message || 'Не удалось загрузить настройки Яндекс');
+        }
+      } finally {
+        if (!cancelled) setYandexLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const connected = callbackParams.get('yandex_connected');
+    const err = callbackParams.get('yandex_error');
+    if (connected) {
+      setYandexNotice('OAuth Яндекса подключен');
+      loadYandex().catch(() => {});
+    } else if (err) {
+      setError(`Ошибка OAuth Яндекс: ${err}`);
+    }
+  }, [callbackParams]);
+
+  useEffect(() => {
+    if (yandexLoading) return undefined;
+    const timer = setInterval(() => {
+      loadYandex().catch(() => {});
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [yandexLoading]);
 
   if (!isReady) {
     return <AuthLoadingScreen />;
@@ -143,8 +250,159 @@ function AdminPanelPage() {
     }
   };
 
+  const saveYandexCredentials = async () => {
+    setYandexSaving(true);
+    setError(null);
+    setYandexNotice(null);
+    try {
+      const payload = { client_id: yandexClientId.trim() };
+      if (yandexClientSecret.trim()) {
+        payload.client_secret = yandexClientSecret.trim();
+      }
+      const res = await apiRequest('/admin/yandex/credentials', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      setYandexIntegration(res);
+      hydrateYandexForm(res);
+      setYandexClientSecret('');
+      setYandexNotice('Client ID/Secret сохранены');
+    } catch (e) {
+      setError(e?.message || 'Ошибка сохранения OAuth настроек Яндекс');
+    } finally {
+      setYandexSaving(false);
+    }
+  };
+
+  const startYandexOAuth = () => {
+    const redirectTo = '/admin-settings';
+    const href = `${API_BASE}/admin/yandex/oauth/start?redirect_to=${encodeURIComponent(redirectTo)}`;
+    window.location.href = href;
+  };
+
+  const disconnectYandexOAuth = async () => {
+    setYandexSaving(true);
+    setError(null);
+    try {
+      const res = await apiRequest('/admin/yandex/oauth/disconnect', { method: 'POST' });
+      setYandexIntegration(res);
+      hydrateYandexForm(res);
+      setYandexNotice('OAuth Яндекса отключен');
+    } catch (e) {
+      setError(e?.message || 'Ошибка отключения OAuth Яндекс');
+    } finally {
+      setYandexSaving(false);
+    }
+  };
+
+  const saveYandexFeedSettings = async () => {
+    const debounce = Number(debounceSeconds);
+    const control = Number(controlSyncIntervalMinutes);
+    if (!Number.isFinite(debounce) || debounce < 30 || debounce > 3600) {
+      setError('Debounce: введите число от 30 до 3600 секунд');
+      return;
+    }
+    if (!Number.isFinite(control) || control < 30 || control > 10080) {
+      setError('Контрольный интервал: введите число от 30 до 10080 минут');
+      return;
+    }
+    setYandexSaving(true);
+    setError(null);
+    setYandexNotice(null);
+    try {
+      const res = await apiRequest('/admin/yandex/feed-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          feed_type: feedType,
+          region_ids_csv: regionIdsCsv,
+          used_condition_type: usedConditionType,
+          used_condition_reason: usedConditionReason,
+          event_driven_enabled: eventDrivenEnabled,
+          debounce_seconds: debounce,
+          control_sync_interval_minutes: control,
+          enabled: yandexEnabled,
+        }),
+      });
+      setYandexIntegration(res);
+      hydrateYandexForm(res);
+      setYandexNotice('Настройки фида сохранены');
+      await loadYandexDiagnostics();
+    } catch (e) {
+      setError(e?.message || 'Ошибка сохранения настроек фида Яндекс');
+    } finally {
+      setYandexSaving(false);
+    }
+  };
+
+  const ensureYandexHost = async () => {
+    setYandexEnsureHostBusy(true);
+    setError(null);
+    setYandexNotice(null);
+    setYandexHostResult(null);
+    try {
+      const res = await apiRequest('/admin/yandex/host/ensure', {
+        method: 'POST',
+        body: JSON.stringify({ host_url: hostUrl.trim() || 'https://svoygarage.ru' }),
+      });
+      setYandexHostResult(res);
+      if (res.ok) {
+        setYandexNotice(res.note || 'Сайт синхронизирован с Яндекс Вебмастером');
+      } else {
+        setError(res.message || 'Не удалось подтвердить сайт');
+      }
+      await loadYandex();
+      await loadYandexDiagnostics();
+    } catch (e) {
+      setError(e?.message || 'Ошибка проверки сайта в Яндекс Вебмастере');
+    } finally {
+      setYandexEnsureHostBusy(false);
+    }
+  };
+
+  const runYandexSync = async (force = false) => {
+    setYandexSyncBusy(true);
+    setError(null);
+    setYandexNotice(null);
+    try {
+      await apiRequest(`/admin/yandex/feeds/sync?force=${force ? 'true' : 'false'}`, {
+        method: 'POST',
+      });
+      setYandexNotice('Асинхронная загрузка фида запущена');
+      await loadYandex();
+    } catch (e) {
+      setError(e?.message || 'Ошибка запуска асинхронной загрузки фида');
+    } finally {
+      setYandexSyncBusy(false);
+    }
+  };
+
+  const checkYandexFeedHead = async () => {
+    setYandexHeadCheckBusy(true);
+    setError(null);
+    try {
+      const res = await apiRequest('/admin/yandex/feeds/public-head-check');
+      setYandexHeadCheckResult(res);
+      const preview = await apiRequest('/admin/yandex/feeds/public-preview');
+      setYandexPreview(preview);
+    } catch (e) {
+      setError(e?.message || 'Ошибка проверки публичного feed URL');
+    } finally {
+      setYandexHeadCheckBusy(false);
+    }
+  };
+
+  const loadUploadedYandexFeeds = async () => {
+    setError(null);
+    try {
+      const res = await apiRequest('/admin/yandex/feeds/list');
+      setYandexFeedsList(res);
+    } catch (e) {
+      setError(e?.message || 'Ошибка получения списка фидов из Яндекс Вебмастера');
+    }
+  };
+
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-4xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Настройки</h1>
       <p className="text-gray-600 mb-6">
         Параметры сайта для администраторов
@@ -153,6 +411,12 @@ function AdminPanelPage() {
       {error && (
         <div className="mb-4 rounded-lg bg-red-50 text-red-800 text-sm px-4 py-3 border border-red-100">
           {error}
+        </div>
+      )}
+
+      {yandexNotice && (
+        <div className="mb-4 rounded-lg bg-green-50 text-green-800 text-sm px-4 py-3 border border-green-100">
+          {yandexNotice}
         </div>
       )}
 
@@ -216,6 +480,294 @@ function AdminPanelPage() {
             {savingMarkup ? 'Сохранение…' : 'Сохранить'}
           </button>
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">
+          Яндекс Товары / Вебмастер
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">
+          OAuth, проверка сайта и асинхронная загрузка товарного YML-фида.
+        </p>
+
+        {yandexLoading ? (
+          <p className="text-sm text-gray-500">Загрузка настроек Яндекс…</p>
+        ) : (
+          <div className="space-y-6">
+            <div className="rounded-lg border border-gray-200 p-4">
+              <h3 className="font-medium text-gray-900 mb-3">OAuth приложение</h3>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Client ID
+                  </label>
+                  <input
+                    type="text"
+                    value={yandexClientId}
+                    onChange={(e) => setYandexClientId(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="76422e7eada24b5ba50c9b0c03628e21"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Client secret
+                  </label>
+                  <input
+                    type="password"
+                    value={yandexClientSecret}
+                    onChange={(e) => setYandexClientSecret(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder={
+                      yandexIntegration?.client_secret_configured
+                        ? 'Оставьте пустым, если не меняете'
+                        : 'Введите Client secret'
+                    }
+                  />
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={saveYandexCredentials}
+                  disabled={yandexSaving}
+                  className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {yandexSaving ? 'Сохранение…' : 'Сохранить OAuth данные'}
+                </button>
+                <button
+                  type="button"
+                  onClick={startYandexOAuth}
+                  disabled={yandexSaving || !yandexClientId.trim()}
+                  className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+                >
+                  Подключить Яндекс (OAuth code)
+                </button>
+                <button
+                  type="button"
+                  onClick={disconnectYandexOAuth}
+                  disabled={yandexSaving || !yandexConnected}
+                  className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Отключить OAuth
+                </button>
+              </div>
+              <div className="mt-3 text-xs text-gray-600 space-y-1">
+                <p>Статус OAuth: {yandexConnected ? 'подключен' : 'не подключен'}</p>
+                {yandexIntegration?.token_expires_at && (
+                  <p>Токен истекает: {new Date(yandexIntegration.token_expires_at).toLocaleString()}</p>
+                )}
+                {yandexIntegration?.yandex_user_id && (
+                  <p>Yandex user_id: {yandexIntegration.yandex_user_id}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 p-4">
+              <h3 className="font-medium text-gray-900 mb-3">Сайт в Вебмастере</h3>
+              <div className="grid sm:grid-cols-[1fr_auto] gap-3">
+                <input
+                  type="text"
+                  value={hostUrl}
+                  onChange={(e) => setHostUrl(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  placeholder="https://svoygarage.ru"
+                />
+                <button
+                  type="button"
+                  onClick={ensureYandexHost}
+                  disabled={yandexEnsureHostBusy || !yandexConnected}
+                  className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {yandexEnsureHostBusy ? 'Проверка…' : 'Auto-try добавить/проверить host'}
+                </button>
+              </div>
+              <div className="mt-3 text-xs text-gray-600 space-y-1">
+                <p>host_id: {yandexIntegration?.host_id || '—'}</p>
+                <p>host_url: {yandexIntegration?.host_url || '—'}</p>
+              </div>
+              {yandexHostResult && (
+                <pre className="mt-3 rounded-md bg-gray-50 p-3 text-xs text-gray-700 overflow-auto">
+                  {JSON.stringify(yandexHostResult, null, 2)}
+                </pre>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-gray-200 p-4">
+              <h3 className="font-medium text-gray-900 mb-3">Настройки товарного фида (used-only)</h3>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">feed_type</label>
+                  <select
+                    value={feedType}
+                    onChange={(e) => setFeedType(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    {['GOODS', 'REALTY', 'VACANCY', 'DOCTORS', 'CARS', 'SERVICES', 'EDUCATION', 'ACTIVITY'].map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    regionIds (csv)
+                  </label>
+                  <input
+                    type="text"
+                    value={regionIdsCsv}
+                    onChange={(e) => setRegionIdsCsv(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="225"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    condition.type
+                  </label>
+                  <input
+                    type="text"
+                    value={usedConditionType}
+                    onChange={(e) => setUsedConditionType(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    placeholder="preowned"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    debounce (сек)
+                  </label>
+                  <input
+                    type="number"
+                    min={30}
+                    max={3600}
+                    value={debounceSeconds}
+                    onChange={(e) => setDebounceSeconds(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    condition.reason
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={usedConditionReason}
+                    onChange={(e) => setUsedConditionReason(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Контрольный sync (мин)
+                  </label>
+                  <input
+                    type="number"
+                    min={30}
+                    max={10080}
+                    value={controlSyncIntervalMinutes}
+                    onChange={(e) => setControlSyncIntervalMinutes(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-2 justify-end pb-1">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={eventDrivenEnabled}
+                      onChange={(e) => setEventDrivenEnabled(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600"
+                    />
+                    Event-driven sync
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={yandexEnabled}
+                      onChange={(e) => setYandexEnabled(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-indigo-600"
+                    />
+                    Интеграция включена
+                  </label>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={saveYandexFeedSettings}
+                  disabled={yandexSaving}
+                  className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {yandexSaving ? 'Сохранение…' : 'Сохранить настройки фида'}
+                </button>
+                <button
+                  type="button"
+                  onClick={checkYandexFeedHead}
+                  disabled={yandexHeadCheckBusy}
+                  className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {yandexHeadCheckBusy ? 'Проверка…' : 'Проверить feed URL'}
+                </button>
+              </div>
+              <div className="mt-3 text-xs text-gray-600 space-y-1">
+                <p>Feed URL: {yandexIntegration?.feed_url || '—'}</p>
+                {yandexPreview && (
+                  <p>
+                    preview: offers={yandexPreview.offers_count}, categories={yandexPreview.categories_count}, checksum={yandexPreview.checksum}
+                  </p>
+                )}
+              </div>
+              {yandexHeadCheckResult && (
+                <pre className="mt-3 rounded-md bg-gray-50 p-3 text-xs text-gray-700 overflow-auto">
+                  {JSON.stringify(yandexHeadCheckResult, null, 2)}
+                </pre>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-gray-200 p-4">
+              <h3 className="font-medium text-gray-900 mb-3">Асинхронная загрузка в Яндекс</h3>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => runYandexSync(false)}
+                  disabled={yandexSyncBusy || !yandexConnected}
+                  className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {yandexSyncBusy ? 'Запуск…' : 'Загрузить фид сейчас (async)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runYandexSync(true)}
+                  disabled={yandexSyncBusy || !yandexConnected}
+                  className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+                >
+                  Force sync
+                </button>
+                <button
+                  type="button"
+                  onClick={loadUploadedYandexFeeds}
+                  disabled={!yandexConnected}
+                  className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Список фидов в Вебмастере
+                </button>
+              </div>
+              <div className="mt-3 text-xs text-gray-600 space-y-1">
+                <p>pending_sync: {String(Boolean(yandexSyncStatus?.pending_sync))}</p>
+                <p>sync_in_progress: {String(Boolean(yandexSyncStatus?.sync_in_progress))}</p>
+                <p>last_request_id: {yandexSyncStatus?.last_request_id || '—'}</p>
+                <p>last_process_status: {yandexSyncStatus?.last_process_status || '—'}</p>
+                <p>last_error: {yandexSyncStatus?.last_error || '—'}</p>
+              </div>
+              {yandexFeedsList && (
+                <pre className="mt-3 rounded-md bg-gray-50 p-3 text-xs text-gray-700 overflow-auto">
+                  {JSON.stringify(yandexFeedsList, null, 2)}
+                </pre>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">

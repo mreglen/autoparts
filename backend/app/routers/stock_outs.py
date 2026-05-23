@@ -14,6 +14,7 @@ from app.services.stock_sale_fulfillment import (
     fulfill_stock_out,
 )
 from app.services.audit_service import log_audit
+from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty
 
 router = APIRouter(prefix="/stock-outs", tags=["Stock Out"])
 
@@ -45,6 +46,10 @@ def create_stock_out(
             source_kind=StockOutSourceKind.WAREHOUSE_MANUAL if is_sale else StockOutSourceKind.WRITEOFF,
         ),
     )
+    if result.stock_out and result.stock_out.product_id:
+        product = db.query(Product).filter(Product.id == result.stock_out.product_id).first()
+        if product and product.is_new is False:
+            mark_yandex_feed_dirty(db, "stock_out_created_used")
     return result.stock_out
 
 @router.get("/sales", response_model=list[StockOutSchema])
@@ -78,6 +83,9 @@ def update_stock_out(stock_out_id: int, stock_out: StockOutCreate, db: Session =
 
     db.commit()
     db.refresh(db_stock_out)
+    product = db.query(Product).filter(Product.id == db_stock_out.product_id).first()
+    if product and product.is_new is False:
+        mark_yandex_feed_dirty(db, "stock_out_updated_used")
     return db_stock_out
 
 @router.delete("/{stock_out_id}", status_code=204)
@@ -88,6 +96,9 @@ def delete_stock_out(stock_out_id: int, db: Session = Depends(get_db)):
 
     db.delete(db_stock_out)
     db.commit()
+    product = db.query(Product).filter(Product.id == db_stock_out.product_id).first()
+    if product and product.is_new is False:
+        mark_yandex_feed_dirty(db, "stock_out_deleted_used")
     return
 
 @router.get("/", response_model=list[StockOutSchema])
@@ -196,6 +207,13 @@ def create_return(
         organization_id=current_user.organization_id,
         details={"returns": processed_returns},
     )
+    if any(
+        db.query(Product)
+        .filter(Product.id == row["product_id"], Product.is_new == False)  # noqa: E712
+        .first()
+        for row in processed_returns
+    ):
+        mark_yandex_feed_dirty(db, "stock_out_return_used")
 
     # Refresh для получения ID новых записей
     for stock_in in created_stock_ins:
