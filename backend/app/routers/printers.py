@@ -72,8 +72,24 @@ def _build_test_label_storage_cells():
         ("Стеллаж", "A-01"),
         ("Секция", "02"),
         ("Место", "03"),
+        ("Ряд", "04"),
+        ("Уровень", "B2"),
+        ("Полка", "C5"),
     ]
     return [{"name_short": _short_cell_name(name), "value": value} for name, value in samples]
+
+
+def _storage_cells_per_row(width_mm: int) -> int:
+    """Сколько колонок адресного хранения помещается в левую часть этикетки."""
+    left_mm = max(18, int(width_mm) - 21)
+    return max(2, min(5, left_mm // 7))
+
+
+def _chunk_storage_cells(cells, width_mm: int):
+    size = _storage_cells_per_row(width_mm)
+    if not cells:
+        return [[]]
+    return [cells[i : i + size] for i in range(0, len(cells), size)]
 
 
 def _normalize_public_base_url(raw_url: str) -> str:
@@ -434,12 +450,13 @@ async def print_test_label(
     qr_data_uri = _build_qr_data_uri(qr_url)
 
     tmpl = _templates_env.get_template("label_print_test.html")
+    test_storage_cells = _build_test_label_storage_cells()
     html = tmpl.render(
         label_width_mm=width_mm,
         label_height_mm=height_mm,
         brand="BOSCH",
         article="0 986 479 123",
-        storage_cells=_build_test_label_storage_cells(),
+        storage_cell_rows=_chunk_storage_cells(test_storage_cells, width_mm),
         name="Тормозные колодки передние",
         internal_code="INT-0000123",
         price="1 250 ₽",

@@ -30,13 +30,13 @@
         width: {{label_width_mm|default(58)}}mm;
         height: {{label_height_mm|default(38)}}mm;
         box-sizing: border-box;
-        padding: 2mm 2.5mm;
+        padding: 2mm 2mm;
       }
 
       .content {
         display: flex;
         align-items: center;
-        gap: 3mm;
+        gap: 2mm;
         height: 100%;
       }
 
@@ -46,49 +46,43 @@
         display: flex;
         flex-direction: column;
         justify-content: center;
-        gap: 1.2mm;
+        gap: 1mm;
       }
 
       .qr {
         flex: 0 0 auto;
-        width: 16mm;
-        height: 16mm;
+        width: 14mm;
+        height: 14mm;
         display: block;
         object-fit: contain;
       }
 
       .right {
         flex: 0 0 auto;
-        width: 17mm;
+        width: 14mm;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 1mm;
+        gap: 0.8mm;
       }
 
       .right-meta {
         width: 100%;
         text-align: center;
-        font-size: 6.5pt;
-        line-height: 1.1;
+        font-size: 6pt;
+        line-height: 1.05;
         white-space: nowrap;
       }
 
       .row {
-        line-height: 1.2;
-      }
-
-      .title {
-        font-size: 5.5pt;
-        font-weight: 700;
-        opacity: 0.8;
+        line-height: 1.15;
       }
 
       .value {
         font-size: 7.5pt;
         font-weight: 600;
-        line-height: 1.2;
+        line-height: 1.15;
         word-break: break-word;
       }
 
@@ -96,20 +90,35 @@
         font-size: 6.5pt;
       }
 
+      .storage-block {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        width: 100%;
+      }
+
       .storage-grid {
         width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
-        margin-top: 0.4mm;
+      }
+
+      .storage-grid + .storage-grid {
+        margin-top: -0.2mm;
+      }
+
+      .storage-grid + .storage-grid th,
+      .storage-grid + .storage-grid td {
+        border-top: none;
       }
 
       .storage-grid th,
       .storage-grid td {
         border: 0.2mm solid #000;
-        padding: 0.3mm 0.5mm;
+        padding: 0.25mm 0.4mm;
         text-align: center;
         vertical-align: middle;
-        line-height: 1.1;
+        line-height: 1.05;
         word-break: break-word;
       }
 
@@ -130,33 +139,33 @@
         <div class="content">
           <div class="left">
             <div class="row">
-              <div class="title">Бренд</div>
               <div class="value">{{brand}}</div>
             </div>
 
             <div class="row">
-              <div class="title">Артикул</div>
               <div class="value">{{article}}</div>
             </div>
 
             <div class="row">
-              <div class="title">Адресное хранение</div>
-              <table class="storage-grid">
-                <tr>
-                  {% for cell in storage_cells %}
-                  <th>{{ cell.name_short }}</th>
-                  {% endfor %}
-                </tr>
-                <tr>
-                  {% for cell in storage_cells %}
-                  <td>{{ cell.value }}</td>
-                  {% endfor %}
-                </tr>
-              </table>
+              <div class="storage-block">
+                {% for row_cells in storage_cell_rows %}
+                <table class="storage-grid">
+                  <tr>
+                    {% for cell in row_cells %}
+                    <th>{{ cell.name_short }}</th>
+                    {% endfor %}
+                  </tr>
+                  <tr>
+                    {% for cell in row_cells %}
+                    <td>{{ cell.value }}</td>
+                    {% endfor %}
+                  </tr>
+                </table>
+                {% endfor %}
+              </div>
             </div>
 
             <div class="row" style="margin-bottom: 0;">
-              <div class="title">Наименование</div>
               <div class="value small">{{name}}</div>
             </div>
           </div>

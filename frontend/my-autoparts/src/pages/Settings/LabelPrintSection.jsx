@@ -34,7 +34,65 @@ const TEST_LABEL_STORAGE_CELLS = [
   { nameShort: 'Стел', value: 'A-01' },
   { nameShort: 'Секц', value: '02' },
   { nameShort: 'Мест', value: '03' },
+  { nameShort: 'Ряд', value: '04' },
+  { nameShort: 'Уров', value: 'B2' },
+  { nameShort: 'Полк', value: 'C5' },
 ];
+
+function storageCellsPerRow(widthMm) {
+  const leftMm = Math.max(18, Number(widthMm || 58) - 21);
+  return Math.max(2, Math.min(5, Math.floor(leftMm / 7)));
+}
+
+function chunkStorageCells(cells, widthMm) {
+  const size = storageCellsPerRow(widthMm);
+  if (!cells.length) return [[]];
+  const rows = [];
+  for (let i = 0; i < cells.length; i += size) {
+    rows.push(cells.slice(i, i + size));
+  }
+  return rows;
+}
+
+function StorageCellsPreview({ cells, widthMm }) {
+  const rows = useMemo(() => chunkStorageCells(cells, widthMm), [cells, widthMm]);
+
+  return (
+    <div className="flex flex-col gap-0 w-full">
+      {rows.map((rowCells, rowIndex) => (
+        <table
+          key={`storage-row-${rowIndex}`}
+          className={`w-full border-collapse table-fixed text-black ${rowIndex > 0 ? '-mt-px [&_th]:border-t-0 [&_td]:border-t-0' : ''}`}
+        >
+          <thead>
+            <tr>
+              {rowCells.map((cell) => (
+                <th
+                  key={`head-${rowIndex}-${cell.nameShort}-${cell.value}`}
+                  className="border border-black px-0.5 py-0 text-[7px] font-bold leading-tight text-center"
+                >
+                  {cell.nameShort}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {rowCells.map((cell) => (
+                <td
+                  key={`val-${rowIndex}-${cell.nameShort}-${cell.value}`}
+                  className="border border-black px-0.5 py-0 text-[8px] font-semibold leading-tight text-center break-words"
+                >
+                  {cell.value}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      ))}
+    </div>
+  );
+}
 
 function LabelPreview({ widthMm, heightMm }) {
   const frameRef = useRef(null);
@@ -92,55 +150,26 @@ function LabelPreview({ widthMm, heightMm }) {
             boxSizing: 'border-box',
           }}
         >
-          <div className="flex items-start gap-3 h-full">
+          <div className="flex items-start gap-2 h-full">
             <div className="flex-1 min-w-0 text-black">
-              <div className="mb-1.5">
-                <div className="text-[8px] font-bold leading-tight">Бренд</div>
-                <div className="text-[11px] leading-tight break-words">BOSCH</div>
+              <div className="mb-1">
+                <div className="text-[11px] font-semibold leading-tight break-words">BOSCH</div>
               </div>
-              <div className="mb-1.5">
-                <div className="text-[8px] font-bold leading-tight">Артикул</div>
-                <div className="text-[11px] leading-tight break-words">0 986 479 123</div>
+              <div className="mb-1">
+                <div className="text-[11px] font-semibold leading-tight break-words">0 986 479 123</div>
               </div>
-              <div className="mb-1.5">
-                <div className="text-[8px] font-bold leading-tight">Адресное хранение</div>
-                <table className="mt-0.5 w-full border-collapse table-fixed text-black">
-                  <thead>
-                    <tr>
-                      {TEST_LABEL_STORAGE_CELLS.map((cell) => (
-                        <th
-                          key={`head-${cell.nameShort}`}
-                          className="border border-black px-0.5 py-0 text-[7px] font-bold leading-tight text-center"
-                        >
-                          {cell.nameShort}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      {TEST_LABEL_STORAGE_CELLS.map((cell) => (
-                        <td
-                          key={`val-${cell.nameShort}`}
-                          className="border border-black px-0.5 py-0 text-[8px] font-semibold leading-tight text-center break-words"
-                        >
-                          {cell.value}
-                        </td>
-                      ))}
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="mb-1">
+                <StorageCellsPreview cells={TEST_LABEL_STORAGE_CELLS} widthMm={widthMm} />
               </div>
-              <div className="mb-1.5">
-                <div className="text-[8px] font-bold leading-tight">Наименование</div>
-                <div className="text-[9px] leading-tight break-words">Тормозные колодки передние</div>
+              <div className="mb-0">
+                <div className="text-[9px] font-semibold leading-tight break-words">Тормозные колодки передние</div>
               </div>
             </div>
 
-              <div className="shrink-0 flex flex-col items-center">
-                <div className="w-[56px] h-[56px] bg-black" aria-label="QR placeholder" />
-                <div className="mt-1 text-[9px] leading-tight text-black text-center whitespace-nowrap">Цена: 1 250 ₽</div>
-                <div className="mt-0.5 text-[8px] leading-tight text-black text-center whitespace-nowrap">Код: INT-0000123</div>
+              <div className="shrink-0 w-[52px] flex flex-col items-center">
+                <div className="w-[48px] h-[48px] bg-black" aria-label="QR placeholder" />
+                <div className="mt-1 text-[8px] leading-tight text-black text-center whitespace-nowrap">Цена: 1 250 ₽</div>
+                <div className="mt-0.5 text-[7px] leading-tight text-black text-center whitespace-nowrap">Код: INT-0000123</div>
               </div>
           </div>
         </div>
