@@ -1,5 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, Header
-from typing import Dict, List
+from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 import json
 import base64
@@ -20,6 +20,9 @@ from app.models.rejected_product import RejectedProduct
 from app.models.printer_agent import PrinterAgent
 from app.models.printer_agent_printer import PrinterAgentPrinter
 from app.models.printer_permission import PrinterPermission
+from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
+from app.models.pending_product_storage_cell import PendingProductStorageCell as PendingProductStorageCellModel
+from app.models.storage_cell import StorageCell as StorageCellModel
 from app.db.database import get_db
 from app.services.audit_service import log_audit
 from sqlalchemy import and_
@@ -79,17 +82,147 @@ def _build_test_label_storage_cells():
     return [{"name_short": _short_cell_name(name), "value": value} for name, value in samples]
 
 
-def _storage_cells_per_row(width_mm: int) -> int:
-    """Сколько колонок адресного хранения помещается в левую часть этикетки."""
-    left_mm = max(18, int(width_mm) - 21)
-    return max(2, min(5, left_mm // 7))
+def _storage_cells_per_row_full(width_mm: int) -> int:
+    """Колонок адресного хранения на всю ширину этикетки (пробная печать)."""
+    usable = max(24, int(width_mm) - 4)
+    return max(3, min(8, usable // 6))
 
 
-def _chunk_storage_cells(cells, width_mm: int):
-    size = _storage_cells_per_row(width_mm)
+def _chunk_test_storage_cells(cells, width_mm: int):
+    size = _storage_cells_per_row_full(width_mm)
     if not cells:
-        return [[]]
+        return []
     return [cells[i : i + size] for i in range(0, len(cells), size)]
+
+
+def _storage_cell_row(name: str, value: str) -> Optional[dict]:
+    clean_value = (value or "").strip()
+    if not clean_value:
+        return None
+    return {"name_short": _short_cell_name(name), "value": clean_value}
+
+
+def _normalize_payload_storage_cells(payload: dict) -> list:
+    raw = payload.get("storage_cells")
+    if not isinstance(raw, list) or not raw:
+        return []
+
+    rows = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = (
+            item.get("name")
+            or item.get("cell_name")
+            or item.get("storage_cell_name")
+            or ""
+        )
+        name_short = item.get("name_short") or _short_cell_name(name)
+        value = item.get("value")
+        clean_value = (str(value) if value is not None else "").strip()
+        if not clean_value:
+            continue
+        rows.append({"name_short": name_short, "value": clean_value})
+    return rows
+
+
+def _load_product_storage_cell_rows(db: Session, product_id: int, organization_id: str) -> list:
+    product = (
+        db.query(ProductModel)
+        .filter(
+            ProductModel.id == product_id,
+            ProductModel.organization_id == organization_id,
+        )
+        .first()
+    )
+    if not product:
+        return []
+
+    links = (
+        db.query(ProductStorageCellModel)
+        .filter(ProductStorageCellModel.product_id == product_id)
+        .all()
+    )
+    rows = []
+    for link in links:
+        cell = db.query(StorageCellModel).filter(StorageCellModel.id == link.storage_cell_id).first()
+        row = _storage_cell_row(cell.name if cell else "", link.value)
+        if row:
+            rows.append(row)
+    return rows
+
+
+def _load_pending_storage_cell_rows(db: Session, pending_product_id: int, organization_id: str) -> list:
+    pending = (
+        db.query(PendingProduct)
+        .filter(
+            PendingProduct.id == pending_product_id,
+            PendingProduct.organization_id == organization_id,
+        )
+        .first()
+    )
+    if not pending:
+        return []
+
+    links = (
+        db.query(PendingProductStorageCellModel)
+        .filter(PendingProductStorageCellModel.pending_product_id == pending_product_id)
+        .all()
+    )
+    rows = []
+    for link in links:
+        cell = db.query(StorageCellModel).filter(StorageCellModel.id == link.storage_cell_id).first()
+        row = _storage_cell_row(cell.name if cell else "", link.value)
+        if row:
+            rows.append(row)
+    return rows
+
+
+def _build_label_storage_cell_rows(payload: dict, db: Session, current_user: User, width_mm: int) -> list:
+    rows = _normalize_payload_storage_cells(payload)
+    if not rows:
+        source = (payload.get("source") or "product").strip().lower()
+        org_id = current_user.organization_id
+        if source == "pending":
+            try:
+                pending_id = int(payload.get("pending_product_id") or payload.get("product_id"))
+                rows = _load_pending_storage_cell_rows(db, pending_id, org_id)
+            except (TypeError, ValueError):
+                rows = []
+        elif source != "rejected":
+            try:
+                product_id = int(payload.get("product_id"))
+                rows = _load_product_storage_cell_rows(db, product_id, org_id)
+            except (TypeError, ValueError):
+                rows = []
+
+    return _chunk_test_storage_cells(rows, width_mm)
+
+
+def _render_label_html(
+    *,
+    width_mm: int,
+    height_mm: int,
+    brand: str,
+    article: str,
+    name: str,
+    internal_code: str,
+    price: str,
+    qr_data_uri: str,
+    storage_cell_rows: list,
+) -> str:
+    tmpl = _templates_env.get_template("label_print_test.html")
+    return tmpl.render(
+        label_width_mm=width_mm,
+        label_height_mm=height_mm,
+        brand=brand,
+        article=article,
+        storage_cell_rows=storage_cell_rows,
+        name=name,
+        internal_code=internal_code,
+        price=price,
+        qr_data_uri=qr_data_uri,
+    )
 
 
 def _normalize_public_base_url(raw_url: str) -> str:
@@ -408,7 +541,7 @@ async def print_test_label(
     db: Session = Depends(get_db),
 ):
     """
-    Печать пробной этикетки по HTML-шаблону label_print.html, как PDF.
+    Печать пробной этикетки по HTML-шаблону label_print_test.html, как PDF.
     """
     global job_counter
     try:
@@ -449,18 +582,17 @@ async def print_test_label(
     qr_url = f"{base_url}/my-parts" if base_url else "/my-parts"
     qr_data_uri = _build_qr_data_uri(qr_url)
 
-    tmpl = _templates_env.get_template("label_print_test.html")
     test_storage_cells = _build_test_label_storage_cells()
-    html = tmpl.render(
-        label_width_mm=width_mm,
-        label_height_mm=height_mm,
+    html = _render_label_html(
+        width_mm=width_mm,
+        height_mm=height_mm,
         brand="BOSCH",
         article="0 986 479 123",
-        storage_cell_rows=_chunk_storage_cells(test_storage_cells, width_mm),
         name="Тормозные колодки передние",
         internal_code="INT-0000123",
         price="1 250 ₽",
         qr_data_uri=qr_data_uri,
+        storage_cell_rows=_chunk_test_storage_cells(test_storage_cells, width_mm),
     )
 
     pdf_bytes = _html_to_pdf_bytes(html, width_mm=width_mm, height_mm=height_mm)
@@ -571,7 +703,7 @@ async def print_product_label(
     db: Session = Depends(get_db),
 ):
     """
-    Печать этикетки товара по HTML-шаблону label_print.html, как PDF.
+    Печать этикетки товара по HTML-шаблону label_print_test.html, как PDF.
     """
     global job_counter
     try:
@@ -612,24 +744,23 @@ async def print_product_label(
     # Extract product data from payload
     brand = payload.get("brand", "—")
     article = payload.get("article", "—")
-    storage_address = payload.get("storage_address", "—")
     name = payload.get("name", "—")
     internal_code = payload.get("internal_code", "—")
     price = payload.get("price", "—")
     qr_url = _resolve_label_qr_url(payload, current_user, db)
     qr_data_uri = _build_qr_data_uri(qr_url)
+    storage_cell_rows = _build_label_storage_cell_rows(payload, db, current_user, width_mm)
 
-    tmpl = _templates_env.get_template("label_print.html")
-    html = tmpl.render(
-        label_width_mm=width_mm,
-        label_height_mm=height_mm,
+    html = _render_label_html(
+        width_mm=width_mm,
+        height_mm=height_mm,
         brand=brand,
         article=article,
-        storage_address=storage_address,
         name=name,
         internal_code=internal_code,
         price=price,
         qr_data_uri=qr_data_uri,
+        storage_cell_rows=storage_cell_rows,
     )
 
     pdf_bytes = _html_to_pdf_bytes(html, width_mm=width_mm, height_mm=height_mm)

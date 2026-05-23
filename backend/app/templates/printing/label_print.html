@@ -137,24 +137,19 @@
           var label = document.querySelector(".label");
           var design = document.getElementById("design");
           if (!label || !design) return;
-          
-          // Базовые размеры дизайна 58x38mm
+
           var baseW = 58;
           var baseH = 38;
-          
-          // Фактические размеры label в пикселях
+
           var actualW = label.clientWidth;
           var actualH = label.clientHeight;
-          
-          // Вычисляем коэффициент масштабирования
-          // Отношение фактических размеров к базовым
-          var scaleX = actualW / (baseW * 3.78); // 1mm ≈ 3.78px при 96 DPI
+
+          var scaleX = actualW / (baseW * 3.78);
           var scaleY = actualH / (baseH * 3.78);
           var k = Math.min(scaleX, scaleY);
-          
+
           if (!isFinite(k) || k <= 0 || k > 1.5) return;
-          
-          // Применяем масштабирование с центрированием
+
           design.style.transformOrigin = "center center";
           design.style.transform = "scale(" + k.toFixed(4) + ")";
         } catch (e) {}

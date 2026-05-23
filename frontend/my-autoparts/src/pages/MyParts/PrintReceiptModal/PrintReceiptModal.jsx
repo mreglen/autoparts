@@ -7,6 +7,8 @@ import {
   clearError,
 } from '../../../redux/slices/PrinterSlice';
 import { apiAxios } from '../../../utils/apiClient';
+import LabelStorageCellsPreview from '../../../components/LabelPrint/LabelStorageCellsPreview';
+import { buildStorageCellsForLabel } from '../../../utils/labelPrintDisplay';
 
 const MM_TO_PX = 96 / 25.4;
 const PRINTER_POLL_MS = 4000;
@@ -43,18 +45,15 @@ function getLabelQrUrl(selectedPart) {
   return `${base}/seller/part-card/${selectedPart.id}`;
 }
 
-function buildLabelPrintPayload(selectedPart, productStorageCells) {
-  const storageAddress = productStorageCells && productStorageCells.length > 0
-    ? productStorageCells
-      .map((cell) => cell.value || cell.id || '')
-      .filter(Boolean)
-      .join(';')
-    : '—';
+function buildLabelPrintPayload(selectedPart, productStorageCells, cellCatalog = []) {
+  const storageCells = buildStorageCellsForLabel(productStorageCells, cellCatalog).map((cell) => ({
+    name_short: cell.nameShort,
+    value: cell.value,
+  }));
 
   const base = {
     brand: selectedPart?.brand || '—',
     article: selectedPart?.article || '—',
-    storage_address: storageAddress,
     name: selectedPart?.name || '—',
     internal_code: formatInternalCode(selectedPart?.internal_code),
     price: selectedPart?.price != null
@@ -64,6 +63,10 @@ function buildLabelPrintPayload(selectedPart, productStorageCells) {
     height_mm: 38,
     copies: 1,
   };
+
+  if (storageCells.length) {
+    base.storage_cells = storageCells;
+  }
 
   if (selectedPart?.moderationKind === 'pending') {
     return { ...base, source: 'pending', pending_product_id: selectedPart.id };
@@ -96,7 +99,7 @@ function useElementSize(ref) {
   return size;
 }
 
-function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) {
+function LabelPreview({ widthMm, heightMm, selectedPart, storageCellsForLabel }) {
   const frameRef = useRef(null);
   const frameSize = useElementSize(frameRef);
 
@@ -122,14 +125,6 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
     const k = Math.min(availableW / basePx.w, availableH / basePx.h);
     return clamp(k, 0.05, 10);
   }, [frameSize.width, frameSize.height, basePx.w, basePx.h]);
-
-  const cellsText = useMemo(() => {
-    if (!productStorageCells || productStorageCells.length === 0) return '';
-    return productStorageCells
-      .map(cell => cell.value || cell.id || '')
-      .filter(value => value)
-      .join(';');
-  }, [productStorageCells]);
 
   const qrTargetUrl = useMemo(
     () => getLabelQrUrl(selectedPart),
@@ -162,6 +157,12 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
     };
   }, [qrTargetUrl]);
 
+  const internalCodeLabel = selectedPart?.internal_code
+    ? (typeof selectedPart.internal_code === 'object'
+      ? (selectedPart.internal_code.code || selectedPart.internal_code.id || '—')
+      : selectedPart.internal_code)
+    : '—';
+
   return (
     <div
       ref={frameRef}
@@ -187,48 +188,53 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
             boxSizing: 'border-box'
           }}
         >
-          <div className="flex items-start h-full">
-            <div className="flex-1 min-w-0 text-black space-y-1.5">
-              <div>
-                <div className="text-[8px] font-bold leading-tight">Бренд</div>
-                <div className="text-[11px] leading-tight break-words">{selectedPart?.brand || '—'}</div>
+          <div className="flex flex-col justify-between h-full gap-1">
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0 text-black">
+                <div className="mb-1">
+                  <div className="text-[8px] font-bold leading-tight">Бренд</div>
+                  <div className="text-[11px] font-semibold leading-tight break-words">{selectedPart?.brand || '—'}</div>
+                </div>
+                <div className="mb-1">
+                  <div className="text-[8px] font-bold leading-tight">Артикул</div>
+                  <div className="text-[11px] font-semibold leading-tight break-words">{selectedPart?.article || '—'}</div>
+                </div>
+                <div>
+                  <div className="text-[8px] font-bold leading-tight">Наименование</div>
+                  <div className="text-[9px] font-semibold leading-tight break-words">{selectedPart?.name || '—'}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-[8px] font-bold leading-tight">Артикул</div>
-                <div className="text-[11px] leading-tight break-words">{selectedPart?.article || '—'}</div>
-              </div>
-              <div>
-                <div className="text-[8px] font-bold leading-tight">Адресное хранение</div>
-                <div className="text-[9px] leading-tight break-words">{cellsText || '—'}</div>
-              </div>
-              <div>
-                <div className="text-[8px] font-bold leading-tight">Наименование</div>
-                <div className="text-[9px] leading-tight break-words">{selectedPart?.name || '—'}</div>
+
+              <div className="shrink-0 w-[52px] flex flex-col items-center">
+                <div className="w-[48px] h-[48px] border border-black overflow-hidden bg-white">
+                  {qrPreviewSrc ? (
+                    <img
+                      src={qrPreviewSrc}
+                      alt="QR code preview"
+                      className="w-full h-full object-contain"
+                      loading="lazy"
+                    />
+                  ) : null}
+                </div>
+                <div className="mt-1 text-[8px] leading-tight text-black text-center whitespace-nowrap">
+                  Цена: {selectedPart?.price != null ? `${parseFloat(selectedPart.price).toFixed(0)} ₽` : '—'}
+                </div>
+                <div className="mt-0.5 text-[7px] leading-tight text-black text-center whitespace-nowrap">
+                  Код: {internalCodeLabel}
+                </div>
               </div>
             </div>
 
-            <div className="shrink-0 flex flex-col items-center gap-1">
-              <div className="w-[56px] h-[56px] border border-black overflow-hidden bg-white">
-                {qrPreviewSrc ? (
-                  <img
-                    src={qrPreviewSrc}
-                    alt="QR code preview"
-                    className="w-full h-full object-contain"
-                    loading="lazy"
-                  />
-                ) : null}
+            {storageCellsForLabel.length > 0 && (
+              <div className="w-full">
+                <div className="text-[8px] font-bold leading-tight text-black mb-0.5">Адресное хранение</div>
+                <LabelStorageCellsPreview
+                  cells={storageCellsForLabel}
+                  widthMm={widthMm}
+                  fullWidth
+                />
               </div>
-              <div className="text-[9px] leading-tight text-black text-center whitespace-nowrap">
-                Цена: {selectedPart?.price != null ? `${parseFloat(selectedPart.price).toFixed(0)} ₽` : '—'}
-              </div>
-              <div className="text-[8px] leading-tight text-black text-center whitespace-nowrap">
-                Код: {selectedPart?.internal_code
-                  ? (typeof selectedPart.internal_code === 'object'
-                    ? (selectedPart.internal_code.code || selectedPart.internal_code.id || '—')
-                    : selectedPart.internal_code)
-                  : '—'}
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -269,6 +275,12 @@ const PrintReceiptModal = ({
 }) => {
   const dispatch = useDispatch();
   const printing = useSelector(selectSendingPrint);
+  const storageCellCatalog = useSelector((state) => state.storageCells.storageCells);
+
+  const storageCellsForLabel = useMemo(
+    () => buildStorageCellsForLabel(productStorageCells, storageCellCatalog),
+    [productStorageCells, storageCellCatalog]
+  );
 
   const [printers, setPrinters] = useState([]);
   const [selectedPrinterId, setSelectedPrinterId] = useState('');
@@ -280,6 +292,9 @@ const PrintReceiptModal = ({
     () => printers.find((p) => String(p.id) === String(selectedPrinterId)),
     [printers, selectedPrinterId]
   );
+
+  const labelWidthMm = Number(selectedPrinter?.label_width_mm || 58);
+  const labelHeightMm = Number(selectedPrinter?.label_height_mm || 38);
 
   const hasOnlinePrinter = printers.some((p) => p.is_online);
 
@@ -390,7 +405,9 @@ const PrintReceiptModal = ({
       return;
     }
 
-    const productData = buildLabelPrintPayload(selectedPart, productStorageCells);
+    const productData = buildLabelPrintPayload(selectedPart, productStorageCells, storageCellCatalog);
+    productData.width_mm = labelWidthMm;
+    productData.height_mm = labelHeightMm;
 
     try {
       await dispatch(printLabel({
@@ -517,10 +534,10 @@ const PrintReceiptModal = ({
             <div className="p-3 rounded-xl bg-white border border-gray-200">
               <div className="flex justify-center items-center w-full">
                 <LabelPreview
-                  widthMm="58"
-                  heightMm="38"
+                  widthMm={labelWidthMm}
+                  heightMm={labelHeightMm}
                   selectedPart={selectedPart}
-                  productStorageCells={productStorageCells}
+                  storageCellsForLabel={storageCellsForLabel}
                 />
               </div>
             </div>

@@ -31,40 +31,40 @@
         height: {{label_height_mm|default(38)}}mm;
         box-sizing: border-box;
         padding: 2mm 2mm;
-      }
-
-      .content {
         display: flex;
-        align-items: center;
-        gap: 2mm;
-        height: 100%;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 1mm;
       }
 
-      .left {
+      .header-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 2mm;
+      }
+
+      .info {
         flex: 1 1 auto;
         min-width: 0;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        gap: 1mm;
+        gap: 0.8mm;
       }
 
-      .qr {
-        flex: 0 0 auto;
-        width: 14mm;
-        height: 14mm;
-        display: block;
-        object-fit: contain;
-      }
-
-      .right {
+      .side {
         flex: 0 0 auto;
         width: 14mm;
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        gap: 0.8mm;
+        gap: 0.6mm;
+      }
+
+      .qr {
+        width: 14mm;
+        height: 14mm;
+        display: block;
+        object-fit: contain;
       }
 
       .right-meta {
@@ -75,8 +75,14 @@
         white-space: nowrap;
       }
 
-      .row {
+      .field {
         line-height: 1.15;
+      }
+
+      .title {
+        font-size: 5.5pt;
+        font-weight: 700;
+        opacity: 0.8;
       }
 
       .value {
@@ -88,6 +94,11 @@
 
       .value.small {
         font-size: 6.5pt;
+      }
+
+      .storage-bottom {
+        width: 100%;
+        flex: 0 0 auto;
       }
 
       .storage-block {
@@ -136,46 +147,50 @@
   <body>
     <div class="label">
       <div class="design" id="design">
-        <div class="content">
-          <div class="left">
-            <div class="row">
+        <div class="header-row">
+          <div class="info">
+            <div class="field">
+              <div class="title">Бренд</div>
               <div class="value">{{brand}}</div>
             </div>
-
-            <div class="row">
+            <div class="field">
+              <div class="title">Артикул</div>
               <div class="value">{{article}}</div>
             </div>
-
-            <div class="row">
-              <div class="storage-block">
-                {% for row_cells in storage_cell_rows %}
-                <table class="storage-grid">
-                  <tr>
-                    {% for cell in row_cells %}
-                    <th>{{ cell.name_short }}</th>
-                    {% endfor %}
-                  </tr>
-                  <tr>
-                    {% for cell in row_cells %}
-                    <td>{{ cell.value }}</td>
-                    {% endfor %}
-                  </tr>
-                </table>
-                {% endfor %}
-              </div>
-            </div>
-
-            <div class="row" style="margin-bottom: 0;">
+            <div class="field">
+              <div class="title">Наименование</div>
               <div class="value small">{{name}}</div>
             </div>
           </div>
 
-          <div class="right">
+          <div class="side">
             <img class="qr" src="{{qr_data_uri}}" alt="QR code" />
             <div class="right-meta">Цена: {{price|default("—")}}</div>
             <div class="right-meta">Код: {{internal_code|default("—")}}</div>
           </div>
         </div>
+
+        {% if storage_cell_rows %}
+        <div class="storage-bottom">
+          <div class="title">Адресное хранение</div>
+          <div class="storage-block">
+            {% for row_cells in storage_cell_rows %}
+            <table class="storage-grid">
+              <tr>
+                {% for cell in row_cells %}
+                <th>{{ cell.name_short }}</th>
+                {% endfor %}
+              </tr>
+              <tr>
+                {% for cell in row_cells %}
+                <td>{{ cell.value }}</td>
+                {% endfor %}
+              </tr>
+            </table>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
     <script>
