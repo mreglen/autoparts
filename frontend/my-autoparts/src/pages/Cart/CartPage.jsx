@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   selectCart,
   selectCartLoading,
@@ -9,8 +9,389 @@ import {
   updateCartItemQuantity,
   updateUsedCartItemQuantity,
   removeFromCart,
-  removeUsedFromCart
+  removeUsedFromCart,
 } from '../../redux/slices/CartSlice';
+
+const formatPrice = (price) =>
+  new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price);
+
+function formatDeliveryTime(deliveryString) {
+  if (!deliveryString) return 'Не указана';
+
+  if (
+    typeof deliveryString === 'string' &&
+    deliveryString.includes('с') &&
+    deliveryString.includes('до')
+  ) {
+    return deliveryString;
+  }
+
+  if (
+    deliveryString &&
+    typeof deliveryString === 'object' &&
+    deliveryString.delivery_start &&
+    deliveryString.delivery_end
+  ) {
+    try {
+      const startDate = new Date(deliveryString.delivery_start);
+      const endDate = new Date(deliveryString.delivery_end);
+      const dayText = startDate.toLocaleDateString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+      const startTime = startDate.toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const endTime = endDate.toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      return `${dayText} с ${startTime} до ${endTime}`;
+    } catch {
+      return 'Не указана';
+    }
+  }
+
+  return formatDate(deliveryString);
+}
+
+function formatDate(dateString) {
+  if (!dateString) return 'Не указана';
+  try {
+    let date;
+    if (typeof dateString === 'string') {
+      date = new Date(dateString);
+    } else if (dateString?.year) {
+      date = new Date(
+        dateString.year,
+        dateString.month - 1,
+        dateString.day,
+        dateString.hour || 0,
+        dateString.minute || 0
+      );
+    } else {
+      date = new Date(dateString);
+    }
+    if (Number.isNaN(date.getTime())) return 'Не указана';
+    return date.toLocaleDateString('ru-RU');
+  } catch {
+    return 'Не указана';
+  }
+}
+
+function getMaxAllowedQuantity() {
+  return 50;
+}
+
+function PartTypeBadge({ type }) {
+  if (type === 'used') {
+    return (
+      <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20">
+        Б/У
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
+      Новая
+    </span>
+  );
+}
+
+function QuantityControl({ quantity, onDecrease, onIncrease, max }) {
+  return (
+    <div className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
+      <button
+        type="button"
+        onClick={onDecrease}
+        disabled={quantity <= 1}
+        className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label="Уменьшить количество"
+      >
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+        </svg>
+      </button>
+      <span className="min-w-[2rem] text-center text-sm font-semibold text-gray-900">{quantity}</span>
+      <button
+        type="button"
+        onClick={onIncrease}
+        disabled={quantity >= max}
+        className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label="Увеличить количество"
+      >
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function CartItemRow({
+  item,
+  selected,
+  onSelect,
+  onQuantityChange,
+  onRemove,
+  showDelivery,
+}) {
+  const maxQty = getMaxAllowedQuantity(item);
+  const lineTotal = item.price * item.quantity;
+
+  return (
+    <article className="flex gap-3 rounded-xl border border-gray-100 bg-gray-50/50 p-3 transition hover:border-gray-200 sm:p-4">
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={onSelect}
+        className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+        aria-label={`Выбрать ${item.name}`}
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-start gap-2">
+          <PartTypeBadge type={item.type} />
+          <h3 className="min-w-0 flex-1 text-sm font-medium text-gray-900 sm:text-base">{item.name}</h3>
+        </div>
+        <p className="mt-1 text-xs text-gray-500 sm:text-sm">
+          {item.brand} · {item.number}
+        </p>
+        {showDelivery && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-xs text-gray-600 sm:text-sm">
+            <svg
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
+            <span>
+              Поставка:{' '}
+              <span className="font-medium text-gray-800">
+                {item.deliveryDate ? formatDeliveryTime(item.deliveryDate) : 'Не указана'}
+              </span>
+            </span>
+          </p>
+        )}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <QuantityControl
+            quantity={item.quantity}
+            max={maxQty}
+            onDecrease={() => onQuantityChange(item.id, item.quantity - 1)}
+            onIncrease={() => onQuantityChange(item.id, item.quantity + 1)}
+          />
+          <button
+            type="button"
+            onClick={() => onRemove(item.id)}
+            className="text-xs font-medium text-red-600 hover:text-red-700 sm:text-sm"
+          >
+            Удалить
+          </button>
+        </div>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-sm font-bold text-gray-900 sm:text-base">{formatPrice(lineTotal)}</p>
+        <p className="mt-0.5 text-xs text-gray-500">{formatPrice(item.price)} / шт.</p>
+      </div>
+    </article>
+  );
+}
+
+function ItemsSection({ title, subtitle, badgeTone, items, children }) {
+  if (!items.length) return null;
+  const toneClass =
+    badgeTone === 'indigo'
+      ? 'border-indigo-100 bg-indigo-50/40'
+      : 'border-amber-100 bg-amber-50/40';
+
+  return (
+    <div className="space-y-3">
+      <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
+        <p className="text-sm font-semibold text-gray-900">{title}</p>
+        {subtitle ? <p className="mt-0.5 text-xs text-gray-600">{subtitle}</p> : null}
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function SellerCartBlock({
+  seller,
+  newItems,
+  usedItems,
+  allItems,
+  selectedItems,
+  deliverInParts,
+  onDeliverInPartsChange,
+  onSelectAll,
+  onItemSelect,
+  onQuantityChange,
+  onRemove,
+  onRemoveSelected,
+  onCheckout,
+  onCheckoutSelected,
+  isAuthorized,
+  calculateSellerTotal,
+}) {
+  const allSelected = allItems.length > 0 && allItems.every((item) => selectedItems.has(item.id));
+  const someSelected = allItems.some((item) => selectedItems.has(item.id));
+  const selectedCount = allItems.filter((item) => selectedItems.has(item.id)).length;
+  const totalQty = allItems.reduce((sum, item) => sum + item.quantity, 0);
+  const hasNew = newItems.length > 0;
+  const hasUsed = usedItems.length > 0;
+
+  const renderItems = (items, showDelivery) =>
+    items.map((item) => (
+      <CartItemRow
+        key={item.id}
+        item={item}
+        selected={selectedItems.has(item.id)}
+        onSelect={() => onItemSelect(item.id)}
+        onQuantityChange={onQuantityChange}
+        onRemove={onRemove}
+        showDelivery={showDelivery}
+      />
+    ));
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <header className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-4 py-4 sm:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={(el) => {
+                if (el) el.indeterminate = someSelected && !allSelected;
+              }}
+              onChange={onSelectAll}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              aria-label={`Выбрать все у ${seller}`}
+            />
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-semibold text-gray-900 sm:text-xl">{seller}</h2>
+                {hasNew && hasUsed && (
+                  <span className="text-xs text-gray-500">новые и б/у</span>
+                )}
+              </div>
+              <p className="mt-0.5 text-sm text-gray-500">
+                {allItems.length} поз. · {totalQty} шт. · {formatPrice(calculateSellerTotal(allItems))}
+              </p>
+            </div>
+          </div>
+
+          {hasNew && (
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm">
+              <input
+                type="checkbox"
+                checked={deliverInParts}
+                onChange={(e) => onDeliverInPartsChange(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="font-medium text-gray-700">Доставить частями</span>
+            </label>
+          )}
+        </div>
+      </header>
+
+      <div className="space-y-6 px-4 py-5 sm:px-6">
+        <ItemsSection
+          title="Новые запчасти"
+          subtitle="Поставка с учётом выбранного режима доставки"
+          badgeTone="indigo"
+          items={newItems}
+        >
+          {renderItems(newItems, true)}
+        </ItemsSection>
+
+        {usedItems.length > 0 && (
+          <div className="space-y-2">{renderItems(usedItems, false)}</div>
+        )}
+      </div>
+
+      <footer className="border-t border-gray-100 bg-gray-50/80 px-4 py-4 sm:px-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="text-sm text-gray-600">
+            {selectedCount > 0 ? (
+              <span>
+                Выбрано: <span className="font-medium text-gray-900">{selectedCount}</span> из{' '}
+                {allItems.length}
+              </span>
+            ) : (
+              <span>Отметьте позиции для частичного оформления</span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            {someSelected && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={onRemoveSelected}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                >
+                  <img src="/img/trash_full.svg" alt="" className="h-3.5 w-3.5 opacity-70" />
+                  Удалить выбранное
+                </button>
+                <button
+                  type="button"
+                  onClick={onCheckoutSelected}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                >
+                  {isAuthorized ? 'Оформить выбранное' : 'Войти'}
+                </button>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+              <div className="mr-auto sm:mr-0 sm:text-right">
+                <p className="text-xs text-gray-500">Итого по организации</p>
+                <p className="text-lg font-bold text-gray-900">
+                  {formatPrice(calculateSellerTotal(allItems))}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => allItems.forEach((item) => onRemove(item.id))}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Очистить
+              </button>
+              <button
+                type="button"
+                onClick={onCheckout}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:flex-none"
+              >
+                <img src="/img/cart.svg" alt="" className="h-4 w-4 brightness-0 invert" />
+                {isAuthorized ? 'Оформить заказ' : 'Войти для заказа'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </section>
+  );
+}
+
+function PageState({ icon, title, description, action }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100">{icon}</div>
+      <h2 className="text-xl font-semibold text-gray-900 sm:text-2xl">{title}</h2>
+      {description ? <p className="mt-2 max-w-sm text-sm text-gray-500">{description}</p> : null}
+      {action ? <div className="mt-6">{action}</div> : null}
+    </div>
+  );
+}
 
 export default function CartPage() {
   const dispatch = useDispatch();
@@ -20,50 +401,34 @@ export default function CartPage() {
   const error = useSelector(selectCartError);
   const isAuthorized = useSelector((state) => Boolean(state.auth.token));
 
-  // Состояние для выбранных товаров
   const [selectedItems, setSelectedItems] = useState(new Set());
-
-
-  // Состояние для режима доставки по продавцам (частями или единовременно)
   const [sellerDeliveryParts, setSellerDeliveryParts] = useState({});
 
-  // Загрузка корзины при монтировании компонента
   useEffect(() => {
     dispatch(fetchCart());
   }, [dispatch]);
 
-  // Группировка товаров по продавцам
-  const groupedItems = React.useMemo(() => {
+  const groupedItems = useMemo(() => {
     if (!cart) return {};
 
     const groups = {};
 
-    // Группируем новые запчасти
     if (cart.new_parts_items) {
-      // Сначала собираем все товары по продавцам для определения последней даты поставки
       const sellerItemsMap = {};
-      cart.new_parts_items.forEach(item => {
+      cart.new_parts_items.forEach((item) => {
         const seller = item.seller || 'Новые запчасти';
-        if (!sellerItemsMap[seller]) {
-          sellerItemsMap[seller] = [];
-        }
+        if (!sellerItemsMap[seller]) sellerItemsMap[seller] = [];
         sellerItemsMap[seller].push(item);
       });
 
-      // Для каждого продавца определяем дату поставки в зависимости от режима доставки
-      Object.keys(sellerItemsMap).forEach(seller => {
+      Object.keys(sellerItemsMap).forEach((seller) => {
         const items = sellerItemsMap[seller];
         const deliverParts = sellerDeliveryParts[seller] || false;
-
         let deliveryDate = null;
 
-        if (deliverParts) {
-          // Если доставка частями - каждый товар сохраняет свою дату
-          // В этом случае дата будет индивидуальной для каждого товара
-        } else {
-          // Если доставка единовременная - находим самую позднюю дату поставки
+        if (!deliverParts) {
           let latestDelivery = null;
-          items.forEach(item => {
+          items.forEach((item) => {
             if (item.delivery && item.delivery !== 'Не указана') {
               if (!latestDelivery || item.delivery > latestDelivery) {
                 latestDelivery = item.delivery;
@@ -73,42 +438,34 @@ export default function CartPage() {
           deliveryDate = latestDelivery;
         }
 
-        // Создаем группы с учетом режима доставки
-        items.forEach(item => {
-          if (!groups[seller]) {
-            groups[seller] = [];
-          }
-
-          // Преобразуем item в формат, ожидаемый компонентом
+        items.forEach((item) => {
+          if (!groups[seller]) groups[seller] = [];
           groups[seller].push({
             id: item.id,
             type: 'new',
-            seller: seller,
+            seller,
             brand: item.brand,
             number: item.partnumber,
-            name: item.name || `${item.brand} ${item.partnumber}`, // Используем name если есть, иначе бренд + номер
+            name: item.name || `${item.brand} ${item.partnumber}`,
             deliveryDate: deliverParts ? item.delivery : deliveryDate,
             price: item.price,
             quantity: item.quantity,
-            stock_id: item.stock_id, // Добавляем stock_id для ограничения количества
-            product_id: item.product_id, // Добавляем product_id для передачи в заказ
-            image: '/api/placeholder/80/80'
+            stock_id: item.stock_id,
+            product_id: item.product_id,
+            image: '/api/placeholder/80/80',
           });
         });
       });
     }
 
-    // Группируем б/у запчасти (пока пусто)
     if (cart.used_parts_items) {
-      cart.used_parts_items.forEach(item => {
+      cart.used_parts_items.forEach((item) => {
         const seller = item.seller || 'Б/У запчасти';
-        if (!groups[seller]) {
-          groups[seller] = [];
-    }
+        if (!groups[seller]) groups[seller] = [];
         groups[seller].push({
           id: item.id,
           type: 'used',
-          seller: seller,
+          seller,
           brand: item.brand,
           number: item.partnumber,
           internalCode: item.partnumber,
@@ -116,8 +473,8 @@ export default function CartPage() {
           deliveryDate: item.delivery,
           price: item.price,
           quantity: item.quantity,
-          product_id: item.product_id, // Добавляем product_id для передачи в заказ
-          image: '/api/placeholder/80/80'
+          product_id: item.product_id,
+          image: '/api/placeholder/80/80',
         });
       });
     }
@@ -125,524 +482,224 @@ export default function CartPage() {
     return groups;
   }, [cart, sellerDeliveryParts]);
 
-  // Получаем все товары из группировки
-  const cartItems = React.useMemo(() => {
-    return Object.values(groupedItems).flat();
-  }, [groupedItems]);
+  const cartItems = useMemo(() => Object.values(groupedItems).flat(), [groupedItems]);
 
+  const sellerGroups = useMemo(
+    () =>
+      Object.entries(groupedItems).map(([seller, items]) => ({
+        seller,
+        items,
+        newItems: items.filter((i) => i.type === 'new'),
+        usedItems: items.filter((i) => i.type === 'used'),
+      })),
+    [groupedItems]
+  );
+
+  const grandTotal = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [cartItems]
+  );
+
+  const grandQty = useMemo(
+    () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
+    [cartItems]
+  );
 
   const handleQuantityChange = async (id, newQuantity) => {
     const quantity = Math.max(1, newQuantity);
-
-    // Находим товар в корзине
-    const cartItem = cartItems.find(item => item.id === id);
+    const cartItem = cartItems.find((item) => item.id === id);
     if (!cartItem) {
-      // Если товар не найден, просто перезагружаем корзину
       dispatch(fetchCart());
       return;
     }
-
-    // Получаем максимальное доступное количество на складе
     const maxAllowed = getMaxAllowedQuantity(cartItem);
-
-    // Ограничиваем количество максимальным доступным на складе
-    const finalQuantity = Math.min(quantity, maxAllowed);
-
-    // Минимум 1
-    const safeQuantity = Math.max(1, finalQuantity);
-
+    const safeQuantity = Math.max(1, Math.min(quantity, maxAllowed));
     try {
       if (cartItem.type === 'used') {
         await dispatch(updateUsedCartItemQuantity({ itemId: id, quantity: safeQuantity })).unwrap();
       } else {
         await dispatch(updateCartItemQuantity({ itemId: id, quantity: safeQuantity })).unwrap();
       }
-    } catch (error) {
-      // При ошибке перезагрузим корзину
+    } catch {
       dispatch(fetchCart());
     }
   };
 
   const handleRemoveItem = async (id) => {
-    setSelectedItems(prev => {
+    setSelectedItems((prev) => {
       const newSet = new Set(prev);
       newSet.delete(id);
       return newSet;
     });
-
-    // Находим товар в корзине чтобы определить его тип
-    const cartItem = cartItems.find(item => item.id === id);
-    
+    const cartItem = cartItems.find((item) => item.id === id);
     try {
       if (cartItem?.type === 'used') {
-        // Удаление б/у запчасти
         await dispatch(removeUsedFromCart(id)).unwrap();
       } else {
-        // Удаление новой запчасти (по умолчанию)
         await dispatch(removeFromCart(id)).unwrap();
       }
-    } catch (error) {
-      // При ошибке перезагрузим корзину
+    } catch {
       dispatch(fetchCart());
     }
   };
 
+  const saveOrderAndNavigate = useCallback(
+    (items, seller) => {
+      if (!isAuthorized) {
+        navigate('/auth');
+        return;
+      }
+      const orderData = {
+        items,
+        seller,
+        deliverInParts: sellerDeliveryParts[seller] || false,
+      };
+      localStorage.setItem('orderData', JSON.stringify(orderData));
+      navigate('/order-reg');
+    },
+    [isAuthorized, navigate, sellerDeliveryParts]
+  );
+
   const handleCheckout = (seller) => {
-    if (!isAuthorized) {
-      navigate('/auth');
-      return;
-    }
-    // Оформление заказа для всех товаров продавца
-    const sellerItems = groupedItems[seller] || [];
-
-    // Сохраняем данные в localStorage для передачи на страницу оформления
-    const orderData = {
-      items: sellerItems,
-      seller: seller,
-      deliverInParts: sellerDeliveryParts[seller] || false
-    };
-    localStorage.setItem('orderData', JSON.stringify(orderData));
-
-    // Переходим на страницу оформления заказа
-    navigate('/order-reg');
+    saveOrderAndNavigate(groupedItems[seller] || [], seller);
   };
 
   const handleCheckoutSelected = (seller) => {
-    if (!isAuthorized) {
-      navigate('/auth');
-      return;
-    }
-    // Оформление выбранных товаров продавца
-    const selectedFromSeller = groupedItems[seller]?.filter(item => selectedItems.has(item.id)) || [];
-
-    // Сохраняем данные в localStorage для передачи на страницу оформления
-    const orderData = {
-      items: selectedFromSeller,
-      seller: seller,
-      deliverInParts: sellerDeliveryParts[seller] || false
-    };
-    localStorage.setItem('orderData', JSON.stringify(orderData));
-
-    // Переходим на страницу оформления заказа
-    navigate('/order-reg');
+    const selected = groupedItems[seller]?.filter((item) => selectedItems.has(item.id)) || [];
+    saveOrderAndNavigate(selected, seller);
   };
 
   const handleItemSelect = (itemId) => {
-    setSelectedItems(prev => {
+    setSelectedItems((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(itemId)) {
-        newSet.delete(itemId);
-      } else {
-        newSet.add(itemId);
-      }
+      if (newSet.has(itemId)) newSet.delete(itemId);
+      else newSet.add(itemId);
       return newSet;
     });
   };
 
   const handleSelectAllSellerItems = (seller) => {
-    const sellerItemIds = groupedItems[seller].map(item => item.id);
-    const allSelected = sellerItemIds.every(id => selectedItems.has(id));
-
-    setSelectedItems(prev => {
+    const sellerItemIds = groupedItems[seller].map((item) => item.id);
+    const allSelected = sellerItemIds.every((id) => selectedItems.has(id));
+    setSelectedItems((prev) => {
       const newSet = new Set(prev);
-      if (allSelected) {
-        // Снимаем выделение со всех товаров продавца
-        sellerItemIds.forEach(id => newSet.delete(id));
-      } else {
-        // Выделяем все товары продавца
-        sellerItemIds.forEach(id => newSet.add(id));
-      }
+      if (allSelected) sellerItemIds.forEach((id) => newSet.delete(id));
+      else sellerItemIds.forEach((id) => newSet.add(id));
       return newSet;
     });
   };
 
-
-  const calculateSellerTotal = (items) => {
-    return items.reduce((total, item) => total + (item.price * item.quantity), 0);
-  };
-
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'RUB'
-    }).format(price);
-  };
-
-  const formatDeliveryTime = (deliveryString) => {
-    if (!deliveryString) return 'Не указана';
-
-    // Если это уже отформатированная строка вида "26.12.2025 с 09:15 до 20:00"
-    if (typeof deliveryString === 'string' && deliveryString.includes('с') && deliveryString.includes('до')) {
-      return deliveryString;
-    }
-
-    // Если это объект с delivery_start и delivery_end
-    if (deliveryString && typeof deliveryString === 'object' && deliveryString.delivery_start && deliveryString.delivery_end) {
-      try {
-        const startDate = new Date(deliveryString.delivery_start);
-        const endDate = new Date(deliveryString.delivery_end);
-
-        const dayText = startDate.toLocaleDateString('ru-RU', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        });
-
-        const startTime = startDate.toLocaleTimeString('ru-RU', {
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-        const endTime = endDate.toLocaleTimeString('ru-RU', {
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-
-        return `${dayText} с ${startTime} до ${endTime}`;
-      } catch (error) {
-        console.error('Error formatting delivery time:', error);
-        return 'Не указана';
-      }
-    }
-
-    // Для других форматов дат используем старый formatDate
-    return formatDate(deliveryString);
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Не указана';
-
-    try {
-      let date;
-
-      // Обработка разных форматов дат
-      if (typeof dateString === 'string') {
-        date = new Date(dateString);
-      } else if (dateString && typeof dateString === 'object' && dateString.year) {
-        // Формат datetime объекта из Python
-        date = new Date(dateString.year, dateString.month - 1, dateString.day,
-                       dateString.hour || 0, dateString.minute || 0);
-      } else {
-        date = new Date(dateString);
-      }
-
-      // Проверка корректности даты
-      if (isNaN(date.getTime())) {
-        return 'Не указана';
-      }
-
-      return date.toLocaleDateString('ru-RU');
-    } catch (error) {
-      console.error('Error formatting date:', error, 'dateString:', dateString);
-      return 'Не указана';
-    }
-  };
-
-  // Функция для получения максимального количества товара (упрощенная версия)
-  const getMaxAllowedQuantity = (item) => {
-    // Без данных о складах ограничиваем до 50 для безопасности
-    return 50;
-  };
+  const calculateSellerTotal = (items) =>
+    items.reduce((total, item) => total + item.price * item.quantity, 0);
 
   return (
-    <div className="max-md:mt-0 mt-5">
-      <h1 className="max-md:hidden text-3xl font-bold text-gray-900 mb-8">Корзина</h1>
+    <div className="max-md:mt-0 mt-5 pb-8">
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-indigo-600">Покупки</p>
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Корзина</h1>
+          {!loading && cartItems.length > 0 && (
+            <p className="mt-1 text-sm text-gray-500">
+              {sellerGroups.length}{' '}
+              {sellerGroups.length === 1 ? 'организация' : sellerGroups.length < 5 ? 'организации' : 'организаций'}
+              · {cartItems.length} поз. · {grandQty} шт.
+            </p>
+          )}
+        </div>
+        {!loading && cartItems.length > 0 && (
+          <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm sm:text-right">
+            <p className="text-xs text-gray-500">Общая сумма</p>
+            <p className="text-xl font-bold text-gray-900">{formatPrice(grandTotal)}</p>
+          </div>
+        )}
+      </div>
 
       {loading ? (
-        <div className="text-center py-16">
-          <div className="bg-gray-100 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-            <svg className="animate-spin h-12 w-12 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        <PageState
+          icon={
+            <svg className="h-10 w-10 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
             </svg>
-          </div>
-          <h2 className="text-2xl font-medium text-gray-900 mb-2">Загрузка корзины...</h2>
-        </div>
+          }
+          title="Загрузка корзины..."
+        />
       ) : error ? (
-        <div className="text-center py-16">
-          <div className="bg-red-100 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        <PageState
+          icon={
+            <svg className="h-10 w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+              />
             </svg>
-          </div>
-          <h2 className="text-2xl font-medium text-gray-900 mb-2">Ошибка загрузки корзины</h2>
-          <p className="text-gray-500 mb-6">{typeof error === 'object' ? error.detail || 'Произошла ошибка' : error}</p>
-          <button
-            onClick={() => dispatch(fetchCart())}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            Попробовать снова
-          </button>
-        </div>
+          }
+          title="Не удалось загрузить корзину"
+          description={typeof error === 'object' ? error.detail || 'Произошла ошибка' : String(error)}
+          action={
+            <button
+              type="button"
+              onClick={() => dispatch(fetchCart())}
+              className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Попробовать снова
+            </button>
+          }
+        />
       ) : cartItems.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="bg-gray-100 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-            <img src="/img/cart.svg" alt="Корзина пуста" className="h-12 w-12 text-gray-400 filter brightness-0 saturate-100 invert-61 sepia-0 saturate-0 hue-rotate-0deg brightness-90 contrast-89" />
-          </div>
-          <h2 className="text-2xl font-medium text-gray-900 mb-2">Корзина пуста</h2>
-          <p className="text-gray-500 mb-6">Добавьте товары в корзину, чтобы оформить заказ</p>
-          <a
-            href="/autoparts"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            Перейти к покупкам
-          </a>
-        </div>
+        <PageState
+          icon={
+            <img
+              src="/img/cart.svg"
+              alt=""
+              className="h-10 w-10 opacity-40"
+            />
+          }
+          title="Корзина пуста"
+          description="Добавьте новые или б/у запчасти — они сгруппируются по организациям продавцов"
+          action={
+            <Link
+              to="/autoparts"
+              className="inline-flex rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Перейти к каталогу
+            </Link>
+          }
+        />
       ) : (
-        <div className="space-y-8">
-          {Object.entries(groupedItems).map(([seller, items]) => (
-            <div key={seller} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              {/* Заголовок продавца */}
-              <div className="bg-gray-50 max-md:px-4 max-md:py-3 px-6 py-4 border-b border-gray-200">
-                <div className="flex max-md:flex-col max-md:items-start max-md:gap-3 items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={items.every(item => selectedItems.has(item.id))}
-                      onChange={() => handleSelectAllSellerItems(seller)}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                    <h2 className="max-md:text-lg text-xl font-semibold text-gray-900">{seller}</h2>
-                  </div>
-                  <div className="flex max-md:w-full max-md:flex-col max-md:gap-2 items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        id={`deliverParts-${seller}`}
-                        type="checkbox"
-                        checked={sellerDeliveryParts[seller] || false}
-                        onChange={(e) => {
-                          const isChecked = e.target.checked;
-                          setSellerDeliveryParts(prev => ({
-                            ...prev,
-                            [seller]: isChecked
-                          }));
-                        }}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor={`deliverParts-${seller}`} className="text-sm font-medium text-gray-700">
-                        Доставить частями
-                      </label>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      {items.length} товар{items.length !== 1 ? 'а' : ''} • Итого: {formatPrice(calculateSellerTotal(items))}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Карточки товаров — mobile */}
-              <div className="md:hidden divide-y divide-gray-100">
-                {items.map((item) => (
-                  <div key={`mobile-${item.id}`} className="space-y-3 p-4">
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedItems.has(item.id)}
-                        onChange={() => handleItemSelect(item.id)}
-                        className="mt-1 h-4 w-4 shrink-0 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-900">{item.name}</p>
-                        <p className="text-sm text-gray-500">{item.brand} · {item.number}</p>
-                        <p className="mt-1 text-sm text-gray-600">
-                          Поставка: {item.deliveryDate ? formatDeliveryTime(item.deliveryDate) : 'Не указана'}
-                        </p>
-                      </div>
-                      <p className="shrink-0 font-semibold text-gray-900">{formatPrice(item.price)}</p>
-                    </div>
-                    <div className="flex items-center justify-between pl-7">
-                      <div className="flex items-center gap-3 rounded-full border border-gray-200 bg-gray-50 px-2 py-1">
-                        <button
-                          type="button"
-                          onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-gray-600 active:bg-white disabled:opacity-40"
-                          disabled={item.quantity <= 1}
-                          aria-label="Уменьшить количество"
-                        >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                          </svg>
-                        </button>
-                        <span className="min-w-[24px] text-center text-sm font-semibold">{item.quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-gray-600 active:bg-white disabled:opacity-40"
-                          disabled={item.quantity >= getMaxAllowedQuantity(item)}
-                          aria-label="Увеличить количество"
-                        >
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                          </svg>
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveItem(item.id)}
-                        className="text-sm font-medium text-red-600"
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Таблица товаров — desktop */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Выбор
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Товар
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Запчасть
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Дата поставки
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Кол-во
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Цена
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {items.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <input
-                            type="checkbox"
-                            checked={selectedItems.has(item.id)}
-                            onChange={() => handleItemSelect(item.id)}
-                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900 break-words leading-tight">
-                            {item.name}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div className="leading-tight">
-                            <div className="font-medium">{item.brand}</div>
-                            <div className="text-gray-500">{item.number}</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.deliveryDate ? formatDeliveryTime(item.deliveryDate) : 'Не указана'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                              className="text-gray-400 hover:text-gray-600 p-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={item.quantity <= 1}
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                              </svg>
-                            </button>
-                            <span className="text-sm font-medium text-gray-900 w-8 text-center">
-                              {item.quantity}
-                            </span>
-                            <button
-                              onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                              className="text-gray-400 hover:text-gray-600 p-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={item.quantity >= getMaxAllowedQuantity(item)}
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                              </svg>
-                            </button>
-                            {item.quantity >= getMaxAllowedQuantity(item) && getMaxAllowedQuantity(item) < 10 && (
-                              <div className="relative group">
-                                <svg className="w-4 h-4 text-orange-500 ml-1" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                </svg>
-                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10">
-                                  Товара больше нет в наличии на этом складе
-                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatPrice(item.price)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Итого и оформление заказа для продавца */}
-              <div className="bg-gray-50 max-md:px-4 max-md:py-4 px-6 py-4 border-t border-gray-200">
-                <div className="flex max-md:flex-col max-md:gap-4 items-center justify-between">
-                  <div className="text-sm text-gray-600 max-md:w-full">
-                    Итого товаров: {items.reduce((sum, item) => sum + item.quantity, 0)} шт.
-                  </div>
-                  <div className="flex max-md:w-full max-md:flex-col max-md:gap-3 items-center space-x-4">
-
-                    <div className="flex max-md:w-full max-md:flex-wrap gap-2 space-x-2">
-                      {/* Кнопки для выбранных товаров этого продавца */}
-                      {items.some(item => selectedItems.has(item.id)) && (
-                        <>
-                          <button
-                            onClick={() => {
-                              // Удалить выбранные товары этого продавца
-                              items
-                                .filter(item => selectedItems.has(item.id))
-                                .forEach(item => handleRemoveItem(item.id));
-                            }}
-                            className="inline-flex items-center px-3 py-1 border border-red-300 text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-red-500"
-                          >
-                            <img src="/img/trash_full.svg" alt="" className="w-3 h-3 mr-1 filter brightness-0 saturate-100 invert-16 sepia-84 saturate-7456 hue-rotate-0deg brightness-97 contrast-105" />
-                            Удалить выбранное
-                          </button>
-                          <button
-                            onClick={() => handleCheckoutSelected(seller)}
-                            className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          >
-                            <img src="/img/cart.svg" alt="" className="w-3 h-3 mr-1 filter brightness-0" />
-                            {isAuthorized ? 'Оформить выбранное' : 'Авторизироваться'}
-                          </button>
-                        </>
-                      )}
-                      <div className="text-right max-md:text-left max-md:w-full">
-                        <div className="text-sm text-gray-600">Итого к оплате:</div>
-                        <div className="text-lg font-bold text-gray-900">
-                          {formatPrice(calculateSellerTotal(items))}
-                        </div>
-                      </div>
-                      {/* Основные кнопки */}
-                      <button
-                        onClick={() => {
-                          // Удалить все товары этого продавца
-                          items.forEach(item => handleRemoveItem(item.id));
-                        }}
-                        className="inline-flex items-center px-3 py-1 border border-red-300 text-xs font-medium rounded text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-1 focus:ring-red-500"
-                      >
-                        <img src="/img/trash_full.svg" alt="" className="w-3 h-3 mr-1 filter brightness-0 saturate-100 invert-16 sepia-84 saturate-7456 hue-rotate-0deg brightness-97 contrast-105" />
-                        Удалить все
-                      </button>
-                      <button
-                        onClick={() => handleCheckout(seller)}
-                        className="inline-flex max-md:w-full max-md:justify-center items-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                      >
-                        {isAuthorized ? 'Оформить заказ' : 'Авторизироваться'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+        <div className="space-y-6">
+          {sellerGroups.map(({ seller, items, newItems, usedItems }) => (
+            <SellerCartBlock
+              key={seller}
+              seller={seller}
+              newItems={newItems}
+              usedItems={usedItems}
+              allItems={items}
+              selectedItems={selectedItems}
+              deliverInParts={sellerDeliveryParts[seller] || false}
+              onDeliverInPartsChange={(checked) =>
+                setSellerDeliveryParts((prev) => ({ ...prev, [seller]: checked }))
+              }
+              onSelectAll={() => handleSelectAllSellerItems(seller)}
+              onItemSelect={handleItemSelect}
+              onQuantityChange={handleQuantityChange}
+              onRemove={handleRemoveItem}
+              onRemoveSelected={() => {
+                items
+                  .filter((item) => selectedItems.has(item.id))
+                  .forEach((item) => handleRemoveItem(item.id));
+              }}
+              onCheckout={() => handleCheckout(seller)}
+              onCheckoutSelected={() => handleCheckoutSelected(seller)}
+              isAuthorized={isAuthorized}
+              calculateSellerTotal={calculateSellerTotal}
+            />
           ))}
         </div>
       )}
