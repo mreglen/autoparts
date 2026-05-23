@@ -11,8 +11,8 @@ import MainLayout from './layouts/MainLayout';
 import ProfileWithMenuLayout from './layouts/ProfileWithMenuLayout';
 import ProfilePage from './pages/Profile/ProfilePage';
 import PasswordReset from './pages/Autorization/PasswordReset/PasswordReset';
-import Home from './pages/Home/Home';
 import AutoParts from './pages/AutoParts/AutoParts';
+import AboutCompany from './pages/About/AboutCompany';
 import UsedPartsFiltersPage from './pages/AutoParts/UsedParts/UsedPartsFiltersPage';
 import NewPartsFiltersPage from './pages/AutoParts/NewParts/NewPartsFiltersPage';
 import Main from './pages/Main/Main';
@@ -134,7 +134,8 @@ function App() {
           <Route path="/autoparts/new" element={<AutoParts />} />
           <Route path="/autoparts/used/filters" element={<UsedPartsFiltersPage />} />
           <Route path="/autoparts/used" element={<AutoParts />} />
-          <Route path="/autoservice" element={<Home />} />
+          <Route path="/about" element={<AboutCompany />} />
+          <Route path="/autoservice" element={<Navigate to="/about" replace />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/order-reg" element={<OrderRegistration />} />
           <Route path="/my-parts/add" element={<AddPart />} />

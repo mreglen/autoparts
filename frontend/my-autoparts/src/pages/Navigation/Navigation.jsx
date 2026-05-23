@@ -224,12 +224,12 @@ export default function Navigation() {
                             Автозапчасти
                         </NavLink>
                         <NavLink
-                            to="/autoservice"
+                            to="/about"
                             className={({ isActive }) =>
                                 `text-lg transition-colors ease-in-out ${isActive ? 'text-indigo-700 font-medium' : 'text-gray-700 hover:text-indigo-600'
                                 }`}
                         >
-                            Сервис
+                            О компании
                         </NavLink>
                     </nav>
                 </div>

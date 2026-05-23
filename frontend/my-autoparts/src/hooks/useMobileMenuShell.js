@@ -61,12 +61,12 @@ export function useMobileMenuShell(userOverride) {
                 <button
                     type="button"
                     onClick={() => {
-                        navigate('/autoservice');
+                        navigate('/about');
                         setIsMobileMenuOpen(false);
                     }}
                     className="min-h-[44px] w-full rounded-xl border border-gray-200 py-3 font-bold text-gray-800 active:bg-gray-50"
                 >
-                    Сервис
+                    О компании
                 </button>
             </div>
         ),
@@ -91,6 +91,7 @@ export function getPageTitle(pathname) {
     if (pathname === '/') return 'Главная';
     if (pathname.endsWith('/filters') && pathname.startsWith('/autoparts')) return 'Фильтры';
     if (pathname.startsWith('/autoparts')) return 'Поиск';
+    if (pathname === '/about') return 'О компании';
     if (pathname === '/cart') return 'Корзина';
     if (pathname.startsWith('/chats')) return 'Чаты';
     if (pathname === '/dashboard') return 'Дашборд';

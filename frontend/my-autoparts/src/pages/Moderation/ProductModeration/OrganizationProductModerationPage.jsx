@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
     fetchPendingProducts,
-    fetchRejectedProducts,
     approveProduct,
     rejectProduct,
     clearModerationError,
@@ -31,12 +30,8 @@ function resolveSellerIdForOrganization(sellers, organizationId) {
     return (director || orgSellers[0]).id;
 }
 
-const filterAndSortProducts = (products, { search, sort, hideRejected }) => {
+const filterAndSortProducts = (products, { search, sort }) => {
     let items = [...products];
-
-    if (hideRejected) {
-        items = items.filter((product) => product.moderationKind !== 'rejected');
-    }
 
     if (search.trim()) {
         const query = search.toLowerCase().replace(/\s+/g, '');
@@ -78,12 +73,11 @@ export default function OrganizationProductModerationPage() {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { isReady, user } = useAuthReady();
-    const { pendingProducts, rejectedProducts, loading, error } = useSelector((state) => state.moderationProducts);
+    const { pendingProducts, loading, error } = useSelector((state) => state.moderationProducts);
     const sellers = useSelector((state) => state.sellers.sellers);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [sortOrder, setSortOrder] = useState('date_desc');
-    const [hideRejected, setHideRejected] = useState(false);
     const [viewProduct, setViewProduct] = useState(null);
     const [mediaModalOpen, setMediaModalOpen] = useState(false);
     const [currentMediaItems, setCurrentMediaItems] = useState([]);
@@ -100,13 +94,12 @@ export default function OrganizationProductModerationPage() {
     useEffect(() => {
         if (!user?.is_admin) return;
         dispatch(fetchPendingProducts());
-        dispatch(fetchRejectedProducts());
         if (!sellers.length) dispatch(fetchSellers());
     }, [dispatch, user?.is_admin, sellers.length]);
 
     const organizationGroups = useMemo(
-        () => buildOrganizations(pendingProducts, rejectedProducts),
-        [pendingProducts, rejectedProducts],
+        () => buildOrganizations(pendingProducts, []),
+        [pendingProducts],
     );
 
     const selectedGroup = useMemo(
@@ -116,14 +109,12 @@ export default function OrganizationProductModerationPage() {
 
     const unifiedProducts = useMemo(() => {
         if (!selectedGroup) return [];
-        const pending = selectedGroup.pending.map((product) => ({ ...product, moderationKind: 'pending' }));
-        const rejected = selectedGroup.rejected.map((product) => ({ ...product, moderationKind: 'rejected' }));
-        return [...pending, ...rejected];
+        return selectedGroup.pending.map((product) => ({ ...product, moderationKind: 'pending' }));
     }, [selectedGroup]);
 
     const filteredProducts = useMemo(
-        () => filterAndSortProducts(unifiedProducts, { search: searchQuery, sort: sortOrder, hideRejected }),
-        [unifiedProducts, searchQuery, sortOrder, hideRejected],
+        () => filterAndSortProducts(unifiedProducts, { search: searchQuery, sort: sortOrder }),
+        [unifiedProducts, searchQuery, sortOrder],
     );
 
     const moderationCount = unifiedProducts.length;
@@ -199,7 +190,6 @@ export default function OrganizationProductModerationPage() {
                 productId: target.id,
                 reason,
             })).unwrap();
-            await dispatch(fetchRejectedProducts()).unwrap();
             setSuccessModalData({ title: 'Успешно!', message: 'Запчасть отклонена' });
             setIsSuccessModalOpen(true);
             setIsRejectModalOpen(false);
@@ -315,15 +305,6 @@ export default function OrganizationProductModerationPage() {
                             <option value="name_asc">По названию А–Я</option>
                             <option value="name_desc">По названию Я–А</option>
                         </select>
-                        <label className="inline-flex items-center gap-2 text-sm text-gray-700 whitespace-nowrap">
-                            <input
-                                type="checkbox"
-                                checked={hideRejected}
-                                onChange={(e) => setHideRejected(e.target.checked)}
-                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                            />
-                            Скрыть отклонённые
-                        </label>
                     </div>
 
                     <ProductTable

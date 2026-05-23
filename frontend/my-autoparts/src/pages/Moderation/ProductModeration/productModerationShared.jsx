@@ -77,7 +77,7 @@ export const EmptyState = ({ title, text }) => (
 );
 
 export const OrganizationCard = ({ group, onClick }) => {
-    const { organization, pending, rejected } = group;
+    const { organization, pending } = group;
     const hasPending = pending.length > 0;
     const logoUrl = organization.logo_organization ? normalizeImageUrl(organization.logo_organization) : null;
 
@@ -111,9 +111,6 @@ export const OrganizationCard = ({ group, onClick }) => {
                     <div className="flex gap-2 mt-3">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
                             Ожидают: {pending.length}
-                        </span>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700">
-                            Отклонённые: {rejected.length}
                         </span>
                     </div>
                 </div>
@@ -364,7 +361,7 @@ export const ProductTable = ({ products, onApprove, onReject, onView, onImageCli
         return (
             <EmptyState
                 title="Нет запчастей на модерации"
-                text="У выбранной организации нет запчастей на модерации или отклонённых заявок."
+                text="У выбранной организации нет запчастей на модерации."
             />
         );
     }

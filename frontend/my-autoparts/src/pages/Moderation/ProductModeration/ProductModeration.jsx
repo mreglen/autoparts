@@ -1,10 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import {
-    fetchPendingProducts,
-    fetchRejectedProducts,
-} from '../../../redux/slices/ModerationProductsSlice.js';
+import { fetchPendingProducts } from '../../../redux/slices/ModerationProductsSlice.js';
 import { buildOrganizations, EmptyState, OrganizationCard } from './productModerationShared.jsx';
 import { useAuthReady } from '../../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -14,7 +11,7 @@ const ProductModeration = () => {
     const navigate = useNavigate();
     const { isReady, user } = useAuthReady();
 
-    const { pendingProducts, rejectedProducts, loading } = useSelector((state) => state.moderationProducts);
+    const { pendingProducts, loading } = useSelector((state) => state.moderationProducts);
 
     useEffect(() => {
         if (!user || !user.is_admin) {
@@ -25,12 +22,11 @@ const ProductModeration = () => {
     useEffect(() => {
         if (!user?.is_admin) return;
         dispatch(fetchPendingProducts());
-        dispatch(fetchRejectedProducts());
     }, [dispatch, isReady, user?.is_admin]);
 
     const organizationGroups = useMemo(
-        () => buildOrganizations(pendingProducts, rejectedProducts),
-        [pendingProducts, rejectedProducts],
+        () => buildOrganizations(pendingProducts, []).filter((group) => group.pending.length > 0),
+        [pendingProducts],
     );
 
     if (!isReady) {
@@ -54,7 +50,7 @@ const ProductModeration = () => {
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">Модерация запчастей</h1>
                 <p className="text-gray-600 mt-2">
-                    Выберите организацию, чтобы проверить ожидающие или отклонённые запчасти.
+                    Выберите организацию, чтобы проверить ожидающие запчасти.
                 </p>
             </div>
 
@@ -66,7 +62,7 @@ const ProductModeration = () => {
             ) : organizationGroups.length === 0 ? (
                 <EmptyState
                     title="Нет организаций с запчастями для модерации"
-                    text="Ожидающие и отклонённые запчасти отсутствуют."
+                    text="Ожидающие запчасти отсутствуют."
                 />
             ) : (
                 <div>
