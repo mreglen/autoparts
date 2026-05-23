@@ -39,7 +39,7 @@ const CardPart = ({
   const [showActions, setShowActions] = useState(false);
   const isModeration = variant === 'moderation';
   const isRejectedModeration = isModeration && moderationKind === 'rejected';
-  const expandedColSpan = isModeration ? 6 : 7;
+  const expandedColSpan = isModeration ? 7 : 8;
 
   const renderActionsMenu = (menuClassName) => (
     <div className={menuClassName}>
@@ -717,6 +717,14 @@ const DEFAULT_MODERATION_FILTERS = { search: '', storage: '', sort: 'date_desc',
 
 const getModerationPartKey = (part) => `${part.moderationKind || 'pending'}-${part.id}`;
 
+const normalizeInternalCodeForSearch = (code) => {
+  if (code == null || code === '') return '';
+  if (typeof code === 'object') {
+    return String(code.code || code.id || '');
+  }
+  return String(code);
+};
+
 function MyParts() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -724,6 +732,8 @@ function MyParts() {
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const { items: products, pendingItems, rejectedItems, loading, error } = useSelector((state) => state.products);
   const [authChecked, setAuthChecked] = useState(false);
+  const [moderationLoading, setModerationLoading] = useState(false);
+  const [moderationLoadError, setModerationLoadError] = useState(null);
   const [pendingStorageCellsByProduct, setPendingStorageCellsByProduct] = useState({});
 
   const { storageLocations } = useSelector((state) => state.organization);
@@ -789,7 +799,7 @@ function MyParts() {
     const query = inStockFilters.search.toLowerCase().replace(/\s+/g, '');
     return (
       (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (part.internal_code && part.internal_code.toLowerCase().replace(/\s+/g, '').includes(query)) ||
+      (normalizeInternalCodeForSearch(part.internal_code).toLowerCase().replace(/\s+/g, '').includes(query)) ||
       (part.name && part.name.toLowerCase().includes(inStockFilters.search.toLowerCase()))
     );
   }), [products, inStockFilters]);
@@ -834,7 +844,7 @@ function MyParts() {
     const query = moderationFilters.search.toLowerCase().replace(/\s+/g, '');
     return items.filter((part) =>
       (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (part.internal_code && part.internal_code.toLowerCase().replace(/\s+/g, '').includes(query)) ||
+      (normalizeInternalCodeForSearch(part.internal_code).toLowerCase().replace(/\s+/g, '').includes(query)) ||
       (part.name && part.name.toLowerCase().includes(moderationFilters.search.toLowerCase()))
     );
   }, [pendingItems, rejectedItems, moderationFilters]);
@@ -1247,13 +1257,28 @@ function MyParts() {
     };
   }, [user?.organization_id]);
 
+  const loadModerationParts = React.useCallback(async () => {
+    if (!user?.id) return;
+    setModerationLoading(true);
+    setModerationLoadError(null);
+    try {
+      await Promise.all([
+        dispatch(fetchMyPendingProducts()).unwrap(),
+        dispatch(fetchMyRejectedProducts()).unwrap(),
+      ]);
+    } catch (err) {
+      setModerationLoadError(typeof err === 'string' ? err : 'Ошибка загрузки запчастей');
+    } finally {
+      setModerationLoading(false);
+    }
+  }, [dispatch, user?.id]);
+
   // Load pending and rejected products when pending tab is active
   useEffect(() => {
     if (activeTab === 'pending' && user?.id) {
-      dispatch(fetchMyPendingProducts());
-      dispatch(fetchMyRejectedProducts());
+      loadModerationParts();
     }
-  }, [dispatch, activeTab, user?.id]);
+  }, [activeTab, user?.id, loadModerationParts]);
 
   useEffect(() => {
     if (activeTab !== 'pending' || !pendingItems?.length) return undefined;
@@ -1778,7 +1803,7 @@ function MyParts() {
       ))}
 
       {activeTab === 'pending' && (
-        loading ? (
+        moderationLoading ? (
           <div className="mt-8 text-center py-16 px-6">
             <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
               <svg className="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1789,7 +1814,7 @@ function MyParts() {
             <h2 className="text-xl font-medium text-gray-900 mb-2">Загрузка запчастей на модерации...</h2>
             <p className="text-gray-600 text-base">Пожалуйста, подождите</p>
           </div>
-        ) : error ? (
+        ) : moderationLoadError ? (
           <div className="mt-8 text-center py-16 px-6">
             <div className="bg-red-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1797,12 +1822,9 @@ function MyParts() {
               </svg>
             </div>
             <h2 className="text-xl font-medium text-gray-900 mb-2">Ошибка загрузки запчастей</h2>
-            <p className="text-gray-500 mb-6 text-base">{error}</p>
+            <p className="text-gray-500 mb-6 text-base">{moderationLoadError}</p>
             <button
-              onClick={() => {
-                dispatch(fetchMyPendingProducts());
-                dispatch(fetchMyRejectedProducts());
-              }}
+              onClick={loadModerationParts}
               className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
             >
               Попробовать снова
@@ -1816,12 +1838,20 @@ function MyParts() {
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              {moderationFilters.search ? 'Ничего не найдено' : 'Запчастей на модерации нет'}
+              {moderationFilters.search || moderationFilters.storage
+                ? 'Ничего не найдено'
+                : moderationFilters.hideRejected && moderationItemsCount > 0
+                  ? 'Отклонённые скрыты'
+                  : 'Запчастей на модерации нет'}
             </h2>
             <p className="text-gray-600 text-base mb-6">
               {moderationFilters.search
                 ? `По запросу "${moderationFilters.search}" ничего не найдено среди запчастей на модерации.`
-                : 'У вас пока нет запчастей, ожидающих модерации'}
+                : moderationFilters.storage
+                  ? 'В выбранном складе нет запчастей на модерации.'
+                  : moderationFilters.hideRejected && moderationItemsCount > 0
+                    ? 'Снимите галочку «Скрыть отклонённые», чтобы увидеть отклонённые запчасти.'
+                    : 'У вас пока нет запчастей, ожидающих модерации'}
             </p>
           </div>
         ) : (

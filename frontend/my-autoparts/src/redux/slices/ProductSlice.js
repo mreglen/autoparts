@@ -832,28 +832,22 @@ const productSlice = createSlice({
     extraReducers: (builder) => {
         builder
             .addCase(fetchMyRejectedProducts.pending, (state) => {
-                state.loading = true;
                 state.error = null;
             })
             .addCase(fetchMyRejectedProducts.fulfilled, (state, action) => {
-                state.loading = false;
                 state.rejectedItems = action.payload;
             })
             .addCase(fetchMyRejectedProducts.rejected, (state, action) => {
-                state.loading = false;
                 state.error = action.payload;
                 state.rejectedItems = [];
             })
             .addCase(fetchMyPendingProducts.pending, (state) => {
-                state.loading = true;
                 state.error = null;
             })
             .addCase(fetchMyPendingProducts.fulfilled, (state, action) => {
-                state.loading = false;
                 state.pendingItems = action.payload;
             })
             .addCase(fetchMyPendingProducts.rejected, (state, action) => {
-                state.loading = false;
                 state.error = action.payload;
                 state.pendingItems = [];
             })

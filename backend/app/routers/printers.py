@@ -776,6 +776,79 @@ async def get_my_printer_permissions(
     return out
 
 
+@router.get("/me/label-print")
+async def get_my_printers_for_label_print(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Принтеры для печати этикеток: из БД (права пользователя) + пометка онлайн по WebSocket агента.
+    Не зависит только от моментального подключения агента — список не пропадает при кратком обрыве.
+    """
+    if not current_user.organization_id:
+        return []
+
+    agent_ids_online = set(active_connections.keys())
+    by_id: Dict[int, dict] = {}
+
+    perm_rows = (
+        db.query(PrinterPermission)
+        .join(PrinterAgentPrinter, PrinterPermission.printer_id == PrinterAgentPrinter.id)
+        .join(PrinterAgent, PrinterAgentPrinter.agent_id == PrinterAgent.id)
+        .filter(PrinterPermission.user_id == current_user.id)
+        .filter(PrinterAgent.organization_id == current_user.organization_id)
+        .all()
+    )
+
+    for perm in perm_rows:
+        p = perm.printer
+        if not p:
+            continue
+        agent = (
+            db.query(PrinterAgent)
+            .filter(PrinterAgent.id == p.agent_id)
+            .first()
+        )
+        by_id[p.id] = {
+            "id": p.id,
+            "name": p.printer_name,
+            "is_default": bool(p.is_default),
+            "is_current": bool(getattr(perm, "is_current", False)),
+            "is_online": bool(agent and agent.id in agent_ids_online),
+        }
+
+    if agent_ids_online:
+        online_rows = (
+            db.query(PrinterAgentPrinter)
+            .join(PrinterAgent, PrinterAgentPrinter.agent_id == PrinterAgent.id)
+            .filter(PrinterAgentPrinter.agent_id.in_(agent_ids_online))
+            .filter(PrinterAgent.organization_id == current_user.organization_id)
+            .all()
+        )
+        for p in online_rows:
+            if p.id in by_id:
+                by_id[p.id]["is_online"] = True
+            else:
+                by_id[p.id] = {
+                    "id": p.id,
+                    "name": p.printer_name,
+                    "is_default": bool(p.is_default),
+                    "is_current": False,
+                    "is_online": True,
+                }
+
+    items = list(by_id.values())
+    items.sort(
+        key=lambda row: (
+            not row.get("is_current"),
+            not row.get("is_online"),
+            not row.get("is_default"),
+            (row.get("name") or "").lower(),
+        )
+    )
+    return items
+
+
 @router.post("/id/{printer_id}/grant")
 async def grant_printer_permission(
     printer_id: str,

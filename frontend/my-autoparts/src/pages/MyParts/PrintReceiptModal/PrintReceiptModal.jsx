@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import {
-  fetchAvailablePrinters,
   printLabel,
   selectSendingPrint,
   clearError,
@@ -10,6 +9,13 @@ import {
 import { apiAxios } from '../../../utils/apiClient';
 
 const MM_TO_PX = 96 / 25.4;
+const PRINTER_POLL_MS = 4000;
+const PRINTER_RETRY_ATTEMPTS = 5;
+const PRINTER_RETRY_DELAY_MS = 1200;
+
+const sleep = (ms) => new Promise((resolve) => {
+  setTimeout(resolve, ms);
+});
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
@@ -32,7 +38,7 @@ function useElementSize(ref) {
     const ro = new ResizeObserver(() => update());
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [ref]);
 
   return size;
 }
@@ -116,7 +122,6 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
           width: `${designMm.w * MM_TO_PX}px`,
           height: basePx.h,
           transform: `scale(${scale})`,
-          // Center scaling so the preview stays visually centered
           transformOrigin: 'center center',
           overflow: 'hidden'
         }}
@@ -180,6 +185,31 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
   );
 }
 
+function pickDefaultPrinterId(printers, currentSelection) {
+  if (!printers?.length) return '';
+
+  const stillValid = printers.find((p) => String(p.id) === String(currentSelection));
+  if (stillValid?.is_online) {
+    return String(stillValid.id);
+  }
+
+  const currentOnline = printers.find((p) => p.is_current && p.is_online);
+  if (currentOnline) return String(currentOnline.id);
+
+  const defaultOnline = printers.find((p) => p.is_default && p.is_online);
+  if (defaultOnline) return String(defaultOnline.id);
+
+  const anyOnline = printers.find((p) => p.is_online);
+  if (anyOnline) return String(anyOnline.id);
+
+  if (stillValid) return String(stillValid.id);
+
+  const current = printers.find((p) => p.is_current);
+  if (current) return String(current.id);
+
+  return String(printers[0].id);
+}
+
 const PrintReceiptModal = ({
   isOpen,
   onClose,
@@ -189,65 +219,94 @@ const PrintReceiptModal = ({
   const dispatch = useDispatch();
   const printing = useSelector(selectSendingPrint);
 
-  const [connectedPrinters, setConnectedPrinters] = useState([]);
+  const [printers, setPrinters] = useState([]);
   const [selectedPrinterId, setSelectedPrinterId] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
+  const [agentWaiting, setAgentWaiting] = useState(false);
 
-  const loadPrinters = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const [connectedRes, permsRes] = await Promise.all([
-        apiAxios.get('/printers/connected'),
-        apiAxios.get('/printers/me/permissions'),
-      ]);
-      dispatch(fetchAvailablePrinters());
+  const selectedPrinter = useMemo(
+    () => printers.find((p) => String(p.id) === String(selectedPrinterId)),
+    [printers, selectedPrinterId]
+  );
 
-      const connected = connectedRes.data || [];
-      const perms = permsRes.data || [];
-      setConnectedPrinters(connected);
+  const hasOnlinePrinter = printers.some((p) => p.is_online);
 
-      const currentPerm = perms.find((p) => p.is_current) || perms[0];
-      let printerId = currentPerm?.printer_id ? String(currentPerm.printer_id) : '';
-
-      const isConnected = (id) => connected.some((p) => String(p.id) === String(id));
-
-      if (printerId && !isConnected(printerId)) {
-        printerId = '';
+  const fetchPrintersList = useCallback(async () => {
+    let list = [];
+    for (let attempt = 0; attempt < PRINTER_RETRY_ATTEMPTS; attempt += 1) {
+      const res = await apiAxios.get('/printers/me/label-print');
+      list = res.data || [];
+      if (list.some((p) => p.is_online) || attempt === PRINTER_RETRY_ATTEMPTS - 1) {
+        break;
       }
+      await sleep(PRINTER_RETRY_DELAY_MS);
+    }
+    return list;
+  }, []);
 
-      if (!printerId && connected.length > 0) {
-        const preferred = connected.find((p) => p.is_default) || connected[0];
+  const loadPrinters = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) {
+      setLoading(true);
+      setLoadError(null);
+    }
+    try {
+      const list = await fetchPrintersList();
+      setPrinters(list);
+      setAgentWaiting(list.length > 0 && !list.some((p) => p.is_online));
+
+      let nextId = '';
+      setSelectedPrinterId((prev) => {
+        nextId = pickDefaultPrinterId(list, prev);
+        return nextId;
+      });
+
+      const toGrant = list.find(
+        (p) => String(p.id) === nextId && p.is_online && !p.is_current
+      ) || list.find((p) => p.is_online && !p.is_current);
+      if (toGrant) {
         try {
-          await apiAxios.post(`/printers/id/${preferred.id}/grant`);
-          printerId = String(preferred.id);
-        } catch (grantErr) {
-          printerId = String(preferred.id);
-          console.warn('grant printer failed', grantErr);
+          await apiAxios.post(`/printers/id/${toGrant.id}/grant`);
+          const refreshed = await apiAxios.get('/printers/me/label-print');
+          const refreshedList = refreshed.data || [];
+          setPrinters(refreshedList);
+          setAgentWaiting(refreshedList.length > 0 && !refreshedList.some((p) => p.is_online));
+          setSelectedPrinterId((prev) => pickDefaultPrinterId(refreshedList, prev));
+        } catch {
+          /* grant optional */
         }
       }
-
-      setSelectedPrinterId(printerId);
     } catch (e) {
-      setConnectedPrinters([]);
-      setSelectedPrinterId('');
+      if (!silent) {
+        setPrinters([]);
+        setSelectedPrinterId('');
+      }
       setLoadError(e?.response?.data?.detail || 'Ошибка загрузки принтеров');
+      setAgentWaiting(false);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
-  }, [dispatch]);
+  }, [fetchPrintersList]);
 
   useEffect(() => {
     if (!isOpen) {
       setSelectedPrinterId('');
-      setConnectedPrinters([]);
+      setPrinters([]);
       setLoadError(null);
+      setAgentWaiting(false);
       return undefined;
     }
 
-    loadPrinters();
+    loadPrinters({ silent: false });
+
+    const pollId = setInterval(() => {
+      loadPrinters({ silent: true });
+    }, PRINTER_POLL_MS);
+
     return () => {
+      clearInterval(pollId);
       dispatch(clearError());
     };
   }, [isOpen, loadPrinters, dispatch]);
@@ -255,8 +314,14 @@ const PrintReceiptModal = ({
   const handleSelectPrinter = async (printerId) => {
     setSelectedPrinterId(printerId);
     if (!printerId) return;
+    const picked = printers.find((p) => String(p.id) === String(printerId));
+    if (!picked?.is_online) return;
     try {
       await apiAxios.post(`/printers/id/${printerId}/grant`);
+      const res = await apiAxios.get('/printers/me/label-print');
+      const list = res.data || [];
+      setPrinters(list);
+      setAgentWaiting(list.length > 0 && !list.some((p) => p.is_online));
     } catch (e) {
       setLoadError(e?.response?.data?.detail || 'Не удалось назначить принтер');
     }
@@ -267,6 +332,10 @@ const PrintReceiptModal = ({
   const handlePrint = async () => {
     if (!selectedPrinterId) {
       alert('Выберите принтер');
+      return;
+    }
+    if (!selectedPrinter?.is_online) {
+      alert('Агент печати не подключён. Запустите агент на компьютере с принтером и нажмите «Обновить».');
       return;
     }
 
@@ -303,8 +372,11 @@ const PrintReceiptModal = ({
     } catch (e) {
       const msg = typeof e === 'string' ? e : (e?.message || 'Ошибка печати');
       setLoadError(msg);
+      loadPrinters({ silent: true });
     }
   };
+
+  const canPrint = Boolean(selectedPrinterId && selectedPrinter?.is_online && !printing);
 
   return (
     <div className="fixed inset-0 bg-black/55 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
@@ -313,8 +385,8 @@ const PrintReceiptModal = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 sm:p-7 relative">
-          {/* Кнопка закрытия */}
           <button
+            type="button"
             onClick={onClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10 rounded-full p-1.5 hover:bg-gray-100"
             aria-label="Закрыть"
@@ -332,7 +404,6 @@ const PrintReceiptModal = ({
           </p>
 
           <div className="space-y-5 flex flex-col justify-start">
-            {/* Выбор принтера */}
             <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/70">
               <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Принтер
@@ -344,21 +415,21 @@ const PrintReceiptModal = ({
                   {typeof loadError === 'string' ? loadError : 'Ошибка загрузки'}
                   <button
                     type="button"
-                    onClick={loadPrinters}
+                    onClick={() => loadPrinters({ silent: false })}
                     className="ml-2 text-indigo-600 underline hover:text-indigo-800"
                   >
                     Обновить
                   </button>
                 </div>
-              ) : connectedPrinters.length === 0 ? (
+              ) : printers.length === 0 ? (
                 <div className="text-sm text-orange-600 space-y-2">
                   <p>
-                    Принтеры не найдены. Убедитесь, что агент печати запущен, или выберите принтер в настройках.
+                    Принтеры не настроены. Запустите агент печати на компьютере с принтером и выберите принтер в настройках.
                   </p>
                   <div className="flex flex-wrap gap-3">
                     <button
                       type="button"
-                      onClick={loadPrinters}
+                      onClick={() => loadPrinters({ silent: false })}
                       className="text-indigo-600 underline hover:text-indigo-800"
                     >
                       Обновить
@@ -373,25 +444,49 @@ const PrintReceiptModal = ({
                   </div>
                 </div>
               ) : (
-                <select
-                  value={selectedPrinterId}
-                  onChange={(e) => handleSelectPrinter(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="">Выберите принтер</option>
-                  {connectedPrinters.map((printer) => (
-                    <option key={printer.id} value={printer.id}>
-                      {printer.name} {printer.is_default ? '(По умолчанию)' : ''}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  {agentWaiting && (
+                    <p className="text-sm text-amber-700 mb-2">
+                      Агент печати не в сети. Ожидаем подключение… (обновление каждые несколько секунд)
+                    </p>
+                  )}
+                  <select
+                    value={selectedPrinterId}
+                    onChange={(e) => handleSelectPrinter(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="">Выберите принтер</option>
+                    {printers.map((printer) => (
+                      <option
+                        key={printer.id}
+                        value={printer.id}
+                        disabled={!printer.is_online}
+                      >
+                        {printer.name}
+                        {printer.is_default ? ' (По умолчанию)' : ''}
+                        {printer.is_current ? ' · текущий' : ''}
+                        {!printer.is_online ? ' · офлайн' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {!hasOnlinePrinter && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      Запустите AutoParts Printer Agent и нажмите «Обновить».
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => loadPrinters({ silent: false })}
+                    className="mt-2 text-sm text-indigo-600 underline hover:text-indigo-800"
+                  >
+                    Обновить список
+                  </button>
+                </>
               )}
             </div>
 
-            {/* Предпросмотр */}
             <div className="p-3 rounded-xl bg-white border border-gray-200">
-              
-              <div className='flex justify-center items-center w-full'>
+              <div className="flex justify-center items-center w-full">
                 <LabelPreview
                   widthMm="58"
                   heightMm="38"
@@ -401,13 +496,12 @@ const PrintReceiptModal = ({
               </div>
             </div>
 
-
-            {/* Кнопка печати */}
             <div className="pt-1">
               <button
+                type="button"
                 onClick={handlePrint}
-                disabled={!selectedPrinterId || printing}
-                className={`w-full px-4 py-3 rounded-lg font-semibold transition-colors ${!selectedPrinterId || printing
+                disabled={!canPrint}
+                className={`w-full px-4 py-3 rounded-lg font-semibold transition-colors ${!canPrint
                   ? 'bg-indigo-400 text-white cursor-not-allowed'
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                   }`}
