@@ -506,7 +506,7 @@ function AdminPanelPage() {
                     value={yandexClientId}
                     onChange={(e) => setYandexClientId(e.target.value)}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                    placeholder="76422e7eada24b5ba50c9b0c03628e21"
+                    placeholder="Введите Client ID"
                   />
                 </div>
                 <div>
