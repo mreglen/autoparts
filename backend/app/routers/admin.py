@@ -1,5 +1,6 @@
 # app/routers/admin.py
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session, joinedload, selectinload
 from app.models.user import User
 from app.models.organization import Organization
@@ -34,6 +35,12 @@ from app.services.photo_localization import (
     format_failures_for_output,
     migrate_external_product_photos,
 )
+from app.services.sitemap_service import (
+    DEFAULT_PRODUCT_URLS_LIMIT,
+    collect_working_product_urls,
+    generate_product_urls_text_file,
+)
+from app.utils.yandex_integration_db import get_or_create_yandex_integration
 from app.schemas.client import ClientBuyerOrdersResponse, ClientListItemResponse
 from app.utils.event_logger import log_event
 from app.utils.user_public_code import assign_public_code
@@ -894,3 +901,34 @@ def get_seller_employees(
 ):
     org_id = _org_id_from_seller(db, seller_id)
     return db.query(User).filter(User.organization_id == org_id).all()
+
+
+@router.get("/seo/product-card-urls")
+def download_product_card_urls(
+    limit: int = Query(DEFAULT_PRODUCT_URLS_LIMIT, ge=1, le=500),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    integration = get_or_create_yandex_integration(db)
+    items = collect_working_product_urls(
+        db,
+        limit=limit,
+        preferred_host_url=integration.host_url,
+    )
+    if not items:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Нет товаров в наличии с фото, брендом и артикулом для формирования списка URL",
+        )
+
+    content = generate_product_urls_text_file(
+        db,
+        limit=limit,
+        preferred_host_url=integration.host_url,
+    )
+    filename = f"product-card-urls-{len(items)}.txt"
+    return Response(
+        content=content,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

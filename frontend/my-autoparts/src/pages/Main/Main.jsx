@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSearchResults, setSearchQuery as setGlobalSearchQuery } from '../../redux/slices/RosskoSlice';
 import { searchUsedParts } from '../../redux/slices/ProductSlice';
+import { apiAxiosUnauth } from '../../utils/apiClient';
+import { buildPartDetailPath } from '../../utils/partRoutes';
 
 const featureItems = [
   {
@@ -40,21 +42,33 @@ function Main() {
 
   const autopartsPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
 
-  const runSearch = (e) => {
+  const runSearch = async (e) => {
     e?.preventDefault();
     const trimmed = query.trim();
     if (!trimmed || busy) return;
     setBusy(true);
-    dispatch(setGlobalSearchQuery(trimmed));
-    Promise.all([
-      dispatch(searchUsedParts(trimmed)),
-      dispatch(fetchSearchResults({ text: trimmed })),
-    ])
-      .catch(() => {})
-      .finally(() => {
-        setBusy(false);
-        navigate(`${autopartsPath}?q=${encodeURIComponent(trimmed)}`);
+
+    try {
+      const { data } = await apiAxiosUnauth.get('/search-products/resolve', {
+        params: { q: trimmed },
       });
+
+      if (data.status === 'found' && data.product) {
+        navigate(buildPartDetailPath(data.product));
+        return;
+      }
+
+      dispatch(setGlobalSearchQuery(trimmed));
+      await Promise.all([
+        dispatch(searchUsedParts(trimmed)),
+        dispatch(fetchSearchResults({ text: trimmed })),
+      ]);
+      navigate(`${autopartsPath}?q=${encodeURIComponent(trimmed)}`);
+    } catch {
+      navigate(`${autopartsPath}?q=${encodeURIComponent(trimmed)}`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -137,7 +151,7 @@ function Main() {
                     </button>
                   </div>
                   <p className="mt-3 text-xs leading-relaxed text-gray-500 sm:text-sm">
-                    Откроется раздел автозапчастей с запросом: новые (поставщики) и б/у (каталог продавцов).
+                    Поиск по артикулу, бренду или названию. При точном совпадении откроется карточка товара.
                   </p>
                 </form>
               </div>

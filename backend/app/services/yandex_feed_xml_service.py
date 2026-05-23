@@ -8,6 +8,8 @@ from typing import Iterable
 from urllib.parse import urlparse
 from xml.sax.saxutils import escape
 
+from app.utils.product_urls import build_product_page_url
+
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
@@ -109,7 +111,7 @@ def _offer_lines(
     category_id = int(product.part_type_id or 1)
     title = (product.name or "").strip() or f"{(product.brand or '').strip()} {(product.article or '').strip()}".strip()
     title = title or f"Запчасть #{product.id}"
-    product_url = f"{site_origin}/part/{product.id}"
+    product_url = build_product_page_url(product, site_origin)
     price_value = _format_price(product.price)
     available = "true" if (product.quantity or 0) > 0 else "false"
     is_new_item = bool(product.is_new)

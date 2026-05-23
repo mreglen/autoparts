@@ -7,7 +7,50 @@ import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, sel
 import { createOrGetChat } from '../../redux/slices/ChatSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
+import { buildPartDetailPath } from '../../utils/partRoutes';
 import MediaModal from '../../components/MediaModal/MediaModal';
+
+const SITE_ORIGIN = 'https://svoygarage.ru';
+
+function buildProductSeo(product) {
+  const brand = (product?.brand || '').trim();
+  const article = (product?.article || '').trim();
+  const name = (product?.name || '').trim() || `${brand} ${article}`.trim() || 'Автозапчасть';
+  const conditionLabel = product?.is_new ? 'новая' : 'б/у';
+  const priceText = product?.price ? ` Цена ${Number(product.price).toLocaleString('ru-RU')} ₽.` : '';
+  const path = buildPartDetailPath(product);
+  const canonicalUrl = `${SITE_ORIGIN}${path}`;
+  const title = `${brand} ${article} — ${name} | Свой Гараж`.replace(/\s+/g, ' ').trim();
+  const description = `Купить ${name}${brand ? ` (${brand}` : ''}${article ? `, арт. ${article}` : ''}${brand ? ')' : ''}.${priceText} ${conditionLabel.charAt(0).toUpperCase()}${conditionLabel.slice(1)} запчасть на Свой Гараж. Доставка по России.`;
+  const firstPhoto = product?.photos?.[0]?.photo_url;
+  const imageUrl = firstPhoto ? normalizeImageUrl(firstPhoto) : null;
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name,
+    sku: article || undefined,
+    description: stripHtmlTags(product?.description || description).slice(0, 500) || description,
+    brand: brand ? { '@type': 'Brand', name: brand } : undefined,
+    image: imageUrl ? [imageUrl] : undefined,
+    offers: product?.price
+      ? {
+          '@type': 'Offer',
+          url: canonicalUrl,
+          priceCurrency: 'RUB',
+          price: Number(product.price).toFixed(2),
+          availability: (product.quantity || 0) > 0
+            ? 'https://schema.org/InStock'
+            : 'https://schema.org/OutOfStock',
+          itemCondition: product?.is_new
+            ? 'https://schema.org/NewCondition'
+            : 'https://schema.org/UsedCondition',
+        }
+      : undefined,
+  };
+
+  return { title, description, canonicalUrl, imageUrl, jsonLd };
+}
 
 const PartDetail = () => {
   // Parse the combined productId parameter
@@ -327,9 +370,29 @@ const PartDetail = () => {
   }
 
   const sellerOrg = currentProduct.organization || organization;
+  const seo = buildProductSeo(currentProduct);
 
   return (
     <div className="min-h-screen bg-gray-50 max-md:pb-28">
+      <Helmet>
+        <title>{seo.title}</title>
+        <meta name="description" content={seo.description} />
+        <link rel="canonical" href={seo.canonicalUrl} />
+        <meta property="og:type" content="product" />
+        <meta property="og:site_name" content="Свой Гараж" />
+        <meta property="og:title" content={seo.title} />
+        <meta property="og:description" content={seo.description} />
+        <meta property="og:url" content={seo.canonicalUrl} />
+        <meta property="og:locale" content="ru_RU" />
+        {seo.imageUrl ? <meta property="og:image" content={seo.imageUrl} /> : null}
+        {currentProduct.price ? (
+          <>
+            <meta property="product:price:amount" content={String(currentProduct.price)} />
+            <meta property="product:price:currency" content="RUB" />
+          </>
+        ) : null}
+        <script type="application/ld+json">{JSON.stringify(seo.jsonLd)}</script>
+      </Helmet>
       {/* Back Button */}
       <div className="max-w-6xl mx-auto px-4 py-4">
         <button

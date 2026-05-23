@@ -68,6 +68,88 @@ def search_products(q: str, db: Session = Depends(get_db)):
     """Простой поиск (универсальный)"""
     return search_local_products_query(db, q).all()
 
+
+@router.get("/resolve")
+def resolve_product(q: str, db: Session = Depends(get_db)):
+    """
+    Определяет одну карточку товара по артикулу или названию.
+    Используется для прямого перехода из адресной строки (/find?q=...) и быстрого поиска.
+    """
+    trimmed = q.strip()
+    if not trimmed:
+        return jsonable_encoder({"status": "not_found", "query": q, "match_type": None, "product": None, "products": []})
+
+    normalized = normalize_partnumber(trimmed)
+
+    base_query = db.query(ProductModel).options(
+        selectinload(ProductModel.photos),
+        selectinload(ProductModel.storage_location),
+        selectinload(ProductModel.organization),
+    ).filter(func.coalesce(ProductModel.quantity, 0) > 0)
+
+    if normalized:
+        by_article = base_query.filter(get_sql_normalize(ProductModel.article) == normalized).all()
+        if len(by_article) == 1:
+            return jsonable_encoder({
+                "status": "found",
+                "query": trimmed,
+                "match_type": "article",
+                "product": by_article[0],
+                "products": by_article,
+            })
+        if len(by_article) > 1:
+            return jsonable_encoder({
+                "status": "multiple",
+                "query": trimmed,
+                "match_type": "article",
+                "product": None,
+                "products": by_article,
+            })
+
+    by_name = base_query.filter(func.lower(func.trim(ProductModel.name)) == trimmed.lower()).all()
+    if len(by_name) == 1:
+        return jsonable_encoder({
+            "status": "found",
+            "query": trimmed,
+            "match_type": "name",
+            "product": by_name[0],
+            "products": by_name,
+        })
+    if len(by_name) > 1:
+        return jsonable_encoder({
+            "status": "multiple",
+            "query": trimmed,
+            "match_type": "name",
+            "product": None,
+            "products": by_name,
+        })
+
+    results = search_local_products_query(db, trimmed).limit(20).all()
+    if len(results) == 1:
+        return jsonable_encoder({
+            "status": "found",
+            "query": trimmed,
+            "match_type": "search",
+            "product": results[0],
+            "products": results,
+        })
+    if len(results) > 1:
+        return jsonable_encoder({
+            "status": "multiple",
+            "query": trimmed,
+            "match_type": "search",
+            "product": None,
+            "products": results,
+        })
+
+    return jsonable_encoder({
+        "status": "not_found",
+        "query": trimmed,
+        "match_type": None,
+        "product": None,
+        "products": [],
+    })
+
 @router.get("/search-combined")
 async def search_combined(q: str, db: Session = Depends(get_db)):
     """
