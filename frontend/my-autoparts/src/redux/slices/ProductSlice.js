@@ -611,8 +611,9 @@ export const fetchCatalogProducts = createAsyncThunk(
     'products/fetchCatalogProducts',
     async (params = {}, { rejectWithValue }) => {
         try {
+            const { append: _append, ...apiParams } = params;
             const queryParams = new URLSearchParams();
-            Object.entries(params).forEach(([key, value]) => {
+            Object.entries(apiParams).forEach(([key, value]) => {
                 if (value === null || value === undefined || value === '') return;
                 if (Array.isArray(value)) {
                     value.forEach((item) => {
@@ -802,6 +803,7 @@ const productSlice = createSlice({
         catalogPage: 1,
         catalogPageSize: 20,
         catalogLoading: false,
+        catalogLoadingMore: false,
         catalogFacets: null,
         publicPartTypes: [],
     },
@@ -816,6 +818,13 @@ const productSlice = createSlice({
         },
         clearSearchCache: (state) => {
             state.searchCache = {};
+        },
+        resetCatalogCatalog: (state) => {
+            state.catalogItems = [];
+            state.catalogTotal = 0;
+            state.catalogPage = 1;
+            state.catalogLoading = false;
+            state.catalogLoadingMore = false;
         },
         updateProductQuantity: (state, action) => {
             const { productId, newQuantity } = action.payload;
@@ -965,22 +974,43 @@ const productSlice = createSlice({
                 state.error = action.payload;
                 state.items = [];
             })
-            .addCase(fetchCatalogProducts.pending, (state) => {
-                state.catalogLoading = true;
+            .addCase(fetchCatalogProducts.pending, (state, action) => {
+                const append = Boolean(action.meta?.arg?.append);
+                if (append) {
+                    state.catalogLoadingMore = true;
+                } else {
+                    state.catalogLoading = true;
+                }
                 state.error = null;
             })
             .addCase(fetchCatalogProducts.fulfilled, (state, action) => {
+                const append = Boolean(action.meta?.arg?.append);
                 state.catalogLoading = false;
-                state.catalogItems = action.payload.items || [];
+                state.catalogLoadingMore = false;
+                const newItems = action.payload.items || [];
+                if (append) {
+                    const existingIds = new Set(state.catalogItems.map((p) => p.id));
+                    newItems.forEach((item) => {
+                        if (!existingIds.has(item.id)) {
+                            state.catalogItems.push(item);
+                        }
+                    });
+                } else {
+                    state.catalogItems = newItems;
+                }
                 state.catalogTotal = action.payload.total ?? 0;
                 state.catalogPage = action.payload.page ?? 1;
                 state.catalogPageSize = action.payload.page_size ?? 20;
             })
             .addCase(fetchCatalogProducts.rejected, (state, action) => {
+                const append = Boolean(action.meta?.arg?.append);
                 state.catalogLoading = false;
-                state.error = action.payload;
-                state.catalogItems = [];
-                state.catalogTotal = 0;
+                state.catalogLoadingMore = false;
+                if (!append) {
+                    state.error = action.payload;
+                    state.catalogItems = [];
+                    state.catalogTotal = 0;
+                }
             })
             .addCase(fetchCatalogFacets.fulfilled, (state, action) => {
                 state.catalogFacets = action.payload;
@@ -1235,7 +1265,7 @@ export const fetchPublicProducts = createAsyncThunk(
     }
 );
 
-export const { clearProductError, resetProducts, updateProductQuantity, clearSearchCache } = productSlice.actions;
+export const { clearProductError, resetProducts, updateProductQuantity, clearSearchCache, resetCatalogCatalog } = productSlice.actions;
 export { fetchAllProducts };
 export const selectMyParts = (state) => state.products.items;
 export const selectMyPartsStatus = (state) => state.products.loading ? 'loading' : 'idle';
@@ -1245,6 +1275,7 @@ export const selectCatalogTotal = (state) => state.products.catalogTotal;
 export const selectCatalogPage = (state) => state.products.catalogPage;
 export const selectCatalogPageSize = (state) => state.products.catalogPageSize;
 export const selectCatalogLoading = (state) => state.products.catalogLoading;
+export const selectCatalogLoadingMore = (state) => state.products.catalogLoadingMore;
 export const selectCatalogFacets = (state) => state.products.catalogFacets;
 export const selectPublicPartTypes = (state) => state.products.publicPartTypes;
 export default productSlice.reducer;

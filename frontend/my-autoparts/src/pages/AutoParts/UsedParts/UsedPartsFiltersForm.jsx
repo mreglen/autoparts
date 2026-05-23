@@ -81,9 +81,7 @@ export default function UsedPartsFiltersForm({ updateCatalogUrl, showClearInPane
 
   const setFilter = (key, value) => {
     if (!updateCatalogUrl) return;
-    const updates = { [key]: value };
-    if (key !== 'page') updates.page = 1;
-    updateCatalogUrl(updates);
+    updateCatalogUrl({ [key]: value });
   };
 
   const toggleMultiFilter = (key, value) => {
@@ -105,7 +103,6 @@ export default function UsedPartsFiltersForm({ updateCatalogUrl, showClearInPane
       vm: null,
       vehicle_id: null,
       has_photos: null,
-      page: 1,
     });
   };
 

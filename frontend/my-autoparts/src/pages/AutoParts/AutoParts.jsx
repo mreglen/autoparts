@@ -1,5 +1,5 @@
 // src/components/AutoParts.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -14,6 +14,7 @@ import {
   fetchCatalogProducts,
   fetchCatalogFacets,
   fetchPublicPartTypes,
+  resetCatalogCatalog,
 } from '../../redux/slices/ProductSlice';
 import { fetchCart } from '../../redux/slices/CartSlice';
 import UsedPartsList from './UsedParts/UsedPartsList';
@@ -84,6 +85,7 @@ function AutoParts() {
 
   const updateCatalogUrl = useCallback((updates) => {
     const params = new URLSearchParams(searchParams);
+    params.delete('page');
     Object.entries(updates).forEach(([key, value]) => {
       params.delete(key);
       if (value === null || value === undefined || value === '') {
@@ -154,7 +156,7 @@ function AutoParts() {
 
   const applyUsedSort = useCallback((uiSort) => {
     setUsedPartsSort(uiSort);
-    updateCatalogUrl({ sort: uiSortToApi(uiSort), page: 1 });
+    updateCatalogUrl({ sort: uiSortToApi(uiSort) });
     setShowSortDropdown(false);
   }, [updateCatalogUrl]);
   
@@ -196,6 +198,11 @@ function AutoParts() {
     setUsedPartsSort(apiSortToUi(searchParams.get('sort') || 'created_at_desc'));
   }, [searchParams]);
 
+  const usedCatalogFilterKey = useMemo(
+    () => JSON.stringify(buildUsedCatalogFilterParams(searchParams)),
+    [searchParams]
+  );
+
   useEffect(() => {
     if (activeTab !== 'my') return;
 
@@ -215,8 +222,9 @@ function AutoParts() {
       dispatch(setSearchQuery(''));
     }
 
-    dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams)));
-  }, [searchQuery, activeTab, searchParams, dispatch]);
+    dispatch(resetCatalogCatalog());
+    dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams, 1)));
+  }, [searchQuery, activeTab, usedCatalogFilterKey, searchParams, dispatch]);
 
   useEffect(() => {
     if (activeTab !== 'rossko') return;

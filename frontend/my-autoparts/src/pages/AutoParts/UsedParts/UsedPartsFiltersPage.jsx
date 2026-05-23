@@ -6,6 +6,7 @@ import {
   fetchCatalogProducts,
   fetchCatalogFacets,
   fetchPublicPartTypes,
+  resetCatalogCatalog,
 } from '../../../redux/slices/ProductSlice';
 import { fetchCart } from '../../../redux/slices/CartSlice';
 import UsedPartsFiltersForm from './UsedPartsFiltersForm';
@@ -23,6 +24,7 @@ export default function UsedPartsFiltersPage() {
 
   const updateCatalogUrl = useCallback((updates) => {
     const params = new URLSearchParams(searchParams);
+    params.delete('page');
     Object.entries(updates).forEach(([key, value]) => {
       params.delete(key);
       if (value === null || value === undefined || value === '') {
@@ -52,7 +54,6 @@ export default function UsedPartsFiltersPage() {
       vm: null,
       vehicle_id: null,
       has_photos: null,
-      page: 1,
     });
   }, [updateCatalogUrl]);
 
@@ -75,7 +76,8 @@ export default function UsedPartsFiltersPage() {
       return;
     }
 
-    dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams)));
+    dispatch(resetCatalogCatalog());
+    dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams, 1)));
   }, [searchParams, dispatch]);
 
   const hasFilters = usedHasActiveFilters(searchParams);

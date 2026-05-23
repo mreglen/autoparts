@@ -35,11 +35,12 @@ export function isUsedCatalogBrowseMode(searchParams) {
   return !getUsedPartsUrlQuery(searchParams);
 }
 
-/** Параметры GET /catalog/products для вкладки «Б/у» (локальный склад, без фильтра is_new). */
-export function buildUsedCatalogParams(searchParams) {
+const CATALOG_PAGE_SIZE = 20;
+
+/** Фильтры и сортировка каталога (без номера страницы — для бесконечной прокрутки). */
+export function buildUsedCatalogFilterParams(searchParams) {
   const params = {
-    page: parseInt(searchParams.get('page') || '1', 10),
-    page_size: 20,
+    page_size: CATALOG_PAGE_SIZE,
     sort: searchParams.get('sort') || 'created_at_desc',
   };
   const partTypes = searchParams.getAll('part_type').map((value) => parseInt(value, 10)).filter(Number.isFinite);
@@ -61,3 +62,13 @@ export function buildUsedCatalogParams(searchParams) {
   if (urlQ) params.q = urlQ;
   return params;
 }
+
+/** Параметры запроса каталога с номером страницы. */
+export function buildUsedCatalogParams(searchParams, page = 1) {
+  return {
+    ...buildUsedCatalogFilterParams(searchParams),
+    page,
+  };
+}
+
+export { CATALOG_PAGE_SIZE };

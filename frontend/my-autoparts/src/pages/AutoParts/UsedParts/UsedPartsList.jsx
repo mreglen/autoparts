@@ -1,18 +1,19 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import ProductCard from '../ProductCard';
 import UsedPartsFiltersForm from './UsedPartsFiltersForm';
 import {
+  fetchCatalogProducts,
   selectCatalogItems,
   selectCatalogTotal,
   selectCatalogPage,
-  selectCatalogPageSize,
   selectCatalogLoading,
+  selectCatalogLoadingMore,
 } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
 import { normalizeImageUrl } from '../../../utils/apiClient';
-import { isUsedCatalogBrowseMode } from '../../../utils/autopartsPublic';
+import { buildUsedCatalogParams, isUsedCatalogBrowseMode } from '../../../utils/autopartsPublic';
 
 // Селекторы для б/у запчастей
 const selectUsedPartsData = (state) => state.products.usedPartsData;
@@ -57,12 +58,14 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const catalogItems = useSelector(selectCatalogItems);
   const catalogTotal = useSelector(selectCatalogTotal);
   const catalogPage = useSelector(selectCatalogPage);
-  const catalogPageSize = useSelector(selectCatalogPageSize);
   const isCatalogMode = isUsedCatalogBrowseMode(searchParams);
   const catalogLoading = useSelector(selectCatalogLoading);
+  const catalogLoadingMore = useSelector(selectCatalogLoadingMore);
   const usedPartsLoading = useSelector(selectUsedPartsLoading);
+  const loadMoreSentinelRef = useRef(null);
+  const catalogHasMore = isCatalogMode && catalogItems.length < catalogTotal;
   const status = isCatalogMode
-    ? (catalogLoading ? 'loading' : 'idle')
+    ? (catalogLoading && catalogItems.length === 0 ? 'loading' : 'idle')
     : (usedPartsLoading ? 'loading' : 'idle');
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
@@ -76,7 +79,40 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     [isCatalogMode, usedPartsData]
   );
 
-  const totalPages = Math.max(1, Math.ceil(catalogTotal / catalogPageSize));
+  const loadMoreCatalog = useCallback(() => {
+    if (!isCatalogMode || catalogLoading || catalogLoadingMore || !catalogHasMore) {
+      return;
+    }
+    dispatch(fetchCatalogProducts({
+      ...buildUsedCatalogParams(searchParams, catalogPage + 1),
+      append: true,
+    }));
+  }, [
+    isCatalogMode,
+    catalogLoading,
+    catalogLoadingMore,
+    catalogHasMore,
+    dispatch,
+    searchParams,
+    catalogPage,
+  ]);
+
+  useEffect(() => {
+    if (!isCatalogMode || !catalogHasMore) return undefined;
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMoreCatalog();
+        }
+      },
+      { root: null, rootMargin: '240px', threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [isCatalogMode, catalogHasMore, loadMoreCatalog]);
 
   const activeFilters = useMemo(() => ({
     partTypes: searchParams.getAll('part_type'),
@@ -126,13 +162,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
     return true;
   }, [activeFilters]);
-
-  const setFilter = (key, value) => {
-    if (!updateCatalogUrl) return;
-    const updates = { [key]: value };
-    if (key !== 'page') updates.page = 1;
-    updateCatalogUrl(updates);
-  };
 
   // Sort parts based on selected option
   const sortedAvailableParts = useMemo(() => {
@@ -466,11 +495,11 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             </div>
           )}
 
-          {isCatalogMode && totalPages > 1 && (
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-              <button type="button" disabled={catalogPage <= 1} onClick={() => setFilter('page', catalogPage - 1)} className="px-3 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40">Назад</button>
-              <span className="text-sm text-gray-600 px-2">Стр. {catalogPage} из {totalPages}</span>
-              <button type="button" disabled={catalogPage >= totalPages} onClick={() => setFilter('page', catalogPage + 1)} className="px-3 py-2 rounded-lg border border-gray-300 text-sm disabled:opacity-40">Вперёд</button>
+          {isCatalogMode && catalogHasMore && (
+            <div ref={loadMoreSentinelRef} className="mt-6 flex justify-center py-4" aria-hidden="true">
+              {catalogLoadingMore && (
+                <span className="text-sm text-gray-500">Загрузка…</span>
+              )}
             </div>
           )}
         </>
