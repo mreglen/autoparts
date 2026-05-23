@@ -149,6 +149,12 @@ function Main() {
                 <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200/80 shadow-sm">
                   Чаты на платформе
                 </span>
+                <Link
+                  to="/delivery"
+                  className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200/80 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-900"
+                >
+                  Доставка
+                </Link>
                 <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200/80 shadow-sm">
                   Для бизнеса
                 </span>
@@ -160,6 +166,12 @@ function Main() {
                   className="inline-flex min-h-12 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-3 text-center text-base font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl"
                 >
                   Открыть каталог
+                </Link>
+                <Link
+                  to="/delivery"
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl border border-indigo-200 bg-white px-8 py-3 text-center text-base font-semibold text-indigo-700 shadow-sm transition hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md"
+                >
+                  Условия доставки
                 </Link>
                 <Link
                   to="/auth"
