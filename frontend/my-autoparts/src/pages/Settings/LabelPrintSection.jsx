@@ -30,6 +30,12 @@ function useElementSize(ref) {
   return size;
 }
 
+const TEST_LABEL_STORAGE_CELLS = [
+  { nameShort: 'Стел', value: 'A-01' },
+  { nameShort: 'Секц', value: '02' },
+  { nameShort: 'Мест', value: '03' },
+];
+
 function LabelPreview({ widthMm, heightMm }) {
   const frameRef = useRef(null);
   const frameSize = useElementSize(frameRef);
@@ -98,7 +104,32 @@ function LabelPreview({ widthMm, heightMm }) {
               </div>
               <div className="mb-1.5">
                 <div className="text-[8px] font-bold leading-tight">Адресное хранение</div>
-                <div className="text-[9px] leading-tight break-words">A-01-02-03</div>
+                <table className="mt-0.5 w-full border-collapse table-fixed text-black">
+                  <thead>
+                    <tr>
+                      {TEST_LABEL_STORAGE_CELLS.map((cell) => (
+                        <th
+                          key={`head-${cell.nameShort}`}
+                          className="border border-black px-0.5 py-0 text-[7px] font-bold leading-tight text-center"
+                        >
+                          {cell.nameShort}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      {TEST_LABEL_STORAGE_CELLS.map((cell) => (
+                        <td
+                          key={`val-${cell.nameShort}`}
+                          className="border border-black px-0.5 py-0 text-[8px] font-semibold leading-tight text-center break-words"
+                        >
+                          {cell.value}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
               </div>
               <div className="mb-1.5">
                 <div className="text-[8px] font-bold leading-tight">Наименование</div>

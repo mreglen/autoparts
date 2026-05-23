@@ -61,6 +61,21 @@ def _build_qr_data_uri(url: str, size_px: int = 220) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
+def _short_cell_name(name: str) -> str:
+    text = (name or "").strip()
+    return text[:4] if text else "—"
+
+
+def _build_test_label_storage_cells():
+    """Демо-ячейки для пробной печати: первая строка — сокращённое имя (4 символа), вторая — значение."""
+    samples = [
+        ("Стеллаж", "A-01"),
+        ("Секция", "02"),
+        ("Место", "03"),
+    ]
+    return [{"name_short": _short_cell_name(name), "value": value} for name, value in samples]
+
+
 def _normalize_public_base_url(raw_url: str) -> str:
     if not raw_url:
         return ""
@@ -414,16 +429,21 @@ async def print_test_label(
     width_mm = int(getattr(perm, "label_width_mm", 58) if perm else 58)
     height_mm = int(getattr(perm, "label_height_mm", 38) if perm else 38)
 
-    tmpl = _templates_env.get_template("label_print.html")
+    base_url = _normalize_public_base_url(settings.PUBLIC_BASE_URL or "")
+    qr_url = f"{base_url}/my-parts" if base_url else "/my-parts"
+    qr_data_uri = _build_qr_data_uri(qr_url)
+
+    tmpl = _templates_env.get_template("label_print_test.html")
     html = tmpl.render(
         label_width_mm=width_mm,
         label_height_mm=height_mm,
         brand="BOSCH",
         article="0 986 479 123",
-        storage_address="A-01-02-03",
+        storage_cells=_build_test_label_storage_cells(),
         name="Тормозные колодки передние",
         internal_code="INT-0000123",
         price="1 250 ₽",
+        qr_data_uri=qr_data_uri,
     )
 
     pdf_bytes = _html_to_pdf_bytes(html, width_mm=width_mm, height_mm=height_mm)
