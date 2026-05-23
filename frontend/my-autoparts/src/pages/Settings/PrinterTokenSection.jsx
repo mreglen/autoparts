@@ -66,11 +66,14 @@ export default function PrinterTokenSection() {
           <div className="mt-1 flex flex-col gap-1">
             <a
               href={agentInstallerHref}
-              download
+              download="AutoParts_PrinterAgent_Setup.exe"
               className="text-sm text-indigo-600 underline underline-offset-2 hover:text-indigo-800 w-fit"
             >
-              Скачать программу агент
+              Скачать установщик агента печати
             </a>
+            <p className="text-xs text-gray-500">
+              Запустите установщик, нажмите «Установить». Программа появится в меню «Пуск» → AutoParts.
+            </p>
             <a
               href={xprinterDriverHref}
               download

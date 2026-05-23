@@ -38,7 +38,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="AutoParts_PrinterAgent_Setup",
+    name="AutoParts_PrinterAgent",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

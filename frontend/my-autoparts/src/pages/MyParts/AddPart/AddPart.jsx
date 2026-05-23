@@ -7,9 +7,14 @@ import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { fetchStorageCells, createStorageCell } from '../../../redux/slices/StorageCellsSlice';
 import { createPendingProductStorageCellsBatch } from '../../../redux/slices/PendingProductStorageCellsSlice';
 import { fetchPartTypes } from '../../../redux/slices/PartTypeSlice';
-import { normalizeImageUrl, apiRequest, apiRequestFormData } from '../../../utils/apiClient';
+import { normalizeImageUrl, apiRequest, apiRequestFormData, apiAxios } from '../../../utils/apiClient';
 import { useAuthReady } from '../../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
+import {
+  buildRosskoLookupText,
+  getRosskoMinPrice,
+  pickBestRosskoPart,
+} from '../../AutoParts/NewParts/rosskoHelpers';
 
 import VehicleModal from './VehicleModal';
 import MobilePageSection from '../../../components/MobilePageSection/MobilePageSection';
@@ -52,6 +57,9 @@ const AddPart = () => {
   const [brandLoading, setBrandLoading] = useState(false);
   const [articleFocused, setArticleFocused] = useState(false);
   const [brandFocused, setBrandFocused] = useState(false);
+  const [rosskoLookupLoading, setRosskoLookupLoading] = useState(false);
+  const [rosskoLookupError, setRosskoLookupError] = useState(null);
+  const [rosskoLookupNotice, setRosskoLookupNotice] = useState(null);
 
   const [photos, setPhotos] = useState([]);
   const [videos, setVideos] = useState([]);
@@ -378,6 +386,63 @@ const AddPart = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === 'article' || name === 'brand') {
+      setRosskoLookupError(null);
+      setRosskoLookupNotice(null);
+    }
+  };
+
+  const handleFillFromRossko = async () => {
+    const article = (formData.article || '').trim();
+    const brand = (formData.brand || '').trim();
+
+    if (!article) {
+      setRosskoLookupError('Введите артикул для поиска в Rossko');
+      setRosskoLookupNotice(null);
+      return;
+    }
+
+    setRosskoLookupLoading(true);
+    setRosskoLookupError(null);
+    setRosskoLookupNotice(null);
+
+    try {
+      const response = await apiAxios.post('/rossko/GetSearch', {
+        text: buildRosskoLookupText(article, brand),
+        delivery_id: '000000001',
+        address_id: 176458,
+      });
+
+      const best = pickBestRosskoPart(response.data, article, brand);
+      if (!best) {
+        setRosskoLookupError('В Rossko ничего не найдено по введённым данным');
+        return;
+      }
+
+      const minPrice = getRosskoMinPrice(best);
+      const filledArticle = best.partnumber || article;
+      const filledBrand = best.brand || brand;
+      const filledName = best.name || formData.name;
+
+      setFormData((prev) => ({
+        ...prev,
+        article: filledArticle,
+        brand: filledBrand,
+        name: filledName || prev.name,
+        condition: 'новый',
+        sale_price: minPrice > 0 ? String(minPrice) : prev.sale_price,
+      }));
+
+      setRosskoLookupNotice(
+        `Данные заполнены из Rossko: ${filledBrand || '—'} ${filledArticle}`.trim()
+      );
+    } catch (err) {
+      setRosskoLookupError(
+        err.response?.data?.detail || err.message || 'Ошибка при поиске в Rossko'
+      );
+    } finally {
+      setRosskoLookupLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -753,6 +818,31 @@ const AddPart = () => {
                 </li>
               ))}
             </ul>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Заполнение из Rossko</p>
+              <p className="text-xs text-gray-600 mt-1">
+                Введите артикул и при необходимости бренд, затем подгрузите название и цену.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleFillFromRossko}
+              disabled={rosskoLookupLoading || !(formData.article || '').trim()}
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+            >
+              {rosskoLookupLoading ? 'Ищем в Rossko...' : 'Заполнить из Rossko'}
+            </button>
+          </div>
+          {rosskoLookupError && (
+            <p className="mt-3 text-sm text-red-700">{rosskoLookupError}</p>
+          )}
+          {rosskoLookupNotice && (
+            <p className="mt-3 text-sm text-green-700">{rosskoLookupNotice}</p>
           )}
         </div>
 

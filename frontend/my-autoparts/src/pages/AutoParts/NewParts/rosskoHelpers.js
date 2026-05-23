@@ -79,3 +79,63 @@ export const QUICK_SEARCH_CHIPS = [
 ];
 
 export const POPULAR_BRANDS = ['MANN', 'BOSCH', 'KYB', 'NGK', 'VALEO', 'SACHS', 'FEBI', 'MAHLE'];
+
+export const normalizeArticle = (value) => {
+  if (!value) return '';
+  return String(value).replace(/[^A-Za-z0-9А-Яа-яЁё]/gi, '').toUpperCase();
+};
+
+export const getRosskoParts = (data) => {
+  let parts = data?.PartsList?.Part;
+  if (!parts) return [];
+  return Array.isArray(parts) ? parts : [parts];
+};
+
+const scoreRosskoPart = (part, queryArticleNorm, queryBrandLower) => {
+  let score = 0;
+  const pn = normalizeArticle(part?.partnumber);
+  const brandLower = String(part?.brand || '').trim().toLowerCase();
+
+  if (queryArticleNorm && pn === queryArticleNorm) score += 100;
+  else if (queryArticleNorm && (pn.startsWith(queryArticleNorm) || queryArticleNorm.startsWith(pn))) score += 50;
+  else if (queryArticleNorm && pn.includes(queryArticleNorm)) score += 20;
+
+  if (queryBrandLower && brandLower === queryBrandLower) score += 30;
+  else if (queryBrandLower && brandLower.includes(queryBrandLower)) score += 10;
+
+  if (getRosskoStockCount(part) > 0) score += 10;
+
+  const price = getRosskoMinPrice(part);
+  if (price > 0) score += 5;
+
+  return score;
+};
+
+export const pickBestRosskoPart = (data, article, brand) => {
+  const parts = getRosskoParts(data);
+  if (!parts.length) return null;
+
+  const queryArticleNorm = normalizeArticle(article);
+  const queryBrandLower = String(brand || '').trim().toLowerCase();
+
+  const ranked = parts
+    .map((part) => ({
+      part,
+      score: scoreRosskoPart(part, queryArticleNorm, queryBrandLower),
+      price: getRosskoMinPrice(part),
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (a.price && b.price) return a.price - b.price;
+      return 0;
+    });
+
+  return ranked[0]?.part || null;
+};
+
+export const buildRosskoLookupText = (article, brand) => {
+  const articleTrimmed = String(article || '').trim();
+  const brandTrimmed = String(brand || '').trim();
+  return brandTrimmed ? `${brandTrimmed} ${articleTrimmed}` : articleTrimmed;
+};
+
