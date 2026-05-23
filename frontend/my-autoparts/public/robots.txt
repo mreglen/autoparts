@@ -1,6 +1,3 @@
-# robots.txt — Свой Гараж (https://svoygarage.ru)
-# Публичные разделы открыты для индексации; личный кабинет и служебные URL закрыты.
-
 User-agent: *
 Allow: /
 Allow: /catalog
@@ -10,7 +7,6 @@ Allow: /delivery
 Allow: /payment
 Allow: /part/
 
-# Авторизация и личный кабинет
 Disallow: /auth
 Disallow: /dashboard
 Disallow: /profile
@@ -24,7 +20,6 @@ Disallow: /sellers
 Disallow: /admin-settings
 Disallow: /admin/
 
-# Корзина, оформление заказа и служебные разделы
 Disallow: /cart
 Disallow: /order-reg
 Disallow: /purchases/
@@ -35,13 +30,11 @@ Disallow: /warehouse-sales
 Disallow: /chats
 Disallow: /product-not-found
 
-# API и служебные эндпоинты
 Disallow: /api/
 Allow: /api/feeds/sitemap-products.xml
 Allow: /api/feeds/yandex/
 Disallow: /server/
 
-# Яндекс: основное зеркало и игнор UTM-меток
 Host: svoygarage.ru
 Clean-param: utm_source&utm_medium&utm_campaign&utm_content&utm_term&yclid&ysclid&from
 
