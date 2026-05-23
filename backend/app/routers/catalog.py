@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import exists, func, or_, coalesce
+from sqlalchemy import exists, func, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.database import get_db
@@ -98,7 +98,7 @@ def _apply_catalog_filters(
 
 def _in_stock_filter():
     """Товары в наличии: quantity > 0 (NULL считаем нулём)."""
-    return coalesce(ProductModel.quantity, 0) > 0
+    return func.coalesce(ProductModel.quantity, 0) > 0
 
 
 def _apply_sort(query, sort: str):

@@ -23,7 +23,6 @@ import MobileCompactSearch from '../../components/MobileCompactSearch/MobileComp
 import {
   buildUsedCatalogParams,
   getUsedPartsUrlQuery,
-  isUsedCatalogBrowseMode,
 } from '../../utils/autopartsPublic';
 
 const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs'];

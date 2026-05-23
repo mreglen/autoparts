@@ -21,6 +21,9 @@ function AdminPanelPage() {
   const [error, setError] = useState(null);
   const [markupDialogOpen, setMarkupDialogOpen] = useState(false);
   const [pendingMarkupValue, setPendingMarkupValue] = useState(null);
+  const [photoMigrationBusy, setPhotoMigrationBusy] = useState(false);
+  const [photoMigrationResult, setPhotoMigrationResult] = useState(null);
+  const [photoMigrationOrgId, setPhotoMigrationOrgId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -111,6 +114,35 @@ function AdminPanelPage() {
     }
   };
 
+  const runPhotoLocalization = async ({ dryRun }) => {
+    if (!dryRun) {
+      const ok = window.confirm(
+        'Запустить подмену внешних ссылок фото на локальные /pictures? Операция может занять время.'
+      );
+      if (!ok) return;
+    }
+    setPhotoMigrationBusy(true);
+    setError(null);
+    try {
+      const payload = {
+        dry_run: dryRun,
+        all_external: false,
+      };
+      const trimmedOrgId = photoMigrationOrgId.trim();
+      if (trimmedOrgId) payload.org_id = trimmedOrgId;
+
+      const res = await apiRequest('/admin/photos/localize-external', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setPhotoMigrationResult(res);
+    } catch (e) {
+      setError(e?.message || 'Не удалось запустить локализацию фото');
+    } finally {
+      setPhotoMigrationBusy(false);
+    }
+  };
+
   return (
     <div className="max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Настройки</h1>
@@ -184,6 +216,74 @@ function AdminPanelPage() {
             {savingMarkup ? 'Сохранение…' : 'Сохранить'}
           </button>
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">
+          Локализация фото с Avito
+        </h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Переносит внешние Avito-ссылки фото в локальные файлы на сервере и обновляет URL в товарах.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label
+              htmlFor="photo-migration-org-id"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Организация (опционально)
+            </label>
+            <input
+              id="photo-migration-org-id"
+              type="text"
+              placeholder="например qMHbBIoD51"
+              className="block w-52 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              value={photoMigrationOrgId}
+              disabled={photoMigrationBusy}
+              onChange={(e) => setPhotoMigrationOrgId(e.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => runPhotoLocalization({ dryRun: true })}
+            disabled={photoMigrationBusy}
+            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+          >
+            {photoMigrationBusy ? 'Выполняется…' : 'Проверить'}
+          </button>
+          <button
+            type="button"
+            onClick={() => runPhotoLocalization({ dryRun: false })}
+            disabled={photoMigrationBusy}
+            className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {photoMigrationBusy ? 'Выполняется…' : 'Подменить ссылки фото'}
+          </button>
+        </div>
+        {photoMigrationResult && (
+          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 space-y-2">
+            <p className="font-medium text-gray-900">
+              Результат: {photoMigrationResult.dry_run ? 'dry-run' : 'выполнение'}
+            </p>
+            <p>
+              Найдено: <span className="font-semibold">{photoMigrationResult.matched}</span>,
+              заменено: <span className="font-semibold">{photoMigrationResult.migrated}</span>,
+              ошибок: <span className="font-semibold">{photoMigrationResult.failed}</span>
+            </p>
+            {Array.isArray(photoMigrationResult.failures) && photoMigrationResult.failures.length > 0 && (
+              <div>
+                <p className="font-medium text-gray-900 mb-1">Ошибки (первые записи):</p>
+                <ul className="space-y-1 max-h-44 overflow-auto pr-1">
+                  {photoMigrationResult.failures.map((row) => (
+                    <li key={`${row.photo_id}-${row.reason}`} className="text-xs text-gray-600">
+                      photo_id={row.photo_id}: {row.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {markupDialogOpen && (

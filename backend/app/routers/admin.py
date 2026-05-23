@@ -30,6 +30,10 @@ from app.services.organization_clients import (
     get_buyer_orders_for_organization,
     list_buyers_for_organization,
 )
+from app.services.photo_localization import (
+    format_failures_for_output,
+    migrate_external_product_photos,
+)
 from app.schemas.client import ClientBuyerOrdersResponse, ClientListItemResponse
 from app.utils.event_logger import log_event
 from app.utils.user_public_code import assign_public_code
@@ -73,6 +77,32 @@ class OrdersV2MigrationResponse(BaseModel):
     new_created: int
     avito_created: int
     skipped: int
+
+
+class PhotoLocalizationAdminRequest(BaseModel):
+    dry_run: bool = False
+    org_id: Optional[str] = None
+    all_external: bool = False
+    limit: Optional[int] = Field(None, ge=1, le=50000)
+    failure_limit: int = Field(30, ge=1, le=200)
+    per_photo_timeout_s: float = Field(25.0, ge=1.0, le=120.0)
+    celery_timeout_s: int = Field(120, ge=5, le=600)
+
+
+class PhotoLocalizationFailure(BaseModel):
+    photo_id: int
+    old_url: str
+    reason: str
+
+
+class PhotoLocalizationAdminResponse(BaseModel):
+    dry_run: bool
+    scanned: int
+    matched: int
+    migrated: int
+    failed: int
+    skipped: int
+    failures: List[PhotoLocalizationFailure]
 
 
 @router.get("/site-settings", response_model=SiteSettingsResponse)
@@ -159,6 +189,52 @@ def migrate_orders_v2_down(
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
         detail="Миграции заказов отключены (таблицы и ORM-модели заказов удалены)",
+    )
+
+
+@router.post("/photos/localize-external", response_model=PhotoLocalizationAdminResponse)
+def localize_external_product_photos_admin(
+    payload: PhotoLocalizationAdminRequest,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    result = migrate_external_product_photos(
+        db,
+        dry_run=payload.dry_run,
+        org_id=payload.org_id,
+        process_all_external=payload.all_external,
+        row_limit=payload.limit,
+        per_photo_timeout_s=payload.per_photo_timeout_s,
+        celery_timeout_s=payload.celery_timeout_s,
+    )
+    counters = result.counters
+    failures = format_failures_for_output(result.failures, limit=payload.failure_limit)
+    log_audit(
+        db,
+        event_type="admin_photo_localization_run",
+        category="admin",
+        summary="Запущена локализация внешних ссылок фото",
+        user=current_user,
+        details={
+            "dry_run": payload.dry_run,
+            "org_id": payload.org_id,
+            "all_external": payload.all_external,
+            "limit": payload.limit,
+            "scanned": counters.scanned,
+            "matched": counters.matched,
+            "migrated": counters.migrated,
+            "failed": counters.failed,
+            "skipped": counters.skipped,
+        },
+    )
+    return PhotoLocalizationAdminResponse(
+        dry_run=payload.dry_run,
+        scanned=counters.scanned,
+        matched=counters.matched,
+        migrated=counters.migrated,
+        failed=counters.failed,
+        skipped=counters.skipped,
+        failures=failures,
     )
 
 
