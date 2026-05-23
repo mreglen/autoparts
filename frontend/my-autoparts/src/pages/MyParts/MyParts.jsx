@@ -5,16 +5,113 @@ import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import { normalizeImageUrl, apiRequest } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
-import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
+import { fetchMyProducts, fetchMyPendingProducts, deletePendingProduct, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchProductStorageCells, fetchStorageCells } from '../../redux/slices/StorageCellsSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
-import PendingParts from './PendingParts/PendingParts';
 import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
 
-const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, onPrint, onExport, showExport, onExportDrom, showDromExport, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, productStorageCells = [], imageErrors = {}, onImageError }) => {
+const CardPart = ({
+  part,
+  variant = 'stock',
+  getStorageAddress,
+  getCellName,
+  onSale,
+  onWriteoff,
+  onPrint,
+  onDelete,
+  onExport,
+  showExport,
+  onExportDrom,
+  showDromExport,
+  onToggleExpand,
+  isExpanded,
+  onImageClick,
+  isSelected,
+  onSelect,
+  productStorageCells = [],
+  imageErrors = {},
+  onImageError,
+}) => {
   const [showActions, setShowActions] = useState(false);
+  const isModeration = variant === 'moderation';
+  const expandedColSpan = isModeration ? 6 : 7;
+
+  const renderActionsMenu = (menuClassName) => (
+    <div className={menuClassName}>
+      <button
+        onClick={(e) => { e.stopPropagation(); onPrint(part); setShowActions(false); }}
+        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+        </svg>
+        Печать
+      </button>
+      {isModeration ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(part); setShowActions(false); }}
+          className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Удалить
+        </button>
+      ) : (
+        <>
+          <button
+            onClick={(e) => { e.stopPropagation(); onSale(part); setShowActions(false); }}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Продать
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onWriteoff(part); setShowActions(false); }}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Списать
+          </button>
+          {showExport && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onExport(part); setShowActions(false); }}
+              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            >
+              <img src="/logos/avito.png" alt="" className="w-4 h-4" />
+              Экспорт Avito
+            </button>
+          )}
+          {showDromExport && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onExportDrom(part); setShowActions(false); }}
+              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+            >
+              <img src="/logos/drom.png" alt="" className="w-4 h-4" />
+              Экспорт Drom
+            </button>
+          )}
+          <div className="border-t border-gray-100 my-1"></div>
+          <Link
+            to={`/my-parts/edit/${part.id}`}
+            onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
+            className="w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Редактировать
+          </Link>
+        </>
+      )}
+    </div>
+  );
 
   
   useEffect(() => {
@@ -44,17 +141,19 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
   <React.Fragment>
     {/* Desktop table row */}
     <tr className="group hover:bg-gray-50/50 transition-all duration-200 border-b border-gray-100 hidden md:table-row">
-      <td className="px-4 py-4 whitespace-nowrap">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={(e) => {
-            e.stopPropagation();
-            onSelect();
-          }}
-          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
-        />
-      </td>
+      {!isModeration && (
+        <td className="px-4 py-4 whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onSelect();
+            }}
+            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+          />
+        </td>
+      )}
       
       {/* Product info cell with image */}
       <td className="px-4 py-4" colSpan={4}>
@@ -96,37 +195,43 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
             
             {/* Status badges */}
             <div className="flex items-center gap-2 flex-wrap">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {part.is_new ? 'Новый' : 'Б/у'}
-              </span>
-              
-              {/* Platform icons */}
-              <div className="flex items-center gap-1">
-                <img 
-                  src="/logos/svoygarage.png" 
-                  alt="Свой Гараж" 
-                  className="w-4 h-4 object-contain"
-                  title="Свой Гараж"
-                />
-                {part.is_on_avito && (
-                  <img 
-                    src="/logos/avito.png" 
-                    alt="Avito" 
-                    className="w-4 h-4 object-contain"
-                    title="Avito"
-                  />
-                )}
-                {part.is_on_drom && (
-                  <img 
-                    src="/logos/drom.png" 
-                    alt="Drom" 
-                    className="w-4 h-4 object-contain"
-                    title="Drom"
-                  />
-                )}
-              </div>
+              {isModeration ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  На модерации
+                </span>
+              ) : (
+                <>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {part.is_new ? 'Новый' : 'Б/у'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <img
+                      src="/logos/svoygarage.png"
+                      alt="Свой Гараж"
+                      className="w-4 h-4 object-contain"
+                      title="Свой Гараж"
+                    />
+                    {part.is_on_avito && (
+                      <img
+                        src="/logos/avito.png"
+                        alt="Avito"
+                        className="w-4 h-4 object-contain"
+                        title="Avito"
+                      />
+                    )}
+                    {part.is_on_drom && (
+                      <img
+                        src="/logos/drom.png"
+                        alt="Drom"
+                        className="w-4 h-4 object-contain"
+                        title="Drom"
+                      />
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -158,83 +263,25 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
             <span className="hidden sm:inline">Действия</span>
           </button>
 
-          {showActions && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20 actions-dropdown">
-              <button
-                onClick={(e) => { e.stopPropagation(); onPrint(part); setShowActions(false); }}
-                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                Печать
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); onSale(part); setShowActions(false); }}
-                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Продать
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); onWriteoff(part); setShowActions(false); }}
-                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Списать
-              </button>
-              {showExport && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onExport(part); setShowActions(false); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                >
-                  <img src="/logos/avito.png" alt="" className="w-4 h-4" />
-                  Экспорт Avito
-                </button>
-              )}
-              {showDromExport && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onExportDrom(part); setShowActions(false); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                >
-                  <img src="/logos/drom.png" alt="" className="w-4 h-4" />
-                  Экспорт Drom
-                </button>
-              )}
-              <div className="border-t border-gray-100 my-1"></div>
-              <Link
-                to={`/my-parts/edit/${part.id}`}
-                onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
-                className="w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                Редактировать
-              </Link>
-            </div>
-          )}
+          {showActions && renderActionsMenu('absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20 actions-dropdown')}
         </div>
       </td>
     </tr>
 
     {/* Mobile card version */}
     <div className="md:hidden bg-white rounded-lg shadow-sm border border-gray-200 mb-3">
-      {/* Card header with checkbox and actions */}
-      <div className="flex items-center justify-between p-3 border-b border-gray-100">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={(e) => {
-            e.stopPropagation();
-            onSelect();
-          }}
-          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
-        />
+      <div className={`flex items-center p-3 border-b border-gray-100 ${isModeration ? 'justify-end' : 'justify-between'}`}>
+        {!isModeration && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onSelect();
+            }}
+            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+          />
+        )}
         <div className="relative actions-dropdown">
           <button
             onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
@@ -246,66 +293,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
             <span>Действия</span>
           </button>
 
-          {showActions && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 actions-dropdown">
-              <button
-                onClick={(e) => { e.stopPropagation(); onPrint(part); setShowActions(false); }}
-                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                Печать
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); onSale(part); setShowActions(false); }}
-                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Продать
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); onWriteoff(part); setShowActions(false); }}
-                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Списать
-              </button>
-              {showExport && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onExport(part); setShowActions(false); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                >
-                  <img src="/logos/avito.png" alt="" className="w-4 h-4" />
-                  Экспорт Avito
-                </button>
-              )}
-              {showDromExport && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onExportDrom(part); setShowActions(false); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                >
-                  <img src="/logos/drom.png" alt="" className="w-4 h-4" />
-                  Экспорт Drom
-                </button>
-              )}
-              <div className="border-t border-gray-100 my-1"></div>
-              <Link
-                to={`/my-parts/edit/${part.id}`}
-                onClick={(e) => { e.stopPropagation(); setShowActions(false); }}
-                className="w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                Редактировать
-              </Link>
-            </div>
-          )}
+          {showActions && renderActionsMenu('absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 actions-dropdown')}
         </div>
       </div>
 
@@ -359,29 +347,37 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
               </div>
             </div>
 
-            {/* Platform icons */}
+            {/* Status / platforms */}
             <div className="flex items-center gap-2 mt-2">
-              <img 
-                src="/logos/svoygarage.png" 
-                alt="Свой Гараж" 
-                className="w-4 h-4 object-contain"
-                title="Свой Гараж"
-              />
-              {part.is_on_avito && (
-                <img 
-                  src="/logos/avito.png" 
-                  alt="Avito" 
-                  className="w-4 h-4 object-contain"
-                  title="Avito"
-                />
-              )}
-              {part.is_on_drom && (
-                <img 
-                  src="/logos/drom.png" 
-                  alt="Drom" 
-                  className="w-4 h-4 object-contain"
-                  title="Drom"
-                />
+              {isModeration ? (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  На модерации
+                </span>
+              ) : (
+                <>
+                  <img
+                    src="/logos/svoygarage.png"
+                    alt="Свой Гараж"
+                    className="w-4 h-4 object-contain"
+                    title="Свой Гараж"
+                  />
+                  {part.is_on_avito && (
+                    <img
+                      src="/logos/avito.png"
+                      alt="Avito"
+                      className="w-4 h-4 object-contain"
+                      title="Avito"
+                    />
+                  )}
+                  {part.is_on_drom && (
+                    <img
+                      src="/logos/drom.png"
+                      alt="Drom"
+                      className="w-4 h-4 object-contain"
+                      title="Drom"
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -395,11 +391,17 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
             {/* Status */}
             <div>
               <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Состояние</h4>
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {part.is_new ? 'Новый' : 'Б/у'}
-              </span>
+              {isModeration ? (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  На модерации
+                </span>
+              ) : (
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                  part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {part.is_new ? 'Новый' : 'Б/у'}
+                </span>
+              )}
             </div>
 
             {/* Description */}
@@ -508,7 +510,7 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
     {/* Expandable details row for desktop */}
     {isExpanded && (
       <tr className="bg-gray-50/50 hidden md:table-row">
-        <td colSpan="7" className="px-6 py-6 border-t border-gray-200">
+        <td colSpan={expandedColSpan} className="px-6 py-6 border-t border-gray-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Photos and Videos */}
             <div>
@@ -533,11 +535,17 @@ const CardPart = ({ part, getStorageAddress, getCellName, onSale, onWriteoff, on
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Состояние</h4>
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                    part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {part.is_new ? 'Новый' : 'Б/у'}
-                  </span>
+                  {isModeration ? (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      На модерации
+                    </span>
+                  ) : (
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                      part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {part.is_new ? 'Новый' : 'Б/у'}
+                    </span>
+                  )}
                 </div>
                 <div>
                   <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Склад</h4>
@@ -634,8 +642,9 @@ function MyParts() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, permissionCodes } = useSelector((state) => state.auth);
-  const { items: products, pendingItems, rejectedItems, loading, error } = useSelector((state) => state.products);
+  const { items: products, pendingItems, loading, error } = useSelector((state) => state.products);
   const [authChecked, setAuthChecked] = useState(false);
+  const [pendingStorageCellsByProduct, setPendingStorageCellsByProduct] = useState({});
 
   const { storageLocations } = useSelector((state) => state.organization);
   const { productStorageCells, storageCells, lastModified } = useSelector((state) => state.storageCells);
@@ -690,10 +699,8 @@ function MyParts() {
     const items = [...displayParts];
 
     if (sortOrder === 'date_desc') {
-      // Сначала новые
       items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
     } else if (sortOrder === 'date_asc') {
-      // Сначала старые
       items.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
     } else if (sortOrder === 'name_asc' || sortOrder === 'name_desc') {
       items.sort((a, b) => {
@@ -708,6 +715,38 @@ function MyParts() {
     return items;
   }, [displayParts, sortOrder]);
 
+  const displayPendingParts = React.useMemo(() => {
+    const items = pendingItems || [];
+    if (!searchQuery.trim()) return items;
+
+    const query = searchQuery.toLowerCase().replace(/\s+/g, '');
+    return items.filter((part) =>
+      (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
+      (part.internal_code && part.internal_code.toLowerCase().replace(/\s+/g, '').includes(query)) ||
+      (part.name && part.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [pendingItems, searchQuery]);
+
+  const sortedPendingParts = React.useMemo(() => {
+    const items = [...displayPendingParts];
+
+    if (sortOrder === 'date_desc') {
+      items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    } else if (sortOrder === 'date_asc') {
+      items.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    } else if (sortOrder === 'name_asc' || sortOrder === 'name_desc') {
+      items.sort((a, b) => {
+        const aName = (a.name || a.brand || a.article || '').toString().toLowerCase();
+        const bName = (b.name || b.brand || b.article || '').toString().toLowerCase();
+        if (aName < bName) return sortOrder === 'name_asc' ? -1 : 1;
+        if (aName > bName) return sortOrder === 'name_asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return items;
+  }, [displayPendingParts, sortOrder]);
+
   // Расчет общей суммы и количества
   const totalValue = displayParts.reduce((sum, part) => sum + (part.price * part.quantity), 0);
   const totalQuantity = displayParts.reduce((sum, part) => sum + part.quantity, 0);
@@ -721,6 +760,37 @@ function MyParts() {
   const handleOpenPrintModal = (part) => {
     setSelectedPart(part);
     setPrintModalOpen(true);
+  };
+
+  const handleDeletePending = async (part) => {
+    if (!part?.id) return;
+    if (!window.confirm('Удалить запчасть с модерации?')) return;
+
+    try {
+      await dispatch(deletePendingProduct(part.id)).unwrap();
+      if (selectedPart?.id === part.id) {
+        setPrintModalOpen(false);
+        setSelectedPart(null);
+      }
+      if (expandedPartId === part.id) {
+        setExpandedPartId(null);
+      }
+      setPendingStorageCellsByProduct((prev) => {
+        const next = { ...prev };
+        delete next[part.id];
+        return next;
+      });
+    } catch (err) {
+      alert(typeof err === 'string' ? err : 'Не удалось удалить запчасть с модерации');
+    }
+  };
+
+  const getStorageCellsForPart = (part, isPending = false) => {
+    if (!part?.id) return [];
+    if (isPending) {
+      return pendingStorageCellsByProduct[part.id] || [];
+    }
+    return productStorageCells[part.id] || [];
   };
 
   const handleOpenMediaModal = (mediaItems, initialIndex = 0) => {
@@ -1016,13 +1086,47 @@ function MyParts() {
     };
   }, [user?.organization_id]);
 
-  // Load pending and rejected products when pending tab is active
+  // Load pending products when pending tab is active
   useEffect(() => {
     if (activeTab === 'pending' && user?.id) {
       dispatch(fetchMyPendingProducts());
-      dispatch(fetchMyRejectedProducts());
     }
   }, [dispatch, activeTab, user?.id]);
+
+  useEffect(() => {
+    if (activeTab !== 'pending' || !pendingItems?.length) return undefined;
+
+    let cancelled = false;
+    const loadPendingStorageCells = async () => {
+      const entries = await Promise.all(
+        pendingItems.map(async (part) => {
+          if (!part?.id) return null;
+          try {
+            const cells = await apiRequest(`/pending-product-storage-cells/?pending_product_id=${part.id}`);
+            return [part.id, Array.isArray(cells) ? cells : []];
+          } catch {
+            return [part.id, []];
+          }
+        })
+      );
+
+      if (cancelled) return;
+      setPendingStorageCellsByProduct((prev) => {
+        const next = { ...prev };
+        entries.forEach((entry) => {
+          if (!entry) return;
+          const [partId, cells] = entry;
+          next[partId] = cells;
+        });
+        return next;
+      });
+    };
+
+    loadPendingStorageCells();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, pendingItems]);
 
   // Create memoized product IDs that need storage cell data
   const productIdsNeedingData = React.useMemo(() => {
@@ -1289,9 +1393,9 @@ function MyParts() {
           >
             <div className="pb-2 inline-block border-b-4 border-yellow-500">
               На модерации
-              {(pendingItems?.length > 0 || rejectedItems?.length > 0) && (
+              {pendingItems?.length > 0 && (
                 <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                  {(pendingItems?.length || 0) + (rejectedItems?.length || 0)}
+                  {pendingItems.length}
                 </span>
               )}
             </div>
@@ -1493,19 +1597,105 @@ function MyParts() {
         </>
       ))}
 
-      {/* Pending Parts Tab Content */}
       {activeTab === 'pending' && (
-        <PendingParts 
-          pendingParts={pendingItems || []}
-          rejectedParts={rejectedItems || []}
-          loading={loading}
-          error={error}
-          getStorageAddress={(id) => {
-            const location = storageLocations.find(loc => loc.id === id);
-            return location?.address || `Склад #${id}`;
-          }}
-          productStorageCells={productStorageCells}
-        />
+        loading ? (
+          <div className="mt-8 text-center py-16 px-6">
+            <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+              <svg className="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+            <h2 className="text-xl font-medium text-gray-900 mb-2">Загрузка запчастей на модерации...</h2>
+            <p className="text-gray-600 text-base">Пожалуйста, подождите</p>
+          </div>
+        ) : error ? (
+          <div className="mt-8 text-center py-16 px-6">
+            <div className="bg-red-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-medium text-gray-900 mb-2">Ошибка загрузки запчастей</h2>
+            <p className="text-gray-500 mb-6 text-base">{error}</p>
+            <button
+              onClick={() => dispatch(fetchMyPendingProducts())}
+              className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
+            >
+              Попробовать снова
+            </button>
+          </div>
+        ) : sortedPendingParts.length === 0 ? (
+          <div className="mt-12 text-center py-16 px-6">
+            <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+              <svg className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              {searchQuery ? 'Ничего не найдено' : 'Запчастей на модерации нет'}
+            </h2>
+            <p className="text-gray-600 text-base mb-6">
+              {searchQuery
+                ? `По запросу "${searchQuery}" ничего не найдено среди запчастей на модерации.`
+                : 'У вас пока нет запчастей, ожидающих модерации'}
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="hidden md:block w-full">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider" colSpan={4}>Запчасть</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Остаток</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Цена</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Действия</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedPendingParts.map((part) => (
+                    <CardPart
+                      key={part.id}
+                      variant="moderation"
+                      part={part}
+                      getStorageAddress={getStorageAddress}
+                      getCellName={getCellName}
+                      onPrint={handleOpenPrintModal}
+                      onDelete={handleDeletePending}
+                      onToggleExpand={() => toggleExpand(part.id)}
+                      isExpanded={expandedPartId === part.id}
+                      onImageClick={handleOpenMediaModal}
+                      productStorageCells={getStorageCellsForPart(part, true)}
+                      imageErrors={imageErrors}
+                      onImageError={(partId) => setImageErrors((prev) => ({ ...prev, [partId]: true }))}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="md:hidden">
+              {sortedPendingParts.map((part) => (
+                <CardPart
+                  key={part.id}
+                  variant="moderation"
+                  part={part}
+                  getStorageAddress={getStorageAddress}
+                  getCellName={getCellName}
+                  onPrint={handleOpenPrintModal}
+                  onDelete={handleDeletePending}
+                  onToggleExpand={() => toggleExpand(part.id)}
+                  isExpanded={expandedPartId === part.id}
+                  onImageClick={handleOpenMediaModal}
+                  productStorageCells={getStorageCellsForPart(part, true)}
+                  imageErrors={imageErrors}
+                  onImageError={(partId) => setImageErrors((prev) => ({ ...prev, [partId]: true }))}
+                />
+              ))}
+            </div>
+          </>
+        )
       )}
 
       <StockOutModal
@@ -1531,7 +1721,11 @@ function MyParts() {
         isOpen={printModalOpen}
         onClose={() => setPrintModalOpen(false)}
         selectedPart={selectedPart}
-        productStorageCells={selectedPart ? (productStorageCells[selectedPart.id] || []) : []}
+        productStorageCells={
+          selectedPart
+            ? getStorageCellsForPart(selectedPart, activeTab === 'pending')
+            : []
+        }
       />
     </div>
   );

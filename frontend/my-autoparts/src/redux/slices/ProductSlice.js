@@ -93,6 +93,21 @@ export const fetchMyRejectedProducts = createAsyncThunk(
     }
 );
 
+// Async thunk: удаление запчасти с модерации
+export const deletePendingProduct = createAsyncThunk(
+    'products/deletePendingProduct',
+    async (productId, { rejectWithValue }) => {
+        try {
+            await apiAxios.delete(`/pending-products/${productId}`);
+            return productId;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка удаления запчасти с модерации'
+            );
+        }
+    }
+);
+
 // Async thunk: получение запчастей пользователя в ожидании модерации
 export const fetchMyPendingProducts = createAsyncThunk(
     'products/fetchMyPendingProducts',
@@ -747,6 +762,12 @@ const productSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
                 state.pendingItems = [];
+            })
+            .addCase(deletePendingProduct.fulfilled, (state, action) => {
+                state.pendingItems = state.pendingItems.filter((p) => p.id !== action.payload);
+            })
+            .addCase(deletePendingProduct.rejected, (state, action) => {
+                state.error = action.payload;
             })
             .addCase(searchAllProducts.pending, (state) => {
                 state.loading = true;
