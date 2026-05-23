@@ -5,7 +5,7 @@ import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import { normalizeImageUrl, apiRequest } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
-import { fetchMyProducts, fetchMyPendingProducts, deletePendingProduct, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
+import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchProductStorageCells, fetchStorageCells } from '../../redux/slices/StorageCellsSlice';
@@ -15,12 +15,14 @@ import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
 const CardPart = ({
   part,
   variant = 'stock',
+  moderationKind = 'pending',
   getStorageAddress,
   getCellName,
   onSale,
   onWriteoff,
   onPrint,
   onDelete,
+  onEdit,
   onExport,
   showExport,
   onExportDrom,
@@ -36,10 +38,64 @@ const CardPart = ({
 }) => {
   const [showActions, setShowActions] = useState(false);
   const isModeration = variant === 'moderation';
+  const isRejectedModeration = isModeration && moderationKind === 'rejected';
   const expandedColSpan = isModeration ? 6 : 7;
 
   const renderActionsMenu = (menuClassName) => (
     <div className={menuClassName}>
+      {isRejectedModeration ? (
+        <>
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(part); setShowActions(false); }}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Редактировать
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(part); setShowActions(false); }}
+            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Удалить
+          </button>
+        </>
+      ) : isModeration ? (
+        <>
+          <button
+            onClick={(e) => { e.stopPropagation(); onPrint(part); setShowActions(false); }}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Печать
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(part); setShowActions(false); }}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Редактировать
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(part); setShowActions(false); }}
+            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Удалить
+          </button>
+        </>
+      ) : (
+        <>
       <button
         onClick={(e) => { e.stopPropagation(); onPrint(part); setShowActions(false); }}
         className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
@@ -49,18 +105,6 @@ const CardPart = ({
         </svg>
         Печать
       </button>
-      {isModeration ? (
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(part); setShowActions(false); }}
-          className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-          Удалить
-        </button>
-      ) : (
-        <>
           <button
             onClick={(e) => { e.stopPropagation(); onSale(part); setShowActions(false); }}
             className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
@@ -196,9 +240,15 @@ const CardPart = ({
             {/* Status badges */}
             <div className="flex items-center gap-2 flex-wrap">
               {isModeration ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                  На модерации
-                </span>
+                isRejectedModeration ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    Отклонена
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    На модерации
+                  </span>
+                )
               ) : (
                 <>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -350,9 +400,15 @@ const CardPart = ({
             {/* Status / platforms */}
             <div className="flex items-center gap-2 mt-2">
               {isModeration ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                  На модерации
-                </span>
+                isRejectedModeration ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    Отклонена
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    На модерации
+                  </span>
+                )
               ) : (
                 <>
                   <img
@@ -392,9 +448,15 @@ const CardPart = ({
             <div>
               <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Состояние</h4>
               {isModeration ? (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                  На модерации
-                </span>
+                isRejectedModeration ? (
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    Отклонена
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    На модерации
+                  </span>
+                )
               ) : (
                 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                   part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
@@ -409,6 +471,13 @@ const CardPart = ({
               <div>
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Описание</h4>
                 <p className="text-sm text-gray-900 leading-relaxed">{stripHtmlTags(part.description)}</p>
+              </div>
+            )}
+
+            {isRejectedModeration && part.rejection_reason && (
+              <div className="p-3 bg-red-50 rounded-lg border border-red-100">
+                <h4 className="text-xs font-semibold text-red-800 uppercase tracking-wide mb-1">Причина отклонения</h4>
+                <p className="text-sm text-red-700">{part.rejection_reason}</p>
               </div>
             )}
 
@@ -536,9 +605,15 @@ const CardPart = ({
                 <div>
                   <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Состояние</h4>
                   {isModeration ? (
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                      На модерации
-                    </span>
+                    isRejectedModeration ? (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        Отклонена
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        На модерации
+                      </span>
+                    )
                   ) : (
                     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                       part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
@@ -637,12 +712,17 @@ const CardPart = ({
   );
 };
 
+const DEFAULT_IN_STOCK_FILTERS = { search: '', storage: '', sort: 'date_desc' };
+const DEFAULT_MODERATION_FILTERS = { search: '', storage: '', sort: 'date_desc', hideRejected: false };
+
+const getModerationPartKey = (part) => `${part.moderationKind || 'pending'}-${part.id}`;
+
 function MyParts() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, permissionCodes } = useSelector((state) => state.auth);
-  const { items: products, pendingItems, loading, error } = useSelector((state) => state.products);
+  const { items: products, pendingItems, rejectedItems, loading, error } = useSelector((state) => state.products);
   const [authChecked, setAuthChecked] = useState(false);
   const [pendingStorageCellsByProduct, setPendingStorageCellsByProduct] = useState({});
 
@@ -654,10 +734,36 @@ function MyParts() {
   const [expandedPartId, setExpandedPartId] = useState(null);
   const [selectedParts, setSelectedParts] = useState(new Set());
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
-  const [showBulkActions, setShowBulkActions] = useState(false); // Dropdown for bulk actions
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || ''); // Поисковый запрос
-  const [selectedStorageLocation, setSelectedStorageLocation] = useState(searchParams.get('storage') || ''); // Выбранный склад
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'in-stock'); // 'in-stock' or 'pending'
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'in-stock');
+  const [inStockFilters, setInStockFilters] = useState(() => ({
+    ...DEFAULT_IN_STOCK_FILTERS,
+    search: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('q') || ''),
+    storage: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('storage') || ''),
+  }));
+  const [moderationFilters, setModerationFilters] = useState(() => ({
+    ...DEFAULT_MODERATION_FILTERS,
+    search: searchParams.get('tab') === 'pending' ? (searchParams.get('q') || '') : '',
+    storage: searchParams.get('tab') === 'pending' ? (searchParams.get('storage') || '') : '',
+    hideRejected: searchParams.get('hide_rejected') === '1',
+  }));
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'pending' || tab === 'in-stock') {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  const isModerationTab = activeTab === 'pending';
+  const activeFilters = isModerationTab ? moderationFilters : inStockFilters;
+  const updateActiveFilters = (patch) => {
+    if (isModerationTab) {
+      setModerationFilters((prev) => ({ ...prev, ...patch }));
+    } else {
+      setInStockFilters((prev) => ({ ...prev, ...patch }));
+    }
+  };
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [currentMediaItems, setCurrentMediaItems] = useState([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -673,30 +779,24 @@ function MyParts() {
   });
 
   // Сортировка: по умолчанию сначала новые
-  const [sortOrder, setSortOrder] = useState('date_desc'); // 'date_desc', 'date_asc', 'name_asc', 'name_desc'
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
-  // Calculate displayParts BEFORE the useEffect that uses it
-  const displayParts = products.filter(part => {
-    // Если выбран склад, сначала проверяем принадлежность к складу
-    if (selectedStorageLocation && part.storage_location_id != selectedStorageLocation) {
+  const displayParts = React.useMemo(() => products.filter((part) => {
+    if (inStockFilters.storage && part.storage_location_id != inStockFilters.storage) {
       return false;
     }
-    
-    // Поиск по всем полям
-    if (!searchQuery.trim()) return true;
-
-    const query = searchQuery.toLowerCase().replace(/\s+/g, ''); // Убираем пробелы из запроса
+    if (!inStockFilters.search.trim()) return true;
+    const query = inStockFilters.search.toLowerCase().replace(/\s+/g, '');
     return (
       (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
       (part.internal_code && part.internal_code.toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (part.name && part.name.toLowerCase().includes(query))
+      (part.name && part.name.toLowerCase().includes(inStockFilters.search.toLowerCase()))
     );
-  });
+  }), [products, inStockFilters]);
 
-  // Применяем сортировку к отфильтрованным запчастям
   const sortedDisplayParts = React.useMemo(() => {
     const items = [...displayParts];
+    const sortOrder = inStockFilters.sort;
 
     if (sortOrder === 'date_desc') {
       items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
@@ -713,27 +813,48 @@ function MyParts() {
     }
 
     return items;
-  }, [displayParts, sortOrder]);
+  }, [displayParts, inStockFilters.sort]);
 
-  const displayPendingParts = React.useMemo(() => {
-    const items = pendingItems || [];
-    if (!searchQuery.trim()) return items;
+  const displayModerationParts = React.useMemo(() => {
+    let items = [
+      ...(pendingItems || []).map((part) => ({ ...part, moderationKind: 'pending' })),
+      ...(rejectedItems || []).map((part) => ({ ...part, moderationKind: 'rejected' })),
+    ];
 
-    const query = searchQuery.toLowerCase().replace(/\s+/g, '');
+    if (moderationFilters.hideRejected) {
+      items = items.filter((part) => part.moderationKind !== 'rejected');
+    }
+
+    if (moderationFilters.storage) {
+      items = items.filter((part) => String(part.storage_location_id) === String(moderationFilters.storage));
+    }
+
+    if (!moderationFilters.search.trim()) return items;
+
+    const query = moderationFilters.search.toLowerCase().replace(/\s+/g, '');
     return items.filter((part) =>
       (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
       (part.internal_code && part.internal_code.toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (part.name && part.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      (part.name && part.name.toLowerCase().includes(moderationFilters.search.toLowerCase()))
     );
-  }, [pendingItems, searchQuery]);
+  }, [pendingItems, rejectedItems, moderationFilters]);
 
-  const sortedPendingParts = React.useMemo(() => {
-    const items = [...displayPendingParts];
+  const sortedModerationParts = React.useMemo(() => {
+    const items = [...displayModerationParts];
+    const sortOrder = moderationFilters.sort;
 
     if (sortOrder === 'date_desc') {
-      items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      items.sort((a, b) => {
+        const aDate = a.moderationKind === 'rejected' ? (a.rejected_at || a.created_at) : a.created_at;
+        const bDate = b.moderationKind === 'rejected' ? (b.rejected_at || b.created_at) : b.created_at;
+        return new Date(bDate || 0) - new Date(aDate || 0);
+      });
     } else if (sortOrder === 'date_asc') {
-      items.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+      items.sort((a, b) => {
+        const aDate = a.moderationKind === 'rejected' ? (a.rejected_at || a.created_at) : a.created_at;
+        const bDate = b.moderationKind === 'rejected' ? (b.rejected_at || b.created_at) : b.created_at;
+        return new Date(aDate || 0) - new Date(bDate || 0);
+      });
     } else if (sortOrder === 'name_asc' || sortOrder === 'name_desc') {
       items.sort((a, b) => {
         const aName = (a.name || a.brand || a.article || '').toString().toLowerCase();
@@ -745,11 +866,13 @@ function MyParts() {
     }
 
     return items;
-  }, [displayPendingParts, sortOrder]);
+  }, [displayModerationParts, moderationFilters.sort]);
 
-  // Расчет общей суммы и количества
-  const totalValue = displayParts.reduce((sum, part) => sum + (part.price * part.quantity), 0);
-  const totalQuantity = displayParts.reduce((sum, part) => sum + part.quantity, 0);
+  const moderationItemsCount = (pendingItems?.length || 0) + (rejectedItems?.length || 0);
+
+  const statsParts = isModerationTab ? sortedModerationParts : sortedDisplayParts;
+  const totalValue = statsParts.reduce((sum, part) => sum + ((Number(part.price) || 0) * (Number(part.quantity) || 0)), 0);
+  const totalQuantity = statsParts.reduce((sum, part) => sum + (Number(part.quantity) || 0), 0);
 
   const handleOpenModal = (part, type) => {
     setSelectedPart(part);
@@ -768,11 +891,12 @@ function MyParts() {
 
     try {
       await dispatch(deletePendingProduct(part.id)).unwrap();
-      if (selectedPart?.id === part.id) {
+      const partKey = getModerationPartKey(part);
+      if (selectedPart?.id === part.id && selectedPart?.moderationKind !== 'rejected') {
         setPrintModalOpen(false);
         setSelectedPart(null);
       }
-      if (expandedPartId === part.id) {
+      if (expandedPartId === partKey) {
         setExpandedPartId(null);
       }
       setPendingStorageCellsByProduct((prev) => {
@@ -783,6 +907,47 @@ function MyParts() {
     } catch (err) {
       alert(typeof err === 'string' ? err : 'Не удалось удалить запчасть с модерации');
     }
+  };
+
+  const handleDeleteRejected = async (part) => {
+    if (!part?.id) return;
+    if (!window.confirm('Удалить отклонённую запчасть?')) return;
+
+    try {
+      await dispatch(deleteRejectedProduct(part.id)).unwrap();
+      const partKey = getModerationPartKey(part);
+      if (expandedPartId === partKey) {
+        setExpandedPartId(null);
+      }
+    } catch (err) {
+      alert(typeof err === 'string' ? err : 'Не удалось удалить отклонённую запчасть');
+    }
+  };
+
+  const handleEditRejected = (part) => {
+    if (!part?.id) return;
+    navigate(`/my-parts/resubmit/${part.id}`);
+  };
+
+  const handleEditPending = (part) => {
+    if (!part?.id) return;
+    navigate(`/my-parts/edit-pending/${part.id}`);
+  };
+
+  const handleModerationEdit = (part) => {
+    if (part.moderationKind === 'rejected') {
+      handleEditRejected(part);
+      return;
+    }
+    handleEditPending(part);
+  };
+
+  const handleModerationDelete = (part) => {
+    if (part.moderationKind === 'rejected') {
+      handleDeleteRejected(part);
+      return;
+    }
+    handleDeletePending(part);
   };
 
   const getStorageCellsForPart = (part, isPending = false) => {
@@ -1009,42 +1174,38 @@ function MyParts() {
   // Sync URL parameters with component state
   useEffect(() => {
     const params = new URLSearchParams();
-    
-    if (searchQuery) {
-      params.set('q', searchQuery);
-    } else {
-      params.delete('q');
+    const filters = isModerationTab ? moderationFilters : inStockFilters;
+
+    if (filters.search) {
+      params.set('q', filters.search);
     }
-    
-    if (selectedStorageLocation) {
-      params.set('storage', selectedStorageLocation);
-    } else {
-      params.delete('storage');
+
+    if (filters.storage) {
+      params.set('storage', filters.storage);
     }
-    
-    if (activeTab && activeTab !== 'in-stock') {
-      params.set('tab', activeTab);
-    } else {
-      params.delete('tab');
+
+    if (isModerationTab) {
+      params.set('tab', 'pending');
+      if (moderationFilters.hideRejected) {
+        params.set('hide_rejected', '1');
+      }
     }
-    
+
     setSearchParams(params);
-  }, [searchQuery, selectedStorageLocation, activeTab, setSearchParams]);
+  }, [inStockFilters, moderationFilters, isModerationTab, setSearchParams]);
 
   useEffect(() => {
-    // Формируем параметры для запроса
     const params = {};
-    if (selectedStorageLocation) {
-      params.storage_location_id = selectedStorageLocation;
+    if (inStockFilters.storage) {
+      params.storage_location_id = inStockFilters.storage;
     }
-    
+
     dispatch(fetchMyProducts(params));
     if (user?.organization_id) {
       dispatch(fetchStorageLocations(user.organization_id));
-      // Загружаем все ячейки организации
       dispatch(fetchStorageCells());
     }
-  }, [dispatch, user?.organization_id, selectedStorageLocation]);
+  }, [dispatch, user?.organization_id, inStockFilters.storage]);
 
   useEffect(() => {
     if (!user?.organization_id) {
@@ -1086,10 +1247,11 @@ function MyParts() {
     };
   }, [user?.organization_id]);
 
-  // Load pending products when pending tab is active
+  // Load pending and rejected products when pending tab is active
   useEffect(() => {
     if (activeTab === 'pending' && user?.id) {
       dispatch(fetchMyPendingProducts());
+      dispatch(fetchMyRejectedProducts());
     }
   }, [dispatch, activeTab, user?.id]);
 
@@ -1214,13 +1376,17 @@ function MyParts() {
             {totalValue.toLocaleString('ru-RU')} ₽
           </div>
           <div className="text-sm text-gray-500">
-            {selectedStorageLocation ? 'Общая стоимость склада' : 'Общая стоимость всех складов'}
+            {activeFilters.storage
+              ? (isModerationTab ? 'Стоимость по складу (модерация)' : 'Общая стоимость склада')
+              : (isModerationTab ? 'Стоимость на модерации' : 'Общая стоимость всех складов')}
           </div>
           <div className="text-lg font-semibold text-gray-700 mt-1">
             {totalQuantity.toLocaleString('ru-RU')} шт.
           </div>
           <div className="text-sm text-gray-500">
-            {selectedStorageLocation ? 'Общее количество склада' : 'Общее количество всех складов'}
+            {activeFilters.storage
+              ? (isModerationTab ? 'Количество по складу (модерация)' : 'Общее количество склада')
+              : (isModerationTab ? 'Количество на модерации' : 'Общее количество всех складов')}
           </div>
         </div>
       </div>
@@ -1231,8 +1397,8 @@ function MyParts() {
         <div className="md:w-64">
           <label className="block text-sm font-medium text-gray-700 mb-1">Склад</label>
           <select
-            value={selectedStorageLocation}
-            onChange={(e) => setSelectedStorageLocation(e.target.value)}
+            value={activeFilters.storage}
+            onChange={(e) => updateActiveFilters({ storage: e.target.value })}
             className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           >
             <option value="">Все склады</option>
@@ -1247,7 +1413,7 @@ function MyParts() {
         {/* Поисковое поле */}
         <div className="flex-1 max-w-md">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Поиск {selectedStorageLocation && '(в выбранном складе)'}
+            Поиск {activeFilters.storage && '(в выбранном складе)'}
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1258,14 +1424,14 @@ function MyParts() {
             <input
               type="text"
               placeholder="Поиск по номеру, внутр. коду или названию..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={activeFilters.search}
+              onChange={(e) => updateActiveFilters({ search: e.target.value })}
               className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
-            {searchQuery && (
+            {activeFilters.search && (
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                 <button
-                  onClick={() => setSearchQuery('')}
+                  onClick={() => updateActiveFilters({ search: '' })}
                   className="text-gray-400 hover:text-gray-600 focus:outline-none"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1276,6 +1442,20 @@ function MyParts() {
             )}
           </div>
         </div>
+
+        {isModerationTab && (
+          <div className="md:w-auto flex items-end">
+            <label className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md bg-white cursor-pointer min-h-[40px]">
+              <input
+                type="checkbox"
+                checked={moderationFilters.hideRejected}
+                onChange={(e) => updateActiveFilters({ hideRejected: e.target.checked })}
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+              />
+              <span className="text-sm text-gray-700 whitespace-nowrap">Скрыть отклонённые</span>
+            </label>
+          </div>
+        )}
 
         {/* Сортировка */}
         <div className="md:w-64 relative">
@@ -1301,12 +1481,12 @@ function MyParts() {
           {showSortDropdown && (
             <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-30">
               <button
-                onClick={() => { setSortOrder('date_desc'); setShowSortDropdown(false); }}
-                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'date_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                onClick={() => { updateActiveFilters({ sort: 'date_desc' }); setShowSortDropdown(false); }}
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'date_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
               >
                 <div className="flex items-center justify-between">
                   <span>Сначала новые</span>
-                  {sortOrder === 'date_desc' && (
+                  {activeFilters.sort === 'date_desc' && (
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -1314,12 +1494,12 @@ function MyParts() {
                 </div>
               </button>
               <button
-                onClick={() => { setSortOrder('date_asc'); setShowSortDropdown(false); }}
-                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'date_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                onClick={() => { updateActiveFilters({ sort: 'date_asc' }); setShowSortDropdown(false); }}
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'date_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
               >
                 <div className="flex items-center justify-between">
                   <span>Сначала старые</span>
-                  {sortOrder === 'date_asc' && (
+                  {activeFilters.sort === 'date_asc' && (
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -1327,12 +1507,12 @@ function MyParts() {
                 </div>
               </button>
               <button
-                onClick={() => { setSortOrder('name_asc'); setShowSortDropdown(false); }}
-                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'name_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                onClick={() => { updateActiveFilters({ sort: 'name_asc' }); setShowSortDropdown(false); }}
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'name_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
               >
                 <div className="flex items-center justify-between">
                   <span>По алфавиту (А–Я)</span>
-                  {sortOrder === 'name_asc' && (
+                  {activeFilters.sort === 'name_asc' && (
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -1340,12 +1520,12 @@ function MyParts() {
                 </div>
               </button>
               <button
-                onClick={() => { setSortOrder('name_desc'); setShowSortDropdown(false); }}
-                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'name_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                onClick={() => { updateActiveFilters({ sort: 'name_desc' }); setShowSortDropdown(false); }}
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'name_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
               >
                 <div className="flex items-center justify-between">
                   <span>По алфавиту (Я–А)</span>
-                  {sortOrder === 'name_desc' && (
+                  {activeFilters.sort === 'name_desc' && (
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -1393,9 +1573,9 @@ function MyParts() {
           >
             <div className="pb-2 inline-block border-b-4 border-yellow-500">
               На модерации
-              {pendingItems?.length > 0 && (
+              {moderationItemsCount > 0 && (
                 <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                  {pendingItems.length}
+                  {moderationItemsCount}
                 </span>
               )}
             </div>
@@ -1439,17 +1619,17 @@ function MyParts() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            {searchQuery ? 'Ничего не найдено' : 'Запчастей нет'}
+            {inStockFilters.search ? 'Ничего не найдено' : 'Запчастей нет'}
           </h2>
           <p className="text-gray-600 text-base mb-6">
-            {searchQuery
-              ? `По запросу "${searchQuery}" ${selectedStorageLocation ? 'в выбранном складе ' : ''}ничего не найдено. Попробуйте изменить поисковый запрос.`
-              : selectedStorageLocation 
+            {inStockFilters.search
+              ? `По запросу "${inStockFilters.search}" ${inStockFilters.storage ? 'в выбранном складе ' : ''}ничего не найдено. Попробуйте изменить поисковый запрос.`
+              : inStockFilters.storage 
                 ? 'В выбранном складе пока нет запчастей'
                 : 'У вас пока нет добавленных запчастей'
             }
           </p>
-          {!searchQuery && (
+          {!inStockFilters.search && (
             <button
               onClick={() => navigate('/my-parts/add')}
               className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
@@ -1466,7 +1646,7 @@ function MyParts() {
               <div className="mb-3 flex items-center justify-between py-2 border-b border-gray-200">
                 <span className="text-sm text-gray-500">
                   <span className="ml-2">Выбрано: {selectedParts.size}</span>
-                  {searchQuery && selectedParts.size > 0 && (
+                  {inStockFilters.search && selectedParts.size > 0 && (
                     <span className="ml-2 text-indigo-600">
                       (из {displayParts.length} найденных)
                     </span>
@@ -1619,13 +1799,16 @@ function MyParts() {
             <h2 className="text-xl font-medium text-gray-900 mb-2">Ошибка загрузки запчастей</h2>
             <p className="text-gray-500 mb-6 text-base">{error}</p>
             <button
-              onClick={() => dispatch(fetchMyPendingProducts())}
+              onClick={() => {
+                dispatch(fetchMyPendingProducts());
+                dispatch(fetchMyRejectedProducts());
+              }}
               className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
             >
               Попробовать снова
             </button>
           </div>
-        ) : sortedPendingParts.length === 0 ? (
+        ) : sortedModerationParts.length === 0 ? (
           <div className="mt-12 text-center py-16 px-6">
             <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
               <svg className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1633,11 +1816,11 @@ function MyParts() {
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              {searchQuery ? 'Ничего не найдено' : 'Запчастей на модерации нет'}
+              {moderationFilters.search ? 'Ничего не найдено' : 'Запчастей на модерации нет'}
             </h2>
             <p className="text-gray-600 text-base mb-6">
-              {searchQuery
-                ? `По запросу "${searchQuery}" ничего не найдено среди запчастей на модерации.`
+              {moderationFilters.search
+                ? `По запросу "${moderationFilters.search}" ничего не найдено среди запчастей на модерации.`
                 : 'У вас пока нет запчастей, ожидающих модерации'}
             </p>
           </div>
@@ -1654,19 +1837,21 @@ function MyParts() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {sortedPendingParts.map((part) => (
+                  {sortedModerationParts.map((part) => (
                     <CardPart
-                      key={part.id}
+                      key={getModerationPartKey(part)}
                       variant="moderation"
+                      moderationKind={part.moderationKind}
                       part={part}
                       getStorageAddress={getStorageAddress}
                       getCellName={getCellName}
                       onPrint={handleOpenPrintModal}
-                      onDelete={handleDeletePending}
-                      onToggleExpand={() => toggleExpand(part.id)}
-                      isExpanded={expandedPartId === part.id}
+                      onDelete={handleModerationDelete}
+                      onEdit={handleModerationEdit}
+                      onToggleExpand={() => toggleExpand(getModerationPartKey(part))}
+                      isExpanded={expandedPartId === getModerationPartKey(part)}
                       onImageClick={handleOpenMediaModal}
-                      productStorageCells={getStorageCellsForPart(part, true)}
+                      productStorageCells={part.moderationKind === 'pending' ? getStorageCellsForPart(part, true) : []}
                       imageErrors={imageErrors}
                       onImageError={(partId) => setImageErrors((prev) => ({ ...prev, [partId]: true }))}
                     />
@@ -1676,19 +1861,21 @@ function MyParts() {
             </div>
 
             <div className="md:hidden">
-              {sortedPendingParts.map((part) => (
+              {sortedModerationParts.map((part) => (
                 <CardPart
-                  key={part.id}
+                  key={getModerationPartKey(part)}
                   variant="moderation"
+                  moderationKind={part.moderationKind}
                   part={part}
                   getStorageAddress={getStorageAddress}
                   getCellName={getCellName}
                   onPrint={handleOpenPrintModal}
-                  onDelete={handleDeletePending}
-                  onToggleExpand={() => toggleExpand(part.id)}
-                  isExpanded={expandedPartId === part.id}
+                  onDelete={handleModerationDelete}
+                  onEdit={handleModerationEdit}
+                  onToggleExpand={() => toggleExpand(getModerationPartKey(part))}
+                  isExpanded={expandedPartId === getModerationPartKey(part)}
                   onImageClick={handleOpenMediaModal}
-                  productStorageCells={getStorageCellsForPart(part, true)}
+                  productStorageCells={part.moderationKind === 'pending' ? getStorageCellsForPart(part, true) : []}
                   imageErrors={imageErrors}
                   onImageError={(partId) => setImageErrors((prev) => ({ ...prev, [partId]: true }))}
                 />

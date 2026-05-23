@@ -19,6 +19,8 @@ import Main from './pages/Main/Main';
 import MyParts from './pages/MyParts/MyParts';
 import AddPart from './pages/MyParts/AddPart/AddPart';
 import EditPart from './pages/MyParts/EditPart/EditPart';
+import ResubmitPart from './pages/MyParts/ResubmitPart/ResubmitPart';
+import EditPendingPart from './pages/MyParts/EditPendingPart/EditPendingPart';
 import StockInList from './pages/StockIn/StockInList';
 import { StockOutList } from './pages/StockOut';
 import CartPage from './pages/Cart/CartPage';
@@ -149,6 +151,8 @@ function App() {
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/my-parts" element={<MyParts />} />
+          <Route path="/my-parts/resubmit/:id" element={<ResubmitPart />} />
+          <Route path="/my-parts/edit-pending/:id" element={<EditPendingPart />} />
           <Route path="/vehicles" element={<VehiclesList />} />
           <Route path="/vehicles/add" element={<AddVehiclePage />} />
           <Route path="/vehicles/edit/:id" element={<EditVehiclePage />} />

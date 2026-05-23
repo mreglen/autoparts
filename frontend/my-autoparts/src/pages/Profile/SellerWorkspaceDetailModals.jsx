@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import { stripHtmlTags } from '../../utils/text';
+import { parseMediaList } from '../../utils/mediaHelpers';
 
 function WorkspaceDetailShell({ isOpen, title, subtitle, onClose, children }) {
     useEffect(() => {
@@ -63,26 +64,47 @@ function DetailField({ label, value, mono }) {
     );
 }
 
-export function PartDetailContent({ part, getStorageAddress, onImageClick, hideSiteLink = false }) {
+export function PartDetailContent({
+    part,
+    getStorageAddress,
+    onImageClick,
+    hideSiteLink = false,
+    moderationKind = null,
+}) {
     if (!part) return null;
 
     const priceLabel = part.price != null && !Number.isNaN(Number(part.price))
         ? `${Number(part.price).toLocaleString('ru-RU')} ₽`
         : '—';
 
+    const storageLabel = part.storage_location?.address
+        || part.storage_location_address
+        || (part.storage_location_id && getStorageAddress?.(part.storage_location_id))
+        || '—';
+
     return (
         <div className="space-y-5">
                 <div className="flex flex-wrap gap-2">
-                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
-                        part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}
-                    >
-                        {part.is_new ? 'Новый' : 'Б/у'}
-                    </span>
-                    {part.is_on_avito && (
+                    {moderationKind === 'rejected' ? (
+                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            Отклонена
+                        </span>
+                    ) : moderationKind === 'pending' ? (
+                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            На модерации
+                        </span>
+                    ) : (
+                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
+                            part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                        >
+                            {part.is_new ? 'Новый' : 'Б/у'}
+                        </span>
+                    )}
+                    {!moderationKind && part.is_on_avito && (
                         <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Avito</span>
                     )}
-                    {part.is_on_drom && (
+                    {!moderationKind && part.is_on_drom && (
                         <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Drom</span>
                     )}
                 </div>
@@ -91,16 +113,22 @@ export function PartDetailContent({ part, getStorageAddress, onImageClick, hideS
                     <DetailField label="Остаток" value={`${part.quantity ?? 0} шт.`} />
                     <DetailField label="Цена" value={priceLabel} />
                     <DetailField label="Внутренний код" value={part.internal_code} mono />
-                    <DetailField
-                        label="Склад"
-                        value={
-                            part.storage_location?.address
-                            || (part.storage_location_id && getStorageAddress?.(part.storage_location_id))
-                            || '—'
-                        }
-                    />
+                    <DetailField label="Склад" value={storageLabel} />
                     <DetailField label="Ответственный" value={part.creator_name} />
+                    {moderationKind === 'rejected' && part.rejected_at && (
+                        <DetailField label="Дата отклонения" value={new Date(part.rejected_at).toLocaleString('ru-RU')} />
+                    )}
+                    {moderationKind === 'pending' && part.created_at && (
+                        <DetailField label="Дата отправки" value={new Date(part.created_at).toLocaleString('ru-RU')} />
+                    )}
                 </dl>
+
+                {moderationKind === 'rejected' && part.rejection_reason && (
+                    <div className="p-3 bg-red-50 rounded-lg border border-red-100">
+                        <h3 className="text-xs font-semibold text-red-800 uppercase tracking-wide mb-1">Причина отклонения</h3>
+                        <p className="text-sm text-red-700">{part.rejection_reason}</p>
+                    </div>
+                )}
 
                 {part.description && (
                     <div>
@@ -111,12 +139,12 @@ export function PartDetailContent({ part, getStorageAddress, onImageClick, hideS
                     </div>
                 )}
 
-                {(part.photos?.length > 0 || part.videos?.length > 0) && (
+                {(parseMediaList(part.photos).length > 0 || parseMediaList(part.videos).length > 0) && (
                     <div>
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Фото и видео</h3>
                         <PhotoThumbnail
-                            photos={part.photos || []}
-                            videos={part.videos || []}
+                            photos={parseMediaList(part.photos)}
+                            videos={parseMediaList(part.videos)}
                             onImageClick={onImageClick}
                         />
                     </div>
@@ -143,7 +171,7 @@ export function PartDetailContent({ part, getStorageAddress, onImageClick, hideS
                     </div>
                 )}
 
-            {!hideSiteLink && part.id && (
+            {!hideSiteLink && part.id && !moderationKind && (
                 <div className="pt-2 border-t border-gray-100">
                     <Link
                         to={`/part/${part.id}`}
@@ -173,6 +201,26 @@ export function SellerPartDetailModal({ part, isOpen, onClose, getStorageAddress
                 part={part}
                 getStorageAddress={getStorageAddress}
                 onImageClick={onImageClick}
+            />
+        </WorkspaceDetailShell>
+    );
+}
+
+export function ModerationProductViewModal({ product, isOpen, onClose, onImageClick }) {
+    if (!product) return null;
+
+    return (
+        <WorkspaceDetailShell
+            isOpen={isOpen}
+            onClose={onClose}
+            title={`${product.brand || '—'} · ${product.article || '—'}`}
+            subtitle={product.name}
+        >
+            <PartDetailContent
+                part={product}
+                onImageClick={onImageClick}
+                hideSiteLink
+                moderationKind={product.moderationKind}
             />
         </WorkspaceDetailShell>
     );

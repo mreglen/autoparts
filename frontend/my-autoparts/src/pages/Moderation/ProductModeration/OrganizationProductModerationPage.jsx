@@ -13,6 +13,9 @@ import RejectProductModal from '../../../components/RejectProductModal/RejectPro
 import SuccessModal from '../../../components/SuccessModal/SuccessModal.jsx';
 import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal.jsx';
 import ErrorModal from '../../../components/ErrorModal/ErrorModal.jsx';
+import MediaModal from '../../../components/MediaModal/MediaModal.jsx';
+import { ModerationProductViewModal } from '../../Profile/SellerWorkspaceDetailModals.jsx';
+import { normalizeProductMedia, formatMediaForModal, getMediaItemUrl } from '../../../utils/mediaHelpers.js';
 import { normalizeImageUrl } from '../../../utils/apiClient.js';
 import { buildOrganizations, ProductTable } from './productModerationShared.jsx';
 import { useAuthReady } from '../../../hooks/useAuthReady';
@@ -28,6 +31,48 @@ function resolveSellerIdForOrganization(sellers, organizationId) {
     return (director || orgSellers[0]).id;
 }
 
+const filterAndSortProducts = (products, { search, sort, hideRejected }) => {
+    let items = [...products];
+
+    if (hideRejected) {
+        items = items.filter((product) => product.moderationKind !== 'rejected');
+    }
+
+    if (search.trim()) {
+        const query = search.toLowerCase().replace(/\s+/g, '');
+        const queryText = search.toLowerCase();
+        items = items.filter((product) =>
+            (product.article && product.article.toLowerCase().replace(/\s+/g, '').includes(query))
+            || (product.internal_code && String(product.internal_code).toLowerCase().replace(/\s+/g, '').includes(query))
+            || (product.name && product.name.toLowerCase().includes(queryText))
+        );
+    }
+
+    if (sort === 'date_desc') {
+        items.sort((a, b) => {
+            const aDate = a.moderationKind === 'rejected' ? (a.rejected_at || a.created_at) : a.created_at;
+            const bDate = b.moderationKind === 'rejected' ? (b.rejected_at || b.created_at) : b.created_at;
+            return new Date(bDate || 0) - new Date(aDate || 0);
+        });
+    } else if (sort === 'date_asc') {
+        items.sort((a, b) => {
+            const aDate = a.moderationKind === 'rejected' ? (a.rejected_at || a.created_at) : a.created_at;
+            const bDate = b.moderationKind === 'rejected' ? (b.rejected_at || b.created_at) : b.created_at;
+            return new Date(aDate || 0) - new Date(bDate || 0);
+        });
+    } else if (sort === 'name_asc' || sort === 'name_desc') {
+        items.sort((a, b) => {
+            const aName = (a.name || a.brand || a.article || '').toString().toLowerCase();
+            const bName = (b.name || b.brand || b.article || '').toString().toLowerCase();
+            if (aName < bName) return sort === 'name_asc' ? -1 : 1;
+            if (aName > bName) return sort === 'name_asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
+    return items;
+};
+
 export default function OrganizationProductModerationPage() {
     const { organizationId } = useParams();
     const navigate = useNavigate();
@@ -36,9 +81,15 @@ export default function OrganizationProductModerationPage() {
     const { pendingProducts, rejectedProducts, loading, error } = useSelector((state) => state.moderationProducts);
     const sellers = useSelector((state) => state.sellers.sellers);
 
-    const [activeStatus, setActiveStatus] = useState('pending');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortOrder, setSortOrder] = useState('date_desc');
+    const [hideRejected, setHideRejected] = useState(false);
+    const [viewProduct, setViewProduct] = useState(null);
+    const [mediaModalOpen, setMediaModalOpen] = useState(false);
+    const [currentMediaItems, setCurrentMediaItems] = useState([]);
+    const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
     const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState(null);
+    const [rejectTarget, setRejectTarget] = useState(null);
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
     const [successModalData, setSuccessModalData] = useState({ title: '', message: '' });
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -63,15 +114,24 @@ export default function OrganizationProductModerationPage() {
         [organizationGroups, organizationId],
     );
 
+    const unifiedProducts = useMemo(() => {
+        if (!selectedGroup) return [];
+        const pending = selectedGroup.pending.map((product) => ({ ...product, moderationKind: 'pending' }));
+        const rejected = selectedGroup.rejected.map((product) => ({ ...product, moderationKind: 'rejected' }));
+        return [...pending, ...rejected];
+    }, [selectedGroup]);
+
+    const filteredProducts = useMemo(
+        () => filterAndSortProducts(unifiedProducts, { search: searchQuery, sort: sortOrder, hideRejected }),
+        [unifiedProducts, searchQuery, sortOrder, hideRejected],
+    );
+
+    const moderationCount = unifiedProducts.length;
+
     const sellerId = useMemo(
         () => resolveSellerIdForOrganization(sellers, organizationId),
         [sellers, organizationId],
     );
-
-    useEffect(() => {
-        if (!selectedGroup) return;
-        setActiveStatus(selectedGroup.pending.length > 0 ? 'pending' : 'rejected');
-    }, [selectedGroup?.organization.id]);
 
     useEffect(() => {
         if (error) {
@@ -102,21 +162,48 @@ export default function OrganizationProductModerationPage() {
     };
 
     const handleRejectClick = (product) => {
-        setSelectedProduct(product);
+        setRejectTarget(product);
         setIsRejectModalOpen(true);
     };
 
+    const handleViewProduct = (product) => {
+        setViewProduct(normalizeProductMedia(product));
+    };
+
+    const handleOpenMediaModal = (mediaItems, initialIndex = 0) => {
+        let formatted = mediaItems;
+        if (!mediaItems?.[0]?.src) {
+            formatted = (Array.isArray(mediaItems) ? mediaItems : [])
+                .map(getMediaItemUrl)
+                .filter(Boolean)
+                .map((url) => {
+                    const normalizedUrl = normalizeImageUrl(url);
+                    const isVideo = normalizedUrl.toLowerCase().match(/\.(mp4|webm|ogg|mov)$/);
+                    return { type: isVideo ? 'video' : 'image', src: normalizedUrl };
+                });
+        }
+        if (!formatted.length) return;
+        setCurrentMediaItems(formatted);
+        setCurrentMediaIndex(initialIndex);
+        setMediaModalOpen(true);
+    };
+
     const handleRejectSubmit = async (reason) => {
+        const target = rejectTarget;
+        if (!target) return;
         try {
             await dispatch(rejectProduct({
-                productId: selectedProduct.id,
+                productId: target.id,
                 reason,
             })).unwrap();
             await dispatch(fetchRejectedProducts()).unwrap();
             setSuccessModalData({ title: 'Успешно!', message: 'Запчасть отклонена' });
             setIsSuccessModalOpen(true);
             setIsRejectModalOpen(false);
-            setSelectedProduct(null);
+            setRejectTarget(null);
+            if (viewProduct?.id === target.id && viewProduct?.moderationKind === 'pending') {
+                setViewProduct(null);
+            }
         } catch {
             /* handled via redux */
         }
@@ -171,6 +258,9 @@ export default function OrganizationProductModerationPage() {
                             <p className="text-sm text-gray-500 mt-1">
                                 ID: {organization.id} · Телефон: {organization.phone || '—'}
                             </p>
+                            <p className="text-sm text-gray-500 mt-1">
+                                На модерации: {moderationCount}
+                            </p>
                         </div>
                     </div>
                     {sellerId && (
@@ -194,44 +284,51 @@ export default function OrganizationProductModerationPage() {
                 </div>
             ) : selectedGroup && (
                 <>
-                    <div className="border-b border-gray-200 mb-4">
-                        <nav className="-mb-px flex gap-6">
-                            <button
-                                type="button"
-                                onClick={() => setActiveStatus('pending')}
-                                className={`py-3 px-1 border-b-2 font-medium text-sm ${
-                                    activeStatus === 'pending'
-                                        ? 'border-indigo-500 text-indigo-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
+                    <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Поиск по артикулу, названию, internal_code"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            />
+                            <svg
+                                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
                             >
-                                Ожидают модерации
-                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                    {selectedGroup.pending.length}
-                                </span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setActiveStatus('rejected')}
-                                className={`py-3 px-1 border-b-2 font-medium text-sm ${
-                                    activeStatus === 'rejected'
-                                        ? 'border-indigo-500 text-indigo-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                Отклонённые
-                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    {selectedGroup.rejected.length}
-                                </span>
-                            </button>
-                        </nav>
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <select
+                            value={sortOrder}
+                            onChange={(e) => setSortOrder(e.target.value)}
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                        >
+                            <option value="date_desc">Сначала новые</option>
+                            <option value="date_asc">Сначала старые</option>
+                            <option value="name_asc">По названию А–Я</option>
+                            <option value="name_desc">По названию Я–А</option>
+                        </select>
+                        <label className="inline-flex items-center gap-2 text-sm text-gray-700 whitespace-nowrap">
+                            <input
+                                type="checkbox"
+                                checked={hideRejected}
+                                onChange={(e) => setHideRejected(e.target.checked)}
+                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                            />
+                            Скрыть отклонённые
+                        </label>
                     </div>
 
                     <ProductTable
-                        products={activeStatus === 'pending' ? selectedGroup.pending : selectedGroup.rejected}
-                        status={activeStatus}
+                        products={filteredProducts}
                         onApprove={handleApprove}
                         onReject={handleRejectClick}
+                        onView={handleViewProduct}
+                        onImageClick={handleOpenMediaModal}
                     />
                 </>
             )}
@@ -240,10 +337,24 @@ export default function OrganizationProductModerationPage() {
                 isOpen={isRejectModalOpen}
                 onClose={() => {
                     setIsRejectModalOpen(false);
-                    setSelectedProduct(null);
+                    setRejectTarget(null);
                 }}
                 onReject={handleRejectSubmit}
-                productName={selectedProduct?.name}
+                productName={rejectTarget?.name}
+            />
+
+            <ModerationProductViewModal
+                product={viewProduct}
+                isOpen={Boolean(viewProduct)}
+                onClose={() => setViewProduct(null)}
+                onImageClick={handleOpenMediaModal}
+            />
+
+            <MediaModal
+                isOpen={mediaModalOpen}
+                onClose={() => setMediaModalOpen(false)}
+                mediaItems={currentMediaItems}
+                initialIndex={currentMediaIndex}
             />
 
             <SuccessModal

@@ -1,11 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { createPendingProduct, uploadPhotos, uploadMedia, clearProductError, resetProducts } from '../../../redux/slices/ProductSlice';
+import {
+  createPendingProduct,
+  fetchMyRejectedProduct,
+  fetchMyPendingProduct,
+  resubmitRejectedProduct,
+  updatePendingProduct,
+  uploadPhotos,
+  uploadMedia,
+  clearProductError,
+  resetProducts,
+} from '../../../redux/slices/ProductSlice';
 import { createStockIn, clearStockInError } from '../../../redux/slices/StockInSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
 import { fetchStorageCells, createStorageCell } from '../../../redux/slices/StorageCellsSlice';
-import { createPendingProductStorageCellsBatch } from '../../../redux/slices/PendingProductStorageCellsSlice';
+import {
+  createPendingProductStorageCellsBatch,
+  deletePendingProductStorageCell,
+} from '../../../redux/slices/PendingProductStorageCellsSlice';
 import { fetchPartTypes } from '../../../redux/slices/PartTypeSlice';
 import { normalizeImageUrl, apiRequest, apiRequestFormData, apiAxios } from '../../../utils/apiClient';
 import { useAuthReady } from '../../../hooks/useAuthReady';
@@ -25,8 +38,11 @@ const SUGGEST_LIST =
 const SUGGEST_ITEM =
   'w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none';
 
-const AddPart = () => {
+const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
   const navigate = useNavigate();
+  const { id: routeId } = useParams();
+  const resubmitId = resubmitMode ? routeId : null;
+  const editPendingId = editPendingMode ? routeId : null;
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
   const productStatus = useSelector((state) => state.products.loading);
@@ -60,6 +76,9 @@ const AddPart = () => {
   const [rosskoLookupLoading, setRosskoLookupLoading] = useState(false);
   const [rosskoLookupError, setRosskoLookupError] = useState(null);
   const [rosskoLookupNotice, setRosskoLookupNotice] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [loadingFormData, setLoadingFormData] = useState(resubmitMode || editPendingMode);
+  const [existingPendingStorageCells, setExistingPendingStorageCells] = useState([]);
 
   const [photos, setPhotos] = useState([]);
   const [videos, setVideos] = useState([]);
@@ -132,6 +151,143 @@ const AddPart = () => {
       dispatch(resetProducts());
     };
   }, [dispatch]);
+
+  useEffect(() => {
+    if (!resubmitMode || !resubmitId) return undefined;
+
+    let cancelled = false;
+    setLoadingFormData(true);
+
+    dispatch(fetchMyRejectedProduct(Number(resubmitId, 10)))
+      .unwrap()
+      .then((product) => {
+        if (cancelled || !product) return;
+
+        setRejectionReason(product.rejection_reason || '');
+        setFormData({
+          article: product.article || '',
+          name: product.name || '',
+          brand: product.brand || '',
+          description: product.description || '',
+          condition: product.is_new ? 'новый' : 'б/у',
+          quantity: product.quantity != null ? String(product.quantity) : '',
+          sale_price: product.price != null ? String(product.price) : '',
+          storage_location_id: product.storage_location_id ? String(product.storage_location_id) : '',
+          part_type_id: product.part_type_id ? String(product.part_type_id) : '',
+        });
+
+        setPhotos(
+          (product.photos || []).map((url) => ({
+            finalPath: typeof url === 'string' ? url : (url.full_url || url.photo_url || url.url || ''),
+            name: 'photo',
+            isExisting: true,
+          })).filter((item) => item.finalPath)
+        );
+
+        setVideos(
+          (product.videos || []).map((url) => ({
+            finalPath: typeof url === 'string' ? url : (url.full_url || url.video_url || url.url || ''),
+            name: 'video',
+            isExisting: true,
+          })).filter((item) => item.finalPath)
+        );
+
+        if (product.vehicle_ids?.length) {
+          apiRequest(`/vehicles/${product.vehicle_ids[0]}`)
+            .then((vehicle) => {
+              if (!cancelled && vehicle) setSelectedVehicle(vehicle);
+            })
+            .catch(() => {});
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          alert(typeof err === 'string' ? err : 'Не удалось загрузить отклонённую запчасть');
+          navigate('/my-parts?tab=pending', { replace: true });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingFormData(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, resubmitMode, resubmitId, navigate]);
+
+  useEffect(() => {
+    if (!editPendingMode || !editPendingId) return undefined;
+
+    let cancelled = false;
+    setLoadingFormData(true);
+
+    Promise.all([
+      dispatch(fetchMyPendingProduct(Number(editPendingId, 10))).unwrap(),
+      apiRequest(`/pending-product-storage-cells/?pending_product_id=${editPendingId}`),
+    ])
+      .then(([product, storageCellsResponse]) => {
+        if (cancelled || !product) return;
+
+        setFormData({
+          article: product.article || '',
+          name: product.name || '',
+          brand: product.brand || '',
+          description: product.description || '',
+          condition: product.is_new ? 'новый' : 'б/у',
+          quantity: product.quantity != null ? String(product.quantity) : '',
+          sale_price: product.price != null ? String(product.price) : '',
+          storage_location_id: product.storage_location_id ? String(product.storage_location_id) : '',
+          part_type_id: product.part_type_id ? String(product.part_type_id) : '',
+        });
+
+        setPhotos(
+          (product.photos || []).map((url) => ({
+            finalPath: typeof url === 'string' ? url : (url.full_url || url.photo_url || url.url || ''),
+            name: 'photo',
+            isExisting: true,
+          })).filter((item) => item.finalPath)
+        );
+
+        setVideos(
+          (product.videos || []).map((url) => ({
+            finalPath: typeof url === 'string' ? url : (url.full_url || url.video_url || url.url || ''),
+            name: 'video',
+            isExisting: true,
+          })).filter((item) => item.finalPath)
+        );
+
+        const cells = Array.isArray(storageCellsResponse) ? storageCellsResponse : [];
+        setExistingPendingStorageCells(cells);
+        const initialQuantities = {};
+        cells.forEach((link) => {
+          if (link.storage_cell_id) {
+            initialQuantities[link.storage_cell_id] = link.value || '';
+          }
+        });
+        setCellQuantities(initialQuantities);
+
+        if (product.vehicle_ids?.length) {
+          apiRequest(`/vehicles/${product.vehicle_ids[0]}`)
+            .then((vehicle) => {
+              if (!cancelled && vehicle) setSelectedVehicle(vehicle);
+            })
+            .catch(() => {});
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          alert(typeof err === 'string' ? err : 'Не удалось загрузить запчасть на модерации');
+          navigate('/my-parts?tab=pending', { replace: true });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingFormData(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, editPendingMode, editPendingId, navigate]);
 
   const handleFileAdd = async (e) => {
     const files = Array.from(e.target.files);
@@ -343,7 +499,7 @@ const AddPart = () => {
     const fileToRemove = photos[index];
     
     // If it's a File/Blob that was uploaded, delete from storage
-    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.finalPath) {
+    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.finalPath && !fileToRemove.isExisting) {
       try {
         // Extract filename from path and delete
         const pathParts = fileToRemove.finalPath.split('/');
@@ -365,7 +521,7 @@ const AddPart = () => {
     const fileToRemove = videos[index];
     
     // If it's a File/Blob that was uploaded, delete from storage
-    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.finalPath) {
+    if ((fileToRemove instanceof File || fileToRemove instanceof Blob) && fileToRemove.finalPath && !fileToRemove.isExisting) {
       try {
         // Extract filename from path and delete
         const pathParts = fileToRemove.finalPath.split('/');
@@ -655,11 +811,16 @@ const AddPart = () => {
       try {
         // Photos are already uploaded with final paths, just use them
         photoUrls = photos
-          .filter(file => file.finalPath)
-          .map(file => {
-            // Ensure path starts with / for consistency
-            return file.finalPath.startsWith('/') ? file.finalPath : '/' + file.finalPath;
-          });
+          .map((file) => {
+            if (file?.finalPath) {
+              return file.finalPath.startsWith('/') ? file.finalPath : `/${file.finalPath}`;
+            }
+            if (typeof file === 'string') {
+              return file.startsWith('/') ? file : `/${file}`;
+            }
+            return null;
+          })
+          .filter(Boolean);
       } catch (error) {
         console.error('Error processing photos:', error);
         alert(`Ошибка обработки фото: ${error.message}`);
@@ -678,11 +839,16 @@ const AddPart = () => {
         
         // Просто используем temp пути - бэкенд сам запустит обработку после создания продукта
         videoUrls = videos
-          .filter(file => file.finalPath)
-          .map(file => {
-            // Ensure path starts with / for consistency
-            return file.finalPath.startsWith('/') ? file.finalPath : '/' + file.finalPath;
-          });
+          .map((file) => {
+            if (file?.finalPath) {
+              return file.finalPath.startsWith('/') ? file.finalPath : `/${file.finalPath}`;
+            }
+            if (typeof file === 'string') {
+              return file.startsWith('/') ? file : `/${file}`;
+            }
+            return null;
+          })
+          .filter(Boolean);
         
         console.log('✅ Video URLs prepared:', videoUrls);
       } catch (error) {
@@ -715,6 +881,77 @@ const AddPart = () => {
     };
 
     try {
+      if (editPendingMode) {
+        const updateAction = await dispatch(updatePendingProduct({
+          id: Number(editPendingId, 10),
+          productData,
+        }));
+        if (updatePendingProduct.rejected.match(updateAction)) {
+          return;
+        }
+
+        await Promise.all(
+          existingPendingStorageCells.map((link) =>
+            dispatch(deletePendingProductStorageCell(link.id)).unwrap().catch(() => null)
+          )
+        );
+
+        const storageCellAssignments = [];
+        Object.entries(cellQuantities).forEach(([cellId, value]) => {
+          if (value && value.trim()) {
+            storageCellAssignments.push({
+              pending_product_id: Number(editPendingId, 10),
+              storage_cell_id: parseInt(cellId, 10),
+              value: value.trim(),
+            });
+          }
+        });
+
+        if (storageCellAssignments.length > 0) {
+          try {
+            await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments));
+          } catch (storageError) {
+            console.error('Error creating storage cell assignments:', storageError);
+          }
+        }
+
+        navigate('/my-parts?tab=pending');
+        return;
+      }
+
+      if (resubmitMode) {
+        const resubmitAction = await dispatch(resubmitRejectedProduct({
+          id: Number(resubmitId, 10),
+          productData,
+        }));
+        if (resubmitRejectedProduct.rejected.match(resubmitAction)) {
+          return;
+        }
+
+        const pendingProductId = resubmitAction.payload.pendingProduct.id;
+        const storageCellAssignments = [];
+        Object.entries(cellQuantities).forEach(([cellId, value]) => {
+          if (value && value.trim()) {
+            storageCellAssignments.push({
+              pending_product_id: pendingProductId,
+              storage_cell_id: parseInt(cellId, 10),
+              value: value.trim(),
+            });
+          }
+        });
+
+        if (storageCellAssignments.length > 0) {
+          try {
+            await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments));
+          } catch (storageError) {
+            console.error('Error creating storage cell assignments:', storageError);
+          }
+        }
+
+        navigate('/my-parts?tab=pending');
+        return;
+      }
+
       const productAction = await dispatch(createPendingProduct(productData));
       if (createPendingProduct.rejected.match(productAction)) {
         return;
@@ -763,7 +1000,7 @@ const AddPart = () => {
     }
   }, [isReady, canAccess, navigate]);
 
-  if (!isReady) {
+  if (!isReady || loadingFormData) {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <AuthLoadingScreen />
@@ -779,9 +1016,27 @@ const AddPart = () => {
     );
   }
 
+  const submitLabel = productStatus || isUploadingMedia
+    ? (resubmitMode ? 'Отправка...' : editPendingMode ? 'Сохранение...' : 'Создание...')
+    : (resubmitMode ? 'Отправить повторно' : editPendingMode ? 'Сохранить' : 'Создать запчасть');
+
+  const pageTitle = resubmitMode
+    ? 'Повторная отправка на модерацию'
+    : editPendingMode
+      ? 'Редактирование запчасти на модерации'
+      : 'Добавить запчасть';
+
+  const cancelPath = (resubmitMode || editPendingMode) ? '/my-parts?tab=pending' : '/my-parts';
+
   return (
     <div className="max-w-4xl mx-auto p-6 max-md:pb-32">
-      <h1 className="mb-6 text-2xl font-bold max-md:hidden">Добавить запчасть</h1>
+      <h1 className="mb-6 text-2xl font-bold max-md:hidden">{pageTitle}</h1>
+      {resubmitMode && rejectionReason && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-lg">
+          <p className="text-sm font-medium text-red-800">Причина отклонения</p>
+          <p className="mt-1 text-sm text-red-700">{rejectionReason}</p>
+        </div>
+      )}
       <form id="add-part-form" onSubmit={handleSubmit} className="space-y-6 md:space-y-6">
         <MobilePageSection title="Основное">
         {/* Артикул */}
@@ -1279,7 +1534,7 @@ const AddPart = () => {
               : 'bg-indigo-600 hover:bg-indigo-700'
               } text-white`}
           >
-            {productStatus || isUploadingMedia ? 'Создание...' : 'Создать запчасть'}
+            {productStatus || isUploadingMedia ? (resubmitMode ? 'Отправка...' : 'Создание...') : submitLabel}
           </button>
           <button
             type="button"
@@ -1288,7 +1543,7 @@ const AddPart = () => {
               await cleanupFiles();
               setPhotos([]);
               setVideos([]);
-              navigate('/my-parts');
+              navigate(cancelPath);
             }}
             className="px-4 py-2 border border-gray-300 rounded-md"
           >
@@ -1299,14 +1554,14 @@ const AddPart = () => {
 
       <MobileStickyFooter
         formId="add-part-form"
-        primaryLabel={productStatus || isUploadingMedia ? 'Создание...' : 'Создать запчасть'}
+        primaryLabel={submitLabel}
         primaryDisabled={productStatus || isUploadingMedia}
         secondaryLabel="Отмена"
         onSecondary={async () => {
           await cleanupFiles();
           setPhotos([]);
           setVideos([]);
-          navigate('/my-parts');
+          navigate(cancelPath);
         }}
       />
 

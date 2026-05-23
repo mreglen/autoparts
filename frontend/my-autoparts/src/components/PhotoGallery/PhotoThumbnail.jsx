@@ -1,31 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { normalizeImageUrl } from '../../utils/apiClient';
+import { getMediaItemUrl, parseMediaList } from '../../utils/mediaHelpers';
 
 const PhotoThumbnail = ({ photos = [], videos = [], onImageClick }) => {
   const [objectUrls, setObjectUrls] = useState(new Map());
   
+  const parsedPhotos = parseMediaList(photos);
+  const parsedVideos = parseMediaList(videos);
+
   // Combine photos and videos into a single media array
   const allMedia = React.useMemo(() => {
-    const photoItems = (photos || []).map(photo => ({
+    const photoItems = parsedPhotos.map(photo => ({
       type: 'photo',
       item: photo,
-      url: typeof photo === 'string' ? photo : (photo.full_url || photo.photo_url || '')
+      url: getMediaItemUrl(photo)
     }));
     
-    const videoItems = (videos || []).map(video => ({
+    const videoItems = parsedVideos.map(video => ({
       type: 'video',
       item: video,
-      url: typeof video === 'string' ? video : (video.full_url || video.video_url || '')
+      url: getMediaItemUrl(video)
     }));
     
-    return [...photoItems, ...videoItems];
-  }, [photos, videos]);
+    return [...photoItems, ...videoItems].filter((media) => media.url);
+  }, [parsedPhotos, parsedVideos]);
 
   // Создаем и очищаем object URLs для File объектов
   useEffect(() => {
     const newUrls = new Map();
 
-    photos.forEach((item, index) => {
+    parsedPhotos.forEach((item, index) => {
       if (item instanceof File) {
         const url = URL.createObjectURL(item);
         newUrls.set(index, url);

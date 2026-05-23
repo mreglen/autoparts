@@ -93,6 +93,100 @@ export const fetchMyRejectedProducts = createAsyncThunk(
     }
 );
 
+// Async thunk: получение одной отклонённой запчасти
+export const fetchMyRejectedProduct = createAsyncThunk(
+    'products/fetchMyRejectedProduct',
+    async (productId, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get(`/moderation/products/rejected/my/${productId}`);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки отклонённой запчасти'
+            );
+        }
+    }
+);
+
+// Async thunk: удаление отклонённой запчасти
+export const deleteRejectedProduct = createAsyncThunk(
+    'products/deleteRejectedProduct',
+    async (productId, { rejectWithValue }) => {
+        try {
+            await apiAxios.delete(`/moderation/products/rejected/my/${productId}`);
+            return productId;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка удаления отклонённой запчасти'
+            );
+        }
+    }
+);
+
+// Async thunk: повторная отправка отклонённой запчасти на модерацию
+export const resubmitRejectedProduct = createAsyncThunk(
+    'products/resubmitRejectedProduct',
+    async ({ id, productData }, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.post(
+                `/moderation/products/rejected/my/${id}/resubmit`,
+                productData,
+            );
+            return { rejectedId: id, pendingProduct: response.data };
+        } catch (error) {
+            let errorMessage = 'Ошибка повторной отправки на модерацию';
+            if (error.response?.data?.detail) {
+                if (Array.isArray(error.response.data.detail)) {
+                    errorMessage = error.response.data.detail.map((err) =>
+                        typeof err === 'string' ? err : err.msg || 'Ошибка валидации'
+                    ).join(', ');
+                } else if (typeof error.response.data.detail === 'string') {
+                    errorMessage = error.response.data.detail;
+                }
+            }
+            return rejectWithValue(errorMessage);
+        }
+    }
+);
+
+// Async thunk: получение одной pending-запчасти
+export const fetchMyPendingProduct = createAsyncThunk(
+    'products/fetchMyPendingProduct',
+    async (productId, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get(`/pending-products/${productId}`);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки запчасти на модерации'
+            );
+        }
+    }
+);
+
+// Async thunk: обновление pending-запчасти
+export const updatePendingProduct = createAsyncThunk(
+    'products/updatePendingProduct',
+    async ({ id, productData }, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.put(`/pending-products/${id}`, productData);
+            return response.data;
+        } catch (error) {
+            let errorMessage = 'Ошибка обновления запчасти';
+            if (error.response?.data?.detail) {
+                if (Array.isArray(error.response.data.detail)) {
+                    errorMessage = error.response.data.detail.map((err) =>
+                        typeof err === 'string' ? err : err.msg || 'Ошибка валидации'
+                    ).join(', ');
+                } else if (typeof error.response.data.detail === 'string') {
+                    errorMessage = error.response.data.detail;
+                }
+            }
+            return rejectWithValue(errorMessage);
+        }
+    }
+);
+
 // Async thunk: удаление запчасти с модерации
 export const deletePendingProduct = createAsyncThunk(
     'products/deletePendingProduct',
@@ -767,6 +861,43 @@ const productSlice = createSlice({
                 state.pendingItems = state.pendingItems.filter((p) => p.id !== action.payload);
             })
             .addCase(deletePendingProduct.rejected, (state, action) => {
+                state.error = action.payload;
+            })
+            .addCase(updatePendingProduct.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(updatePendingProduct.fulfilled, (state, action) => {
+                state.loading = false;
+                const updated = action.payload;
+                state.pendingItems = state.pendingItems.map((item) =>
+                    item.id === updated.id ? { ...item, ...updated } : item
+                );
+            })
+            .addCase(updatePendingProduct.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            .addCase(deleteRejectedProduct.fulfilled, (state, action) => {
+                state.rejectedItems = state.rejectedItems.filter((p) => p.id !== action.payload);
+            })
+            .addCase(deleteRejectedProduct.rejected, (state, action) => {
+                state.error = action.payload;
+            })
+            .addCase(resubmitRejectedProduct.fulfilled, (state, action) => {
+                state.loading = false;
+                const { rejectedId, pendingProduct } = action.payload;
+                state.rejectedItems = state.rejectedItems.filter((p) => p.id !== rejectedId);
+                if (pendingProduct) {
+                    state.pendingItems = [pendingProduct, ...state.pendingItems.filter((p) => p.id !== pendingProduct.id)];
+                }
+            })
+            .addCase(resubmitRejectedProduct.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(resubmitRejectedProduct.rejected, (state, action) => {
+                state.loading = false;
                 state.error = action.payload;
             })
             .addCase(searchAllProducts.pending, (state) => {

@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { Link } from 'react-router-dom';
 import {
   fetchAvailablePrinters,
   printLabel,
-  selectAvailablePrinters,
-  selectFetchingPrinters,
   selectSendingPrint,
-  selectPrintersError,
-  clearError
+  clearError,
 } from '../../../redux/slices/PrinterSlice';
 import { apiAxios } from '../../../utils/apiClient';
 
@@ -189,43 +187,85 @@ const PrintReceiptModal = ({
   productStorageCells = []
 }) => {
   const dispatch = useDispatch();
-  const printers = useSelector(selectAvailablePrinters);
-  const loading = useSelector(selectFetchingPrinters);
-  const error = useSelector(selectPrintersError);
   const printing = useSelector(selectSendingPrint);
 
-  const [printerSettings, setPrinterSettings] = useState({
-    printer: ''
-  });
+  const [connectedPrinters, setConnectedPrinters] = useState([]);
+  const [selectedPrinterId, setSelectedPrinterId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+
+  const loadPrinters = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [connectedRes, permsRes] = await Promise.all([
+        apiAxios.get('/printers/connected'),
+        apiAxios.get('/printers/me/permissions'),
+      ]);
+      dispatch(fetchAvailablePrinters());
+
+      const connected = connectedRes.data || [];
+      const perms = permsRes.data || [];
+      setConnectedPrinters(connected);
+
+      const currentPerm = perms.find((p) => p.is_current) || perms[0];
+      let printerId = currentPerm?.printer_id ? String(currentPerm.printer_id) : '';
+
+      const isConnected = (id) => connected.some((p) => String(p.id) === String(id));
+
+      if (printerId && !isConnected(printerId)) {
+        printerId = '';
+      }
+
+      if (!printerId && connected.length > 0) {
+        const preferred = connected.find((p) => p.is_default) || connected[0];
+        try {
+          await apiAxios.post(`/printers/id/${preferred.id}/grant`);
+          printerId = String(preferred.id);
+        } catch (grantErr) {
+          printerId = String(preferred.id);
+          console.warn('grant printer failed', grantErr);
+        }
+      }
+
+      setSelectedPrinterId(printerId);
+    } catch (e) {
+      setConnectedPrinters([]);
+      setSelectedPrinterId('');
+      setLoadError(e?.response?.data?.detail || 'Ошибка загрузки принтеров');
+    } finally {
+      setLoading(false);
+    }
+  }, [dispatch]);
 
   useEffect(() => {
-    if (isOpen) {
-      dispatch(fetchAvailablePrinters());
+    if (!isOpen) {
+      setSelectedPrinterId('');
+      setConnectedPrinters([]);
+      setLoadError(null);
+      return undefined;
     }
+
+    loadPrinters();
     return () => {
       dispatch(clearError());
     };
-  }, [isOpen, dispatch]);
+  }, [isOpen, loadPrinters, dispatch]);
 
-  useEffect(() => {
-    if (printers && printers.length > 0 && !printerSettings.printer) {
-      const defaultPrinter = printers.find(p => p.is_default);
-      if (defaultPrinter) {
-        setPrinterSettings(prev => ({ ...prev, printer: defaultPrinter.id }));
-      } else if (printers.length === 1) {
-        setPrinterSettings(prev => ({ ...prev, printer: printers[0].id }));
-      }
+  const handleSelectPrinter = async (printerId) => {
+    setSelectedPrinterId(printerId);
+    if (!printerId) return;
+    try {
+      await apiAxios.post(`/printers/id/${printerId}/grant`);
+    } catch (e) {
+      setLoadError(e?.response?.data?.detail || 'Не удалось назначить принтер');
     }
-  }, [printers, printerSettings.printer]);
+  };
 
   if (!isOpen) return null;
 
-  const handleSettingChange = (field, value) => {
-    setPrinterSettings(prev => ({ ...prev, [field]: value }));
-  };
-
   const handlePrint = async () => {
-    if (!printerSettings.printer) {
+    if (!selectedPrinterId) {
       alert('Выберите принтер');
       return;
     }
@@ -254,14 +294,15 @@ const PrintReceiptModal = ({
       copies: 1
     };
 
-    const result = await dispatch(printLabel({
-      printerId: printerSettings.printer,
-      productData
-    })).unwrap();
-
-    if (result) {
-      alert(`Задача печати отправлена!\nID задачи: ${result.job_id}`);
+    try {
+      await dispatch(printLabel({
+        printerId: selectedPrinterId,
+        productData
+      })).unwrap();
       onClose();
+    } catch (e) {
+      const msg = typeof e === 'string' ? e : (e?.message || 'Ошибка печати');
+      setLoadError(msg);
     }
   };
 
@@ -298,26 +339,47 @@ const PrintReceiptModal = ({
               </label>
               {loading ? (
                 <div className="text-sm text-gray-500">Загрузка списка принтеров...</div>
-              ) : error ? (
-                <div className="text-sm text-red-600">{error}</div>
-              ) : printers.length === 0 ? (
-                <div className="text-sm text-orange-600">
-                  Принтеры не найдены. Выберите принтер в разделе "Печать" или убедитесь, что агент запущен.
+              ) : loadError ? (
+                <div className="text-sm text-red-600">
+                  {typeof loadError === 'string' ? loadError : 'Ошибка загрузки'}
                   <button
-                    onClick={() => dispatch(fetchAvailablePrinters())}
+                    type="button"
+                    onClick={loadPrinters}
                     className="ml-2 text-indigo-600 underline hover:text-indigo-800"
                   >
                     Обновить
                   </button>
                 </div>
+              ) : connectedPrinters.length === 0 ? (
+                <div className="text-sm text-orange-600 space-y-2">
+                  <p>
+                    Принтеры не найдены. Убедитесь, что агент печати запущен, или выберите принтер в настройках.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={loadPrinters}
+                      className="text-indigo-600 underline hover:text-indigo-800"
+                    >
+                      Обновить
+                    </button>
+                    <Link
+                      to="/settings/printers"
+                      onClick={onClose}
+                      className="text-indigo-600 underline hover:text-indigo-800"
+                    >
+                      Перейти в настройки печати
+                    </Link>
+                  </div>
+                </div>
               ) : (
                 <select
-                  value={printerSettings.printer}
-                  onChange={(e) => handleSettingChange('printer', e.target.value)}
+                  value={selectedPrinterId}
+                  onChange={(e) => handleSelectPrinter(e.target.value)}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="">Выберите принтер</option>
-                  {printers.map((printer) => (
+                  {connectedPrinters.map((printer) => (
                     <option key={printer.id} value={printer.id}>
                       {printer.name} {printer.is_default ? '(По умолчанию)' : ''}
                     </option>
@@ -344,8 +406,8 @@ const PrintReceiptModal = ({
             <div className="pt-1">
               <button
                 onClick={handlePrint}
-                disabled={!printerSettings.printer || printing}
-                className={`w-full px-4 py-3 rounded-lg font-semibold transition-colors ${!printerSettings.printer || printing
+                disabled={!selectedPrinterId || printing}
+                className={`w-full px-4 py-3 rounded-lg font-semibold transition-colors ${!selectedPrinterId || printing
                   ? 'bg-indigo-400 text-white cursor-not-allowed'
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                   }`}

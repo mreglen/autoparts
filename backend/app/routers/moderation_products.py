@@ -17,6 +17,7 @@ from app.models.product_storage_cell import ProductStorageCell
 from app.models.pending_product_storage_cell import PendingProductStorageCell
 from app.schemas.moderation import ModerateProductRequest, ModerateProductResponse
 from app.schemas.rejected_product import RejectedProductCreate
+from app.schemas.pending_product import PendingProductCreate
 from app.schemas.product import ProductCreate
 from app.core.auth import get_current_admin_user, get_current_user
 from app.services.audit_service import log_audit
@@ -28,11 +29,36 @@ router = APIRouter(prefix="/moderation/products", tags=["Moderation Products"])
 def _safe_json_list(raw):
     if not raw:
         return []
+    if isinstance(raw, list):
+        return raw
+    if not isinstance(raw, str):
+        return []
+    raw = raw.strip()
+    if not raw:
+        return []
     try:
         parsed = json.loads(raw)
         return parsed if isinstance(parsed, list) else []
     except Exception:
         return []
+
+
+def _normalize_media_urls(items):
+    urls = []
+    for item in items or []:
+        if isinstance(item, str) and item.strip():
+            urls.append(item.strip())
+        elif isinstance(item, dict):
+            url = (
+                item.get("full_url")
+                or item.get("photo_url")
+                or item.get("video_url")
+                or item.get("url")
+                or item.get("path")
+            )
+            if url:
+                urls.append(url)
+    return urls
 
 
 def _organization_payload(organization):
@@ -48,15 +74,29 @@ def _organization_payload(organization):
 
 def _serialize_moderation_product(product):
     product_dict = product.__dict__.copy()
-    product_dict["photos"] = _safe_json_list(product_dict.get("photos"))
-    product_dict["videos"] = _safe_json_list(product_dict.get("videos"))
+    product_dict["photos"] = _normalize_media_urls(_safe_json_list(product_dict.get("photos")))
+    product_dict["videos"] = _normalize_media_urls(_safe_json_list(product_dict.get("videos")))
     product_dict["vehicle_ids"] = _safe_json_list(product_dict.get("vehicle_ids"))
     product_dict["storage_location_address"] = (
         product.storage_location.address if product.storage_location else None
     )
     product_dict["organization"] = _organization_payload(product.organization)
+    product_dict["creator_name"] = getattr(product, "creator_name", None)
     product_dict.pop("_sa_instance_state", None)
     return product_dict
+
+
+def _get_owned_rejected_product(db: Session, product_id: int, user: User):
+    product = db.query(RejectedProductModel).filter(
+        RejectedProductModel.id == product_id,
+        RejectedProductModel.created_by == user.id,
+    ).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Запчасть не найдена",
+        )
+    return product
 
 
 @router.get("/pending", response_model=list)
@@ -92,32 +132,105 @@ def get_my_rejected_products(
         .offset(skip)\
         .limit(limit)\
         .all()
-    
-    
-    result = []
-    for product in products:
-        product_dict = product.__dict__.copy()
-        if product_dict.get('photos'):
-            try:
-                product_dict['photos'] = json.loads(product_dict['photos'])
-            except:
-                product_dict['photos'] = []
-        else:
-            product_dict['photos'] = []
-            
-        if product_dict.get('vehicle_ids'):
-            try:
-                product_dict['vehicle_ids'] = json.loads(product_dict['vehicle_ids'])
-            except:
-                product_dict['vehicle_ids'] = []
-        else:
-            product_dict['vehicle_ids'] = []
-            
 
-        product_dict.pop('_sa_instance_state', None)
-        result.append(product_dict)
+    result = [_serialize_moderation_product(product) for product in products]
 
     return jsonable_encoder(result)
+
+
+@router.get("/rejected/my/{product_id}", response_model=dict)
+def get_my_rejected_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Получить одну отклонённую запчасть текущего пользователя"""
+    product = _get_owned_rejected_product(db, product_id, current_user)
+    return jsonable_encoder(_serialize_moderation_product(product))
+
+
+@router.delete("/rejected/my/{product_id}")
+def delete_my_rejected_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Удалить отклонённую запчасть текущего пользователя"""
+    product = _get_owned_rejected_product(db, product_id, current_user)
+    product_name = product.name or product.article
+    org_id = product.organization_id
+    db.delete(product)
+    db.commit()
+    log_audit(
+        db,
+        event_type="rejected_product_deleted",
+        category="products",
+        summary=f"Отклонённая запчасть удалена: {product_name or product_id}",
+        user=current_user,
+        organization_id=org_id,
+        details={"rejected_product_id": product_id},
+        entity_type="rejected_product",
+        entity_id=product_id,
+    )
+    return {"message": "Запчасть успешно удалена"}
+
+
+@router.post("/rejected/my/{product_id}/resubmit", response_model=dict)
+def resubmit_rejected_product(
+    product_id: int,
+    product_data: PendingProductCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Повторно отправить отклонённую запчасть на модерацию"""
+    rejected = _get_owned_rejected_product(db, product_id, current_user)
+
+    if not product_data.part_type_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Выберите вид запчасти",
+        )
+
+    photos_json = json.dumps(product_data.photos) if product_data.photos else None
+    videos_json = json.dumps(product_data.videos) if product_data.videos else None
+    vehicle_ids_json = json.dumps(product_data.vehicle_ids) if product_data.vehicle_ids else None
+
+    db_pending = PendingProductModel(
+        article=product_data.article,
+        name=product_data.name,
+        brand=product_data.brand,
+        description=product_data.description,
+        is_new=product_data.is_new,
+        price=product_data.price,
+        quantity=product_data.quantity,
+        storage_location_id=product_data.storage_location_id,
+        part_type_id=product_data.part_type_id,
+        photos=photos_json,
+        videos=videos_json,
+        vehicle_ids=vehicle_ids_json,
+        internal_code=rejected.internal_code,
+        organization_id=rejected.organization_id or current_user.organization_id,
+        created_by=current_user.id,
+    )
+
+    db.add(db_pending)
+    db.delete(rejected)
+    db.commit()
+    db.refresh(db_pending)
+
+    log_audit(
+        db,
+        event_type="product_resubmitted_to_moderation",
+        category="products",
+        summary=f"Запчасть повторно отправлена на модерацию: {db_pending.name or db_pending.article or db_pending.id}",
+        user=current_user,
+        organization_id=db_pending.organization_id,
+        details={"rejected_product_id": product_id, "pending_product_id": db_pending.id},
+        entity_type="pending_product",
+        entity_id=db_pending.id,
+    )
+
+    return jsonable_encoder(_serialize_moderation_product(db_pending))
 
 
 @router.post("/{product_id}/approve", response_model=ModerateProductResponse)
@@ -305,12 +418,8 @@ def reject_product(
 ):
     """Отклонить запчасть - перенести в rejected_products"""
     
-    if not moderation_data.rejection_reason or not moderation_data.rejection_reason.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Необходимо указать причину отклонения"
-        )
-    
+    rejection_reason = (moderation_data.rejection_reason or '').strip()
+
     # Найти запчасть в pending
     pending_product = db.query(PendingProductModel)\
         .filter(PendingProductModel.id == product_id)\
@@ -322,8 +431,7 @@ def reject_product(
             detail="Запчасть не найдена"
         )
     
-    # Создать запись в rejected_products
-    rejected_data = RejectedProductCreate(
+    db_rejected = RejectedProductModel(
         article=pending_product.article,
         name=pending_product.name,
         brand=pending_product.brand,
@@ -334,14 +442,13 @@ def reject_product(
         quantity=pending_product.quantity,
         organization_id=pending_product.organization_id,
         storage_location_id=pending_product.storage_location_id,
+        part_type_id=pending_product.part_type_id,
         created_by=pending_product.created_by,
-        rejection_reason=moderation_data.rejection_reason.strip(),
-        photos=json.loads(pending_product.photos) if pending_product.photos else None,
-        videos=json.loads(pending_product.videos) if pending_product.videos else None,
-        vehicle_ids=json.loads(pending_product.vehicle_ids) if pending_product.vehicle_ids else None
+        rejection_reason=rejection_reason,
+        photos=pending_product.photos,
+        videos=pending_product.videos,
+        vehicle_ids=pending_product.vehicle_ids,
     )
-    
-    db_rejected = RejectedProductModel(**rejected_data.dict())
     db.add(db_rejected)
     pending_org_id = pending_product.organization_id
 
@@ -357,7 +464,7 @@ def reject_product(
         summary=f"Товар отклонён модерацией (pending #{product_id})",
         user=current_user,
         organization_id=pending_org_id,
-        details={"pending_product_id": product_id, "reason": moderation_data.rejection_reason},
+        details={"pending_product_id": product_id, "reason": rejection_reason or None},
     )
     return ModerateProductResponse(
         message="Запчасть отклонена",
