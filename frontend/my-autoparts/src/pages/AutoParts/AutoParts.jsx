@@ -23,6 +23,7 @@ import NewPartsResults from './NewParts/NewPartsResults';
 import MobileCompactSearch from '../../components/MobileCompactSearch/MobileCompactSearch';
 import {
   buildUsedCatalogParams,
+  buildUsedCatalogFilterParams,
   getUsedPartsUrlQuery,
 } from '../../utils/autopartsPublic';
 
