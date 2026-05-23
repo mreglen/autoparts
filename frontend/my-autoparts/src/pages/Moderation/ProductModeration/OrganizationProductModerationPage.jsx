@@ -148,6 +148,9 @@ export default function OrganizationProductModerationPage() {
             onConfirm: async () => {
                 try {
                     await dispatch(approveProduct(productId)).unwrap();
+                    if (viewProduct?.id === productId && viewProduct?.moderationKind === 'pending') {
+                        setViewProduct(null);
+                    }
                     setSuccessModalData({
                         title: 'Успешно!',
                         message: 'Запчасть успешно одобрена и добавлена в каталог',
@@ -348,6 +351,8 @@ export default function OrganizationProductModerationPage() {
                 isOpen={Boolean(viewProduct)}
                 onClose={() => setViewProduct(null)}
                 onImageClick={handleOpenMediaModal}
+                onApprove={viewProduct?.moderationKind === 'pending' ? handleApprove : undefined}
+                onReject={viewProduct?.moderationKind === 'pending' ? handleRejectClick : undefined}
             />
 
             <MediaModal

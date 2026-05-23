@@ -37,7 +37,14 @@ export const printLabel = createAsyncThunk(
       const response = await apiAxios.post(`/printers/id/${printerId}/print-label`, productData);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.detail || 'Failed to print label');
+      const detail = error.response?.data?.detail;
+      let message = 'Не удалось напечатать этикетку';
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail) && detail[0]?.msg) {
+        message = detail[0].msg;
+      }
+      return rejectWithValue(message);
     }
   }
 );

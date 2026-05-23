@@ -6,7 +6,7 @@ import {
   selectCatalogFacets,
   selectPublicPartTypes,
 } from '../../../redux/slices/ProductSlice';
-import { selectSearchQuery } from '../../../redux/slices/RosskoSlice';
+import { isUsedCatalogBrowseMode } from '../../../utils/autopartsPublic';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
@@ -25,8 +25,7 @@ export default function UsedPartsFiltersForm({ updateCatalogUrl, showClearInPane
   const catalogItems = useSelector(selectCatalogItems);
   const catalogFacets = useSelector(selectCatalogFacets);
   const publicPartTypes = useSelector(selectPublicPartTypes);
-  const searchQuery = useSelector(selectSearchQuery);
-  const isCatalogMode = !(searchQuery || '').trim();
+  const isCatalogMode = isUsedCatalogBrowseMode(searchParams);
 
   const availableParts = useMemo(
     () => (isCatalogMode ? catalogItems : (usedPartsData?.available_parts || [])),

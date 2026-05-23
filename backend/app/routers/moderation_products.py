@@ -284,6 +284,10 @@ def approve_product(
             break
         next_code += 1
     
+    approved_quantity = pending_product.quantity
+    if approved_quantity is None or approved_quantity < 1:
+        approved_quantity = 1
+
     # Создать запись в products (без vehicle_ids и photos)
     db_product = ProductModel(
         article=pending_product.article,
@@ -293,7 +297,7 @@ def approve_product(
         description=pending_product.description,
         is_new=pending_product.is_new,
         price=pending_product.price,
-        quantity=pending_product.quantity,
+        quantity=approved_quantity,
         organization_id=pending_product.organization_id,
         storage_location_id=pending_product.storage_location_id,
         created_by=pending_product.created_by,
@@ -362,7 +366,7 @@ def approve_product(
     # Создаем запись в поступлениях (stock_in)
     # Для этого создаем запись в stock_in напрямую без связанного acquired_product
     stock_in = StockInModel(
-        quantity=pending_product.quantity,
+        quantity=approved_quantity,
         sale_price=pending_product.price,
         organization_id=pending_product.organization_id,
         storage_location_id=pending_product.storage_location_id,

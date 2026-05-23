@@ -206,8 +206,18 @@ export function SellerPartDetailModal({ part, isOpen, onClose, getStorageAddress
     );
 }
 
-export function ModerationProductViewModal({ product, isOpen, onClose, onImageClick }) {
+export function ModerationProductViewModal({
+    product,
+    isOpen,
+    onClose,
+    onImageClick,
+    onApprove,
+    onReject,
+}) {
     if (!product) return null;
+
+    const isPending = product.moderationKind === 'pending';
+    const showModerationActions = isPending && (onApprove || onReject);
 
     return (
         <WorkspaceDetailShell
@@ -222,6 +232,28 @@ export function ModerationProductViewModal({ product, isOpen, onClose, onImageCl
                 hideSiteLink
                 moderationKind={product.moderationKind}
             />
+            {showModerationActions && (
+                <div className="flex flex-col sm:flex-row gap-3 pt-5 mt-5 border-t border-gray-200">
+                    {onApprove && (
+                        <button
+                            type="button"
+                            onClick={() => onApprove(product.id)}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 px-4 rounded-lg text-sm font-medium transition-colors"
+                        >
+                            Принять
+                        </button>
+                    )}
+                    {onReject && (
+                        <button
+                            type="button"
+                            onClick={() => onReject(product)}
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 px-4 rounded-lg text-sm font-medium transition-colors"
+                        >
+                            Отклонить
+                        </button>
+                    )}
+                </div>
+            )}
         </WorkspaceDetailShell>
     );
 }

@@ -29,7 +29,7 @@ class Product(ProductBase):
     storage_location: Optional[StorageLocation] = None
     organization: Optional[Organization] = None
     part_type_id: int  # Required field
-    part_type: PartType  # Required field
+    part_type: Optional[PartType] = None
     is_on_avito: bool = False  # Indicates if product is published on Avito
     is_on_drom: bool = False  # Indicates if product is exported to Drom
 

@@ -21,6 +21,59 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
+function formatInternalCode(internalCode) {
+  if (!internalCode) return '—';
+  if (typeof internalCode === 'object') {
+    return internalCode.code || internalCode.id || '—';
+  }
+  return internalCode;
+}
+
+function getLabelQrUrl(selectedPart) {
+  if (!selectedPart?.id) return '';
+  const base = (typeof window !== 'undefined' && window.location?.origin)
+    ? window.location.origin
+    : '';
+  if (selectedPart.moderationKind === 'pending') {
+    return `${base}/my-parts/edit-pending/${selectedPart.id}`;
+  }
+  if (selectedPart.moderationKind === 'rejected') {
+    return `${base}/my-parts/resubmit/${selectedPart.id}`;
+  }
+  return `${base}/seller/part-card/${selectedPart.id}`;
+}
+
+function buildLabelPrintPayload(selectedPart, productStorageCells) {
+  const storageAddress = productStorageCells && productStorageCells.length > 0
+    ? productStorageCells
+      .map((cell) => cell.value || cell.id || '')
+      .filter(Boolean)
+      .join(';')
+    : '—';
+
+  const base = {
+    brand: selectedPart?.brand || '—',
+    article: selectedPart?.article || '—',
+    storage_address: storageAddress,
+    name: selectedPart?.name || '—',
+    internal_code: formatInternalCode(selectedPart?.internal_code),
+    price: selectedPart?.price != null
+      ? `${parseFloat(selectedPart.price).toFixed(0)} ₽`
+      : '—',
+    width_mm: 58,
+    height_mm: 38,
+    copies: 1,
+  };
+
+  if (selectedPart?.moderationKind === 'pending') {
+    return { ...base, source: 'pending', pending_product_id: selectedPart.id };
+  }
+  if (selectedPart?.moderationKind === 'rejected') {
+    return { ...base, source: 'rejected', rejected_product_id: selectedPart.id };
+  }
+  return { ...base, source: 'product', product_id: selectedPart?.id };
+}
+
 function useElementSize(ref) {
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -78,12 +131,10 @@ function LabelPreview({ widthMm, heightMm, selectedPart, productStorageCells }) 
       .join(';');
   }, [productStorageCells]);
 
-  const qrTargetUrl = useMemo(() => {
-    const productId = selectedPart?.id;
-    if (!productId) return '';
-    const base = (typeof window !== 'undefined' && window.location?.origin) ? window.location.origin : '';
-    return `${base}/seller/part-card/${productId}`;
-  }, [selectedPart?.id]);
+  const qrTargetUrl = useMemo(
+    () => getLabelQrUrl(selectedPart),
+    [selectedPart]
+  );
 
   const [qrPreviewSrc, setQrPreviewSrc] = useState('');
 
@@ -339,29 +390,7 @@ const PrintReceiptModal = ({
       return;
     }
 
-    const productData = {
-      product_id: selectedPart?.id,
-      brand: selectedPart?.brand || '—',
-      article: selectedPart?.article || '—',
-      storage_address: productStorageCells && productStorageCells.length > 0
-        ? productStorageCells
-          .map(cell => cell.value || cell.id || '')
-          .filter(value => value)
-          .join(';')
-        : '—',
-      name: selectedPart?.name || '—',
-      internal_code: selectedPart?.internal_code
-        ? (typeof selectedPart.internal_code === 'object'
-          ? (selectedPart.internal_code.code || selectedPart.internal_code.id || '—')
-          : selectedPart.internal_code)
-        : '—',
-      price: selectedPart?.price != null
-        ? `${parseFloat(selectedPart.price).toFixed(0)} ₽`
-        : '—',
-      width_mm: 58,
-      height_mm: 38,
-      copies: 1
-    };
+    const productData = buildLabelPrintPayload(selectedPart, productStorageCells);
 
     try {
       await dispatch(printLabel({

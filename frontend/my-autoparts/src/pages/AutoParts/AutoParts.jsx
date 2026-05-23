@@ -20,6 +20,11 @@ import UsedPartsList from './UsedParts/UsedPartsList';
 import NewPartsLanding from './NewParts/NewPartsLanding';
 import NewPartsResults from './NewParts/NewPartsResults';
 import MobileCompactSearch from '../../components/MobileCompactSearch/MobileCompactSearch';
+import {
+  buildUsedCatalogParams,
+  getUsedPartsUrlQuery,
+  isUsedCatalogBrowseMode,
+} from '../../utils/autopartsPublic';
 
 const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs'];
 
@@ -195,38 +200,23 @@ function AutoParts() {
   useEffect(() => {
     if (activeTab !== 'my') return;
 
-    dispatch(fetchCatalogFacets({ is_new: false }));
+    dispatch(fetchCatalogFacets({}));
     dispatch(fetchPublicPartTypes());
 
-    const trimmed = (searchQuery || '').trim();
-    if (trimmed) {
-      dispatch(searchUsedParts(trimmed));
+    const urlQ = getUsedPartsUrlQuery(searchParams);
+    if (urlQ) {
+      if ((searchQuery || '').trim() !== urlQ) {
+        dispatch(setSearchQuery(urlQ));
+      }
+      dispatch(searchUsedParts(urlQ));
       return;
     }
 
-    const params = {
-      page: parseInt(searchParams.get('page') || '1', 10),
-      page_size: 20,
-      sort: searchParams.get('sort') || 'created_at_desc',
-      is_new: false,
-    };
-    const partTypes = searchParams.getAll('part_type').map((value) => parseInt(value, 10)).filter(Number.isFinite);
-    if (partTypes.length) params.part_type_id = partTypes;
-    const brands = searchParams.getAll('brand').filter(Boolean);
-    if (brands.length) params.brand = brands;
-    const vmin = searchParams.get('vmin');
-    if (vmin) params.price_min = parseFloat(vmin);
-    const vmax = searchParams.get('vmax');
-    if (vmax) params.price_max = parseFloat(vmax);
-    const vehicleBrands = searchParams.getAll('vb').filter(Boolean);
-    if (vehicleBrands.length) params.vehicle_brand = vehicleBrands;
-    const vehicleModels = searchParams.getAll('vm').filter(Boolean);
-    if (vehicleModels.length) params.vehicle_model = vehicleModels;
-    const vehicleId = searchParams.get('vehicle_id');
-    if (vehicleId) params.vehicle_id = parseInt(vehicleId, 10);
-    if (searchParams.get('has_photos') === '1') params.has_photos = true;
+    if ((searchQuery || '').trim()) {
+      dispatch(setSearchQuery(''));
+    }
 
-    dispatch(fetchCatalogProducts(params));
+    dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams)));
   }, [searchQuery, activeTab, searchParams, dispatch]);
 
   useEffect(() => {

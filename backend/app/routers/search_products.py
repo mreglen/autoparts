@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, coalesce
 from sqlalchemy.orm import Session, selectinload
 import re
 import logging
@@ -56,7 +56,7 @@ def search_local_products_query(db: Session, q: str, is_new: bool = None):
         selectinload(ProductModel.photos),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
-    ).filter(or_(*conditions), ProductModel.quantity > 0)
+    ).filter(or_(*conditions), coalesce(ProductModel.quantity, 0) > 0)
     
     if is_new is not None:
         query = query.filter(ProductModel.is_new == is_new)
@@ -134,7 +134,7 @@ async def search_combined(q: str, db: Session = Depends(get_db)):
             get_sql_normalize(ProductModel.article).ilike(f"%{normalized_q}%") if normalized_q else False,
             ProductModel.name.ilike(f"%{trimmed_query}%")
         ),
-        ProductModel.quantity > 0
+        coalesce(ProductModel.quantity, 0) > 0
     ).all()
 
     # 3. Разделение результатов
@@ -235,7 +235,7 @@ async def search_used_parts(
                     selectinload(ProductModel.organization)
                 ).filter(
                     get_sql_normalize(ProductModel.article).in_(list(analog_pns)),
-                    ProductModel.quantity > 0
+                    coalesce(ProductModel.quantity, 0) > 0
                 ).all()
                 
                 # Исключаем те, что уже найдены как прямые соответствия

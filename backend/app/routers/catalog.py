@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import exists, func, or_
+from sqlalchemy import exists, func, or_, coalesce
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.database import get_db
@@ -96,6 +96,11 @@ def _apply_catalog_filters(
     return query
 
 
+def _in_stock_filter():
+    """Товары в наличии: quantity > 0 (NULL считаем нулём)."""
+    return coalesce(ProductModel.quantity, 0) > 0
+
+
 def _apply_sort(query, sort: str):
     if sort == "price_asc":
         return query.order_by(ProductModel.price.asc().nulls_last(), ProductModel.id.desc())
@@ -133,7 +138,7 @@ def list_catalog_products(
         query = (
             db.query(ProductModel)
             .options(*_catalog_load_options())
-            .filter(ProductModel.quantity > 0)
+            .filter(_in_stock_filter())
         )
         if is_new is not None:
             query = query.filter(ProductModel.is_new == is_new)
@@ -173,19 +178,20 @@ def list_catalog_products(
 
 @router.get("/facets", response_model=CatalogFacetsResponse)
 def get_catalog_facets(
-    is_new: bool = False,
+    is_new: Optional[bool] = None,
     limit: int = Query(30, ge=1, le=100),
     vehicle_brand: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
+    brand_q = db.query(ProductModel.brand, func.count(ProductModel.id)).filter(
+        _in_stock_filter(),
+        ProductModel.brand.isnot(None),
+        ProductModel.brand != "",
+    )
+    if is_new is not None:
+        brand_q = brand_q.filter(ProductModel.is_new == is_new)
     brand_rows = (
-        db.query(ProductModel.brand, func.count(ProductModel.id))
-        .filter(
-            ProductModel.quantity > 0,
-            ProductModel.is_new == is_new,
-            ProductModel.brand.isnot(None),
-            ProductModel.brand != "",
-        )
+        brand_q
         .group_by(ProductModel.brand)
         .order_by(func.count(ProductModel.id).desc())
         .limit(limit)
@@ -195,8 +201,10 @@ def get_catalog_facets(
     vehicle_q = (
         db.query(VehicleModel.brand, func.count(func.distinct(ProductModel.id)))
         .join(ProductModel.compatible_vehicles)
-        .filter(ProductModel.quantity > 0, ProductModel.is_new == is_new)
+        .filter(_in_stock_filter())
     )
+    if is_new is not None:
+        vehicle_q = vehicle_q.filter(ProductModel.is_new == is_new)
     vehicle_brand_rows = (
         vehicle_q.group_by(VehicleModel.brand)
         .order_by(func.count(func.distinct(ProductModel.id)).desc())
@@ -207,8 +215,10 @@ def get_catalog_facets(
     model_q = (
         db.query(VehicleModel.model, func.count(func.distinct(ProductModel.id)))
         .join(ProductModel.compatible_vehicles)
-        .filter(ProductModel.quantity > 0, ProductModel.is_new == is_new)
+        .filter(_in_stock_filter())
     )
+    if is_new is not None:
+        model_q = model_q.filter(ProductModel.is_new == is_new)
     if vehicle_brand and vehicle_brand.strip():
         model_q = model_q.filter(VehicleModel.brand.ilike(f"%{vehicle_brand.strip()}%"))
     vehicle_model_rows = (

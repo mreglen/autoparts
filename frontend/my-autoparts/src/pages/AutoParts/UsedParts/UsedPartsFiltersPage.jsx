@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { selectSearchQuery } from '../../../redux/slices/RosskoSlice';
 import {
   searchUsedParts,
   fetchCatalogProducts,
@@ -11,13 +10,16 @@ import {
 import { fetchCart } from '../../../redux/slices/CartSlice';
 import UsedPartsFiltersForm from './UsedPartsFiltersForm';
 import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
+import {
+  buildUsedCatalogParams,
+  getUsedPartsUrlQuery,
+} from '../../../utils/autopartsPublic';
 import { Z_MOBILE_STICKY_FOOTER } from '../../../constants/mobileTokens';
 
 export default function UsedPartsFiltersPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const searchQuery = useSelector(selectSearchQuery);
 
   const updateCatalogUrl = useCallback((updates) => {
     const params = new URLSearchParams(searchParams);
@@ -64,39 +66,17 @@ export default function UsedPartsFiltersPage() {
   }, [dispatch]);
 
   useEffect(() => {
-    dispatch(fetchCatalogFacets({ is_new: false }));
+    dispatch(fetchCatalogFacets({}));
     dispatch(fetchPublicPartTypes());
 
-    const trimmed = (searchQuery || '').trim();
-    if (trimmed) {
-      dispatch(searchUsedParts(trimmed));
+    const urlQ = getUsedPartsUrlQuery(searchParams);
+    if (urlQ) {
+      dispatch(searchUsedParts(urlQ));
       return;
     }
 
-    const params = {
-      page: parseInt(searchParams.get('page') || '1', 10),
-      page_size: 20,
-      sort: searchParams.get('sort') || 'created_at_desc',
-      is_new: false,
-    };
-    const partTypes = searchParams.getAll('part_type').map((value) => parseInt(value, 10)).filter(Number.isFinite);
-    if (partTypes.length) params.part_type_id = partTypes;
-    const brands = searchParams.getAll('brand').filter(Boolean);
-    if (brands.length) params.brand = brands;
-    const vmin = searchParams.get('vmin');
-    if (vmin) params.price_min = parseFloat(vmin);
-    const vmax = searchParams.get('vmax');
-    if (vmax) params.price_max = parseFloat(vmax);
-    const vehicleBrands = searchParams.getAll('vb').filter(Boolean);
-    if (vehicleBrands.length) params.vehicle_brand = vehicleBrands;
-    const vehicleModels = searchParams.getAll('vm').filter(Boolean);
-    if (vehicleModels.length) params.vehicle_model = vehicleModels;
-    const vehicleId = searchParams.get('vehicle_id');
-    if (vehicleId) params.vehicle_id = parseInt(vehicleId, 10);
-    if (searchParams.get('has_photos') === '1') params.has_photos = true;
-
-    dispatch(fetchCatalogProducts(params));
-  }, [searchQuery, searchParams, dispatch]);
+    dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams)));
+  }, [searchParams, dispatch]);
 
   const hasFilters = usedHasActiveFilters(searchParams);
 

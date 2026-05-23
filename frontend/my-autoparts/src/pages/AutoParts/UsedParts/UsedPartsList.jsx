@@ -10,9 +10,9 @@ import {
   selectCatalogPageSize,
   selectCatalogLoading,
 } from '../../../redux/slices/ProductSlice';
-import { selectSearchQuery } from '../../../redux/slices/RosskoSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
 import { normalizeImageUrl } from '../../../utils/apiClient';
+import { isUsedCatalogBrowseMode } from '../../../utils/autopartsPublic';
 
 // Селекторы для б/у запчастей
 const selectUsedPartsData = (state) => state.products.usedPartsData;
@@ -58,8 +58,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const catalogTotal = useSelector(selectCatalogTotal);
   const catalogPage = useSelector(selectCatalogPage);
   const catalogPageSize = useSelector(selectCatalogPageSize);
-  const searchQuery = useSelector(selectSearchQuery);
-  const isCatalogMode = !(searchQuery || '').trim();
+  const isCatalogMode = isUsedCatalogBrowseMode(searchParams);
   const catalogLoading = useSelector(selectCatalogLoading);
   const usedPartsLoading = useSelector(selectUsedPartsLoading);
   const status = isCatalogMode

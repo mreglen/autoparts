@@ -15,6 +15,8 @@ from app.core.config import settings
 from app.models.user import User
 from app.models.organization import Organization
 from app.models.product import Product as ProductModel
+from app.models.pending_product import PendingProduct
+from app.models.rejected_product import RejectedProduct
 from app.models.printer_agent import PrinterAgent
 from app.models.printer_agent_printer import PrinterAgentPrinter
 from app.models.printer_permission import PrinterPermission
@@ -462,6 +464,68 @@ async def print_test_label(
         raise HTTPException(status_code=500, detail=f"Failed to send print command: {str(e)}")
 
 
+def _resolve_label_qr_url(payload: dict, current_user: User, db: Session) -> str:
+    """QR для этикетки: складской товар, на модерации или отклонённый."""
+    base_url = _normalize_public_base_url(settings.PUBLIC_BASE_URL or "")
+    source = (payload.get("source") or "product").strip().lower()
+
+    if source == "pending":
+        try:
+            pending_id = int(payload.get("pending_product_id") or payload.get("product_id"))
+        except Exception:
+            raise HTTPException(status_code=422, detail="pending_product_id is required")
+        row = (
+            db.query(PendingProduct)
+            .filter(
+                PendingProduct.id == pending_id,
+                PendingProduct.organization_id == current_user.organization_id,
+            )
+            .first()
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Pending product not found")
+        path = f"/my-parts/edit-pending/{pending_id}"
+        return f"{base_url}{path}" if base_url else path
+
+    if source == "rejected":
+        try:
+            rejected_id = int(payload.get("rejected_product_id") or payload.get("product_id"))
+        except Exception:
+            raise HTTPException(status_code=422, detail="rejected_product_id is required")
+        row = (
+            db.query(RejectedProduct)
+            .filter(
+                RejectedProduct.id == rejected_id,
+                RejectedProduct.organization_id == current_user.organization_id,
+            )
+            .first()
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Rejected product not found")
+        path = f"/my-parts/resubmit/{rejected_id}"
+        return f"{base_url}{path}" if base_url else path
+
+    try:
+        product_id = int(payload.get("product_id"))
+    except Exception:
+        raise HTTPException(status_code=422, detail="product_id is required")
+
+    product = (
+        db.query(ProductModel)
+        .filter(
+            ProductModel.id == product_id,
+            ProductModel.organization_id == current_user.organization_id,
+        )
+        .first()
+    )
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    if base_url:
+        return f"{base_url}/seller/part-card/{product_id}"
+    return f"/seller/part-card/{product_id}"
+
+
 @router.post("/id/{printer_id}/print-label")
 async def print_product_label(
     printer_id: str,
@@ -508,22 +572,6 @@ async def print_product_label(
     width_mm = int(getattr(perm, "label_width_mm", payload.get("width_mm", 58)))
     height_mm = int(getattr(perm, "label_height_mm", payload.get("height_mm", 38)))
 
-    try:
-        product_id = int(payload.get("product_id"))
-    except Exception:
-        raise HTTPException(status_code=422, detail="product_id is required")
-
-    product = (
-        db.query(ProductModel)
-        .filter(
-            ProductModel.id == product_id,
-            ProductModel.organization_id == current_user.organization_id,
-        )
-        .first()
-    )
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-
     # Extract product data from payload
     brand = payload.get("brand", "—")
     article = payload.get("article", "—")
@@ -531,8 +579,7 @@ async def print_product_label(
     name = payload.get("name", "—")
     internal_code = payload.get("internal_code", "—")
     price = payload.get("price", "—")
-    base_url = _normalize_public_base_url(settings.PUBLIC_BASE_URL or "")
-    qr_url = f"{base_url}/seller/part-card/{product_id}" if base_url else f"/seller/part-card/{product_id}"
+    qr_url = _resolve_label_qr_url(payload, current_user, db)
     qr_data_uri = _build_qr_data_uri(qr_url)
 
     tmpl = _templates_env.get_template("label_print.html")
