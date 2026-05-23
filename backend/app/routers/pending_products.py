@@ -17,6 +17,45 @@ from app.models.organization import Organization
 router = APIRouter(prefix="/pending-products", tags=["Pending Products"])
 
 
+def _require_organization(user: User) -> None:
+    if not user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Пользователь не привязан к организации",
+        )
+
+
+def _serialize_pending_product(product: PendingProductModel) -> dict:
+    product_dict = product.__dict__.copy()
+    if product_dict.get("photos"):
+        try:
+            product_dict["photos"] = json.loads(product_dict["photos"])
+        except Exception:
+            product_dict["photos"] = []
+    else:
+        product_dict["photos"] = []
+
+    if product_dict.get("videos"):
+        try:
+            product_dict["videos"] = json.loads(product_dict["videos"])
+        except Exception:
+            product_dict["videos"] = []
+    else:
+        product_dict["videos"] = []
+
+    if product_dict.get("vehicle_ids"):
+        try:
+            product_dict["vehicle_ids"] = json.loads(product_dict["vehicle_ids"])
+        except Exception:
+            product_dict["vehicle_ids"] = []
+    else:
+        product_dict["vehicle_ids"] = []
+
+    product_dict.pop("_sa_instance_state", None)
+    product_dict["creator_name"] = product.creator_name
+    return product_dict
+
+
 @router.post("/", response_model=PendingProduct)
 def create_pending_product(
     product_data: PendingProductCreate,
@@ -228,12 +267,17 @@ def get_pending_products(
     current_user: User = Depends(get_current_user)
 ):
     """Получить список всех запчастей в ожидании модерации для организации пользователя"""
-    
-    products = db.query(PendingProductModel)\
-        .filter(PendingProductModel.organization_id == current_user.organization_id)\
-        .offset(skip)\
-        .limit(limit)\
+    _require_organization(current_user)
+
+    products = (
+        db.query(PendingProductModel)
+        .filter(PendingProductModel.organization_id == current_user.organization_id)
+        .order_by(PendingProductModel.created_at.desc())
+        .offset(skip)
+        .limit(limit)
         .all()
+    )
+    return [_serialize_pending_product(product) for product in products]
 
 
 @router.get("/my", response_model=List[PendingProduct])
@@ -243,47 +287,18 @@ def get_my_pending_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Получить список запчастей в ожидании модерации, созданных текущим пользователем"""
-    
-    products = db.query(PendingProductModel)\
-        .filter(PendingProductModel.created_by == current_user.id)\
-        .offset(skip)\
-        .limit(limit)\
+    """Запчасти на модерации всей организации (для раздела «Мои запчасти» у сотрудников)."""
+    _require_organization(current_user)
+
+    products = (
+        db.query(PendingProductModel)
+        .filter(PendingProductModel.organization_id == current_user.organization_id)
+        .order_by(PendingProductModel.created_at.desc())
+        .offset(skip)
+        .limit(limit)
         .all()
-    
-    # Преобразуем JSON строки обратно в списки
-    result = []
-    for product in products:
-        product_dict = product.__dict__.copy()
-        if product_dict.get('photos'):
-            try:
-                product_dict['photos'] = json.loads(product_dict['photos'])
-            except:
-                product_dict['photos'] = []
-        else:
-            product_dict['photos'] = []
-        
-        if product_dict.get('videos'):
-            try:
-                product_dict['videos'] = json.loads(product_dict['videos'])
-            except:
-                product_dict['videos'] = []
-        else:
-            product_dict['videos'] = []
-            
-        if product_dict.get('vehicle_ids'):
-            try:
-                product_dict['vehicle_ids'] = json.loads(product_dict['vehicle_ids'])
-            except:
-                product_dict['vehicle_ids'] = []
-        else:
-            product_dict['vehicle_ids'] = []
-            
-        # Удаляем SQLAlchemy состояние
-        product_dict.pop('_sa_instance_state', None)
-        result.append(product_dict)
-    
-    return result
+    )
+    return [_serialize_pending_product(product) for product in products]
 
 
 @router.get("/{product_id}", response_model=PendingProduct)

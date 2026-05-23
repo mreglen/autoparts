@@ -5,8 +5,10 @@ import { apiAxios } from '../../utils/apiClient';
 import {
   CHANNEL_OPTIONS,
   buildFinanceQueryParams,
+  clampFinanceDate,
   formatFinanceCurrency,
   formatFinanceDate,
+  getFinanceTodayDate,
   getMonthRangeDefaults,
 } from './financeDisplay';
 import MobileCollapsibleFilters from '../../components/MobileCollapsibleFilters/MobileCollapsibleFilters';
@@ -50,6 +52,7 @@ export default function FinancePage() {
   const navigate = useNavigate();
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const defaults = useMemo(() => getMonthRangeDefaults(), []);
+  const todayDate = useMemo(() => getFinanceTodayDate(), []);
 
   const hasPermission =
     user?.is_admin ||
@@ -137,7 +140,7 @@ export default function FinancePage() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       const detail = err?.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : 'Не удалось скачать XLSX');
+      setError(typeof detail === 'string' ? detail : 'Не удалось выполнить экспорт');
     } finally {
       setExporting(false);
     }
@@ -169,7 +172,7 @@ export default function FinancePage() {
           disabled={exporting || loading}
           className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 shrink-0"
         >
-          {exporting ? 'Формируем файл...' : 'Скачать XLSX'}
+          {exporting ? 'Формируем файл...' : 'Экспорт в таблицу'}
         </button>
       </div>
 
@@ -181,7 +184,12 @@ export default function FinancePage() {
             <input
               type="date"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              max={dateTo < todayDate ? dateTo : todayDate}
+              onChange={(e) => {
+                const next = clampFinanceDate(e.target.value, todayDate);
+                setDateFrom(next);
+                if (next > dateTo) setDateTo(next);
+              }}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </label>
@@ -190,7 +198,13 @@ export default function FinancePage() {
             <input
               type="date"
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
+              min={dateFrom}
+              max={todayDate}
+              onChange={(e) => {
+                const next = clampFinanceDate(e.target.value, todayDate);
+                setDateTo(next);
+                if (next < dateFrom) setDateFrom(next);
+              }}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </label>
@@ -199,7 +213,8 @@ export default function FinancePage() {
             <input
               type="date"
               value={asOfDate}
-              onChange={(e) => setAsOfDate(e.target.value)}
+              max={todayDate}
+              onChange={(e) => setAsOfDate(clampFinanceDate(e.target.value, todayDate))}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </label>

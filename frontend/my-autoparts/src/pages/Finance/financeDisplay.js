@@ -24,13 +24,30 @@ export function formatFinanceDate(value) {
   });
 }
 
+export function formatFinanceDateInput(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Сегодня (локальная дата) в формате YYYY-MM-DD для input[type=date]. */
+export function getFinanceTodayDate() {
+  return formatFinanceDateInput(new Date());
+}
+
+/** Не позже maxDate (по умолчанию — сегодня). */
+export function clampFinanceDate(value, maxDate = getFinanceTodayDate()) {
+  if (!value) return maxDate;
+  return value > maxDate ? maxDate : value;
+}
+
 export function getMonthRangeDefaults() {
   const now = new Date();
+  const today = getFinanceTodayDate();
   const from = new Date(now.getFullYear(), now.getMonth(), 1);
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const pad = (n) => String(n).padStart(2, '0');
-  const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  return { dateFrom: fmt(from), dateTo: fmt(to), asOfDate: fmt(now) };
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const dateFrom = formatFinanceDateInput(from);
+  const dateTo = clampFinanceDate(formatFinanceDateInput(endOfMonth), today);
+  return { dateFrom, dateTo, asOfDate: today };
 }
 
 export function buildFinanceQueryParams({ dateFrom, dateTo, asOfDate, channel }) {

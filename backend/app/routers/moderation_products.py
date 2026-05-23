@@ -86,10 +86,15 @@ def _serialize_moderation_product(product):
     return product_dict
 
 
-def _get_owned_rejected_product(db: Session, product_id: int, user: User):
+def _get_org_rejected_product(db: Session, product_id: int, user: User):
+    if not user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Пользователь не привязан к организации",
+        )
     product = db.query(RejectedProductModel).filter(
         RejectedProductModel.id == product_id,
-        RejectedProductModel.created_by == user.id,
+        RejectedProductModel.organization_id == user.organization_id,
     ).first()
     if not product:
         raise HTTPException(
@@ -125,13 +130,21 @@ def get_my_rejected_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Получить список отклоненных запчастей, созданных текущим пользователем"""
-    
-    products = db.query(RejectedProductModel)\
-        .filter(RejectedProductModel.created_by == current_user.id)\
-        .offset(skip)\
-        .limit(limit)\
+    """Отклонённые запчасти всей организации (для раздела «На модерации» у сотрудников)."""
+    if not current_user.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Пользователь не привязан к организации",
+        )
+
+    products = (
+        db.query(RejectedProductModel)
+        .filter(RejectedProductModel.organization_id == current_user.organization_id)
+        .order_by(RejectedProductModel.rejected_at.desc())
+        .offset(skip)
+        .limit(limit)
         .all()
+    )
 
     result = [_serialize_moderation_product(product) for product in products]
 
@@ -145,7 +158,7 @@ def get_my_rejected_product(
     current_user: User = Depends(get_current_user),
 ):
     """Получить одну отклонённую запчасть текущего пользователя"""
-    product = _get_owned_rejected_product(db, product_id, current_user)
+    product = _get_org_rejected_product(db, product_id, current_user)
     return jsonable_encoder(_serialize_moderation_product(product))
 
 
@@ -155,8 +168,8 @@ def delete_my_rejected_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Удалить отклонённую запчасть текущего пользователя"""
-    product = _get_owned_rejected_product(db, product_id, current_user)
+    """Удалить отклонённую запчасть организации"""
+    product = _get_org_rejected_product(db, product_id, current_user)
     product_name = product.name or product.article
     org_id = product.organization_id
     db.delete(product)
@@ -183,7 +196,7 @@ def resubmit_rejected_product(
     current_user: User = Depends(get_current_user),
 ):
     """Повторно отправить отклонённую запчасть на модерацию"""
-    rejected = _get_owned_rejected_product(db, product_id, current_user)
+    rejected = _get_org_rejected_product(db, product_id, current_user)
 
     if not product_data.part_type_id:
         raise HTTPException(
