@@ -10,6 +10,8 @@ from app.db.schema_patches import (
     ensure_organization_markup_columns,
     ensure_stock_out_source_columns,
     ensure_avito_pro_status_columns,
+    ensure_site_reviews_table,
+    ensure_site_reviews_user_id_column,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
@@ -34,6 +36,7 @@ import app.models.yandex_oauth_state  # noqa: F401 — yandex oauth state
 import app.models.site_delivery_option  # noqa: F401 — site delivery matrix
 import app.models.site_quick_link  # noqa: F401 — site quick links
 import app.models.site_analytics  # noqa: F401 — site analytics
+import app.models.site_review  # noqa: F401 — site reviews
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings
@@ -84,6 +87,8 @@ try:
     ensure_garage_order_delivery_columns()
     ensure_avito_order_fulfillment_columns()
     ensure_avito_pro_status_columns()
+    ensure_site_reviews_table()
+    ensure_site_reviews_user_id_column()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
 except Exception as e:

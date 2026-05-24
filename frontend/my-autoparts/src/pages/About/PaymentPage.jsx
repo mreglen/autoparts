@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 
 export default function PaymentPage() {
@@ -26,12 +25,6 @@ export default function PaymentPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <nav className="text-sm text-gray-500 mb-6">
-        <Link to="/" className="hover:text-indigo-600">Главная</Link>
-        <span className="mx-2">/</span>
-        <span className="text-gray-900">Оплата</span>
-      </nav>
-
       <header className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Оплата</h1>
         <p className="mt-3 text-gray-600 leading-relaxed">

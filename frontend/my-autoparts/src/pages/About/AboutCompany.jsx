@@ -48,12 +48,6 @@ export default function AboutCompany() {
 
     return (
         <div className="max-w-4xl mx-auto">
-            <nav className="text-sm text-gray-500 mb-6">
-                <Link to="/" className="hover:text-indigo-600">Главная</Link>
-                <span className="mx-2">/</span>
-                <span className="text-gray-900">О компании</span>
-            </nav>
-
             <header className="mb-8">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">О компании</h1>
                 <p className="mt-3 text-gray-600 leading-relaxed">

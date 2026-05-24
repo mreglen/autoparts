@@ -49,6 +49,11 @@ export function buildBreadcrumbsForPath(pathname, context = {}) {
     return items;
   }
 
+  if (path === '/reviews') {
+    items.push({ label: 'Отзывы' });
+    return items;
+  }
+
   if (path === '/payment') {
     items.push({ label: 'Оплата' });
     return items;

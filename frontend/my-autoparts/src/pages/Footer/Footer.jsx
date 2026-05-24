@@ -34,6 +34,13 @@ function Footer() {
                     </NavLink>
                     <NavLink
                         exact
+                        to='/reviews'
+                        className='hover:text-blue_primary-light transition-colors ease-in-out'
+                    >
+                        Отзывы
+                    </NavLink>
+                    <NavLink
+                        exact
                         to='/about'
                         className='hover:text-blue_primary-light transition-colors ease-in-out'
                     >

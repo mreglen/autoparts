@@ -390,3 +390,68 @@ def ensure_avito_pro_status_columns() -> None:
 
     logger.info("Applied Avito Pro status column patches: %s", statements)
 
+
+def ensure_site_reviews_table() -> None:
+    """Create site_reviews table for public testimonials."""
+    inspector = inspect(engine)
+    if "site_reviews" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE site_reviews (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            author_name VARCHAR(120) NOT NULL,
+            author_role VARCHAR(80),
+            text TEXT NOT NULL,
+            rating INTEGER NOT NULL DEFAULT 5,
+            source VARCHAR(32) NOT NULL DEFAULT 'platform',
+            review_date TIMESTAMPTZ,
+            featured BOOLEAN NOT NULL DEFAULT FALSE,
+            enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE site_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id),
+            author_name VARCHAR(120) NOT NULL,
+            author_role VARCHAR(80),
+            text TEXT NOT NULL,
+            rating INTEGER NOT NULL DEFAULT 5,
+            source VARCHAR(32) NOT NULL DEFAULT 'platform',
+            review_date DATETIME,
+            featured BOOLEAN NOT NULL DEFAULT 0,
+            enabled BOOLEAN NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+
+    logger.info("Applied site_reviews table patch")
+
+
+def ensure_site_reviews_user_id_column() -> None:
+    """Add user_id to site_reviews for authenticated submissions."""
+    inspector = inspect(engine)
+    if "site_reviews" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("site_reviews")}
+    if "user_id" in columns:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE site_reviews ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+
+    logger.info("Applied site_reviews user_id column patch")
+

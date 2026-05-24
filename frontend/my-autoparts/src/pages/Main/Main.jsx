@@ -6,6 +6,9 @@ import { searchUsedParts } from '../../redux/slices/ProductSlice';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 import { buildPartDetailPath } from '../../utils/partRoutes';
 
+import ReviewsSection from '../../components/Reviews/ReviewsSection';
+import PageAmbientBackground from '../../components/PageAmbientBackground/PageAmbientBackground';
+
 const featureItems = [
   {
     title: 'Умный поиск',
@@ -73,21 +76,8 @@ function Main() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f6fb] text-gray-900">
-      {/* Фон: мягкие пятна + лёгкая сетка */}
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -left-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-blue-400/20 blur-3xl" />
-        <div className="absolute -bottom-40 -right-24 h-[32rem] w-[32rem] rounded-full bg-indigo-500/15 blur-3xl" />
-        <div className="absolute left-1/2 top-1/3 h-64 w-64 -translate-x-1/2 rounded-full bg-violet-400/10 blur-3xl" />
-        <div
-          className="absolute inset-0 opacity-[0.35]"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 1px 1px, rgb(148 163 184 / 0.35) 1px, transparent 0)',
-            backgroundSize: '28px 28px',
-          }}
-        />
-      </div>
+    <div className="relative w-full text-gray-900">
+      <PageAmbientBackground />
 
       {/* Герой */}
       <section className="relative overflow-hidden pt-14 pb-20 sm:pt-16 sm:pb-24 md:pt-20 md:pb-28">
@@ -186,6 +176,12 @@ function Main() {
                   className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200/80 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-900"
                 >
                   Доставка
+                </Link>
+                <Link
+                  to="/reviews"
+                  className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200/80 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-900"
+                >
+                  Отзывы
                 </Link>
                 <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200/80 shadow-sm">
                   Для бизнеса
@@ -321,6 +317,8 @@ function Main() {
           </div>
         </div>
       </section>
+
+      <ReviewsSection />
 
       {/* CTA */}
       <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 py-16 md:py-20">

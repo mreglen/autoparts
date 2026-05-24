@@ -15,6 +15,7 @@ SPA_ROUTE_PREFIXES = (
     "/catalog",
     "/about",
     "/delivery",
+    "/reviews",
     "/payment",
     "/autoservice",
     "/cart",
