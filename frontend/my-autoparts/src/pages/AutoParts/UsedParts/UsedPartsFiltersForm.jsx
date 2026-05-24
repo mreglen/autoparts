@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
+import { trackFormField } from '../../../utils/siteAnalytics';
 import {
   selectCatalogItems,
   selectCatalogFacets,
@@ -81,10 +82,12 @@ export default function UsedPartsFiltersForm({ updateCatalogUrl, showClearInPane
 
   const setFilter = (key, value) => {
     if (!updateCatalogUrl) return;
+    trackFormField('used_parts_filters', key);
     updateCatalogUrl({ [key]: value });
   };
 
   const toggleMultiFilter = (key, value) => {
+    trackFormField('used_parts_filters', key);
     const currentValues = searchParams.getAll(key);
     const nextValues = currentValues.includes(String(value))
       ? currentValues.filter((item) => item !== String(value))

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectRosskoItems } from '../../../redux/slices/RosskoSlice';
+import { trackFormField } from '../../../utils/siteAnalytics';
 
 const COLLAPSED_FILTER_LIMIT = 3;
 
@@ -45,10 +46,12 @@ export default function NewPartsFiltersForm({ updateNewPartsUrl }) {
 
   const setFilter = (key, value) => {
     if (!updateNewPartsUrl) return;
+    trackFormField('new_parts_filters', key);
     updateNewPartsUrl({ [key]: value });
   };
 
   const toggleBrand = (brand) => {
+    trackFormField('new_parts_filters', 'brand');
     const next = selectedBrands.includes(brand)
       ? selectedBrands.filter((b) => b !== brand)
       : [...selectedBrands, brand];

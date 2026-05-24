@@ -59,6 +59,8 @@ import ChatsHubPage from './pages/Chat/ChatsHubPage';
 import ProductNotFound from './pages/Chat/ProductNotFound';
 import AdminPanelPage from './pages/Admin/AdminPanelPage';
 import AuditLogPage from './pages/Admin/AuditLogPage';
+import AnalyticsPage from './pages/Admin/AnalyticsPage';
+import useSiteAnalytics from './hooks/useSiteAnalytics';
 
 
 
@@ -81,6 +83,11 @@ function ServiceWorkerNavigationHandler() {
   }, [navigate]);
   
   return null; // This component doesn't render anything
+}
+
+function SiteAnalyticsTracker() {
+  useSiteAnalytics();
+  return null;
 }
 
 function App() {
@@ -125,6 +132,7 @@ function App() {
   return (
     <BrowserRouter>
       <ServiceWorkerNavigationHandler />
+      <SiteAnalyticsTracker />
       <Routes>
         {/* Публичные маршруты */}
         <Route path="/auth" element={<Authorization />} />
@@ -189,6 +197,7 @@ function App() {
           <Route path="/sellers" element={<SellersPage />} />
           <Route path="/sellers/:sellerId/workspace" element={<SellerWorkspacePage />} />
           <Route path="/admin-settings" element={<AdminPanelPage />} />
+          <Route path="/admin/analytics" element={<AnalyticsPage />} />
           <Route path="/admin/audit-log" element={<AuditLogPage />} />
         </Route>
       </Routes>

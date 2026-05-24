@@ -16,6 +16,7 @@ import {
 } from '../../../redux/slices/AuthSlice';
 import { fetchCart } from '../../../redux/slices/CartSlice';
 import { useNavigate } from 'react-router-dom';
+import { trackFormField, trackFormSubmit } from '../../../utils/siteAnalytics';
 
 export default function Registration() {
     const navigate = useNavigate();
@@ -122,7 +123,11 @@ export default function Registration() {
 
     // --- Handlers ---
     const handleRoleSelect = (role) => dispatch(setIsBuyer(role === 'buyer'));
-    const handleFieldChange = (field, value) => dispatch(updateField({ [field]: value }));
+    const handleFieldChange = (field, value) => {
+        const formId = isSeller ? 'seller_registration' : 'buyer_registration';
+        trackFormField(formId, field);
+        dispatch(updateField({ [field]: value }));
+    };
 
     const handlePhoneChange = (e) => {
         let inputValue = e.target.value;
@@ -214,6 +219,16 @@ export default function Registration() {
             }))
                 .unwrap()
                 .then(() => {
+                    trackFormSubmit('seller_registration', [
+                        'last_name',
+                        'first_name',
+                        'patronymic',
+                        'name_organization',
+                        'description_organization',
+                        'address_organization',
+                        'phone',
+                        'email',
+                    ]);
                     // Show success modal instead of alert
                     setShowSuccessModal(true);
                 })
@@ -241,6 +256,13 @@ export default function Registration() {
             }))
                 .unwrap()
                 .then(() => {
+                    trackFormSubmit('buyer_registration', [
+                        'last_name',
+                        'first_name',
+                        'patronymic',
+                        'email',
+                        'phone',
+                    ]);
                     dispatch(fetchCart());
                     navigate('/');
                 })

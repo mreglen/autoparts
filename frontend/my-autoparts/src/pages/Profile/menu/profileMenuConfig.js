@@ -23,6 +23,7 @@ export const TAB_PATH_MAP = {
     'pending-sellers': '/moderation/pending-sellers',
     'product-moderation': '/moderation/products',
     'audit-log': '/admin/audit-log',
+    analytics: '/admin/analytics',
     chats: '/chats',
 };
 
@@ -34,6 +35,7 @@ export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/vehicles/edit')) return 'vehicles';
     if (path.startsWith('/sellers')) return 'sellers';
     if (path.startsWith('/moderation/products')) return 'product-moderation';
+    if (path.startsWith('/admin/analytics')) return 'analytics';
     return PATH_TAB_MAP[path] || (user?.is_seller ? 'dashboard' : 'profile');
 };
 
@@ -234,6 +236,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
             submenu: [
                 { id: 'pending-sellers', label: 'Регистрация продавцов' },
                 { id: 'product-moderation', label: 'Проверка запчастей' },
+                { id: 'analytics', label: 'Аналитика' },
                 { id: 'admin-panel', label: 'Настройки' },
                 auditSubmenuItem,
             ],

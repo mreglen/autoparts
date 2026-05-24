@@ -14,6 +14,7 @@ import {
   formatPhoneInput,
   formatPhoneFromRaw,
 } from '../../utils/contactValidation';
+import { trackFormField, trackFormSubmit } from '../../utils/siteAnalytics';
 
 function formatApiErrorDetail(detail) {
   if (!detail) return 'Ошибка при оформлении заказа. Попробуйте еще раз.';
@@ -313,11 +314,17 @@ export default function OrderRegistration() {
 
   const handleFullNameBlur = () => {
     markTouched('fullName');
+    if (recipient.fullName.trim()) trackFormField('order_registration', 'fullName');
     setRecipient((prev) => ({ ...prev, fullName: normalizeFullName(prev.fullName) }));
   };
 
   const handlePhoneChange = (e) => {
     setRecipient((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }));
+  };
+
+  const handlePhoneBlur = () => {
+    markTouched('phone');
+    if (recipient.phone.trim()) trackFormField('order_registration', 'phone');
   };
 
   const handleEmailChange = (e) => {
@@ -326,6 +333,7 @@ export default function OrderRegistration() {
 
   const handleEmailBlur = () => {
     markTouched('email');
+    if (recipient.email.trim()) trackFormField('order_registration', 'email');
     setRecipient((prev) => ({ ...prev, email: normalizeEmail(prev.email) }));
   };
 
@@ -343,6 +351,15 @@ export default function OrderRegistration() {
   const handleSubmitOrder = async () => {
     if (submitting || orderSuccess) return;
     if (!validateBeforeSubmit()) return;
+
+    trackFormSubmit('order_registration', [
+      recipient.fullName.trim() ? 'fullName' : null,
+      recipient.phone.trim() ? 'phone' : null,
+      recipient.email.trim() ? 'email' : null,
+      deliveryAddress.trim() ? 'deliveryAddress' : null,
+      selectedRegionId ? 'deliveryRegion' : null,
+      selectedDeliveryOptionId ? 'deliveryOption' : null,
+    ].filter(Boolean));
 
     const usedItemsWithoutProduct = selectedItems.filter(
       (item) => item.type === 'used' && !item.product_id
@@ -667,7 +684,7 @@ export default function OrderRegistration() {
                   autoComplete="tel"
                   value={recipient.phone}
                   onChange={handlePhoneChange}
-                  onBlur={() => markTouched('phone')}
+                  onBlur={handlePhoneBlur}
                   className={inputClass(showError('phone'))}
                   placeholder="+7 (999) 123-45-67"
                 />

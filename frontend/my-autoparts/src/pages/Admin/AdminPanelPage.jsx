@@ -24,8 +24,6 @@ function AdminPanelPage() {
   const [photoMigrationBusy, setPhotoMigrationBusy] = useState(false);
   const [photoMigrationResult, setPhotoMigrationResult] = useState(null);
   const [photoMigrationOrgId, setPhotoMigrationOrgId] = useState('');
-  const [productUrlsDownloadBusy, setProductUrlsDownloadBusy] = useState(false);
-  const [productUrlsNotice, setProductUrlsNotice] = useState(null);
   const location = useLocation();
 
   const [yandexLoading, setYandexLoading] = useState(true);
@@ -291,39 +289,6 @@ function AdminPanelPage() {
       setError(e?.message || 'Не удалось запустить локализацию фото');
     } finally {
       setPhotoMigrationBusy(false);
-    }
-  };
-
-  const downloadProductCardUrls = async () => {
-    setProductUrlsDownloadBusy(true);
-    setProductUrlsNotice(null);
-    setError(null);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/admin/seo/product-card-urls?limit=150`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Не удалось сформировать файл с URL');
-      }
-      const blob = await response.blob();
-      const disposition = response.headers.get('Content-Disposition') || '';
-      const filenameMatch = disposition.match(/filename="([^"]+)"/);
-      const filename = filenameMatch?.[1] || 'product-card-urls-150.txt';
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      setProductUrlsNotice(`Файл ${filename} скачан. В списке только рабочие карточки: в наличии, с фото, брендом и артикулом.`);
-    } catch (e) {
-      setError(e?.message || 'Не удалось скачать файл с URL карточек');
-    } finally {
-      setProductUrlsDownloadBusy(false);
     }
   };
 
@@ -1339,27 +1304,6 @@ function AdminPanelPage() {
               </button>
             </div>
           </div>
-        )}
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">
-          SEO — рабочие URL карточек товаров
-        </h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Скачайте текстовый файл со 150 адресами карточек, которые реально открываются на сайте:
-          товар в наличии, есть фото, заполнены бренд, артикул и название.
-        </p>
-        <button
-          type="button"
-          onClick={downloadProductCardUrls}
-          disabled={productUrlsDownloadBusy}
-          className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {productUrlsDownloadBusy ? 'Формируем файл…' : 'Скачать 150 URL карточек (.txt)'}
-        </button>
-        {productUrlsNotice && (
-          <p className="mt-3 text-sm text-green-700">{productUrlsNotice}</p>
         )}
       </div>
 

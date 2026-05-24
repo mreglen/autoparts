@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { login as loginThunk } from '../../../redux/slices/AuthSlice';
 import { fetchCart } from '../../../redux/slices/CartSlice';
+import { trackFormField, trackFormSubmit } from '../../../utils/siteAnalytics';
 
 export default function Login() {
     const [loginValue, setLoginValue] = useState('');
@@ -15,6 +16,7 @@ export default function Login() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        trackFormSubmit('auth_login', loginValue.trim() ? ['login'] : []);
         dispatch(loginThunk({ login: loginValue, password }))
             .unwrap()
             .then(() => {
@@ -43,6 +45,9 @@ export default function Login() {
                     type="text"
                     value={loginValue}
                     onChange={(e) => setLoginValue(e.target.value)}
+                    onBlur={() => {
+                        if (loginValue.trim()) trackFormField('auth_login', 'login');
+                    }}
                     placeholder="Email или телефон"
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
                     required
