@@ -35,6 +35,7 @@ const publicInfoSlice = createSlice({
     initialState: {
         adminOrganizationPhone: null,
         showNewAutoparts: true,
+        showSiteReviews: true,
         newPartsMarkupPercent: 15,
         usedPartsPurchaseMode: 'both',
         adminSellerMarkupContext: null,
@@ -47,12 +48,16 @@ const publicInfoSlice = createSlice({
     clearPublicInfo: (state) => {
       state.adminOrganizationPhone = null;
       state.showNewAutoparts = true;
+      state.showSiteReviews = true;
       state.newPartsMarkupPercent = 15;
       state.usedPartsPurchaseMode = 'both';
       state.error = null;
     },
     setShowNewAutoparts: (state, action) => {
       state.showNewAutoparts = action.payload !== false;
+    },
+    setShowSiteReviews: (state, action) => {
+      state.showSiteReviews = action.payload !== false;
     },
     setNewPartsMarkupPercent: (state, action) => {
       const n = Number(action.payload);
@@ -73,6 +78,7 @@ const publicInfoSlice = createSlice({
         state.loading = false;
         const p = action.payload;
         state.showNewAutoparts = p?.show_new_autoparts !== false;
+        state.showSiteReviews = p?.show_site_reviews !== false;
         const m = Number(p?.new_parts_markup_percent);
         state.newPartsMarkupPercent =
           Number.isFinite(m) && m >= 0 ? m : 15;
@@ -92,6 +98,7 @@ const publicInfoSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
         state.showNewAutoparts = true;
+        state.showSiteReviews = true;
         state.newPartsMarkupPercent = 15;
       })
       .addCase(fetchSiteQuickLinks.pending, (state) => {
@@ -111,6 +118,7 @@ const publicInfoSlice = createSlice({
 export const {
   clearPublicInfo,
   setShowNewAutoparts,
+  setShowSiteReviews,
   setNewPartsMarkupPercent,
   setAdminSellerMarkupContext,
 } = publicInfoSlice.actions;

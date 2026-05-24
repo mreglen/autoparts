@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiAxiosUnauth } from '../../utils/apiClient';
+import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 import ReviewCard from './ReviewCard';
 import StarRating from './StarRating';
 
 export default function ReviewsSection() {
+  const showSiteReviews = useShowSiteReviews();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!showSiteReviews) return undefined;
     let cancelled = false;
     (async () => {
       try {
@@ -25,7 +28,9 @@ export default function ReviewsSection() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showSiteReviews]);
+
+  if (!showSiteReviews) return null;
 
   if (loading) {
     return (

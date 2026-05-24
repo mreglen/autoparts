@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import { stripHtmlTags } from '../../utils/text';
+import { useActionsDropdownPlacement } from '../../hooks/useActionsDropdownPlacement';
+import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 
 export const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpanded, onImageClick, isSelected, onSelect, onReturn }) => {
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const actionsPlacement = useActionsDropdownPlacement(showActionsDropdown, 56);
 
   // Получаем URL первого фото
   const firstPhoto = item.product?.photos?.[0];
@@ -124,7 +127,7 @@ export const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpande
       
       {/* Actions */}
       <td className="px-4 py-4 whitespace-nowrap">
-        <div className="relative actions-dropdown">
+        <div ref={actionsPlacement.anchorRef} className="relative actions-dropdown">
           <button
             onClick={(e) => { e.stopPropagation(); setShowActionsDropdown(!showActionsDropdown); }}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -136,7 +139,7 @@ export const StockOutRow = ({ item, getStorageAddress, onToggleExpand, isExpande
           </button>
 
           {showActionsDropdown && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20 actions-dropdown">
+            <div className={buildActionsDropdownMenuClassName(actionsPlacement.openUp, 'w-48 z-50')}>
               <button
                 onClick={(e) => { e.stopPropagation(); onReturn(item); setShowActionsDropdown(false); }}
                 className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"

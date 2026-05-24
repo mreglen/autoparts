@@ -6,6 +6,7 @@ import { searchUsedParts } from '../../redux/slices/ProductSlice';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 import { buildPartDetailPath } from '../../utils/partRoutes';
 
+import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 import ReviewsSection from '../../components/Reviews/ReviewsSection';
 import PageAmbientBackground from '../../components/PageAmbientBackground/PageAmbientBackground';
 
@@ -40,6 +41,7 @@ function Main() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
+  const showSiteReviews = useShowSiteReviews();
   const quickLinks = useSelector((state) => state.publicInfo.quickLinks) || [];
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
@@ -177,12 +179,14 @@ function Main() {
                 >
                   Доставка
                 </Link>
+                {showSiteReviews && (
                 <Link
                   to="/reviews"
                   className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200/80 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-900"
                 >
                   Отзывы
                 </Link>
+                )}
                 <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200/80 shadow-sm">
                   Для бизнеса
                 </span>
@@ -318,7 +322,7 @@ function Main() {
         </div>
       </section>
 
-      <ReviewsSection />
+      {showSiteReviews && <ReviewsSection />}
 
       {/* CTA */}
       <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 py-16 md:py-20">

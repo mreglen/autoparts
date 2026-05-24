@@ -325,15 +325,15 @@ export default function ProfileMenuTabs({
     };
 
     if (isDrawer) {
-        return <div className="flex flex-col gap-0.5">{tabs.map(renderMenuItem)}</div>;
+        return <div className="flex flex-col gap-0.5 pb-20">{tabs.map(renderMenuItem)}</div>;
     }
 
     return (
         <div
-            className="w-full min-w-[15.5rem] rounded-xl border border-gray-200 bg-white shadow-md sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain [&::-webkit-scrollbar]:hidden"
+            className="w-full min-w-[15.5rem] rounded-xl border border-gray-200 bg-white shadow-md sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain scroll-pb-32 [&::-webkit-scrollbar]:hidden"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-            <div className="flex flex-col">{tabs.map(renderMenuItem)}</div>
+            <div className="flex flex-col pb-32 pt-1">{tabs.map(renderMenuItem)}</div>
         </div>
     );
 }

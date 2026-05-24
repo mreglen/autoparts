@@ -1,102 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchVehicles } from '../../redux/slices/ProductSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
+import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import VehicleCard, { VehiclesEmptyState } from '../../components/Vehicles/VehicleCard';
 
-const VehicleTableRow = ({ vehicle, storageLabel, isExpanded, onToggleExpand }) => {
-  const [showActions, setShowActions] = useState(false);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.actions-dropdown')) {
-        setShowActions(false);
-      }
-    };
-    if (showActions) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showActions]);
-
-  return (
-    <React.Fragment>
-      <tr className="hover:bg-gray-50">
-        <td
-          className="px-2 py-3 whitespace-nowrap text-sm font-medium text-gray-900 cursor-pointer"
-          onClick={onToggleExpand}
-        >
-          {vehicle.brand || '—'}
-        </td>
-        <td
-          className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
-          onClick={onToggleExpand}
-        >
-          {vehicle.model || '—'}
-        </td>
-        <td
-          className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 cursor-pointer"
-          onClick={onToggleExpand}
-        >
-          {vehicle.generation || '—'}
-        </td>
-        <td
-          className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 cursor-pointer max-w-[12rem] truncate"
-          onClick={onToggleExpand}
-          title={storageLabel || '—'}
-        >
-          {storageLabel || '—'}
-        </td>
-        <td className="px-2 py-3 whitespace-nowrap text-sm text-gray-500 text-right align-middle">
-          <div className="relative actions-dropdown inline-flex justify-end w-full">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowActions(!showActions);
-              }}
-              className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1 ml-auto"
-            >
-              Действия
-              <img
-                src="/img/arrow_sm.svg"
-                alt=""
-                className={`w-3 h-3 transition-transform duration-200 filter brightness-0 ${showActions ? 'rotate-90' : ''}`}
-                style={{
-                  filter:
-                    'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)',
-                }}
-              />
-            </button>
-            {showActions && (
-              <div className="absolute right-0 top-full mt-1 min-w-[10rem] bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown py-1 text-left">
-                <Link
-                  to={`/vehicles/edit/${vehicle.id}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="block w-full px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
-                >
-                  Редактировать
-                </Link>
-              </div>
-            )}
-          </div>
-        </td>
-      </tr>
-      {isExpanded && (
-        <tr className="bg-gray-50">
-          <td colSpan="5" className="px-6 py-4 border-t">
-            <div>
-              <span className="text-xs text-gray-500">Описание</span>
-              <div className="font-medium mt-1 whitespace-pre-wrap">
-                {vehicle.description?.trim() ? vehicle.description : '—'}
-              </div>
-            </div>
-          </td>
-        </tr>
-      )}
-    </React.Fragment>
-  );
-};
+const SORT_OPTIONS = [
+  { id: 'brand_asc', label: 'Марка А–Я' },
+  { id: 'brand_desc', label: 'Марка Я–А' },
+];
 
 function VehiclesList() {
   const navigate = useNavigate();
@@ -105,10 +18,11 @@ function VehiclesList() {
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const { vehicles, vehiclesLoading, error } = useSelector((state) => state.products);
   const { storageLocations } = useSelector((state) => state.organization);
+
   const [authChecked, setAuthChecked] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [sortOrder, setSortOrder] = useState('brand_asc');
-  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedStorageLocation, setSelectedStorageLocation] = useState(
     () => searchParams.get('storage') || ''
   );
@@ -123,14 +37,30 @@ function VehiclesList() {
         permissionCodes.includes('my-parts') ||
         permissionCodes.includes('stock-in')));
 
+  const fetchParams = useMemo(
+    () => (selectedStorageLocation ? { storage_location_id: selectedStorageLocation } : {}),
+    [selectedStorageLocation]
+  );
+
+  const loadVehicles = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) setRefreshing(true);
+      try {
+        await dispatch(fetchVehicles(fetchParams)).unwrap();
+      } catch {
+        /* error in redux */
+      } finally {
+        if (isRefresh) setRefreshing(false);
+      }
+    },
+    [dispatch, fetchParams]
+  );
+
   useEffect(() => {
     if (authChecked && hasPermission) {
-      const params = selectedStorageLocation
-        ? { storage_location_id: selectedStorageLocation }
-        : {};
-      dispatch(fetchVehicles(params));
+      loadVehicles();
     }
-  }, [dispatch, authChecked, hasPermission, selectedStorageLocation]);
+  }, [authChecked, hasPermission, loadVehicles]);
 
   useEffect(() => {
     if (authChecked && hasPermission && user?.organization_id) {
@@ -140,13 +70,9 @@ function VehiclesList() {
 
   useEffect(() => {
     const next = new URLSearchParams();
-    if (selectedStorageLocation) {
-      next.set('storage', selectedStorageLocation);
-    }
+    if (selectedStorageLocation) next.set('storage', selectedStorageLocation);
     const q = searchQuery.trim();
-    if (q) {
-      next.set('q', q);
-    }
+    if (q) next.set('q', q);
     setSearchParams(next);
   }, [selectedStorageLocation, searchQuery, setSearchParams]);
 
@@ -174,166 +100,156 @@ function VehiclesList() {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return sortedVehicles;
     return sortedVehicles.filter((v) => {
-      const hay = `${v.brand || ''} ${v.model || ''} ${v.generation || ''}`.toLowerCase();
+      const hay = [
+        v.brand,
+        v.model,
+        v.generation,
+        v.engine,
+        v.vin,
+        v.description,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
       return hay.includes(q);
     });
   }, [sortedVehicles, searchQuery]);
 
-  const getStorageLabel = (id) => {
-    if (id == null || id === '') return null;
-    const loc = storageLocations.find((l) => String(l.id) === String(id));
-    return loc?.address || `Склад #${id}`;
+  const stats = useMemo(() => {
+    const brands = new Set(displayVehicles.map((v) => (v.brand || '').trim()).filter(Boolean));
+    return { count: displayVehicles.length, brands: brands.size };
+  }, [displayVehicles]);
+
+  const getStorageLabel = useCallback(
+    (id) => {
+      if (id == null || id === '') return null;
+      const loc = storageLocations.find((l) => String(l.id) === String(id));
+      return loc?.address || `Склад #${id}`;
+    },
+    [storageLocations]
+  );
+
+  const toggleExpand = (id) => {
+    setExpandedId((prev) => (prev === id ? null : id));
   };
 
   if (!authChecked) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
-      </div>
-    );
+    return <AuthLoadingScreen />;
   }
 
   if (!user) return <Navigate to="/auth" replace />;
   if (!hasPermission) return <Navigate to="/" replace />;
 
-  if (vehiclesLoading) {
-    return (
-      <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-        <div className="text-center py-16 px-6">
-          <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <svg
-              className="animate-spin h-10 w-10 text-indigo-600"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-          </div>
-          <h2 className="text-xl font-medium text-gray-900 mb-2">Загрузка автомобилей…</h2>
-          <p className="text-gray-600 text-base">Пожалуйста, подождите</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-        <div className="text-center py-16 px-6">
-          <div className="bg-red-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-10 w-10 text-red-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-              />
-            </svg>
-          </div>
-          <h2 className="text-xl font-medium text-gray-900 mb-2">Ошибка загрузки</h2>
-          <p className="text-gray-500 mb-6 text-base">{error}</p>
-          <button
-            type="button"
-            onClick={() =>
-              dispatch(
-                fetchVehicles(
-                  selectedStorageLocation
-                    ? { storage_location_id: selectedStorageLocation }
-                    : {}
-                )
-              )
-            }
-            className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
-          >
-            Попробовать снова
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const toggleExpand = (id) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
+  const totalInList = sortedVehicles.length;
+  const hasActiveFilters = Boolean(searchQuery.trim()) || Boolean(selectedStorageLocation);
 
   return (
-    <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
-        <h1 className="text-2xl sm:text-2xl font-bold text-gray-800">Автомобили</h1>
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-          <div className="relative">
+    <div className="min-w-0 space-y-6">
+      <header className="relative overflow-hidden rounded-2xl border border-white/80 bg-gradient-to-br from-white via-white to-slate-100/90 p-5 shadow-sm ring-1 ring-gray-200/60 sm:p-6">
+        <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-slate-400/10 blur-2xl" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">Склад</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Автомобили</h1>
+            <p className="mt-2 max-w-xl text-sm text-gray-600">
+              Учёт автомобилей на складах: привязка к запчастям, VIN, пробег и описание для разборки.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => setShowSortDropdown(!showSortDropdown)}
-              className="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-gray-200 text-gray-700 hover:bg-gray-300 min-h-[40px]"
-              title="Сортировка"
+              onClick={() => loadVehicles(true)}
+              disabled={vehiclesLoading || refreshing}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
-              <span className="hidden sm:inline">Сортировка</span>
-              <svg
-                className={`w-4 h-4 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              {refreshing ? 'Обновление…' : 'Обновить'}
             </button>
-            {showSortDropdown && (
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-30">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortOrder('brand_asc');
-                    setShowSortDropdown(false);
-                  }}
-                  className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'brand_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-                >
-                  По марке (А–Я)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSortOrder('brand_desc');
-                    setShowSortDropdown(false);
-                  }}
-                  className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${sortOrder === 'brand_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-                >
-                  По марке (Я–А)
-                </button>
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => navigate('/vehicles/add')}
+              className="inline-flex items-center justify-center rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-slate-900"
+            >
+              Добавить автомобиль
+            </button>
           </div>
         </div>
-      </div>
 
-      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-6 gap-4">
-        <div className="flex flex-col sm:flex-row flex-wrap gap-4 flex-1">
-          <div className="sm:w-64">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Склад</label>
+        {!vehiclesLoading && !error && totalInList > 0 && (
+          <dl className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
+              <dt className="text-xs font-medium text-gray-500">Автомобилей</dt>
+              <dd className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{stats.count}</dd>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
+              <dt className="text-xs font-medium text-gray-500">Марок</dt>
+              <dd className="mt-1 text-2xl font-bold tabular-nums text-slate-700">{stats.brands}</dd>
+            </div>
+          </dl>
+        )}
+      </header>
+
+      <div className="rounded-2xl border border-gray-200/80 bg-white p-1 shadow-sm">
+        <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-end">
+          <div className="relative min-w-0 flex-1">
+            <svg
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Марка, модель, поколение, VIN…"
+              autoComplete="off"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-slate-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label="Очистить поиск"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          <div className="w-full lg:w-56">
+            <label htmlFor="vehicles-storage-filter" className="sr-only">
+              Склад
+            </label>
             <select
+              id="vehicles-storage-filter"
               value={selectedStorageLocation}
               onChange={(e) => setSelectedStorageLocation(e.target.value)}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 px-3 text-sm text-gray-900 focus:border-slate-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-500/20"
             >
               <option value="">Все склады</option>
               {storageLocations.map((location) => (
@@ -343,174 +259,75 @@ function VehiclesList() {
               ))}
             </select>
           </div>
-          <div className="flex-1 min-w-[200px] max-w-md">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Поиск</label>
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Марка, модель, поколение…"
-              autoComplete="off"
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            />
-          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate('/vehicles/add')}
-          className="px-6 py-3 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-base font-medium min-h-[48px] sm:min-h-0 lg:self-center shrink-0"
-        >
-          Добавить автомобиль
-        </button>
+
+        <div className="flex flex-wrap gap-2 border-t border-gray-100 px-3 py-3">
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setSortOrder(opt.id)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                sortOrder === opt.id
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {sortedVehicles.length === 0 ? (
-        <div className="mt-12 text-center py-16 px-6">
-          <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <svg className="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-              />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Автомобилей пока нет</h2>
-          <p className="text-gray-600 text-base mb-6">Добавьте первый автомобиль по кнопке выше</p>
+      {vehiclesLoading && (
+        <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center">
+          <AuthLoadingScreen className="h-24" />
+          <p className="mt-4 text-sm text-gray-600">Загружаем автомобили…</p>
         </div>
-      ) : displayVehicles.length === 0 ? (
-        <div className="mt-12 text-center py-16 px-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Ничего не найдено</h2>
-          <p className="text-gray-600 text-base">
-            По запросу «{searchQuery.trim()}» среди марки, модели и поколения совпадений нет. Попробуйте
-            другой текст или сбросьте фильтр склада.
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="hidden md:block w-full">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Марка
-                  </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Модель
-                  </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Поколение
-                  </th>
-                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Склад
-                  </th>
-                  <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Действия
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {displayVehicles.map((v) => (
-                  <VehicleTableRow
-                    key={v.id}
-                    vehicle={v}
-                    storageLabel={getStorageLabel(v.storage_location_id)}
-                    isExpanded={expandedId === v.id}
-                    onToggleExpand={() => toggleExpand(v.id)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+      )}
 
-          <div className="md:hidden space-y-5">
+      {error && !vehiclesLoading && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-center">
+          <p className="text-sm font-medium text-red-800">{error}</p>
+          <button
+            type="button"
+            onClick={() => loadVehicles()}
+            className="mt-4 inline-flex rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+          >
+            Попробовать снова
+          </button>
+        </div>
+      )}
+
+      {!vehiclesLoading && !error && (
+        <>
+          {totalInList > 0 && displayVehicles.length !== totalInList && (
+            <p className="text-sm text-gray-500">
+              Показано {displayVehicles.length} из {totalInList} автомобилей
+              {hasActiveFilters ? ' (с учётом фильтров)' : ''}
+            </p>
+          )}
+
+          <div className="space-y-4">
             {displayVehicles.map((v) => (
-              <div key={v.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                <div className="flex justify-between items-start mb-3 gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-base font-semibold text-gray-900">{v.brand || '—'}</div>
-                    <div className="text-sm text-gray-600 mt-1">{v.model || '—'}</div>
-                    <div className="text-sm text-gray-500 mt-1">Поколение: {v.generation || '—'}</div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      Склад: {getStorageLabel(v.storage_location_id) || '—'}
-                    </div>
-                  </div>
-                  <div className="relative actions-dropdown flex-shrink-0">
-                    <MobileActionsButton vehicleId={v.id} />
-                  </div>
-                </div>
-                <div className="pt-3 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => toggleExpand(v.id)}
-                    className="w-full text-indigo-600 text-sm font-medium hover:text-indigo-800 transition-colors py-2"
-                  >
-                    {expandedId === v.id ? 'Скрыть детали' : 'Показать детали'}
-                  </button>
-                </div>
-                {expandedId === v.id && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <span className="text-sm text-gray-500 block mb-1">Описание</span>
-                    <div className="text-base text-gray-900 whitespace-pre-wrap">
-                      {v.description?.trim() ? v.description : '—'}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <VehicleCard
+                key={v.id}
+                vehicle={v}
+                storageLabel={getStorageLabel(v.storage_location_id)}
+                isExpanded={expandedId === v.id}
+                onToggle={toggleExpand}
+              />
             ))}
           </div>
+
+          {displayVehicles.length === 0 && (
+            <VehiclesEmptyState
+              searchQuery={searchQuery}
+              hasStorageFilter={Boolean(selectedStorageLocation)}
+              onAdd={() => navigate('/vehicles/add')}
+            />
+          )}
         </>
-      )}
-    </div>
-  );
-}
-
-function MobileActionsButton({ vehicleId }) {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.actions-dropdown')) {
-        setOpen(false);
-      }
-    };
-    if (open) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [open]);
-
-  return (
-    <div className="relative actions-dropdown ml-auto">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen(!open);
-        }}
-        className="text-gray-600 hover:text-gray-800 text-xs font-medium border-2 border-gray-400 rounded px-2 py-1 bg-transparent hover:bg-gray-50 transition-colors flex items-center gap-1"
-      >
-        Действия
-        <img
-          src="/img/arrow_sm.svg"
-          alt=""
-          className={`w-3 h-3 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
-          style={{
-            filter:
-              'brightness(0) saturate(100%) invert(61%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(90%) contrast(89%)',
-          }}
-        />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 min-w-[10rem] bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown py-1">
-          <Link
-            to={`/vehicles/edit/${vehicleId}`}
-            onClick={(e) => e.stopPropagation()}
-            className="block w-full px-3 py-2 text-sm text-gray-900 hover:bg-gray-50"
-          >
-            Редактировать
-          </Link>
-        </div>
       )}
     </div>
   );

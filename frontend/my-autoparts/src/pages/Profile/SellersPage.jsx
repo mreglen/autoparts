@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { fetchSellers } from '../../redux/slices/SellerSlice';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 
 export default function SellersPage() {
     const dispatch = useDispatch();
@@ -192,8 +193,7 @@ export default function SellersPage() {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-100">
-                                {filteredSellers.map((seller, index) => {
-                                    const isLastRow = index === filteredSellers.length - 1;
+                                {filteredSellers.map((seller) => {
                                     const isMenuOpen = showActionsPopup === seller.id;
                                     return (
                                     <tr
@@ -218,36 +218,21 @@ export default function SellersPage() {
                                             )}
                                         </td>
                                         <td className={`px-4 py-4 text-right ${isMenuOpen ? 'relative z-30' : ''}`}>
-                                            <div className="relative inline-block actions-dropdown">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowActionsPopup(showActionsPopup === seller.id ? null : seller.id)}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                                            <ActionsDropdown
+                                                isOpen={isMenuOpen}
+                                                onOpenChange={(next) => setShowActionsPopup(next ? seller.id : null)}
+                                                menuClassName="w-48 z-50"
+                                                estimatedMenuHeight={56}
+                                            >
+                                                <ActionsDropdownItem
+                                                    onClick={() => {
+                                                        setShowActionsPopup(null);
+                                                        navigate(`/sellers/${seller.id}/workspace`);
+                                                    }}
                                                 >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                                    </svg>
-                                                    Действия
-                                                </button>
-                                                {isMenuOpen && (
-                                                    <div
-                                                        className={`absolute right-0 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 actions-dropdown ${
-                                                            isLastRow ? 'bottom-full mb-2' : 'top-full mt-2'
-                                                        }`}
-                                                    >
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setShowActionsPopup(null);
-                                                                navigate(`/sellers/${seller.id}/workspace`);
-                                                            }}
-                                                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                                                        >
-                                                            Рабочий стол
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
+                                                    Рабочий стол
+                                                </ActionsDropdownItem>
+                                            </ActionsDropdown>
                                         </td>
                                     </tr>
                                     );

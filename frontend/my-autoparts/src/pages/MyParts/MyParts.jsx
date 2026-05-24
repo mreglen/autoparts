@@ -11,6 +11,8 @@ import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchProductStorageCells, fetchStorageCells } from '../../redux/slices/StorageCellsSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
 import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
+import { useActionsDropdownPlacement } from '../../hooks/useActionsDropdownPlacement';
+import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 
 const CardPart = ({
   part,
@@ -40,6 +42,9 @@ const CardPart = ({
   const isModeration = variant === 'moderation';
   const isRejectedModeration = isModeration && moderationKind === 'rejected';
   const expandedColSpan = isModeration ? 7 : 8;
+  const actionsMenuHeight = isRejectedModeration ? 120 : isModeration ? 160 : showExport && showDromExport ? 360 : showExport || showDromExport ? 300 : 260;
+  const desktopActionsPlacement = useActionsDropdownPlacement(showActions, actionsMenuHeight);
+  const mobileActionsPlacement = useActionsDropdownPlacement(showActions, actionsMenuHeight);
 
   const renderActionsMenu = (menuClassName) => (
     <div className={menuClassName}>
@@ -302,7 +307,7 @@ const CardPart = ({
       
       {/* Actions */}
       <td className="px-4 py-4 whitespace-nowrap">
-        <div className="relative actions-dropdown">
+        <div ref={desktopActionsPlacement.anchorRef} className="relative actions-dropdown">
           <button
             onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -313,7 +318,7 @@ const CardPart = ({
             <span className="hidden sm:inline">Действия</span>
           </button>
 
-          {showActions && renderActionsMenu('absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20 actions-dropdown')}
+          {showActions && renderActionsMenu(buildActionsDropdownMenuClassName(desktopActionsPlacement.openUp, 'w-48 z-50'))}
         </div>
       </td>
     </tr>
@@ -332,7 +337,7 @@ const CardPart = ({
             className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
           />
         )}
-        <div className="relative actions-dropdown">
+        <div ref={mobileActionsPlacement.anchorRef} className="relative actions-dropdown">
           <button
             onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200"
@@ -343,7 +348,7 @@ const CardPart = ({
             <span>Действия</span>
           </button>
 
-          {showActions && renderActionsMenu('absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 actions-dropdown')}
+          {showActions && renderActionsMenu(buildActionsDropdownMenuClassName(mobileActionsPlacement.openUp, 'w-48 z-50'))}
         </div>
       </div>
 
@@ -745,6 +750,7 @@ function MyParts() {
   const [selectedParts, setSelectedParts] = useState(new Set());
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const bulkActionsPlacement = useActionsDropdownPlacement(showBulkActions, 130);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'in-stock');
   const [inStockFilters, setInStockFilters] = useState(() => ({
     ...DEFAULT_IN_STOCK_FILTERS,
@@ -1681,7 +1687,7 @@ function MyParts() {
                     </span>
                   )}
                 </span>
-                <div className="relative actions-dropdown">
+                <div ref={bulkActionsPlacement.anchorRef} className="relative actions-dropdown">
                   <button
                     onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
                     disabled={selectedParts.size === 0}
@@ -1694,7 +1700,7 @@ function MyParts() {
                   </button>
 
                   {showBulkActions && (
-                    <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10 actions-dropdown">
+                    <div className={buildActionsDropdownMenuClassName(bulkActionsPlacement.openUp, 'w-40 z-50')}>
                       <div className="py-1">
                         <button
                           onClick={(e) => { e.stopPropagation(); handleBulkAction(); setShowBulkActions(false); }}

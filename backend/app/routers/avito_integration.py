@@ -48,7 +48,11 @@ from app.schemas.avito_integration import (
 from app.tasks.avito_tasks import run_avito_export_job, run_avito_publish_job, _map_avito_category
 from app.services import avito_api as avito_api_svc
 from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload, upsert_products_to_avito_autoload
-from app.services.avito_media import ensure_local_pictures, normalize_for_xlsx
+from app.services.avito_media import (
+    ensure_local_pictures,
+    normalize_for_xlsx,
+    product_photo_urls_for_avito_export,
+)
 from app.utils.avito_crypto import decrypt_secret, encrypt_secret
 from app.utils.integration_access import ensure_avito_integration_access, ensure_org_member
 from app.services.avito_pro_status_service import (
@@ -848,24 +852,7 @@ async def export_products_to_avito_autoload(
         if not product:
             continue
         raw_photos = [ph.photo_url for ph in (product.photos or []) if ph.photo_url]
-        photos: list[str] = []
-        for raw_photo in raw_photos[:5]:
-            try:
-                localized = await ensure_local_pictures(
-                    [raw_photo],
-                    org_id=org_id,
-                    db=db,
-                    for_xlsx=True,
-                    limit=1,
-                    soft_fail=False,
-                    per_photo_timeout_s=25.0,
-                    celery_timeout_s=120,
-                )
-                if localized and localized[0]:
-                    photos.append(str(localized[0]).strip())
-            except Exception:
-                continue
-        photos = list(dict.fromkeys([p for p in photos if p]))
+        photos = product_photo_urls_for_avito_export(raw_photos)
         avito_link = db.query(ProductAvitoListingLink).filter(
             ProductAvitoListingLink.organization_id == org_id,
             ProductAvitoListingLink.product_id == product.id,
@@ -1642,59 +1629,89 @@ async def import_avito_autoload_rows(
                     }
                 )
 
-        db.query(ProductPhoto).filter(ProductPhoto.product_id == product.id).delete()
-        db.query(ProductVideo).filter(ProductVideo.product_id == product.id).delete()
+        existing_photos = (
+            db.query(ProductPhoto)
+            .filter(ProductPhoto.product_id == product.id)
+            .order_by(ProductPhoto.id.asc())
+            .all()
+        )
+        # У уже существующих товаров не подменяем фото ссылками из файла Авито.
+        skip_avito_photo_import = (not product_created) and bool(existing_photos)
+        processed_urls_for_xlsx: list[str] = []
 
-        photos = item.get("photos") or []
-        videos = item.get("videos") or []
-        if isinstance(photos, list) and photos:
-            processed_paths: list[str] = []
-            for photo_index, raw_photo in enumerate(photos[:5], start=1):
-                raw_photo_url = str(raw_photo or "").strip()
-                if not raw_photo_url:
-                    continue
-                try:
-                    localized = await ensure_local_pictures(
-                        [raw_photo_url],
-                        org_id=org_id,
-                        db=db,
-                        for_xlsx=False,
-                        limit=1,
-                        soft_fail=False,
-                        per_photo_timeout_s=25.0,
-                        celery_timeout_s=120,
+        if skip_avito_photo_import:
+            processed_urls_for_xlsx = product_photo_urls_for_avito_export(
+                [p.photo_url for p in existing_photos if p.photo_url]
+            )
+        else:
+            db.query(ProductPhoto).filter(ProductPhoto.product_id == product.id).delete()
+            db.query(ProductVideo).filter(ProductVideo.product_id == product.id).delete()
+
+            photos = item.get("photos") or []
+            videos = item.get("videos") or []
+            if isinstance(photos, list) and photos:
+                processed_paths: list[str] = []
+                for photo_index, raw_photo in enumerate(photos[:5], start=1):
+                    raw_photo_url = str(raw_photo or "").strip()
+                    if not raw_photo_url:
+                        continue
+                    try:
+                        localized = await ensure_local_pictures(
+                            [raw_photo_url],
+                            org_id=org_id,
+                            db=db,
+                            for_xlsx=False,
+                            limit=1,
+                            soft_fail=False,
+                            per_photo_timeout_s=25.0,
+                            celery_timeout_s=120,
+                        )
+                        if localized and localized[0]:
+                            processed_paths.append(str(localized[0]).strip())
+                    except Exception as exc:
+                        skipped_rows.append(
+                            {
+                                "sheet": key[0],
+                                "row": key[1],
+                                "reason": (
+                                    f"Фото #{photo_index} не удалось локализовать: "
+                                    f"{type(exc).__name__}"
+                                ),
+                            }
+                        )
+
+                processed_paths = list(dict.fromkeys([p for p in processed_paths if p]))
+                processed_urls_for_xlsx = [normalize_for_xlsx(p) for p in processed_paths]
+
+                for p_url in processed_paths[:5]:
+                    p_url = str(p_url).strip()
+                    if not p_url or p_url.startswith("http://") or p_url.startswith("https://"):
+                        continue
+                    db.add(
+                        ProductPhoto(
+                            product_id=product.id,
+                            photo_url=p_url,
+                            organization_id=org_id,
+                            processing_status="completed",
+                        )
                     )
-                    if localized and localized[0]:
-                        processed_paths.append(str(localized[0]).strip())
-                except Exception as exc:
-                    skipped_rows.append(
-                        {
-                            "sheet": key[0],
-                            "row": key[1],
-                            "reason": (
-                                f"Фото #{photo_index} не удалось локализовать: "
-                                f"{type(exc).__name__}"
-                            ),
-                        }
+
+            if isinstance(videos, list):
+                for v in videos[:1]:
+                    v_url = str(v).strip()
+                    if not v_url:
+                        continue
+                    db.add(
+                        ProductVideo(
+                            product_id=product.id,
+                            video_url=v_url,
+                            organization_id=org_id,
+                            processing_status="completed",
+                        )
                     )
 
-            processed_paths = list(dict.fromkeys([p for p in processed_paths if p]))
-            processed_urls_for_xlsx = [normalize_for_xlsx(p) for p in processed_paths]
-
-            for p_url in processed_paths[:5]:
-                p_url = str(p_url).strip()
-                if not p_url or p_url.startswith("http://") or p_url.startswith("https://"):
-                    continue
-                db.add(
-                    ProductPhoto(
-                        product_id=product.id,
-                        photo_url=p_url,
-                        organization_id=org_id,
-                        processing_status="completed",
-                    )
-                )
-
-            # Rewrite XLSX cell 'Ссылки на фото' for this row so UI/next visits see local URLs.
+        if processed_urls_for_xlsx:
+            # В XLSX пишем только родные (локальные) URL — не ссылки на CDN Авито.
             try:
                 cache_row = db.query(OrganizationAvitoAutoloadCache).filter(
                     OrganizationAvitoAutoloadCache.organization_id == org_id
@@ -1712,7 +1729,6 @@ async def import_avito_autoload_rows(
                             if sheet_name not in photo_col_cache:
                                 col = None
                                 for col_idx in range(1, (ws.max_column or 0) + 1):
-                                    # НОВЫЙ ФОРМАТ: заголовки в Row 1
                                     h = str(ws.cell(row=1, column=col_idx).value or "").strip()
                                     if h in ("ImageUrls", "Ссылки на фото", "Фото"):
                                         col = col_idx
@@ -1723,21 +1739,7 @@ async def import_avito_autoload_rows(
                             if col:
                                 ws.cell(row=row_no, column=col, value=" | ".join(processed_urls_for_xlsx))
             except Exception:
-                # Soft fail: DB import should still succeed.
                 pass
-        if isinstance(videos, list):
-            for v in videos[:1]:
-                v_url = str(v).strip()
-                if not v_url:
-                    continue
-                db.add(
-                    ProductVideo(
-                        product_id=product.id,
-                        video_url=v_url,
-                        organization_id=org_id,
-                        processing_status="completed",
-                    )
-                )
 
         # Создаём запись StockIn только для НОВЫХ товаров (не для обновлённых)
         if product_created:

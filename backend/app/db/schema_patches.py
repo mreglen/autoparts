@@ -455,3 +455,24 @@ def ensure_site_reviews_user_id_column() -> None:
 
     logger.info("Applied site_reviews user_id column patch")
 
+
+def ensure_site_settings_show_site_reviews_column() -> None:
+    """Add show_site_reviews toggle to site_settings."""
+    inspector = inspect(engine)
+    if "site_settings" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("site_settings")}
+    if "show_site_reviews" in columns:
+        return
+
+    if engine.dialect.name == "postgresql":
+        stmt = "ALTER TABLE site_settings ADD COLUMN show_site_reviews BOOLEAN NOT NULL DEFAULT TRUE"
+    else:
+        stmt = "ALTER TABLE site_settings ADD COLUMN show_site_reviews BOOLEAN NOT NULL DEFAULT 1"
+
+    with engine.begin() as conn:
+        conn.execute(text(stmt))
+
+    logger.info("Applied site_settings show_site_reviews column patch")
+

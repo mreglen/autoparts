@@ -57,6 +57,32 @@ def is_local_media(url: str) -> bool:
     return any(value.startswith(p) for p in LOCAL_PREFIXES)
 
 
+def product_photo_urls_for_avito_export(
+    urls: Iterable[str],
+    *,
+    limit: int = 5,
+) -> list[str]:
+    """
+    Absolute URLs for Avito autoload XLSX from site-native media only.
+    External links (Avito CDN etc.) are skipped so export keeps catalog photos.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in list(urls or [])[:limit]:
+        value = (raw or "").strip()
+        if not value:
+            continue
+        pathish = _strip_base_url(value)
+        if not is_local_media(pathish):
+            continue
+        normalized = normalize_for_xlsx(pathish)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        out.append(normalized)
+    return out
+
+
 def normalize_for_xlsx(url_or_path: str) -> str:
     """
     Return absolute URL for XLSX export.

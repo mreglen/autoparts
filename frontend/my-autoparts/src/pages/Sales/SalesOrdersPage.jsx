@@ -1,29 +1,66 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 import { AvitoOrderCard } from '../../components/AvitoOrderCard';
-import { GarageOrderCard } from '../../components/GarageOrderCard';
-import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
-import { openAvitoProductFlow } from '../../utils/avitoProductFlow';
+import SalesGarageOrderCard from '../../components/SalesOrders/SalesGarageOrderCard';
+import SalesOrdersEmptyState from '../../components/SalesOrders/SalesOrdersEmptyState';
+import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import {
   getAvitoBuyerAndDelivery,
   getAvitoDisplayTotal,
   getAvitoMobileDeliveryText,
   getAvitoOrderItems,
   getAvitoLineItemTitle,
-  getAvitoLineItemTotal,
-  getAvitoLineItemQty,
   getAvitoWarehouseCanRetry,
   getAvitoWarehouseMismatch,
   getAvitoSkipReasonsForDisplay,
 } from './avitoOrderDisplay';
 import { useAvitoAccountStatus } from '../../hooks/useAvitoAccountStatus';
 import { canUseAvitoProFeatures } from '../../utils/avitoProAccess';
+import {
+  formatGarageOrderDate,
+  formatGarageOrderPrice,
+  getGarageDeliveryInfo,
+  GARAGE_STATUS_COLORS,
+  GARAGE_STATUS_NAMES,
+  GARAGE_ACTIVE_STATUSES,
+  GARAGE_COMPLETED_STATUSES,
+  AVITO_STATUS_COLORS,
+  AVITO_ACTIVE_STATUSES,
+  AVITO_COMPLETED_STATUSES,
+  AVITO_CANCELED_STATUSES,
+} from '../../utils/garageOrderUi';
+
+const STATUS_FILTER_OPTIONS = [
+  { id: 'all', label: 'Все' },
+  { id: 'active', label: 'В работе' },
+  { id: 'completed', label: 'Завершённые' },
+  { id: 'rejected', label: 'Отменённые' },
+];
+
+function sortOrdersNewestFirst(orders) {
+  return [...orders].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+}
+
+function matchesGarageStatusFilter(order, filterId) {
+  const code = order.status_code || 'pending';
+  if (filterId === 'all') return true;
+  if (filterId === 'active') return GARAGE_ACTIVE_STATUSES.has(code);
+  if (filterId === 'completed') return GARAGE_COMPLETED_STATUSES.has(code);
+  if (filterId === 'rejected') return code === 'rejected';
+  return true;
+}
+
+function matchesAvitoStatusFilter(order, filterId) {
+  const code = order.avito_status_code || '';
+  if (filterId === 'all') return true;
+  if (filterId === 'active') return AVITO_ACTIVE_STATUSES.has(code);
+  if (filterId === 'completed') return AVITO_COMPLETED_STATUSES.has(code);
+  if (filterId === 'rejected') return AVITO_CANCELED_STATUSES.has(code);
+  return true;
+}
 
 export default function SalesOrdersPage() {
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const { status: avitoAccountStatus } = useAvitoAccountStatus(user?.organization_id, {
     enabled: Boolean(user?.organization_id),
@@ -35,7 +72,10 @@ export default function SalesOrdersPage() {
 
   const [activeTab, setActiveTab] = useState('used'); // used | new | avito
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const [usedOrders, setUsedOrders] = useState([]);
   const [newOrders, setNewOrders] = useState([]);
@@ -84,22 +124,13 @@ export default function SalesOrdersPage() {
     ];
   }, [availableStatuses]);
 
-  const formatDate = (dateString) => new Date(dateString).toLocaleDateString('ru-RU');
-  const formatPrice = (amount) => `${Number(amount || 0).toLocaleString('ru-RU')} ₽`;
+  const formatDate = formatGarageOrderDate;
+  const formatPrice = formatGarageOrderPrice;
 
-  const getAvitoStatusColor = (statusCode) => {
-    const colorMap = {
-      on_confirmation: 'bg-yellow-100 text-yellow-800',
-      ready_to_ship: 'bg-blue-100 text-blue-800',
-      in_transit: 'bg-purple-100 text-purple-800',
-      delivered: 'bg-green-100 text-green-800',
-      canceled: 'bg-red-100 text-red-800',
-      closed: 'bg-gray-100 text-gray-800',
-      on_return: 'bg-orange-100 text-orange-800',
-      in_dispute: 'bg-pink-100 text-pink-800',
-    };
-    return colorMap[statusCode] || 'bg-gray-100 text-gray-800';
-  };
+  const getGarageStatusColor = (statusCode) => GARAGE_STATUS_COLORS[statusCode] || GARAGE_STATUS_COLORS.closed;
+  const getGarageStatusName = (statusCode) => GARAGE_STATUS_NAMES[statusCode] || statusCode || 'pending';
+
+  const getAvitoStatusColor = (statusCode) => AVITO_STATUS_COLORS[statusCode] || AVITO_STATUS_COLORS.closed;
 
   const getAvitoStatusName = (statusCode, order = null) => {
     if (order?.id && statusCode === 'on_confirmation' && cncPreparedByOrderId[order.id]?.prepared) {
@@ -118,19 +149,13 @@ export default function SalesOrdersPage() {
     return statusMap[statusCode] || statusCode;
   };
 
-  const handleProductClick = async (item, e) => {
-    e?.stopPropagation?.();
-    await openAvitoProductFlow({
-      item,
-      dispatch,
-      navigate,
-      fetchLinkThunk: fetchAvitoChatProductLink,
-    });
-  };
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
 
       // Keep Avito orders cache fresh before reading it.
@@ -178,13 +203,14 @@ export default function SalesOrdersPage() {
       setError(e?.response?.data?.detail || e.message || 'Ошибка загрузки');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [avitoProActive]);
 
   useEffect(() => {
     if (!hasPermission) return;
     fetchAll();
-  }, [hasPermission, avitoProActive]);
+  }, [hasPermission, fetchAll]);
 
   useEffect(() => {
     if (!avitoProActive && activeTab === 'avito') {
@@ -601,95 +627,315 @@ export default function SalesOrdersPage() {
     }
   };
 
-  const getGarageStatusColor = (statusCode) => {
-    const colorMap = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      confirmed: 'bg-blue-100 text-blue-800',
-      rejected: 'bg-red-100 text-red-800',
-      assembled: 'bg-indigo-100 text-indigo-800',
-      shipped: 'bg-purple-100 text-purple-800',
-      delivered: 'bg-green-100 text-green-800',
-      closed: 'bg-gray-100 text-gray-800',
-    };
-    return colorMap[statusCode] || 'bg-gray-100 text-gray-800';
-  };
+  const filterOrders = useCallback(
+    (orders, tab) => {
+      const q = searchQuery.trim().toLowerCase();
+      return sortOrdersNewestFirst(orders).filter((order) => {
+        const statusOk =
+          tab === 'avito'
+            ? matchesAvitoStatusFilter(order, statusFilter)
+            : matchesGarageStatusFilter(order, statusFilter);
+        if (!statusOk) return false;
+        if (!q) return true;
 
-  const getGarageStatusName = (statusCode) => {
-    const statusMap = {
-      pending: 'В ожидании',
-      confirmed: 'Подтверждён',
-      rejected: 'Не подтверждён',
-      assembled: 'Сформирован',
-      shipped: 'Передан в доставку',
-      delivered: 'Получен',
-      closed: 'Закрыт',
-    };
-    return statusMap[statusCode] || statusCode || 'pending';
-  };
+        if (tab === 'avito') {
+          const { buyerName, buyerPhone, delivery } = getAvitoBuyerAndDelivery(order);
+          const haystack = [
+            order.id,
+            order.avito_order_id,
+            buyerName,
+            buyerPhone,
+            getAvitoMobileDeliveryText(delivery),
+            ...getAvitoOrderItems(order).map((item) => getAvitoLineItemTitle(item)),
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(q);
+        }
+
+        const haystack = [
+          order.id,
+          order.buyer_name,
+          order.buyer_phone,
+          getGarageDeliveryInfo(order),
+          ...(order.items || []).flatMap((item) => [item.name, item.brand, item.partnumber]),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(q);
+      });
+    },
+    [searchQuery, statusFilter]
+  );
+
+  const filteredUsedOrders = useMemo(() => filterOrders(usedOrders, 'used'), [filterOrders, usedOrders]);
+  const filteredNewOrders = useMemo(() => filterOrders(newOrders, 'new'), [filterOrders, newOrders]);
+  const filteredAvitoOrders = useMemo(() => filterOrders(avitoOrders, 'avito'), [filterOrders, avitoOrders]);
+
+  const activeOrders =
+    activeTab === 'used' ? filteredUsedOrders : activeTab === 'new' ? filteredNewOrders : filteredAvitoOrders;
+  const totalInTab =
+    activeTab === 'used' ? usedOrders.length : activeTab === 'new' ? newOrders.length : avitoOrders.length;
+
+  const stats = useMemo(() => {
+    const pool = activeTab === 'used' ? usedOrders : activeTab === 'new' ? newOrders : avitoOrders;
+    let activeCount = 0;
+    let totalSum = 0;
+    pool.forEach((order) => {
+      if (activeTab === 'avito') {
+        if (AVITO_ACTIVE_STATUSES.has(order.avito_status_code)) activeCount += 1;
+        totalSum += getAvitoDisplayTotal(order);
+      } else {
+        if (GARAGE_ACTIVE_STATUSES.has(order.status_code || 'pending')) activeCount += 1;
+        totalSum += Number(order.total_amount || 0);
+      }
+    });
+    return { total: pool.length, activeCount, totalSum };
+  }, [activeTab, usedOrders, newOrders, avitoOrders]);
+
+  const tabLabel = activeTab === 'used' ? 'Б/У' : activeTab === 'new' ? 'Новые' : 'Авито';
+  const isAvitoTab = activeTab === 'avito';
 
   if (!hasPermission) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Заказы</h1>
-          <button onClick={fetchAll} className="text-sm px-3 py-2 border rounded bg-white hover:bg-gray-50">
-            Обновить
+    <div className="min-w-0 space-y-6">
+      <header
+        className={`relative overflow-hidden rounded-2xl border border-white/80 p-5 shadow-sm ring-1 ring-gray-200/60 sm:p-6 ${
+          isAvitoTab
+            ? 'bg-gradient-to-br from-white via-white to-teal-50/80'
+            : 'bg-gradient-to-br from-white via-white to-indigo-50/70'
+        }`}
+      >
+        <div
+          className={`pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full blur-2xl ${
+            isAvitoTab ? 'bg-teal-400/15' : 'bg-indigo-400/10'
+          }`}
+        />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p
+              className={`text-xs font-semibold uppercase tracking-wider ${
+                isAvitoTab ? 'text-teal-700' : 'text-indigo-600'
+              }`}
+            >
+              Продажи
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Заказы</h1>
+            <p className="mt-2 max-w-xl text-sm text-gray-600">
+              {isAvitoTab
+                ? 'Заказы с Авито: статусы, оплата, состав и проводка склада. Синхронизация при обновлении списка.'
+                : 'Входящие заказы с сайта и Авито: статусы, оплата, состав и проводка склада.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => fetchAll(true)}
+            disabled={loading || refreshing}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
+          >
+            <svg
+              className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            {refreshing ? 'Обновление…' : 'Обновить'}
           </button>
         </div>
 
-        <div className="bg-white shadow-sm rounded-lg mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
-              <button
-                onClick={() => setActiveTab('used')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'used' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+        {!loading && !error && (
+          <dl className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
+              <dt className="text-xs font-medium text-gray-500">Всего · {tabLabel}</dt>
+              <dd className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{stats.total}</dd>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
+              <dt className="text-xs font-medium text-gray-500">В работе</dt>
+              <dd
+                className={`mt-1 text-2xl font-bold tabular-nums ${
+                  isAvitoTab ? 'text-teal-700' : 'text-indigo-700'
+                }`}
               >
-                Б/У <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">{usedOrders.length}</span>
-              </button>
-              {canViewNewOrders && (
-                <button
-                  onClick={() => setActiveTab('new')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'new' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-                >
-                  Новые <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">{newOrders.length}</span>
-                </button>
-              )}
-              {avitoProActive && (
+                {stats.activeCount}
+              </dd>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
+              <dt className="text-xs font-medium text-gray-500">Сумма</dt>
+              <dd className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{formatPrice(stats.totalSum)}</dd>
+            </div>
+          </dl>
+        )}
+      </header>
+
+      <div className="rounded-2xl border border-gray-200/80 bg-white p-1 shadow-sm">
+        <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Тип заказов">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'used'}
+              onClick={() => setActiveTab('used')}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+                activeTab === 'used' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Б/У
+              <span className={`rounded-full px-2 py-0.5 text-xs ${activeTab === 'used' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                {usedOrders.length}
+              </span>
+            </button>
+            {canViewNewOrders && (
               <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'new'}
+                onClick={() => setActiveTab('new')}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+                  activeTab === 'new' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Новые
+                <span className={`rounded-full px-2 py-0.5 text-xs ${activeTab === 'new' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                  {newOrders.length}
+                </span>
+              </button>
+            )}
+            {avitoProActive && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'avito'}
                 onClick={() => setActiveTab('avito')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'avito' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+                  activeTab === 'avito'
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-teal-50 hover:text-teal-900'
+                }`}
               >
-                Авито <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">{avitoOrders.length}</span>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white/20 text-[10px] font-bold">
+                  <img src="/logos/avito.png" alt="Avito" className="w-5 h-5 object-contain" />
+                </span>
+                Авито
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs ${
+                    activeTab === 'avito' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  {avitoOrders.length}
+                </span>
               </button>
-              )}
-            </nav>
+            )}
+          </div>
+
+          <div className="relative min-w-0 flex-1 lg:max-w-sm">
+            <svg
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Покупатель, телефон, № заказа…"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
           </div>
         </div>
 
-        {loading && <div className="text-gray-600">Загрузка…</div>}
-        {error && <div className="text-red-600">{error}</div>}
-        {!error && transitionError && <div className="text-red-600">{transitionError}</div>}
-        {!error && usedOrderStatusMessage && (
-          <div
-            className={`mb-4 rounded-md px-4 py-3 text-sm ${
-              usedOrderStatusMessage.type === 'success'
-                ? 'bg-green-50 text-green-800 border border-green-200'
-                : 'bg-red-50 text-red-800 border border-red-200'
-            }`}
-          >
-            {usedOrderStatusMessage.text}
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2 border-t border-gray-100 px-3 py-3">
+          {STATUS_FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setStatusFilter(opt.id)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                statusFilter === opt.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        {!loading && !error && activeTab === 'used' && (
+      {loading && (
+        <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center">
+          <AuthLoadingScreen className="h-24" />
+          <p className="mt-4 text-sm text-gray-600">Загружаем заказы…</p>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-center">
+          <p className="text-sm font-medium text-red-800">{error}</p>
+          <button
+            type="button"
+            onClick={() => fetchAll()}
+            className="mt-4 inline-flex rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+          >
+            Попробовать снова
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && transitionError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{transitionError}</div>
+      )}
+
+      {!loading && !error && usedOrderStatusMessage && (
+        <div
+          className={`rounded-xl px-4 py-3 text-sm ${
+            usedOrderStatusMessage.type === 'success'
+              ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
+              : 'border border-red-200 bg-red-50 text-red-800'
+          }`}
+        >
+          {usedOrderStatusMessage.text}
+        </div>
+      )}
+
+      {!loading && !error && activeTab === 'avito' && avitoWarehouseMessage && (
+        <div
+          className={`rounded-xl px-4 py-3 text-sm ${
+            avitoWarehouseMessage.type === 'success'
+              ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
+              : 'border border-red-200 bg-red-50 text-red-800'
+          }`}
+        >
+          {avitoWarehouseMessage.text}
+        </div>
+      )}
+
+      {!loading && !error && (
+        <>
+          {totalInTab > 0 && activeOrders.length !== totalInTab && (
+            <p className="text-sm text-gray-500">
+              Показано {activeOrders.length} из {totalInTab} заказов
+            </p>
+          )}
+
           <div className="space-y-4">
-            <div className="hidden md:block space-y-4">
-              {usedOrders.map((o) => (
-                <GarageOrderCard
+            {activeTab === 'used' &&
+              filteredUsedOrders.map((o) => (
+                <SalesGarageOrderCard
                   key={o.id}
                   order={o}
                   orderType="used"
@@ -705,82 +951,11 @@ export default function SalesOrdersPage() {
                   formatPrice={formatPrice}
                 />
               ))}
-            </div>
-            <div className="md:hidden space-y-5">
-              {usedOrders.map((o) => (
-                <div key={o.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                  <div className="mb-4 space-y-2 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-xs font-mono">
-                        Б/У #{o.id}
-                      </span>
-                      <span className="text-sm text-gray-400">•</span>
-                      <span className="text-sm text-gray-500">{formatDate(o.created_at)}</span>
-                    </div>
-                    <div className="text-sm text-gray-800 break-words">{o.buyer_name}</div>
-                    <div className="text-sm text-gray-600 break-all">{o.buyer_phone}</div>
-                    <div className="pt-3 border-t border-gray-100 flex flex-col gap-2 min-w-0">
-                      <div className="text-lg font-bold text-gray-900">{formatPrice(o.total_amount)}</div>
-                      <div className="flex flex-wrap gap-2 items-center">
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${o.is_paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {o.is_paid ? 'Оплачен' : 'Не оплачено'}
-                        </span>
-                        {/* Статус заказа - редактируемый */}
-                        {editingStatus?.type === 'used' && editingStatus?.id === o.id ? (
-                          <select
-                            value={o.status_code || 'pending'}
-                            onChange={(e) => {
-                              updateUsedOrderStatus(o.id, e.target.value);
-                            }}
-                            onBlur={() => setEditingStatus(null)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="px-2 py-0.5 text-xs font-medium border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
-                            autoFocus
-                          >
-                            {getOrderStatusOptions.map((status) => (
-                              <option key={status.code} value={status.code}>
-                                {status.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span
-                            className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 ${getGarageStatusColor(o.status_code)}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingStatus({ type: 'used', id: o.id });
-                            }}
-                          >
-                            {getGarageStatusName(o.status_code)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-900">Товары ({(o.items || []).length})</h3>
-                    {(o.items || []).map((item, idx) => (
-                      <div key={`${o.id}-${idx}`} className="bg-gray-50 rounded-lg p-3">
-                        <button onClick={(e) => handleProductClick(item, e)} className="text-sm font-medium text-gray-900 underline text-left">
-                          {item.name}
-                        </button>
-                        <div className="text-xs text-gray-600 mt-1">{item.quantity} шт.</div>
-                        <div className="text-sm font-semibold text-gray-900 mt-1">{formatPrice((item.price || 0) * (item.quantity || 0))}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {usedOrders.length === 0 && <div className="text-gray-600">Заказов Б/У нет</div>}
-          </div>
-        )}
 
-        {!loading && !error && canViewNewOrders && activeTab === 'new' && (
-          <div className="space-y-4">
-            <div className="hidden md:block space-y-4">
-              {newOrders.map((o) => (
-                <GarageOrderCard
+            {activeTab === 'new' &&
+              canViewNewOrders &&
+              filteredNewOrders.map((o) => (
+                <SalesGarageOrderCard
                   key={o.id}
                   order={o}
                   orderType="new"
@@ -796,90 +971,10 @@ export default function SalesOrdersPage() {
                   formatPrice={formatPrice}
                 />
               ))}
-            </div>
-            <div className="md:hidden space-y-5">
-              {newOrders.map((o) => (
-                <div key={o.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                  <div className="mb-4 space-y-2 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-mono">
-                        Новый #{o.id}
-                      </span>
-                      <span className="text-sm text-gray-400">•</span>
-                      <span className="text-sm text-gray-500">{formatDate(o.created_at)}</span>
-                    </div>
-                    <div className="text-sm text-gray-800 break-words">{o.buyer_name}</div>
-                    <div className="text-sm text-gray-600 break-all">{o.buyer_phone}</div>
-                    <div className="pt-3 border-t border-gray-100 flex flex-col gap-2 min-w-0">
-                      <div className="text-lg font-bold text-gray-900">{formatPrice(o.total_amount)}</div>
-                      <div className="flex flex-wrap gap-2 items-center">
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${o.is_paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {o.is_paid ? 'Оплачен' : 'Не оплачено'}
-                        </span>
-                        {/* Статус заказа - редактируемый */}
-                        {editingStatus?.type === 'new' && editingStatus?.id === o.id ? (
-                          <select
-                            value={o.status_code || 'pending'}
-                            onChange={(e) => {
-                              updateNewOrderStatus(o.id, e.target.value);
-                            }}
-                            onBlur={() => setEditingStatus(null)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="px-2 py-0.5 text-xs font-medium border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
-                            autoFocus
-                          >
-                            {getOrderStatusOptions.map((status) => (
-                              <option key={status.code} value={status.code}>
-                                {status.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span
-                            className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 ${getGarageStatusColor(o.status_code)}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingStatus({ type: 'new', id: o.id });
-                            }}
-                          >
-                            {getGarageStatusName(o.status_code)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-900">Товары ({(o.items || []).length})</h3>
-                    {(o.items || []).map((item, idx) => (
-                      <div key={`${o.id}-${idx}`} className="bg-gray-50 rounded-lg p-3">
-                        <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                        <div className="text-xs text-gray-600 mt-1">{item.quantity} шт.</div>
-                        <div className="text-sm font-semibold text-gray-900 mt-1">{formatPrice((item.price || 0) * (item.quantity || 0))}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {newOrders.length === 0 && <div className="text-gray-600">Заказов новых товаров нет</div>}
-          </div>
-        )}
 
-        {!loading && !error && activeTab === 'avito' && (
-          <div className="space-y-4">
-            {avitoWarehouseMessage && (
-              <div
-                className={`rounded-lg px-4 py-3 text-sm ${
-                  avitoWarehouseMessage.type === 'success'
-                    ? 'bg-green-50 text-green-800 border border-green-200'
-                    : 'bg-red-50 text-red-800 border border-red-200'
-                }`}
-              >
-                {avitoWarehouseMessage.text}
-              </div>
-            )}
-            <div className="hidden md:block space-y-4">
-              {avitoOrders.map((o) => (
+            {activeTab === 'avito' &&
+              avitoProActive &&
+              filteredAvitoOrders.map((o) => (
                 <AvitoOrderCard
                   key={o.id}
                   order={o}
@@ -902,115 +997,17 @@ export default function SalesOrdersPage() {
                   getAvitoSkipReasonsForDisplay={getAvitoSkipReasonsForDisplay}
                 />
               ))}
-            </div>
-            <div className="md:hidden space-y-5">
-              {avitoOrders.map((order) => (
-                <div key={order.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                  {(() => {
-                    const { delivery, buyerName, buyerPhone } = getAvitoBuyerAndDelivery(order);
-                    const displayTotal = getAvitoDisplayTotal(order);
-                    const deliveryText = getAvitoMobileDeliveryText(delivery);
-                    return (
-                      <>
-                        <div className="mb-4 space-y-2 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-mono">
-                              Авито #{order.avito_order_id}
-                            </span>
-                            <span className="text-sm text-gray-400">•</span>
-                            <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
-                          </div>
-                          <div className="text-sm text-gray-800 break-words">{buyerName}</div>
-                          <div className="text-sm text-gray-600 break-all">{buyerPhone}</div>
-                          <div className="text-sm text-gray-600 break-words">{deliveryText}</div>
-                          {getAvitoWarehouseMismatch(order) && (
-                            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                              <div className="font-medium">Склад не проведён полностью</div>
-                              {getAvitoSkipReasonsForDisplay(order).slice(0, 2).map((r, idx) => (
-                                <div key={`${r.code}-${idx}`} className="mt-1">{r.label}</div>
-                              ))}
-                              {getAvitoWarehouseCanRetry(order) && (
-                                <button
-                                  type="button"
-                                  onClick={() => retryAvitoWarehouse(order)}
-                                  disabled={Boolean(warehouseRetryLoadingByOrderId[order.id])}
-                                  className="mt-2 text-amber-800 underline disabled:opacity-50"
-                                >
-                                  {warehouseRetryLoadingByOrderId[order.id]
-                                    ? 'Проводим...'
-                                    : 'Повторить проводку'}
-                                </button>
-                              )}
-                            </div>
-                          )}
-                          <div className="pt-3 border-t border-gray-100 flex flex-col gap-2 min-w-0">
-                            <div className="text-lg font-bold text-gray-900">{formatPrice(displayTotal)}</div>
-                            <div className="flex flex-wrap gap-2 items-center">
-                              <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${order.is_paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                {order.is_paid ? 'Оплачен' : 'Не оплачено'}
-                              </span>
-                              {/* Статус заказа - редактируемый */}
-                              {editingStatus?.type === 'avito' && editingStatus?.id === order.id ? (
-                                <select
-                                  value=""
-                                  onChange={(e) => {
-                                    handleAvitoTransitionSelect(order, e.target.value);
-                                  }}
-                                  disabled={Boolean(transitionLoadingByOrderId[order.id]) || getAvitoTransitionOptions(order).length === 0}
-                                  onBlur={() => setEditingStatus(null)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="px-2 py-0.5 text-xs font-medium border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[140px]"
-                                  autoFocus
-                                >
-                                <option value="" disabled>
-                                  {transitionLoadingByOrderId[order.id] ? 'Выполняем...' : 'Выберите действие'}
-                                </option>
-                                  {getAvitoTransitionOptions(order).map((transition) => (
-                                    <option key={transition} value={transition}>
-                                      {getAvitoTransitionLabel(transition)}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <span
-                                  className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer hover:opacity-80 ${getAvitoStatusColor(order.avito_status_code)}`}
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    // Fetch available transitions before showing dropdown
-                                    await fetchAvitoTransitions(order.id);
-                                    setEditingStatus({ type: 'avito', id: order.id });
-                                  }}
-                                >
-                                  {getAvitoStatusName(order.avito_status_code, order)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="space-y-3">
-                          <h3 className="text-sm font-semibold text-gray-900">Товары ({getAvitoOrderItems(order).length})</h3>
-                          {getAvitoOrderItems(order).map((item, idx) => (
-                            <div key={`${order.id}-${idx}`} className="bg-gray-50 rounded-lg p-3">
-                              <button onClick={(e) => handleProductClick(item, e)} className="text-sm font-medium text-gray-900 underline text-left">
-                                {getAvitoLineItemTitle(item)}
-                              </button>
-                              <div className="text-xs text-gray-600 mt-1">{getAvitoLineItemQty(item)} шт.</div>
-                              <div className="text-sm font-semibold text-gray-900 mt-1">{formatPrice(getAvitoLineItemTotal(item))}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              ))}
-              {avitoOrders.length === 0 && <div className="text-gray-600">Заказов Авито нет</div>}
-            </div>
           </div>
-        )}
+
+          {activeOrders.length === 0 && (
+            <SalesOrdersEmptyState tabLabel={tabLabel} variant={isAvitoTab ? 'avito' : 'default'} />
+          )}
+        </>
+      )}
+
         {cncPrepareModal.isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
               <h3 className="text-lg font-semibold text-gray-900">Подготовка CNC заказа</h3>
               <p className="mt-2 text-sm text-gray-600">
                 Заполните данные для передачи заказа покупателю перед подтверждением получения.
@@ -1023,7 +1020,7 @@ export default function SalesOrdersPage() {
                 type="text"
                 value={cncPrepareModal.address}
                 onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, address: e.target.value, error: '' }))}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                 placeholder="г Екатеринбург, ул Фруктовая, 17"
                 autoFocus
               />
@@ -1036,7 +1033,7 @@ export default function SalesOrdersPage() {
                 min="1"
                 value={cncPrepareModal.bookingPeriod}
                 onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, bookingPeriod: e.target.value, error: '' }))}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
               />
               <label className="mt-3 block text-sm font-medium text-gray-700" htmlFor="cnc-prepare-details">
                 Комментарий покупателю
@@ -1046,7 +1043,7 @@ export default function SalesOrdersPage() {
                 value={cncPrepareModal.details}
                 onChange={(e) => setCncPrepareModal((prev) => ({ ...prev, details: e.target.value, error: '' }))}
                 rows={3}
-                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                 placeholder="Могу передать товар с 13:00 до 18:00"
               />
               {cncPrepareModal.error && (
@@ -1055,7 +1052,7 @@ export default function SalesOrdersPage() {
               <div className="mt-5 flex justify-end gap-2">
                 <button
                   type="button"
-                  className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   onClick={closeCncPrepareModal}
                   disabled={cncPrepareModal.isSubmitting}
                 >
@@ -1063,7 +1060,7 @@ export default function SalesOrdersPage() {
                 </button>
                 <button
                   type="button"
-                  className="rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={submitCncPrepare}
                   disabled={cncPrepareModal.isSubmitting}
                 >
@@ -1074,8 +1071,8 @@ export default function SalesOrdersPage() {
           </div>
         )}
         {receiveCodeModal.isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
               <h3 className="text-lg font-semibold text-gray-900">Подтверждение получения заказа</h3>
               {receiveCodeModal.step === 'hint' && (
                 <div className="mt-2 space-y-2 text-sm text-gray-700">
@@ -1106,7 +1103,7 @@ export default function SalesOrdersPage() {
                     type="text"
                     value={receiveCodeModal.confirmCode}
                     onChange={(e) => setReceiveCodeModal((prev) => ({ ...prev, confirmCode: e.target.value, error: '' }))}
-                    className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                     placeholder="Введите код"
                     autoFocus
                   />
@@ -1127,7 +1124,7 @@ export default function SalesOrdersPage() {
                 {receiveCodeModal.step === 'hint' ? (
                   <button
                     type="button"
-                    className="rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
+                    className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700"
                     onClick={() => setReceiveCodeModal((prev) => ({ ...prev, step: 'code', error: '' }))}
                   >
                     Ввести код
@@ -1136,7 +1133,7 @@ export default function SalesOrdersPage() {
                   <>
                     <button
                       type="button"
-                      className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                       onClick={() => setReceiveCodeModal((prev) => ({ ...prev, step: 'hint', error: '' }))}
                       disabled={receiveCodeModal.isSubmitting}
                     >
@@ -1144,7 +1141,7 @@ export default function SalesOrdersPage() {
                     </button>
                     <button
                       type="button"
-                      className="rounded bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={submitReceiveCodeTransition}
                       disabled={receiveCodeModal.isSubmitting}
                     >
@@ -1156,7 +1153,6 @@ export default function SalesOrdersPage() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

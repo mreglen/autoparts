@@ -122,7 +122,7 @@ export default function MobileSideMenu({
                     </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto overscroll-contain p-2">
+                <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-24 p-2 pb-6">
                     {guestContent || (
                         <ProfileMenuTabs
                             variant="drawer"

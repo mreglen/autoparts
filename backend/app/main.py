@@ -12,6 +12,7 @@ from app.db.schema_patches import (
     ensure_avito_pro_status_columns,
     ensure_site_reviews_table,
     ensure_site_reviews_user_id_column,
+    ensure_site_settings_show_site_reviews_column,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
@@ -89,6 +90,7 @@ try:
     ensure_avito_pro_status_columns()
     ensure_site_reviews_table()
     ensure_site_reviews_user_id_column()
+    ensure_site_settings_show_site_reviews_column()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
 except Exception as e:

@@ -6,6 +6,8 @@ import {
     normalizeProductMedia,
     parseMediaList,
 } from '../../../utils/mediaHelpers.js';
+import { useActionsDropdownPlacement } from '../../../hooks/useActionsDropdownPlacement';
+import { buildActionsDropdownMenuClassName } from '../../../utils/actionsDropdownPlacement';
 
 export const UNKNOWN_ORG_ID = 'unknown';
 
@@ -123,6 +125,9 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
     const [showActions, setShowActions] = useState(false);
     const [imageError, setImageError] = useState(false);
     const isRejected = product.moderationKind === 'rejected';
+    const menuHeight = isRejected ? 56 : 160;
+    const desktopActionsPlacement = useActionsDropdownPlacement(showActions, menuHeight);
+    const mobileActionsPlacement = useActionsDropdownPlacement(showActions, menuHeight);
 
     const normalizedProduct = normalizeProductMedia(product);
     const photoUrl = getFirstMediaUrl(normalizedProduct);
@@ -268,7 +273,7 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
                     <div className="text-base font-bold text-gray-900">{priceLabel}</div>
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="relative moderation-actions-dropdown">
+                    <div ref={desktopActionsPlacement.anchorRef} className="relative moderation-actions-dropdown">
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
@@ -279,7 +284,7 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
                             </svg>
                             <span className="hidden sm:inline">Действия</span>
                         </button>
-                        {showActions && renderActionsMenu('absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-20 moderation-actions-dropdown')}
+                        {showActions && renderActionsMenu(buildActionsDropdownMenuClassName(desktopActionsPlacement.openUp, 'w-48 z-50 moderation-actions-dropdown'))}
                     </div>
                 </td>
             </tr>
@@ -289,7 +294,7 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
                 onDoubleClick={handleRowDoubleClick}
             >
                 <div className="flex items-center justify-end p-3 border-b border-gray-100">
-                    <div className="relative moderation-actions-dropdown">
+                    <div ref={mobileActionsPlacement.anchorRef} className="relative moderation-actions-dropdown">
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
@@ -300,7 +305,7 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
                             </svg>
                             <span>Действия</span>
                         </button>
-                        {showActions && renderActionsMenu('absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 moderation-actions-dropdown')}
+                        {showActions && renderActionsMenu(buildActionsDropdownMenuClassName(mobileActionsPlacement.openUp, 'w-48 z-50 moderation-actions-dropdown'))}
                     </div>
                 </div>
                 <div className="p-4 cursor-pointer">

@@ -802,6 +802,7 @@ const productSlice = createSlice({
         catalogTotal: 0,
         catalogPage: 1,
         catalogPageSize: 20,
+        catalogHasMore: false,
         catalogLoading: false,
         catalogLoadingMore: false,
         catalogFacets: null,
@@ -823,6 +824,7 @@ const productSlice = createSlice({
             state.catalogItems = [];
             state.catalogTotal = 0;
             state.catalogPage = 1;
+            state.catalogHasMore = false;
             state.catalogLoading = false;
             state.catalogLoadingMore = false;
         },
@@ -988,6 +990,8 @@ const productSlice = createSlice({
                 state.catalogLoading = false;
                 state.catalogLoadingMore = false;
                 const newItems = action.payload.items || [];
+                const pageSize = action.payload.page_size ?? state.catalogPageSize ?? 20;
+                const beforeLen = state.catalogItems.length;
                 if (append) {
                     const existingIds = new Set(state.catalogItems.map((p) => p.id));
                     newItems.forEach((item) => {
@@ -1000,7 +1004,12 @@ const productSlice = createSlice({
                 }
                 state.catalogTotal = action.payload.total ?? 0;
                 state.catalogPage = action.payload.page ?? 1;
-                state.catalogPageSize = action.payload.page_size ?? 20;
+                state.catalogPageSize = pageSize;
+                const addedCount = state.catalogItems.length - (append ? beforeLen : 0);
+                const receivedFullPage = newItems.length >= pageSize;
+                const hasRoomByTotal = state.catalogItems.length < state.catalogTotal;
+                state.catalogHasMore =
+                    hasRoomByTotal && receivedFullPage && (append ? addedCount > 0 : newItems.length > 0);
             })
             .addCase(fetchCatalogProducts.rejected, (state, action) => {
                 const append = Boolean(action.meta?.arg?.append);
@@ -1010,6 +1019,7 @@ const productSlice = createSlice({
                     state.error = action.payload;
                     state.catalogItems = [];
                     state.catalogTotal = 0;
+                    state.catalogHasMore = false;
                 }
             })
             .addCase(fetchCatalogFacets.fulfilled, (state, action) => {
@@ -1276,6 +1286,7 @@ export const selectCatalogPage = (state) => state.products.catalogPage;
 export const selectCatalogPageSize = (state) => state.products.catalogPageSize;
 export const selectCatalogLoading = (state) => state.products.catalogLoading;
 export const selectCatalogLoadingMore = (state) => state.products.catalogLoadingMore;
+export const selectCatalogHasMore = (state) => state.products.catalogHasMore;
 export const selectCatalogFacets = (state) => state.products.catalogFacets;
 export const selectPublicPartTypes = (state) => state.products.publicPartTypes;
 export default productSlice.reducer;

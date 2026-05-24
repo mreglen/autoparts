@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 import ReviewCard from '../../components/Reviews/ReviewCard';
 import StarRating from '../../components/Reviews/StarRating';
 import ReviewSubmitForm from '../../components/Reviews/ReviewSubmitForm';
 import PageAmbientBackground from '../../components/PageAmbientBackground/PageAmbientBackground';
+import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 import { reviewSourceLabel } from '../../components/Reviews/reviewUtils';
 import YandexReviewsEmbed from '../../components/Reviews/YandexReviewsEmbed';
 
@@ -17,6 +18,7 @@ const FILTER_OPTIONS = [
 ];
 
 export default function ReviewsPage() {
+  const showSiteReviews = useShowSiteReviews();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -54,6 +56,10 @@ export default function ReviewsPage() {
   }, [data?.reviews]);
 
   const total = data?.total_count || 0;
+
+  if (!showSiteReviews) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <>

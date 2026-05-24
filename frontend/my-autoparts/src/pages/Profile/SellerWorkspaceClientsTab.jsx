@@ -6,6 +6,7 @@ import {
     fetchSellerClients,
 } from '../../redux/slices/SellerSlice';
 import ClientOrdersModal from './ClientOrdersModal';
+import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 
 function clientFullName(client) {
     return `${client.last_name || ''} ${client.first_name || ''}${client.patronymic ? ` ${client.patronymic}` : ''}`.trim();
@@ -130,9 +131,8 @@ export default function SellerWorkspaceClientsTab({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {filteredClients.map((client, index) => {
+                                {filteredClients.map((client) => {
                                     const rowKey = clientRowKey(client);
-                                    const isLastRow = index === filteredClients.length - 1;
                                     const isMenuOpen = openActionsId === rowKey;
                                     return (
                                         <tr
@@ -152,33 +152,16 @@ export default function SellerWorkspaceClientsTab({
                                                 {client.orders_count ?? 0}
                                             </td>
                                             <td className={`px-4 py-4 text-right ${isMenuOpen ? 'relative z-30' : ''}`}>
-                                                <div className="relative inline-block actions-dropdown">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setOpenActionsId(isMenuOpen ? null : rowKey)}
-                                                        className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                                        </svg>
-                                                        Действия
-                                                    </button>
-                                                    {isMenuOpen && (
-                                                        <div
-                                                            className={`absolute right-0 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50 actions-dropdown ${
-                                                                isLastRow ? 'bottom-full mb-2' : 'top-full mt-2'
-                                                            }`}
-                                                        >
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleOpenOrders(client)}
-                                                                className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                                                            >
-                                                                Просмотреть заказы
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                <ActionsDropdown
+                                                    isOpen={isMenuOpen}
+                                                    onOpenChange={(next) => setOpenActionsId(next ? rowKey : null)}
+                                                    menuClassName="w-56 z-50"
+                                                    estimatedMenuHeight={56}
+                                                >
+                                                    <ActionsDropdownItem onClick={() => handleOpenOrders(client)}>
+                                                        Просмотреть заказы
+                                                    </ActionsDropdownItem>
+                                                </ActionsDropdown>
                                             </td>
                                         </tr>
                                     );

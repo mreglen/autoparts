@@ -20,7 +20,7 @@ from app.models.product_avito_listing_link import ProductAvitoListingLink
 from app.models.storage_location import StorageLocation as StorageLocationModel
 from app.services import avito_api as avito_api_svc
 from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload, upsert_products_to_avito_autoload
-from app.services.avito_media import ensure_local_pictures
+from app.services.avito_media import product_photo_urls_for_avito_export
 from app.utils.avito_crypto import decrypt_secret
 from app.services.avito_pro_status_service import is_avito_pro_active
 
@@ -233,26 +233,7 @@ def run_avito_export_job(self, job_id: int):
             storage = storage_by_id.get(product.storage_location_id) if product.storage_location_id else None
             address = ((storage.address if storage and storage.address else "") or org_address).strip()
             raw_photos = photo_map.get(product.id, [])
-            photos_for_xlsx: list[str] = []
-            for raw_photo in raw_photos[:5]:
-                try:
-                    localized = asyncio.run(
-                        ensure_local_pictures(
-                            [raw_photo],
-                            org_id=org_id,
-                            db=db,
-                            for_xlsx=True,
-                            limit=1,
-                            soft_fail=False,
-                            per_photo_timeout_s=25.0,
-                            celery_timeout_s=120,
-                        )
-                    )
-                    if localized and localized[0]:
-                        photos_for_xlsx.append(str(localized[0]).strip())
-                except Exception:
-                    continue
-            photos_for_xlsx = list(dict.fromkeys([p for p in photos_for_xlsx if p]))
+            photos_for_xlsx = product_photo_urls_for_avito_export(raw_photos)
             description = product.description or ""
             
             export_rows.append(

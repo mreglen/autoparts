@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchEmployees, addEmployee as createEmployee, updateEmployee, deleteEmployee } from '../../redux/slices/OrganizationSlice';
 import PermissionAssignmentModal from '../../components/Employees/PermissionAssignmentModal';
+import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
 
 const EmployeesPage = () => {
   const dispatch = useDispatch();
@@ -161,55 +162,44 @@ const EmployeesPage = () => {
     }
   };
 
-  const renderEmployeeActions = (emp, fullName, dropdownClass = 'mt-2') => {
+  const renderEmployeeActions = (emp, fullName, containerExtraClass = '') => {
     if (emp.id === user?.id) return null;
+    const isOpen = openDropdownId === emp.id;
     return (
-      <div className={`relative actions-popup-container ${dropdownClass}`}>
-        <button
-          type="button"
-          onClick={() => setOpenDropdownId(openDropdownId === emp.id ? null : emp.id)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-all duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+      <ActionsDropdown
+        containerClassName={`relative actions-popup-container actions-dropdown ${containerExtraClass}`.trim()}
+        isOpen={isOpen}
+        onOpenChange={(next) => setOpenDropdownId(next ? emp.id : null)}
+        menuClassName="w-52 z-50"
+        estimatedMenuHeight={200}
+      >
+        <ActionsDropdownItem
+          onClick={() => {
+            startEditing(emp);
+            setOpenDropdownId(null);
+          }}
         >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-          </svg>
-          <span>Действия</span>
-        </button>
-        {openDropdownId === emp.id && (
-          <div className="absolute right-0 z-50 mt-2 w-52 rounded-xl border border-gray-200 bg-white py-1 shadow-lg actions-dropdown">
-            <button
-              type="button"
-              onClick={() => {
-                startEditing(emp);
-                setOpenDropdownId(null);
-              }}
-              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
-            >
-              Редактировать
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                openPermissionModal(emp);
-                setOpenDropdownId(null);
-              }}
-              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
-            >
-              Назначить права
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                openDeleteModal(emp.id, fullName);
-                setOpenDropdownId(null);
-              }}
-              className="flex w-full items-center gap-2 border-t border-gray-100 px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
-            >
-              Удалить
-            </button>
-          </div>
-        )}
-      </div>
+          Редактировать
+        </ActionsDropdownItem>
+        <ActionsDropdownItem
+          onClick={() => {
+            openPermissionModal(emp);
+            setOpenDropdownId(null);
+          }}
+        >
+          Назначить права
+        </ActionsDropdownItem>
+        <ActionsDropdownItem
+          danger
+          className="border-t border-gray-100"
+          onClick={() => {
+            openDeleteModal(emp.id, fullName);
+            setOpenDropdownId(null);
+          }}
+        >
+          Удалить
+        </ActionsDropdownItem>
+      </ActionsDropdown>
     );
   };
 

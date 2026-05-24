@@ -41,6 +41,22 @@ def _resolve_site_origin(preferred_host_url: str | None = None) -> str:
     return "https://svoygarage.ru"
 
 
+_YANDEX_CONDITION_TYPES = frozenset(
+    {"preowned", "showcasesample", "reduction", "renovated", "refurbished"}
+)
+_YANDEX_CONDITION_QUALITIES = frozenset({"perfect", "excellent", "good"})
+
+
+def _normalize_condition_type(value: str | None) -> str:
+    normalized = (value or "preowned").strip().lower()
+    return normalized if normalized in _YANDEX_CONDITION_TYPES else "preowned"
+
+
+def _normalize_condition_quality(value: str | None) -> str:
+    normalized = (value or "good").strip().lower()
+    return normalized if normalized in _YANDEX_CONDITION_QUALITIES else "good"
+
+
 def _format_price(value: Decimal | float | int | None) -> str:
     if value is None:
         return "0"
@@ -106,6 +122,8 @@ def _offer_lines(
     product: Product,
     *,
     site_origin: str,
+    used_condition_type: str,
+    used_condition_quality: str,
     used_condition_reason: str,
 ) -> list[str] | None:
     category_id = int(product.part_type_id or 1)
@@ -156,10 +174,13 @@ def _offer_lines(
         lines.append(f'        <param name="{escape(param_name)}">{escape(param_value)}</param>')
 
     if not is_new_item:
+        condition_type = _normalize_condition_type(used_condition_type)
+        condition_quality = _normalize_condition_quality(used_condition_quality)
         reason = (used_condition_reason or "Товар бывший в употреблении, проверен продавцом").strip()
         lines.extend(
             [
-                '        <condition type="preowned">',
+                f'        <condition type="{condition_type}">',
+                f"          <quality>{condition_quality}</quality>",
                 "          <reason>",
                 f"            {escape(reason)}",
                 "          </reason>",
@@ -176,9 +197,11 @@ def generate_used_yml_feed(
     *,
     preferred_host_url: str | None,
     condition_type: str = "preowned",
+    condition_quality: str = "good",
     condition_reason: str = "Товар бывший в употреблении, проверен продавцом",
 ) -> YandexUsedFeedResult:
-    del condition_type  # состояние определяется per-offer по product.is_new
+    normalized_condition_type = _normalize_condition_type(condition_type)
+    normalized_condition_quality = _normalize_condition_quality(condition_quality)
 
     site_origin = _resolve_site_origin(preferred_host_url)
     products = list(_iter_catalog_products(db))
@@ -218,6 +241,8 @@ def generate_used_yml_feed(
         offer_lines = _offer_lines(
             p,
             site_origin=site_origin,
+            used_condition_type=normalized_condition_type,
+            used_condition_quality=normalized_condition_quality,
             used_condition_reason=condition_reason,
         )
         if not offer_lines:

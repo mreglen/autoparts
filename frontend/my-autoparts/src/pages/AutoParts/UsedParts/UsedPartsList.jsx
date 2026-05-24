@@ -10,6 +10,7 @@ import {
   selectCatalogPage,
   selectCatalogLoading,
   selectCatalogLoadingMore,
+  selectCatalogHasMore,
 } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
 import { normalizeImageUrl } from '../../../utils/apiClient';
@@ -61,9 +62,10 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const isCatalogMode = isUsedCatalogBrowseMode(searchParams);
   const catalogLoading = useSelector(selectCatalogLoading);
   const catalogLoadingMore = useSelector(selectCatalogLoadingMore);
+  const catalogHasMoreFromStore = useSelector(selectCatalogHasMore);
   const usedPartsLoading = useSelector(selectUsedPartsLoading);
   const loadMoreSentinelRef = useRef(null);
-  const catalogHasMore = isCatalogMode && catalogItems.length < catalogTotal;
+  const catalogHasMore = isCatalogMode && catalogHasMoreFromStore;
   const status = isCatalogMode
     ? (catalogLoading && catalogItems.length === 0 ? 'loading' : 'idle')
     : (usedPartsLoading ? 'loading' : 'idle');
@@ -80,7 +82,13 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   );
 
   const loadMoreCatalog = useCallback(() => {
-    if (!isCatalogMode || catalogLoading || catalogLoadingMore || !catalogHasMore) {
+    if (
+      !isCatalogMode
+      || catalogLoading
+      || catalogLoadingMore
+      || !catalogHasMoreFromStore
+      || catalogItems.length >= catalogTotal
+    ) {
       return;
     }
     dispatch(fetchCatalogProducts({
@@ -91,14 +99,18 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     isCatalogMode,
     catalogLoading,
     catalogLoadingMore,
-    catalogHasMore,
+    catalogHasMoreFromStore,
+    catalogItems.length,
+    catalogTotal,
     dispatch,
     searchParams,
     catalogPage,
   ]);
 
   useEffect(() => {
-    if (!isCatalogMode || !catalogHasMore) return undefined;
+    if (!isCatalogMode || !catalogHasMore || catalogLoading || catalogLoadingMore) {
+      return undefined;
+    }
     const sentinel = loadMoreSentinelRef.current;
     if (!sentinel) return undefined;
 
@@ -108,11 +120,11 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           loadMoreCatalog();
         }
       },
-      { root: null, rootMargin: '240px', threshold: 0 }
+      { root: null, rootMargin: '120px', threshold: 0 }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [isCatalogMode, catalogHasMore, loadMoreCatalog]);
+  }, [isCatalogMode, catalogHasMore, catalogLoading, catalogLoadingMore, loadMoreCatalog]);
 
   const activeFilters = useMemo(() => ({
     partTypes: searchParams.getAll('part_type'),

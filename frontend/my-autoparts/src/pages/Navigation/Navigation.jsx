@@ -6,6 +6,7 @@ import { selectCart } from '../../redux/slices/CartSlice';
 import { fetchAdminOrganizationPhone } from '../../redux/slices/PublicInfoSlice';
 import { fetchUnreadCount } from '../../redux/slices/ChatSlice';
 import Search from './Search/Search';
+import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 
 const formatPhoneNumber = (phone) => {
   if (!phone) return '';
@@ -70,6 +71,7 @@ export default function Navigation() {
   const { chats } = useSelector((state) => state.chats);
   const { chats: avitoChats } = useSelector((state) => state.avitoChats);
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
+  const showSiteReviews = useShowSiteReviews();
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [closeTimeout, setCloseTimeout] = useState(null);
@@ -188,7 +190,7 @@ export default function Navigation() {
             )}
             <DesktopNavLink to="/autoparts/used">Б/У</DesktopNavLink>
             <DesktopNavLink to="/delivery">Доставка</DesktopNavLink>
-            <DesktopNavLink to="/reviews">Отзывы</DesktopNavLink>
+            {showSiteReviews && <DesktopNavLink to="/reviews">Отзывы</DesktopNavLink>}
             <DesktopNavLink to="/payment">Оплата</DesktopNavLink>
             <DesktopNavLink to="/about">О компании</DesktopNavLink>
           </nav>

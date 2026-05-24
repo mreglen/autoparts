@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useActionsDropdownPlacement } from '../../hooks/useActionsDropdownPlacement';
+import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 
 export const settingsInputClass =
     'w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 shadow-sm transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
@@ -38,6 +40,7 @@ function ActionsDotsIcon() {
 
 export function SettingsActionsDropdown({ items = [], disabled = false, menuWidth = 'w-48' }) {
     const [open, setOpen] = useState(false);
+    const { anchorRef, openUp } = useActionsDropdownPlacement(open, Math.max(120, items.length * 44 + 16));
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -52,7 +55,7 @@ export function SettingsActionsDropdown({ items = [], disabled = false, menuWidt
     }, [open]);
 
     return (
-        <div className="relative actions-dropdown shrink-0">
+        <div ref={anchorRef} className="relative actions-dropdown shrink-0">
             <button
                 type="button"
                 disabled={disabled}
@@ -66,9 +69,7 @@ export function SettingsActionsDropdown({ items = [], disabled = false, menuWidt
                 <span className="hidden sm:inline">Действия</span>
             </button>
             {open && items.length > 0 && (
-                <div
-                    className={`absolute right-0 z-20 mt-2 ${menuWidth} rounded-xl border border-gray-200 bg-white py-1 shadow-lg actions-dropdown`}
-                >
+                <div className={buildActionsDropdownMenuClassName(openUp, `${menuWidth} z-50`)}>
                     {items.map((item, index) => (
                         <button
                             key={item.key ?? `${item.label}-${index}`}

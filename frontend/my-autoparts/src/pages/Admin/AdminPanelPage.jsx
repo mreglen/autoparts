@@ -7,6 +7,7 @@ import { API_BASE, apiRequest } from '../../utils/apiClient';
 import {
   fetchPublicSiteConfig,
   setShowNewAutoparts,
+  setShowSiteReviews,
   setNewPartsMarkupPercent,
 } from '../../redux/slices/PublicInfoSlice';
 
@@ -14,6 +15,7 @@ function AdminPanelPage() {
   const dispatch = useDispatch();
   const { isReady, user, isAuthenticated } = useAuthReady();
   const [showNewAutoparts, setShowNewLocal] = useState(true);
+  const [showSiteReviews, setShowSiteReviewsLocal] = useState(true);
   const [markupPercent, setMarkupPercent] = useState('15');
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -139,6 +141,7 @@ function AdminPanelPage() {
         ]);
         if (!cancelled) {
           setShowNewLocal(data.show_new_autoparts !== false);
+          setShowSiteReviewsLocal(data.show_site_reviews !== false);
           const m = Number(data.new_parts_markup_percent);
           setMarkupPercent(
             String(Number.isFinite(m) && m >= 0 ? m : 15)
@@ -222,6 +225,24 @@ function AdminPanelPage() {
       });
       setShowNewLocal(checked);
       dispatch(setShowNewAutoparts(checked));
+      dispatch(fetchPublicSiteConfig());
+    } catch (e) {
+      setError(e?.message || 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleShowSiteReviews = async (checked) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest('/admin/site-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ show_site_reviews: checked }),
+      });
+      setShowSiteReviewsLocal(checked);
+      dispatch(setShowSiteReviews(checked));
       dispatch(fetchPublicSiteConfig());
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения');
@@ -700,6 +721,21 @@ function AdminPanelPage() {
             <span className="font-medium text-gray-900 block">Отображать новые запчасти</span>
             <span className="text-sm text-gray-500 block mt-1">
               Если включено, в каталоге есть вкладки «Новые» и «Б/У». Если выключено — только б/у.
+            </span>
+          </span>
+        </label>
+        <label className="mt-6 flex items-start gap-3 cursor-pointer select-none border-t border-gray-100 pt-6">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            checked={showSiteReviews}
+            disabled={loadingSettings || saving}
+            onChange={(e) => handleToggleShowSiteReviews(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium text-gray-900 block">Отображать отзывы на сайте</span>
+            <span className="text-sm text-gray-500 block mt-1">
+              Если выключено, скрываются страница «Отзывы», блок на главной, ссылки в меню и форма отправки отзывов.
             </span>
           </span>
         </label>

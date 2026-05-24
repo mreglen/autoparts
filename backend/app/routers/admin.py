@@ -65,12 +65,14 @@ def _new_parts_markup_percent_value(row) -> float:
 
 class SiteSettingsResponse(BaseModel):
     show_new_autoparts: bool
+    show_site_reviews: bool = True
     new_parts_markup_percent: float
     used_parts_purchase_mode: str = "both"
 
 
 class SiteSettingsPatch(BaseModel):
     show_new_autoparts: Optional[bool] = None
+    show_site_reviews: Optional[bool] = None
     new_parts_markup_percent: Optional[float] = Field(None, ge=0, le=500)
     used_parts_purchase_mode: Optional[str] = None
     global_markup_apply_mode: Optional[str] = Field(
@@ -121,6 +123,7 @@ def get_site_settings_admin(
     mode = getattr(row, "used_parts_purchase_mode", None) or "both"
     return SiteSettingsResponse(
         show_new_autoparts=row.show_new_autoparts,
+        show_site_reviews=getattr(row, "show_site_reviews", True) is not False,
         new_parts_markup_percent=_new_parts_markup_percent_value(row),
         used_parts_purchase_mode=mode,
     )
@@ -141,6 +144,8 @@ def patch_site_settings_admin(
     row = get_or_create_site_settings(db)
     if "show_new_autoparts" in data:
         row.show_new_autoparts = data["show_new_autoparts"]
+    if "show_site_reviews" in data:
+        row.show_site_reviews = data["show_site_reviews"]
     apply_mode = data.pop("global_markup_apply_mode", None)
     if "new_parts_markup_percent" in data:
         new_global = float(data["new_parts_markup_percent"])
@@ -172,6 +177,7 @@ def patch_site_settings_admin(
     mode = getattr(row, "used_parts_purchase_mode", None) or "both"
     return SiteSettingsResponse(
         show_new_autoparts=row.show_new_autoparts,
+        show_site_reviews=getattr(row, "show_site_reviews", True) is not False,
         new_parts_markup_percent=_new_parts_markup_percent_value(row),
         used_parts_purchase_mode=mode,
     )

@@ -1,22 +1,104 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiAxios } from '../../utils/apiClient';
-import { GarageOrderCard } from '../../components/GarageOrderCard';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import PurchaseOrderCard, { PurchaseOrdersEmptyState } from '../../components/PurchaseOrderCard/PurchaseOrderCard';
+import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+
+const ACTIVE_STATUSES = new Set(['pending', 'confirmed', 'assembled', 'shipped']);
+const COMPLETED_STATUSES = new Set(['delivered', 'closed']);
+
+const STATUS_FILTER_OPTIONS = [
+  { id: 'all', label: 'Все' },
+  { id: 'active', label: 'В работе' },
+  { id: 'completed', label: 'Завершённые' },
+  { id: 'rejected', label: 'Отменённые' },
+];
+
+function formatDate(dateString) {
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatPrice(amount) {
+  return `${Number(amount || 0).toLocaleString('ru-RU')} ₽`;
+}
+
+function getGarageStatusColor(statusCode) {
+  const colorMap = {
+    pending: 'bg-amber-50 text-amber-800 ring-1 ring-amber-100',
+    confirmed: 'bg-blue-50 text-blue-800 ring-1 ring-blue-100',
+    rejected: 'bg-red-50 text-red-800 ring-1 ring-red-100',
+    assembled: 'bg-indigo-50 text-indigo-800 ring-1 ring-indigo-100',
+    shipped: 'bg-violet-50 text-violet-800 ring-1 ring-violet-100',
+    delivered: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100',
+    closed: 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
+  };
+  return colorMap[statusCode] || 'bg-gray-100 text-gray-700 ring-1 ring-gray-200';
+}
+
+function getGarageStatusName(statusCode) {
+  const statusMap = {
+    pending: 'В ожидании',
+    confirmed: 'Подтверждён',
+    rejected: 'Не подтверждён',
+    assembled: 'Сформирован',
+    shipped: 'В доставке',
+    delivered: 'Получен',
+    closed: 'Закрыт',
+  };
+  return statusMap[statusCode] || statusCode || 'В ожидании';
+}
+
+function getDeliveryInfo(order) {
+  if (order.delivery_type === 'pickup') {
+    return `Самовывоз · ${order.pickup_address || 'адрес уточняется'}`;
+  }
+  if (order.delivery_type === 'transport') {
+    if (order.transport_company) {
+      return `${order.transport_company} · ${order.delivery_address || 'адрес уточняется'}`;
+    }
+    return `Доставка · ${order.delivery_address || 'адрес уточняется'}`;
+  }
+  return 'Способ доставки уточняется';
+}
+
+function matchesStatusFilter(order, filterId) {
+  const code = order.status_code || 'pending';
+  if (filterId === 'all') return true;
+  if (filterId === 'active') return ACTIVE_STATUSES.has(code);
+  if (filterId === 'completed') return COMPLETED_STATUSES.has(code);
+  if (filterId === 'rejected') return code === 'rejected';
+  return true;
+}
+
+function sortOrdersNewestFirst(orders) {
+  return [...orders].sort((a, b) => {
+    const ta = new Date(a.created_at || 0).getTime();
+    const tb = new Date(b.created_at || 0).getTime();
+    return tb - ta;
+  });
+}
 
 export default function PurchasesOrdersPage() {
   const navigate = useNavigate();
-  const { isReady, user, isAuthenticated } = useAuthReady();
+  const { isReady, isAuthenticated } = useAuthReady();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [usedOrders, setUsedOrders] = useState([]);
   const [newOrders, setNewOrders] = useState([]);
   const [expandedUsedOrderId, setExpandedUsedOrderId] = useState(null);
   const [expandedNewOrderId, setExpandedNewOrderId] = useState(null);
   const [canViewNewOrders, setCanViewNewOrders] = useState(true);
-
-  const [activeTab, setActiveTab] = useState('used'); // used | new
+  const [activeTab, setActiveTab] = useState('used');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!isReady) return;
@@ -25,55 +107,13 @@ export default function PurchasesOrdersPage() {
     }
   }, [isReady, isAuthenticated, navigate]);
 
-  useEffect(() => {
-    if (isReady && isAuthenticated) {
-      fetchAll();
-    }
-  }, [isReady, isAuthenticated]);
-
-  const formatDate = (dateString) => new Date(dateString).toLocaleDateString('ru-RU');
-  const formatPrice = (amount) => `${Number(amount || 0).toLocaleString('ru-RU')} ₽`;
-
-  const getGarageStatusColor = (statusCode) => {
-    const colorMap = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      confirmed: 'bg-blue-100 text-blue-800',
-      rejected: 'bg-red-100 text-red-800',
-      assembled: 'bg-indigo-100 text-indigo-800',
-      shipped: 'bg-purple-100 text-purple-800',
-      delivered: 'bg-green-100 text-green-800',
-      closed: 'bg-gray-100 text-gray-800',
-    };
-    return colorMap[statusCode] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getGarageStatusName = (statusCode) => {
-    const statusMap = {
-      pending: 'В ожидании',
-      confirmed: 'Подтверждён',
-      rejected: 'Не подтверждён',
-      assembled: 'Сформирован',
-      shipped: 'Передан в доставку',
-      delivered: 'Получен',
-      closed: 'Закрыт',
-    };
-    return statusMap[statusCode] || statusCode || 'pending';
-  };
-
-  const getDeliveryInfo = (order) => {
-    if (order.delivery_type === 'pickup') {
-      return `Самовывоз: ${order.pickup_address || 'Адрес не указан'}`;
-    } else if (order.delivery_type === 'transport') {
-      return order.transport_company
-        ? `${order.transport_company}: ${order.delivery_address || 'Адрес не указан'}`
-        : `Доставка: ${order.delivery_address || 'Адрес не указан'}`;
-    }
-    return 'Способ доставки не указан';
-  };
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
 
       const results = await Promise.allSettled([
@@ -84,33 +124,14 @@ export default function PurchasesOrdersPage() {
       const [usedRes, newRes] = results;
 
       if (usedRes.status === 'fulfilled') {
-        const allOrders = Array.isArray(usedRes.value.data) ? usedRes.value.data : [];
-        console.log('=== USED ORDERS FROM API ===');
-        console.log('Total orders:', allOrders.length);
-        console.log('Orders:', allOrders);
-        if (allOrders.length > 0) {
-          console.log('First order:', allOrders[0]);
-          console.log('User info:', { 
-            name: `${user.last_name} ${user.first_name}`, 
-            phone: user.phone, 
-            email: user.email 
-          });
-        }
-        // Показываем ВСЕ заказы без фильтрации
-        setUsedOrders(allOrders);
+        setUsedOrders(Array.isArray(usedRes.value.data) ? usedRes.value.data : []);
       } else {
-        console.error('Failed to fetch used orders:', usedRes.reason);
         throw usedRes.reason;
       }
 
       if (newRes.status === 'fulfilled') {
-        const allOrders = Array.isArray(newRes.value.data) ? newRes.value.data : [];
-        console.log('=== NEW ORDERS FROM API ===');
-        console.log('Total orders:', allOrders.length);
-        console.log('Orders:', allOrders);
-        // Показываем ВСЕ заказы без фильтрации
         setCanViewNewOrders(true);
-        setNewOrders(allOrders);
+        setNewOrders(Array.isArray(newRes.value.data) ? newRes.value.data : []);
       } else {
         const statusCode = newRes.reason?.response?.status;
         if (statusCode === 403) {
@@ -118,15 +139,68 @@ export default function PurchasesOrdersPage() {
           setNewOrders([]);
           setActiveTab((t) => (t === 'new' ? 'used' : t));
         } else {
-          console.error('Failed to fetch new orders:', newRes.reason);
           throw newRes.reason;
         }
       }
     } catch (e) {
-      console.error('FetchAll error:', e);
-      setError(e?.response?.data?.detail || e.message || 'Ошибка загрузки');
+      setError(e?.response?.data?.detail || e.message || 'Не удалось загрузить заказы');
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isReady && isAuthenticated) {
+      fetchAll();
+    }
+  }, [isReady, isAuthenticated, fetchAll]);
+
+  const filterOrders = useCallback(
+    (orders) => {
+      const q = searchQuery.trim().toLowerCase();
+      return sortOrdersNewestFirst(orders).filter((order) => {
+        if (!matchesStatusFilter(order, statusFilter)) return false;
+        if (!q) return true;
+        const haystack = [
+          order.id,
+          order.organization_name,
+          order.seller,
+          order.buyer_name,
+          order.buyer_phone,
+          getDeliveryInfo(order),
+          ...(order.items || []).flatMap((item) => [
+            item.name,
+            item.brand,
+            item.partnumber,
+          ]),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(q);
+      });
+    },
+    [searchQuery, statusFilter]
+  );
+
+  const filteredUsedOrders = useMemo(() => filterOrders(usedOrders), [filterOrders, usedOrders]);
+  const filteredNewOrders = useMemo(() => filterOrders(newOrders), [filterOrders, newOrders]);
+
+  const activeOrders = activeTab === 'used' ? filteredUsedOrders : filteredNewOrders;
+  const totalInTab = activeTab === 'used' ? usedOrders.length : newOrders.length;
+
+  const stats = useMemo(() => {
+    const pool = activeTab === 'used' ? usedOrders : newOrders;
+    const activeCount = pool.filter((o) => ACTIVE_STATUSES.has(o.status_code || 'pending')).length;
+    const totalSum = pool.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+    return { total: pool.length, activeCount, totalSum };
+  }, [activeTab, usedOrders, newOrders]);
+
+  const handleProductClick = (item, e) => {
+    e?.stopPropagation?.();
+    if (item.product_id) {
+      navigate(`/part/${item.product_id}`);
     }
   };
 
@@ -138,292 +212,212 @@ export default function PurchasesOrdersPage() {
     setExpandedNewOrderId((prev) => (prev === orderId ? null : orderId));
   };
 
-  // Обработчик клика по товару для перехода на страницу товара
-  const handleProductClick = (item, e) => {
-    e?.stopPropagation?.();
-    
-    // Если есть product_id - переходим на /part/
-    if (item.product_id) {
-      navigate(`/part/${item.product_id}`);
-    }
-  };
-
-  // Показываем загрузку пока не загрузился auth
-  if (!isReady || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Загрузка...</p>
-        </div>
-      </div>
-    );
+  if (!isReady || !isAuthenticated) {
+    return <AuthLoadingScreen className="min-h-[16rem]" />;
   }
 
+  const catalogHref = activeTab === 'used' ? '/autoparts/used' : '/autoparts/new';
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Мои заказы</h1>
-          <button onClick={fetchAll} className="text-sm px-3 py-2 border rounded bg-white hover:bg-gray-50">
-            Обновить
+    <div className="min-w-0 space-y-6">
+      <header className="relative overflow-hidden rounded-2xl border border-white/80 bg-gradient-to-br from-white via-white to-indigo-50/70 p-5 shadow-sm ring-1 ring-gray-200/60 sm:p-6">
+        <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-indigo-400/10 blur-2xl" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Личный кабинет</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Мои заказы</h1>
+            <p className="mt-2 max-w-xl text-sm text-gray-600">
+              История покупок, статусы и состав заказов. Отслеживайте доставку и оплату в одном месте.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => fetchAll(true)}
+            disabled={loading || refreshing}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
+          >
+            <svg
+              className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            {refreshing ? 'Обновление…' : 'Обновить'}
           </button>
         </div>
 
-        {/* Табы */}
-        <div className="bg-white shadow-sm rounded-lg mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
-              <button
-                onClick={() => setActiveTab('used')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'used'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+        {!loading && !error && (
+          <dl className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
+              <dt className="text-xs font-medium text-gray-500">Всего заказов</dt>
+              <dd className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{stats.total}</dd>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
+              <dt className="text-xs font-medium text-gray-500">В работе</dt>
+              <dd className="mt-1 text-2xl font-bold tabular-nums text-indigo-700">{stats.activeCount}</dd>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
+              <dt className="text-xs font-medium text-gray-500">Сумма покупок</dt>
+              <dd className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{formatPrice(stats.totalSum)}</dd>
+            </div>
+          </dl>
+        )}
+      </header>
+
+      <div className="rounded-2xl border border-gray-200/80 bg-white p-1 shadow-sm">
+        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Тип заказов">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'used'}
+              onClick={() => setActiveTab('used')}
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+                activeTab === 'used'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Б/У запчасти
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  activeTab === 'used' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
                 }`}
               >
-                Б/У <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">{usedOrders.length}</span>
-              </button>
-              {canViewNewOrders && (
-                <button
-                  onClick={() => setActiveTab('new')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === 'new'
-                      ? 'border-indigo-500 text-indigo-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                {usedOrders.length}
+              </span>
+            </button>
+            {canViewNewOrders && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'new'}
+                onClick={() => setActiveTab('new')}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+                  activeTab === 'new'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Новые
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs ${
+                    activeTab === 'new' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
                   }`}
                 >
-                  Новые <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">{newOrders.length}</span>
-                </button>
-              )}
-            </nav>
+                  {newOrders.length}
+                </span>
+              </button>
+            )}
+          </div>
+
+          <div className="relative min-w-0 flex-1 sm:max-w-xs">
+            <svg
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Поиск по номеру, продавцу, товару…"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
           </div>
         </div>
 
-        {loading && <div className="text-gray-600">Загрузка…</div>}
-        {error && <div className="text-red-600">{error}</div>}
-
-        {/* Б/У заказы */}
-        {!loading && !error && activeTab === 'used' && (
-          <div className="space-y-4">
-            {/* Десктопная версия */}
-            <div className="hidden md:block space-y-4">
-              {usedOrders.map((o) => (
-                <GarageOrderCard
-                  key={o.id}
-                  order={{
-                    ...o,
-                    delivery_method_name: getDeliveryInfo(o),
-                  }}
-                  orderType="used"
-                  isExpanded={expandedUsedOrderId === o.id}
-                  onToggle={toggleUsedOrderExpand}
-                  editingStatus={null}
-                  onEditStatus={() => {}}
-                  onUpdateStatus={() => {}}
-                  getStatusColor={getGarageStatusColor}
-                  getStatusName={getGarageStatusName}
-                  orderStatusOptions={[]}
-                  formatDate={formatDate}
-                  formatPrice={formatPrice}
-                />
-              ))}
-            </div>
-
-            {/* Мобильная версия */}
-            <div className="md:hidden space-y-5">
-              {usedOrders.map((o) => (
-                <div key={o.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                  <div className="mb-4 space-y-2 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-xs font-mono">
-                        Б/У #{o.id}
-                      </span>
-                      <span className="text-sm text-gray-400">•</span>
-                      <span className="text-sm text-gray-500">{formatDate(o.created_at)}</span>
-                    </div>
-                    <div className="text-sm font-medium text-gray-900 break-words">{o.organization_name}</div>
-                    <div className="text-sm text-gray-800 break-words">{o.buyer_name}</div>
-                    <div className="text-sm text-gray-600 break-all">{o.buyer_phone}</div>
-                    <div className="text-sm text-gray-600 break-words">{getDeliveryInfo(o)}</div>
-                    <div className="pt-3 border-t border-gray-100 flex flex-col gap-2 min-w-0">
-                      <div className="text-lg font-bold text-gray-900">{formatPrice(o.total_amount)}</div>
-                      <div className="flex flex-wrap gap-2 items-center">
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${o.is_paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {o.is_paid ? 'Оплачен' : 'Не оплачено'}
-                        </span>
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getGarageStatusColor(o.status_code)}`}>
-                          {getGarageStatusName(o.status_code)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Кнопка показа деталей */}
-                  <div className="pt-3 border-t border-gray-100">
-                    <button
-                      onClick={() => toggleUsedOrderExpand(o.id)}
-                      className="w-full text-indigo-600 text-sm font-medium hover:text-indigo-800 transition-colors py-2 min-h-[48px]"
-                    >
-                      {expandedUsedOrderId === o.id ? 'Скрыть товары' : `Показать товары (${(o.items || []).length})`}
-                    </button>
-                  </div>
-
-                  {/* Детали заказа - мобильная версия */}
-                  {expandedUsedOrderId === o.id && (o.items || []).length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <div className="space-y-3">
-                        {(o.items || []).map((item, idx) => (
-                          <div key={`${o.id}-${idx}`} className="bg-gray-50 rounded-lg p-3">
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="flex-1 pr-3">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-sm font-medium text-gray-900">{item.brand || '-'}</span>
-                                  <span className="text-xs text-gray-400">•</span>
-                                  <span className="text-xs text-gray-500 font-mono">{item.partnumber || '-'}</span>
-                                </div>
-                                {/* Название товара - кликабельное */}
-                                {item.product_id ? (
-                                  <button
-                                    onClick={(e) => handleProductClick(item, e)}
-                                    className="text-sm text-gray-800 leading-tight hover:text-indigo-600 hover:underline text-left w-full"
-                                  >
-                                    {item.name}
-                                  </button>
-                                ) : (
-                                  <div className="text-sm text-gray-800 leading-tight">{item.name}</div>
-                                )}
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <div className="text-sm font-semibold text-gray-900 mb-1">
-                                  {formatPrice((item.price || 0) * (item.quantity || 0))}
-                                </div>
-                                <div className="text-xs text-gray-600">{item.quantity} шт.</div>
-                              </div>
-                            </div>
-                            <div className="flex justify-end">
-                              <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getGarageStatusColor(item.status_code)}`}>
-                                {getGarageStatusName(item.status_code)}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {usedOrders.length === 0 && <div className="text-gray-600">Заказов Б/У нет</div>}
-            </div>
-          </div>
-        )}
-
-        {/* Новые заказы */}
-        {!loading && !error && canViewNewOrders && activeTab === 'new' && (
-          <div className="space-y-4">
-            {/* Десктопная версия */}
-            <div className="hidden md:block space-y-4">
-              {newOrders.map((o) => (
-                <GarageOrderCard
-                  key={o.id}
-                  order={{
-                    ...o,
-                    delivery_method_name: getDeliveryInfo(o),
-                  }}
-                  orderType="new"
-                  isExpanded={expandedNewOrderId === o.id}
-                  onToggle={toggleNewOrderExpand}
-                  editingStatus={null}
-                  onEditStatus={() => {}}
-                  onUpdateStatus={() => {}}
-                  getStatusColor={getGarageStatusColor}
-                  getStatusName={getGarageStatusName}
-                  orderStatusOptions={[]}
-                  formatDate={formatDate}
-                  formatPrice={formatPrice}
-                />
-              ))}
-            </div>
-
-            {/* Мобильная версия */}
-            <div className="md:hidden space-y-5">
-              {newOrders.map((o) => (
-                <div key={o.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                  <div className="mb-4 space-y-2 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs font-mono">
-                        Новый #{o.id}
-                      </span>
-                      <span className="text-sm text-gray-400">•</span>
-                      <span className="text-sm text-gray-500">{formatDate(o.created_at)}</span>
-                    </div>
-                    <div className="text-sm text-gray-800 break-words">{o.seller || 'Продавец не указан'}</div>
-                    <div className="text-sm text-gray-800 break-words">{o.buyer_name}</div>
-                    <div className="text-sm text-gray-600 break-all">{o.buyer_phone}</div>
-                    <div className="text-sm text-gray-600 break-words">{getDeliveryInfo(o)}</div>
-                    <div className="pt-3 border-t border-gray-100 flex flex-col gap-2 min-w-0">
-                      <div className="text-lg font-bold text-gray-900">{formatPrice(o.total_amount)}</div>
-                      <div className="flex flex-wrap gap-2 items-center">
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${o.is_paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {o.is_paid ? 'Оплачен' : 'Не оплачено'}
-                        </span>
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getGarageStatusColor(o.status_code)}`}>
-                          {getGarageStatusName(o.status_code)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Кнопка показа деталей */}
-                  <div className="pt-3 border-t border-gray-100">
-                    <button
-                      onClick={() => toggleNewOrderExpand(o.id)}
-                      className="w-full text-indigo-600 text-sm font-medium hover:text-indigo-800 transition-colors py-2 min-h-[48px]"
-                    >
-                      {expandedNewOrderId === o.id ? 'Скрыть товары' : `Показать товары (${(o.items || []).length})`}
-                    </button>
-                  </div>
-
-                  {/* Детали заказа - мобильная версия */}
-                  {expandedNewOrderId === o.id && (o.items || []).length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <div className="space-y-3">
-                        {(o.items || []).map((item, idx) => (
-                          <div key={`${o.id}-${idx}`} className="bg-gray-50 rounded-lg p-3">
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="flex-1 pr-3">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-sm font-medium text-gray-900">{item.brand || '-'}</span>
-                                  <span className="text-xs text-gray-400">•</span>
-                                  <span className="text-xs text-gray-500 font-mono">{item.partnumber || '-'}</span>
-                                </div>
-                                <div className="text-sm text-gray-800 leading-tight">{item.name}</div>
-                              </div>
-                              <div className="text-right flex-shrink-0">
-                                <div className="text-sm font-semibold text-gray-900 mb-1">
-                                  {formatPrice((item.price || 0) * (item.quantity || 0))}
-                                </div>
-                                <div className="text-xs text-gray-600">{item.quantity} шт.</div>
-                              </div>
-                            </div>
-                            <div className="flex justify-end">
-                              <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getGarageStatusColor(item.status_code)}`}>
-                                {getGarageStatusName(item.status_code)}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {newOrders.length === 0 && <div className="text-gray-600">Заказов новых товаров нет</div>}
-            </div>
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2 border-t border-gray-100 px-3 py-3">
+          {STATUS_FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setStatusFilter(opt.id)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                statusFilter === opt.id
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {loading && (
+        <div className="rounded-2xl border border-gray-200 bg-white py-16 text-center">
+          <AuthLoadingScreen className="h-24" />
+          <p className="mt-4 text-sm text-gray-600">Загружаем заказы…</p>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-8 text-center">
+          <p className="text-sm font-medium text-red-800">{error}</p>
+          <button
+            type="button"
+            onClick={() => fetchAll()}
+            className="mt-4 inline-flex rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+          >
+            Попробовать снова
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && (
+        <>
+          {totalInTab > 0 && activeOrders.length !== totalInTab && (
+            <p className="text-sm text-gray-500">
+              Показано {activeOrders.length} из {totalInTab} заказов
+            </p>
+          )}
+
+          <div className="space-y-4">
+            {activeOrders.map((order) => (
+              <PurchaseOrderCard
+                key={order.id}
+                order={{
+                  ...order,
+                  delivery_method_name: getDeliveryInfo(order),
+                }}
+                orderType={activeTab === 'used' ? 'used' : 'new'}
+                isExpanded={
+                  activeTab === 'used'
+                    ? expandedUsedOrderId === order.id
+                    : expandedNewOrderId === order.id
+                }
+                onToggle={activeTab === 'used' ? toggleUsedOrderExpand : toggleNewOrderExpand}
+                formatDate={formatDate}
+                formatPrice={formatPrice}
+                getStatusColor={getGarageStatusColor}
+                getStatusName={getGarageStatusName}
+                getDeliveryInfo={getDeliveryInfo}
+                onProductClick={handleProductClick}
+              />
+            ))}
+          </div>
+
+          {activeOrders.length === 0 && (
+            <PurchaseOrdersEmptyState
+              orderType={activeTab === 'used' ? 'used' : 'new'}
+              catalogHref={catalogHref}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }
-

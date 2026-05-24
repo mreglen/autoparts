@@ -1,8 +1,10 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 import ButtonPrimary from '../UI/ButtonPrimary';
 
 function Footer() {
+    const showSiteReviews = useShowSiteReviews();
     return (
         <footer className='2xl:px-80 xl:px-40 lg:px-20 md:px-10 sm:px-5 px-4 bg-gray_primary-dark mt-40 py-14'>
             {/* Верхняя часть футера */}
@@ -32,6 +34,7 @@ function Footer() {
                     >
                         Автозапчасти
                     </NavLink>
+                    {showSiteReviews && (
                     <NavLink
                         exact
                         to='/reviews'
@@ -39,6 +42,7 @@ function Footer() {
                     >
                         Отзывы
                     </NavLink>
+                    )}
                     <NavLink
                         exact
                         to='/about'
