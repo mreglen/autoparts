@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Iterable, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import bindparam, func, text
 from sqlalchemy.orm import Session
 
 from app.models.site_analytics import (
@@ -20,8 +20,12 @@ from app.schemas.site_analytics import (
     AnalyticsEventIn,
     AnalyticsFormRowOut,
     AnalyticsFormsOut,
+    AnalyticsPageDetailOut,
+    AnalyticsPageInstanceRowOut,
     AnalyticsPageRowOut,
     AnalyticsPagesOut,
+    AnalyticsProductCardRowOut,
+    AnalyticsProductCardsOut,
     AnalyticsSummaryOut,
 )
 
@@ -38,6 +42,8 @@ SENSITIVE_FIELD_NAMES = frozenset(
     }
 )
 
+PRODUCT_CARD_PATH_RE = re.compile(r"^/part/(\d+)(?:-|$)")
+
 PATH_NORMALIZATION_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^/part/[^/]+$"), "/part/:productId"),
     (re.compile(r"^/chats/[^/]+$"), "/chats/:chatId"),
@@ -48,6 +54,17 @@ PATH_NORMALIZATION_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^/sellers/[^/]+/workspace$"), "/sellers/:sellerId/workspace"),
     (re.compile(r"^/moderation/products/[^/]+$"), "/moderation/products/:organizationId"),
 ]
+
+
+def extract_product_id_from_path(path: str) -> Optional[int]:
+    raw = (path or "").split("?")[0].strip()
+    match = PRODUCT_CARD_PATH_RE.match(raw)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
 
 
 def normalize_path(path: str) -> tuple[str, str]:
@@ -373,6 +390,202 @@ def get_activity(db: Session, days: int) -> AnalyticsActivityOut:
         for row in view_rows
     ]
     return AnalyticsActivityOut(days=days, items=items)
+
+
+def get_page_detail(db: Session, path_template: str, days: int) -> AnalyticsPageDetailOut:
+    since = _period_start(days)
+    path_template = path_template.strip() or "/"
+
+    page_views = (
+        db.query(func.count(SiteAnalyticsPageView.id))
+        .join(
+            SiteAnalyticsSession,
+            SiteAnalyticsSession.id == SiteAnalyticsPageView.session_id,
+        )
+        .filter(
+            SiteAnalyticsPageView.path_template == path_template,
+            SiteAnalyticsPageView.entered_at >= since,
+        )
+        .scalar()
+        or 0
+    )
+    unique_visitors = (
+        db.query(func.count(func.distinct(SiteAnalyticsSession.visitor_id)))
+        .join(
+            SiteAnalyticsPageView,
+            SiteAnalyticsPageView.session_id == SiteAnalyticsSession.id,
+        )
+        .filter(
+            SiteAnalyticsPageView.path_template == path_template,
+            SiteAnalyticsPageView.entered_at >= since,
+        )
+        .scalar()
+        or 0
+    )
+    avg_duration = (
+        db.query(func.avg(SiteAnalyticsPageView.duration_sec))
+        .filter(
+            SiteAnalyticsPageView.path_template == path_template,
+            SiteAnalyticsPageView.entered_at >= since,
+        )
+        .scalar()
+        or 0
+    )
+
+    activity_rows = (
+        db.query(
+            func.date(SiteAnalyticsPageView.entered_at).label("day"),
+            func.count(SiteAnalyticsPageView.id).label("page_views"),
+            func.count(func.distinct(SiteAnalyticsSession.visitor_id)).label("unique_visitors"),
+        )
+        .join(
+            SiteAnalyticsSession,
+            SiteAnalyticsSession.id == SiteAnalyticsPageView.session_id,
+        )
+        .filter(
+            SiteAnalyticsPageView.path_template == path_template,
+            SiteAnalyticsPageView.entered_at >= since,
+        )
+        .group_by(func.date(SiteAnalyticsPageView.entered_at))
+        .order_by(func.date(SiteAnalyticsPageView.entered_at).desc())
+        .all()
+    )
+    activity = [
+        AnalyticsActivityRowOut(
+            day=row.day if isinstance(row.day, date) else datetime.fromisoformat(str(row.day)).date(),
+            page_views=int(row.page_views),
+            unique_visitors=int(row.unique_visitors),
+        )
+        for row in activity_rows
+    ]
+
+    instances: list[AnalyticsPageInstanceRowOut] = []
+    instance_rows = (
+        db.query(
+            SiteAnalyticsPageView.path_raw,
+            func.count(SiteAnalyticsPageView.id).label("views"),
+            func.count(func.distinct(SiteAnalyticsSession.visitor_id)).label("unique_visitors"),
+            func.avg(SiteAnalyticsPageView.duration_sec).label("avg_duration_sec"),
+        )
+        .join(
+            SiteAnalyticsSession,
+            SiteAnalyticsSession.id == SiteAnalyticsPageView.session_id,
+        )
+        .filter(
+            SiteAnalyticsPageView.path_template == path_template,
+            SiteAnalyticsPageView.entered_at >= since,
+        )
+        .group_by(SiteAnalyticsPageView.path_raw)
+        .order_by(func.count(SiteAnalyticsPageView.id).desc())
+        .limit(50)
+        .all()
+    )
+    if len(instance_rows) > 1 or path_template == "/part/:productId":
+        instances = [
+            AnalyticsPageInstanceRowOut(
+                path_raw=row.path_raw,
+                views=int(row.views),
+                unique_visitors=int(row.unique_visitors),
+                avg_duration_sec=round(float(row.avg_duration_sec or 0), 1),
+            )
+            for row in instance_rows
+        ]
+
+    return AnalyticsPageDetailOut(
+        days=days,
+        path_template=path_template,
+        page_views=int(page_views),
+        unique_visitors=int(unique_visitors),
+        avg_duration_sec=round(float(avg_duration), 1),
+        activity=activity,
+        instances=instances,
+    )
+
+
+def get_product_cards(db: Session, days: int, limit: int = 100) -> AnalyticsProductCardsOut:
+    since = _period_start(days)
+    path_template = "/part/:productId"
+
+    instance_rows = (
+        db.query(
+            SiteAnalyticsPageView.path_raw,
+            func.count(SiteAnalyticsPageView.id).label("views"),
+            func.count(func.distinct(SiteAnalyticsSession.visitor_id)).label("unique_visitors"),
+            func.avg(SiteAnalyticsPageView.duration_sec).label("avg_duration_sec"),
+        )
+        .join(
+            SiteAnalyticsSession,
+            SiteAnalyticsSession.id == SiteAnalyticsPageView.session_id,
+        )
+        .filter(
+            SiteAnalyticsPageView.path_template == path_template,
+            SiteAnalyticsPageView.entered_at >= since,
+        )
+        .group_by(SiteAnalyticsPageView.path_raw)
+        .order_by(func.count(SiteAnalyticsPageView.id).desc())
+        .limit(max(1, min(limit, 500)))
+        .all()
+    )
+
+    product_ids: list[int] = []
+    parsed_rows: list[tuple] = []
+    for row in instance_rows:
+        product_id = extract_product_id_from_path(row.path_raw)
+        if product_id:
+            product_ids.append(product_id)
+        parsed_rows.append((row, product_id))
+
+    products_by_id: dict[int, dict] = {}
+    unique_ids = list(set(product_ids))
+    if unique_ids:
+        stmt = text(
+            "SELECT id, brand, article, name FROM products WHERE id IN :ids"
+        ).bindparams(bindparam("ids", expanding=True))
+        product_rows = db.execute(stmt, {"ids": unique_ids}).fetchall()
+        products_by_id = {
+            int(product_row.id): {
+                "brand": product_row.brand,
+                "article": product_row.article,
+                "name": product_row.name,
+            }
+            for product_row in product_rows
+        }
+
+    items: list[AnalyticsProductCardRowOut] = []
+    total_views = 0
+    for row, product_id in parsed_rows:
+        views = int(row.views)
+        total_views += views
+        product = products_by_id.get(product_id) if product_id else None
+        items.append(
+            AnalyticsProductCardRowOut(
+                product_id=product_id,
+                path_raw=row.path_raw,
+                brand=product.get("brand") if product else None,
+                article=product.get("article") if product else None,
+                name=product.get("name") if product else None,
+                views=views,
+                unique_visitors=int(row.unique_visitors),
+                avg_duration_sec=round(float(row.avg_duration_sec or 0), 1),
+            )
+        )
+
+    summary_views = (
+        db.query(func.count(SiteAnalyticsPageView.id))
+        .filter(
+            SiteAnalyticsPageView.path_template == path_template,
+            SiteAnalyticsPageView.entered_at >= since,
+        )
+        .scalar()
+        or 0
+    )
+
+    return AnalyticsProductCardsOut(
+        days=days,
+        total_views=int(summary_views),
+        unique_cards=len(items),
+        items=items,
+    )
 
 
 def validate_days(days: int) -> int:

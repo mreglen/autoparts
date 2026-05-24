@@ -63,3 +63,38 @@ class AnalyticsActivityRowOut(BaseModel):
 class AnalyticsActivityOut(BaseModel):
     days: int
     items: List[AnalyticsActivityRowOut]
+
+
+class AnalyticsPageDetailOut(BaseModel):
+    days: int
+    path_template: str
+    page_views: int
+    unique_visitors: int
+    avg_duration_sec: float
+    activity: List[AnalyticsActivityRowOut]
+    instances: List["AnalyticsPageInstanceRowOut"] = []
+
+
+class AnalyticsPageInstanceRowOut(BaseModel):
+    path_raw: str
+    views: int
+    unique_visitors: int
+    avg_duration_sec: float
+
+
+class AnalyticsProductCardRowOut(BaseModel):
+    product_id: Optional[int]
+    path_raw: str
+    brand: Optional[str] = None
+    article: Optional[str] = None
+    name: Optional[str] = None
+    views: int
+    unique_visitors: int
+    avg_duration_sec: float
+
+
+class AnalyticsProductCardsOut(BaseModel):
+    days: int
+    total_views: int
+    unique_cards: int
+    items: List[AnalyticsProductCardRowOut]

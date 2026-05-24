@@ -12,7 +12,10 @@ from app.db.database import get_db
 from app.core.auth import get_current_user
 from app.models.user import User
 from app.services.audit_service import log_audit
-from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty
+from app.services.yandex_feed_sync_service import (
+    mark_yandex_feed_dirty,
+    mark_yandex_feed_dirty_for_used_product,
+)
 from sqlalchemy.orm import selectinload
 
 
@@ -639,6 +642,7 @@ def delete_product_photos(
         db.delete(photo)
 
     db.commit()
+    mark_yandex_feed_dirty_for_used_product(db, product, "product_photos_deleted")
 
     return
 
@@ -710,6 +714,7 @@ def delete_product_photo(
     # Удаляем запись из базы данных
     db.delete(photo)
     db.commit()
+    mark_yandex_feed_dirty_for_used_product(db, product, "product_photo_deleted")
 
     return
 

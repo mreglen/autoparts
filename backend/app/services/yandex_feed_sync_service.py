@@ -69,6 +69,7 @@ def build_public_feed_url(host_url: str | None) -> str:
 
 
 def mark_yandex_feed_dirty(db: Session, reason: str) -> None:
+    """Помечает фид б/у товаров для Яндекса как устаревший (синхронизация по расписанию)."""
     state = get_or_create_yandex_feed_sync_state(db)
     state.pending_sync = True
     state.last_change_reason = (reason or "").strip()[:128] or "unknown"
@@ -76,3 +77,9 @@ def mark_yandex_feed_dirty(db: Session, reason: str) -> None:
     db.add(state)
     db.commit()
     db.refresh(state)
+
+
+def mark_yandex_feed_dirty_for_used_product(db: Session, product, reason: str) -> None:
+    """Помечает фид только для б/у товаров (is_new=False), попадающих в YML."""
+    if product is not None and getattr(product, "is_new", True) is False:
+        mark_yandex_feed_dirty(db, reason)

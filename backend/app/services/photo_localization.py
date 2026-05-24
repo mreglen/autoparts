@@ -162,6 +162,10 @@ def migrate_external_product_photos(
             failures.append((photo.id, old_url, f"{type(exc).__name__}: {exc}"))
 
     counters.skipped = counters.matched - counters.migrated - counters.failed
+    if counters.migrated > 0:
+        from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty
+
+        mark_yandex_feed_dirty(db, "photos_localized")
     return PhotoLocalizationResult(counters=counters, failures=failures)
 
 

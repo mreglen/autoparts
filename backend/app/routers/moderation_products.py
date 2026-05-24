@@ -21,6 +21,7 @@ from app.schemas.pending_product import PendingProductCreate
 from app.schemas.product import ProductCreate
 from app.core.auth import get_current_admin_user, get_current_user
 from app.services.audit_service import log_audit
+from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty_for_used_product
 
 
 router = APIRouter(prefix="/moderation/products", tags=["Moderation Products"])
@@ -420,6 +421,7 @@ def approve_product(
         entity_type="product",
         entity_id=db_product.id,
     )
+    mark_yandex_feed_dirty_for_used_product(db, db_product, "product_moderation_approved")
     return ModerateProductResponse(
         message="Запчасть одобрена и добавлена в каталог",
         product_id=db_product.id

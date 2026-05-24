@@ -147,6 +147,16 @@ def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: i
     return output.getvalue()
 
 
+def _mark_yandex_feed_after_product_photo(db, photo_record) -> None:
+    if not photo_record or not getattr(photo_record, "product_id", None):
+        return
+    from app.models.product import Product
+    from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty_for_used_product
+
+    product = db.query(Product).filter(Product.id == photo_record.product_id).first()
+    mark_yandex_feed_dirty_for_used_product(db, product, "product_photo_processed")
+
+
 @celery_app.task(bind=True, max_retries=3)
 def process_and_upload_photo(
     self,
@@ -391,6 +401,7 @@ def process_and_upload_photo(
                             if verify_result.photo_url == media_path and verify_result.processing_status == 'completed':
                                 print(f"✅ Database updated successfully via SQL! Photo {photo_record.id} now points to: {media_path}")
                                 db_updated = True
+                                _mark_yandex_feed_after_product_photo(db, photo_record)
                             else:
                                 print(f"⚠️ Warning: Update succeeded but values don't match!")
                                 print(f"   Expected: photo_url='{media_path}', status='completed'")
@@ -431,6 +442,7 @@ def process_and_upload_photo(
                         if photo_record.photo_url == media_path:
                             print(f"✅ Database updated via ORM! Photo {photo_record.id} now points to: {media_path}")
                             db_updated = True
+                            _mark_yandex_feed_after_product_photo(db, photo_record)
                         else:
                             print(f"⚠️ Warning: ORM update did not persist!")
                     else:

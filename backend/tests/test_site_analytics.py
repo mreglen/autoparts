@@ -13,8 +13,11 @@ from app.models.site_analytics import (
 )
 from app.schemas.site_analytics import AnalyticsEventIn
 from app.services.site_analytics_service import (
+    extract_product_id_from_path,
     get_forms,
+    get_page_detail,
     get_pages,
+    get_product_cards,
     get_summary,
     ingest_events,
     normalize_path,
@@ -74,6 +77,24 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
                         field_name VARCHAR(128),
                         event_type VARCHAR(32) NOT NULL,
                         created_at DATETIME
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE products (
+                        id INTEGER PRIMARY KEY,
+                        article VARCHAR(30),
+                        name VARCHAR(255),
+                        brand VARCHAR(100),
+                        internal_code VARCHAR(100) NOT NULL,
+                        is_new BOOLEAN,
+                        quantity INTEGER,
+                        organization_id VARCHAR,
+                        created_by INTEGER NOT NULL,
+                        part_type_id INTEGER NOT NULL
                     )
                     """
                 )
@@ -160,6 +181,52 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
         forms = get_forms(self.db, days=7)
         login_rows = [row for row in forms.items if row.form_id == "auth_login"]
         self.assertTrue(any(row.field_name == "login" for row in login_rows))
+
+    def test_extract_product_id_from_path(self):
+        self.assertEqual(extract_product_id_from_path("/part/42-brand-article"), 42)
+        self.assertEqual(extract_product_id_from_path("/part/7"), 7)
+        self.assertIsNone(extract_product_id_from_path("/catalog"))
+
+    def test_page_detail_and_product_cards(self):
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO products (id, article, name, brand, internal_code, is_new, quantity, created_by, part_type_id)
+                    VALUES (10, 'ART1', 'Фильтр масляный', 'MANN', 'TEST-10', 0, 1, 1, 1)
+                    """
+                )
+            )
+
+        path_a = "/part/10-mann-art1"
+        path_b = "/part/10-mann-art1-copy"
+        visitor = "visitor-cards"
+        ingest_events(
+            self.db,
+            [
+                AnalyticsEventIn(type="page_view", visitor_id=visitor, path=path_a, view_id="v1"),
+                AnalyticsEventIn(type="page_view", visitor_id=visitor, path=path_b, view_id="v2"),
+                AnalyticsEventIn(type="page_view", visitor_id="visitor-other", path="/catalog", view_id="v3"),
+            ],
+            user_id=None,
+        )
+
+        detail = get_page_detail(self.db, "/part/:productId", days=7)
+        self.assertEqual(detail.page_views, 2)
+        self.assertEqual(detail.path_template, "/part/:productId")
+        self.assertGreaterEqual(len(detail.instances), 1)
+
+        cards = get_product_cards(self.db, days=7, limit=10)
+        self.assertEqual(cards.total_views, 2)
+        self.assertGreaterEqual(cards.unique_cards, 1)
+        top = cards.items[0]
+        self.assertEqual(top.product_id, 10)
+        self.assertEqual(top.brand, "MANN")
+        self.assertEqual(top.article, "ART1")
+
+        catalog_detail = get_page_detail(self.db, "/catalog", days=7)
+        self.assertEqual(catalog_detail.page_views, 1)
+        self.assertEqual(len(catalog_detail.activity), 1)
 
     def test_summary_and_pages_aggregation(self):
         visitor_a = "visitor-a"
