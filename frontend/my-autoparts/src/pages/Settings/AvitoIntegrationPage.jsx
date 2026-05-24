@@ -5,6 +5,9 @@ import { apiRequest, apiRequestFormData, API_BASE, BACKEND_BASE } from '../../ut
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { canAccessAvitoIntegration } from './integrationAccess';
+import { useAvitoAccountStatus } from '../../hooks/useAvitoAccountStatus';
+import { canUseAvitoProFeatures } from '../../utils/avitoProAccess';
+import AvitoProExpiredBanner from '../../components/AvitoProExpiredBanner/AvitoProExpiredBanner';
 
 const AD_TYPE_NOT_SPECIFIED = '__NOT_SPECIFIED__';
 
@@ -357,6 +360,10 @@ export default function AvitoIntegrationPage() {
   const permissionCodes = useSelector((s) => s.auth.permissionCodes);
   const orgId = user?.organization_id;
   const canAccess = canAccessAvitoIntegration(user, permissionCodes);
+  const { status: avitoAccountStatus, refetch: refetchAvitoAccountStatus } = useAvitoAccountStatus(orgId, {
+    enabled: Boolean(orgId),
+  });
+  const avitoProActive = canUseAvitoProFeatures(avitoAccountStatus);
 
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
@@ -384,8 +391,6 @@ export default function AvitoIntegrationPage() {
   const [isAvitoConnectOpen, setIsAvitoConnectOpen] = useState(false);
   const [isConfirmDisableOpen, setIsConfirmDisableOpen] = useState(false);
   const [webhookSubscribing, setWebhookSubscribing] = useState(false);
-  const [avitoDeliveryWarning, setAvitoDeliveryWarning] = useState(null);
-  const [checkingDelivery, setCheckingDelivery] = useState(false);
 
   const avitoApiConnected =
     Boolean(secretConfigured && (clientId || '').trim() && (avitoUserId || '').trim() && integrationEnabled);
@@ -435,38 +440,10 @@ export default function AvitoIntegrationPage() {
     loadCredentials();
   }, [loadCredentials]);
 
-  // Проверка Avito Доставки при загрузке страницы (если API подключено)
   useEffect(() => {
-    if (!orgId || !avitoApiConnected) {
-      setAvitoDeliveryWarning(null);
-      return;
-    }
-
-    let active = true;
-    setCheckingDelivery(true);
-    
-    apiRequest(`/organizations/${orgId}/avito/delivery/check`, { method: 'GET' })
-      .then((data) => {
-        if (!active) return;
-        if (data && data.delivery_enabled === false && data.message) {
-          setAvitoDeliveryWarning(data.message);
-        } else {
-          setAvitoDeliveryWarning(null);
-        }
-      })
-      .catch((e) => {
-        // Если ошибка - не показываем предупреждение, т.к. это может быть проблема с API
-        console.warn('Ошибка проверки Avito доставки:', e);
-        if (active) setAvitoDeliveryWarning(null);
-      })
-      .finally(() => {
-        if (active) setCheckingDelivery(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [orgId, avitoApiConnected]);
+    if (!orgId || !avitoApiConnected) return;
+    refetchAvitoAccountStatus();
+  }, [orgId, avitoApiConnected, refetchAvitoAccountStatus]);
 
 
   const statuses = useMemo(() => {
@@ -677,14 +654,11 @@ export default function AvitoIntegrationPage() {
         console.warn('Не удалось подписаться на вебхук:', webhookErr);
       }
       
-      // Проверяем Avito Доставку после подключения
+      // Проверяем статус Avito Pro после подключения
       try {
-        const deliveryCheck = await apiRequest(`/organizations/${orgId}/avito/delivery/check`, { method: 'GET' });
-        if (deliveryCheck && deliveryCheck.delivery_enabled === false && deliveryCheck.message) {
-          setAvitoDeliveryWarning(deliveryCheck.message);
-        }
+        await refetchAvitoAccountStatus({ force: true });
       } catch (deliveryErr) {
-        console.warn('Ошибка проверки Avito доставки:', deliveryErr);
+        console.warn('Ошибка проверки статуса Avito Pro:', deliveryErr);
       }
       
       setIsAvitoConnectOpen(false);
@@ -868,19 +842,7 @@ export default function AvitoIntegrationPage() {
           {notice}
         </div>
       )}
-      {avitoDeliveryWarning && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-          <div className="flex items-start gap-3">
-            <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-            </svg>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-amber-800 mb-1">Внимание: Авито Доставка не подключена</p>
-              <p className="text-sm text-amber-700">{avitoDeliveryWarning}</p>
-            </div>
-          </div>
-        </div>
-      )}
+      <AvitoProExpiredBanner status={avitoAccountStatus} />
       {warnings && warnings.length > 0 && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
           <div className="flex items-start gap-2">
@@ -952,14 +914,14 @@ export default function AvitoIntegrationPage() {
           <h2 className="text-base font-semibold text-gray-900 mb-4">Автозагрузка объявлений</h2>
           
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg cursor-pointer bg-white hover:bg-gray-50 transition-colors">
+            <label className={`inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg bg-white transition-colors ${avitoProActive ? 'cursor-pointer hover:bg-gray-50' : 'cursor-not-allowed opacity-50'}`}>
               <span className="text-sm font-medium text-gray-700">{uploading ? 'Загрузка…' : 'Загрузить XLSX'}</span>
-              <input type="file" accept=".xlsx" className="hidden" disabled={uploading} onChange={handleFile} />
+              <input type="file" accept=".xlsx" className="hidden" disabled={uploading || !avitoProActive} onChange={handleFile} />
             </label>
             <button
               type="button"
               onClick={handlePublishAutoload}
-              disabled={!savedPath || publishing}
+              disabled={!savedPath || publishing || !avitoProActive}
               className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
             >
               {publishing ? 'Публикация…' : 'Опубликовать'}
@@ -989,7 +951,7 @@ export default function AvitoIntegrationPage() {
               <button
                 type="button"
                 onClick={handleSyncAvitoAdIds}
-                disabled={saving}
+                disabled={saving || !avitoProActive}
                 className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
                 title="Синхронизировать Avito ID из описаний объявлений"
               >

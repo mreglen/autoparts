@@ -22,6 +22,7 @@ from app.services import avito_api as avito_api_svc
 from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload, upsert_products_to_avito_autoload
 from app.services.avito_media import ensure_local_pictures
 from app.utils.avito_crypto import decrypt_secret
+from app.services.avito_pro_status_service import is_avito_pro_active
 
 
 def _json_loads(raw: str | None, default: Any) -> Any:
@@ -164,6 +165,15 @@ def run_avito_export_job(self, job_id: int):
 
         payload = _json_loads(job.payload_json, {})
         org_id = job.organization_id
+        if not is_avito_pro_active(db, org_id):
+            _set_job_state(
+                db,
+                job_id,
+                status="failed",
+                stage="failed",
+                error_summary="Подписка Avito Pro истекла или нет доступа к API Avito",
+            )
+            return {"status": "failed", "error": "avito pro inactive"}
         product_ids = [int(x) for x in (payload.get("product_ids") or []) if str(x).isdigit()]
         # Автоотправка в Avito отключена по бизнес-правилу:
         # экспорт только формирует/обновляет XLSX файл.
@@ -406,6 +416,15 @@ def run_avito_publish_job(self, job_id: int):
         if not job:
             return {"status": "failed", "error": "job not found"}
         org_id = job.organization_id
+        if not is_avito_pro_active(db, org_id):
+            _set_job_state(
+                db,
+                job_id,
+                status="failed",
+                stage="failed",
+                error_summary="Подписка Avito Pro истекла или нет доступа к API Avito",
+            )
+            return {"status": "failed", "error": "avito pro inactive"}
         _set_job_state(db, job_id, status="processing", stage="load_file")
 
         xlsx_path, rel_path = _resolve_saved_path_from_cache(db, org_id)

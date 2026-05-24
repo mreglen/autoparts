@@ -24,6 +24,7 @@ from app.services.avito_messenger_api import (
     upload_messenger_voice,
 )
 from app.utils.avito_crypto import decrypt_secret
+from app.services.avito_pro_status_service import ensure_avito_pro_active
 
 # Префикс без повторного /api: api_router уже монтируется с prefix="/api" → итог /api/avito/messenger/...
 router = APIRouter(prefix="/avito/messenger", tags=["Avito Messenger"])
@@ -50,6 +51,9 @@ def _get_org_integration_or_raise(db: Session, current_user: User) -> Organizati
     ).first()
     if not row or not row.client_id or not row.client_secret_encrypted or not row.avito_user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Авито не настроена")
+    if not row.enabled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Авито отключена")
+    ensure_avito_pro_active(db, current_user.organization_id)
     return row
 
 
@@ -77,13 +81,14 @@ async def avito_messenger_enabled(
     current_user: User = Depends(get_current_user),
 ):
     if not current_user.organization_id:
-        return {"enabled": False, "avito_user_id": None}
+        return {"enabled": False, "avito_user_id": None, "pro_active": False}
     row = db.query(OrganizationAvitoIntegration).filter(
         OrganizationAvitoIntegration.organization_id == current_user.organization_id
     ).first()
-    enabled = bool(row and row.enabled and row.client_id and row.client_secret_encrypted and row.avito_user_id)
+    integration_ok = bool(row and row.enabled and row.client_id and row.client_secret_encrypted and row.avito_user_id)
+    pro_active = bool(integration_ok and row.pro_active)
     avito_uid = int(row.avito_user_id) if row and row.avito_user_id is not None else None
-    return {"enabled": enabled, "avito_user_id": avito_uid}
+    return {"enabled": pro_active, "avito_user_id": avito_uid, "pro_active": pro_active}
 
 
 @router.get("/chats")

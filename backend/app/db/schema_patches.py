@@ -343,3 +343,50 @@ def ensure_garage_order_delivery_columns() -> None:
             conn.execute(text(stmt))
     logger.info("Applied garage order delivery column patches: %s", statements)
 
+
+def ensure_avito_pro_status_columns() -> None:
+    """Persist Avito Pro subscription probe results on organization_avito_integration."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "organization_avito_integration" not in table_names:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("organization_avito_integration")}
+    statements: list[str] = []
+
+    if "pro_active" not in columns:
+        statements.append(
+            "ALTER TABLE organization_avito_integration ADD COLUMN pro_active BOOLEAN NOT NULL DEFAULT TRUE"
+        )
+    if "pro_status_message" not in columns:
+        statements.append(
+            "ALTER TABLE organization_avito_integration ADD COLUMN pro_status_message TEXT"
+        )
+    if "pro_status_checked_at" not in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append(
+                "ALTER TABLE organization_avito_integration ADD COLUMN pro_status_checked_at TIMESTAMPTZ"
+            )
+        else:
+            statements.append(
+                "ALTER TABLE organization_avito_integration ADD COLUMN pro_status_checked_at DATETIME"
+            )
+    if "pro_features_json" not in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append(
+                "ALTER TABLE organization_avito_integration ADD COLUMN pro_features_json JSONB"
+            )
+        else:
+            statements.append(
+                "ALTER TABLE organization_avito_integration ADD COLUMN pro_features_json TEXT"
+            )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied Avito Pro status column patches: %s", statements)
+

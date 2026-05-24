@@ -8,12 +8,17 @@ import { useMobileMenuShell } from '../hooks/useMobileMenuShell';
 import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
 import Breadcrumbs from '../components/Breadcrumbs/Breadcrumbs';
 import { usePageBreadcrumbs } from '../hooks/usePageBreadcrumbs';
+import AvitoProExpiredBanner from '../components/AvitoProExpiredBanner/AvitoProExpiredBanner';
+import { useAvitoAccountStatus } from '../hooks/useAvitoAccountStatus';
 
 export default function MainLayout() {
     const location = useLocation();
     const { user } = useSelector((state) => state.auth);
     const breadcrumbItems = usePageBreadcrumbs();
     const isPartPage = location.pathname.startsWith('/part/');
+    const { status: avitoAccountStatus } = useAvitoAccountStatus(user?.organization_id, {
+        enabled: Boolean(user?.organization_id),
+    });
 
     const isAutopartsPage = location.pathname.startsWith('/autoparts');
 
@@ -55,6 +60,7 @@ export default function MainLayout() {
                 {breadcrumbItems.length > 0 ? (
                     <Breadcrumbs items={breadcrumbItems} includeJsonLd={!isPartPage} />
                 ) : null}
+                <AvitoProExpiredBanner status={avitoAccountStatus} />
                 <Outlet />
             </main>
 

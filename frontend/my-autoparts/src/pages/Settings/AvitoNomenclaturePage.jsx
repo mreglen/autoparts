@@ -5,6 +5,9 @@ import { apiRequest, apiRequestFormData, BACKEND_BASE, normalizeImageUrl } from 
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { canAccessAvitoIntegration } from './integrationAccess';
+import { useAvitoAccountStatus } from '../../hooks/useAvitoAccountStatus';
+import { canUseAvitoProFeatures } from '../../utils/avitoProAccess';
+import AvitoProExpiredBanner from '../../components/AvitoProExpiredBanner/AvitoProExpiredBanner';
 
 const AD_TYPE_NOT_SPECIFIED = '__NOT_SPECIFIED__';
 const AD_TYPE_OPTIONS = [
@@ -405,6 +408,10 @@ export default function AvitoNomenclaturePage() {
   const orgId = user?.organization_id;
   const navigate = useNavigate();
   const canAccess = canAccessAvitoIntegration(user, permissionCodes);
+  const { status: avitoAccountStatus } = useAvitoAccountStatus(orgId, {
+    enabled: Boolean(orgId),
+  });
+  const avitoProActive = canUseAvitoProFeatures(avitoAccountStatus);
 
   const [items, setItems] = useState([]);
   const [uploadResult, setUploadResult] = useState(null);
@@ -747,6 +754,8 @@ export default function AvitoNomenclaturePage() {
         </button>
       </div>
 
+      <AvitoProExpiredBanner status={avitoAccountStatus} />
+
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800 text-sm whitespace-pre-wrap">
           {error}
@@ -875,7 +884,7 @@ export default function AvitoNomenclaturePage() {
                 </p>
                 <button
                   type="button"
-                  disabled={savingBulkAction || selectedRows.length === 0}
+                  disabled={savingBulkAction || selectedRows.length === 0 || !avitoProActive}
                   onClick={handleApplyBulkAction}
                   className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm"
                 >

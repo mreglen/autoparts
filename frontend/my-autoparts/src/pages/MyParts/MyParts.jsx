@@ -1227,7 +1227,11 @@ function MyParts() {
       .then((data) => {
         if (!active) return;
         setAvitoIntegrationReady(
-          Boolean(data?.client_id) && Boolean(data?.client_secret_configured) && Boolean(data?.avito_user_id)
+          Boolean(data?.client_id)
+            && Boolean(data?.client_secret_configured)
+            && Boolean(data?.avito_user_id)
+            && data?.enabled !== false
+            && data?.pro_active !== false
         );
       })
       .catch(() => {

@@ -27,6 +27,108 @@ const formatTime = (dateString) => {
   return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 };
 
+function formatListDate(dateString) {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+
+  if (date >= startOfToday) {
+    return formatTime(dateString);
+  }
+  if (date >= startOfYesterday) {
+    return 'Вчера';
+  }
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  }
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: '2-digit' });
+}
+
+function getChatSearchHaystack(chat, isAvito, avitoUserId, currentUserId) {
+  const title = isAvito
+    ? (() => {
+        const mine = avitoUserId != null ? String(avitoUserId) : '';
+        const others = (chat.participants || []).filter((p) => p.id && p.id !== mine);
+        return others.map((p) => p.name).filter(Boolean).join(' ') || chat.title || '';
+      })()
+    : (currentUserId === chat.seller_id
+        ? (chat.buyer_name || '')
+        : (chat.seller_name || chat.seller_organization || ''));
+
+  return [
+    title,
+    chat.product_name,
+    chat.context_title,
+    chat.last_message_text,
+    chat.last_message?.message,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function SourceBadge({ isAvito, className = '' }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${className} ${
+        isAvito ? 'bg-[#fff3e0] text-[#e65100]' : 'bg-indigo-50 text-indigo-700'
+      }`}
+    >
+      <img
+        src={isAvito ? '/logos/avito.png' : '/logos/svoygarage.png'}
+        alt=""
+        className="h-3 w-3 object-contain"
+      />
+      {isAvito ? 'Авито' : 'Гараж'}
+    </span>
+  );
+}
+
+function ChatEmptyState({ icon, title, subtitle, action }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
+      <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 ring-1 ring-gray-200/80">
+        {icon}
+      </div>
+      <p className="mb-1 font-medium text-gray-800">{title}</p>
+      {subtitle ? <p className="max-w-xs text-sm text-gray-500">{subtitle}</p> : null}
+      {action}
+    </div>
+  );
+}
+
+function ChatPanelHeader({ onBack, avatar, title, subtitle, badge, trailing }) {
+  return (
+    <div className="flex-shrink-0 border-b border-gray-200/80 bg-white/95 px-3 py-3 backdrop-blur-sm sm:px-4">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="-ml-1 flex-shrink-0 rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 md:hidden"
+          aria-label="Назад к списку"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        {avatar}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="truncate font-semibold text-gray-900">{title}</h3>
+            {badge}
+          </div>
+          {subtitle ? <p className="truncate text-xs text-gray-500">{subtitle}</p> : null}
+        </div>
+        {trailing}
+      </div>
+    </div>
+  );
+}
+
 const ChatsHubPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -48,6 +150,8 @@ const ChatsHubPage = () => {
   const avitoChatId = searchParams.get('avitoChatId');
   const activeChatSource = searchParams.get('source'); // 'garage' или 'avito'
   const activeChatId = searchParams.get('chatId');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('all');
 
   // Подключаем WebSocket при загрузке
   useEffect(() => {
@@ -104,11 +208,13 @@ const ChatsHubPage = () => {
       _lastMessageAt: chat.last_message?.created_at || chat.created_at || '',
     }));
     
-    const avito = (avitoChats || []).map(chat => ({
-      ...chat,
-      _source: 'avito',
-      _lastMessageAt: chat.last_message_created_at || '',
-    }));
+    const avito = avitoEnabled
+      ? (avitoChats || []).map(chat => ({
+        ...chat,
+        _source: 'avito',
+        _lastMessageAt: chat.last_message_created_at || '',
+      }))
+      : [];
     
     // Сортируем по дате последнего сообщения (новые сверху)
     return [...garage, ...avito].sort((a, b) => {
@@ -116,7 +222,56 @@ const ChatsHubPage = () => {
       const dateB = new Date(b._lastMessageAt);
       return dateB - dateA;
     });
-  }, [garageChats, avitoChats]);
+  }, [garageChats, avitoChats, avitoEnabled]);
+
+  const chatCounts = useMemo(() => ({
+    all: unifiedChats.length,
+    garage: unifiedChats.filter((c) => c._source === 'garage').length,
+    avito: unifiedChats.filter((c) => c._source === 'avito').length,
+  }), [unifiedChats]);
+
+  const filteredChats = useMemo(() => {
+    let list = unifiedChats;
+    if (sourceFilter === 'garage') {
+      list = list.filter((c) => c._source === 'garage');
+    } else if (sourceFilter === 'avito') {
+      list = list.filter((c) => c._source === 'avito');
+    }
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((chat) => getChatSearchHaystack(
+      chat,
+      chat._source === 'avito',
+      avitoUserId,
+      user?.id,
+    ).includes(q));
+  }, [unifiedChats, sourceFilter, searchQuery, avitoUserId, user?.id]);
+
+  const sourceFilters = useMemo(() => {
+    const items = [
+      { id: 'all', label: 'Все', count: chatCounts.all },
+      { id: 'garage', label: 'Гараж', count: chatCounts.garage },
+    ];
+    if (avitoEnabled) {
+      items.push({ id: 'avito', label: 'Авито', count: chatCounts.avito });
+    }
+    return items;
+  }, [chatCounts, avitoEnabled]);
+
+  useEffect(() => {
+    if (sourceFilter === 'avito' && !avitoEnabled) {
+      setSourceFilter('all');
+    }
+  }, [sourceFilter, avitoEnabled]);
+
+  useEffect(() => {
+    if (activeChatSource === 'avito' && !avitoEnabled) {
+      const next = new URLSearchParams(searchParams);
+      next.set('source', 'garage');
+      next.delete('avitoChatId');
+      setSearchParams(next, { replace: true });
+    }
+  }, [activeChatSource, avitoEnabled, searchParams, setSearchParams]);
 
   const handleSelectChat = useCallback((chat) => {
     const isAvito = chat._source === 'avito';
@@ -155,108 +310,186 @@ const ChatsHubPage = () => {
     : null;
 
   return (
-    <div className="flex w-full min-h-0 flex-col max-md:min-h-[calc(100dvh-7rem)] max-md:pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] md:static md:min-h-0">
-      <div className="flex min-h-0 w-full flex-1 flex-row bg-white md:h-[calc(100vh-200px)] md:overflow-hidden md:rounded-lg md:border md:border-gray-200 md:shadow-sm">
-        {/* Левая панель - Список чатов */}
-        <div
-          className={`${
-            activeChatId ? 'hidden md:flex' : 'flex'
-          } min-h-0 w-full min-w-0 flex-col border-gray-200 md:w-96 md:border-r`}
-        >
-          {/* Список чатов */}
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-            {(garageLoading || avitoLoading) && unifiedChats.length === 0 ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-sm text-gray-500">Загрузка чатов...</p>
-                </div>
+    <div className="mx-auto w-full max-w-7xl">
+      {!activeChatId && (
+        <div className="mb-4 hidden md:block">
+          <h1 className="text-2xl font-bold text-gray-900">Сообщения</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Переписка на Свой Гараж{avitoEnabled ? ' и Авито' : ''} в одном месте
+          </p>
+        </div>
+      )}
+
+      <div className="flex w-full min-h-0 flex-col max-md:min-h-[calc(100dvh-7rem)] max-md:pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] md:static md:min-h-0">
+        <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden bg-white md:h-[calc(100vh-220px)] md:min-h-[560px] md:rounded-2xl md:border md:border-gray-200/80 md:shadow-lg md:shadow-gray-200/50">
+          {/* Левая панель — список чатов */}
+          <div
+            className={`${
+              activeChatId ? 'hidden md:flex' : 'flex'
+            } min-h-0 w-full min-w-0 flex-col border-gray-200/80 bg-white md:w-[22rem] lg:w-96 md:border-r`}
+          >
+            <div className="flex-shrink-0 border-b border-gray-100 bg-white px-3 pb-3 pt-3 sm:px-4">
+              <div className="mb-3 flex items-center justify-between gap-2 md:hidden">
+                <h1 className="text-lg font-bold text-gray-900">Сообщения</h1>
+                {(garageLoading || avitoLoading) && (
+                  <span className="text-xs text-gray-400">Обновление…</span>
+                )}
               </div>
-            ) : garageError ? (
-              <div className="flex flex-col items-center justify-center h-full px-6 py-12">
-                <div className="w-20 h-20 mb-4 rounded-full bg-red-100 flex items-center justify-center">
-                  <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                </div>
-                <p className="text-red-600 font-medium mb-1">Ошибка загрузки чатов</p>
-                <p className="text-sm text-gray-500 text-center">{garageError}</p>
-                <button 
-                  onClick={() => dispatch(fetchUserChats({}))}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              <div className="relative">
+                <svg
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  Повторить
-                </button>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Поиск по имени или товару"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
+                />
               </div>
-            ) : unifiedChats.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full px-6 py-12">
-                <div className="w-20 h-20 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                  <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
-                <p className="text-gray-600 font-medium mb-1">У вас пока нет сообщений</p>
-                <p className="text-sm text-gray-500 text-center">Здесь будут отображаться ваши диалоги</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {unifiedChats.map((chat) => {
-                  const isAvito = chat._source === 'avito';
-                  const isSelected = isAvito
-                    ? String(chat.id) === String(selectedAvitoChatId)
-                    : String(chat.id) === String(activeChatId);
-                  
+              <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {sourceFilters.map((item) => {
+                  const active = sourceFilter === item.id;
                   return (
-                    <UnifiedChatListRow
-                      key={`${chat._source}-${chat.id}`}
-                      chat={chat}
-                      isAvito={isAvito}
-                      isSelected={isSelected}
-                      avitoUserId={avitoUserId}
-                      currentUserId={user?.id}
-                      onSelect={() => handleSelectChat(chat)}
-                    />
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSourceFilter(item.id)}
+                      className={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                        active
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {item.label}
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? 'bg-white/20' : 'bg-white text-gray-500'}`}>
+                        {item.count}
+                      </span>
+                    </button>
                   );
                 })}
               </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+              {(garageLoading || avitoLoading) && filteredChats.length === 0 ? (
+                <div className="flex h-64 items-center justify-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                    <p className="text-sm text-gray-500">Загрузка чатов…</p>
+                  </div>
+                </div>
+              ) : garageError ? (
+                <ChatEmptyState
+                  icon={(
+                    <svg className="h-10 w-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  )}
+                  title="Не удалось загрузить чаты"
+                  subtitle={garageError}
+                  action={(
+                    <button
+                      type="button"
+                      onClick={() => dispatch(fetchUserChats({}))}
+                      className="mt-4 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                    >
+                      Повторить
+                    </button>
+                  )}
+                />
+              ) : filteredChats.length === 0 ? (
+                <ChatEmptyState
+                  icon={(
+                    <svg className="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  )}
+                  title={searchQuery.trim() ? 'Ничего не найдено' : 'Пока нет диалогов'}
+                  subtitle={
+                    searchQuery.trim()
+                      ? 'Попробуйте другой запрос или сбросьте фильтр'
+                      : 'Здесь появятся сообщения от покупателей и с площадок'
+                  }
+                  action={
+                    searchQuery.trim() ? (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="mt-4 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                      >
+                        Очистить поиск
+                      </button>
+                    ) : null
+                  }
+                />
+              ) : (
+                <div className="divide-y divide-gray-100/80">
+                  {filteredChats.map((chat) => {
+                    const isAvito = chat._source === 'avito';
+                    const isSelected = isAvito
+                      ? String(chat.id) === String(selectedAvitoChatId)
+                      : String(chat.id) === String(activeChatId);
+
+                    return (
+                      <UnifiedChatListRow
+                        key={`${chat._source}-${chat.id}`}
+                        chat={chat}
+                        isAvito={isAvito}
+                        isSelected={isSelected}
+                        avitoUserId={avitoUserId}
+                        currentUserId={user?.id}
+                        onSelect={() => handleSelectChat(chat)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Правая панель — активный чат */}
+          <div
+            className={`${
+              activeChatId ? 'flex' : 'hidden md:flex'
+            } min-h-0 min-w-0 flex-1 flex-col bg-[#eef2f6]`}
+          >
+            {activeChatId ? (
+              isAvitoActive ? (
+                <AvitoChatPanel
+                  chat={selectedAvitoChatObj}
+                  chatId={activeChatId}
+                  avitoUserId={avitoUserId}
+                  onBack={handleBackToList}
+                />
+              ) : (
+                <GarageChatPanel
+                  chat={selectedGarageChat}
+                  chatId={activeChatId}
+                  onBack={handleBackToList}
+                />
+              )
+            ) : (
+              <div className="flex flex-1 items-center justify-center bg-gradient-to-b from-[#eef2f6] to-[#e8edf3] p-6">
+                <div className="max-w-sm text-center">
+                  <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-3xl bg-white shadow-md ring-1 ring-gray-200/60">
+                    <svg className="h-12 w-12 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <p className="text-lg font-semibold text-gray-800">Выберите диалог</p>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-500">
+                    Слева — все переписки. Откройте чат, чтобы ответить покупателю или посмотреть историю.
+                  </p>
+                </div>
+              </div>
             )}
           </div>
-        </div>
-
-        {/* Правая панель - Активный чат */}
-        <div
-          className={`${
-            activeChatId ? 'flex' : 'hidden md:flex'
-          } min-h-0 min-w-0 flex-1 flex-col`}
-        >
-          {activeChatId ? (
-            isAvitoActive ? (
-              <AvitoChatPanel
-                chat={selectedAvitoChatObj}
-                chatId={activeChatId}
-                avitoUserId={avitoUserId}
-                onBack={handleBackToList}
-              />
-            ) : (
-              <GarageChatPanel
-                chat={selectedGarageChat}
-                chatId={activeChatId}
-                onBack={handleBackToList}
-              />
-            )
-          ) : (
-            <div className="flex-1 flex items-center justify-center bg-gray-50">
-              <div className="text-center">
-                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                  <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
-                <p className="text-gray-600 font-medium">Выберите чат</p>
-                <p className="text-sm text-gray-500 mt-1">Начните беседу или продолжите существующую</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -352,89 +585,81 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full flex items-start gap-3 p-4 text-left transition-colors duration-150 ${
-        isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+      className={`group relative w-full px-3 py-3.5 text-left transition-colors sm:px-4 ${
+        isSelected
+          ? 'bg-indigo-50/90 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-indigo-600'
+          : 'hover:bg-gray-50/90'
       }`}
     >
-      {/* Аватар */}
-      <div 
-        className="flex-shrink-0 cursor-pointer" 
-        onClick={handlePhotoClick}
-        title="Перейти к товару"
-      >
-        {img ? (
-          <img 
-            src={img} 
-            alt="" 
-            className="w-14 h-14 rounded-lg object-cover ring-2 ring-gray-100 hover:ring-blue-300 transition-all" 
-          />
-        ) : (
-          <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-xl ring-2 ring-gray-100">
-            {placeholderLetter}
-          </div>
-        )}
-      </div>
-      
-      {/* Информация о чате */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <h3 className="font-semibold truncate text-base text-gray-900">
-            {title}
-          </h3>
-          {lastMessageTime && (
-            <span className="text-xs text-gray-500 flex-shrink-0">
-              {formatTime(lastMessageTime)}
-            </span>
+      <div className="flex items-start gap-3">
+        <div
+          className="relative flex-shrink-0 cursor-pointer"
+          onClick={handlePhotoClick}
+          title="Перейти к товару"
+        >
+          {img ? (
+            <img
+              src={img}
+              alt=""
+              className="h-12 w-12 rounded-2xl object-cover ring-2 ring-white shadow-sm transition-all group-hover:ring-indigo-200"
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-lg font-semibold text-white shadow-sm ring-2 ring-white">
+              {placeholderLetter}
+            </div>
           )}
+          <span
+            className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow ring-1 ring-gray-200"
+            onClick={handleSourceIconClick}
+            title={isAvito ? 'Открыть на Авито' : 'Перейти к товару'}
+          >
+            <img
+              src={isAvito ? '/logos/avito.png' : '/logos/svoygarage.png'}
+              alt=""
+              className="h-3.5 w-3.5 object-contain"
+            />
+          </span>
         </div>
-        
-        {!isAvito && chat.product_name && (
-          <p className="text-xs text-gray-500 truncate mb-1.5">
-            {chat.product_name}
-          </p>
-        )}
-        
-        {isAvito && chat.context_title && (
-          <p className="text-xs text-gray-500 truncate mb-1.5">
-            {chat.context_title}
-          </p>
-        )}
-        
-        {lastMessageText && (
-          <div className="flex items-center gap-1.5">
-            {lastMessageIsMine && (
-              <span className="flex-shrink-0">
-                <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                </svg>
+
+        <div className="min-w-0 flex-1">
+          <div className="mb-0.5 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className={`truncate text-[15px] ${Number(chat.unread_count) > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>
+                {title}
+              </h3>
+              {!isAvito && chat.product_name && (
+                <p className="truncate text-xs text-gray-500">{chat.product_name}</p>
+              )}
+              {isAvito && chat.context_title && (
+                <p className="truncate text-xs text-gray-500">{chat.context_title}</p>
+              )}
+            </div>
+            {lastMessageTime && (
+              <span className="flex-shrink-0 text-[11px] text-gray-400">
+                {formatListDate(lastMessageTime)}
               </span>
             )}
-            <p className="text-sm text-gray-600 truncate">
-              {lastMessageIsMine && 'Вы: '}
-              {lastMessageText}
-            </p>
           </div>
+
+          {lastMessageText && (
+            <div className="flex items-center gap-1.5">
+              {lastMessageIsMine && (
+                <svg className="h-3.5 w-3.5 flex-shrink-0 text-indigo-500" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                </svg>
+              )}
+              <p className={`truncate text-sm ${Number(chat.unread_count) > 0 ? 'font-medium text-gray-800' : 'text-gray-500'}`}>
+                {lastMessageIsMine ? `Вы: ${lastMessageText}` : lastMessageText}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {Number(chat.unread_count) > 0 && (
+          <span className="mt-1 flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-indigo-600 px-1.5 text-[11px] font-bold text-white">
+            {chat.unread_count > 99 ? '99+' : chat.unread_count}
+          </span>
         )}
-      </div>
-      
-      {/* Счётчик непрочитанных */}
-      {Number(chat.unread_count) > 0 && (
-        <span className="ml-2 px-2.5 py-1 bg-blue-600 text-white text-xs font-bold rounded-full flex-shrink-0 min-w-[20px] text-center">
-          {chat.unread_count}
-        </span>
-      )}
-      
-      {/* Иконка источника чата */}
-      <div 
-        className="flex-shrink-0 flex flex-col items-center justify-center ml-2 cursor-pointer hover:opacity-70 transition-opacity"
-        onClick={handleSourceIconClick}
-        title={isAvito ? 'Открыть на Авито' : 'Перейти к товару'}
-      >
-        <img 
-          src={isAvito ? '/logos/avito.png' : '/logos/svoygarage.png'} 
-          alt={isAvito ? 'Авито' : 'Свой Гараж'} 
-          className="w-6 h-6 object-contain" 
-        />
       </div>
     </button>
   );
@@ -443,6 +668,7 @@ function UnifiedChatListRow({ chat, isAvito, isSelected, avitoUserId, currentUse
 // Панель чата Свой Гараж - полноценная реализация
 function GarageChatPanel({ chat, chatId, onBack }) {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
   const { messages, currentChat, wsConnected } = useSelector((state) => state.chats);
   const replyToMessage = useSelector(state => state.chats.replyToMessage);
@@ -636,56 +862,63 @@ function GarageChatPanel({ chat, chatId, onBack }) {
     ? (chat?.buyer_name || 'Покупатель')
     : (chat?.seller_name || chat?.seller_organization || 'Продавец');
 
+  const openProduct = () => {
+    if (chat?.product_id) {
+      navigate(`/part/${chat.product_id}`);
+    }
+  };
+
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      {/* Шапка чата */}
-      <div className="flex-shrink-0 border-b border-gray-200 bg-white p-4 pb-3 shadow-sm max-md:pt-3">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors flex-shrink-0"
-            aria-label="Назад к списку"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          {chat?.product_photo_url ? (
-            <img 
-              src={chat.product_photo_url}
-              alt={chat?.product_name || 'Товар'}
-              className="w-11 h-11 rounded-lg object-cover flex-shrink-0 ring-2 ring-gray-100"
-            />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#eef2f6]">
+      <ChatPanelHeader
+        onBack={onBack}
+        avatar={
+          chat?.product_photo_url ? (
+            <button type="button" onClick={openProduct} className="flex-shrink-0">
+              <img
+                src={chat.product_photo_url}
+                alt=""
+                className="h-11 w-11 rounded-2xl object-cover ring-2 ring-white shadow-sm"
+              />
+            </button>
           ) : (
-            <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold flex-shrink-0 ring-2 ring-gray-100">
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-sm font-semibold text-white shadow-sm ring-2 ring-white">
               {(title && title.charAt(0).toUpperCase()) || 'Ч'}
             </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 truncate">{title}</h3>
-            {chat?.product_name ? (
-              <p className="text-xs text-gray-500 truncate">{chat.product_name}{chat.product_article ? ` - ${chat.product_article}` : ''}</p>
-            ) : null}
-          </div>
-        </div>
-      </div>
+          )
+        }
+        title={title}
+        subtitle={chat?.product_name ? `${chat.product_name}${chat.product_article ? ` · ${chat.product_article}` : ''}` : null}
+        badge={<SourceBadge isAvito={false} />}
+        trailing={
+          chat?.product_id ? (
+            <button
+              type="button"
+              onClick={openProduct}
+              className="hidden rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:inline-flex"
+            >
+              К товару
+            </button>
+          ) : null
+        }
+      />
 
       {/* Сообщения */}
       <div
         ref={messagesScrollRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-gray-50 p-4"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 sm:px-4"
       >
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex h-full min-h-[200px] items-center justify-center">
+            <ChatEmptyState
+              icon={(
+                <svg className="h-10 w-10 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
-              </div>
-              <p className="text-gray-600 font-medium">Начните беседу!</p>
-            </div>
+              )}
+              title="Начните беседу"
+              subtitle="Напишите первое сообщение покупателю или продавцу"
+            />
           </div>
         ) : (
           <div className="space-y-2">
@@ -745,8 +978,8 @@ function GarageChatPanel({ chat, chatId, onBack }) {
                                 ? 'bg-blue-600 text-white rounded-t-none rounded-bl-xl rounded-br-2xl' 
                                 : 'bg-white text-gray-900 shadow-sm rounded-t-none rounded-br-xl rounded-bl-2xl border border-gray-100')
                             : (isOwn 
-                                ? 'bg-blue-600 text-white rounded-2xl rounded-br-md' 
-                                : 'bg-white text-gray-900 shadow-sm rounded-2xl rounded-bl-md border border-gray-100')
+                                ? 'bg-indigo-600 text-white rounded-2xl rounded-br-md' 
+                                : 'bg-white text-gray-900 shadow-sm rounded-2xl rounded-bl-md border border-gray-100/80')
                         }`}
                         data-message-bubble="true"
                         >
@@ -827,7 +1060,7 @@ function GarageChatPanel({ chat, chatId, onBack }) {
       {/* Ввод сообщения */}
       <form
         onSubmit={handleSendMessage}
-        className="flex-shrink-0 border-t border-gray-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))]"
+        className="flex-shrink-0 border-t border-gray-200/80 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur-sm sm:p-4"
       >
         {/* Reply Preview */}
         {replyToMessage && (
@@ -855,12 +1088,12 @@ function GarageChatPanel({ chat, chatId, onBack }) {
             ))}
           </div>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-1.5 focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/15">
           <button 
             type="button" 
             onClick={() => fileInputRef.current?.click()} 
             disabled={uploading || selectedFiles.length >= 5}
-            className="p-2.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors disabled:opacity-50"
+            className="flex-shrink-0 rounded-xl p-2.5 text-gray-500 transition-colors hover:bg-white hover:text-indigo-600 disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -879,14 +1112,14 @@ function GarageChatPanel({ chat, chatId, onBack }) {
             type="text" 
             value={newMessage} 
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder={selectedFiles.length > 0 ? "Добавить комментарий..." : replyToMessage ? "Ответить..." : "Введите сообщение..."}
-            className="flex-1 min-w-0 px-4 py-2.5 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            placeholder={selectedFiles.length > 0 ? 'Добавить комментарий…' : replyToMessage ? 'Ответить…' : 'Сообщение…'}
+            className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-gray-400"
             disabled={uploading}
           />
           <button 
             type="submit" 
             disabled={(!newMessage.trim() && selectedFiles.length === 0) || uploading}
-            className="px-6 py-2.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+            className="flex-shrink-0 rounded-xl bg-indigo-600 p-2.5 text-white transition-colors hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             {uploading ? (
               <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1011,10 +1244,10 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
           {!isOwn && message.sender_name && (
             <p className="text-xs text-gray-500 mb-0.5 px-1">{message.sender_name}</p>
           )}
-          <div className={`px-4 py-2 rounded-2xl ${
+          <div className={`px-4 py-2.5 rounded-2xl ${
             isOwn
-              ? 'bg-blue-600 text-white rounded-br-md'
-              : 'bg-white text-gray-900 shadow-sm rounded-bl-md border border-gray-100'
+              ? 'bg-indigo-600 text-white rounded-br-md'
+              : 'bg-white text-gray-900 shadow-sm rounded-bl-md border border-gray-100/80'
           }`}>
             {urls.length > 0 && (
               <div className="flex flex-col gap-2 mb-1">
@@ -1053,69 +1286,91 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
   };
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      {/* Шапка чата */}
-      <div className="flex-shrink-0 border-b border-gray-200 bg-white p-4 pb-3 shadow-sm max-md:pt-3">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-gray-600 hover:text-gray-900 transition-colors flex-shrink-0"
-            aria-label="Назад к списку"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          {displayChat?.context_image_url || displayChat?.avatar_url ? (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#eef2f6]">
+      <ChatPanelHeader
+        onBack={onBack}
+        avatar={
+          displayChat?.context_image_url || displayChat?.avatar_url ? (
             <img
               src={displayChat.context_image_url || displayChat.avatar_url}
               alt=""
-              className="w-11 h-11 rounded-lg object-cover flex-shrink-0 ring-2 ring-gray-100"
+              className="h-11 w-11 flex-shrink-0 rounded-2xl object-cover ring-2 ring-white shadow-sm"
             />
           ) : (
-            <div className="w-11 h-11 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold flex-shrink-0 ring-2 ring-gray-100">
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-sm font-semibold text-white shadow-sm ring-2 ring-white">
               {(title && title.charAt(0).toUpperCase()) || 'Ч'}
             </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 truncate">{title}</h3>
-            {displayChat?.context_title ? (
-              <p className="text-xs text-gray-500 truncate">{[displayChat.context_title, displayChat.context_price].filter(Boolean).join(' — ')}</p>
-            ) : null}
-          </div>
-        </div>
-      </div>
+          )
+        }
+        title={title}
+        subtitle={displayChat?.context_title ? [displayChat.context_title, displayChat.context_price].filter(Boolean).join(' · ') : null}
+        badge={<SourceBadge isAvito />}
+        trailing={
+          displayChat?.context_url ? (
+            <a
+              href={displayChat.context_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:inline-flex"
+            >
+              На Авито
+            </a>
+          ) : null
+        }
+      />
 
-      {/* Сообщения */}
       {chatDetailLoading && (
-        <p className="flex-shrink-0 border-b border-gray-100 bg-white px-4 py-1 text-xs text-gray-400">
+        <p className="flex-shrink-0 border-b border-gray-100 bg-white/80 px-4 py-1.5 text-xs text-gray-400">
           Обновление…
         </p>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain bg-gray-50 p-4">
-        {messages.map(renderMessageBubble)}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 py-4 sm:px-4">
+        {messages.length === 0 ? (
+          <div className="flex h-full min-h-[200px] items-center justify-center">
+            <ChatEmptyState
+              icon={(
+                <svg className="h-10 w-10 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              )}
+              title="Нет сообщений"
+              subtitle="История переписки с Авито появится здесь"
+            />
+          </div>
+        ) : (
+          messages.map(renderMessageBubble)
+        )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Ввод сообщения */}
       <form
         onSubmit={handleSendMessage}
-        className="flex flex-shrink-0 items-center gap-2 border-t border-gray-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))]"
+        className="flex-shrink-0 border-t border-gray-200/80 bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur-sm sm:p-4"
       >
-        <input
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Введите сообщение..."
-          className="flex-1 min-w-0 px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-        />
-        <button
-          type="submit"
-          disabled={sending || !newMessage.trim()}
-          className="px-6 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 disabled:bg-gray-300 flex-shrink-0"
-        >
-          Отправить
-        </button>
+        <div className="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-50 p-1.5 focus-within:border-indigo-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/15">
+          <input
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Сообщение…"
+            className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-sm outline-none placeholder:text-gray-400"
+          />
+          <button
+            type="submit"
+            disabled={sending || !newMessage.trim()}
+            className="flex-shrink-0 rounded-xl bg-indigo-600 p-2.5 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            {sending ? (
+              <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            )}
+          </button>
+        </div>
       </form>
 
       {/* Media Lightbox */}

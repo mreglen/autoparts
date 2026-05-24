@@ -24,11 +24,35 @@ class AvitoLastAutoloadSnapshot(BaseModel):
     warnings: Optional[list[str]] = None
 
 
+class AvitoFeatureStatus(BaseModel):
+    available: bool = False
+    reason: Optional[str] = None
+    status_code: Optional[int] = None
+
+
+class AvitoAccountStatusResponse(BaseModel):
+    integration_enabled: bool = False
+    credentials_configured: bool = False
+    pro_active: bool = True
+    pro_status_message: Optional[str] = None
+    pro_status_checked_at: Optional[str] = None
+    stale: bool = False
+    features: dict[str, AvitoFeatureStatus] = Field(default_factory=dict)
+
+
+class AvitoDeliveryCheckResponse(BaseModel):
+    delivery_enabled: bool = True
+    message: Optional[str] = None
+
+
 class AvitoCredentialsResponse(BaseModel):
     client_id: str = ""
     avito_user_id: Optional[int] = None
     client_secret_configured: bool = False
     enabled: bool = True
+    pro_active: bool = True
+    pro_status_message: Optional[str] = None
+    pro_status_checked_at: Optional[str] = None
     last_autoload: Optional[AvitoLastAutoloadSnapshot] = None
 
 

@@ -6,7 +6,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from openpyxl import load_workbook
 from sqlalchemy.exc import IntegrityError
@@ -39,6 +39,8 @@ from app.schemas.avito_integration import (
     AvitoAutoloadCategoryTreeResponse,
     AvitoAutoloadSetCategoryRequest,
     AvitoAutoloadSetAdTypeRequest,
+    AvitoAccountStatusResponse,
+    AvitoDeliveryCheckResponse,
     AvitoCredentialsResponse,
     AvitoCredentialsUpdate,
     AvitoLastAutoloadSnapshot,
@@ -48,7 +50,11 @@ from app.services import avito_api as avito_api_svc
 from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload, upsert_products_to_avito_autoload
 from app.services.avito_media import ensure_local_pictures, normalize_for_xlsx
 from app.utils.avito_crypto import decrypt_secret, encrypt_secret
-from app.utils.integration_access import ensure_avito_integration_access
+from app.utils.integration_access import ensure_avito_integration_access, ensure_org_member
+from app.services.avito_pro_status_service import (
+    check_and_persist_avito_pro_status,
+    ensure_avito_pro_active,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +272,37 @@ def _has_avito_integration(db: Session, org_id: str) -> bool:
     return bool(row.client_id and row.client_secret_encrypted and row.avito_user_id)
 
 
+def _require_avito_pro(db: Session, org_id: str) -> None:
+    ensure_avito_pro_active(db, org_id)
+
+
+def _credentials_to_response(
+    row: OrganizationAvitoIntegration | None,
+    last: AvitoLastAutoloadSnapshot | None,
+) -> AvitoCredentialsResponse:
+    if not row:
+        return AvitoCredentialsResponse(
+            client_id="",
+            avito_user_id=None,
+            client_secret_configured=False,
+            enabled=True,
+            pro_active=True,
+            last_autoload=last,
+        )
+    return AvitoCredentialsResponse(
+        client_id=row.client_id,
+        avito_user_id=int(row.avito_user_id),
+        client_secret_configured=True,
+        enabled=row.enabled,
+        pro_active=bool(row.pro_active),
+        pro_status_message=row.pro_status_message,
+        pro_status_checked_at=(
+            row.pro_status_checked_at.isoformat() if row.pro_status_checked_at else None
+        ),
+        last_autoload=last,
+    )
+
+
 def _job_to_response(job: AvitoAutoloadJob) -> AvitoAutoloadJobResponse:
     return AvitoAutoloadJobResponse(
         id=job.id,
@@ -330,6 +367,7 @@ async def get_avito_autoload_category_tree(
 ):
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
 
     now = time.time()
     cached = _CATEGORY_TREE_CACHE.get(org_id)
@@ -366,20 +404,36 @@ def get_avito_credentials(
         OrganizationAvitoIntegration.organization_id == org_id
     ).first()
     last = _get_last_autoload(db, org_id)
-    if not row:
-        return AvitoCredentialsResponse(
-            client_id="",
-            avito_user_id=None,
-            client_secret_configured=False,
-            enabled=True,
-            last_autoload=last,
-        )
-    return AvitoCredentialsResponse(
-        client_id=row.client_id,
-        avito_user_id=int(row.avito_user_id),
-        client_secret_configured=True,
-        enabled=row.enabled,
-        last_autoload=last,
+    return _credentials_to_response(row, last)
+
+
+@router.get("/{org_id}/avito/account-status", response_model=AvitoAccountStatusResponse)
+async def get_avito_account_status(
+    org_id: str,
+    force: bool = Query(False),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    ensure_org_member(current_user, org_id)
+    _org_exists(db, org_id)
+    return await check_and_persist_avito_pro_status(db, org_id, force=force)
+
+
+@router.get("/{org_id}/avito/delivery/check", response_model=AvitoDeliveryCheckResponse)
+async def check_avito_delivery(
+    org_id: str,
+    force: bool = Query(False),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    ensure_avito_integration_access(db, current_user, org_id)
+    _org_exists(db, org_id)
+    status_data = await check_and_persist_avito_pro_status(db, org_id, force=force)
+    if status_data.pro_active:
+        return AvitoDeliveryCheckResponse(delivery_enabled=True, message=None)
+    return AvitoDeliveryCheckResponse(
+        delivery_enabled=False,
+        message=status_data.pro_status_message or "Подписка Avito Pro истекла или нет доступа к API Avito",
     )
 
 
@@ -432,6 +486,7 @@ async def sync_avito_ad_ids(
     """Sync Avito ad IDs using autoload API - fast batch sync."""
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
     
     # Get Avito integration
     integration = db.query(OrganizationAvitoIntegration).filter(
@@ -616,6 +671,7 @@ async def export_products_to_avito_autoload_async(
 ):
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
     if not _has_avito_integration(db, org_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Авито не настроена")
 
@@ -658,6 +714,7 @@ async def publish_avito_autoload_async(
 ):
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
     cache = db.query(OrganizationAvitoAutoloadCache).filter(
         OrganizationAvitoAutoloadCache.organization_id == org_id
     ).first()
@@ -763,6 +820,7 @@ async def export_products_to_avito_autoload(
 ):
     ensure_avito_integration_access(db, current_user, org_id)
     org = _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
     if not _has_avito_integration(db, org_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Авито не настроена")
 
@@ -899,7 +957,7 @@ async def export_single_product_to_avito_autoload(
 
 
 @router.put("/{org_id}/avito/credentials", response_model=AvitoCredentialsResponse)
-def put_avito_credentials(
+async def put_avito_credentials(
     org_id: str,
     body: AvitoCredentialsUpdate,
     db: Session = Depends(get_db),
@@ -944,14 +1002,10 @@ def put_avito_credentials(
         organization_id=org_id,
         details={"avito_user_id": row.avito_user_id, "client_id": row.client_id},
     )
+    await check_and_persist_avito_pro_status(db, org_id, force=True)
+    db.refresh(row)
     last = _get_last_autoload(db, org_id)
-    return AvitoCredentialsResponse(
-        client_id=row.client_id,
-        avito_user_id=int(row.avito_user_id),
-        client_secret_configured=True,
-        enabled=row.enabled,
-        last_autoload=last,
-    )
+    return _credentials_to_response(row, last)
 
 
 @router.patch("/{org_id}/avito/toggle-enabled", response_model=AvitoCredentialsResponse)
@@ -989,13 +1043,7 @@ def toggle_avito_integration_enabled(
     )
 
     last = _get_last_autoload(db, org_id)
-    return AvitoCredentialsResponse(
-        client_id=row.client_id,
-        avito_user_id=int(row.avito_user_id),
-        client_secret_configured=True,
-        enabled=row.enabled,
-        last_autoload=last,
-    )
+    return _credentials_to_response(row, last)
 
 
 @router.post("/{org_id}/avito/autoload/upload", response_model=AvitoAutoloadUploadResponse)
@@ -1007,6 +1055,7 @@ async def upload_avito_autoload(
 ):
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
 
     if not file.filename or not file.filename.lower().endswith(".xlsx"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ожидается файл .xlsx")
@@ -1221,6 +1270,7 @@ async def set_avito_autoload_category(
 ):
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
 
     cache = db.query(OrganizationAvitoAutoloadCache).filter(
         OrganizationAvitoAutoloadCache.organization_id == org_id
@@ -1299,6 +1349,7 @@ async def set_avito_autoload_ad_type(
 ):
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
 
     cache = db.query(OrganizationAvitoAutoloadCache).filter(
         OrganizationAvitoAutoloadCache.organization_id == org_id
@@ -1384,6 +1435,7 @@ async def import_avito_autoload_rows(
 ):
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
 
     if not current_user.is_seller:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Только продавцы могут импортировать товары")
@@ -1746,6 +1798,7 @@ async def publish_avito_autoload(
 ):
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
     if not _has_avito_integration(db, org_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Авито не настроена")
 
@@ -1797,6 +1850,7 @@ async def apply_avito_autoload_actions(
 ):
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
 
     cache = (
         db.query(OrganizationAvitoAutoloadCache)
@@ -1898,6 +1952,7 @@ async def remove_avito_autoload_rows(
     """Удаляет строки из XLSX файла и обновляет кэш."""
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
 
     cache = (
         db.query(OrganizationAvitoAutoloadCache)
@@ -1998,6 +2053,7 @@ async def debug_avito_item_detail(
     """
     ensure_avito_integration_access(db, current_user, org_id)
     _org_exists(db, org_id)
+    _require_avito_pro(db, org_id)
     
     # Get Avito integration
     integration = db.query(OrganizationAvitoIntegration).filter(

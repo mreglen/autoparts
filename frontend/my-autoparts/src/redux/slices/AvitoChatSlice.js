@@ -165,6 +165,7 @@ export const fetchAvitoChatProductLink = createAsyncThunk(
 
 const initialState = {
   enabled: false,
+  proActive: true,
   /** ID пользователя Авито (аккаунт API), для стороны «я / собеседник» в переписке */
   avitoUserId: null,
   integrationLoading: false,
@@ -200,6 +201,7 @@ const avitoChatSlice = createSlice({
       })
       .addCase(fetchAvitoMessengerEnabled.fulfilled, (state, action) => {
         state.integrationLoading = false;
+        state.proActive = action.payload?.pro_active !== false;
         state.enabled = !!action.payload?.enabled;
         const uid = action.payload?.avito_user_id;
         state.avitoUserId = uid != null && uid !== '' ? uid : null;
@@ -207,6 +209,7 @@ const avitoChatSlice = createSlice({
       .addCase(fetchAvitoMessengerEnabled.rejected, (state, action) => {
         state.integrationLoading = false;
         state.enabled = false;
+        state.proActive = false;
         state.avitoUserId = null;
         state.error = action.payload;
       })

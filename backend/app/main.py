@@ -9,6 +9,7 @@ from app.db.schema_patches import (
     ensure_garage_order_delivery_columns,
     ensure_organization_markup_columns,
     ensure_stock_out_source_columns,
+    ensure_avito_pro_status_columns,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
@@ -82,6 +83,7 @@ try:
     ensure_garage_used_order_item_fulfillment_columns()
     ensure_garage_order_delivery_columns()
     ensure_avito_order_fulfillment_columns()
+    ensure_avito_pro_status_columns()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
 except Exception as e:

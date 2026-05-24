@@ -37,6 +37,7 @@ from app.services.avito_warehouse_fulfillment import (
 from app.services.marketplace_used_fulfillment import fulfill_used_order_on_status_change
 from app.services.audit_service import log_audit
 from app.schemas.avito_orders import AvitoCheckConfirmationCodeRequest, AvitoOrderTransitionRequest
+from app.services.avito_pro_status_service import ensure_avito_pro_active
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,12 @@ def _require_sales_orders_access(db: Session, user: UserModel) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нет доступа к заказам")
 
 
-from app.utils.org_access import org_has_admin_director
+def _require_avito_pro_orders(db: Session, user: UserModel) -> None:
+    if not user.organization_id:
+        if user.is_admin:
+            return
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="У пользователя нет organization_id")
+    ensure_avito_pro_active(db, user.organization_id)
 
 
 def _org_has_admin_director(db: Session, org_id: Optional[str]) -> bool:
@@ -242,6 +248,7 @@ def list_avito_orders(
     current_user: UserModel = Depends(get_current_user),
 ):
     _require_sales_orders_access(db, current_user)
+    _require_avito_pro_orders(db, current_user)
     if not current_user.organization_id and not current_user.is_admin:
         return []
     q = db.query(AvitoOrderCache).order_by(AvitoOrderCache.created_at.desc())
@@ -257,6 +264,7 @@ async def sync_avito_orders(
     current_user: UserModel = Depends(get_current_user),
 ):
     _require_sales_orders_access(db, current_user)
+    _require_avito_pro_orders(db, current_user)
     if not current_user.organization_id:
         raise HTTPException(status_code=400, detail="У пользователя нет organization_id")
 
@@ -274,6 +282,7 @@ async def retry_avito_warehouse(
 ):
     """Повторная проводка склада для закрытого заказа Авито."""
     _require_sales_orders_access(db, current_user)
+    _require_avito_pro_orders(db, current_user)
 
     order = db.query(AvitoOrderCache).filter(AvitoOrderCache.id == order_id).first()
     if not order:
@@ -357,6 +366,7 @@ async def apply_avito_order_transition(
 ):
     """Apply status transition to Avito order via Avito API"""
     _require_sales_orders_access(db, current_user)
+    _require_avito_pro_orders(db, current_user)
     
     order = db.query(AvitoOrderCache).filter(AvitoOrderCache.id == order_id).first()
     if not order:
@@ -458,6 +468,7 @@ async def get_avito_order_transitions(
 ):
     """Get available transitions for an Avito order"""
     _require_sales_orders_access(db, current_user)
+    _require_avito_pro_orders(db, current_user)
     
     order = db.query(AvitoOrderCache).filter(AvitoOrderCache.id == order_id).first()
     if not order:
@@ -510,6 +521,7 @@ async def check_avito_confirmation_code(
 ):
     """Проверить confirmation code для CNC заказа через Avito API."""
     _require_sales_orders_access(db, current_user)
+    _require_avito_pro_orders(db, current_user)
 
     order = db.query(AvitoOrderCache).filter(AvitoOrderCache.id == order_id).first()
     if not order:

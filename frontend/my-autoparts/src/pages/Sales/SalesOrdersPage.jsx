@@ -18,11 +18,17 @@ import {
   getAvitoWarehouseMismatch,
   getAvitoSkipReasonsForDisplay,
 } from './avitoOrderDisplay';
+import { useAvitoAccountStatus } from '../../hooks/useAvitoAccountStatus';
+import { canUseAvitoProFeatures } from '../../utils/avitoProAccess';
 
 export default function SalesOrdersPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, permissionCodes } = useSelector((state) => state.auth);
+  const { status: avitoAccountStatus } = useAvitoAccountStatus(user?.organization_id, {
+    enabled: Boolean(user?.organization_id),
+  });
+  const avitoProActive = canUseAvitoProFeatures(avitoAccountStatus);
 
   const hasPermission = user?.is_admin || user?.is_seller ||
     (user?.is_employee && permissionCodes && permissionCodes.includes('sales.orders'));
@@ -129,12 +135,14 @@ export default function SalesOrdersPage() {
 
       // Keep Avito orders cache fresh before reading it.
       // If sync fails (e.g., integration not configured), we still render from existing cache.
-      await apiAxios.post('/sales/avito-orders/sync').catch(() => {});
+      if (avitoProActive) {
+        await apiAxios.post('/sales/avito-orders/sync').catch(() => {});
+      }
 
       const results = await Promise.allSettled([
         apiAxios.get('/sales/used-parts-orders'),
         apiAxios.get('/sales/new-parts-orders'),
-        apiAxios.get('/sales/avito-orders'),
+        avitoProActive ? apiAxios.get('/sales/avito-orders') : Promise.resolve({ data: [] }),
       ]);
 
       const [usedRes, newRes, avitoRes] = results;
@@ -147,6 +155,8 @@ export default function SalesOrdersPage() {
 
       if (avitoRes.status === 'fulfilled') {
         setAvitoOrders(Array.isArray(avitoRes.value.data) ? avitoRes.value.data : []);
+      } else if (!avitoProActive) {
+        setAvitoOrders([]);
       } else {
         throw avitoRes.reason;
       }
@@ -174,7 +184,13 @@ export default function SalesOrdersPage() {
   useEffect(() => {
     if (!hasPermission) return;
     fetchAll();
-  }, [hasPermission]);
+  }, [hasPermission, avitoProActive]);
+
+  useEffect(() => {
+    if (!avitoProActive && activeTab === 'avito') {
+      setActiveTab('used');
+    }
+  }, [avitoProActive, activeTab]);
 
   useEffect(() => {
     if (!hasPermission) return;
@@ -642,12 +658,14 @@ export default function SalesOrdersPage() {
                   Новые <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">{newOrders.length}</span>
                 </button>
               )}
+              {avitoProActive && (
               <button
                 onClick={() => setActiveTab('avito')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'avito' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
               >
                 Авито <span className="ml-2 px-2.5 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-800">{avitoOrders.length}</span>
               </button>
+              )}
             </nav>
           </div>
         </div>
