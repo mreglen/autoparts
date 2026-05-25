@@ -6,6 +6,7 @@ Allow: /about
 Allow: /delivery
 Allow: /payment
 Allow: /part/
+Allow: /organizations
 
 Disallow: /auth
 Disallow: /dashboard
@@ -32,6 +33,7 @@ Disallow: /product-not-found
 
 Disallow: /api/
 Allow: /api/feeds/sitemap-products.xml
+Allow: /api/feeds/sitemap-organizations.xml
 Allow: /api/feeds/yandex/
 Disallow: /server/
 

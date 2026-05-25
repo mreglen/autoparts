@@ -59,6 +59,17 @@ export function buildBreadcrumbsForPath(pathname, context = {}) {
     return items;
   }
 
+  if (path === '/organizations') {
+    items.push({ label: 'Организации' });
+    return items;
+  }
+
+  if (path.startsWith('/organizations/')) {
+    items.push({ label: 'Организации', href: '/organizations' });
+    items.push({ label: context.organizationName || 'Организация' });
+    return items;
+  }
+
   if (path === '/autoparts/new') {
     items.push({ label: 'Новые запчасти' });
     return items;

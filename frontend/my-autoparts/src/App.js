@@ -63,6 +63,8 @@ import RequireAuth from './components/auth/RequireAuth';
 import AdminPanelPage from './pages/Admin/AdminPanelPage';
 import AuditLogPage from './pages/Admin/AuditLogPage';
 import AnalyticsPage from './pages/Admin/AnalyticsPage';
+import OrganizationsPage from './pages/Organizations/OrganizationsPage';
+import OrganizationPublicPage from './pages/Organizations/OrganizationPublicPage';
 import useSiteAnalytics from './hooks/useSiteAnalytics';
 
 
@@ -167,6 +169,8 @@ function App() {
           <Route path="/delivery" element={<DeliveryPage />} />
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/reviews" element={<ReviewsRoute />} />
+          <Route path="/organizations" element={<OrganizationsPage />} />
+          <Route path="/organizations/:orgId" element={<OrganizationPublicPage />} />
           <Route path="/autoservice" element={<Navigate to="/about" replace />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/order-reg" element={<OrderRegistration />} />

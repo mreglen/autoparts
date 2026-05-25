@@ -4,6 +4,7 @@ import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 
 export function getPublicSiteMenuLinks(showSiteReviews) {
   const links = [
+    { path: '/organizations', label: 'Организации' },
     { path: '/delivery', label: 'Доставка' },
     { path: '/about', label: 'О компании' },
     ...(showSiteReviews ? [{ path: '/reviews', label: 'Отзывы' }] : []),

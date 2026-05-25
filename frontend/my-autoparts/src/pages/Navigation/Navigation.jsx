@@ -109,7 +109,7 @@ export default function Navigation() {
 
   const firstName = user?.first_name || 'Пользователь';
   const fullName = `${user?.last_name || ''} ${user?.first_name || ''} ${user?.patronymic || ''}`.trim();
-  const profilePath = user?.is_seller || user?.is_admin ? '/dashboard' : '/profile';
+  const profilePath = '/profile';
 
   const cartData = useMemo(() => {
     if (!cart) return { itemCount: 0, totalPrice: 0 };
@@ -193,6 +193,7 @@ export default function Navigation() {
             {showSiteReviews && <DesktopNavLink to="/reviews">Отзывы</DesktopNavLink>}
             <DesktopNavLink to="/payment">Оплата</DesktopNavLink>
             <DesktopNavLink to="/about">О компании</DesktopNavLink>
+            <DesktopNavLink to="/organizations">Организации</DesktopNavLink>
           </nav>
         </div>
       </div>
@@ -262,13 +263,13 @@ export default function Navigation() {
                 </Link>
 
                 <div
-                  className="relative ml-1"
+                  className="relative ml-1 flex items-center"
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
                 >
-                  <button
-                    type="button"
-                    onClick={() => navigate(profilePath)}
+                  <Link
+                    to={profilePath}
+                    aria-label="Профиль"
                     className="flex items-center gap-2 rounded-xl border border-gray-200 py-1.5 pl-1.5 pr-3 transition hover:border-indigo-200 hover:bg-gray-50"
                   >
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 text-sm font-semibold text-white">
@@ -277,14 +278,25 @@ export default function Navigation() {
                     <span className="hidden max-w-[120px] truncate text-sm font-medium text-gray-800 lg:block">
                       {firstName}
                     </span>
-                    <svg className="hidden h-4 w-4 text-gray-400 lg:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  </Link>
+                  <button
+                    type="button"
+                    aria-label="Меню аккаунта"
+                    aria-expanded={isProfileOpen}
+                    className="ml-0.5 hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 lg:flex"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
 
                   {isProfileOpen && (
                     <div className="absolute right-0 top-[calc(100%+6px)] w-80 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
-                      <div className="border-b border-gray-100 bg-gradient-to-br from-indigo-50/80 to-white px-4 py-4">
+                      <Link
+                        to={profilePath}
+                        onClick={() => setIsProfileOpen(false)}
+                        className="block border-b border-gray-100 bg-gradient-to-br from-indigo-50/80 to-white px-4 py-4 transition hover:bg-indigo-50/90"
+                      >
                         <div className="flex items-center gap-3">
                           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-lg font-semibold text-white">
                             {firstName.charAt(0).toUpperCase()}
@@ -296,7 +308,7 @@ export default function Navigation() {
                             )}
                           </div>
                         </div>
-                      </div>
+                      </Link>
 
                       <div className="space-y-0.5 p-2 text-sm text-gray-600">
                         {user.phone && (

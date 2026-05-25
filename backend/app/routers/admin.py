@@ -39,6 +39,7 @@ from app.services.sitemap_service import (
     DEFAULT_PRODUCT_URLS_LIMIT,
     generate_product_urls_text_file,
     get_daily_product_url_batch,
+    get_site_sitemap_files,
 )
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
 from app.schemas.client import ClientBuyerOrdersResponse, ClientListItemResponse
@@ -912,6 +913,19 @@ def get_seller_employees(
 ):
     org_id = _org_id_from_seller(db, seller_id)
     return db.query(User).filter(User.organization_id == org_id).all()
+
+
+@router.get("/seo/sitemaps")
+def list_site_sitemaps(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    integration = get_or_create_yandex_integration(db)
+    site_origin = integration.host_url or "https://svoygarage.ru"
+    return {
+        "site_origin": site_origin.rstrip("/"),
+        "items": get_site_sitemap_files(db, preferred_host_url=integration.host_url),
+    }
 
 
 @router.get("/seo/product-card-urls")

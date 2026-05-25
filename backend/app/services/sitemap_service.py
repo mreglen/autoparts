@@ -14,6 +14,70 @@ from app.utils.yandex_integration_db import get_or_create_yandex_integration
 DEFAULT_PRODUCT_URLS_LIMIT = 150
 
 
+def build_organization_page_url(org_id: str, site_origin: str) -> str:
+    return f"{site_origin.rstrip('/')}/organizations/{org_id}"
+
+
+def count_working_catalog_products(db: Session) -> int:
+    count = 0
+    for product in _iter_catalog_products(db):
+        if is_working_catalog_product(product):
+            count += 1
+    return count
+
+
+def count_public_organizations(db: Session) -> int:
+    from app.models.organization import Organization as OrganizationModel
+
+    return db.query(OrganizationModel).count()
+
+
+def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None) -> list[dict[str, str | int]]:
+    site_origin = _resolve_origin(db, preferred_host_url)
+    org_count = count_public_organizations(db)
+    product_count = count_working_catalog_products(db)
+    static_pages_count = 10
+
+    return [
+        {
+            "id": "index",
+            "title": "Индекс sitemap",
+            "description": "Корневой файл со списком всех sitemap сайта",
+            "url": f"{site_origin}/sitemap.xml",
+            "type": "index",
+            "url_count": 3,
+            "location": "frontend/public",
+        },
+        {
+            "id": "pages",
+            "title": "Статические страницы",
+            "description": "Главная, каталог, разделы автозапчастей, организации и информационные страницы",
+            "url": f"{site_origin}/sitemap-pages.xml",
+            "type": "static",
+            "url_count": static_pages_count,
+            "location": "frontend/public",
+        },
+        {
+            "id": "products",
+            "title": "Карточки товаров",
+            "description": "Рабочие карточки товаров в наличии с фото и заполненными полями",
+            "url": f"{site_origin}/api/feeds/sitemap-products.xml",
+            "type": "dynamic",
+            "url_count": product_count,
+            "location": "backend",
+        },
+        {
+            "id": "organizations",
+            "title": "Организации",
+            "description": "Публичные страницы зарегистрированных организаций",
+            "url": f"{site_origin}/api/feeds/sitemap-organizations.xml",
+            "type": "dynamic",
+            "url_count": org_count,
+            "location": "backend",
+        },
+    ]
+
+
 def _resolve_origin(db: Session, preferred_host_url: str | None = None) -> str:
     if preferred_host_url:
         return _resolve_site_origin(preferred_host_url)
@@ -231,6 +295,41 @@ def generate_products_sitemap_xml(db: Session, *, preferred_host_url: str | None
                 f"    <loc>{loc}</loc>",
                 "    <changefreq>weekly</changefreq>",
                 f"    <priority>{priority}</priority>",
+                "  </url>",
+            ]
+        )
+
+    lines.append("</urlset>")
+    return "\n".join(lines) + "\n"
+
+
+def generate_organizations_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:
+    from app.models.organization import Organization as OrganizationModel
+
+    site_origin = _resolve_origin(db, preferred_host_url)
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        "  <url>",
+        f"    <loc>{site_origin.rstrip('/')}/organizations</loc>",
+        "    <changefreq>weekly</changefreq>",
+        "    <priority>0.75</priority>",
+        "  </url>",
+    ]
+
+    orgs = (
+        db.query(OrganizationModel)
+        .order_by(OrganizationModel.name.asc(), OrganizationModel.id.asc())
+        .all()
+    )
+    for org in orgs:
+        loc = build_organization_page_url(org.id, site_origin)
+        lines.extend(
+            [
+                "  <url>",
+                f"    <loc>{loc}</loc>",
+                "    <changefreq>weekly</changefreq>",
+                "    <priority>0.7</priority>",
                 "  </url>",
             ]
         )

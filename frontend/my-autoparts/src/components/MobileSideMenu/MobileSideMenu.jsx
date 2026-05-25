@@ -105,7 +105,14 @@ export default function MobileSideMenu({
                 </div>
 
                 {token && user && !guestContent && (
-                    <div className="border-b border-gray-100 bg-gradient-to-br from-indigo-50 to-white px-4 py-4">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            requestClose();
+                            navigate('/profile');
+                        }}
+                        className="w-full border-b border-gray-100 bg-gradient-to-br from-indigo-50 to-white px-4 py-4 text-left transition active:bg-indigo-100/80"
+                    >
                         <div className="flex items-center gap-3">
                             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-lg font-semibold text-white">
                                 {(firstName || 'П').charAt(0).toUpperCase()}
@@ -120,7 +127,7 @@ export default function MobileSideMenu({
                                 )}
                             </div>
                         </div>
-                    </div>
+                    </button>
                 )}
 
                 <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-24 p-2 pb-6">

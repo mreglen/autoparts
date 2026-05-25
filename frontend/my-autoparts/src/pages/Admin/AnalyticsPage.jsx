@@ -15,6 +15,7 @@ const TABS = [
   { id: 'overview', label: 'Обзор' },
   { id: 'pages', label: 'Страницы' },
   { id: 'product-cards', label: 'Карточки' },
+  { id: 'sitemap', label: 'Sitemap' },
 ];
 
 const PAGE_LABELS = {
@@ -153,6 +154,8 @@ export default function AnalyticsPage() {
   const [productCards, setProductCards] = useState(null);
   const [productUrlsDownloadBusy, setProductUrlsDownloadBusy] = useState(false);
   const [productUrlsNotice, setProductUrlsNotice] = useState(null);
+  const [sitemapLoading, setSitemapLoading] = useState(false);
+  const [sitemapData, setSitemapData] = useState(null);
 
   const loadOverview = useCallback(async () => {
     setLoading(true);
@@ -206,6 +209,18 @@ export default function AnalyticsPage() {
     }
   }, [days]);
 
+  const loadSitemaps = useCallback(async () => {
+    setSitemapLoading(true);
+    setError(null);
+    try {
+      setSitemapData(await apiRequest('/admin/seo/sitemaps'));
+    } catch (e) {
+      setError(e?.message || 'Ошибка загрузки');
+    } finally {
+      setSitemapLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isReady || !user?.is_admin) return;
     if (viewMode === 'overview') loadOverview();
@@ -215,8 +230,10 @@ export default function AnalyticsPage() {
         .then((res) => setPages(res?.items || []))
         .catch((e) => setError(e?.message || 'Ошибка загрузки'))
         .finally(() => setLoading(false));
+    } else if (viewMode === 'sitemap') {
+      loadSitemaps();
     } else loadProductCards();
-  }, [isReady, user?.is_admin, viewMode, days, loadOverview, loadProductCards]);
+  }, [isReady, user?.is_admin, viewMode, days, loadOverview, loadProductCards, loadSitemaps]);
 
   useEffect(() => {
     if (!isReady || !user?.is_admin || viewMode !== 'pages' || !selectedPath) return;
@@ -601,6 +618,76 @@ export default function AnalyticsPage() {
               rows={productCards?.items || []}
               rowKey={(r) => r.path_raw}
             />
+          )}
+        </Panel>
+      )}
+
+      {viewMode === 'sitemap' && (
+        <Panel
+          title="Файлы sitemap на сайте"
+          action={
+            <button
+              type="button"
+              onClick={loadSitemaps}
+              disabled={sitemapLoading}
+              className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Обновить
+            </button>
+          }
+        >
+          {sitemapLoading ? (
+            <LoadingBlock />
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {(sitemapData?.items || []).map((item) => (
+                <div key={item.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-gray-900">{item.title}</p>
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-600">
+                        {item.type}
+                      </span>
+                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
+                        {item.location}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">{item.description}</p>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-block break-all font-mono text-xs text-indigo-600 hover:underline"
+                    >
+                      {item.url}
+                    </a>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs text-gray-500">URL в файле</p>
+                    <p className="text-lg font-semibold tabular-nums text-gray-900">
+                      {formatNumber(item.url_count)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {!sitemapData?.items?.length && (
+                <p className="px-4 py-10 text-center text-sm text-gray-400">Нет данных о sitemap</p>
+              )}
+            </div>
+          )}
+          {sitemapData?.site_origin && (
+            <div className="border-t border-gray-100 bg-gray-50/80 px-4 py-3 text-xs text-gray-500">
+              Базовый домен: <span className="font-mono text-gray-700">{sitemapData.site_origin}</span>.
+              Индекс:{' '}
+              <a
+                href={`${sitemapData.site_origin}/sitemap.xml`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 hover:underline"
+              >
+                /sitemap.xml
+              </a>
+            </div>
           )}
         </Panel>
       )}

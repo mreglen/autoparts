@@ -84,6 +84,7 @@ export function getPageTitle(pathname) {
         '/about': 'О компании',
         '/delivery': 'Доставка',
         '/payment': 'Оплата',
+        '/organizations': 'Организации',
         '/reviews': 'Отзывы',
         '/cart': 'Корзина',
         '/dashboard': 'Обзор',
@@ -117,6 +118,7 @@ export function getPageTitle(pathname) {
     if (exact[pathname]) return exact[pathname];
     if (pathname.endsWith('/filters') && pathname.startsWith('/autoparts')) return 'Фильтры';
     if (pathname.startsWith('/autoparts')) return 'Поиск';
+    if (pathname.startsWith('/organizations/')) return 'Организация';
     if (pathname.startsWith('/chats')) return 'Сообщения';
     if (pathname.startsWith('/my-parts')) return 'Мои запчасти';
     if (pathname.startsWith('/settings')) return 'Настройки';

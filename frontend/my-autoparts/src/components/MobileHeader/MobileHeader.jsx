@@ -16,7 +16,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true }) {
     const showBack = location.pathname !== '/' && !isAutopartsListRoot;
 
     const firstName = user?.first_name || user?.name?.split?.(' ')?.[0] || 'П';
-    const profilePath = user?.is_seller || user?.is_admin ? '/dashboard' : '/profile';
+    const profilePath = '/profile';
 
     const handleBack = () => {
         if (window.history.length > 1) {
@@ -65,14 +65,13 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true }) {
                 </button>
 
                 {token && user ? (
-                    <button
-                        type="button"
-                        onClick={() => navigate(profilePath)}
+                    <Link
+                        to={profilePath}
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-sm font-semibold text-white"
                         aria-label="Профиль"
                     >
                         {firstName.charAt(0).toUpperCase()}
-                    </button>
+                    </Link>
                 ) : (
                     <button
                         type="button"

@@ -7,4 +7,7 @@
   <sitemap>
     <loc>https://svoygarage.ru/api/feeds/sitemap-products.xml</loc>
   </sitemap>
+  <sitemap>
+    <loc>https://svoygarage.ru/api/feeds/sitemap-organizations.xml</loc>
+  </sitemap>
 </sitemapindex>
