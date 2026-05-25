@@ -552,3 +552,55 @@ def ensure_group_chat_columns() -> None:
     else:
         logger.info("Group chat schema already up to date")
 
+
+def ensure_seo_product_url_exports_table() -> None:
+    """Table tracking product URLs already included in daily SEO export batches."""
+    inspector = inspect(engine)
+    if "seo_product_url_exports" in inspector.get_table_names():
+        return
+
+    dialect = engine.dialect.name
+    with engine.begin() as conn:
+        if dialect == "postgresql":
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_product_url_exports (
+                        id SERIAL PRIMARY KEY,
+                        product_id INTEGER NOT NULL REFERENCES products(id),
+                        export_date DATE NOT NULL,
+                        exported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        CONSTRAINT uq_seo_product_url_exports_product_id UNIQUE (product_id)
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_seo_product_url_exports_export_date "
+                    "ON seo_product_url_exports (export_date)"
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_product_url_exports (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        product_id INTEGER NOT NULL REFERENCES products(id),
+                        export_date DATE NOT NULL,
+                        exported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE (product_id)
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_seo_product_url_exports_export_date "
+                    "ON seo_product_url_exports (export_date)"
+                )
+            )
+
+    logger.info("Created seo_product_url_exports table")
+

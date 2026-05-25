@@ -5,6 +5,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import { API_BASE, apiRequest } from '../../utils/apiClient';
 
 const PERIOD_OPTIONS = [
+  { value: 1, label: '1 дн.' },
   { value: 7, label: '7 дн.' },
   { value: 30, label: '30 дн.' },
   { value: 90, label: '90 дн.' },
@@ -161,7 +162,7 @@ export default function AnalyticsPage() {
         apiRequest(`/admin/analytics/summary?days=${days}`),
         apiRequest(`/admin/analytics/pages?days=${days}`),
         apiRequest(`/admin/analytics/forms?days=${days}`),
-        apiRequest(`/admin/analytics/activity?days=${Math.max(days, 30)}`),
+        apiRequest(`/admin/analytics/activity?days=${days}`),
       ]);
       setSummary(summaryRes);
       setPages(pagesRes?.items || []);
@@ -605,14 +606,19 @@ export default function AnalyticsPage() {
       )}
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
-        <button
-          type="button"
-          onClick={downloadProductCardUrls}
-          disabled={productUrlsDownloadBusy}
-          className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {productUrlsDownloadBusy ? '…' : '150 URL для SEO'}
-        </button>
+        <div className="flex flex-col gap-1">
+          <button
+            type="button"
+            onClick={downloadProductCardUrls}
+            disabled={productUrlsDownloadBusy}
+            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 w-fit"
+          >
+            {productUrlsDownloadBusy ? '…' : '150 URL для SEO'}
+          </button>
+          <p className="text-xs text-gray-500 max-w-md">
+            Каждые сутки — новые 150 карточек без повторов. Повторное скачивание в тот же день вернёт тот же список.
+          </p>
+        </div>
         {productUrlsNotice && (
           <span className="text-xs text-green-700">{productUrlsNotice}</span>
         )}

@@ -14,6 +14,7 @@ from app.db.schema_patches import (
     ensure_site_reviews_user_id_column,
     ensure_site_settings_show_site_reviews_column,
     ensure_group_chat_columns,
+    ensure_seo_product_url_exports_table,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
@@ -39,6 +40,7 @@ import app.models.site_delivery_option  # noqa: F401 — site delivery matrix
 import app.models.site_quick_link  # noqa: F401 — site quick links
 import app.models.site_analytics  # noqa: F401 — site analytics
 import app.models.site_review  # noqa: F401 — site reviews
+import app.models.seo_product_url_export  # noqa: F401 — SEO URL export tracking
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings
@@ -95,6 +97,7 @@ try:
     ensure_event_log_audit_columns()
     ensure_user_public_code()
     ensure_group_chat_columns()
+    ensure_seo_product_url_exports_table()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise

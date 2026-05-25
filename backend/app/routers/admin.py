@@ -37,8 +37,8 @@ from app.services.photo_localization import (
 )
 from app.services.sitemap_service import (
     DEFAULT_PRODUCT_URLS_LIMIT,
-    collect_working_product_urls,
     generate_product_urls_text_file,
+    get_daily_product_url_batch,
 )
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
 from app.schemas.client import ClientBuyerOrdersResponse, ClientListItemResponse
@@ -921,7 +921,7 @@ def download_product_card_urls(
     db: Session = Depends(get_db),
 ):
     integration = get_or_create_yandex_integration(db)
-    items = collect_working_product_urls(
+    items, export_date, _created, _pool_reset = get_daily_product_url_batch(
         db,
         limit=limit,
         preferred_host_url=integration.host_url,
@@ -936,8 +936,12 @@ def download_product_card_urls(
         db,
         limit=limit,
         preferred_host_url=integration.host_url,
+        items=items,
+        export_date=export_date,
+        created_new_batch=_created,
+        pool_was_reset=_pool_reset,
     )
-    filename = f"product-card-urls-{len(items)}.txt"
+    filename = f"product-card-urls-{export_date.isoformat()}-{len(items)}.txt"
     return Response(
         content=content,
         media_type="text/plain; charset=utf-8",
