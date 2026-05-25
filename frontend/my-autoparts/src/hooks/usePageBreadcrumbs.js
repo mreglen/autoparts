@@ -12,6 +12,13 @@ export function usePageBreadcrumbs(extraContext = {}) {
     if (pathname.startsWith('/part/') && currentProduct && !context.product) {
       context.product = currentProduct;
     }
+    if (pathname.startsWith('/organizations/') && !context.organizationName) {
+      const orgId = pathname.split('/')[2];
+      if (orgId) {
+        const stored = sessionStorage.getItem(`org-bc-name:${orgId}`);
+        if (stored) context.organizationName = stored;
+      }
+    }
     return buildBreadcrumbsForPath(pathname, context);
   }, [pathname, currentProduct, extraContext]);
 }

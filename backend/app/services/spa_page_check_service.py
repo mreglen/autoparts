@@ -5,14 +5,17 @@ from urllib.parse import unquote, urlparse
 
 from sqlalchemy.orm import Session
 
+from app.models.organization import Organization as OrganizationModel
 from app.models.product import Product as ProductModel
 
 PART_PATH_RE = re.compile(r"^/part/(?P<product_id>\d+)(?:[-/]|$)")
+ORG_DETAIL_PATH_RE = re.compile(r"^/organizations/(?P<org_id>[A-Za-z0-9_-]+)$")
 
 SPA_ROUTE_PREFIXES = (
     "/auth",
     "/autoparts",
     "/catalog",
+    "/organizations",
     "/about",
     "/delivery",
     "/reviews",
@@ -71,6 +74,11 @@ def _product_exists(db: Session, product_id: int) -> bool:
     return row is not None
 
 
+def _organization_exists(db: Session, org_id: str) -> bool:
+    row = db.query(OrganizationModel.id).filter(OrganizationModel.id == org_id).first()
+    return row is not None
+
+
 def is_spa_page_available(db: Session, raw_path: str) -> bool:
     path = _normalize_path(raw_path)
 
@@ -81,5 +89,9 @@ def is_spa_page_available(db: Session, raw_path: str) -> bool:
     if part_match:
         product_id = int(part_match.group("product_id"))
         return _product_exists(db, product_id)
+
+    org_match = ORG_DETAIL_PATH_RE.match(path)
+    if org_match:
+        return _organization_exists(db, org_match.group("org_id"))
 
     return True

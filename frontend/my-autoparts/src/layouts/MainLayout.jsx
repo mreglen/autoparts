@@ -22,7 +22,10 @@ export default function MainLayout() {
 
     const isAutopartsPage = location.pathname.startsWith('/autoparts');
     const isFullBleedAmbientPage =
-        location.pathname === '/reviews' || location.pathname === '/';
+        location.pathname === '/reviews' ||
+        location.pathname === '/' ||
+        location.pathname === '/organizations' ||
+        location.pathname.startsWith('/organizations/');
 
     const {
         token,
