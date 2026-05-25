@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../redux/slices/AuthSlice';
 import ProfileMenuTabs from '../../pages/Profile/menu/ProfileMenuTabs';
+import PublicSiteMenuLinks from './PublicSiteMenuLinks';
 
 const CLOSE_ANIMATION_MS = 200;
 
@@ -123,7 +124,9 @@ export default function MobileSideMenu({
                 )}
 
                 <div className="flex-1 overflow-y-auto overscroll-contain scroll-pb-24 p-2 pb-6">
-                    {guestContent || (
+                    {guestContent ? (
+                        <div className="flex flex-col gap-1">{guestContent}</div>
+                    ) : (
                         <ProfileMenuTabs
                             variant="drawer"
                             tabs={tabs}
@@ -132,6 +135,7 @@ export default function MobileSideMenu({
                             badgeCounts={badgeCounts}
                         />
                     )}
+                    <PublicSiteMenuLinks variant="drawer" onNavigate={requestClose} />
                 </div>
 
                 {token && user && !guestContent && (

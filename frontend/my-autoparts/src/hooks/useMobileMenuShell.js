@@ -58,16 +58,6 @@ export function useMobileMenuShell(userOverride) {
                 >
                     Поиск запчастей
                 </button>
-                <button
-                    type="button"
-                    onClick={() => {
-                        navigate('/about');
-                        setIsMobileMenuOpen(false);
-                    }}
-                    className="min-h-[44px] w-full rounded-xl border border-gray-200 py-3 font-bold text-gray-800 active:bg-gray-50"
-                >
-                    О компании
-                </button>
             </div>
         ),
         [navigate]
@@ -88,17 +78,50 @@ export function useMobileMenuShell(userOverride) {
 }
 
 export function getPageTitle(pathname) {
-    if (pathname === '/') return 'Главная';
+    const exact = {
+        '/': 'Главная',
+        '/catalog': 'Каталог',
+        '/about': 'О компании',
+        '/delivery': 'Доставка',
+        '/payment': 'Оплата',
+        '/reviews': 'Отзывы',
+        '/cart': 'Корзина',
+        '/dashboard': 'Обзор',
+        '/profile': 'Профиль',
+        '/chats': 'Сообщения',
+        '/my-parts': 'Мои запчасти',
+        '/vehicles': 'Автомобили',
+        '/stock-in': 'Поступление',
+        '/stock-out': 'Расходы',
+        '/warehouse-sales': 'Продажи со склада',
+        '/finance': 'Финансы',
+        '/clients': 'Клиенты',
+        '/sellers': 'Продавцы',
+        '/sales/orders': 'Заказы',
+        '/sales/returns': 'Возвраты',
+        '/purchases/orders': 'Мои заказы',
+        '/purchases/returns': 'Возвраты',
+        '/settings/organization': 'Организация',
+        '/settings/employees': 'Сотрудники',
+        '/settings/storage-addresses': 'Адресное хранение',
+        '/settings/printers': 'Печать',
+        '/settings/integration': 'Интеграции',
+        '/settings/label': 'Этикетки',
+        '/moderation/pending-sellers': 'Регистрация продавцов',
+        '/moderation/products': 'Модерация',
+        '/admin-settings': 'Настройки',
+        '/admin/audit-log': 'Журнал событий',
+        '/admin/analytics': 'Аналитика',
+    };
+
+    if (exact[pathname]) return exact[pathname];
     if (pathname.endsWith('/filters') && pathname.startsWith('/autoparts')) return 'Фильтры';
-    if (pathname === '/catalog') return 'Каталог';
     if (pathname.startsWith('/autoparts')) return 'Поиск';
-    if (pathname === '/about') return 'О компании';
-    if (pathname === '/cart') return 'Корзина';
-    if (pathname.startsWith('/chats')) return 'Чаты';
-    if (pathname === '/dashboard') return 'Дашборд';
-    if (pathname === '/profile') return 'Профиль';
+    if (pathname.startsWith('/chats')) return 'Сообщения';
     if (pathname.startsWith('/my-parts')) return 'Мои запчасти';
     if (pathname.startsWith('/settings')) return 'Настройки';
     if (pathname.startsWith('/moderation')) return 'Модерация';
+    if (pathname.startsWith('/sales')) return 'Продажи';
+    if (pathname.startsWith('/purchases')) return 'Покупки';
     return 'Свой Гараж';
 }

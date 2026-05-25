@@ -717,7 +717,7 @@ export default function SalesOrdersPage() {
           }`}
         />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+          <div className="max-md:hidden">
             <p
               className={`text-xs font-semibold uppercase tracking-wider ${
                 isAvitoTab ? 'text-teal-700' : 'text-indigo-600'
@@ -727,9 +727,7 @@ export default function SalesOrdersPage() {
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Заказы</h1>
             <p className="mt-2 max-w-xl text-sm text-gray-600">
-              {isAvitoTab
-                ? 'Заказы с Авито: статусы, оплата, состав и проводка склада. Синхронизация при обновлении списка.'
-                : 'Входящие заказы с сайта и Авито: статусы, оплата, состав и проводка склада.'}
+              Статусы, оплата и проводка склада
             </p>
           </div>
           <button

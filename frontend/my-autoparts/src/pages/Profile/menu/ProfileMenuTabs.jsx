@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PublicSiteMenuLinks from '../../../components/MobileSideMenu/PublicSiteMenuLinks';
 
 // Icon mapping for menu items
 const getMenuIcon = (menuId) => {
@@ -333,7 +334,8 @@ export default function ProfileMenuTabs({
             className="w-full min-w-[15.5rem] rounded-xl border border-gray-200 bg-white shadow-md sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain scroll-pb-32 [&::-webkit-scrollbar]:hidden"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-            <div className="flex flex-col pb-32 pt-1">{tabs.map(renderMenuItem)}</div>
+            <div className="flex flex-col pb-4 pt-1">{tabs.map(renderMenuItem)}</div>
+            <PublicSiteMenuLinks variant="sidebar" />
         </div>
     );
 }

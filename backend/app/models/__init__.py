@@ -40,7 +40,7 @@ from app.models.product_drom_listing_link import ProductDromListingLink
 from app.models.site_yandex_integration import SiteYandexIntegration
 from app.models.yandex_feed_sync_state import YandexFeedSyncState
 from app.models.yandex_oauth_state import YandexOAuthState
-from app.models.chat import Chat, Message
+from app.models.chat import Chat, Message, ChatParticipant
 from app.models.part_type import PartType
 
 

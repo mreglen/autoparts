@@ -8,9 +8,12 @@ class Chat(Base):
     __tablename__ = "chats"
 
     id = Column(Integer, primary_key=True, index=True)
-    buyer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    seller_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    chat_type = Column(String(20), nullable=False, default="direct", server_default="direct")
+    buyer_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    seller_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
+    organization_id = Column(String(10), ForeignKey("organizations.id"), nullable=True)
+    title = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_active = Column(Boolean, default=True)
@@ -19,7 +22,25 @@ class Chat(Base):
     buyer = relationship("User", foreign_keys=[buyer_id])
     seller = relationship("User", foreign_keys=[seller_id])
     product = relationship("Product")
+    organization = relationship("Organization")
     messages = relationship("Message", back_populates="chat", cascade="all, delete-orphan")
+    participants = relationship("ChatParticipant", back_populates="chat", cascade="all, delete-orphan")
+
+
+class ChatParticipant(Base):
+    __tablename__ = "chat_participants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    joined_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    chat = relationship("Chat", back_populates="participants")
+    user = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint("chat_id", "user_id", name="uq_chat_participant"),
+    )
 
 
 class Message(Base):

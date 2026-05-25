@@ -140,7 +140,6 @@ export default function Organization() {
             <div className="mt-4 space-y-6 px-4 sm:mt-5 sm:px-0">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-800 max-md:hidden">Организация</h1>
-                    <p className="mt-1 text-sm text-gray-500">Настройки компании</p>
                 </div>
                 <SettingsEmptyState title="Организация не найдена" message="У вас пока нет связанной организации." />
             </div>
@@ -152,7 +151,6 @@ export default function Organization() {
             <div className="mt-4 space-y-6 px-4 sm:mt-5 sm:px-0">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-800 max-md:hidden">Организация</h1>
-                    <p className="mt-1 text-sm text-gray-500">Настройки компании</p>
                 </div>
                 <SettingsCard>
                     <div className="animate-pulse space-y-4">
@@ -182,7 +180,7 @@ export default function Organization() {
         <div className="mt-4 space-y-6 px-4 sm:mt-5 sm:px-0">
             <div>
                 <h1 className="text-2xl font-bold text-gray-800 max-md:hidden">Организация</h1>
-                <p className="mt-1 text-sm text-gray-500">Основные данные, склады и доставка</p>
+                <p className="mt-1 max-md:hidden text-sm text-gray-500">Склады, доставка и брендинг</p>
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

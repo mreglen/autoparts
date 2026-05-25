@@ -18,11 +18,15 @@ function buildProductSeo(product) {
   const article = (product?.article || '').trim();
   const name = (product?.name || '').trim() || `${brand} ${article}`.trim() || 'Автозапчасть';
   const conditionLabel = product?.is_new ? 'новая' : 'б/у';
-  const priceText = product?.price ? ` Цена ${Number(product.price).toLocaleString('ru-RU')} ₽.` : '';
   const path = buildPartDetailPath(product);
   const canonicalUrl = `${SITE_ORIGIN}${path}`;
-  const title = `${brand} ${article} — ${name} | Свой Гараж`.replace(/\s+/g, ' ').trim();
-  const description = `Купить ${name}${brand ? ` (${brand}` : ''}${article ? `, арт. ${article}` : ''}${brand ? ')' : ''}.${priceText} ${conditionLabel.charAt(0).toUpperCase()}${conditionLabel.slice(1)} запчасть на Свой Гараж. Доставка по России.`;
+  const title = `${name} | Свой Гараж`.replace(/\s+/g, ' ').trim();
+
+  const uniqueDesc = stripHtmlTags(product?.description || '').replace(/\s+/g, ' ').trim();
+  const description = uniqueDesc.length > 40
+    ? uniqueDesc.slice(0, 160)
+    : `${conditionLabel.charAt(0).toUpperCase()}${conditionLabel.slice(1)} автозапчасть с доставкой по России.`;
+
   const firstPhoto = product?.photos?.[0]?.photo_url;
   const imageUrl = firstPhoto ? normalizeImageUrl(firstPhoto) : null;
 
@@ -31,7 +35,7 @@ function buildProductSeo(product) {
     '@type': 'Product',
     name,
     sku: article || undefined,
-    description: stripHtmlTags(product?.description || description).slice(0, 500) || description,
+    description: uniqueDesc.slice(0, 500) || description,
     brand: brand ? { '@type': 'Brand', name: brand } : undefined,
     image: imageUrl ? [imageUrl] : undefined,
     offers: product?.price
@@ -207,7 +211,7 @@ const PartDetail = () => {
   const handleWriteToSeller = async () => {
     if (!user) {
       // Если пользователь не авторизован, перенаправляем на страницу входа
-      navigate('/login', { state: { from: window.location.pathname } });
+      navigate('/auth', { state: { from: window.location.pathname } });
       return;
     }
 

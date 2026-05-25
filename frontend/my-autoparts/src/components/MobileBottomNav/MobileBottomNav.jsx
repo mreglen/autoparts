@@ -147,12 +147,18 @@ function NavItemLink({ item, isActive, badge }) {
 }
 
 export default function MobileBottomNav() {
-    const { user } = useSelector((state) => state.auth);
+    const { user, token } = useSelector((state) => state.auth);
+    const isAuthenticated = Boolean(token && user);
     const cart = useSelector((state) => state.cart);
     const { chats } = useSelector((state) => state.chats);
     const { chats: avitoChats } = useSelector((state) => state.avitoChats);
     const navigate = useNavigate();
     const location = useLocation();
+
+    const visibleNavItems = React.useMemo(
+        () => (isAuthenticated ? navItems : navItems.filter((item) => item.id !== 'chats')),
+        [isAuthenticated]
+    );
 
     const cartData = React.useMemo(() => {
         if (!cart) return { itemCount: 0 };
@@ -198,8 +204,12 @@ export default function MobileBottomNav() {
             className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 pb-safe"
             aria-label="Основная навигация"
         >
-            <div className="grid grid-cols-4 gap-0 px-1 pt-1">
-                {navItems.map((item) => {
+            <div
+                className={`grid gap-0 px-1 pt-1 ${
+                    visibleNavItems.length === 3 ? 'grid-cols-3' : 'grid-cols-4'
+                }`}
+            >
+                {visibleNavItems.map((item) => {
                     const isActive = item.match(location.pathname);
                     if (item.isButton) {
                         return (

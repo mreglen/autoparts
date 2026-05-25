@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, or_, and_
 from typing import List, Optional
 import anyio
 import os
 import uuid
 from pathlib import Path
 from app.db.database import get_db
-from app.models.chat import Chat, Message, ChatMedia, ChatBlockedUser
+from app.models.chat import Chat, Message, ChatMedia, ChatBlockedUser, ChatParticipant
 from app.models.user import User
 from app.models.product import Product
 from app.schemas.chat import (
@@ -21,8 +21,70 @@ from app.schemas.chat import (
 )
 from app.core.auth import get_current_user
 from app.routers.websocket import manager as websocket_manager
+from app.utils.chat_access import (
+    get_accessible_chat,
+    get_user_chats_query,
+    is_group_chat,
+    get_chat_type,
+)
+from app.services.organization_chat_service import CHAT_TYPE_DIRECT
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
+
+
+def _user_display_name(user: Optional[User]) -> Optional[str]:
+    if not user:
+        return None
+    parts = [user.first_name, user.last_name]
+    name = " ".join(p for p in parts if p).strip()
+    return name or user.phone or user.email
+
+
+def _build_message_response(
+    db_msg: Message,
+    db: Session,
+    *,
+    include_sender_name: bool = False,
+    reply_to: Optional[MessageResponse] = None,
+    media_list: Optional[List[ChatMedia]] = None,
+) -> MessageResponse:
+    sender_name = None
+    if include_sender_name:
+        sender = db.query(User).filter(User.id == db_msg.sender_id).first()
+        sender_name = _user_display_name(sender)
+
+    if media_list is None:
+        media_list = db.query(ChatMedia).filter(ChatMedia.message_id == db_msg.id).all()
+
+    return MessageResponse(
+        id=db_msg.id,
+        chat_id=db_msg.chat_id,
+        sender_id=db_msg.sender_id,
+        message=db_msg.message,
+        is_read=db_msg.is_read,
+        reply_to_id=db_msg.reply_to_id,
+        reply_to=reply_to,
+        created_at=db_msg.created_at,
+        sender_name=sender_name,
+        media=[
+            ChatMediaResponse(
+                id=m.id,
+                message_id=m.message_id,
+                media_type=m.media_type,
+                file_path=m.file_path,
+                thumbnail_path=m.thumbnail_path,
+                original_filename=m.original_filename,
+                file_size=m.file_size,
+                mime_type=m.mime_type,
+                width=m.width,
+                height=m.height,
+                duration=m.duration,
+                is_processing=m.is_processing if m.is_processing is not None else False,
+                created_at=m.created_at,
+            )
+            for m in media_list
+        ],
+    )
 
 
 def _last_message_list_preview(msg: Optional[Message]) -> str:
@@ -91,7 +153,8 @@ def create_or_get_chat(
         Chat.buyer_id == chat_data.buyer_id,
         Chat.seller_id == seller_id,
         Chat.product_id == chat_data.product_id,
-        Chat.is_active == True
+        Chat.is_active == True,
+        or_(Chat.chat_type == CHAT_TYPE_DIRECT, Chat.chat_type.is_(None)),
     ).first()
     
     if existing_chat:
@@ -100,6 +163,7 @@ def create_or_get_chat(
     
     # Создаем новый чат
     new_chat = Chat(
+        chat_type=CHAT_TYPE_DIRECT,
         buyer_id=chat_data.buyer_id,
         seller_id=seller_id,
         product_id=chat_data.product_id
@@ -121,11 +185,7 @@ def get_user_chats(
 ):
     """Получить все чаты пользователя"""
     
-    # Получаем чаты где пользователь - покупатель или продавец
-    chats_query = db.query(Chat).filter(
-        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id)) &
-        (Chat.is_active == True)
-    ).order_by(desc(Chat.updated_at))
+    chats_query = get_user_chats_query(db, current_user.id).order_by(desc(Chat.updated_at))
     
     total = chats_query.count()
     chats = chats_query.offset(skip).limit(limit).all()
@@ -145,10 +205,7 @@ def get_chat(
 ):
     """Получить информацию о чате"""
     
-    chat = db.query(Chat).filter(
-        Chat.id == chat_id,
-        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id))
-    ).first()
+    chat = get_accessible_chat(db, chat_id, current_user.id)
     
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
@@ -166,11 +223,7 @@ def get_chat_messages(
 ):
     """Получить сообщения чата"""
     
-    # Проверяем доступ к чату
-    chat = db.query(Chat).filter(
-        Chat.id == chat_id,
-        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id))
-    ).first()
+    chat = get_accessible_chat(db, chat_id, current_user.id)
     
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
@@ -239,32 +292,12 @@ def get_chat_messages(
         if msg.reply_to_id and msg.reply_to_id in reply_parents:
             reply_to = _message_reply_snippet(reply_parents[msg.reply_to_id])
 
-        result.append(MessageResponse(
-            id=msg.id,
-            chat_id=msg.chat_id,
-            sender_id=msg.sender_id,
-            message=msg.message,
-            is_read=msg.is_read,
-            reply_to_id=msg.reply_to_id,
+        result.append(_build_message_response(
+            msg,
+            db,
+            include_sender_name=is_group_chat(chat),
             reply_to=reply_to,
-            created_at=msg.created_at,
-            media=[
-                ChatMediaResponse(
-                    id=m.id,
-                    message_id=m.message_id,
-                    media_type=m.media_type,
-                    file_path=m.file_path,
-                    thumbnail_path=m.thumbnail_path,
-                    original_filename=m.original_filename,
-                    file_size=m.file_size,
-                    mime_type=m.mime_type,
-                    width=m.width,
-                    height=m.height,
-                    duration=m.duration,
-                    is_processing=m.is_processing if m.is_processing is not None else False,
-                    created_at=m.created_at
-                ) for m in media_list
-            ]
+            media_list=media_list,
         ))
     
     return result
@@ -279,20 +312,18 @@ def send_message(
 ):
     """Отправить сообщение в чат"""
     
-    # Проверяем доступ к чату
-    chat = db.query(Chat).filter(
-        Chat.id == chat_id,
-        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id))
-    ).first()
+    chat = get_accessible_chat(db, chat_id, current_user.id)
     
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
     
-    # Проверяем, что отправитель не заблокирован
-    blocked = db.query(ChatBlockedUser).filter(
-        ChatBlockedUser.chat_id == chat_id,
-        ChatBlockedUser.blocked_user_id == current_user.id
-    ).first()
+    if is_group_chat(chat):
+        blocked = None
+    else:
+        blocked = db.query(ChatBlockedUser).filter(
+            ChatBlockedUser.chat_id == chat_id,
+            ChatBlockedUser.blocked_user_id == current_user.id
+        ).first()
     
     if blocked:
         raise HTTPException(
@@ -332,8 +363,6 @@ def send_message(
                 "created_at": parent_msg.created_at,
             }
 
-    # Push realtime-сообщение второму участнику чата
-    recipient_id = chat.seller_id if current_user.id == chat.buyer_id else chat.buyer_id
     reply_to_ws = None
     if reply_to:
         reply_to_ws = {
@@ -344,6 +373,7 @@ def send_message(
             if hasattr(reply_to["created_at"], "isoformat")
             else reply_to["created_at"],
         }
+
     ws_payload = {
         "type": "message",
         "id": new_message.id,
@@ -357,20 +387,28 @@ def send_message(
         "media": [],
     }
     try:
-        anyio.from_thread.run(websocket_manager.send_personal_message, ws_payload, recipient_id)
+        anyio.from_thread.run(
+            websocket_manager.broadcast_to_chat,
+            ws_payload,
+            chat_id,
+            db,
+            current_user.id,
+        )
     except Exception:
         pass
     
-    return MessageResponse(
-        id=new_message.id,
-        chat_id=new_message.chat_id,
-        sender_id=new_message.sender_id,
-        message=new_message.message,
-        is_read=new_message.is_read,
-        reply_to_id=new_message.reply_to_id,
-        reply_to=reply_to,
-        created_at=new_message.created_at,
-        media=[]  # Обычные сообщения без медиа
+    return _build_message_response(
+        new_message,
+        db,
+        include_sender_name=is_group_chat(chat),
+        reply_to=MessageResponse(
+            id=reply_to["id"],
+            chat_id=new_message.chat_id,
+            sender_id=reply_to["sender_id"],
+            message=reply_to["message"],
+            is_read=False,
+            created_at=reply_to["created_at"],
+        ) if reply_to else None,
     )
 
 
@@ -381,11 +419,17 @@ def get_unread_count(
 ):
     """Получить количество непрочитанных сообщений"""
     
-    count = db.query(Message).join(Chat).filter(
-        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id)),
+    accessible_chat_ids = [
+        row[0]
+        for row in get_user_chats_query(db, current_user.id).with_entities(Chat.id).all()
+    ]
+    if not accessible_chat_ids:
+        return {"unread_count": 0}
+
+    count = db.query(Message).filter(
+        Message.chat_id.in_(accessible_chat_ids),
         Message.sender_id != current_user.id,
         Message.is_read == False,
-        Chat.is_active == True
     ).count()
     
     return {"unread_count": count}
@@ -401,20 +445,18 @@ async def upload_chat_media(
 ):
     """Загрузить медиа файлы (изображения, видео, документы) в чат"""
     
-    # Проверяем доступ к чату
-    chat = db.query(Chat).filter(
-        Chat.id == chat_id,
-        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id))
-    ).first()
+    chat = get_accessible_chat(db, chat_id, current_user.id)
     
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
     
-    # Проверяем, что отправитель не заблокирован
-    blocked = db.query(ChatBlockedUser).filter(
-        ChatBlockedUser.chat_id == chat_id,
-        ChatBlockedUser.blocked_user_id == current_user.id
-    ).first()
+    if not is_group_chat(chat):
+        blocked = db.query(ChatBlockedUser).filter(
+            ChatBlockedUser.chat_id == chat_id,
+            ChatBlockedUser.blocked_user_id == current_user.id
+        ).first()
+    else:
+        blocked = None
     
     if blocked:
         raise HTTPException(
@@ -571,8 +613,6 @@ async def upload_chat_media(
     # Возвращаем сообщение с медиа
     db.refresh(new_message)
 
-    # Push realtime-сообщение второму участнику чата
-    recipient_id = chat.seller_id if current_user.id == chat.buyer_id else chat.buyer_id
     ws_payload = {
         "type": "message",
         "id": new_message.id,
@@ -601,34 +641,17 @@ async def upload_chat_media(
         ]
     }
     try:
-        await websocket_manager.send_personal_message(ws_payload, recipient_id)
+        await websocket_manager.broadcast_to_chat(
+            ws_payload, chat_id, db, current_user.id
+        )
     except Exception:
         pass
     
-    return MessageResponse(
-        id=new_message.id,
-        chat_id=new_message.chat_id,
-        sender_id=new_message.sender_id,
-        message=new_message.message,
-        is_read=new_message.is_read,
-        created_at=new_message.created_at,
-        media=[
-            ChatMediaResponse(
-                id=m.id,
-                message_id=m.message_id,
-                media_type=m.media_type,
-                file_path=m.file_path,
-                thumbnail_path=m.thumbnail_path,
-                original_filename=m.original_filename,
-                file_size=m.file_size,
-                mime_type=m.mime_type,
-                width=m.width,
-                height=m.height,
-                duration=m.duration,
-                is_processing=m.is_processing if m.is_processing is not None else False,
-                created_at=m.created_at
-            ) for m in media_records
-        ]
+    return _build_message_response(
+        new_message,
+        db,
+        include_sender_name=is_group_chat(chat),
+        media_list=media_records,
     )
 
 
@@ -682,12 +705,8 @@ def get_chat_media(
     if not message:
         raise HTTPException(status_code=404, detail="Сообщение не найдено")
     
-    chat = db.query(Chat).filter(
-        Chat.id == message.chat_id,
-        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id))
-    ).first()
-    
-    if not chat:
+    chat = db.query(Chat).filter(Chat.id == message.chat_id).first()
+    if not chat or not get_accessible_chat(db, chat.id, current_user.id):
         raise HTTPException(status_code=403, detail="Нет доступа к этому медиа")
     
     # Проверяем существует ли файл
@@ -758,12 +777,8 @@ def get_chat_media_thumbnail(
     if not message:
         raise HTTPException(status_code=404, detail="Сообщение не найдено")
     
-    chat = db.query(Chat).filter(
-        Chat.id == message.chat_id,
-        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id))
-    ).first()
-    
-    if not chat:
+    chat = db.query(Chat).filter(Chat.id == message.chat_id).first()
+    if not chat or not get_accessible_chat(db, chat.id, current_user.id):
         raise HTTPException(status_code=403, detail="Нет доступа к этому медиа")
     
     # Если thumbnail нет, возвращаем основной файл (для изображений)
@@ -787,14 +802,13 @@ def block_user_in_chat(
     current_user: User = Depends(get_current_user)
 ):
     """Block a user in the chat"""
-    # Check access to chat
-    chat = db.query(Chat).filter(
-        Chat.id == chat_id,
-        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id))
-    ).first()
+    chat = get_accessible_chat(db, chat_id, current_user.id)
     
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
+
+    if is_group_chat(chat):
+        raise HTTPException(status_code=400, detail="Блокировка недоступна в групповых чатах")
     
     # Cannot block yourself
     if user_id == current_user.id:
@@ -864,14 +878,17 @@ def get_block_status(
     current_user: User = Depends(get_current_user)
 ):
     """Get block status in the chat"""
-    # Check access to chat
-    chat = db.query(Chat).filter(
-        Chat.id == chat_id,
-        ((Chat.buyer_id == current_user.id) | (Chat.seller_id == current_user.id))
-    ).first()
+    chat = get_accessible_chat(db, chat_id, current_user.id)
     
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
+
+    if is_group_chat(chat):
+        return {
+            "is_blocked": False,
+            "blocked_by_id": None,
+            "blocked_users": [],
+        }
     
     # Check if current user is blocked
     is_blocked = db.query(ChatBlockedUser).filter(
@@ -900,8 +917,9 @@ def get_block_status(
 
 def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> ChatResponse:
     """Создать ответ чата с дополнительной информацией"""
+    chat_type = get_chat_type(chat)
+    group = is_group_chat(chat)
     
-    # Получаем последнее сообщение (с медиа — для превью в списке чатов)
     last_message = (
         db.query(Message)
         .options(joinedload(Message.media))
@@ -910,7 +928,6 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
         .first()
     )
     
-    # Получаем количество непрочитанных сообщений для текущего пользователя
     unread_count = 0
     if current_user:
         unread_count = db.query(Message).filter(
@@ -918,24 +935,41 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
             Message.sender_id != current_user.id,
             Message.is_read == False
         ).count()
+
+    participants_count = 0
+    organization_name = None
+    organization_logo = None
+    if group:
+        participants_count = db.query(ChatParticipant).filter(
+            ChatParticipant.chat_id == chat.id
+        ).count()
+        if chat.organization_id:
+            from app.models.organization import Organization
+            org = db.query(Organization).filter(Organization.id == chat.organization_id).first()
+            if org:
+                organization_name = org.name
+                organization_logo = org.logo_organization
     
-    # Получаем информацию о продавце
-    seller = db.query(User).filter(User.id == chat.seller_id).first()
-    seller_name = seller.first_name if seller else None
-    seller_phone = seller.phone if seller else None
+    seller_name = None
+    seller_phone = None
     seller_organization = None
+    buyer_name = None
+    buyer_phone = None
+
+    if chat.seller_id:
+        seller = db.query(User).filter(User.id == chat.seller_id).first()
+        seller_name = seller.first_name if seller else None
+        seller_phone = seller.phone if seller else None
+        if seller and seller.organization_id:
+            from app.models.organization import Organization
+            org = db.query(Organization).filter(Organization.id == seller.organization_id).first()
+            seller_organization = org.name if org else None
+
+    if chat.buyer_id:
+        buyer = db.query(User).filter(User.id == chat.buyer_id).first()
+        buyer_name = buyer.first_name if buyer else None
+        buyer_phone = buyer.phone if buyer else None
     
-    if seller and seller.organization_id:
-        from app.models.organization import Organization
-        org = db.query(Organization).filter(Organization.id == seller.organization_id).first()
-        seller_organization = org.name if org else None
-    
-    # Получаем информацию о покупателе
-    buyer = db.query(User).filter(User.id == chat.buyer_id).first()
-    buyer_name = buyer.first_name if buyer else None
-    buyer_phone = buyer.phone if buyer else None
-    
-    # Получаем информацию о товаре
     product_name = None
     product_article = None
     product_price = None
@@ -950,52 +984,60 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
             product_price = float(product.price) if product.price else None
             product_url = f"/part/{product.id}"
             
-            # Получаем первое фото товара
             from app.models.product import ProductPhoto
             first_photo = db.query(ProductPhoto).filter(
                 ProductPhoto.product_id == product.id
             ).order_by(ProductPhoto.id).first()
             
             if first_photo:
-                # Используем full_url property для получения полного URL
                 product_photo_url = first_photo.full_url
-    
-    # Проверяем статус блокировки
-    is_blocked = db.query(ChatBlockedUser).filter(
-        ChatBlockedUser.chat_id == chat.id,
-        ChatBlockedUser.blocked_user_id == current_user.id
-    ).first() is not None
-    
-    blocked_count = db.query(ChatBlockedUser).filter(
-        ChatBlockedUser.chat_id == chat.id
-    ).count()
+
+    is_blocked = False
+    blocked_count = 0
+    if current_user and not group:
+        is_blocked = db.query(ChatBlockedUser).filter(
+            ChatBlockedUser.chat_id == chat.id,
+            ChatBlockedUser.blocked_user_id == current_user.id
+        ).first() is not None
+        blocked_count = db.query(ChatBlockedUser).filter(
+            ChatBlockedUser.chat_id == chat.id
+        ).count()
+
+    last_message_response = None
+    if last_message:
+        last_message_response = _build_message_response(
+            last_message,
+            db,
+            include_sender_name=group,
+        )
+        last_message_response.message = _last_message_list_preview(last_message)
     
     return ChatResponse(
         id=chat.id,
+        chat_type=chat_type,
         buyer_id=chat.buyer_id,
         seller_id=chat.seller_id,
         product_id=chat.product_id,
+        organization_id=chat.organization_id,
+        title=chat.title,
         created_at=chat.created_at,
         updated_at=chat.updated_at,
         is_active=chat.is_active,
-        last_message=MessageResponse(
-            id=last_message.id,
-            chat_id=last_message.chat_id,
-            sender_id=last_message.sender_id,
-            message=_last_message_list_preview(last_message),
-            is_read=last_message.is_read,
-            created_at=last_message.created_at
-        ) if last_message else None,
+        is_group=group,
+        participants_count=participants_count,
+        last_message=last_message_response,
         unread_count=unread_count,
         seller_name=seller_name,
         seller_phone=seller_phone,
         seller_organization=seller_organization,
+        organization_name=organization_name,
+        organization_logo=organization_logo,
         buyer_name=buyer_name,
         buyer_phone=buyer_phone,
         product_name=product_name,
         product_article=product_article,
         product_price=product_price,
-        product_photo_url=product_photo_url,
+        product_photo_url=product_photo_url if not group else organization_logo,
         product_url=product_url,
         current_user_id=current_user.id if current_user else None,
         is_current_user_blocked=is_blocked,

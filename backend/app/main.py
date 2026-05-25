@@ -13,6 +13,7 @@ from app.db.schema_patches import (
     ensure_site_reviews_table,
     ensure_site_reviews_user_id_column,
     ensure_site_settings_show_site_reviews_column,
+    ensure_group_chat_columns,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
@@ -93,6 +94,7 @@ try:
     ensure_site_settings_show_site_reviews_column()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
+    ensure_group_chat_columns()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise
@@ -215,6 +217,19 @@ async def startup_event():
             db.close()
     except Exception as e:
         logger.error(f"Ошибка при заполнении методами доставки: {str(e)}")
+
+    try:
+        from app.services.organization_chat_service import backfill_all_organization_chats
+        from app.db.database import get_db
+
+        db = next(get_db())
+        try:
+            backfill_all_organization_chats(db)
+            logger.info("Organization group chats backfill completed")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Ошибка при backfill групповых чатов организаций: {str(e)}")
 
 
 @app.on_event("shutdown")

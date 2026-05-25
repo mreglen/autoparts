@@ -153,6 +153,11 @@ def register_confirm(data: VerifyCode, request: Request, response: Response, db:
     db.commit()
     db.refresh(user)
     
+    if user.organization_id:
+        from app.services.organization_chat_service import on_user_joined_organization
+        on_user_joined_organization(db, user)
+        db.commit()
+    
     # Refresh user with organization data
     user_with_org = db.query(User).options(joinedload(User.organization)).filter(User.id == user.id).first()
     
@@ -375,6 +380,11 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
         db.delete(pending)
         db.commit()
         db.refresh(user)
+
+        if user.organization_id:
+            from app.services.organization_chat_service import on_user_joined_organization
+            on_user_joined_organization(db, user)
+            db.commit()
         
         # Refresh user with organization data
         user_with_org = db.query(User).options(joinedload(User.organization)).filter(User.id == user.id).first()

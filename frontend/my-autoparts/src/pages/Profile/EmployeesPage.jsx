@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchEmployees, addEmployee as createEmployee, updateEmployee, deleteEmployee } from '../../redux/slices/OrganizationSlice';
 import PermissionAssignmentModal from '../../components/Employees/PermissionAssignmentModal';
 import ActionsDropdown, { ActionsDropdownItem } from '../../components/ActionsDropdown/ActionsDropdown';
+import PageIntro from '../../components/PageIntro/PageIntro';
 
 const EmployeesPage = () => {
   const dispatch = useDispatch();
@@ -162,6 +163,11 @@ const EmployeesPage = () => {
     }
   };
 
+  const lastActionableEmployeeId = useMemo(() => {
+    const actionable = (employees || []).filter((e) => e.id !== user?.id);
+    return actionable.length > 0 ? actionable[actionable.length - 1].id : null;
+  }, [employees, user?.id]);
+
   const renderEmployeeActions = (emp, fullName, containerExtraClass = '') => {
     if (emp.id === user?.id) return null;
     const isOpen = openDropdownId === emp.id;
@@ -172,6 +178,7 @@ const EmployeesPage = () => {
         onOpenChange={(next) => setOpenDropdownId(next ? emp.id : null)}
         menuClassName="w-52 z-50"
         estimatedMenuHeight={200}
+        preferOpenUp={emp.id === lastActionableEmployeeId}
       >
         <ActionsDropdownItem
           onClick={() => {
@@ -208,14 +215,15 @@ const EmployeesPage = () => {
   return (
     <div className="mt-4 sm:mt-5 px-4 sm:px-0">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Сотрудники</h1>
-          {!loadingEmployees && !employeesError && (
-            <p className="mt-1 text-sm text-gray-500">
-              {employeeCount > 0 ? `${employeeCount} в организации` : 'Управление доступом сотрудников'}
-            </p>
-          )}
-        </div>
+        <PageIntro
+          title="Сотрудники"
+          description={
+            !loadingEmployees && !employeesError
+              ? (employeeCount > 0 ? `${employeeCount} в организации` : 'Управление доступом')
+              : undefined
+          }
+          className="mb-0"
+        />
         <button
           type="button"
           onClick={() => {

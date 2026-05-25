@@ -60,6 +60,7 @@ class MessageResponse(MessageBase):
     reply_to_id: Optional[int] = None
     created_at: datetime
     media: List[ChatMediaResponse] = []
+    sender_name: Optional[str] = None
     
     # Replied message info (nested)
     reply_to: Optional['MessageResponse'] = None
@@ -80,12 +81,17 @@ class ChatCreate(ChatBase):
 
 class ChatResponse(BaseModel):
     id: int
-    buyer_id: int
-    seller_id: int
+    chat_type: str = "direct"
+    buyer_id: Optional[int] = None
+    seller_id: Optional[int] = None
     product_id: Optional[int] = None
+    organization_id: Optional[str] = None
+    title: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     is_active: bool
+    is_group: bool = False
+    participants_count: int = 0
     last_message: Optional[MessageResponse] = None
     unread_count: int = 0
     
@@ -97,6 +103,9 @@ class ChatResponse(BaseModel):
     seller_name: Optional[str] = None
     seller_phone: Optional[str] = None
     seller_organization: Optional[str] = None
+    
+    organization_name: Optional[str] = None
+    organization_logo: Optional[str] = None
     
     # Информация о покупателе
     buyer_name: Optional[str] = None

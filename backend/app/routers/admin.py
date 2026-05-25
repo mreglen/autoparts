@@ -489,6 +489,11 @@ def approve_pending_seller(
         # Remove from pending sellers
         db.delete(pending_seller)
         db.commit()
+        db.refresh(user)
+
+        from app.services.organization_chat_service import on_user_joined_organization
+        on_user_joined_organization(db, user)
+        db.commit()
         
         # Log event
         log_event(

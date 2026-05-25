@@ -3,11 +3,12 @@ from sqlalchemy.orm import Session
 from typing import Dict, Set
 import json
 from app.db.database import get_db
-from app.models.chat import Chat, Message
+from app.models.chat import Chat, Message, ChatParticipant
 from app.models.user import User
 from datetime import datetime
 from jose import jwt
 from app.core.config import Settings
+from app.utils.chat_access import get_accessible_chat, is_group_chat, get_chat_participant_ids
 
 router = APIRouter()
 settings = Settings()
@@ -78,52 +79,43 @@ class ConnectionManager:
     async def broadcast_to_chat(self, message: dict, chat_id: int, db: Session, exclude_user_id: int = None):
         """Отправить сообщение всем участникам чата + push notification если offline"""
         from app.routers.notifications import send_push_notification
-        from app.models.chat import Chat
         from app.models.user import User
         
         chat = db.query(Chat).filter(Chat.id == chat_id).first()
-        if chat:
-            # Получаем информацию об отправителе
-            sender = db.query(User).filter(User.id == message.get("sender_id")).first()
-            sender_name = (
-                sender.first_name
-                or sender.phone
-                or sender.email
-            ) if sender else "Неизвестный"
-            
-            # Отправляем покупателю (если это не отправитель)
-            if chat.buyer_id != exclude_user_id:
-                if self.active_connections.get(chat.buyer_id):
-                    await self.send_personal_message(message, chat.buyer_id)
-                else:
-                    # User not connected via WebSocket - send push notification
-                    push_data = {
-                        "type": "message",
-                        "title": f"Новое сообщение от {sender_name}",
-                        "body": message.get("message", "")[:100],  # Truncate to 100 chars
-                        "chatId": chat_id,
-                        "senderId": message.get("sender_id"),
-                        "senderName": sender_name,
-                        "url": f"/chats/{chat_id}"
-                    }
-                    send_push_notification(chat.buyer_id, push_data, db)
-            
-            # Отправляем продавцу (если это не отправитель)
-            if chat.seller_id != exclude_user_id:
-                if self.active_connections.get(chat.seller_id):
-                    await self.send_personal_message(message, chat.seller_id)
-                else:
-                    # User not connected via WebSocket - send push notification
-                    push_data = {
-                        "type": "message",
-                        "title": f"Новое сообщение от {sender_name}",
-                        "body": message.get("message", "")[:100],  # Truncate to 100 chars
-                        "chatId": chat_id,
-                        "senderId": message.get("sender_id"),
-                        "senderName": sender_name,
-                        "url": f"/chats/{chat_id}"
-                    }
-                    send_push_notification(chat.seller_id, push_data, db)
+        if not chat:
+            return
+
+        sender = db.query(User).filter(User.id == message.get("sender_id")).first()
+        sender_name = (
+            sender.first_name
+            or sender.phone
+            or sender.email
+        ) if sender else "Неизвестный"
+
+        if is_group_chat(chat):
+            recipient_ids = get_chat_participant_ids(db, chat_id)
+        else:
+            recipient_ids = [uid for uid in (chat.buyer_id, chat.seller_id) if uid]
+
+        chat_title = chat.title or "Чат"
+        push_url = f"/chats?source={'organization' if is_group_chat(chat) else 'garage'}&chatId={chat_id}"
+
+        for recipient_id in recipient_ids:
+            if recipient_id == exclude_user_id:
+                continue
+            if self.active_connections.get(recipient_id):
+                await self.send_personal_message(message, recipient_id)
+            else:
+                push_data = {
+                    "type": "message",
+                    "title": f"{sender_name} — {chat_title}" if is_group_chat(chat) else f"Новое сообщение от {sender_name}",
+                    "body": message.get("message", "")[:100],
+                    "chatId": chat_id,
+                    "senderId": message.get("sender_id"),
+                    "senderName": sender_name,
+                    "url": push_url,
+                }
+                send_push_notification(recipient_id, push_data, db)
 
 
 manager = ConnectionManager()
@@ -192,11 +184,7 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                 db = next(db_gen)
                 
                 try:
-                    # Проверяем доступ к чату
-                    chat = db.query(Chat).filter(
-                        Chat.id == chat_id,
-                        ((Chat.buyer_id == user_id) | (Chat.seller_id == user_id))
-                    ).first()
+                    chat = get_accessible_chat(db, chat_id, user_id)
                     
                     if not chat:
                         continue
@@ -246,7 +234,7 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                     # Отправляем всем участникам чата, включая отправителя.
                     # Это нужно, чтобы на клиенте временное сообщение (temp_*) заменялось
                     # на реальное сообщение с id из БД без ожидания ручного refresh.
-                    await manager.broadcast_to_chat(message_response, chat_id, db)
+                    await manager.broadcast_to_chat(message_response, chat_id, db, exclude_user_id=None)
                     
                 except Exception as e:
                     print(f"Error processing message: {e}")
@@ -268,8 +256,13 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
                                 "user_id": user_id,
                                 "chat_id": chat_id
                             }
-                            recipient_id = chat.seller_id if int(user_id) == chat.buyer_id else chat.buyer_id
-                            await manager.send_personal_message(typing_message, recipient_id)
+                            if is_group_chat(chat):
+                                for recipient_id in get_chat_participant_ids(db, chat_id):
+                                    if recipient_id != user_id:
+                                        await manager.send_personal_message(typing_message, recipient_id)
+                            elif chat.buyer_id and chat.seller_id:
+                                recipient_id = chat.seller_id if int(user_id) == chat.buyer_id else chat.buyer_id
+                                await manager.send_personal_message(typing_message, recipient_id)
                     finally:
                         db.close()
             

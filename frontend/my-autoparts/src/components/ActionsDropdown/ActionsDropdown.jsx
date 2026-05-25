@@ -29,6 +29,8 @@ export default function ActionsDropdown({
   disabled = false,
   isOpen: controlledOpen,
   onOpenChange,
+  /** Принудительно открывать вверх (например, последняя строка таблицы). */
+  preferOpenUp = false,
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
@@ -39,7 +41,8 @@ export default function ActionsDropdown({
     onOpenChange?.(next);
   };
 
-  const { anchorRef, openUp } = useActionsDropdownPlacement(open, estimatedMenuHeight);
+  const { anchorRef, openUp: autoOpenUp } = useActionsDropdownPlacement(open, estimatedMenuHeight);
+  const openUp = preferOpenUp || autoOpenUp;
 
   useEffect(() => {
     const handleClickOutside = (event) => {

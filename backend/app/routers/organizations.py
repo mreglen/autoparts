@@ -84,6 +84,9 @@ def remove_employee(
     if employee.id == current_user.id:
         raise HTTPException(status_code=400, detail="Нельзя удалить самого себя")
 
+    from app.services.organization_chat_service import on_user_left_organization
+    on_user_left_organization(db, user_id, org_id)
+
     # Delete related data first (cascading delete)
     from app.models.user_permission import UserPermission
     from app.models.user_session import UserSession
@@ -177,6 +180,10 @@ def add_employee(org_id: str, employee: EmployeeCreate, db: Session = Depends(ge
             )
         except Exception as log_error:
             logger.warning(f"Failed to log employee creation event: {log_error}")
+
+        from app.services.organization_chat_service import on_user_joined_organization
+        on_user_joined_organization(db, new_user)
+        db.commit()
         
         return new_user
     except Exception as e:
@@ -220,6 +227,10 @@ def create_organization(org: OrganizationCreate, db: Session = Depends(get_db)):
                 )
             )
     
+    db.commit()
+    
+    from app.services.organization_chat_service import ensure_organization_chat
+    ensure_organization_chat(db, organization_id)
     db.commit()
     
     return db_org

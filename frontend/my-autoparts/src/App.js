@@ -59,6 +59,7 @@ import AddVehiclePage from './pages/Vehicles/AddVehiclePage';
 import EditVehiclePage from './pages/Vehicles/EditVehiclePage';
 import ChatsHubPage from './pages/Chat/ChatsHubPage';
 import ProductNotFound from './pages/Chat/ProductNotFound';
+import RequireAuth from './components/auth/RequireAuth';
 import AdminPanelPage from './pages/Admin/AdminPanelPage';
 import AuditLogPage from './pages/Admin/AuditLogPage';
 import AnalyticsPage from './pages/Admin/AnalyticsPage';
@@ -72,6 +73,11 @@ function ServiceWorkerNavigationHandler() {
   
   useEffect(() => {
     const handleNavigateToChat = (event) => {
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken) {
+        navigate('/auth', { replace: true });
+        return;
+      }
       const { chatId } = event.detail;
       console.log('[App] Navigating to chat from notification:', chatId);
       navigate(`/chats/${chatId}`, { state: { scrollToBottom: true } });
@@ -192,8 +198,22 @@ function App() {
           <Route path="/warehouse-sales" element={<WarehouseSalesPage />} />
           <Route path="/finance" element={<FinancePage />} />
           <Route path="/settings/employees" element={<EmployeesPage />} />
-          <Route path="/chats" element={<ChatsHubPage />} />
-          <Route path="/chats/:chatId" element={<ChatsHubPage />} />
+          <Route
+            path="/chats"
+            element={(
+              <RequireAuth>
+                <ChatsHubPage />
+              </RequireAuth>
+            )}
+          />
+          <Route
+            path="/chats/:chatId"
+            element={(
+              <RequireAuth>
+                <ChatsHubPage />
+              </RequireAuth>
+            )}
+          />
           <Route path="/settings/storage-addresses" element={<StorageAddressesPage />} />
           <Route path="/settings/organization" element={<Organization />} />
           <Route path="/settings/printers" element={<PrintSettings />} />

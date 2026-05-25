@@ -476,3 +476,79 @@ def ensure_site_settings_show_site_reviews_column() -> None:
 
     logger.info("Applied site_settings show_site_reviews column patch")
 
+
+def ensure_group_chat_columns() -> None:
+    """Add group chat columns to chats and create chat_participants table."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "chats" not in table_names:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("chats")}
+    statements = []
+
+    if "chat_type" not in columns:
+        statements.append(
+            "ALTER TABLE chats ADD COLUMN chat_type VARCHAR(20) NOT NULL DEFAULT 'direct'"
+        )
+    if "organization_id" not in columns:
+        statements.append(
+            "ALTER TABLE chats ADD COLUMN organization_id VARCHAR(10) REFERENCES organizations(id)"
+        )
+    if "title" not in columns:
+        statements.append("ALTER TABLE chats ADD COLUMN title VARCHAR(255)")
+
+    dialect = engine.dialect.name
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+        if dialect == "postgresql":
+            conn.execute(text("ALTER TABLE chats ALTER COLUMN buyer_id DROP NOT NULL"))
+            conn.execute(text("ALTER TABLE chats ALTER COLUMN seller_id DROP NOT NULL"))
+        elif dialect == "sqlite":
+            # SQLite cannot drop NOT NULL in-place; create_all handles new installs.
+            pass
+
+        inspector = inspect(engine)
+        if "chat_participants" not in inspector.get_table_names():
+            if dialect == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE chat_participants (
+                            id SERIAL PRIMARY KEY,
+                            chat_id INTEGER NOT NULL REFERENCES chats(id),
+                            user_id INTEGER NOT NULL REFERENCES users(id),
+                            joined_at TIMESTAMPTZ DEFAULT NOW(),
+                            CONSTRAINT uq_chat_participant UNIQUE (chat_id, user_id)
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text("CREATE INDEX IF NOT EXISTS ix_chat_participants_user_id ON chat_participants (user_id)")
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE chat_participants (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            chat_id INTEGER NOT NULL REFERENCES chats(id),
+                            user_id INTEGER NOT NULL REFERENCES users(id),
+                            joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE (chat_id, user_id)
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text("CREATE INDEX IF NOT EXISTS ix_chat_participants_user_id ON chat_participants (user_id)")
+                )
+
+    if statements:
+        logger.info("Applied group chat column patches: %s", statements)
+    else:
+        logger.info("Group chat schema already up to date")
+
