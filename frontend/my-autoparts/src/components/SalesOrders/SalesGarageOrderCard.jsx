@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
 import { openAvitoProductFlow } from '../../utils/avitoProductFlow';
 import { getGarageDeliveryInfo } from '../../utils/garageOrderUi';
+import UserAvatar from '../UserAvatar/UserAvatar';
 
 export default function SalesGarageOrderCard({
   order,
@@ -60,11 +61,19 @@ export default function SalesGarageOrderCard({
               </span>
               <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
             </div>
-            <div>
-              <h3 className="text-base font-semibold text-gray-900">{order.buyer_name || 'Покупатель не указан'}</h3>
-              <p className="mt-1 text-sm text-gray-600 break-all">{order.buyer_phone || '—'}</p>
-              <p className="mt-1 text-sm text-gray-600 line-clamp-2">{deliveryText}</p>
+            <div className="flex items-start gap-3">
+              <UserAvatar
+                avatarUrl={order.buyer_avatar_url}
+                firstName={order.buyer_name}
+                lastName=""
+                size="lg"
+              />
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold text-gray-900">{order.buyer_name || 'Покупатель не указан'}</h3>
+                <p className="mt-1 text-sm text-gray-600 break-all">{order.buyer_phone || '—'}</p>
+              </div>
             </div>
+              <p className="mt-1 text-sm text-gray-600 line-clamp-2">{deliveryText}</p>
           </div>
 
           <div className="flex flex-wrap items-end gap-3 lg:flex-col lg:items-end">

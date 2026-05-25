@@ -28,6 +28,7 @@ from app.utils.chat_access import (
     get_chat_type,
 )
 from app.services.organization_chat_service import CHAT_TYPE_DIRECT
+from app.utils.user_avatar import avatar_public_url
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
@@ -953,13 +954,17 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
     seller_name = None
     seller_phone = None
     seller_organization = None
+    seller_avatar_url = None
     buyer_name = None
     buyer_phone = None
+    buyer_avatar_url = None
 
     if chat.seller_id:
         seller = db.query(User).filter(User.id == chat.seller_id).first()
-        seller_name = seller.first_name if seller else None
-        seller_phone = seller.phone if seller else None
+        if seller:
+            seller_name = _user_display_name(seller) or seller.first_name
+            seller_phone = seller.phone
+            seller_avatar_url = avatar_public_url(seller.avatar_url)
         if seller and seller.organization_id:
             from app.models.organization import Organization
             org = db.query(Organization).filter(Organization.id == seller.organization_id).first()
@@ -967,8 +972,10 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
 
     if chat.buyer_id:
         buyer = db.query(User).filter(User.id == chat.buyer_id).first()
-        buyer_name = buyer.first_name if buyer else None
-        buyer_phone = buyer.phone if buyer else None
+        if buyer:
+            buyer_name = _user_display_name(buyer) or buyer.first_name
+            buyer_phone = buyer.phone
+            buyer_avatar_url = avatar_public_url(buyer.avatar_url)
     
     product_name = None
     product_article = None
@@ -1030,10 +1037,12 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
         seller_name=seller_name,
         seller_phone=seller_phone,
         seller_organization=seller_organization,
+        seller_avatar_url=seller_avatar_url,
         organization_name=organization_name,
         organization_logo=organization_logo,
         buyer_name=buyer_name,
         buyer_phone=buyer_phone,
+        buyer_avatar_url=buyer_avatar_url,
         product_name=product_name,
         product_article=product_article,
         product_price=product_price,

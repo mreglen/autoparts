@@ -36,6 +36,7 @@ from app.services.avito_warehouse_fulfillment import (
 )
 from app.services.marketplace_used_fulfillment import fulfill_used_order_on_status_change
 from app.services.audit_service import log_audit
+from app.utils.user_avatar import avatar_public_url, resolve_user_by_contact
 from app.schemas.avito_orders import AvitoCheckConfirmationCodeRequest, AvitoOrderTransitionRequest
 from app.services.avito_pro_status_service import ensure_avito_pro_active
 
@@ -98,6 +99,23 @@ def _org_has_admin_director(db: Session, org_id: Optional[str]) -> bool:
     return org_has_admin_director(db, org_id)
 
 
+def _buyer_avatar_for_order(db: Session, order) -> str | None:
+    buyer = resolve_user_by_contact(db, order.buyer_phone, order.buyer_email)
+    if not buyer:
+        return None
+    return avatar_public_url(buyer.avatar_url)
+
+
+def _used_order_response(db: Session, order: GarageUsedOrder) -> UsedPartsOrderResponse:
+    base = UsedPartsOrderResponse.model_validate(order)
+    return base.model_copy(update={"buyer_avatar_url": _buyer_avatar_for_order(db, order)})
+
+
+def _new_order_response(db: Session, order: GarageNewOrder) -> NewPartsOrderResponse:
+    base = NewPartsOrderResponse.model_validate(order)
+    return base.model_copy(update={"buyer_avatar_url": _buyer_avatar_for_order(db, order)})
+
+
 @router.get("/used-parts-orders", response_model=list[UsedPartsOrderResponse])
 def list_used_parts_orders(
     db: Session = Depends(get_db),
@@ -114,7 +132,8 @@ def list_used_parts_orders(
     )
     if not current_user.is_admin:
         q = q.filter(GarageUsedOrder.organization_id == current_user.organization_id)
-    return q.all()
+    orders = q.all()
+    return [_used_order_response(db, o) for o in orders]
 
 
 @router.put("/used-parts-orders/{order_id}/status", response_model=UpdateUsedOrderStatusResponse)
@@ -217,7 +236,8 @@ def list_new_parts_orders(
     )
     if not current_user.is_admin:
         q = q.filter(GarageNewOrder.organization_id == org_id)
-    return q.all()
+    orders = q.all()
+    return [_new_order_response(db, o) for o in orders]
 
 
 @router.put("/new-parts-orders/{order_id}/status")

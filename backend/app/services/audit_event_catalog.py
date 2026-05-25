@@ -12,6 +12,7 @@ CATEGORY_LABELS: dict[str, str] = {
     "orders": "Заказы",
     "settings": "Настройки",
     "system": "Система",
+    "users": "Пользователи",
 }
 
 EVENT_TYPE_LABELS: dict[str, str] = {
@@ -55,6 +56,11 @@ EVENT_TYPE_LABELS: dict[str, str] = {
     "storage_location_updated": "Склад обновлён",
     "storage_location_deleted": "Склад удалён",
     "password_reset_requested": "Запрос сброса пароля",
+    "user_avatar_uploaded": "Аватар загружен",
+    "user_avatar_removed": "Аватар удалён",
+    "admin_user_viewed": "Просмотр пользователя (админ)",
+    "admin_user_sessions_revoked": "Сессии пользователя завершены (админ)",
+    "admin_user_updated": "Пользователь изменён (админ)",
 }
 
 

@@ -17,7 +17,8 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     is_director = Column(Boolean, default=False)
     is_employee = Column(Boolean, default=False)
-    hashed_password = Column(String) 
+    hashed_password = Column(String)
+    avatar_url = Column(String(512), nullable=True)
 
     organization_id = Column(String(10), ForeignKey("organizations.id"))
 

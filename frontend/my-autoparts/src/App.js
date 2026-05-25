@@ -62,6 +62,7 @@ import ProductNotFound from './pages/Chat/ProductNotFound';
 import RequireAuth from './components/auth/RequireAuth';
 import AdminPanelPage from './pages/Admin/AdminPanelPage';
 import AuditLogPage from './pages/Admin/AuditLogPage';
+import AdminUsersPage from './pages/Admin/AdminUsersPage';
 import AnalyticsPage from './pages/Admin/AnalyticsPage';
 import OrganizationsPage from './pages/Organizations/OrganizationsPage';
 import OrganizationPublicPage from './pages/Organizations/OrganizationPublicPage';
@@ -234,6 +235,7 @@ function App() {
           <Route path="/admin-settings" element={<AdminPanelPage />} />
           <Route path="/admin/analytics" element={<AnalyticsPage />} />
           <Route path="/admin/audit-log" element={<AuditLogPage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -112,6 +112,7 @@ export function getPageTitle(pathname) {
         '/moderation/products': 'Модерация',
         '/admin-settings': 'Настройки',
         '/admin/audit-log': 'Журнал событий',
+        '/admin/users': 'Пользователи',
         '/admin/analytics': 'Аналитика',
     };
 

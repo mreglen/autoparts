@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from typing import Any, Optional
 
-from sqlalchemy import func, or_, cast, String
+from sqlalchemy import and_, func, or_, cast, String
 from sqlalchemy.orm import Session
 
 from app.models.event_log import EventLog
@@ -291,6 +291,33 @@ def _apply_filters(q, filters: AuditListFilters):
             )
         )
     return q
+
+
+def list_user_audit_events(
+    db: Session,
+    target_user_id: int,
+    *,
+    page: int = 1,
+    limit: int = 50,
+) -> tuple[list[EventLog], int]:
+    """Events where user is actor or subject (entity_type=user)."""
+    page = max(1, page)
+    limit = min(max(1, limit), 200)
+    target_str = str(target_user_id)
+    base = db.query(EventLog).filter(
+        or_(
+            EventLog.user_id == target_user_id,
+            and_(EventLog.entity_type == "user", EventLog.entity_id == target_str),
+        )
+    )
+    total = base.with_entities(func.count(EventLog.id)).scalar() or 0
+    rows = (
+        base.order_by(EventLog.created_at.desc(), EventLog.id.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    return rows, int(total)
 
 
 def list_audit_events(

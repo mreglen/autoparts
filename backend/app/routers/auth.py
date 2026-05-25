@@ -33,6 +33,7 @@ from app.utils.guest_cart import merge_guest_cart_from_request
 from app.utils.site_settings_db import get_or_create_site_settings
 from app.utils.org_markup import effective_markup_percent, global_markup_percent
 from app.utils.user_public_code import assign_public_code
+from app.utils.user_avatar import avatar_public_url
 import logging
 
 logger = logging.getLogger(__name__)
@@ -284,6 +285,7 @@ def get_profile(current_user: User = Depends(get_current_user), db: Session = De
         "patronymic": user_data.patronymic,
         "email": user_data.email,
         "phone": user_data.phone,
+        "avatar_url": avatar_public_url(user_data.avatar_url),
         "is_buyer": user_data.is_buyer,
         "is_seller": user_data.is_seller,
         "is_admin": user_data.is_admin,

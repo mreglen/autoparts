@@ -20,7 +20,21 @@ from app.models.client import Client as ClientModel
 from app.models.vehicle import Vehicle as VehicleModel
 from app.models.storage_location import StorageLocation as StorageLocationModel
 from app.schemas.event_log import EventLogResponse
-from app.schemas.user import UserResponse, UserUpdate
+from app.schemas.user import (
+    AdminUserAuditResponse,
+    AdminUserDetail,
+    AdminUserListItem,
+    UserResponse,
+    UserSessionBrief,
+    UserUpdate,
+)
+from app.schemas.audit import AuditEventRow
+from app.models.user_session import UserSession
+from app.services.audit_service import (
+    events_to_dicts,
+    list_user_audit_events,
+)
+from app.utils.user_avatar import avatar_public_url
 from app.schemas.organization import Organization as OrganizationSchema, OrganizationCreate, OrganizationUpdate
 from typing import List, Optional
 from pydantic import BaseModel, Field
@@ -52,8 +66,9 @@ from app.services.audit_service import (
     require_audit_access,
 )
 from app.utils.email import send_verification_email, send_welcome_email
+import math
 import secrets
-import string 
+import string
 from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -252,13 +267,153 @@ def localize_external_product_photos_admin(
     )
 
 
-@router.get("/users", response_model=List[UserResponse])
+def _admin_user_list_item(user: User, db: Session) -> AdminUserListItem:
+    org = user.organization
+    active_count = (
+        db.query(UserSession)
+        .filter(UserSession.user_id == user.id, UserSession.is_active.is_(True))
+        .count()
+    )
+    return AdminUserListItem(
+        id=user.id,
+        public_code=user.public_code,
+        last_name=user.last_name,
+        first_name=user.first_name,
+        patronymic=user.patronymic,
+        email=user.email,
+        phone=user.phone,
+        avatar_url=avatar_public_url(user.avatar_url),
+        is_buyer=bool(user.is_buyer),
+        is_seller=bool(user.is_seller),
+        is_admin=bool(user.is_admin),
+        is_director=bool(user.is_director),
+        is_employee=bool(user.is_employee),
+        organization_id=user.organization_id,
+        organization_name=org.name if org else None,
+        organization_phone=org.phone if org else None,
+        active_sessions_count=active_count,
+    )
+
+
+@router.get("/users", response_model=List[AdminUserListItem])
 def get_all_users(
     current_user: User = Depends(get_current_admin_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    users = db.query(User).all()
-    return users
+    users = db.query(User).options(joinedload(User.organization)).order_by(User.last_name, User.first_name).all()
+    return [_admin_user_list_item(u, db) for u in users]
+
+
+@router.get("/users/{user_id}", response_model=AdminUserDetail)
+def get_admin_user_detail(
+    user_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).options(joinedload(User.organization)).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    sessions = (
+        db.query(UserSession)
+        .filter(UserSession.user_id == user_id)
+        .order_by(UserSession.last_activity.desc())
+        .limit(50)
+        .all()
+    )
+    session_briefs = [
+        UserSessionBrief(
+            id=s.id,
+            device_info=s.device_info,
+            ip_address=s.ip_address,
+            is_active=bool(s.is_active),
+            created_at=s.created_at.isoformat() if s.created_at else None,
+            last_activity=s.last_activity.isoformat() if s.last_activity else None,
+        )
+        for s in sessions
+    ]
+
+    log_audit(
+        db,
+        event_type="admin_user_viewed",
+        category="users",
+        summary=f"Админ просмотрел пользователя #{user_id}",
+        user=current_user,
+        organization_id=user.organization_id,
+        details={
+            "target_user_id": user.id,
+            "target_public_code": user.public_code,
+            "target_email": user.email,
+        },
+        entity_type="user",
+        entity_id=user.id,
+    )
+
+    base = _admin_user_list_item(user, db)
+    return AdminUserDetail(**base.model_dump(), sessions=session_briefs)
+
+
+@router.get("/users/{user_id}/audit", response_model=AdminUserAuditResponse)
+def get_admin_user_audit(
+    user_id: int,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    rows, total = list_user_audit_events(db, user_id, page=page, limit=limit)
+    pages = math.ceil(total / limit) if total else 0
+    return AdminUserAuditResponse(
+        rows=[AuditEventRow(**d) for d in events_to_dicts(db, rows)],
+        total=total,
+        page=page,
+        limit=limit,
+        pages=pages,
+    )
+
+
+@router.post("/users/{user_id}/revoke-sessions")
+def revoke_user_sessions(
+    user_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    active_sessions = (
+        db.query(UserSession)
+        .filter(UserSession.user_id == user_id, UserSession.is_active.is_(True))
+        .all()
+    )
+    count = len(active_sessions)
+    for session in active_sessions:
+        session.is_active = False
+    db.commit()
+
+    log_audit(
+        db,
+        event_type="admin_user_sessions_revoked",
+        category="users",
+        summary=f"Админ завершил {count} сессий пользователя #{user_id}",
+        user=current_user,
+        organization_id=user.organization_id,
+        details={
+            "target_user_id": user.id,
+            "target_public_code": user.public_code,
+            "target_email": user.email,
+            "sessions_revoked": count,
+        },
+        entity_type="user",
+        entity_id=user.id,
+    )
+
+    return {"msg": f"Завершено сессий: {count}", "sessions_revoked": count}
 
 
 @router.get("/events", response_model=List[EventLogResponse])

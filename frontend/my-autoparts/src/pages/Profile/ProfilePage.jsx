@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 
 import { useSelector, useDispatch } from 'react-redux';
 
@@ -6,9 +6,10 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { unwrapResult } from '@reduxjs/toolkit';
 
-import { updateProfile } from '../../redux/slices/UserSlice';
+import { updateProfile, uploadAvatar, deleteAvatar } from '../../redux/slices/UserSlice';
 
-import { logout } from '../../redux/slices/AuthSlice';
+import { logout, fetchProfile } from '../../redux/slices/AuthSlice';
+import UserAvatar from '../../components/UserAvatar/UserAvatar';
 
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 
@@ -178,13 +179,14 @@ export default function ProfilePage() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const { user, isLoading, isReady } = useAuthReady();
-    const { loading: saving, error: saveError } = useSelector((state) => state.user);
+    const { loading: saving, avatarLoading, error: saveError } = useSelector((state) => state.user);
 
     const [isEditing, setIsEditing] = useState(false);
 
     const [showPasswordModal, setShowPasswordModal] = useState(false);
 
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const avatarInputRef = useRef(null);
 
     const [formData, setFormData] = useState({
 
@@ -355,6 +357,27 @@ export default function ProfilePage() {
 
     };
 
+    const handleAvatarFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            await dispatch(uploadAvatar(file)).unwrap();
+            dispatch(fetchProfile());
+        } catch {
+            /* error in state.user.error */
+        }
+        e.target.value = '';
+    };
+
+    const handleDeleteAvatar = async () => {
+        try {
+            await dispatch(deleteAvatar()).unwrap();
+            dispatch(fetchProfile());
+        } catch {
+            /* error in state.user.error */
+        }
+    };
+
 
 
     const showOrganization = Boolean(user.organization_id && (user.is_seller || user.is_director || user.is_employee));
@@ -367,10 +390,41 @@ export default function ProfilePage() {
             {/* Hero */}
             <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
                 <div className="flex items-center gap-4">
-                    <div
-                        className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-2xl font-bold text-white shadow-md ring-4 ring-white ${roleMeta.ring}`}
-                    >
-                        {getInitials(user)}
+                    <div className="relative shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => avatarInputRef.current?.click()}
+                            disabled={avatarLoading}
+                            className={`block rounded-2xl shadow-md ring-4 ring-white ${roleMeta.ring} focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60`}
+                            title="Изменить фото"
+                        >
+                            <UserAvatar
+                                avatarUrl={user.avatar_url}
+                                firstName={user.first_name}
+                                lastName={user.last_name}
+                                size="xl"
+                            />
+                        </button>
+                        <input
+                            ref={avatarInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="hidden"
+                            onChange={handleAvatarFileChange}
+                        />
+                        {user.avatar_url && (
+                            <button
+                                type="button"
+                                onClick={handleDeleteAvatar}
+                                disabled={avatarLoading}
+                                className="absolute -bottom-1 -right-1 rounded-full bg-white p-1 text-xs text-gray-500 shadow ring-1 ring-gray-200 hover:text-red-600 disabled:opacity-50"
+                                title="Удалить фото"
+                            >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
 
                     <div className="min-w-0 flex-1">

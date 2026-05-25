@@ -1,6 +1,8 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 
+from app.schemas.audit import AuditEventRow
+
 class UserBase(BaseModel):
     last_name: str
     first_name: str
@@ -42,6 +44,7 @@ class UserResponse(BaseModel):
     patronymic: Optional[str] = None
     email: str
     phone: Optional[str] = None
+    avatar_url: Optional[str] = None
     is_buyer: bool
     is_seller: bool
     is_admin: bool
@@ -52,7 +55,36 @@ class UserResponse(BaseModel):
     organization_phone: Optional[str] = None
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+
+class UserSessionBrief(BaseModel):
+    id: int
+    device_info: Optional[str] = None
+    ip_address: Optional[str] = None
+    is_active: bool = True
+    created_at: Optional[str] = None
+    last_activity: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AdminUserListItem(UserResponse):
+    organization_name: Optional[str] = None
+    active_sessions_count: int = 0
+
+
+class AdminUserDetail(AdminUserListItem):
+    sessions: list[UserSessionBrief] = []
+
+
+class AdminUserAuditResponse(BaseModel):
+    rows: list[AuditEventRow] = []
+    total: int = 0
+    page: int = 1
+    limit: int = 50
+    pages: int = 0
 
 class EmployeeCreate(BaseModel):
     last_name: str

@@ -20,6 +20,7 @@ import SwipeableMessage from './SwipeableMessage';
 import ReplyArrow from './ReplyArrow';
 import { API_BASE } from '../../utils/apiClient';
 import PageIntro from '../../components/PageIntro/PageIntro';
+import UserAvatar from '../../components/UserAvatar/UserAvatar';
 
 const formatTime = (dateString) => {
   if (!dateString) return '';
@@ -561,11 +562,15 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
   const isAvito = source === 'avito';
   const isOrganization = source === 'organization';
 
-  const img = isAvito 
+  const counterpartyAvatar = !isAvito && !isOrganization
+    ? (currentUserId === chat.seller_id ? chat.buyer_avatar_url : chat.seller_avatar_url)
+    : null;
+
+  const img = isAvito
     ? (chat.context_image_url || chat.avatar_url)
     : isOrganization
       ? chat.product_photo_url
-      : chat.product_photo_url;
+      : (counterpartyAvatar || chat.product_photo_url);
   
   const title = isAvito
     ? (() => {
@@ -942,6 +947,10 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
     ? (chat?.participants_count ? `${chat.participants_count} участников` : null)
     : (chat?.product_name ? `${chat.product_name}${chat.product_article ? ` · ${chat.product_article}` : ''}` : null);
 
+  const counterpartyAvatar = !isGroupChat
+    ? (user?.id === chat?.seller_id ? chat?.buyer_avatar_url : chat?.seller_avatar_url)
+    : null;
+
   const openProduct = () => {
     if (chat?.product_id) {
       navigate(`/part/${chat.product_id}`);
@@ -953,7 +962,27 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
       <ChatPanelHeader
         onBack={onBack}
         avatar={
-          chat?.product_photo_url ? (
+          isGroupChat ? (
+            chat?.product_photo_url ? (
+              <img
+                src={chat.product_photo_url}
+                alt=""
+                className="h-11 w-11 rounded-2xl object-cover ring-2 ring-white shadow-sm flex-shrink-0"
+              />
+            ) : (
+              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-sm font-semibold text-white shadow-sm ring-2 ring-white">
+                {(title && title.charAt(0).toUpperCase()) || 'Ч'}
+              </div>
+            )
+          ) : counterpartyAvatar ? (
+            <UserAvatar
+              avatarUrl={counterpartyAvatar}
+              firstName={user?.id === chat?.seller_id ? undefined : chat?.seller_name}
+              lastName={user?.id === chat?.seller_id ? chat?.buyer_name : undefined}
+              size="md"
+              className="ring-2 ring-white shadow-sm"
+            />
+          ) : chat?.product_photo_url ? (
             <button type="button" onClick={openProduct} className="flex-shrink-0">
               <img
                 src={chat.product_photo_url}
@@ -962,9 +991,13 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
               />
             </button>
           ) : (
-            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-sm font-semibold text-white shadow-sm ring-2 ring-white">
-              {(title && title.charAt(0).toUpperCase()) || 'Ч'}
-            </div>
+            <UserAvatar
+              avatarUrl={null}
+              firstName={user?.id === chat?.seller_id ? chat?.buyer_name : chat?.seller_name}
+              lastName=""
+              size="md"
+              className="ring-2 ring-white shadow-sm"
+            />
           )
         }
         title={title}

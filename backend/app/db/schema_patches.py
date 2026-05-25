@@ -604,3 +604,19 @@ def ensure_seo_product_url_exports_table() -> None:
 
     logger.info("Created seo_product_url_exports table")
 
+
+def ensure_user_avatar_column() -> None:
+    """Add avatar_url column to users if missing."""
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("users")}
+    if "avatar_url" in columns:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN avatar_url VARCHAR(512)"))
+
+    logger.info("Applied users.avatar_url column patch")
+

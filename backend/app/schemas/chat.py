@@ -103,6 +103,7 @@ class ChatResponse(BaseModel):
     seller_name: Optional[str] = None
     seller_phone: Optional[str] = None
     seller_organization: Optional[str] = None
+    seller_avatar_url: Optional[str] = None
     
     organization_name: Optional[str] = None
     organization_logo: Optional[str] = None
@@ -110,6 +111,7 @@ class ChatResponse(BaseModel):
     # Информация о покупателе
     buyer_name: Optional[str] = None
     buyer_phone: Optional[str] = None
+    buyer_avatar_url: Optional[str] = None
     
     # Информация о товаре (если есть)
     product_name: Optional[str] = None
