@@ -620,3 +620,203 @@ def ensure_user_avatar_column() -> None:
 
     logger.info("Applied users.avatar_url column patch")
 
+
+def ensure_rossko_settings_table() -> None:
+    """Create rossko_settings table and default row id=1."""
+    inspector = inspect(engine)
+    if "rossko_settings" not in inspector.get_table_names():
+        if engine.dialect.name == "postgresql":
+            ddl = """
+            CREATE TABLE rossko_settings (
+                id INTEGER PRIMARY KEY,
+                delivery_id VARCHAR(64),
+                address_id VARCHAR(64),
+                payment_id INTEGER,
+                requisite_id INTEGER,
+                contact_name VARCHAR(255) NOT NULL DEFAULT '',
+                contact_phone VARCHAR(50) NOT NULL DEFAULT '',
+                default_comment TEXT,
+                delivery_parts BOOLEAN NOT NULL DEFAULT FALSE,
+                delivery_name VARCHAR(255),
+                address_label VARCHAR(512),
+                payment_name VARCHAR(255),
+                requisite_name VARCHAR(255),
+                is_pickup BOOLEAN,
+                requires_address BOOLEAN,
+                requires_requisite BOOLEAN,
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_by_user_id INTEGER REFERENCES users(id)
+            )
+            """
+        else:
+            ddl = """
+            CREATE TABLE rossko_settings (
+                id INTEGER PRIMARY KEY,
+                delivery_id VARCHAR(64),
+                address_id VARCHAR(64),
+                payment_id INTEGER,
+                requisite_id INTEGER,
+                contact_name VARCHAR(255) NOT NULL DEFAULT '',
+                contact_phone VARCHAR(50) NOT NULL DEFAULT '',
+                default_comment TEXT,
+                delivery_parts BOOLEAN NOT NULL DEFAULT 0,
+                delivery_name VARCHAR(255),
+                address_label VARCHAR(512),
+                payment_name VARCHAR(255),
+                requisite_name VARCHAR(255),
+                is_pickup BOOLEAN,
+                requires_address BOOLEAN,
+                requires_requisite BOOLEAN,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_by_user_id INTEGER REFERENCES users(id)
+            )
+            """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+        logger.info("Created rossko_settings table")
+
+    _seed_default_row()
+
+
+def _rossko_settings_seed_sql() -> str:
+    if engine.dialect.name == "postgresql":
+        return """
+            INSERT INTO rossko_settings (
+                id, contact_name, contact_phone, delivery_parts
+            )
+            SELECT 1, '', '', FALSE
+            WHERE NOT EXISTS (SELECT 1 FROM rossko_settings WHERE id = 1)
+        """
+    return """
+        INSERT INTO rossko_settings (
+            id, contact_name, contact_phone, delivery_parts
+        )
+        SELECT 1, '', '', 0
+        WHERE NOT EXISTS (SELECT 1 FROM rossko_settings WHERE id = 1)
+    """
+
+
+def _seed_default_row() -> None:
+    with engine.begin() as conn:
+        conn.execute(text(_rossko_settings_seed_sql()))
+
+
+def ensure_rossko_settings_row_defaults() -> None:
+    """Fix NULLs in default row and add DB defaults if table was created via create_all."""
+    inspector = inspect(engine)
+    if "rossko_settings" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"]: col for col in inspector.get_columns("rossko_settings")}
+    statements: list[str] = []
+
+    if "contact_name" in columns:
+        statements.append(
+            "UPDATE rossko_settings SET contact_name = '' "
+            "WHERE id = 1 AND contact_name IS NULL"
+        )
+    if "contact_phone" in columns:
+        statements.append(
+            "UPDATE rossko_settings SET contact_phone = '' "
+            "WHERE id = 1 AND contact_phone IS NULL"
+        )
+    if "delivery_parts" in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append(
+                "UPDATE rossko_settings SET delivery_parts = FALSE "
+                "WHERE id = 1 AND delivery_parts IS NULL"
+            )
+        else:
+            statements.append(
+                "UPDATE rossko_settings SET delivery_parts = 0 "
+                "WHERE id = 1 AND delivery_parts IS NULL"
+            )
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        conn.execute(text(_rossko_settings_seed_sql()))
+
+    logger.info("Applied rossko_settings row defaults patch")
+
+
+def ensure_garage_new_order_rossko_columns() -> None:
+    """Add Rossko order linkage columns to garage_new_orders."""
+    inspector = inspect(engine)
+    if "garage_new_orders" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("garage_new_orders")}
+    statements: list[str] = []
+    if "rossko_order_id" not in columns:
+        statements.append("ALTER TABLE garage_new_orders ADD COLUMN rossko_order_id VARCHAR(64)")
+    if "rossko_response_raw" not in columns:
+        col_type = "TEXT" if engine.dialect.name == "postgresql" else "TEXT"
+        statements.append(f"ALTER TABLE garage_new_orders ADD COLUMN rossko_response_raw {col_type}")
+
+    if not statements:
+        return
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.info("Applied garage_new_orders Rossko column patches: %s", statements)
+
+
+def ensure_garage_new_order_user_id_column() -> None:
+    """Add user_id column to garage_new_orders for buyer linkage."""
+    inspector = inspect(engine)
+    if "garage_new_orders" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("garage_new_orders")}
+    if "user_id" in columns:
+        return
+
+    with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            conn.execute(
+                text(
+                    "ALTER TABLE garage_new_orders "
+                    "ADD COLUMN user_id INTEGER REFERENCES users(id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_garage_new_orders_user_id "
+                    "ON garage_new_orders (user_id)"
+                )
+            )
+        else:
+            conn.execute(text("ALTER TABLE garage_new_orders ADD COLUMN user_id INTEGER"))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_garage_new_orders_user_id "
+                    "ON garage_new_orders (user_id)"
+                )
+            )
+
+    logger.info("Applied garage_new_orders.user_id column patch")
+
+
+def ensure_cart_max_quantity_columns() -> None:
+    """Add max_quantity to new-parts cart tables for stock limits."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    statements: list[str] = []
+
+    for table in ("new_parts_cart", "guest_new_parts_cart"):
+        if table not in table_names:
+            continue
+        columns = {col["name"] for col in inspector.get_columns(table)}
+        if "max_quantity" not in columns:
+            statements.append(f"ALTER TABLE {table} ADD COLUMN max_quantity INTEGER")
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied cart max_quantity column patches: %s", statements)
+

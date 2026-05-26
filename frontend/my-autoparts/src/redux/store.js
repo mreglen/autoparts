@@ -4,6 +4,7 @@ import organizationReducer from './slices/OrganizationSlice'
 import adminReducer from './slices/AdminSlice'
 import userReducer from './slices/UserSlice'
 import rosskoReducer from './slices/RosskoSlice'
+import rosskoAdminReducer from './slices/RosskoAdminSlice'
 import productReducer from './slices/ProductSlice';
 import stockInReducer from './slices/StockInSlice';
 import stockOutReducer from './slices/StockOutSlice';
@@ -28,6 +29,7 @@ export const store = configureStore({
     admin: adminReducer,
     user: userReducer,
     rossko: rosskoReducer,
+    rosskoAdmin: rosskoAdminReducer,
     products: productReducer,
     stockIn: stockInReducer,
     stockOut: stockOutReducer,

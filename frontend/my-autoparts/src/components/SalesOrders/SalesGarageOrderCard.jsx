@@ -24,7 +24,11 @@ export default function SalesGarageOrderCard({
   const dispatch = useDispatch();
   const items = order.items || [];
   const isUsed = orderType === 'used';
+  const isNew = orderType === 'new';
   const statusCode = order.status_code || 'pending';
+  const rosskoStatus = order.rossko_status;
+  const rosskoOrderId = order.rossko_order_id;
+  const rosskoSyncError = order.rossko_sync_error;
   const isEditing = editingStatus?.type === orderType && editingStatus?.id === order.id;
   const deliveryText = getGarageDeliveryInfo(order);
 
@@ -59,6 +63,16 @@ export default function SalesGarageOrderCard({
               >
                 {isUsed ? 'Б/У' : 'Новые'} · #{order.id}
               </span>
+              {isNew && rosskoOrderId && (
+                <span className="inline-flex items-center rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-100">
+                  Rossko №{rosskoOrderId}
+                </span>
+              )}
+              {isNew && rosskoSyncError && (
+                <span className="inline-flex items-center rounded-lg bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-800 ring-1 ring-orange-100">
+                  Данные Rossko недоступны
+                </span>
+              )}
               <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
             </div>
             <div className="flex items-start gap-3">
@@ -112,10 +126,18 @@ export default function SalesGarageOrderCard({
                     onEditStatus({ type: orderType, id: order.id });
                   }}
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-medium transition hover:opacity-90 ${getStatusColor(statusCode)}`}
-                  title="Изменить статус"
+                  title="Изменить статус для покупателя"
                 >
                   {getStatusName(statusCode)}
                 </button>
+              )}
+              {isNew && rosskoStatus && (
+                <span
+                  className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800 ring-1 ring-sky-100"
+                  title="Статус заказа в Rossko (из API)"
+                >
+                  Rossko: {rosskoStatus}
+                </span>
               )}
             </div>
           </div>
@@ -185,8 +207,19 @@ export default function SalesGarageOrderCard({
                     <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                       <div className="text-base font-semibold tabular-nums text-gray-900">{formatPrice(lineTotal)}</div>
                       {item.status_code && (
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(item.status_code)}`}>
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(item.status_code)}`}
+                          title={isNew ? 'Статус для покупателя' : undefined}
+                        >
                           {getStatusName(item.status_code)}
+                        </span>
+                      )}
+                      {isNew && item.rossko_status && (
+                        <span
+                          className="inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-sky-100"
+                          title="Статус позиции в Rossko"
+                        >
+                          Rossko: {item.rossko_status}
                         </span>
                       )}
                     </div>

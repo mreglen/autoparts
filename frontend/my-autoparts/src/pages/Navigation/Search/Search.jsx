@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchSearchResults, setSearchQuery as setGlobalSearchQuery } from '../../../redux/slices/RosskoSlice';
-import { searchUsedParts } from '../../../redux/slices/ProductSlice';
+import { useDebouncedCallback } from '../../../hooks/useDebouncedCallback';
 
 function Search() {
   const [searchParams] = useSearchParams();
@@ -13,6 +13,31 @@ function Search() {
   const location = useLocation();
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
   const autopartsSearchPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
+  const isOnUsedAutoparts = location.pathname.startsWith('/autoparts/used');
+
+  useEffect(() => {
+    setSearchTerm(searchParams.get('q') || '');
+  }, [searchParams]);
+
+  const applyUsedQueryToUrl = useCallback((text) => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('page');
+    const trimmed = text.trim();
+    if (trimmed) {
+      params.set('q', trimmed);
+      dispatch(setGlobalSearchQuery(trimmed));
+    } else {
+      params.delete('q');
+      dispatch(setGlobalSearchQuery(''));
+    }
+    const basePath = location.pathname.startsWith('/autoparts/used')
+      ? location.pathname
+      : '/autoparts/used';
+    const qs = params.toString();
+    navigate(`${basePath}${qs ? `?${qs}` : ''}`, { replace: true });
+  }, [searchParams, navigate, location.pathname, dispatch]);
+
+  const debouncedUsedLiveSearch = useDebouncedCallback(applyUsedQueryToUrl, 320);
 
   const handleSearch = () => {
     const trimmedTerm = searchTerm.trim();
@@ -21,11 +46,13 @@ function Search() {
     setIsSearching(true);
     dispatch(setGlobalSearchQuery(trimmedTerm));
 
-    Promise.all([
-      dispatch(searchUsedParts(trimmedTerm)),
-      dispatch(fetchSearchResults({ text: trimmedTerm })),
-    ])
-      .then(() => setSearchTerm(trimmedTerm))
+    if (isOnUsedAutoparts || !showNewAutoparts) {
+      applyUsedQueryToUrl(trimmedTerm);
+      setIsSearching(false);
+      return;
+    }
+
+    dispatch(fetchSearchResults({ text: trimmedTerm }))
       .finally(() => {
         setIsSearching(false);
         navigate(`${autopartsSearchPath}?q=${encodeURIComponent(trimmedTerm)}`);
@@ -35,6 +62,12 @@ function Search() {
   const handleInputChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
+
+    if (isOnUsedAutoparts || (!showNewAutoparts && location.pathname.startsWith('/autoparts'))) {
+      debouncedUsedLiveSearch(value);
+      return;
+    }
+
     const trimmedValue = value.trim();
     if (trimmedValue && !location.pathname.startsWith('/autoparts')) {
       navigate(`${autopartsSearchPath}?q=${encodeURIComponent(trimmedValue)}`);

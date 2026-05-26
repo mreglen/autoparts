@@ -11,14 +11,17 @@ import {
   selectCatalogLoading,
   selectCatalogLoadingMore,
   selectCatalogHasMore,
+  selectAnalogsLoading,
 } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
 import { normalizeImageUrl } from '../../../utils/apiClient';
-import { buildUsedCatalogParams, isUsedCatalogBrowseMode } from '../../../utils/autopartsPublic';
+import {
+  buildUsedCatalogParams,
+  getUsedPartsUrlQuery,
+  isUsedCatalogBrowseMode,
+} from '../../../utils/autopartsPublic';
 
-// Селекторы для б/у запчастей
 const selectUsedPartsData = (state) => state.products.usedPartsData;
-const selectUsedPartsLoading = (state) => state.products.loading;
 
 // Функция форматирования телефона
 const formatPhoneNumber = (phone) => {
@@ -59,27 +62,24 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const catalogItems = useSelector(selectCatalogItems);
   const catalogTotal = useSelector(selectCatalogTotal);
   const catalogPage = useSelector(selectCatalogPage);
+  const urlQ = getUsedPartsUrlQuery(searchParams);
   const isCatalogMode = isUsedCatalogBrowseMode(searchParams);
   const catalogLoading = useSelector(selectCatalogLoading);
   const catalogLoadingMore = useSelector(selectCatalogLoadingMore);
   const catalogHasMoreFromStore = useSelector(selectCatalogHasMore);
-  const usedPartsLoading = useSelector(selectUsedPartsLoading);
+  const analogsLoading = useSelector(selectAnalogsLoading);
   const loadMoreSentinelRef = useRef(null);
   const catalogHasMore = isCatalogMode && catalogHasMoreFromStore;
-  const status = isCatalogMode
-    ? (catalogLoading && catalogItems.length === 0 ? 'loading' : 'idle')
-    : (usedPartsLoading ? 'loading' : 'idle');
+  const status = catalogLoading && catalogItems.length === 0 ? 'loading' : 'idle';
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
 
-  const availableParts = useMemo(
-    () => (isCatalogMode ? catalogItems : (usedPartsData?.available_parts || [])),
-    [isCatalogMode, catalogItems, usedPartsData]
-  );
-  const analogParts = useMemo(
-    () => (isCatalogMode ? [] : (usedPartsData?.analog_parts || [])),
-    [isCatalogMode, usedPartsData]
-  );
+  const availableParts = useMemo(() => catalogItems, [catalogItems]);
+  const analogParts = useMemo(() => {
+    if (!urlQ) return [];
+    const catalogIds = new Set(catalogItems.map((p) => p.id));
+    return (usedPartsData?.analog_parts || []).filter((p) => !catalogIds.has(p.id));
+  }, [urlQ, usedPartsData, catalogItems]);
 
   const loadMoreCatalog = useCallback(() => {
     if (
@@ -518,10 +518,15 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
       )}
 
       {/* Аналоги */}
-      {hasAnalogParts && (
+      {(hasAnalogParts || (urlQ && analogsLoading)) && (
         <>
           <div className="font-medium text-xl sm:text-xl my-6 sm:my-10 px-4 sm:px-0">
-            <h2 className="border-b-4 border-blue-500 pb-2 inline-block">Аналоги</h2>
+            <h2 className="border-b-4 border-blue-500 pb-2 inline-block">
+              Аналоги
+              {analogsLoading && (
+                <span className="ml-2 text-sm font-normal text-gray-500">загрузка…</span>
+              )}
+            </h2>
           </div>
 
           {/* Grid view - карточки */}

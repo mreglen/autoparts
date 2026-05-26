@@ -10,6 +10,11 @@ from app.models.seo_product_url_export import SeoProductUrlExport
 from app.services.yandex_feed_xml_service import _iter_catalog_products, _resolve_site_origin
 from app.utils.product_urls import build_product_page_url
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
+from app.services.public_user_profile_service import (
+    count_public_buyer_profiles,
+    count_public_seller_profiles,
+    iter_public_profile_urls,
+)
 
 DEFAULT_PRODUCT_URLS_LIMIT = 150
 
@@ -36,6 +41,7 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
     site_origin = _resolve_origin(db, preferred_host_url)
     org_count = count_public_organizations(db)
     product_count = count_working_catalog_products(db)
+    profile_count = count_public_seller_profiles(db) + count_public_buyer_profiles(db)
     static_pages_count = 10
 
     return [
@@ -45,7 +51,7 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
             "description": "Корневой файл со списком всех sitemap сайта",
             "url": f"{site_origin}/sitemap.xml",
             "type": "index",
-            "url_count": 3,
+            "url_count": 4,
             "location": "frontend/public",
         },
         {
@@ -73,6 +79,15 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
             "url": f"{site_origin}/api/feeds/sitemap-organizations.xml",
             "type": "dynamic",
             "url_count": org_count,
+            "location": "backend",
+        },
+        {
+            "id": "profiles",
+            "title": "Профили продавцов и покупателей",
+            "description": "Публичные страницы пользователей по ID",
+            "url": f"{site_origin}/api/feeds/sitemap-profiles.xml",
+            "type": "dynamic",
+            "url_count": profile_count,
             "location": "backend",
         },
     ]
@@ -330,6 +345,28 @@ def generate_organizations_sitemap_xml(db: Session, *, preferred_host_url: str |
                 f"    <loc>{loc}</loc>",
                 "    <changefreq>weekly</changefreq>",
                 "    <priority>0.7</priority>",
+                "  </url>",
+            ]
+        )
+
+    lines.append("</urlset>")
+    return "\n".join(lines) + "\n"
+
+
+def generate_profiles_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:
+    site_origin = _resolve_origin(db, preferred_host_url)
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+
+    for loc, priority in iter_public_profile_urls(db, site_origin):
+        lines.extend(
+            [
+                "  <url>",
+                f"    <loc>{loc}</loc>",
+                "    <changefreq>monthly</changefreq>",
+                f"    <priority>{priority}</priority>",
                 "  </url>",
             ]
         )

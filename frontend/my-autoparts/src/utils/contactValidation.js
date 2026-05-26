@@ -26,6 +26,11 @@ export function normalizeEmail(value) {
   return (value || '').trim().toLowerCase();
 }
 
+/** Форматирование email при вводе: без пробелов, в нижнем регистре */
+export function formatEmailInput(value) {
+  return (value || '').replace(/\s+/g, '').toLowerCase();
+}
+
 export function validateEmail(value) {
   const raw = value || '';
   if (!raw.trim()) return 'Укажите email';

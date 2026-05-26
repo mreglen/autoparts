@@ -31,8 +31,9 @@ export function getUsedPartsUrlQuery(searchParams) {
   return (searchParams.get('q') || '').trim();
 }
 
-export function isUsedCatalogBrowseMode(searchParams) {
-  return !getUsedPartsUrlQuery(searchParams);
+/** Основной список б/у всегда из быстрого каталога (в т.ч. при ?q=). */
+export function isUsedCatalogBrowseMode() {
+  return true;
 }
 
 const CATALOG_PAGE_SIZE = 20;

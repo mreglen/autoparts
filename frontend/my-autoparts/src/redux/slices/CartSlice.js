@@ -1,17 +1,46 @@
 // src/store/slices/CartSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiAxios } from '../../utils/apiClient';
+import {
+    computeCartSummary,
+    loadCartSummaryCache,
+    saveCartSummaryCache,
+    clearCartSummaryCache,
+} from '../../utils/cartSummary';
 
-// Async thunk: добавление новых запчастей в корзину
+function patchCartItemInState(state, payload, listKey) {
+    if (!state.cart?.[listKey]) return;
+    const index = state.cart[listKey].findIndex((item) => item.id === payload.id);
+    if (index === -1) return;
+    state.cart[listKey][index] = {
+        ...state.cart[listKey][index],
+        quantity: payload.quantity,
+        ...(payload.max_quantity != null ? { max_quantity: payload.max_quantity } : {}),
+    };
+}
+
+function setCartItemQuantityById(state, itemId, quantity, listKey) {
+    if (!state.cart?.[listKey]) return;
+    const index = state.cart[listKey].findIndex((item) => item.id === itemId);
+    if (index === -1) return;
+    state.cart[listKey][index].quantity = quantity;
+}
+
+function removeQuantityUpdatingId(state, itemId) {
+    state.quantityUpdatingIds = state.quantityUpdatingIds.filter((id) => id !== itemId);
+}
+
+function syncSummaryFromCart(state) {
+    const summary = computeCartSummary(state.cart);
+    state.summary = summary;
+    saveCartSummaryCache(summary);
+}
+
 export const addNewPartsToCart = createAsyncThunk(
     'cart/addNewPartsToCart',
     async (cartItem, { rejectWithValue, dispatch }) => {
         try {
-            const response = await apiAxios.post(
-                `/cart/new-parts`,
-                cartItem,
-            );
-            // Перезагружаем корзину после успешного добавления
+            const response = await apiAxios.post('/cart/new-parts', cartItem);
             dispatch(fetchCart());
             return response.data;
         } catch (error) {
@@ -22,14 +51,40 @@ export const addNewPartsToCart = createAsyncThunk(
     }
 );
 
-// Async thunk: получение корзины
+export const fetchNewPartsCheckoutConfig = createAsyncThunk(
+    'cart/fetchNewPartsCheckoutConfig',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get('/orders/new-parts/config');
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки настроек оформления'
+            );
+        }
+    }
+);
+
+export const createNewPartsOrder = createAsyncThunk(
+    'cart/createNewPartsOrder',
+    async (payload = {}, { rejectWithValue, dispatch }) => {
+        try {
+            const response = await apiAxios.post('/orders/new-parts', payload);
+            dispatch(fetchCart());
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка оформления заказа'
+            );
+        }
+    }
+);
+
 export const fetchCart = createAsyncThunk(
     'cart/fetchCart',
     async (_, { rejectWithValue }) => {
         try {
-            const response = await apiAxios.get(
-                `/cart/`,
-            );
+            const response = await apiAxios.get('/cart/');
             return response.data;
         } catch (error) {
             return rejectWithValue(
@@ -39,15 +94,11 @@ export const fetchCart = createAsyncThunk(
     }
 );
 
-// Async thunk: удаление товара из корзины
 export const removeFromCart = createAsyncThunk(
     'cart/removeFromCart',
     async (itemId, { rejectWithValue, dispatch }) => {
         try {
-            await apiAxios.delete(
-                `/cart/new-parts/${itemId}`,
-            );
-            // Перезагружаем корзину после успешного удаления
+            await apiAxios.delete(`/cart/new-parts/${itemId}`);
             dispatch(fetchCart());
             return itemId;
         } catch (error) {
@@ -58,17 +109,11 @@ export const removeFromCart = createAsyncThunk(
     }
 );
 
-// Async thunk: обновление количества товара
 export const updateCartItemQuantity = createAsyncThunk(
     'cart/updateCartItemQuantity',
-    async ({ itemId, quantity }, { rejectWithValue, dispatch }) => {
+    async ({ itemId, quantity }, { rejectWithValue }) => {
         try {
-            const response = await apiAxios.put(
-                `/cart/new-parts/${itemId}/quantity`,
-                { quantity }
-            );
-            // Перезагружаем корзину после успешного обновления
-            dispatch(fetchCart());
+            const response = await apiAxios.put(`/cart/new-parts/${itemId}/quantity`, { quantity });
             return response.data;
         } catch (error) {
             return rejectWithValue(
@@ -78,15 +123,11 @@ export const updateCartItemQuantity = createAsyncThunk(
     }
 );
 
-// Async thunk: добавление б/у запчастей в корзину
 export const addUsedPartsToCart = createAsyncThunk(
     'cart/addUsedPartsToCart',
     async (cartItem, { rejectWithValue, dispatch }) => {
         try {
-            const response = await apiAxios.post(
-                `/cart/used-parts`,
-                cartItem,
-            );
+            const response = await apiAxios.post('/cart/used-parts', cartItem);
             dispatch(fetchCart());
             return response.data;
         } catch (error) {
@@ -97,14 +138,11 @@ export const addUsedPartsToCart = createAsyncThunk(
     }
 );
 
-// Async thunk: удаление б/у запчастей из корзины
 export const removeUsedFromCart = createAsyncThunk(
     'cart/removeUsedFromCart',
     async (itemId, { rejectWithValue, dispatch }) => {
         try {
-            await apiAxios.delete(
-                `/cart/used-parts/${itemId}`,
-            );
+            await apiAxios.delete(`/cart/used-parts/${itemId}`);
             dispatch(fetchCart());
             return itemId;
         } catch (error) {
@@ -115,16 +153,11 @@ export const removeUsedFromCart = createAsyncThunk(
     }
 );
 
-// Async thunk: обновление количества б/у запчастей
 export const updateUsedCartItemQuantity = createAsyncThunk(
     'cart/updateUsedCartItemQuantity',
-    async ({ itemId, quantity }, { rejectWithValue, dispatch }) => {
+    async ({ itemId, quantity }, { rejectWithValue }) => {
         try {
-            const response = await apiAxios.put(
-                `/cart/used-parts/${itemId}/quantity`,
-                { quantity }
-            );
-            dispatch(fetchCart());
+            const response = await apiAxios.put(`/cart/used-parts/${itemId}/quantity`, { quantity });
             return response.data;
         } catch (error) {
             return rejectWithValue(
@@ -138,7 +171,9 @@ const cartSlice = createSlice({
     name: 'cart',
     initialState: {
         cart: null,
+        summary: loadCartSummaryCache(),
         loading: false,
+        quantityUpdatingIds: [],
         error: null,
     },
     reducers: {
@@ -147,27 +182,26 @@ const cartSlice = createSlice({
         },
         clearCart: (state) => {
             state.cart = null;
+            state.summary = { itemCount: 0, totalPrice: 0 };
             state.loading = false;
+            state.quantityUpdatingIds = [];
             state.error = null;
+            clearCartSummaryCache();
         },
     },
     extraReducers: (builder) => {
         builder
-            // Добавление в корзину
             .addCase(addNewPartsToCart.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(addNewPartsToCart.fulfilled, (state, action) => {
+            .addCase(addNewPartsToCart.fulfilled, (state) => {
                 state.loading = false;
-                // Корзина будет перезагружена в thunk
             })
             .addCase(addNewPartsToCart.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })
-
-            // Получение корзины
             .addCase(fetchCart.pending, (state) => {
                 state.loading = true;
                 state.error = null;
@@ -175,41 +209,41 @@ const cartSlice = createSlice({
             .addCase(fetchCart.fulfilled, (state, action) => {
                 state.loading = false;
                 state.cart = action.payload;
+                syncSummaryFromCart(state);
             })
             .addCase(fetchCart.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })
-
-            // Удаление из корзины
             .addCase(removeFromCart.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(removeFromCart.fulfilled, (state, action) => {
+            .addCase(removeFromCart.fulfilled, (state) => {
                 state.loading = false;
-                // Корзина будет перезагружена в thunk
             })
             .addCase(removeFromCart.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
-                // При ошибке нужно перезагрузить корзину
             })
-
-            // Обновление количества (новые)
-            .addCase(updateCartItemQuantity.pending, (state) => {
-                state.loading = true;
+            .addCase(updateCartItemQuantity.pending, (state, action) => {
+                const { itemId, quantity } = action.meta.arg;
+                if (!state.quantityUpdatingIds.includes(itemId)) {
+                    state.quantityUpdatingIds.push(itemId);
+                }
+                setCartItemQuantityById(state, itemId, quantity, 'new_parts_items');
+                syncSummaryFromCart(state);
                 state.error = null;
             })
             .addCase(updateCartItemQuantity.fulfilled, (state, action) => {
-                state.loading = false;
+                removeQuantityUpdatingId(state, action.payload.id);
+                patchCartItemInState(state, action.payload, 'new_parts_items');
+                syncSummaryFromCart(state);
             })
             .addCase(updateCartItemQuantity.rejected, (state, action) => {
-                state.loading = false;
+                removeQuantityUpdatingId(state, action.meta.arg.itemId);
                 state.error = action.payload;
             })
-
-            // Добавление в корзину (б/у)
             .addCase(addUsedPartsToCart.pending, (state) => {
                 state.loading = true;
                 state.error = null;
@@ -221,8 +255,6 @@ const cartSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
             })
-
-            // Удаление из корзины (б/у)
             .addCase(removeUsedFromCart.pending, (state) => {
                 state.loading = true;
                 state.error = null;
@@ -234,29 +266,40 @@ const cartSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
             })
-
-            // Обновление количества (б/у)
-            .addCase(updateUsedCartItemQuantity.pending, (state) => {
-                state.loading = true;
+            .addCase(updateUsedCartItemQuantity.pending, (state, action) => {
+                const { itemId, quantity } = action.meta.arg;
+                if (!state.quantityUpdatingIds.includes(itemId)) {
+                    state.quantityUpdatingIds.push(itemId);
+                }
+                setCartItemQuantityById(state, itemId, quantity, 'used_parts_items');
+                syncSummaryFromCart(state);
                 state.error = null;
             })
-            .addCase(updateUsedCartItemQuantity.fulfilled, (state) => {
-                state.loading = false;
+            .addCase(updateUsedCartItemQuantity.fulfilled, (state, action) => {
+                removeQuantityUpdatingId(state, action.payload.id);
+                patchCartItemInState(state, action.payload, 'used_parts_items');
+                syncSummaryFromCart(state);
             })
             .addCase(updateUsedCartItemQuantity.rejected, (state, action) => {
-                state.loading = false;
+                removeQuantityUpdatingId(state, action.meta.arg.itemId);
                 state.error = action.payload;
             });
     },
 });
 
-export const {
-    clearCartError,
-    clearCart
-} = cartSlice.actions;
+export const { clearCartError, clearCart } = cartSlice.actions;
 
 export const selectCart = (state) => state.cart.cart;
 export const selectCartLoading = (state) => state.cart.loading;
+export const selectCartQuantityUpdatingIds = (state) => state.cart.quantityUpdatingIds;
 export const selectCartError = (state) => state.cart.error;
+
+/** Счётчик и сумма для шапки: из корзины или из кэша, пока идёт загрузка. */
+export const selectCartSummary = (state) => {
+    if (state.cart.cart) {
+        return computeCartSummary(state.cart.cart);
+    }
+    return state.cart.summary || { itemCount: 0, totalPrice: 0 };
+};
 
 export default cartSlice.reducer;

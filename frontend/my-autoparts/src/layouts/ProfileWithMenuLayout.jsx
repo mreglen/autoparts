@@ -12,11 +12,13 @@ import ProfileMenuTabs from '../pages/Profile/menu/ProfileMenuTabs';
 import { useAuthReady } from '../hooks/useAuthReady';
 import { useMobileMenuShell } from '../hooks/useMobileMenuShell';
 import AuthLoadingScreen from '../components/AuthLoadingScreen/AuthLoadingScreen';
+import useCartSync from '../hooks/useCartSync';
 import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
 
 export default function ProfileWithMenuLayout() {
     const dispatch = useDispatch();
     const { isReady, user } = useAuthReady();
+    useCartSync();
     const permissionCodes = useSelector((state) => state.auth.permissionCodes);
     const moderationProducts = useSelector((state) => state.moderationProducts);
     const moderation = useSelector((state) => state.moderation);
@@ -81,11 +83,17 @@ export default function ProfileWithMenuLayout() {
             <main
                 className={`mx-auto ${
                     isChatsPage
-                        ? 'max-w-full max-md:px-0 max-md:py-0 px-3 py-6 sm:py-8 md:max-w-7xl'
+                        ? 'max-w-full max-md:px-0 max-md:py-0 px-3 py-6 sm:py-8 md:flex md:max-h-[calc(100dvh-4rem)] md:min-h-0 md:flex-col md:overflow-hidden md:py-4 md:max-w-7xl'
                         : 'max-w-7xl max-md:px-3 max-md:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                 }`}
             >
-                <div className={`grid grid-cols-1 lg:grid-cols-[minmax(15.5rem,17.5rem)_1fr] ${isChatsPage ? 'max-md:gap-0 gap-6' : 'gap-6'}`}>
+                <div
+                    className={`grid min-h-0 grid-cols-1 lg:grid-cols-[minmax(15.5rem,17.5rem)_1fr] ${
+                        isChatsPage
+                            ? 'max-md:gap-0 flex-1 gap-6 md:overflow-hidden'
+                            : 'gap-6'
+                    }`}
+                >
                     <div className="hidden lg:block min-w-0">
                         <ProfileMenuTabs
                             tabs={tabs}
@@ -95,7 +103,11 @@ export default function ProfileWithMenuLayout() {
                         />
                     </div>
 
-                    <div className="min-h-0 min-w-0">
+                    <div
+                        className={`min-h-0 min-w-0 ${
+                            isChatsPage ? 'flex min-h-0 flex-col md:h-full md:overflow-hidden' : ''
+                        }`}
+                    >
                         <Outlet />
                     </div>
                 </div>

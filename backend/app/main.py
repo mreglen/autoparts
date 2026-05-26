@@ -16,6 +16,11 @@ from app.db.schema_patches import (
     ensure_group_chat_columns,
     ensure_seo_product_url_exports_table,
     ensure_user_avatar_column,
+    ensure_rossko_settings_table,
+    ensure_rossko_settings_row_defaults,
+    ensure_garage_new_order_rossko_columns,
+    ensure_garage_new_order_user_id_column,
+    ensure_cart_max_quantity_columns,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
@@ -42,6 +47,7 @@ import app.models.site_quick_link  # noqa: F401 — site quick links
 import app.models.site_analytics  # noqa: F401 — site analytics
 import app.models.site_review  # noqa: F401 — site reviews
 import app.models.seo_product_url_export  # noqa: F401 — SEO URL export tracking
+import app.models.rossko_settings  # noqa: F401 — Rossko checkout settings
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings
@@ -100,6 +106,11 @@ try:
     ensure_group_chat_columns()
     ensure_seo_product_url_exports_table()
     ensure_user_avatar_column()
+    ensure_rossko_settings_table()
+    ensure_rossko_settings_row_defaults()
+    ensure_garage_new_order_rossko_columns()
+    ensure_garage_new_order_user_id_column()
+    ensure_cart_max_quantity_columns()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise

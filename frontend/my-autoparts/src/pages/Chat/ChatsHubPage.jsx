@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   connectWebSocket,
   disconnectWebSocket,
@@ -21,6 +21,8 @@ import ReplyArrow from './ReplyArrow';
 import { API_BASE } from '../../utils/apiClient';
 import PageIntro from '../../components/PageIntro/PageIntro';
 import UserAvatar from '../../components/UserAvatar/UserAvatar';
+import ChatParticipantsPanel from './ChatParticipantsPanel';
+import { getGarageCounterpartyProfilePath } from '../../utils/publicProfile';
 
 const formatTime = (dateString) => {
   if (!dateString) return '';
@@ -122,7 +124,7 @@ function ChatEmptyState({ icon, title, subtitle, action }) {
   );
 }
 
-function ChatPanelHeader({ onBack, avatar, title, subtitle, badge, trailing }) {
+function ChatPanelHeader({ onBack, avatar, title, subtitle, subtitleAction, badge, trailing }) {
   return (
     <div className="flex-shrink-0 border-b border-gray-200/80 bg-white/95 px-3 py-3 backdrop-blur-sm sm:px-4">
       <div className="flex items-center gap-3">
@@ -142,7 +144,19 @@ function ChatPanelHeader({ onBack, avatar, title, subtitle, badge, trailing }) {
             <h3 className="truncate font-semibold text-gray-900">{title}</h3>
             {badge}
           </div>
-          {subtitle ? <p className="truncate text-xs text-gray-500">{subtitle}</p> : null}
+          {subtitle ? (
+            subtitleAction ? (
+              <button
+                type="button"
+                onClick={subtitleAction}
+                className="truncate text-left text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
+              >
+                {subtitle}
+              </button>
+            ) : (
+              <p className="truncate text-xs text-gray-500">{subtitle}</p>
+            )
+          ) : null}
         </div>
         {trailing}
       </div>
@@ -365,26 +379,21 @@ const ChatsHubPage = () => {
     ? avitoChats.find(c => String(c.id) === activeChatId)
     : null;
 
-  const chatsIntroDescription = useMemo(() => {
-    const sources = ['Гараж'];
-    if (showOrganizationFilter) sources.push('организация');
-    if (avitoEnabled) sources.push('Авито');
-    return sources.join(' · ');
-  }, [showOrganizationFilter, avitoEnabled]);
-
   return (
-    <div className="mx-auto w-full max-w-7xl">
+    <div className="mx-auto flex w-full max-w-7xl min-h-0 flex-col max-md:min-h-0 md:h-full md:overflow-hidden">
       {!activeChatId && (
-        <PageIntro title="Сообщения" description={chatsIntroDescription} />
+        <div className="mb-4 flex-shrink-0">
+          <PageIntro title="Сообщения" />
+        </div>
       )}
 
-      <div className="flex w-full min-h-0 flex-col max-md:min-h-[calc(100dvh-7rem)] max-md:pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] md:static md:min-h-0">
-        <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden bg-white md:h-[calc(100vh-220px)] md:min-h-[560px] md:rounded-2xl md:border md:border-gray-200/80 md:shadow-lg md:shadow-gray-200/50">
+      <div className="flex min-h-0 w-full flex-1 flex-col max-md:min-h-[calc(100dvh-7rem)] max-md:pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] md:h-0 md:overflow-hidden">
+        <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden bg-white max-md:min-h-[calc(100dvh-7rem)] md:h-full md:max-h-full md:rounded-2xl md:border md:border-gray-200/80 md:shadow-lg md:shadow-gray-200/50">
           {/* Левая панель — список чатов */}
           <div
             className={`${
               activeChatId ? 'hidden md:flex' : 'flex'
-            } min-h-0 w-full min-w-0 flex-col border-gray-200/80 bg-white md:w-[22rem] lg:w-96 md:border-r`}
+            } min-h-0 w-full min-w-0 flex-col overflow-hidden border-gray-200/80 bg-white md:h-full md:max-h-full md:w-[22rem] lg:w-96 md:border-r`}
           >
             <div className="flex-shrink-0 border-b border-gray-100 bg-white px-3 pb-3 pt-3 sm:px-4">
               {(garageLoading || avitoLoading) && (
@@ -515,7 +524,7 @@ const ChatsHubPage = () => {
           <div
             className={`${
               activeChatId ? 'flex' : 'hidden md:flex'
-            } min-h-0 min-w-0 flex-1 flex-col bg-[#eef2f6]`}
+            } min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] md:h-full md:max-h-full`}
           >
             {activeChatId ? (
               isAvitoActive ? (
@@ -534,7 +543,7 @@ const ChatsHubPage = () => {
                 />
               )
             ) : (
-              <div className="flex flex-1 items-center justify-center bg-gradient-to-b from-[#eef2f6] to-[#e8edf3] p-6">
+              <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-gradient-to-b from-[#eef2f6] to-[#e8edf3] p-6">
                 <div className="max-w-sm text-center">
                   <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-3xl bg-white shadow-md ring-1 ring-gray-200/60">
                     <svg className="h-12 w-12 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -754,6 +763,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
   const [newMessage, setNewMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesScrollRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -771,6 +781,10 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
       dispatch(fetchChatMessages({ chatId: parseInt(chatId) }));
     }
   }, [dispatch, chatId, chat]);
+
+  useEffect(() => {
+    setShowParticipants(false);
+  }, [chatId]);
 
   // Автоскролл к последнему сообщению
   useEffect(() => {
@@ -957,8 +971,42 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
     }
   };
 
+  const counterpartyProfilePath = !isGroupChat
+    ? getGarageCounterpartyProfilePath(chat, user?.id)
+    : null;
+
+  const headerTrailing = (
+    <div className="flex flex-shrink-0 items-center gap-2">
+      {isGroupChat ? (
+        <button
+          type="button"
+          onClick={() => setShowParticipants(true)}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+        >
+          Участники
+        </button>
+      ) : counterpartyProfilePath ? (
+        <Link
+          to={counterpartyProfilePath}
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+        >
+          Профиль
+        </Link>
+      ) : null}
+      {!isGroupChat && chat?.product_id ? (
+        <button
+          type="button"
+          onClick={openProduct}
+          className="hidden rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:inline-flex"
+        >
+          К товару
+        </button>
+      ) : null}
+    </div>
+  );
+
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#eef2f6]">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] max-md:min-h-0 md:h-full">
       <ChatPanelHeader
         onBack={onBack}
         avatar={
@@ -1002,18 +1050,19 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
         }
         title={title}
         subtitle={panelSubtitle}
-        badge={<SourceBadge source={isGroupChat ? 'organization' : 'garage'} />}
-        trailing={
-          !isGroupChat && chat?.product_id ? (
-            <button
-              type="button"
-              onClick={openProduct}
-              className="hidden rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:inline-flex"
-            >
-              К товару
-            </button>
-          ) : null
+        subtitleAction={
+          isGroupChat && chat?.participants_count
+            ? () => setShowParticipants(true)
+            : undefined
         }
+        badge={<SourceBadge source={isGroupChat ? 'organization' : 'garage'} />}
+        trailing={headerTrailing}
+      />
+
+      <ChatParticipantsPanel
+        chatId={chatId ? parseInt(chatId, 10) : null}
+        isOpen={isGroupChat && showParticipants}
+        onClose={() => setShowParticipants(false)}
       />
 
       {/* Сообщения */}
@@ -1402,7 +1451,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
   };
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-[#eef2f6]">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] max-md:min-h-0 md:h-full">
       <ChatPanelHeader
         onBack={onBack}
         avatar={

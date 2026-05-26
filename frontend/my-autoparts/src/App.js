@@ -30,6 +30,7 @@ import StockInList from './pages/StockIn/StockInList';
 import { StockOutList } from './pages/StockOut';
 import CartPage from './pages/Cart/CartPage';
 import OrderRegistration from './pages/Cart/OrderRegistration';
+import NewPartsOrderRegistration from './pages/Cart/NewPartsOrderRegistration';
 import SalesOrdersPage from './pages/Sales/SalesOrdersPage';
 import SalesReturnsPage from './pages/Sales/SalesReturnsPage';
 import PurchasesOrdersPage from './pages/Sales/PurchasesOrdersPage';
@@ -54,6 +55,7 @@ import DromIntegrationPage from './pages/Settings/DromIntegrationPage';
 import DromNomenclaturePage from './pages/Settings/DromNomenclaturePage';
 import NotFound from './pages/NotFound/NotFound';
 import PartDetail from './pages/PartDetail/PartDetail';
+import SellerPartCardPage from './pages/SellerPartCard/SellerPartCardPage';
 import VehiclesList from './pages/Vehicles/VehiclesList';
 import AddVehiclePage from './pages/Vehicles/AddVehiclePage';
 import EditVehiclePage from './pages/Vehicles/EditVehiclePage';
@@ -63,9 +65,12 @@ import RequireAuth from './components/auth/RequireAuth';
 import AdminPanelPage from './pages/Admin/AdminPanelPage';
 import AuditLogPage from './pages/Admin/AuditLogPage';
 import AdminUsersPage from './pages/Admin/AdminUsersPage';
+import RosskoSettingsPage from './pages/Admin/RosskoSettingsPage';
 import AnalyticsPage from './pages/Admin/AnalyticsPage';
 import OrganizationsPage from './pages/Organizations/OrganizationsPage';
 import OrganizationPublicPage from './pages/Organizations/OrganizationPublicPage';
+import PublicSellerProfilePage from './pages/PublicProfiles/PublicSellerProfilePage';
+import PublicBuyerProfilePage from './pages/PublicProfiles/PublicBuyerProfilePage';
 import useSiteAnalytics from './hooks/useSiteAnalytics';
 
 
@@ -73,7 +78,7 @@ import useSiteAnalytics from './hooks/useSiteAnalytics';
 // Component to handle Service Worker navigation messages
 function ServiceWorkerNavigationHandler() {
   const navigate = useNavigate();
-  
+
   useEffect(() => {
     const handleNavigateToChat = (event) => {
       const storedToken = localStorage.getItem('token');
@@ -85,14 +90,14 @@ function ServiceWorkerNavigationHandler() {
       console.log('[App] Navigating to chat from notification:', chatId);
       navigate(`/chats/${chatId}`, { state: { scrollToBottom: true } });
     };
-    
+
     window.addEventListener('navigateToChat', handleNavigateToChat);
-    
+
     return () => {
       window.removeEventListener('navigateToChat', handleNavigateToChat);
     };
   }, [navigate]);
-  
+
   return null; // This component doesn't render anything
 }
 
@@ -172,9 +177,13 @@ function App() {
           <Route path="/reviews" element={<ReviewsRoute />} />
           <Route path="/organizations" element={<OrganizationsPage />} />
           <Route path="/organizations/:orgId" element={<OrganizationPublicPage />} />
+          <Route path="/seller/part-card/:id" element={<SellerPartCardPage />} />
+          <Route path="/seller/:publicCode" element={<PublicSellerProfilePage />} />
+          <Route path="/buyer/:publicCode" element={<PublicBuyerProfilePage />} />
           <Route path="/autoservice" element={<Navigate to="/about" replace />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/order-reg" element={<OrderRegistration />} />
+          <Route path="/cart/new/checkout" element={<NewPartsOrderRegistration />} />
           <Route path="/my-parts/add" element={<AddPart />} />
           <Route path="/my-parts/edit/:id" element={<EditPart />} />
           <Route path="/part/:productId" element={<PartDetail />} />
@@ -236,6 +245,7 @@ function App() {
           <Route path="/admin/analytics" element={<AnalyticsPage />} />
           <Route path="/admin/audit-log" element={<AuditLogPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/rossko" element={<RosskoSettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

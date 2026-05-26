@@ -5,9 +5,11 @@ import { clearCart } from '../../redux/slices/CartSlice';
 import { apiAxios, apiAxiosUnauth } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import MobileFormField from '../../components/MobileFormField/MobileFormField';
+import DadataAddressInput from '../../components/DadataAddressInput/DadataAddressInput';
 import {
   normalizeFullName,
   normalizeEmail,
+  formatEmailInput,
   validateFullName,
   validateEmail,
   validatePhone,
@@ -110,13 +112,21 @@ export default function OrderRegistration() {
   const { user, isReady } = useAuthReady();
 
   const orderData = JSON.parse(localStorage.getItem('orderData') || '{}');
-  const selectedItems = orderData.items || [];
+  const rawItems = orderData.items || [];
+  const selectedItems = useMemo(
+    () => rawItems.filter((item) => item.type === 'used'),
+    [rawItems]
+  );
   const seller = orderData.seller || 'Организация';
   const deliverInParts = orderData.deliverInParts || false;
 
   useEffect(() => {
+    if (rawItems.some((item) => item.type === 'new')) {
+      navigate('/cart/new/checkout', { replace: true });
+      return;
+    }
     if (!selectedItems.length) navigate('/cart');
-  }, [selectedItems.length, navigate]);
+  }, [rawItems, selectedItems.length, navigate]);
 
   const [deliveryOptions, setDeliveryOptions] = useState([]);
   const [deliveryOptionsLoading, setDeliveryOptionsLoading] = useState(true);
@@ -138,9 +148,7 @@ export default function OrderRegistration() {
   const [submitting, setSubmitting] = useState(false);
   const [itemsExpanded, setItemsExpanded] = useState(false);
 
-  const hasNewItems = selectedItems.some((item) => item.type === 'new');
-  const hasUsedItems = selectedItems.some((item) => item.type === 'used');
-  const isUsedOnlyCheckout = hasUsedItems && !hasNewItems;
+  const hasUsedItems = selectedItems.length > 0;
 
 
   const deliveryTypeLabels = {
@@ -225,6 +233,12 @@ export default function OrderRegistration() {
     pickupAddresses[seller] ||
     'Адрес самовывоза не указан';
 
+  const dadataLocations = useMemo(() => {
+    const regionName = selectedDeliveryOption?.region_name;
+    if (!regionName) return undefined;
+    return [{ region: regionName }];
+  }, [selectedDeliveryOption]);
+
   const isFormValid = recipientValid && deliveryValid;
 
   useEffect(() => {
@@ -292,7 +306,7 @@ export default function OrderRegistration() {
       return {
         fullName: prev.fullName || fullName,
         phone: prev.phone || formatPhoneFromRaw(user.phone || ''),
-        email: prev.email || user.email || '',
+        email: prev.email || formatEmailInput(user.email || ''),
       };
     });
   }, [isReady, user]);
@@ -325,10 +339,11 @@ export default function OrderRegistration() {
   const handlePhoneBlur = () => {
     markTouched('phone');
     if (recipient.phone.trim()) trackFormField('order_registration', 'phone');
+    setRecipient((prev) => ({ ...prev, phone: formatPhoneInput(prev.phone) }));
   };
 
   const handleEmailChange = (e) => {
-    setRecipient((prev) => ({ ...prev, email: e.target.value }));
+    setRecipient((prev) => ({ ...prev, email: formatEmailInput(e.target.value) }));
   };
 
   const handleEmailBlur = () => {
@@ -377,8 +392,7 @@ export default function OrderRegistration() {
       setNotification(null);
       const token = localStorage.getItem('token');
 
-      const newCartItemIds = selectedItems.filter((item) => item.type === 'new').map((item) => item.id);
-      const usedCartItemIds = selectedItems.filter((item) => item.type === 'used').map((item) => item.id);
+      const usedCartItemIds = selectedItems.map((item) => item.id);
 
       const orderPayload = {
         items: selectedItems.map((item) => ({
@@ -390,6 +404,7 @@ export default function OrderRegistration() {
           product_id: item.product_id,
         })),
         used_cart_item_ids: usedCartItemIds,
+        cart_item_ids: [],
         recipient_name: normalizeFullName(recipient.fullName),
         recipient_phone: recipient.phone,
         recipient_email: normalizeEmail(recipient.email),
@@ -404,14 +419,6 @@ export default function OrderRegistration() {
         }),
         total_amount: calculateTotal(),
       };
-
-      if (!isUsedOnlyCheckout) {
-        orderPayload.cart_item_ids = newCartItemIds;
-        orderPayload.new_parts_order = {
-          seller,
-          deliver_in_parts: deliverInParts,
-        };
-      }
 
       const response = await apiAxios.post('/orders/', orderPayload, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -790,15 +797,16 @@ export default function OrderRegistration() {
                         : ''
                     }
                   >
-                    <textarea
+                    <DadataAddressInput
                       id="delivery-address"
                       value={deliveryAddress}
-                      onChange={(e) => setDeliveryAddress(e.target.value)}
-                      rows={3}
+                      onChange={setDeliveryAddress}
+                      locations={dadataLocations}
+                      hasError={submitAttempted && !deliveryAddress.trim()}
                       className={inputClass(submitAttempted && !deliveryAddress.trim())}
                       placeholder={
                         selectedDeliveryOption.delivery_type === 'pvz'
-                          ? 'Город, улица, пункт выдачи'
+                          ? 'Город, улица, дом (пункт выдачи можно дописать)'
                           : 'Город, улица, дом, квартира'
                       }
                     />

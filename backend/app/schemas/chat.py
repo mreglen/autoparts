@@ -112,6 +112,8 @@ class ChatResponse(BaseModel):
     buyer_name: Optional[str] = None
     buyer_phone: Optional[str] = None
     buyer_avatar_url: Optional[str] = None
+    buyer_public_code: Optional[str] = None
+    seller_public_code: Optional[str] = None
     
     # Информация о товаре (если есть)
     product_name: Optional[str] = None

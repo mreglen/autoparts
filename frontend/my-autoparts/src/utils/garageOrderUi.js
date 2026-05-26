@@ -11,17 +11,49 @@ export function formatGarageOrderPrice(amount) {
   return `${Number(amount || 0).toLocaleString('ru-RU')} ₽`;
 }
 
+const DELIVERY_TYPE_LABELS = {
+  pickup: 'Самовывоз',
+  pvz: 'ПВЗ',
+  courier: 'Курьер',
+  transport: 'Доставка',
+};
+
+function formatDeliveryAddress(order) {
+  const parts = [
+    order.delivery_region_name,
+    order.delivery_address,
+  ].filter(Boolean);
+  if (parts.length) return parts.join(', ');
+  return 'адрес уточняется';
+}
+
 export function getGarageDeliveryInfo(order) {
-  if (order.delivery_type === 'pickup') {
-    return `Самовывоз · ${order.pickup_address || 'адрес уточняется'}`;
+  if (order.delivery_method_name) {
+    return order.delivery_method_name;
   }
-  if (order.delivery_type === 'transport') {
-    if (order.transport_company) {
-      return `${order.transport_company} · ${order.delivery_address || 'адрес уточняется'}`;
+
+  const type = order.delivery_type || '';
+  const typeLabel = DELIVERY_TYPE_LABELS[type] || (type ? type : null);
+
+  if (type === 'pickup') {
+    const addr = order.pickup_address || formatDeliveryAddress(order);
+    return `${typeLabel || 'Самовывоз'} · ${addr}`;
+  }
+
+  if (type === 'pvz' || type === 'courier' || type === 'transport') {
+    const carrier = order.transport_company;
+    const addr = formatDeliveryAddress(order);
+    if (carrier) {
+      return `${typeLabel ? `${typeLabel} · ` : ''}${carrier} · ${addr}`;
     }
-    return `Доставка · ${order.delivery_address || 'адрес уточняется'}`;
+    return `${typeLabel || 'Доставка'} · ${addr}`;
   }
-  return order.delivery_method_name || 'Способ доставки уточняется';
+
+  if (typeLabel) {
+    return `${typeLabel} · ${formatDeliveryAddress(order)}`;
+  }
+
+  return 'Способ доставки уточняется';
 }
 
 export const GARAGE_STATUS_COLORS = {

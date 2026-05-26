@@ -10,10 +10,12 @@ import Breadcrumbs from '../components/Breadcrumbs/Breadcrumbs';
 import { usePageBreadcrumbs } from '../hooks/usePageBreadcrumbs';
 import AvitoProExpiredBanner from '../components/AvitoProExpiredBanner/AvitoProExpiredBanner';
 import { useAvitoAccountStatus } from '../hooks/useAvitoAccountStatus';
+import useCartSync from '../hooks/useCartSync';
 
 export default function MainLayout() {
     const location = useLocation();
     const { user } = useSelector((state) => state.auth);
+    useCartSync();
     const breadcrumbItems = usePageBreadcrumbs();
     const isPartPage = location.pathname.startsWith('/part/');
     const { status: avitoAccountStatus } = useAvitoAccountStatus(user?.organization_id, {

@@ -110,13 +110,18 @@ def create_order_legacy(
             detail="Список товаров пуст",
         )
 
-    create_new = len(payload.cart_item_ids) > 0
-    create_used = len(payload.used_cart_item_ids) > 0 or not create_new
-
-    if create_new and not current_user.organization_id:
+    if len(payload.cart_item_ids) > 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Пользователь не привязан к организации",
+            detail="Новые запчасти оформляются через POST /orders/new-parts",
+        )
+
+    create_new = False
+    create_used = len(payload.used_cart_item_ids) > 0
+    if not create_used:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Укажите позиции б/у в корзине (used_cart_item_ids)",
         )
 
     created_new_id: Optional[int] = None

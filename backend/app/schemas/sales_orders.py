@@ -62,9 +62,14 @@ class NewPartsOrderItemResponse(BaseModel):
     quantity: int
     price: float
     status_code: str
+    rossko_status: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class NewPartsOrderCanViewResponse(BaseModel):
+    can_view: bool
 
 
 class NewPartsOrderResponse(BaseModel):
@@ -78,11 +83,16 @@ class NewPartsOrderResponse(BaseModel):
     delivery_address: Optional[str] = None
     transport_company: Optional[str] = None
     pickup_address: Optional[str] = None
+    delivery_region_id: Optional[int] = None
+    delivery_region_name: Optional[str] = None
     total_amount: float
     is_paid: bool
     status_code: str
     seller: Optional[str] = None
     deliver_in_parts: bool
+    rossko_order_id: Optional[str] = None
+    rossko_status: Optional[str] = None
+    rossko_sync_error: Optional[str] = None
     created_at: datetime
     items: list[NewPartsOrderItemResponse] = Field(default_factory=list)
 
@@ -188,7 +198,7 @@ class PurchasedNewOrderItemResponse(BaseModel):
 class PurchasedNewOrderResponse(BaseModel):
     id: int
     organization_id: str
-    organization_name: str
+    organization_name: Optional[str] = None
     buyer_name: str
     buyer_phone: str
     buyer_email: str
@@ -196,6 +206,8 @@ class PurchasedNewOrderResponse(BaseModel):
     delivery_address: Optional[str] = None
     transport_company: Optional[str] = None
     pickup_address: Optional[str] = None
+    delivery_region_id: Optional[int] = None
+    delivery_region_name: Optional[str] = None
     total_amount: float
     is_paid: bool
     status_code: str

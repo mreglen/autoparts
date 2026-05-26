@@ -61,6 +61,9 @@ EVENT_TYPE_LABELS: dict[str, str] = {
     "admin_user_viewed": "Просмотр пользователя (админ)",
     "admin_user_sessions_revoked": "Сессии пользователя завершены (админ)",
     "admin_user_updated": "Пользователь изменён (админ)",
+    "rossko_settings_updated": "Настройки Rossko обновлены",
+    "rossko_order_created": "Заказ Rossko создан",
+    "rossko_order_failed": "Ошибка отправки заказа в Rossko",
 }
 
 

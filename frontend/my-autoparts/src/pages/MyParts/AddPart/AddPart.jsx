@@ -274,11 +274,20 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
             .catch(() => {});
         }
       })
-      .catch((err) => {
-        if (!cancelled) {
-          alert(typeof err === 'string' ? err : 'Не удалось загрузить запчасть на модерации');
-          navigate('/my-parts?tab=pending', { replace: true });
+      .catch(async (err) => {
+        if (cancelled) return;
+        // Старые/ошибочные QR могли вести на edit-pending с id складского товара
+        try {
+          const card = await apiAxios.get(`/products/qr-card/${editPendingId}`);
+          if (card.data?.id) {
+            navigate(`/seller/part-card/${card.data.id}`, { replace: true });
+            return;
+          }
+        } catch {
+          // not a warehouse product for this seller
         }
+        alert(typeof err === 'string' ? err : 'Не удалось загрузить запчасть на модерации');
+        navigate('/my-parts?tab=pending', { replace: true });
       })
       .finally(() => {
         if (!cancelled) setLoadingFormData(false);

@@ -81,8 +81,11 @@ function formatDate(dateString) {
   }
 }
 
-function getMaxAllowedQuantity() {
-  return 50;
+function getMaxAllowedQuantity(item) {
+  const max = item?.maxQuantity;
+  if (max != null && max > 0) return max;
+  if (item?.type === 'new') return 99;
+  return Math.max(1, item?.quantity || 1);
 }
 
 function PartTypeBadge({ type }) {
@@ -205,24 +208,6 @@ function CartItemRow({
   );
 }
 
-function ItemsSection({ title, subtitle, badgeTone, items, children }) {
-  if (!items.length) return null;
-  const toneClass =
-    badgeTone === 'indigo'
-      ? 'border-indigo-100 bg-indigo-50/40'
-      : 'border-amber-100 bg-amber-50/40';
-
-  return (
-    <div className="space-y-3">
-      <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
-        <p className="text-sm font-semibold text-gray-900">{title}</p>
-        {subtitle ? <p className="mt-0.5 text-xs text-gray-600">{subtitle}</p> : null}
-      </div>
-      <div className="space-y-2">{children}</div>
-    </div>
-  );
-}
-
 function SellerCartBlock({
   seller,
   newItems,
@@ -240,6 +225,7 @@ function SellerCartBlock({
   onCheckoutSelected,
   isAuthorized,
   calculateSellerTotal,
+  checkoutLabel = 'Оформить заказ',
 }) {
   const allSelected = allItems.length > 0 && allItems.every((item) => selectedItems.has(item.id));
   const someSelected = allItems.some((item) => selectedItems.has(item.id));
@@ -303,19 +289,9 @@ function SellerCartBlock({
         </div>
       </header>
 
-      <div className="space-y-6 px-4 py-5 sm:px-6">
-        <ItemsSection
-          title="Новые запчасти"
-          subtitle="Поставка с учётом выбранного режима доставки"
-          badgeTone="indigo"
-          items={newItems}
-        >
-          {renderItems(newItems, true)}
-        </ItemsSection>
-
-        {usedItems.length > 0 && (
-          <div className="space-y-2">{renderItems(usedItems, false)}</div>
-        )}
+      <div className="space-y-2 px-4 py-5 sm:px-6">
+        {newItems.length > 0 && renderItems(newItems, true)}
+        {usedItems.length > 0 && renderItems(usedItems, false)}
       </div>
 
       <footer className="border-t border-gray-100 bg-gray-50/80 px-4 py-4 sm:px-6">
@@ -327,7 +303,7 @@ function SellerCartBlock({
                 {allItems.length}
               </span>
             ) : (
-              <span>Отметьте позиции для частичного оформления</span>
+              <span>Выберите товары для оформления</span>
             )}
           </div>
 
@@ -372,7 +348,7 @@ function SellerCartBlock({
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:flex-none"
               >
                 <img src="/img/cart.svg" alt="" className="h-4 w-4 brightness-0 invert" />
-                {isAuthorized ? 'Оформить заказ' : 'Войти для заказа'}
+                {isAuthorized ? checkoutLabel : 'Войти для заказа'}
               </button>
             </div>
           </div>
@@ -399,6 +375,7 @@ export default function CartPage() {
   const cart = useSelector(selectCart);
   const loading = useSelector(selectCartLoading);
   const error = useSelector(selectCartError);
+  const isInitialLoad = loading && !cart;
   const isAuthorized = useSelector((state) => Boolean(state.auth.token));
 
   const [selectedItems, setSelectedItems] = useState(new Set());
@@ -408,91 +385,87 @@ export default function CartPage() {
     dispatch(fetchCart());
   }, [dispatch]);
 
-  const groupedItems = useMemo(() => {
-    if (!cart) return {};
+  const mapNewItem = useCallback((item) => {
+    const deliverParts = sellerDeliveryParts['__new__'] || false;
+    return {
+      id: item.id,
+      type: 'new',
+      seller: 'Заказ',
+      brand: item.brand,
+      number: item.partnumber,
+      name: item.name || `${item.brand} ${item.partnumber}`,
+      deliveryDate: item.delivery,
+      price: item.price,
+      quantity: item.quantity,
+      maxQuantity: item.max_quantity,
+      stock_id: item.stock_id,
+      product_id: item.product_id,
+      image: '/api/placeholder/80/80',
+      showDelivery: deliverParts,
+    };
+  }, [sellerDeliveryParts]);
 
-    const groups = {};
-
-    if (cart.new_parts_items) {
-      const sellerItemsMap = {};
+  const newPartsItems = useMemo(() => {
+    if (!cart?.new_parts_items?.length) return [];
+    const deliverParts = sellerDeliveryParts['__new__'] || false;
+    let sharedDelivery = null;
+    if (!deliverParts) {
       cart.new_parts_items.forEach((item) => {
-        const seller = item.seller || 'Новые запчасти';
-        if (!sellerItemsMap[seller]) sellerItemsMap[seller] = [];
-        sellerItemsMap[seller].push(item);
-      });
-
-      Object.keys(sellerItemsMap).forEach((seller) => {
-        const items = sellerItemsMap[seller];
-        const deliverParts = sellerDeliveryParts[seller] || false;
-        let deliveryDate = null;
-
-        if (!deliverParts) {
-          let latestDelivery = null;
-          items.forEach((item) => {
-            if (item.delivery && item.delivery !== 'Не указана') {
-              if (!latestDelivery || item.delivery > latestDelivery) {
-                latestDelivery = item.delivery;
-              }
-            }
-          });
-          deliveryDate = latestDelivery;
+        if (item.delivery && item.delivery !== 'Не указана') {
+          if (!sharedDelivery || item.delivery > sharedDelivery) {
+            sharedDelivery = item.delivery;
+          }
         }
-
-        items.forEach((item) => {
-          if (!groups[seller]) groups[seller] = [];
-          groups[seller].push({
-            id: item.id,
-            type: 'new',
-            seller,
-            brand: item.brand,
-            number: item.partnumber,
-            name: item.name || `${item.brand} ${item.partnumber}`,
-            deliveryDate: deliverParts ? item.delivery : deliveryDate,
-            price: item.price,
-            quantity: item.quantity,
-            stock_id: item.stock_id,
-            product_id: item.product_id,
-            image: '/api/placeholder/80/80',
-          });
-        });
       });
     }
+    return cart.new_parts_items.map((item) => {
+      const mapped = mapNewItem(item);
+      if (!deliverParts && sharedDelivery) {
+        mapped.deliveryDate = sharedDelivery;
+      }
+      return mapped;
+    });
+  }, [cart, mapNewItem, sellerDeliveryParts]);
 
-    if (cart.used_parts_items) {
-      cart.used_parts_items.forEach((item) => {
-        const seller = item.seller || 'Б/У запчасти';
-        if (!groups[seller]) groups[seller] = [];
-        groups[seller].push({
-          id: item.id,
-          type: 'used',
-          seller,
-          brand: item.brand,
-          number: item.partnumber,
-          internalCode: item.partnumber,
-          name: `${item.brand} ${item.partnumber}`,
-          deliveryDate: item.delivery,
-          price: item.price,
-          quantity: item.quantity,
-          product_id: item.product_id,
-          image: '/api/placeholder/80/80',
-        });
+  const usedGroupedItems = useMemo(() => {
+    if (!cart?.used_parts_items?.length) return {};
+    const groups = {};
+    cart.used_parts_items.forEach((item) => {
+      const seller = item.seller || 'Продавец';
+      if (!groups[seller]) groups[seller] = [];
+      groups[seller].push({
+        id: item.id,
+        type: 'used',
+        seller,
+        brand: item.brand,
+        number: item.partnumber,
+        internalCode: item.partnumber,
+        name: `${item.brand} ${item.partnumber}`,
+        deliveryDate: item.delivery,
+        price: item.price,
+        quantity: item.quantity,
+        maxQuantity: item.max_quantity,
+        product_id: item.product_id,
+        image: '/api/placeholder/80/80',
       });
-    }
-
+    });
     return groups;
-  }, [cart, sellerDeliveryParts]);
+  }, [cart]);
 
-  const cartItems = useMemo(() => Object.values(groupedItems).flat(), [groupedItems]);
+  const cartItems = useMemo(
+    () => [...newPartsItems, ...Object.values(usedGroupedItems).flat()],
+    [newPartsItems, usedGroupedItems]
+  );
 
-  const sellerGroups = useMemo(
+  const usedSellerGroups = useMemo(
     () =>
-      Object.entries(groupedItems).map(([seller, items]) => ({
+      Object.entries(usedGroupedItems).map(([seller, items]) => ({
         seller,
         items,
-        newItems: items.filter((i) => i.type === 'new'),
-        usedItems: items.filter((i) => i.type === 'used'),
+        newItems: [],
+        usedItems: items,
       })),
-    [groupedItems]
+    [usedGroupedItems]
   );
 
   const grandTotal = useMemo(
@@ -543,30 +516,51 @@ export default function CartPage() {
     }
   };
 
-  const saveOrderAndNavigate = useCallback(
+  const saveUsedOrderAndNavigate = useCallback(
     (items, seller) => {
       if (!isAuthorized) {
         navigate('/auth');
         return;
       }
+      const usedOnly = items.filter((item) => item.type === 'used');
+      if (!usedOnly.length) return;
       const orderData = {
-        items,
+        items: usedOnly,
         seller,
-        deliverInParts: sellerDeliveryParts[seller] || false,
+        deliverInParts: false,
+        checkoutType: 'used',
       };
       localStorage.setItem('orderData', JSON.stringify(orderData));
       navigate('/order-reg');
     },
-    [isAuthorized, navigate, sellerDeliveryParts]
+    [isAuthorized, navigate]
   );
 
+  const handleNewPartsCheckout = useCallback(() => {
+    if (!isAuthorized) {
+      navigate('/auth');
+      return;
+    }
+    navigate('/cart/new/checkout');
+  }, [isAuthorized, navigate]);
+
+  const handleNewPartsCheckoutSelected = useCallback(() => {
+    if (!isAuthorized) {
+      navigate('/auth');
+      return;
+    }
+    const selected = newPartsItems.filter((item) => selectedItems.has(item.id));
+    if (selected.length === 0) return;
+    navigate('/cart/new/checkout');
+  }, [isAuthorized, navigate, newPartsItems, selectedItems]);
+
   const handleCheckout = (seller) => {
-    saveOrderAndNavigate(groupedItems[seller] || [], seller);
+    saveUsedOrderAndNavigate(usedGroupedItems[seller] || [], seller);
   };
 
   const handleCheckoutSelected = (seller) => {
-    const selected = groupedItems[seller]?.filter((item) => selectedItems.has(item.id)) || [];
-    saveOrderAndNavigate(selected, seller);
+    const selected = (usedGroupedItems[seller] || []).filter((item) => selectedItems.has(item.id));
+    saveUsedOrderAndNavigate(selected, seller);
   };
 
   const handleItemSelect = (itemId) => {
@@ -578,8 +572,19 @@ export default function CartPage() {
     });
   };
 
+  const handleSelectAllNewItems = () => {
+    const ids = newPartsItems.map((item) => item.id);
+    const allSelected = ids.every((id) => selectedItems.has(id));
+    setSelectedItems((prev) => {
+      const newSet = new Set(prev);
+      if (allSelected) ids.forEach((id) => newSet.delete(id));
+      else ids.forEach((id) => newSet.add(id));
+      return newSet;
+    });
+  };
+
   const handleSelectAllSellerItems = (seller) => {
-    const sellerItemIds = groupedItems[seller].map((item) => item.id);
+    const sellerItemIds = (usedGroupedItems[seller] || []).map((item) => item.id);
     const allSelected = sellerItemIds.every((id) => selectedItems.has(id));
     setSelectedItems((prev) => {
       const newSet = new Set(prev);
@@ -598,15 +603,19 @@ export default function CartPage() {
         <div>
           <p className="text-sm font-medium text-indigo-600">Покупки</p>
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Корзина</h1>
-          {!loading && cartItems.length > 0 && (
+          {!isInitialLoad && cartItems.length > 0 && (
             <p className="mt-1 text-sm text-gray-500">
-              {sellerGroups.length}{' '}
-              {sellerGroups.length === 1 ? 'организация' : sellerGroups.length < 5 ? 'организации' : 'организаций'}
+              {newPartsItems.length > 0 && 'новые запчасти'}
+              {newPartsItems.length > 0 && usedSellerGroups.length > 0 && ' · '}
+              {usedSellerGroups.length > 0 &&
+                `${usedSellerGroups.length} ${
+                  usedSellerGroups.length === 1 ? 'продавец б/у' : 'продавцов б/у'
+                }`}
               · {cartItems.length} поз. · {grandQty} шт.
             </p>
           )}
         </div>
-        {!loading && cartItems.length > 0 && (
+        {!isInitialLoad && cartItems.length > 0 && (
           <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm sm:text-right">
             <p className="text-xs text-gray-500">Общая сумма</p>
             <p className="text-xl font-bold text-gray-900">{formatPrice(grandTotal)}</p>
@@ -614,7 +623,7 @@ export default function CartPage() {
         )}
       </div>
 
-      {loading ? (
+      {isInitialLoad ? (
         <PageState
           icon={
             <svg className="h-10 w-10 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
@@ -674,33 +683,60 @@ export default function CartPage() {
         />
       ) : (
         <div className="space-y-6">
-          {sellerGroups.map(({ seller, items, newItems, usedItems }) => (
+          {newPartsItems.length > 0 && (
             <SellerCartBlock
-              key={seller}
-              seller={seller}
-              newItems={newItems}
-              usedItems={usedItems}
-              allItems={items}
+              seller="Заказ"
+              newItems={newPartsItems}
+              usedItems={[]}
+              allItems={newPartsItems}
               selectedItems={selectedItems}
-              deliverInParts={sellerDeliveryParts[seller] || false}
+              deliverInParts={sellerDeliveryParts.__new__ || false}
               onDeliverInPartsChange={(checked) =>
-                setSellerDeliveryParts((prev) => ({ ...prev, [seller]: checked }))
+                setSellerDeliveryParts((prev) => ({ ...prev, __new__: checked }))
               }
-              onSelectAll={() => handleSelectAllSellerItems(seller)}
+              onSelectAll={handleSelectAllNewItems}
               onItemSelect={handleItemSelect}
               onQuantityChange={handleQuantityChange}
               onRemove={handleRemoveItem}
               onRemoveSelected={() => {
-                items
+                newPartsItems
                   .filter((item) => selectedItems.has(item.id))
                   .forEach((item) => handleRemoveItem(item.id));
               }}
-              onCheckout={() => handleCheckout(seller)}
-              onCheckoutSelected={() => handleCheckoutSelected(seller)}
+              onCheckout={handleNewPartsCheckout}
+              onCheckoutSelected={handleNewPartsCheckoutSelected}
               isAuthorized={isAuthorized}
               calculateSellerTotal={calculateSellerTotal}
+              checkoutLabel="Оформить заказ"
             />
-          ))}
+          )}
+
+          {usedSellerGroups.length > 0 &&
+            usedSellerGroups.map(({ seller, items, usedItems }) => (
+              <SellerCartBlock
+                key={seller}
+                seller={seller}
+                newItems={[]}
+                usedItems={usedItems}
+                allItems={items}
+                selectedItems={selectedItems}
+                deliverInParts={false}
+                onDeliverInPartsChange={() => {}}
+                onSelectAll={() => handleSelectAllSellerItems(seller)}
+                onItemSelect={handleItemSelect}
+                onQuantityChange={handleQuantityChange}
+                onRemove={handleRemoveItem}
+                onRemoveSelected={() => {
+                  items
+                    .filter((item) => selectedItems.has(item.id))
+                    .forEach((item) => handleRemoveItem(item.id));
+                }}
+                onCheckout={() => handleCheckout(seller)}
+                onCheckoutSelected={() => handleCheckoutSelected(seller)}
+                isAuthorized={isAuthorized}
+                calculateSellerTotal={calculateSellerTotal}
+              />
+            ))}
         </div>
       )}
     </div>

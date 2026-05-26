@@ -113,6 +113,7 @@ export function getPageTitle(pathname) {
         '/admin-settings': 'Настройки',
         '/admin/audit-log': 'Журнал событий',
         '/admin/users': 'Пользователи',
+        '/admin/rossko': 'Rossko',
         '/admin/analytics': 'Аналитика',
     };
 

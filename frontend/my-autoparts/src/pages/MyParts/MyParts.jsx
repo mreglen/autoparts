@@ -897,7 +897,15 @@ function MyParts() {
   };
 
   const handleOpenPrintModal = (part) => {
-    setSelectedPart(part);
+    if (activeTab === 'pending') {
+      setSelectedPart({
+        ...part,
+        moderationKind: part.moderationKind || 'pending',
+      });
+    } else {
+      const { moderationKind: _ignored, ...stockPart } = part;
+      setSelectedPart(stockPart);
+    }
     setPrintModalOpen(true);
   };
 

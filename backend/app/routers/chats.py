@@ -17,8 +17,10 @@ from app.schemas.chat import (
     MessageCreate,
     MessageResponse,
     ChatMediaResponse,
-    ChatBlockResponse
+    ChatBlockResponse,
 )
+from app.schemas.public_user import ChatParticipantsResponse
+from app.services.public_user_profile_service import participant_from_user
 from app.core.auth import get_current_user
 from app.routers.websocket import manager as websocket_manager
 from app.utils.chat_access import (
@@ -872,6 +874,49 @@ def unblock_user_in_chat(
     return {"message": "Пользователь разблокирован", "is_blocked": False}
 
 
+@router.get("/{chat_id}/participants", response_model=ChatParticipantsResponse)
+def list_chat_participants(
+    chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Участники чата для групповых и личных диалогов."""
+    chat = get_accessible_chat(db, chat_id, current_user.id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Чат не найден")
+
+    participants: list = []
+    if is_group_chat(chat):
+        rows = (
+            db.query(ChatParticipant)
+            .filter(ChatParticipant.chat_id == chat.id)
+            .all()
+        )
+        user_ids = [row.user_id for row in rows]
+        if user_ids:
+            users = db.query(User).filter(User.id.in_(user_ids)).all()
+            users_by_id = {u.id: u for u in users}
+            for uid in user_ids:
+                user = users_by_id.get(uid)
+                if user:
+                    participants.append(participant_from_user(user))
+    else:
+        for uid in (chat.buyer_id, chat.seller_id):
+            if not uid or uid == current_user.id:
+                continue
+            user = db.query(User).filter(User.id == uid).first()
+            if user:
+                participants.append(participant_from_user(user))
+
+    participants.sort(key=lambda p: p.display_name.lower())
+
+    return ChatParticipantsResponse(
+        chat_id=chat.id,
+        is_group=is_group_chat(chat),
+        participants=participants,
+    )
+
+
 @router.get("/{chat_id}/block-status")
 def get_block_status(
     chat_id: int,
@@ -955,9 +1000,11 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
     seller_phone = None
     seller_organization = None
     seller_avatar_url = None
+    seller_public_code = None
     buyer_name = None
     buyer_phone = None
     buyer_avatar_url = None
+    buyer_public_code = None
 
     if chat.seller_id:
         seller = db.query(User).filter(User.id == chat.seller_id).first()
@@ -965,6 +1012,7 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
             seller_name = _user_display_name(seller) or seller.first_name
             seller_phone = seller.phone
             seller_avatar_url = avatar_public_url(seller.avatar_url)
+            seller_public_code = seller.public_code
         if seller and seller.organization_id:
             from app.models.organization import Organization
             org = db.query(Organization).filter(Organization.id == seller.organization_id).first()
@@ -976,6 +1024,7 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
             buyer_name = _user_display_name(buyer) or buyer.first_name
             buyer_phone = buyer.phone
             buyer_avatar_url = avatar_public_url(buyer.avatar_url)
+            buyer_public_code = buyer.public_code
     
     product_name = None
     product_article = None
@@ -1043,6 +1092,8 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
         buyer_name=buyer_name,
         buyer_phone=buyer_phone,
         buyer_avatar_url=buyer_avatar_url,
+        buyer_public_code=buyer_public_code,
+        seller_public_code=seller_public_code,
         product_name=product_name,
         product_article=product_article,
         product_price=product_price,

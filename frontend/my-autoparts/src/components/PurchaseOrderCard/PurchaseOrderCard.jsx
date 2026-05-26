@@ -55,7 +55,7 @@ export default function PurchaseOrderCard({
   const isUsed = orderType === 'used';
   const sellerLabel = isUsed
     ? (order.organization_name || 'Продавец не указан')
-    : (order.seller || 'Продавец не указан');
+    : `Заказ новых запчастей №${order.id}`;
   const statusCode = order.status_code || 'pending';
   const statusIcon = STATUS_ICONS[statusCode] || STATUS_ICONS.pending;
 

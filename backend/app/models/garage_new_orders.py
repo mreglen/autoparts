@@ -11,6 +11,7 @@ class GarageNewOrder(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     organization_id = Column(String(10), ForeignKey("organizations.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=True)
 
     buyer_name = Column(String(255), nullable=False, default="")
     buyer_phone = Column(String(50), nullable=False, default="")
@@ -29,6 +30,8 @@ class GarageNewOrder(Base):
 
     seller = Column(String(255), nullable=True)
     deliver_in_parts = Column(Boolean, nullable=False, default=False)
+    rossko_order_id = Column(String(64), nullable=True, index=True)
+    rossko_response_raw = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())

@@ -2,7 +2,6 @@ import React, { useCallback, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  searchUsedParts,
   fetchCatalogProducts,
   fetchCatalogFacets,
   fetchPublicPartTypes,
@@ -11,10 +10,7 @@ import {
 import { fetchCart } from '../../../redux/slices/CartSlice';
 import UsedPartsFiltersForm from './UsedPartsFiltersForm';
 import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
-import {
-  buildUsedCatalogParams,
-  getUsedPartsUrlQuery,
-} from '../../../utils/autopartsPublic';
+import { buildUsedCatalogParams } from '../../../utils/autopartsPublic';
 import { Z_MOBILE_STICKY_FOOTER } from '../../../constants/mobileTokens';
 
 export default function UsedPartsFiltersPage() {
@@ -69,13 +65,6 @@ export default function UsedPartsFiltersPage() {
   useEffect(() => {
     dispatch(fetchCatalogFacets({}));
     dispatch(fetchPublicPartTypes());
-
-    const urlQ = getUsedPartsUrlQuery(searchParams);
-    if (urlQ) {
-      dispatch(searchUsedParts(urlQ));
-      return;
-    }
-
     dispatch(resetCatalogCatalog());
     dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams, 1)));
   }, [searchParams, dispatch]);

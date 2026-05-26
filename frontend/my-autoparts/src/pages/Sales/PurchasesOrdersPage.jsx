@@ -4,6 +4,7 @@ import { apiAxios } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import PurchaseOrderCard, { PurchaseOrdersEmptyState } from '../../components/PurchaseOrderCard/PurchaseOrderCard';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { getGarageDeliveryInfo } from '../../utils/garageOrderUi';
 
 const ACTIVE_STATUSES = new Set(['pending', 'confirmed', 'assembled', 'shipped']);
 const COMPLETED_STATUSES = new Set(['delivered', 'closed']);
@@ -54,19 +55,6 @@ function getGarageStatusName(statusCode) {
   return statusMap[statusCode] || statusCode || 'В ожидании';
 }
 
-function getDeliveryInfo(order) {
-  if (order.delivery_type === 'pickup') {
-    return `Самовывоз · ${order.pickup_address || 'адрес уточняется'}`;
-  }
-  if (order.delivery_type === 'transport') {
-    if (order.transport_company) {
-      return `${order.transport_company} · ${order.delivery_address || 'адрес уточняется'}`;
-    }
-    return `Доставка · ${order.delivery_address || 'адрес уточняется'}`;
-  }
-  return 'Способ доставки уточняется';
-}
-
 function matchesStatusFilter(order, filterId) {
   const code = order.status_code || 'pending';
   if (filterId === 'all') return true;
@@ -96,6 +84,7 @@ export default function PurchasesOrdersPage() {
   const [expandedUsedOrderId, setExpandedUsedOrderId] = useState(null);
   const [expandedNewOrderId, setExpandedNewOrderId] = useState(null);
   const [canViewNewOrders, setCanViewNewOrders] = useState(true);
+  const [newOrdersLoadFailed, setNewOrdersLoadFailed] = useState(false);
   const [activeTab, setActiveTab] = useState('used');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -131,16 +120,12 @@ export default function PurchasesOrdersPage() {
 
       if (newRes.status === 'fulfilled') {
         setCanViewNewOrders(true);
+        setNewOrdersLoadFailed(false);
         setNewOrders(Array.isArray(newRes.value.data) ? newRes.value.data : []);
       } else {
-        const statusCode = newRes.reason?.response?.status;
-        if (statusCode === 403) {
-          setCanViewNewOrders(false);
-          setNewOrders([]);
-          setActiveTab((t) => (t === 'new' ? 'used' : t));
-        } else {
-          throw newRes.reason;
-        }
+        setCanViewNewOrders(true);
+        setNewOrders([]);
+        setNewOrdersLoadFailed(true);
       }
     } catch (e) {
       setError(e?.response?.data?.detail || e.message || 'Не удалось загрузить заказы');
@@ -157,18 +142,17 @@ export default function PurchasesOrdersPage() {
   }, [isReady, isAuthenticated, fetchAll]);
 
   const filterOrders = useCallback(
-    (orders) => {
+    (orders, { includeOrganization = true } = {}) => {
       const q = searchQuery.trim().toLowerCase();
       return sortOrdersNewestFirst(orders).filter((order) => {
         if (!matchesStatusFilter(order, statusFilter)) return false;
         if (!q) return true;
         const haystack = [
           order.id,
-          order.organization_name,
-          order.seller,
+          ...(includeOrganization ? [order.organization_name, order.seller] : []),
           order.buyer_name,
           order.buyer_phone,
-          getDeliveryInfo(order),
+          getGarageDeliveryInfo(order),
           ...(order.items || []).flatMap((item) => [
             item.name,
             item.brand,
@@ -333,7 +317,11 @@ export default function PurchasesOrdersPage() {
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск по номеру, продавцу, товару…"
+              placeholder={
+                activeTab === 'used'
+                  ? 'Поиск по номеру, продавцу, товару…'
+                  : 'Поиск по номеру, товару…'
+              }
               className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>
@@ -377,6 +365,12 @@ export default function PurchasesOrdersPage() {
         </div>
       )}
 
+      {!loading && !error && newOrdersLoadFailed && activeTab === 'new' && (
+        <p className="text-sm text-amber-700">
+          Не удалось загрузить заказы новых запчастей. Попробуйте обновить страницу.
+        </p>
+      )}
+
       {!loading && !error && (
         <>
           {totalInTab > 0 && activeOrders.length !== totalInTab && (
@@ -391,7 +385,7 @@ export default function PurchasesOrdersPage() {
                 key={order.id}
                 order={{
                   ...order,
-                  delivery_method_name: getDeliveryInfo(order),
+                  delivery_method_name: getGarageDeliveryInfo(order),
                 }}
                 orderType={activeTab === 'used' ? 'used' : 'new'}
                 isExpanded={
@@ -404,7 +398,7 @@ export default function PurchasesOrdersPage() {
                 formatPrice={formatPrice}
                 getStatusColor={getGarageStatusColor}
                 getStatusName={getGarageStatusName}
-                getDeliveryInfo={getDeliveryInfo}
+                getDeliveryInfo={getGarageDeliveryInfo}
                 onProductClick={handleProductClick}
               />
             ))}

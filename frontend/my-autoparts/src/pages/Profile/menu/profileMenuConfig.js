@@ -24,6 +24,7 @@ export const TAB_PATH_MAP = {
     'product-moderation': '/moderation/products',
     'audit-log': '/admin/audit-log',
     'admin-users': '/admin/users',
+    'admin-rossko': '/admin/rossko',
     analytics: '/admin/analytics',
     chats: '/chats',
 };
@@ -38,6 +39,7 @@ export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/moderation/products')) return 'product-moderation';
     if (path.startsWith('/admin/analytics')) return 'analytics';
     if (path.startsWith('/admin/users')) return 'admin-users';
+    if (path.startsWith('/admin/rossko')) return 'admin-rossko';
     return PATH_TAB_MAP[path] || (user?.is_seller ? 'dashboard' : 'profile');
 };
 
@@ -241,6 +243,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
                 { id: 'analytics', label: 'Аналитика' },
                 { id: 'admin-panel', label: 'Настройки' },
                 { id: 'admin-users', label: 'Пользователи' },
+                { id: 'admin-rossko', label: 'Rossko' },
                 auditSubmenuItem,
             ],
         });

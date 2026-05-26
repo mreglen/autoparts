@@ -11,6 +11,7 @@ class NewPartsCartItem(BaseModel):
     quantity: int = 1
     price: float
     stock_id: str
+    max_quantity: Optional[int] = None
     guid: Optional[str] = None
     delivery_start: Optional[datetime] = None
     delivery_end: Optional[datetime] = None
@@ -27,6 +28,7 @@ class CartItemResponse(BaseModel):
     name: Optional[str] = None
     delivery: Optional[str] = None
     quantity: int
+    max_quantity: Optional[int] = None
     price: Optional[float] = None
     stock_id: Optional[str] = None
     product_id: Optional[int] = None

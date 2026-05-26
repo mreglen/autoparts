@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, NavLink, Link } from 'react-router-dom';
 import { logout } from '../../redux/slices/AuthSlice';
-import { selectCart } from '../../redux/slices/CartSlice';
+import { selectCartSummary } from '../../redux/slices/CartSlice';
 import { fetchAdminOrganizationPhone } from '../../redux/slices/PublicInfoSlice';
 import { fetchUnreadCount } from '../../redux/slices/ChatSlice';
 import Search from './Search/Search';
@@ -66,7 +66,7 @@ export default function Navigation() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user, token } = useSelector((state) => state.auth);
-  const cart = useSelector(selectCart);
+  const cartData = useSelector(selectCartSummary);
   const { adminOrganizationPhone } = useSelector((state) => state.publicInfo);
   const { chats } = useSelector((state) => state.chats);
   const { chats: avitoChats } = useSelector((state) => state.avitoChats);
@@ -110,23 +110,6 @@ export default function Navigation() {
   const firstName = user?.first_name || 'Пользователь';
   const fullName = `${user?.last_name || ''} ${user?.first_name || ''} ${user?.patronymic || ''}`.trim();
   const profilePath = '/profile';
-
-  const cartData = useMemo(() => {
-    if (!cart) return { itemCount: 0, totalPrice: 0 };
-    const newPartsCount = cart.new_parts_items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
-    const newPartsPrice =
-      cart.new_parts_items?.reduce((sum, item) => sum + item.price * item.quantity, 0) || 0;
-    const usedPartsCount = cart.used_parts_items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
-    const usedPartsPrice =
-      cart.used_parts_items?.reduce(
-        (sum, item) => sum + (item.price || 0) * item.quantity,
-        0
-      ) || 0;
-    return {
-      itemCount: newPartsCount + usedPartsCount,
-      totalPrice: newPartsPrice + usedPartsPrice,
-    };
-  }, [cart]);
 
   const garageUnreadCount = useMemo(() => {
     if (!chats?.length) return 0;

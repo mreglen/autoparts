@@ -2,6 +2,7 @@
 import React from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import { selectCartSummary } from '../../redux/slices/CartSlice';
 
 const navItems = [
     {
@@ -149,7 +150,7 @@ function NavItemLink({ item, isActive, badge }) {
 export default function MobileBottomNav() {
     const { user, token } = useSelector((state) => state.auth);
     const isAuthenticated = Boolean(token && user);
-    const cart = useSelector((state) => state.cart);
+    const cartData = useSelector(selectCartSummary);
     const { chats } = useSelector((state) => state.chats);
     const { chats: avitoChats } = useSelector((state) => state.avitoChats);
     const navigate = useNavigate();
@@ -159,17 +160,6 @@ export default function MobileBottomNav() {
         () => (isAuthenticated ? navItems : navItems.filter((item) => item.id !== 'chats')),
         [isAuthenticated]
     );
-
-    const cartData = React.useMemo(() => {
-        if (!cart) return { itemCount: 0 };
-        const newPartsCount = cart.new_parts_items
-            ? cart.new_parts_items.reduce((sum, item) => sum + item.quantity, 0)
-            : 0;
-        const usedPartsCount = cart.used_parts_items
-            ? cart.used_parts_items.reduce((sum, item) => sum + item.quantity, 0)
-            : 0;
-        return { itemCount: newPartsCount + usedPartsCount };
-    }, [cart]);
 
     const garageUnreadCount = React.useMemo(() => {
         if (!chats || chats.length === 0) return 0;

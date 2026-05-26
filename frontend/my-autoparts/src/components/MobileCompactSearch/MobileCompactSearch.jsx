@@ -1,15 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useDebouncedCallback } from '../../hooks/useDebouncedCallback';
 
 export default function MobileCompactSearch({
     onSearch,
+    onQueryChange,
+    liveSearch = false,
+    debounceMs = 320,
     placeholder = 'Поиск по названию, артикулу или VIN',
     className = '',
     sticky = true,
+    inputClassName = '',
 }) {
     const [searchParams] = useSearchParams();
     const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
     const [isSearching, setIsSearching] = useState(false);
+
+    const debouncedLiveSearch = useDebouncedCallback((value) => {
+        if (onQueryChange) onQueryChange(value);
+    }, debounceMs);
 
     useEffect(() => {
         setSearchTerm(searchParams.get('q') || '');
@@ -21,9 +30,21 @@ export default function MobileCompactSearch({
 
         setIsSearching(true);
         try {
-            await onSearch(trimmedTerm);
+            if (onSearch) {
+                await onSearch(trimmedTerm);
+            } else if (onQueryChange) {
+                onQueryChange(trimmedTerm);
+            }
         } finally {
             setIsSearching(false);
+        }
+    };
+
+    const handleChange = (e) => {
+        const value = e.target.value;
+        setSearchTerm(value);
+        if (liveSearch && onQueryChange) {
+            debouncedLiveSearch(value);
         }
     };
 
@@ -42,11 +63,11 @@ export default function MobileCompactSearch({
                 <input
                     type="search"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={handleChange}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     placeholder={placeholder}
                     disabled={isSearching}
-                    className="h-9 w-full rounded-full border border-gray-200 bg-white pl-9 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className={`h-9 w-full rounded-full border border-gray-200 bg-white pl-9 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${inputClassName}`}
                 />
                 <button
                     type="button"

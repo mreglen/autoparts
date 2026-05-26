@@ -10,11 +10,12 @@ import {
   setSearchQuery,
 } from '../../redux/slices/RosskoSlice';
 import {
-  searchUsedParts,
+  searchUsedAnalogs,
   fetchCatalogProducts,
   fetchCatalogFacets,
   fetchPublicPartTypes,
   resetCatalogCatalog,
+  clearUsedPartsSearch,
 } from '../../redux/slices/ProductSlice';
 import { fetchCart } from '../../redux/slices/CartSlice';
 import UsedPartsList from './UsedParts/UsedPartsList';
@@ -144,16 +145,31 @@ function AutoParts() {
     navigate(`/autoparts/new?q=${encodeURIComponent(trimmed)}`);
   }, [dispatch, navigate]);
 
-  const handleUsedPartsSearch = useCallback(async (text) => {
+  const applyUsedQueryToUrl = useCallback((text, { replace = true } = {}) => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('page');
     const trimmed = text.trim();
-    if (!trimmed) return;
-    dispatch(setSearchQuery(trimmed));
-    await Promise.all([
-      dispatch(searchUsedParts(trimmed)),
-      dispatch(fetchSearchResults({ text: trimmed })),
-    ]);
-    navigate(`/autoparts/used?q=${encodeURIComponent(trimmed)}`);
-  }, [dispatch, navigate]);
+    if (trimmed) {
+      params.set('q', trimmed);
+      dispatch(setSearchQuery(trimmed));
+    } else {
+      params.delete('q');
+      dispatch(setSearchQuery(''));
+    }
+    const basePath = location.pathname.includes('/autoparts/used')
+      ? location.pathname.replace(/\/filters$/, '')
+      : '/autoparts/used';
+    const qs = params.toString();
+    navigate(`${basePath}${qs ? `?${qs}` : ''}`, { replace });
+  }, [searchParams, navigate, location.pathname, dispatch]);
+
+  const handleUsedLiveQueryChange = useCallback((text) => {
+    applyUsedQueryToUrl(text, { replace: true });
+  }, [applyUsedQueryToUrl]);
+
+  const handleUsedPartsSearch = useCallback((text) => {
+    applyUsedQueryToUrl(text, { replace: true });
+  }, [applyUsedQueryToUrl]);
 
   const applyUsedSort = useCallback((uiSort) => {
     setUsedPartsSort(uiSort);
@@ -211,21 +227,33 @@ function AutoParts() {
     dispatch(fetchPublicPartTypes());
 
     const urlQ = getUsedPartsUrlQuery(searchParams);
-    if (urlQ) {
-      if ((searchQuery || '').trim() !== urlQ) {
-        dispatch(setSearchQuery(urlQ));
-      }
-      dispatch(searchUsedParts(urlQ));
-      return;
+    if (urlQ && (searchQuery || '').trim() !== urlQ) {
+      dispatch(setSearchQuery(urlQ));
     }
-
-    if ((searchQuery || '').trim()) {
+    if (!urlQ && (searchQuery || '').trim()) {
       dispatch(setSearchQuery(''));
     }
 
     dispatch(resetCatalogCatalog());
     dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams, 1)));
   }, [searchQuery, activeTab, usedCatalogFilterKey, searchParams, dispatch]);
+
+  useEffect(() => {
+    if (activeTab !== 'my') return;
+
+    const urlQ = getUsedPartsUrlQuery(searchParams);
+    if (!urlQ) {
+      dispatch(clearUsedPartsSearch());
+      return undefined;
+    }
+
+    dispatch(clearUsedPartsSearch());
+    const timer = setTimeout(() => {
+      dispatch(searchUsedAnalogs(urlQ));
+    }, 650);
+
+    return () => clearTimeout(timer);
+  }, [activeTab, usedCatalogFilterKey, searchParams, dispatch]);
 
   useEffect(() => {
     if (activeTab !== 'rossko') return;
@@ -261,7 +289,12 @@ function AutoParts() {
     <div className="mt-0 sm:mt-5 px-0 w-full">
       <div className="max-md:sticky max-md:top-0 max-md:z-20 max-md:bg-gray-50">
         {activeTab === 'my' && (
-          <MobileCompactSearch onSearch={handleUsedPartsSearch} sticky={false} />
+          <MobileCompactSearch
+            onSearch={handleUsedPartsSearch}
+            onQueryChange={handleUsedLiveQueryChange}
+            liveSearch
+            sticky={false}
+          />
         )}
         {activeTab === 'rossko' && (
           <MobileCompactSearch

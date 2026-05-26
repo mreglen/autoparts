@@ -311,7 +311,14 @@ export default function ProfilePage() {
 
 
 
-    const handleCancel = () => setIsEditing(false);
+    const handleCancel = () => {
+        setFormData({
+            last_name: user.last_name || '',
+            first_name: user.first_name || '',
+            patronymic: user.patronymic || '',
+        });
+        setIsEditing(false);
+    };
 
 
 
@@ -390,13 +397,14 @@ export default function ProfilePage() {
             {/* Hero */}
             <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
                 <div className="flex items-center gap-4">
-                    <div className="relative shrink-0">
+                    <div className="flex shrink-0 flex-col items-center sm:items-start">
                         <button
                             type="button"
                             onClick={() => avatarInputRef.current?.click()}
                             disabled={avatarLoading}
-                            className={`block rounded-2xl shadow-md ring-4 ring-white ${roleMeta.ring} focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60`}
+                            className={`group relative block rounded-2xl shadow-md ring-4 ring-white ${roleMeta.ring} focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60`}
                             title="Изменить фото"
+                            aria-label="Изменить фото профиля"
                         >
                             <UserAvatar
                                 avatarUrl={user.avatar_url}
@@ -404,6 +412,28 @@ export default function ProfilePage() {
                                 lastName={user.last_name}
                                 size="xl"
                             />
+                            <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-black/0 transition-colors group-hover:bg-black/40">
+                                <svg
+                                    className="h-7 w-7 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={1.5}
+                                    aria-hidden
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                                    />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </span>
+                            {avatarLoading && (
+                                <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 text-xs font-medium text-white">
+                                    Загрузка…
+                                </span>
+                            )}
                         </button>
                         <input
                             ref={avatarInputRef}
@@ -417,12 +447,9 @@ export default function ProfilePage() {
                                 type="button"
                                 onClick={handleDeleteAvatar}
                                 disabled={avatarLoading}
-                                className="absolute -bottom-1 -right-1 rounded-full bg-white p-1 text-xs text-gray-500 shadow ring-1 ring-gray-200 hover:text-red-600 disabled:opacity-50"
-                                title="Удалить фото"
+                                className="mt-2 text-xs text-gray-500 transition-colors hover:text-red-600 disabled:opacity-50"
                             >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                Удалить фото
                             </button>
                         )}
                     </div>
@@ -444,7 +471,7 @@ export default function ProfilePage() {
 
                     <div className="flex shrink-0 items-center gap-2 self-center">
                         {!isEditing && (
-                            <HeroIconButton onClick={handleEdit} title="Редактировать ФИО">
+                            <HeroIconButton onClick={handleEdit} title="Редактировать профиль">
                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                 </svg>
@@ -469,13 +496,23 @@ export default function ProfilePage() {
             </div>
 
             <div className={`grid grid-cols-1 gap-6 ${showOrganization ? 'lg:grid-cols-2 lg:items-start' : ''}`}>
-            <section className="h-full space-y-3 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+            <section
+                className={`h-full space-y-3 rounded-2xl border bg-white p-5 shadow-sm sm:p-6 ${
+                    isEditing ? 'border-indigo-200 ring-1 ring-indigo-100' : 'border-gray-200'
+                }`}
+            >
                 {saveError && (
                     <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{saveError}</div>
                 )}
 
                 {isEditing ? (
                     <div className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="text-base font-semibold text-gray-900">Личные данные</h3>
+                            <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                                Редактирование
+                            </span>
+                        </div>
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
 
@@ -539,46 +576,28 @@ export default function ProfilePage() {
 
                         </div>
 
-                        <div className="flex flex-col gap-2 sm:flex-row">
-
+                        <div className="flex flex-col-reverse gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
                             <button
-
                                 type="button"
-
-                                onClick={handleSave}
-
-                                disabled={saving}
-
-                                className="inline-flex flex-1 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 sm:flex-none sm:px-6"
-
-                            >
-
-                                {saving ? 'Сохранение...' : 'Сохранить'}
-
-                            </button>
-
-                            <button
-
-                                type="button"
-
                                 onClick={handleCancel}
-
                                 disabled={saving}
-
-                                className="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:flex-none sm:px-6"
-
+                                className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                             >
-
                                 Отмена
-
                             </button>
-
+                            <button
+                                type="button"
+                                onClick={handleSave}
+                                disabled={saving}
+                                className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                                {saving ? 'Сохранение…' : 'Сохранить'}
+                            </button>
                         </div>
-
                     </div>
-
                 ) : (
                     <div className="space-y-3">
+                        <h3 className="text-base font-semibold text-gray-900">Личные данные</h3>
 
                         <InfoRow
 

@@ -7,9 +7,15 @@ from sqlalchemy.orm import Session
 
 from app.models.organization import Organization as OrganizationModel
 from app.models.product import Product as ProductModel
+from app.services.public_user_profile_service import (
+    get_public_buyer_profile,
+    get_public_seller_profile,
+)
 
 PART_PATH_RE = re.compile(r"^/part/(?P<product_id>\d+)(?:[-/]|$)")
 ORG_DETAIL_PATH_RE = re.compile(r"^/organizations/(?P<org_id>[A-Za-z0-9_-]+)$")
+SELLER_PROFILE_PATH_RE = re.compile(r"^/seller/(?P<public_code>[A-Z]\d{6})$")
+BUYER_PROFILE_PATH_RE = re.compile(r"^/buyer/(?P<public_code>[A-Z]\d{6})$")
 
 SPA_ROUTE_PREFIXES = (
     "/auth",
@@ -40,6 +46,8 @@ SPA_ROUTE_PREFIXES = (
     "/chats",
     "/moderation",
     "/sellers",
+    "/seller/",
+    "/buyer/",
     "/admin-settings",
     "/admin",
 )
@@ -93,5 +101,13 @@ def is_spa_page_available(db: Session, raw_path: str) -> bool:
     org_match = ORG_DETAIL_PATH_RE.match(path)
     if org_match:
         return _organization_exists(db, org_match.group("org_id"))
+
+    seller_match = SELLER_PROFILE_PATH_RE.match(path)
+    if seller_match:
+        return get_public_seller_profile(db, seller_match.group("public_code")) is not None
+
+    buyer_match = BUYER_PROFILE_PATH_RE.match(path)
+    if buyer_match:
+        return get_public_buyer_profile(db, buyer_match.group("public_code")) is not None
 
     return True

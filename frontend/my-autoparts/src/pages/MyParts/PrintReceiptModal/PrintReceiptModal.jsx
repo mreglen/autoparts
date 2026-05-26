@@ -9,6 +9,7 @@ import {
 import { apiAxios } from '../../../utils/apiClient';
 import LabelStorageCellsPreview from '../../../components/LabelPrint/LabelStorageCellsPreview';
 import { buildStorageCellsForLabel } from '../../../utils/labelPrintDisplay';
+import { getLabelQrUrl } from '../../../utils/labelQrUrl';
 
 const MM_TO_PX = 96 / 25.4;
 const PRINTER_POLL_MS = 4000;
@@ -29,20 +30,6 @@ function formatInternalCode(internalCode) {
     return internalCode.code || internalCode.id || '—';
   }
   return internalCode;
-}
-
-function getLabelQrUrl(selectedPart) {
-  if (!selectedPart?.id) return '';
-  const base = (typeof window !== 'undefined' && window.location?.origin)
-    ? window.location.origin
-    : '';
-  if (selectedPart.moderationKind === 'pending') {
-    return `${base}/my-parts/edit-pending/${selectedPart.id}`;
-  }
-  if (selectedPart.moderationKind === 'rejected') {
-    return `${base}/my-parts/resubmit/${selectedPart.id}`;
-  }
-  return `${base}/seller/part-card/${selectedPart.id}`;
 }
 
 function buildLabelPrintPayload(selectedPart, productStorageCells, cellCatalog = []) {

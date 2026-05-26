@@ -220,12 +220,14 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
         // Make sure quantity is a proper integer
         const safeQuantity = Number.isInteger(quantityToAdd) ? quantityToAdd : parseInt(quantityToAdd, 10);
         
+        const availableCount = Math.max(0, Number(stock?.available_count) || 0);
         const cartItem = {
             brand: brand.trim(),
             partnumber: number.trim(),
             quantity: safeQuantity,
             price: calculatedPrice,
             stock_id: stockId,
+            max_quantity: availableCount > 0 ? availableCount : 1,
         };
         
         // Add optional fields only if they have valid values

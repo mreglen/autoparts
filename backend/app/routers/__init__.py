@@ -36,6 +36,8 @@ from app.routers.finance import router as finance_router
 from app.routers.audit import router as audit_router
 from app.routers.orders_meta import router as orders_meta_router
 from app.routers.orders_legacy import router as orders_legacy_router
+from app.routers.orders_new_parts import router as orders_new_parts_router
+from app.routers.admin_rossko import router as admin_rossko_router
 from app.routers.yandex_feeds import router as yandex_feeds_router
 from app.routers.public_feeds import router as public_feeds_router
 from app.routers.site_delivery import router as site_delivery_router
@@ -43,6 +45,7 @@ from app.routers.site_quick_links import router as site_quick_links_router
 from app.routers.site_reviews import router as site_reviews_router
 from app.routers.public_pages import router as public_pages_router
 from app.routers.public_organizations import router as public_organizations_router
+from app.routers.public_users import router as public_users_router
 from app.routers.site_analytics_public import router as site_analytics_public_router
 from app.routers.admin_analytics import router as admin_analytics_router
 
@@ -62,6 +65,7 @@ api_router.include_router(transmissions_router)
 api_router.include_router(tecdoc_parts_router)
 
 api_router.include_router(admin_router)
+api_router.include_router(admin_rossko_router)
 api_router.include_router(auth_router)
 api_router.include_router(user_router)
 api_router.include_router(organizations_router)
@@ -90,6 +94,7 @@ api_router.include_router(finance_router)
 api_router.include_router(audit_router)
 api_router.include_router(orders_meta_router)
 api_router.include_router(orders_legacy_router)
+api_router.include_router(orders_new_parts_router)
 api_router.include_router(yandex_feeds_router)
 api_router.include_router(public_feeds_router)
 api_router.include_router(site_delivery_router)
@@ -97,6 +102,7 @@ api_router.include_router(site_quick_links_router)
 api_router.include_router(site_reviews_router)
 api_router.include_router(public_pages_router)
 api_router.include_router(public_organizations_router)
+api_router.include_router(public_users_router)
 api_router.include_router(site_analytics_public_router)
 api_router.include_router(admin_analytics_router)
 

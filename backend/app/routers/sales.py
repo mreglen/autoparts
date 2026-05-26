@@ -23,12 +23,19 @@ from app.schemas.sales_orders import (
     AvitoRetryWarehouseResponse,
     AvitoWarehouseFulfillmentInfo,
     FulfilledOrderItemOut,
+    NewPartsOrderCanViewResponse,
+    NewPartsOrderItemResponse,
     NewPartsOrderResponse,
     UpdateStatusRequest,
     UpdateUsedOrderStatusResponse,
     UsedPartsOrderResponse,
     PurchasedUsedOrderResponse,
     PurchasedNewOrderResponse,
+)
+from app.services.rossko_get_orders_service import (
+    RosskoOrderLine,
+    RosskoOrderSnapshot,
+    fetch_orders_by_ids_safe,
 )
 from app.services.avito_warehouse_fulfillment import (
     compute_warehouse_fulfillment,
@@ -111,9 +118,74 @@ def _used_order_response(db: Session, order: GarageUsedOrder) -> UsedPartsOrderR
     return base.model_copy(update={"buyer_avatar_url": _buyer_avatar_for_order(db, order)})
 
 
-def _new_order_response(db: Session, order: GarageNewOrder) -> NewPartsOrderResponse:
+def _can_view_new_parts_orders(db: Session, user: UserModel) -> bool:
+    if user.is_admin:
+        return True
+    return _org_has_admin_director(db, user.organization_id)
+
+
+def _item_match_key(brand: str | None, partnumber: str | None) -> tuple[str, str]:
+    return ((partnumber or "").strip().lower(), (brand or "").strip().lower())
+
+
+def _merge_db_items_with_rossko(
+    order: GarageNewOrder,
+    snapshot: RosskoOrderSnapshot | None,
+) -> list[NewPartsOrderItemResponse]:
+    """Локальные статусы позиций (status_code) + статус Rossko отдельным полем."""
+    rossko_by_key: dict[tuple[str, str], RosskoOrderLine] = {}
+    if snapshot and snapshot.lines:
+        for line in snapshot.lines:
+            rossko_by_key[_item_match_key(line.brand, line.partnumber)] = line
+
+    merged: list[NewPartsOrderItemResponse] = []
+    for item in order.items:
+        line = rossko_by_key.get(_item_match_key(item.brand, item.partnumber))
+        merged.append(
+            NewPartsOrderItemResponse(
+                id=item.id,
+                name=item.name,
+                brand=item.brand,
+                partnumber=item.partnumber,
+                quantity=int(item.quantity),
+                price=float(item.price),
+                status_code=item.status_code,
+                rossko_status=line.status_code if line else None,
+            )
+        )
+    return merged
+
+
+def _new_order_response(
+    db: Session,
+    order: GarageNewOrder,
+    *,
+    rossko_by_id: dict[str, RosskoOrderSnapshot] | None = None,
+    rossko_sync_error: str | None = None,
+) -> NewPartsOrderResponse:
     base = NewPartsOrderResponse.model_validate(order)
-    return base.model_copy(update={"buyer_avatar_url": _buyer_avatar_for_order(db, order)})
+    result = base.model_copy(update={"buyer_avatar_url": _buyer_avatar_for_order(db, order)})
+    rossko_id = order.rossko_order_id
+    if not rossko_id:
+        return result
+
+    snapshot = (rossko_by_id or {}).get(str(rossko_id))
+    per_order_error: str | None = None
+    items = _merge_db_items_with_rossko(order, snapshot)
+
+    if snapshot and not snapshot.lines:
+        per_order_error = "Позиции Rossko не найдены"
+    elif rossko_sync_error:
+        per_order_error = rossko_sync_error
+
+    return result.model_copy(
+        update={
+            "rossko_order_id": rossko_id,
+            "rossko_status": snapshot.status if snapshot else None,
+            "rossko_sync_error": per_order_error,
+            "items": items,
+        }
+    )
 
 
 @router.get("/used-parts-orders", response_model=list[UsedPartsOrderResponse])
@@ -217,6 +289,15 @@ def update_used_parts_order_status(
     )
 
 
+@router.get("/new-parts-orders/can-view", response_model=NewPartsOrderCanViewResponse)
+def new_parts_orders_can_view(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _require_sales_orders_access(db, current_user)
+    return NewPartsOrderCanViewResponse(can_view=_can_view_new_parts_orders(db, current_user))
+
+
 @router.get("/new-parts-orders", response_model=list[NewPartsOrderResponse])
 def list_new_parts_orders(
     db: Session = Depends(get_db),
@@ -224,7 +305,7 @@ def list_new_parts_orders(
 ):
     _require_sales_orders_access(db, current_user)
     org_id = current_user.organization_id
-    if not current_user.is_admin and not _org_has_admin_director(db, org_id):
+    if not _can_view_new_parts_orders(db, current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Новые заказы недоступны для организации")
     if not org_id and not current_user.is_admin:
         return []
@@ -237,7 +318,21 @@ def list_new_parts_orders(
     if not current_user.is_admin:
         q = q.filter(GarageNewOrder.organization_id == org_id)
     orders = q.all()
-    return [_new_order_response(db, o) for o in orders]
+
+    rossko_ids: list[int] = []
+    for order in orders:
+        if order.rossko_order_id:
+            try:
+                rossko_ids.append(int(str(order.rossko_order_id).strip()))
+            except ValueError:
+                continue
+
+    rossko_by_id, rossko_sync_error = fetch_orders_by_ids_safe(rossko_ids)
+
+    return [
+        _new_order_response(db, o, rossko_by_id=rossko_by_id, rossko_sync_error=rossko_sync_error)
+        for o in orders
+    ]
 
 
 @router.put("/new-parts-orders/{order_id}/status")
@@ -249,15 +344,22 @@ def update_new_parts_order_status(
 ):
     _require_sales_orders_access(db, current_user)
     org_id = current_user.organization_id
-    if not current_user.is_admin and not _org_has_admin_director(db, org_id):
+    if not _can_view_new_parts_orders(db, current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Новые заказы недоступны для организации")
 
-    order = db.query(GarageNewOrder).filter(GarageNewOrder.id == order_id).first()
+    order = (
+        db.query(GarageNewOrder)
+        .options(selectinload(GarageNewOrder.items))
+        .filter(GarageNewOrder.id == order_id)
+        .first()
+    )
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
     if not current_user.is_admin and order.organization_id != org_id:
         raise HTTPException(status_code=403, detail="Нет доступа к заказу")
     order.status_code = payload.status_code
+    for item in order.items:
+        item.status_code = payload.status_code
     db.commit()
     return {"status": "ok"}
 
@@ -641,27 +743,21 @@ def list_purchased_new_orders(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Get new orders for the current buyer - returns all orders, frontend will filter"""
-    logger.info(f"Fetching new orders for buyer: {current_user.email}")
-    
-    # Get ALL new orders (not filtered by organization)
+    """Новые заказы текущего покупателя (по user_id)."""
     orders = (
         db.query(GarageNewOrder)
         .options(selectinload(GarageNewOrder.items))
+        .filter(GarageNewOrder.user_id == current_user.id)
         .order_by(GarageNewOrder.created_at.desc())
         .all()
     )
-    
-    logger.info(f"Total new orders in system: {len(orders)}")
-    
-    # Add organization name to each order
+
     result = []
     for order in orders:
-        org = db.query(Organization).filter(Organization.id == order.organization_id).first()
         order_dict = {
             "id": order.id,
             "organization_id": order.organization_id,
-            "organization_name": org.name if org else "Не указана",
+            "organization_name": None,
             "buyer_name": order.buyer_name,
             "buyer_phone": order.buyer_phone,
             "buyer_email": order.buyer_email,
@@ -669,6 +765,8 @@ def list_purchased_new_orders(
             "delivery_address": order.delivery_address,
             "transport_company": order.transport_company,
             "pickup_address": order.pickup_address,
+            "delivery_region_id": order.delivery_region_id,
+            "delivery_region_name": order.delivery_region_name,
             "total_amount": order.total_amount,
             "is_paid": order.is_paid,
             "status_code": order.status_code,
@@ -678,6 +776,6 @@ def list_purchased_new_orders(
             "items": order.items,
         }
         result.append(order_dict)
-    
+
     return result
 

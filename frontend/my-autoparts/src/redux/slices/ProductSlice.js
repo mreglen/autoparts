@@ -609,7 +609,7 @@ export const fetchVehicleCatalogTransmissions = createAsyncThunk(
 
 export const fetchCatalogProducts = createAsyncThunk(
     'products/fetchCatalogProducts',
-    async (params = {}, { rejectWithValue }) => {
+    async (params = {}, { rejectWithValue, signal }) => {
         try {
             const { append: _append, ...apiParams } = params;
             const queryParams = new URLSearchParams();
@@ -625,9 +625,15 @@ export const fetchCatalogProducts = createAsyncThunk(
                 }
                 queryParams.set(key, String(value));
             });
-            const response = await apiAxiosUnauth.get('/catalog/products', { params: queryParams });
+            const response = await apiAxiosUnauth.get('/catalog/products', {
+                params: queryParams,
+                signal,
+            });
             return response.data;
         } catch (error) {
+            if (signal?.aborted || error?.code === 'ERR_CANCELED' || error?.name === 'CanceledError') {
+                return rejectWithValue({ aborted: true });
+            }
             return rejectWithValue(
                 error.response?.data?.detail || 'Ошибка загрузки каталога'
             );
@@ -828,6 +834,11 @@ const productSlice = createSlice({
             state.catalogLoading = false;
             state.catalogLoadingMore = false;
         },
+        clearUsedPartsSearch: (state) => {
+            state.usedPartsData = null;
+            state.loading = false;
+            state.analogsLoading = false;
+        },
         updateProductQuantity: (state, action) => {
             const { productId, newQuantity } = action.payload;
             const product = state.items.find(p => p.id === productId);
@@ -945,22 +956,28 @@ const productSlice = createSlice({
             })
             .addCase(searchUsedAnalogs.fulfilled, (state, action) => {
                 state.analogsLoading = false;
-                if (state.usedPartsData) {
-                    // Исключаем из аналогов те запчасти, которые уже есть "в наличии"
-                    const availableIds = new Set((state.usedPartsData.available_parts || []).map(p => p.id));
-                    state.usedPartsData.analog_parts = (action.payload.analog_parts || []).filter(
-                        p => !availableIds.has(p.id)
-                    );
-                    state.usedPartsData.rossko_data = action.payload.rossko_data;
-                    
-                    // Обновляем кэш полными данными
-                    const query = action.meta.arg;
-                    if (query && query.trim()) {
-                        state.usedPartsCache[query.trim()] = {
-                            data: state.usedPartsData,
-                            timestamp: Date.now()
-                        };
-                    }
+                if (!state.usedPartsData) {
+                    state.usedPartsData = {
+                        available_parts: [],
+                        analog_parts: [],
+                        rossko_data: null,
+                    };
+                }
+                const excludeIds = new Set([
+                    ...(state.usedPartsData.available_parts || []).map((p) => p.id),
+                    ...state.catalogItems.map((p) => p.id),
+                ]);
+                state.usedPartsData.analog_parts = (action.payload.analog_parts || []).filter(
+                    (p) => !excludeIds.has(p.id)
+                );
+                state.usedPartsData.rossko_data = action.payload.rossko_data;
+
+                const query = action.meta.arg;
+                if (query && query.trim()) {
+                    state.usedPartsCache[query.trim()] = {
+                        data: state.usedPartsData,
+                        timestamp: Date.now(),
+                    };
                 }
             })
             .addCase(searchUsedAnalogs.rejected, (state) => {
@@ -1012,6 +1029,9 @@ const productSlice = createSlice({
                     hasRoomByTotal && receivedFullPage && (append ? addedCount > 0 : newItems.length > 0);
             })
             .addCase(fetchCatalogProducts.rejected, (state, action) => {
+                if (action.meta?.aborted || action.payload?.aborted) {
+                    return;
+                }
                 const append = Boolean(action.meta?.arg?.append);
                 state.catalogLoading = false;
                 state.catalogLoadingMore = false;
@@ -1275,7 +1295,7 @@ export const fetchPublicProducts = createAsyncThunk(
     }
 );
 
-export const { clearProductError, resetProducts, updateProductQuantity, clearSearchCache, resetCatalogCatalog } = productSlice.actions;
+export const { clearProductError, resetProducts, updateProductQuantity, clearSearchCache, resetCatalogCatalog, clearUsedPartsSearch } = productSlice.actions;
 export { fetchAllProducts };
 export const selectMyParts = (state) => state.products.items;
 export const selectMyPartsStatus = (state) => state.products.loading ? 'loading' : 'idle';
@@ -1289,4 +1309,5 @@ export const selectCatalogLoadingMore = (state) => state.products.catalogLoading
 export const selectCatalogHasMore = (state) => state.products.catalogHasMore;
 export const selectCatalogFacets = (state) => state.products.catalogFacets;
 export const selectPublicPartTypes = (state) => state.products.publicPartTypes;
+export const selectAnalogsLoading = (state) => state.products.analogsLoading;
 export default productSlice.reducer;

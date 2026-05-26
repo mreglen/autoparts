@@ -15,6 +15,72 @@ from app.utils.phone import normalize_to_storage_format
 
 router = APIRouter(prefix="/cart", tags=["Cart"])
 
+
+def _normalize_max_quantity(value: int | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _merge_new_parts_max(existing_max: int | None, incoming_max: int | None) -> int | None:
+    if incoming_max is None:
+        return existing_max
+    if existing_max is None:
+        return incoming_max
+    return max(existing_max, incoming_max)
+
+
+def _cap_to_max(quantity: int, max_qty: int | None) -> int:
+    if max_qty is None or max_qty < 1:
+        return quantity
+    return min(quantity, max_qty)
+
+
+def _product_max_quantity(product: Product | None) -> int:
+    if not product:
+        return 1
+    qty = product.quantity
+    if qty is None or qty < 1:
+        return 1
+    return int(qty)
+
+
+def _new_parts_cart_item_response(cart_item) -> CartItemResponse:
+    return CartItemResponse(
+        id=cart_item.id,
+        brand=cart_item.brand,
+        partnumber=cart_item.partnumber,
+        name=cart_item.name,
+        delivery=cart_item.delivery,
+        quantity=cart_item.quantity,
+        max_quantity=cart_item.max_quantity,
+        price=float(cart_item.price) if cart_item.price is not None else None,
+        stock_id=cart_item.stock_id,
+        seller=cart_item.seller,
+        created_at=cart_item.created_at,
+    )
+
+
+def _used_parts_cart_item_response(cart_item, product: Product | None) -> CartItemResponse:
+    max_qty = _product_max_quantity(product)
+    return CartItemResponse(
+        id=cart_item.id,
+        brand=product.brand if product else cart_item.brand,
+        partnumber=product.article if product else cart_item.partnumber,
+        name=product.name if product else "Б/У запчасть",
+        quantity=cart_item.quantity,
+        max_quantity=max_qty,
+        price=float(product.price) if product and product.price else (float(cart_item.price) if cart_item.price else 0),
+        product_id=cart_item.product_id,
+        seller=cart_item.seller,
+        created_at=cart_item.created_at,
+    )
+
+
 @router.post("/new-parts", response_model=CartItemResponse)
 async def add_new_parts_to_cart(
     item: NewPartsCartItem,
@@ -34,6 +100,8 @@ async def add_new_parts_to_cart(
         raise HTTPException(status_code=422, detail="Price is required and must be greater than 0")
     if item.quantity <= 0:
         raise HTTPException(status_code=422, detail="Quantity must be greater than 0")
+
+    incoming_max = _normalize_max_quantity(item.max_quantity)
 
     delivery_str = None
     if item.delivery is not None:
@@ -72,22 +140,20 @@ async def add_new_parts_to_cart(
             NewPartsCart.partnumber == item.partnumber
         ).first()
         if existing_item:
-            existing_item.quantity += item.quantity
+            merged_max = _merge_new_parts_max(existing_item.max_quantity, incoming_max)
+            existing_item.max_quantity = merged_max
+            existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, merged_max)
             if delivery_str is not None:
                 existing_item.delivery = delivery_str
             existing_item.updated_at = datetime.utcnow()
             db.commit()
             db.refresh(existing_item)
-            return CartItemResponse(
-                id=existing_item.id, brand=existing_item.brand, partnumber=existing_item.partnumber,
-                name=existing_item.name, delivery=existing_item.delivery, quantity=existing_item.quantity,
-                price=existing_item.price, stock_id=existing_item.stock_id, seller=existing_item.seller,
-                created_at=existing_item.created_at
-            )
+            return _new_parts_cart_item_response(existing_item)
 
         cart_item = NewPartsCart(
             cart_id=cart.id, user_id=current_user.id, brand=item.brand, partnumber=item.partnumber, name=item.name,
-            delivery=delivery_str, quantity=item.quantity, price=item.price, stock_id=item.stock_id, guid=item.guid,
+            delivery=delivery_str, quantity=_cap_to_max(item.quantity, incoming_max), price=item.price,
+            stock_id=item.stock_id, max_quantity=incoming_max, guid=item.guid,
             delivery_start=item.delivery_start, delivery_end=item.delivery_end
         )
     else:
@@ -99,23 +165,21 @@ async def add_new_parts_to_cart(
             GuestNewPartsCart.partnumber == item.partnumber
         ).first()
         if existing_item:
-            existing_item.quantity += item.quantity
+            merged_max = _merge_new_parts_max(existing_item.max_quantity, incoming_max)
+            existing_item.max_quantity = merged_max
+            existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, merged_max)
             if delivery_str is not None:
                 existing_item.delivery = delivery_str
             existing_item.updated_at = datetime.utcnow()
             db.commit()
             touch_guest_cart(db, guest_cart)
             db.refresh(existing_item)
-            return CartItemResponse(
-                id=existing_item.id, brand=existing_item.brand, partnumber=existing_item.partnumber,
-                name=existing_item.name, delivery=existing_item.delivery, quantity=existing_item.quantity,
-                price=existing_item.price, stock_id=existing_item.stock_id, seller=existing_item.seller,
-                created_at=existing_item.created_at
-            )
+            return _new_parts_cart_item_response(existing_item)
 
         cart_item = GuestNewPartsCart(
             guest_cart_id=guest_cart.id, brand=item.brand, partnumber=item.partnumber, name=item.name, delivery=delivery_str,
-            quantity=item.quantity, price=item.price, stock_id=item.stock_id, guid=item.guid,
+            quantity=_cap_to_max(item.quantity, incoming_max), price=item.price, stock_id=item.stock_id,
+            max_quantity=incoming_max, guid=item.guid,
             delivery_start=item.delivery_start, delivery_end=item.delivery_end
         )
 
@@ -125,11 +189,7 @@ async def add_new_parts_to_cart(
     if not current_user:
         touch_guest_cart(db, guest_cart)
 
-    return CartItemResponse(
-        id=cart_item.id, brand=cart_item.brand, partnumber=cart_item.partnumber, name=cart_item.name,
-        delivery=cart_item.delivery, quantity=cart_item.quantity, price=cart_item.price, stock_id=cart_item.stock_id,
-        seller=cart_item.seller, created_at=cart_item.created_at
-    )
+    return _new_parts_cart_item_response(cart_item)
 
 @router.post("/used-parts", response_model=CartItemResponse)
 def add_used_parts_to_cart(
@@ -145,7 +205,14 @@ def add_used_parts_to_cart(
     product = db.query(Product).filter(Product.id == item.product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Товар не найден")
-    
+
+    max_qty = _product_max_quantity(product)
+    if item.quantity > max_qty:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Доступно не более {max_qty} шт.",
+        )
+
     if current_user:
         cart = get_or_create_user_cart(db, current_user.id)
         client_phone = normalize_to_storage_format(current_user.phone) if current_user.phone else ""
@@ -169,15 +236,11 @@ def add_used_parts_to_cart(
             UsedPartsCart.product_id == item.product_id
         ).first()
         if existing_item:
-            existing_item.quantity += item.quantity
+            existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, max_qty)
             existing_item.updated_at = datetime.utcnow()
             db.commit()
             db.refresh(existing_item)
-            return CartItemResponse(
-                id=existing_item.id, brand=product.brand, partnumber=product.article, name=product.name,
-                quantity=existing_item.quantity, price=float(product.price) if product.price else 0,
-                product_id=product.id, seller=existing_item.seller, created_at=existing_item.created_at
-            )
+            return _used_parts_cart_item_response(existing_item, product)
 
         cart_item = UsedPartsCart(
             cart_id=cart.id, user_id=current_user.id, product_id=product.id, quantity=item.quantity,
@@ -190,16 +253,12 @@ def add_used_parts_to_cart(
             GuestUsedPartsCart.product_id == item.product_id
         ).first()
         if existing_item:
-            existing_item.quantity += item.quantity
+            existing_item.quantity = _cap_to_max(existing_item.quantity + item.quantity, max_qty)
             existing_item.updated_at = datetime.utcnow()
             db.commit()
             touch_guest_cart(db, guest_cart)
             db.refresh(existing_item)
-            return CartItemResponse(
-                id=existing_item.id, brand=product.brand, partnumber=product.article, name=product.name,
-                quantity=existing_item.quantity, price=float(product.price) if product.price else 0,
-                product_id=product.id, seller=existing_item.seller, created_at=existing_item.created_at
-            )
+            return _used_parts_cart_item_response(existing_item, product)
         cart_item = GuestUsedPartsCart(
             guest_cart_id=guest_cart.id, product_id=product.id, quantity=item.quantity,
             brand=product.brand, partnumber=product.article, price=product.price
@@ -210,11 +269,7 @@ def add_used_parts_to_cart(
     db.refresh(cart_item)
     if not current_user:
         touch_guest_cart(db, guest_cart)
-    return CartItemResponse(
-        id=cart_item.id, brand=product.brand, partnumber=product.article, name=product.name,
-        quantity=cart_item.quantity, price=float(product.price) if product.price else 0,
-        product_id=product.id, seller=cart_item.seller, created_at=cart_item.created_at
-    )
+    return _used_parts_cart_item_response(cart_item, product)
 
 @router.get("/admin-org-address")
 def get_admin_org_address(db: Session = Depends(get_db)):
@@ -247,20 +302,9 @@ def get_cart(
         return CartResponse(
             id=cart.id,
             user_id=cart.user_id,
-            new_parts_items=[
-                CartItemResponse(
-                    id=i.id, brand=i.brand, partnumber=i.partnumber, name=i.name, delivery=i.delivery, quantity=i.quantity,
-                    price=i.price, stock_id=i.stock_id, seller=i.seller, created_at=i.created_at
-                ) for i in cart.new_parts_items
-            ],
+            new_parts_items=[_new_parts_cart_item_response(i) for i in cart.new_parts_items],
             used_parts_items=[
-                CartItemResponse(
-                    id=i.id, brand=i.product.brand if i.product else i.brand,
-                    partnumber=i.product.article if i.product else i.partnumber,
-                    name=i.product.name if i.product else "Б/У запчасть", quantity=i.quantity,
-                    price=float(i.product.price) if i.product and i.product.price else (float(i.price) if i.price else 0),
-                    product_id=i.product_id, seller=i.seller, created_at=i.created_at
-                ) for i in cart.used_parts_items
+                _used_parts_cart_item_response(i, i.product) for i in cart.used_parts_items
             ]
         )
 
@@ -271,20 +315,9 @@ def get_cart(
     return CartResponse(
         id=guest_cart.id,
         user_id=None,
-        new_parts_items=[
-            CartItemResponse(
-                id=i.id, brand=i.brand, partnumber=i.partnumber, name=i.name, delivery=i.delivery, quantity=i.quantity,
-                price=i.price, stock_id=i.stock_id, seller=i.seller, created_at=i.created_at
-            ) for i in guest_cart.new_parts_items
-        ],
+        new_parts_items=[_new_parts_cart_item_response(i) for i in guest_cart.new_parts_items],
         used_parts_items=[
-            CartItemResponse(
-                id=i.id, brand=i.product.brand if i.product else i.brand,
-                partnumber=i.product.article if i.product else i.partnumber,
-                name=i.product.name if i.product else "Б/У запчасть", quantity=i.quantity,
-                price=float(i.product.price) if i.product and i.product.price else (float(i.price) if i.price else 0),
-                product_id=i.product_id, seller=i.seller, created_at=i.created_at
-            ) for i in guest_cart.used_parts_items
+            _used_parts_cart_item_response(i, i.product) for i in guest_cart.used_parts_items
         ]
     )
 
@@ -355,6 +388,13 @@ def update_new_parts_quantity(
             detail="Товар не найден в корзине"
         )
 
+    max_qty = cart_item.max_quantity
+    if max_qty is not None and quantity_data.quantity > max_qty:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Доступно не более {max_qty} шт.",
+        )
+
     cart_item.quantity = quantity_data.quantity
     cart_item.updated_at = datetime.utcnow()
     db.commit()
@@ -362,11 +402,7 @@ def update_new_parts_quantity(
     if not current_user:
         touch_guest_cart(db, guest_cart)
 
-    return CartItemResponse(
-        id=cart_item.id, brand=cart_item.brand, partnumber=cart_item.partnumber, name=cart_item.name,
-        delivery=cart_item.delivery, quantity=cart_item.quantity, price=cart_item.price, stock_id=cart_item.stock_id,
-        seller=cart_item.seller, created_at=cart_item.created_at
-    )
+    return _new_parts_cart_item_response(cart_item)
 
 @router.delete("/used-parts/{item_id}", status_code=204)
 def remove_used_parts_from_cart(
@@ -427,6 +463,12 @@ def update_used_parts_quantity(
         raise HTTPException(status_code=404, detail="Товар не найден в корзине")
 
     product = db.query(Product).filter(Product.id == cart_item.product_id).first() if cart_item.product_id else None
+    max_qty = _product_max_quantity(product)
+    if quantity_data.quantity > max_qty:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Доступно не более {max_qty} шт.",
+        )
 
     cart_item.quantity = quantity_data.quantity
     cart_item.updated_at = datetime.utcnow()
@@ -435,10 +477,4 @@ def update_used_parts_quantity(
     if not current_user:
         touch_guest_cart(db, guest_cart)
 
-    return CartItemResponse(
-        id=cart_item.id, brand=product.brand if product else cart_item.brand,
-        partnumber=product.article if product else cart_item.partnumber,
-        name=product.name if product else "Б/У запчасть", quantity=cart_item.quantity,
-        price=float(product.price) if product and product.price else (float(cart_item.price) if cart_item.price else 0),
-        product_id=cart_item.product_id, seller=cart_item.seller, created_at=cart_item.created_at
-    )
+    return _used_parts_cart_item_response(cart_item, product)

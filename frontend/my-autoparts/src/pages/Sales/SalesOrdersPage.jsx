@@ -83,7 +83,7 @@ export default function SalesOrdersPage() {
   const [expandedAvitoOrderId, setExpandedAvitoOrderId] = useState(null);
   const [expandedUsedOrderId, setExpandedUsedOrderId] = useState(null);
   const [expandedNewOrderId, setExpandedNewOrderId] = useState(null);
-  const [canViewNewOrders, setCanViewNewOrders] = useState(true);
+  const [canViewNewOrders, setCanViewNewOrders] = useState(false);
 
   const [editingStatus, setEditingStatus] = useState(null); // {type:'used'|'new'|'avito', id:number} | null
   const [availableStatuses, setAvailableStatuses] = useState([]);
@@ -166,11 +166,11 @@ export default function SalesOrdersPage() {
 
       const results = await Promise.allSettled([
         apiAxios.get('/sales/used-parts-orders'),
-        apiAxios.get('/sales/new-parts-orders'),
+        apiAxios.get('/sales/new-parts-orders/can-view'),
         avitoProActive ? apiAxios.get('/sales/avito-orders') : Promise.resolve({ data: [] }),
       ]);
 
-      const [usedRes, newRes, avitoRes] = results;
+      const [usedRes, canViewRes, avitoRes] = results;
 
       if (usedRes.status === 'fulfilled') {
         setUsedOrders(Array.isArray(usedRes.value.data) ? usedRes.value.data : []);
@@ -186,18 +186,23 @@ export default function SalesOrdersPage() {
         throw avitoRes.reason;
       }
 
-      if (newRes.status === 'fulfilled') {
-        setCanViewNewOrders(true);
-        setNewOrders(Array.isArray(newRes.value.data) ? newRes.value.data : []);
+      let canView = false;
+      if (canViewRes.status === 'fulfilled') {
+        canView = Boolean(canViewRes.value.data?.can_view);
       } else {
-        const statusCode = newRes.reason?.response?.status;
-        if (statusCode === 403) {
-          setCanViewNewOrders(false);
-          setNewOrders([]);
-          setActiveTab((t) => (t === 'new' ? 'used' : t));
-        } else {
-          throw newRes.reason;
+        const statusCode = canViewRes.reason?.response?.status;
+        if (statusCode !== 403) {
+          throw canViewRes.reason;
         }
+      }
+      setCanViewNewOrders(canView);
+
+      if (canView) {
+        const newRes = await apiAxios.get('/sales/new-parts-orders');
+        setNewOrders(Array.isArray(newRes.data) ? newRes.data : []);
+      } else {
+        setNewOrders([]);
+        setActiveTab((t) => (t === 'new' ? 'used' : t));
       }
     } catch (e) {
       setError(e?.response?.data?.detail || e.message || 'Ошибка загрузки');
@@ -298,8 +303,25 @@ export default function SalesOrdersPage() {
   };
 
   const updateNewOrderStatus = async (orderId, statusCode) => {
-    await apiAxios.put(`/sales/new-parts-orders/${orderId}/status`, { status_code: statusCode });
-    setNewOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status_code: statusCode } : o)));
+    try {
+      await apiAxios.put(`/sales/new-parts-orders/${orderId}/status`, { status_code: statusCode });
+      setNewOrders((prev) =>
+        prev.map((o) => {
+          if (o.id !== orderId) return o;
+          return {
+            ...o,
+            status_code: statusCode,
+            items: (o.items || []).map((item) => ({ ...item, status_code: statusCode })),
+          };
+        })
+      );
+      setEditingStatus(null);
+    } catch (error) {
+      setUsedOrderStatusMessage({
+        type: 'error',
+        text: formatStatusErrorDetail(error?.response?.data?.detail),
+      });
+    }
   };
 
   const closeReceiveCodeModal = () => {

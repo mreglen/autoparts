@@ -14,6 +14,7 @@ class GuestNewPartsCart(Base):
     name = Column(String(255), nullable=True)
     delivery = Column(String(255), nullable=True)
     quantity = Column(Integer, nullable=False, default=1)
+    max_quantity = Column(Integer, nullable=True)
     price = Column(Numeric(12, 2), nullable=False)
     stock_id = Column(String(50), nullable=False, index=True)
     guid = Column(String(50), nullable=True)
