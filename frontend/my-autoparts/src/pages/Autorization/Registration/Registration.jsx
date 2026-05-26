@@ -17,6 +17,7 @@ import {
 import { fetchCart } from '../../../redux/slices/CartSlice';
 import { useNavigate } from 'react-router-dom';
 import { trackFormField, trackFormSubmit } from '../../../utils/siteAnalytics';
+import RegistrationLegalConsent from '../../../components/Legal/RegistrationLegalConsent';
 
 export default function Registration() {
     const navigate = useNavigate();
@@ -41,6 +42,8 @@ export default function Registration() {
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordRepeat, setShowPasswordRepeat] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [acceptedLegalConsent, setAcceptedLegalConsent] = useState(false);
+    const [showLegalErrors, setShowLegalErrors] = useState(false);
     // Add state for step management
     const [currentStep, setCurrentStep] = useState(1); // 1: personal info, 2: verification, 3: additional info
     const dropdownRef = useRef(null);
@@ -186,6 +189,17 @@ export default function Registration() {
             dispatch({ type: 'auth/setError', payload: 'Заполните все обязательные поля' });
             return;
         }
+
+        if (!acceptedLegalConsent) {
+            setShowLegalErrors(true);
+            dispatch({
+                type: 'auth/setError',
+                payload:
+                    'Дайте согласие на обработку персональных данных и подтвердите ознакомление с политикой конфиденциальности',
+            });
+            return;
+        }
+        setShowLegalErrors(false);
 
         if (isSeller) {
             // Seller registration
@@ -611,6 +625,12 @@ export default function Registration() {
                 </>
             )}
 
+            <RegistrationLegalConsent
+                accepted={acceptedLegalConsent}
+                onChange={setAcceptedLegalConsent}
+                showError={showLegalErrors}
+            />
+
             <div className="flex justify-between pt-2">
                 <button
                     type="button"
@@ -622,7 +642,11 @@ export default function Registration() {
                 <button
                     type="button"
                     onClick={handleFinalSubmit}
-                    disabled={loading || emailVerification.status !== 'verified'}
+                    disabled={
+                        loading
+                        || emailVerification.status !== 'verified'
+                        || !acceptedLegalConsent
+                    }
                     className="px-5 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 transition-colors"
                 >
                     {loading ? (isSeller ? 'Отправка заявки...' : 'Регистрация...') : (isSeller ? 'Отправить заявку' : 'Зарегистрироваться')}

@@ -17,6 +17,7 @@ import {
   formatPhoneFromRaw,
 } from '../../utils/contactValidation';
 import { trackFormField, trackFormSubmit } from '../../utils/siteAnalytics';
+import CheckoutPaymentAndOffer from '../../components/Legal/CheckoutPaymentAndOffer';
 
 function formatApiErrorDetail(detail) {
   if (!detail) return 'Ошибка при оформлении заказа. Попробуйте еще раз.';
@@ -147,6 +148,8 @@ export default function OrderRegistration() {
   const [orderSuccess, setOrderSuccess] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [itemsExpanded, setItemsExpanded] = useState(false);
+  const [acceptedOffer, setAcceptedOffer] = useState(false);
+  const [showOfferError, setShowOfferError] = useState(false);
 
   const hasUsedItems = selectedItems.length > 0;
 
@@ -239,7 +242,7 @@ export default function OrderRegistration() {
     return [{ region: regionName }];
   }, [selectedDeliveryOption]);
 
-  const isFormValid = recipientValid && deliveryValid;
+  const isFormValid = recipientValid && deliveryValid && acceptedOffer;
 
   useEffect(() => {
     const fetchAdminOrgAddress = async () => {
@@ -355,17 +358,22 @@ export default function OrderRegistration() {
   const validateBeforeSubmit = () => {
     setSubmitAttempted(true);
     setTouched({ fullName: true, phone: true, email: true });
+    if (!acceptedOffer) {
+      setShowOfferError(true);
+    }
     return (
       !fieldErrors.fullName &&
       !fieldErrors.phone &&
       !fieldErrors.email &&
-      deliveryValid
+      deliveryValid &&
+      acceptedOffer
     );
   };
 
   const handleSubmitOrder = async () => {
     if (submitting || orderSuccess) return;
     if (!validateBeforeSubmit()) return;
+    setShowOfferError(false);
 
     trackFormSubmit('order_registration', [
       recipient.fullName.trim() ? 'fullName' : null,
@@ -452,6 +460,7 @@ export default function OrderRegistration() {
   const checklist = [
     { label: 'Контактные данные', done: recipientValid },
     { label: 'Способ доставки', done: Boolean(deliveryValid) },
+    { label: 'Оферта', done: acceptedOffer },
   ];
 
   const summaryBlock = (
@@ -494,8 +503,15 @@ export default function OrderRegistration() {
         ))}
       </ul>
 
-      <div className="rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-2.5 text-xs text-blue-800">
-        Оплата после подтверждения менеджером: перевод, наличные при получении или онлайн.
+      <div className="hidden md:block">
+        <CheckoutPaymentAndOffer
+          acceptedOffer={acceptedOffer}
+          onOfferChange={(value) => {
+            setAcceptedOffer(value);
+            if (value) setShowOfferError(false);
+          }}
+          showOfferError={showOfferError}
+        />
       </div>
 
       {!orderSuccess && (
@@ -503,7 +519,7 @@ export default function OrderRegistration() {
           type="button"
           onClick={handleSubmitOrder}
           disabled={submitting || !isFormValid}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="hidden md:flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? (
             <>
@@ -827,6 +843,17 @@ export default function OrderRegistration() {
             {submitAttempted && !deliveryValid && !deliveryOptionsLoading && deliveryOptions.length > 0 && (
               <p className="mt-3 text-sm text-red-600">Выберите способ доставки и заполните адрес</p>
             )}
+          </SectionCard>
+
+          <SectionCard title="Оплата и условия" className="md:hidden">
+            <CheckoutPaymentAndOffer
+              acceptedOffer={acceptedOffer}
+              onOfferChange={(value) => {
+                setAcceptedOffer(value);
+                if (value) setShowOfferError(false);
+              }}
+              showOfferError={showOfferError}
+            />
           </SectionCard>
         </div>
 

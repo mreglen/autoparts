@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 
 export default function PaymentPage() {
@@ -28,7 +29,14 @@ export default function PaymentPage() {
       <header className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Оплата</h1>
         <p className="mt-3 text-gray-600 leading-relaxed">
-          Способы оплаты заказов в интернет-магазине «Свой Гараж».
+          Способы оплаты заказов в интернет-магазине «Свой Гараж»: перевод, наличные при получении или онлайн.
+        </p>
+        <p className="mt-2 text-sm text-gray-600">
+          Условия покупки — в{' '}
+          <Link to="/offer" className="text-indigo-600 hover:underline">
+            публичной оферте
+          </Link>
+          .
         </p>
       </header>
 

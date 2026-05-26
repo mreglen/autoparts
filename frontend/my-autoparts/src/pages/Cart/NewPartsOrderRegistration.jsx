@@ -22,6 +22,7 @@ import {
     formatPhoneInput,
     formatPhoneFromRaw,
 } from '../../utils/contactValidation';
+import CheckoutPaymentAndOffer from '../../components/Legal/CheckoutPaymentAndOffer';
 
 function formatApiErrorDetail(detail) {
     if (!detail) return 'Ошибка при оформлении заказа. Попробуйте ещё раз.';
@@ -108,7 +109,6 @@ export default function NewPartsOrderRegistration() {
     const [selectedDeliveryOptionId, setSelectedDeliveryOptionId] = useState('');
     const [deliveryAddress, setDeliveryAddress] = useState('');
     const [adminOrgAddress, setAdminOrgAddress] = useState('');
-    const [deliverInParts, setDeliverInParts] = useState(false);
 
     const [recipient, setRecipient] = useState({
         fullName: '',
@@ -120,6 +120,8 @@ export default function NewPartsOrderRegistration() {
     const [notification, setNotification] = useState(null);
     const [orderSuccess, setOrderSuccess] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    const [acceptedOffer, setAcceptedOffer] = useState(false);
+    const [showOfferError, setShowOfferError] = useState(false);
 
     useEffect(() => {
         if (!isReady) return;
@@ -226,7 +228,7 @@ export default function NewPartsOrderRegistration() {
         return [{ region: regionName }];
     }, [selectedDeliveryOption]);
 
-    const isFormValid = recipientValid && deliveryValid;
+    const isFormValid = recipientValid && deliveryValid && acceptedOffer;
 
     useEffect(() => {
         const fetchAdminOrgAddress = async () => {
@@ -339,12 +341,22 @@ export default function NewPartsOrderRegistration() {
     const validateBeforeSubmit = () => {
         setSubmitAttempted(true);
         setTouched({ fullName: true, phone: true, email: true });
-        return !fieldErrors.fullName && !fieldErrors.phone && !fieldErrors.email && deliveryValid;
+        if (!acceptedOffer) {
+            setShowOfferError(true);
+        }
+        return (
+            !fieldErrors.fullName &&
+            !fieldErrors.phone &&
+            !fieldErrors.email &&
+            deliveryValid &&
+            acceptedOffer
+        );
     };
 
     const handleSubmitOrder = async () => {
         if (submitting || orderSuccess) return;
         if (!validateBeforeSubmit()) return;
+        setShowOfferError(false);
 
         setSubmitting(true);
         setNotification(null);
@@ -367,7 +379,6 @@ export default function NewPartsOrderRegistration() {
                         transport_company: selectedTransportCompany,
                         delivery_address: deliveryAddress.trim(),
                     }),
-                    deliver_in_parts: deliverInParts,
                 })
             ).unwrap();
             setOrderSuccess(result);
@@ -419,6 +430,7 @@ export default function NewPartsOrderRegistration() {
     const checklist = [
         { label: 'Контактные данные', done: recipientValid },
         { label: 'Способ доставки', done: Boolean(deliveryValid) },
+        { label: 'Оферта', done: acceptedOffer },
     ];
 
     const summaryBlock = (
@@ -449,8 +461,15 @@ export default function NewPartsOrderRegistration() {
                     </li>
                 ))}
             </ul>
-            <div className="rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-2.5 text-xs text-blue-800">
-                Оплата после подтверждения менеджером: перевод, наличные при получении или онлайн.
+            <div className="hidden md:block">
+                <CheckoutPaymentAndOffer
+                    acceptedOffer={acceptedOffer}
+                    onOfferChange={(value) => {
+                        setAcceptedOffer(value);
+                        if (value) setShowOfferError(false);
+                    }}
+                    showOfferError={showOfferError}
+                />
             </div>
             <button
                 type="button"
@@ -596,15 +615,6 @@ export default function NewPartsOrderRegistration() {
                         title="Доставка"
                         subtitle="Выберите регион и способ доставки"
                     >
-                        <label className="mb-4 flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                checked={deliverInParts}
-                                onChange={(e) => setDeliverInParts(e.target.checked)}
-                                className="h-4 w-4 rounded border-gray-300 text-indigo-600"
-                            />
-                            <span className="text-sm text-gray-700">Доставить частями по готовности</span>
-                        </label>
                         {deliveryOptionsLoading ? (
                             <p className="text-sm text-gray-500">Загрузка способов доставки…</p>
                         ) : deliveryOptions.length === 0 ? (
@@ -715,6 +725,17 @@ export default function NewPartsOrderRegistration() {
                                 )}
                             </div>
                         )}
+                    </SectionCard>
+
+                    <SectionCard title="Оплата и условия" className="md:hidden">
+                        <CheckoutPaymentAndOffer
+                            acceptedOffer={acceptedOffer}
+                            onOfferChange={(value) => {
+                                setAcceptedOffer(value);
+                                if (value) setShowOfferError(false);
+                            }}
+                            showOfferError={showOfferError}
+                        />
                     </SectionCard>
                 </div>
 

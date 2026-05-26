@@ -55,6 +55,30 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://svoygarage.ru/privacy</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://svoygarage.ru/personal-data-consent</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://svoygarage.ru/offer</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://svoygarage.ru/cookie-policy</loc>
+    <lastmod>2026-05-26</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://svoygarage.ru/organizations</loc>
     <lastmod>2026-05-25</lastmod>
     <changefreq>weekly</changefreq>

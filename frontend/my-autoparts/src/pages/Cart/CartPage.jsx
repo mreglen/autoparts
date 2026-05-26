@@ -214,8 +214,6 @@ function SellerCartBlock({
   usedItems,
   allItems,
   selectedItems,
-  deliverInParts,
-  onDeliverInPartsChange,
   onSelectAll,
   onItemSelect,
   onQuantityChange,
@@ -274,23 +272,11 @@ function SellerCartBlock({
               </p>
             </div>
           </div>
-
-          {hasNew && (
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm">
-              <input
-                type="checkbox"
-                checked={deliverInParts}
-                onChange={(e) => onDeliverInPartsChange(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-              />
-              <span className="font-medium text-gray-700">Доставить частями</span>
-            </label>
-          )}
         </div>
       </header>
 
       <div className="space-y-2 px-4 py-5 sm:px-6">
-        {newItems.length > 0 && renderItems(newItems, true)}
+        {newItems.length > 0 && renderItems(newItems, false)}
         {usedItems.length > 0 && renderItems(usedItems, false)}
       </div>
 
@@ -379,53 +365,31 @@ export default function CartPage() {
   const isAuthorized = useSelector((state) => Boolean(state.auth.token));
 
   const [selectedItems, setSelectedItems] = useState(new Set());
-  const [sellerDeliveryParts, setSellerDeliveryParts] = useState({});
 
   useEffect(() => {
     dispatch(fetchCart());
   }, [dispatch]);
 
-  const mapNewItem = useCallback((item) => {
-    const deliverParts = sellerDeliveryParts['__new__'] || false;
-    return {
-      id: item.id,
-      type: 'new',
-      seller: 'Заказ',
-      brand: item.brand,
-      number: item.partnumber,
-      name: item.name || `${item.brand} ${item.partnumber}`,
-      deliveryDate: item.delivery,
-      price: item.price,
-      quantity: item.quantity,
-      maxQuantity: item.max_quantity,
-      stock_id: item.stock_id,
-      product_id: item.product_id,
-      image: '/api/placeholder/80/80',
-      showDelivery: deliverParts,
-    };
-  }, [sellerDeliveryParts]);
+  const mapNewItem = useCallback((item) => ({
+    id: item.id,
+    type: 'new',
+    seller: 'Новые запчасти',
+    brand: item.brand,
+    number: item.partnumber,
+    name: item.name || `${item.brand} ${item.partnumber}`,
+    deliveryDate: item.delivery,
+    price: item.price,
+    quantity: item.quantity,
+    maxQuantity: item.max_quantity,
+    stock_id: item.stock_id,
+    product_id: item.product_id,
+    image: '/api/placeholder/80/80',
+  }), []);
 
   const newPartsItems = useMemo(() => {
     if (!cart?.new_parts_items?.length) return [];
-    const deliverParts = sellerDeliveryParts['__new__'] || false;
-    let sharedDelivery = null;
-    if (!deliverParts) {
-      cart.new_parts_items.forEach((item) => {
-        if (item.delivery && item.delivery !== 'Не указана') {
-          if (!sharedDelivery || item.delivery > sharedDelivery) {
-            sharedDelivery = item.delivery;
-          }
-        }
-      });
-    }
-    return cart.new_parts_items.map((item) => {
-      const mapped = mapNewItem(item);
-      if (!deliverParts && sharedDelivery) {
-        mapped.deliveryDate = sharedDelivery;
-      }
-      return mapped;
-    });
-  }, [cart, mapNewItem, sellerDeliveryParts]);
+    return cart.new_parts_items.map((item) => mapNewItem(item));
+  }, [cart, mapNewItem]);
 
   const usedGroupedItems = useMemo(() => {
     if (!cart?.used_parts_items?.length) return {};
@@ -685,15 +649,11 @@ export default function CartPage() {
         <div className="space-y-6">
           {newPartsItems.length > 0 && (
             <SellerCartBlock
-              seller="Заказ"
+              seller="Новые запчасти"
               newItems={newPartsItems}
               usedItems={[]}
               allItems={newPartsItems}
               selectedItems={selectedItems}
-              deliverInParts={sellerDeliveryParts.__new__ || false}
-              onDeliverInPartsChange={(checked) =>
-                setSellerDeliveryParts((prev) => ({ ...prev, __new__: checked }))
-              }
               onSelectAll={handleSelectAllNewItems}
               onItemSelect={handleItemSelect}
               onQuantityChange={handleQuantityChange}
@@ -720,8 +680,6 @@ export default function CartPage() {
                 usedItems={usedItems}
                 allItems={items}
                 selectedItems={selectedItems}
-                deliverInParts={false}
-                onDeliverInPartsChange={() => {}}
                 onSelectAll={() => handleSelectAllSellerItems(seller)}
                 onItemSelect={handleItemSelect}
                 onQuantityChange={handleQuantityChange}

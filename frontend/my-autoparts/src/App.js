@@ -15,6 +15,11 @@ import AutoParts from './pages/AutoParts/AutoParts';
 import AboutCompany from './pages/About/AboutCompany';
 import DeliveryPage from './pages/About/DeliveryPage';
 import PaymentPage from './pages/About/PaymentPage';
+import PrivacyPolicyPage from './pages/About/PrivacyPolicyPage';
+import PersonalDataConsentPage from './pages/About/PersonalDataConsentPage';
+import PublicOfferPage from './pages/About/PublicOfferPage';
+import CookiePolicyPage from './pages/About/CookiePolicyPage';
+import CookieBanner from './components/Legal/CookieBanner';
 import ReviewsPage from './pages/About/ReviewsPage';
 import { useShowSiteReviews } from './utils/siteReviewsPublic';
 import UsedPartsFiltersPage from './pages/AutoParts/UsedParts/UsedPartsFiltersPage';
@@ -159,6 +164,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <CookieBanner />
       <ServiceWorkerNavigationHandler />
       <SiteAnalyticsTracker />
       <Routes>
@@ -176,6 +182,10 @@ function App() {
           <Route path="/autoparts/used" element={<AutoParts />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/about" element={<AboutCompany />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/personal-data-consent" element={<PersonalDataConsentPage />} />
+          <Route path="/offer" element={<PublicOfferPage />} />
+          <Route path="/cookie-policy" element={<CookiePolicyPage />} />
           <Route path="/delivery" element={<DeliveryPage />} />
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/reviews" element={<ReviewsRoute />} />

@@ -50,6 +50,34 @@ function Footer() {
                     >
                         О компании
                     </NavLink>
+                    <NavLink
+                        exact
+                        to='/privacy'
+                        className='hover:text-blue_primary-light transition-colors ease-in-out'
+                    >
+                        Конфиденциальность
+                    </NavLink>
+                    <NavLink
+                        exact
+                        to='/personal-data-consent'
+                        className='hover:text-blue_primary-light transition-colors ease-in-out'
+                    >
+                        Персональные данные
+                    </NavLink>
+                    <NavLink
+                        exact
+                        to='/offer'
+                        className='hover:text-blue_primary-light transition-colors ease-in-out'
+                    >
+                        Оферта
+                    </NavLink>
+                    <NavLink
+                        exact
+                        to='/cookie-policy'
+                        className='hover:text-blue_primary-light transition-colors ease-in-out'
+                    >
+                        Cookie
+                    </NavLink>
                 </nav>
 
                 {/* Кнопка "Записаться" */}

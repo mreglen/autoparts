@@ -87,6 +87,26 @@ export default function AboutCompany() {
                             <Link to="/payment" className="text-indigo-600 hover:underline">Способы оплаты</Link>
                         </dd>
                     </div>
+                    <div className="py-3 border-b border-gray-100 last:border-0">
+                        <dt className="text-sm text-gray-500 mb-0.5">Документы</dt>
+                        <dd className="text-gray-900">
+                            <Link to="/privacy" className="text-indigo-600 hover:underline">
+                                Политика конфиденциальности
+                            </Link>
+                            {' · '}
+                            <Link to="/personal-data-consent" className="text-indigo-600 hover:underline">
+                                Согласие на обработку персональных данных
+                            </Link>
+                            {' · '}
+                            <Link to="/offer" className="text-indigo-600 hover:underline">
+                                Публичная оферта
+                            </Link>
+                            {' · '}
+                            <Link to="/cookie-policy" className="text-indigo-600 hover:underline">
+                                Политика обработки cookie
+                            </Link>
+                        </dd>
+                    </div>
                 </dl>
             </section>
 
