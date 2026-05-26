@@ -104,7 +104,21 @@ export default function SalesGarageOrderCard({
               >
                 {order.is_paid ? 'Оплачен' : 'Не оплачен'}
               </span>
-              {statusEditable && isEditing ? (
+              {isNew ? (
+                // Для новых запчастей статус приходит от Rossko и меняется автоматически.
+                // Показываем его в выпадающем списке, но без редактирования.
+                <select
+                  value={statusCode}
+                  disabled
+                  className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700"
+                >
+                  {orderStatusOptions.map((status) => (
+                    <option key={status.code} value={status.code}>
+                      {status.name}
+                    </option>
+                  ))}
+                </select>
+              ) : statusEditable && isEditing ? (
                 <select
                   value={statusCode}
                   onChange={(e) => onUpdateStatus(order.id, e.target.value)}
@@ -144,7 +158,7 @@ export default function SalesGarageOrderCard({
                   className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800 ring-1 ring-sky-100"
                   title="Статус заказа в Rossko (из API)"
                 >
-                  Rossko: {rosskoStatus}
+                  {rosskoStatus}
                 </span>
               )}
             </div>
@@ -227,7 +241,7 @@ export default function SalesGarageOrderCard({
                           className="inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-sky-100"
                           title="Статус позиции в Rossko"
                         >
-                          Rossko: {item.rossko_status}
+                          {item.rossko_status}
                         </span>
                       )}
                     </div>

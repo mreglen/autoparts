@@ -64,6 +64,13 @@ export const GARAGE_STATUS_COLORS = {
   shipped: 'bg-violet-50 text-violet-800 ring-1 ring-violet-100',
   delivered: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100',
   closed: 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
+
+  // Новые запчасти (нормализованные 5 стадий Rossko)
+  new_waiting_confirmation: 'bg-amber-50 text-amber-800 ring-1 ring-amber-100',
+  new_assembling: 'bg-indigo-50 text-indigo-800 ring-1 ring-indigo-100',
+  new_shipped: 'bg-violet-50 text-violet-800 ring-1 ring-violet-100',
+  new_awaiting_arrival: 'bg-sky-50 text-sky-800 ring-1 ring-sky-100',
+  new_received: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100',
 };
 
 export const GARAGE_STATUS_NAMES = {
@@ -74,10 +81,27 @@ export const GARAGE_STATUS_NAMES = {
   shipped: 'В доставке',
   delivered: 'Получен',
   closed: 'Закрыт',
+
+  new_waiting_confirmation: 'Ждёт подтверждения',
+  new_assembling: 'Комплектуется',
+  new_shipped: 'Отгружено',
+  new_awaiting_arrival: 'Ожидает поступления',
+  new_received: 'Получен',
 };
 
-export const GARAGE_ACTIVE_STATUSES = new Set(['pending', 'confirmed', 'assembled', 'shipped']);
-export const GARAGE_COMPLETED_STATUSES = new Set(['delivered', 'closed']);
+export const GARAGE_ACTIVE_STATUSES = new Set([
+  'pending',
+  'confirmed',
+  'assembled',
+  'shipped',
+
+  'new_waiting_confirmation',
+  'new_assembling',
+  'new_shipped',
+  'new_awaiting_arrival',
+]);
+
+export const GARAGE_COMPLETED_STATUSES = new Set(['delivered', 'closed', 'new_received']);
 
 export const AVITO_STATUS_COLORS = {
   on_confirmation: 'bg-amber-50 text-amber-800 ring-1 ring-amber-100',

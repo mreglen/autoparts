@@ -6,8 +6,17 @@ import PurchaseOrderCard, { PurchaseOrdersEmptyState } from '../../components/Pu
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { getGarageDeliveryInfo } from '../../utils/garageOrderUi';
 
-const ACTIVE_STATUSES = new Set(['pending', 'confirmed', 'assembled', 'shipped']);
-const COMPLETED_STATUSES = new Set(['delivered', 'closed']);
+const ACTIVE_STATUSES = new Set([
+  'pending',
+  'confirmed',
+  'assembled',
+  'shipped',
+  'new_waiting_confirmation',
+  'new_assembling',
+  'new_shipped',
+  'new_awaiting_arrival',
+]);
+const COMPLETED_STATUSES = new Set(['delivered', 'closed', 'new_received']);
 
 const STATUS_FILTER_OPTIONS = [
   { id: 'all', label: 'Все' },
@@ -38,6 +47,12 @@ function getGarageStatusColor(statusCode) {
     shipped: 'bg-violet-50 text-violet-800 ring-1 ring-violet-100',
     delivered: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100',
     closed: 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
+
+    new_waiting_confirmation: 'bg-amber-50 text-amber-800 ring-1 ring-amber-100',
+    new_assembling: 'bg-indigo-50 text-indigo-800 ring-1 ring-indigo-100',
+    new_shipped: 'bg-violet-50 text-violet-800 ring-1 ring-violet-100',
+    new_awaiting_arrival: 'bg-sky-50 text-sky-800 ring-1 ring-sky-100',
+    new_received: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100',
   };
   return colorMap[statusCode] || 'bg-gray-100 text-gray-700 ring-1 ring-gray-200';
 }
@@ -51,6 +66,12 @@ function getGarageStatusName(statusCode) {
     shipped: 'В доставке',
     delivered: 'Получен',
     closed: 'Закрыт',
+
+    new_waiting_confirmation: 'Ждёт подтверждения',
+    new_assembling: 'Комплектуется',
+    new_shipped: 'Отгружено',
+    new_awaiting_arrival: 'Ожидает поступления',
+    new_received: 'Получен',
   };
   return statusMap[statusCode] || statusCode || 'В ожидании';
 }

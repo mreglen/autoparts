@@ -37,6 +37,12 @@ from app.services.rossko_get_orders_service import (
     RosskoOrderSnapshot,
     fetch_orders_by_ids_safe,
 )
+from app.services.rossko_status_labels import (
+    NEW_PARTS_STATUS_CODES,
+    NEW_PARTS_STATUS_PRIORITY,
+    format_rossko_status,
+    map_rossko_line_status_to_new_parts_status_code,
+)
 from app.services.avito_warehouse_fulfillment import (
     compute_warehouse_fulfillment,
     enrich_avito_orders_response,
@@ -151,7 +157,7 @@ def _merge_db_items_with_rossko(
                 quantity=int(item.quantity),
                 price=float(item.price),
                 status_code=item.status_code,
-                rossko_status=line.status_code if line else None,
+                rossko_status=format_rossko_status(line.status_code) if line else None,
             )
         )
     return merged
@@ -182,7 +188,7 @@ def _new_order_response(
     return result.model_copy(
         update={
             "rossko_order_id": rossko_id,
-            "rossko_status": snapshot.status if snapshot else None,
+            "rossko_status": format_rossko_status(snapshot.status) if snapshot else None,
             "rossko_sync_error": per_order_error,
             "items": items,
         }
@@ -332,6 +338,48 @@ def list_new_parts_orders(
 
     rossko_by_id, rossko_sync_error = fetch_orders_by_ids_safe(rossko_ids)
 
+    updated_any = False
+
+    for order in orders:
+        rossko_id = order.rossko_order_id
+        if not rossko_id:
+            continue
+
+        snapshot = (rossko_by_id or {}).get(str(rossko_id))
+        if not snapshot:
+            continue
+
+        rossko_line_by_key: dict[tuple[str, str], RosskoOrderLine] = {}
+        for line in snapshot.lines or []:
+            rossko_line_by_key[_item_match_key(line.brand, line.partnumber)] = line
+
+        mapped_order_status = map_rossko_line_status_to_new_parts_status_code(snapshot.status)
+        if mapped_order_status and order.status_code != mapped_order_status:
+            order.status_code = mapped_order_status
+            updated_any = True
+
+        item_statuses: list[str] = []
+        for item in order.items:
+            line = rossko_line_by_key.get(_item_match_key(item.brand, item.partnumber))
+            mapped_item_status = (
+                map_rossko_line_status_to_new_parts_status_code(line.status_code) if line else None
+            )
+            if mapped_item_status:
+                item_statuses.append(mapped_item_status)
+                if item.status_code != mapped_item_status:
+                    item.status_code = mapped_item_status
+                    updated_any = True
+
+        # Если order-level статус не маппится — берём самый "поздний" из позиций.
+        if not mapped_order_status and item_statuses:
+            latest = max(item_statuses, key=lambda c: NEW_PARTS_STATUS_PRIORITY.get(c, 0))
+            if order.status_code != latest:
+                order.status_code = latest
+                updated_any = True
+
+    if updated_any:
+        db.commit()
+
     return [
         _new_order_response(db, o, rossko_by_id=rossko_by_id, rossko_sync_error=rossko_sync_error)
         for o in orders
@@ -360,6 +408,12 @@ def update_new_parts_order_status(
         raise HTTPException(status_code=404, detail="Заказ не найден")
     if not current_user.is_admin and order.organization_id != org_id:
         raise HTTPException(status_code=403, detail="Нет доступа к заказу")
+
+    if payload.status_code not in NEW_PARTS_STATUS_CODES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Недопустимый статус: {payload.status_code}",
+        )
     previous_status_code = order.status_code
     order.status_code = payload.status_code
     for item in order.items:
@@ -768,6 +822,57 @@ def list_purchased_new_orders(
         .order_by(GarageNewOrder.created_at.desc())
         .all()
     )
+
+    # Нормализуем локальные статусы "новых запчастей" в 5 стадий на основе текущих статусов Rossko.
+    # На странице покупателя Rossko-поля не нужны, но без синка локальный status_code может быть legacy.
+    rossko_ids: list[int] = []
+    for order in orders:
+        if order.rossko_order_id:
+            try:
+                rossko_ids.append(int(str(order.rossko_order_id).strip()))
+            except ValueError:
+                continue
+
+    if rossko_ids:
+        rossko_by_id, _rossko_sync_error = fetch_orders_by_ids_safe(rossko_ids)
+        updated_any = False
+
+        for order in orders:
+            if not order.rossko_order_id:
+                continue
+            snapshot = (rossko_by_id or {}).get(str(order.rossko_order_id))
+            if not snapshot:
+                continue
+
+            rossko_line_by_key: dict[tuple[str, str], RosskoOrderLine] = {}
+            for line in snapshot.lines or []:
+                rossko_line_by_key[_item_match_key(line.brand, line.partnumber)] = line
+
+            mapped_order_status = map_rossko_line_status_to_new_parts_status_code(snapshot.status)
+            if mapped_order_status and order.status_code != mapped_order_status:
+                order.status_code = mapped_order_status
+                updated_any = True
+
+            item_statuses: list[str] = []
+            for item in order.items:
+                line = rossko_line_by_key.get(_item_match_key(item.brand, item.partnumber))
+                mapped_item_status = (
+                    map_rossko_line_status_to_new_parts_status_code(line.status_code) if line else None
+                )
+                if mapped_item_status:
+                    item_statuses.append(mapped_item_status)
+                    if item.status_code != mapped_item_status:
+                        item.status_code = mapped_item_status
+                        updated_any = True
+
+            if not mapped_order_status and item_statuses:
+                latest = max(item_statuses, key=lambda c: NEW_PARTS_STATUS_PRIORITY.get(c, 0))
+                if order.status_code != latest:
+                    order.status_code = latest
+                    updated_any = True
+
+        if updated_any:
+            db.commit()
 
     result = []
     for order in orders:

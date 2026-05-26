@@ -448,15 +448,18 @@ export default function NewPartsOrderRegistration() {
             </div>
             <ul className="space-y-2">
                 {checklist.map((item) => (
-                    <li key={item.label} className="flex items-center gap-2 text-sm">
+                    <li key={item.label} className="flex items-center gap-2.5 text-sm leading-5">
                         <span
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                            className={`flex size-5 shrink-0 -translate-y-px items-center justify-center rounded-full text-[11px] font-semibold leading-none ${
                                 item.done ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
                             }`}
+                            aria-hidden
                         >
                             {item.done ? '✓' : '·'}
                         </span>
-                        <span className={item.done ? 'text-gray-700' : 'text-gray-400'}>{item.label}</span>
+                        <span className={item.done ? 'text-gray-700' : 'text-gray-400'}>
+                            {item.label}
+                        </span>
                     </li>
                 ))}
             </ul>

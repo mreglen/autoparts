@@ -111,7 +111,7 @@ export default function SalesOrdersPage() {
     isSubmitting: false,
   });
 
-  const getOrderStatusOptions = useMemo(() => {
+  const usedOrderStatusOptions = useMemo(() => {
     if (availableStatuses.length > 0) return availableStatuses;
     return [
       { code: 'pending', name: 'В ожидании' },
@@ -123,6 +123,14 @@ export default function SalesOrdersPage() {
       { code: 'closed', name: 'Закрыт' },
     ];
   }, [availableStatuses]);
+
+  const newOrderStatusOptions = useMemo(() => ([
+    { code: 'new_waiting_confirmation', name: 'Ждёт подтверждения' },
+    { code: 'new_assembling', name: 'Комплектуется' },
+    { code: 'new_shipped', name: 'Отгружено' },
+    { code: 'new_awaiting_arrival', name: 'Ожидает поступления' },
+    { code: 'new_received', name: 'Получен' },
+  ]), []);
 
   const formatDate = formatGarageOrderDate;
   const formatPrice = formatGarageOrderPrice;
@@ -970,7 +978,7 @@ export default function SalesOrdersPage() {
                   onUpdateStatus={updateUsedOrderStatus}
                   getStatusColor={getGarageStatusColor}
                   getStatusName={getGarageStatusName}
-                  orderStatusOptions={getOrderStatusOptions}
+                  orderStatusOptions={usedOrderStatusOptions}
                   formatDate={formatDate}
                   formatPrice={formatPrice}
                 />
@@ -990,7 +998,7 @@ export default function SalesOrdersPage() {
                   onUpdateStatus={updateNewOrderStatus}
                   getStatusColor={getGarageStatusColor}
                   getStatusName={getGarageStatusName}
-                  orderStatusOptions={getOrderStatusOptions}
+                  orderStatusOptions={newOrderStatusOptions}
                   formatDate={formatDate}
                   formatPrice={formatPrice}
                 />
