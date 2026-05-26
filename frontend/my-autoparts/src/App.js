@@ -1,5 +1,5 @@
 // src/App.jsx
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEffect } from 'react';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
@@ -69,8 +69,7 @@ import RosskoSettingsPage from './pages/Admin/RosskoSettingsPage';
 import AnalyticsPage from './pages/Admin/AnalyticsPage';
 import OrganizationsPage from './pages/Organizations/OrganizationsPage';
 import OrganizationPublicPage from './pages/Organizations/OrganizationPublicPage';
-import PublicSellerProfilePage from './pages/PublicProfiles/PublicSellerProfilePage';
-import PublicBuyerProfilePage from './pages/PublicProfiles/PublicBuyerProfilePage';
+import PublicUserProfilePage from './pages/PublicProfiles/PublicUserProfilePage';
 import useSiteAnalytics from './hooks/useSiteAnalytics';
 
 
@@ -112,6 +111,11 @@ function ReviewsRoute() {
     return <Navigate to="/" replace />;
   }
   return <ReviewsPage />;
+}
+
+function RedirectLegacyProfileRoute() {
+  const { publicCode } = useParams();
+  return <Navigate to={`/users/${encodeURIComponent(publicCode || '')}`} replace />;
 }
 
 function App() {
@@ -178,8 +182,9 @@ function App() {
           <Route path="/organizations" element={<OrganizationsPage />} />
           <Route path="/organizations/:orgId" element={<OrganizationPublicPage />} />
           <Route path="/seller/part-card/:id" element={<SellerPartCardPage />} />
-          <Route path="/seller/:publicCode" element={<PublicSellerProfilePage />} />
-          <Route path="/buyer/:publicCode" element={<PublicBuyerProfilePage />} />
+          <Route path="/users/:publicCode" element={<PublicUserProfilePage />} />
+          <Route path="/seller/:publicCode" element={<RedirectLegacyProfileRoute />} />
+          <Route path="/buyer/:publicCode" element={<RedirectLegacyProfileRoute />} />
           <Route path="/autoservice" element={<Navigate to="/about" replace />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/order-reg" element={<OrderRegistration />} />

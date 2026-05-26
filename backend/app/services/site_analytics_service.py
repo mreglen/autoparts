@@ -53,6 +53,7 @@ PATH_NORMALIZATION_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^/seller/part-card/\d+$"), "/seller/part-card/:id"),
     (re.compile(r"^/seller/[A-Z]\d{6}$"), "/seller/:publicCode"),
     (re.compile(r"^/buyer/[A-Z]\d{6}$"), "/buyer/:publicCode"),
+    (re.compile(r"^/users/[A-Z]\d{6}$"), "/users/:publicCode"),
     (re.compile(r"^/vehicles/edit/\d+$"), "/vehicles/edit/:id"),
     (re.compile(r"^/sellers/[^/]+/workspace$"), "/sellers/:sellerId/workspace"),
     (re.compile(r"^/moderation/products/[^/]+$"), "/moderation/products/:organizationId"),

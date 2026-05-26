@@ -21,6 +21,14 @@ class PublicBuyerProfile(PublicUserProfileBase):
     pass
 
 
+class PublicUserProfile(PublicUserProfileBase):
+    """Единый публичный профиль по /users/{public_code}."""
+    organization_id: Optional[str] = None
+    organization_name: Optional[str] = None
+    organization_logo: Optional[str] = None
+    catalog_products_count: int = 0
+
+
 class ChatParticipantPublic(BaseModel):
     user_id: int
     public_code: str

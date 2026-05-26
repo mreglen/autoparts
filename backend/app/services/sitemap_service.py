@@ -11,8 +11,7 @@ from app.services.yandex_feed_xml_service import _iter_catalog_products, _resolv
 from app.utils.product_urls import build_product_page_url
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
 from app.services.public_user_profile_service import (
-    count_public_buyer_profiles,
-    count_public_seller_profiles,
+    count_public_user_profiles,
     iter_public_profile_urls,
 )
 
@@ -41,7 +40,7 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
     site_origin = _resolve_origin(db, preferred_host_url)
     org_count = count_public_organizations(db)
     product_count = count_working_catalog_products(db)
-    profile_count = count_public_seller_profiles(db) + count_public_buyer_profiles(db)
+    profile_count = count_public_user_profiles(db)
     static_pages_count = 10
 
     return [

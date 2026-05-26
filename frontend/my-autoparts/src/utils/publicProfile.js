@@ -1,31 +1,28 @@
-/** Публичные страницы профиля (без конфликта с /sellers в кабинете). */
+/** Публичные страницы профиля участников и чатов. */
 
-export function getSellerProfilePath(publicCode) {
+export function getUserProfilePath(publicCode) {
   const code = (publicCode || '').trim().toUpperCase();
-  return code ? `/seller/${encodeURIComponent(code)}` : null;
+  return code ? `/users/${encodeURIComponent(code)}` : null;
 }
 
+/** @deprecated Используйте getUserProfilePath */
+export function getSellerProfilePath(publicCode) {
+  return getUserProfilePath(publicCode);
+}
+
+/** @deprecated Используйте getUserProfilePath */
 export function getBuyerProfilePath(publicCode) {
-  const code = (publicCode || '').trim().toUpperCase();
-  return code ? `/buyer/${encodeURIComponent(code)}` : null;
+  return getUserProfilePath(publicCode);
 }
 
 export function getProfilePathForParticipant(participant) {
-  if (!participant?.public_code) return null;
-  if (participant.is_seller) return getSellerProfilePath(participant.public_code);
-  if (participant.is_buyer) return getBuyerProfilePath(participant.public_code);
-  return null;
+  return getUserProfilePath(participant?.public_code);
 }
 
 /** Ссылка на собеседника в личном чате гаража. */
 export function getGarageCounterpartyProfilePath(chat, currentUserId) {
   if (!chat || !currentUserId) return null;
   const iAmSeller = Number(chat.seller_id) === Number(currentUserId);
-  if (iAmSeller && chat.buyer_public_code) {
-    return getBuyerProfilePath(chat.buyer_public_code);
-  }
-  if (!iAmSeller && chat.seller_public_code) {
-    return getSellerProfilePath(chat.seller_public_code);
-  }
-  return null;
+  const code = iAmSeller ? chat.buyer_public_code : chat.seller_public_code;
+  return getUserProfilePath(code);
 }

@@ -37,7 +37,7 @@ export default function ChatParticipantsPanel({ chatId, isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col bg-white/98 backdrop-blur-sm">
+    <div className="absolute inset-0 z-20 flex flex-col bg-white">
       <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
         <h3 className="text-sm font-semibold text-gray-900">Участники</h3>
         <button
@@ -66,6 +66,8 @@ export default function ChatParticipantsPanel({ chatId, isOpen, onClose }) {
                 p.is_seller ? 'Продавец' : null,
                 p.is_buyer ? 'Покупатель' : null,
               ].filter(Boolean).join(' · ');
+              const rowClass =
+                'flex items-center gap-3 rounded-xl px-2 py-2.5 transition hover:bg-gray-50';
               const inner = (
                 <>
                   <UserAvatar
@@ -90,17 +92,11 @@ export default function ChatParticipantsPanel({ chatId, isOpen, onClose }) {
               return (
                 <li key={p.user_id}>
                   {profilePath ? (
-                    <Link
-                      to={profilePath}
-                      onClick={onClose}
-                      className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition hover:bg-gray-50"
-                    >
+                    <Link to={profilePath} onClick={onClose} className={rowClass}>
                       {inner}
                     </Link>
                   ) : (
-                    <div className="flex items-center gap-3 rounded-xl px-2 py-2.5 text-gray-700">
-                      {inner}
-                    </div>
+                    <div className={`${rowClass} text-gray-700`}>{inner}</div>
                   )}
                 </li>
               );

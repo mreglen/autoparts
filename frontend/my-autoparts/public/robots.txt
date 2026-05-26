@@ -9,6 +9,7 @@ Allow: /part/
 Allow: /organizations
 Allow: /seller/
 Allow: /buyer/
+Allow: /users/
 
 Disallow: /auth
 Disallow: /dashboard
