@@ -14,6 +14,7 @@ export default function SalesGarageOrderCard({
   editingStatus,
   onEditStatus,
   onUpdateStatus,
+  statusEditable = true,
   getStatusColor,
   getStatusName,
   orderStatusOptions = [],
@@ -103,7 +104,7 @@ export default function SalesGarageOrderCard({
               >
                 {order.is_paid ? 'Оплачен' : 'Не оплачен'}
               </span>
-              {isEditing ? (
+              {statusEditable && isEditing ? (
                 <select
                   value={statusCode}
                   onChange={(e) => onUpdateStatus(order.id, e.target.value)}
@@ -118,7 +119,7 @@ export default function SalesGarageOrderCard({
                     </option>
                   ))}
                 </select>
-              ) : (
+              ) : statusEditable ? (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -130,6 +131,13 @@ export default function SalesGarageOrderCard({
                 >
                   {getStatusName(statusCode)}
                 </button>
+              ) : (
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(statusCode)}`}
+                  title="Статус заказа"
+                >
+                  {getStatusName(statusCode)}
+                </span>
               )}
               {isNew && rosskoStatus && (
                 <span

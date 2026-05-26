@@ -43,6 +43,7 @@ from app.services.avito_warehouse_fulfillment import (
 )
 from app.services.marketplace_used_fulfillment import fulfill_used_order_on_status_change
 from app.services.audit_service import log_audit
+from app.utils.client_buyers import order_matches_buyer
 from app.utils.user_avatar import avatar_public_url, resolve_user_by_contact
 from app.schemas.avito_orders import AvitoCheckConfirmationCodeRequest, AvitoOrderTransitionRequest
 from app.services.avito_pro_status_service import ensure_avito_pro_active
@@ -237,6 +238,8 @@ def update_used_parts_order_status(
             acting_user_id=current_user.id,
         )
         order.status_code = payload.status_code
+        for item in order.items:
+            item.status_code = payload.status_code
         db.commit()
         log_audit(
             db,
@@ -357,10 +360,26 @@ def update_new_parts_order_status(
         raise HTTPException(status_code=404, detail="Заказ не найден")
     if not current_user.is_admin and order.organization_id != org_id:
         raise HTTPException(status_code=403, detail="Нет доступа к заказу")
+    previous_status_code = order.status_code
     order.status_code = payload.status_code
     for item in order.items:
         item.status_code = payload.status_code
     db.commit()
+    log_audit(
+        db,
+        event_type="order_status_changed",
+        category="orders",
+        summary=f"Заказ новых запчастей #{order_id}: {previous_status_code} → {payload.status_code}",
+        user=current_user,
+        organization_id=order.organization_id,
+        details={
+            "order_id": order_id,
+            "previous_status": previous_status_code,
+            "new_status": payload.status_code,
+        },
+        entity_type="garage_new_order",
+        entity_id=order_id,
+    )
     return {"status": "ok"}
 
 
@@ -698,23 +717,21 @@ def list_purchased_used_orders(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Get used orders for the current buyer - returns all orders, frontend will filter"""
-    logger.info(f"Fetching used orders for buyer: {current_user.email}, name: {current_user.last_name} {current_user.first_name}")
-    
-    # Get ALL used orders (not filtered by organization)
-    # This allows buyers to see their orders regardless of which seller's organization
+    """Заказы б/у текущего покупателя (по email и телефону из профиля)."""
+    target_email = current_user.email or ""
+    target_phone = current_user.phone or ""
+
     orders = (
         db.query(GarageUsedOrder)
         .options(selectinload(GarageUsedOrder.items))
         .order_by(GarageUsedOrder.created_at.desc())
         .all()
     )
-    
-    logger.info(f"Total used orders in system: {len(orders)}")
-    
-    # Add organization name to each order
+
     result = []
     for order in orders:
+        if not order_matches_buyer(order, target_email, target_phone):
+            continue
         org = db.query(Organization).filter(Organization.id == order.organization_id).first()
         order_dict = {
             "id": order.id,

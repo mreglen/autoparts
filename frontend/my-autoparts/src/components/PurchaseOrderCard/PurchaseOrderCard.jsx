@@ -177,8 +177,10 @@ export default function PurchaseOrderCard({
                     </div>
                     <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                       <div className="text-base font-semibold tabular-nums text-gray-900">{formatPrice(lineTotal)}</div>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(item.status_code)}`}>
-                        {getStatusName(item.status_code)}
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(item.status_code || statusCode)}`}
+                      >
+                        {getStatusName(item.status_code || statusCode)}
                       </span>
                     </div>
                   </div>

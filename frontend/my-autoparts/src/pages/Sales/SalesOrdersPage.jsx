@@ -316,6 +316,10 @@ export default function SalesOrdersPage() {
         })
       );
       setEditingStatus(null);
+      setUsedOrderStatusMessage({
+        type: 'success',
+        text: 'Статус заказа обновлён. Покупатель увидит его в «Мои заказы».',
+      });
     } catch (error) {
       setUsedOrderStatusMessage({
         type: 'error',

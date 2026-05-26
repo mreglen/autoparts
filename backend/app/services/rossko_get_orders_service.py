@@ -115,7 +115,17 @@ def _extract_order_id(raw: dict) -> str | None:
 
 
 def _extract_order_status(raw: dict) -> str | None:
-    for key in ("status", "Status", "status_name", "StatusName", "state", "State", "type", "Type"):
+    # Не используем type/Type — там часто 0 (тип заказа), а не статус.
+    for key in (
+        "status_name",
+        "StatusName",
+        "StatusPayment",
+        "statusPayment",
+        "status",
+        "Status",
+        "state",
+        "State",
+    ):
         val = raw.get(key)
         if val is not None and str(val).strip():
             return str(val).strip()
