@@ -17,7 +17,7 @@ PART_PATH_RE = re.compile(r"^/part/(?P<product_id>\d+)(?:[-/]|$)")
 ORG_DETAIL_PATH_RE = re.compile(r"^/organizations/(?P<org_id>[A-Za-z0-9_-]+)$")
 SELLER_PROFILE_PATH_RE = re.compile(r"^/seller/(?P<public_code>[A-Z]\d{6})$")
 BUYER_PROFILE_PATH_RE = re.compile(r"^/buyer/(?P<public_code>[A-Z]\d{6})$")
-USER_PROFILE_PATH_RE = re.compile(r"^/users/(?P<public_code>[A-Z]\d{6})$")
+USER_PROFILE_PATH_RE = re.compile(r"^/users/(?P<public_code>[A-Za-z0-9]{1,10})$")
 
 SPA_ROUTE_PREFIXES = (
     "/auth",
@@ -115,6 +115,9 @@ def is_spa_page_available(db: Session, raw_path: str) -> bool:
 
     user_match = USER_PROFILE_PATH_RE.match(path)
     if user_match:
-        return get_public_user_profile(db, user_match.group("public_code")) is not None
+        code = user_match.group("public_code")
+        if get_public_user_profile(db, code) is not None:
+            return True
+        return False
 
     return True

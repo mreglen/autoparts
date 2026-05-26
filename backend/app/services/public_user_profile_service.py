@@ -36,9 +36,19 @@ def build_user_profile_url(public_code: str, site_origin: str) -> str:
     return f"{site_origin.rstrip('/')}/users/{public_code}"
 
 
+def _normalize_public_code_lookup(public_code: str) -> str:
+    """Код из URL: новый формат K482917 — в верхнем регистре; старые числовые — как в БД."""
+    raw = (public_code or "").strip()
+    if not raw:
+        return ""
+    if raw[0].isalpha():
+        return raw.upper()
+    return raw
+
+
 def _get_user_by_public_code(db: Session, public_code: str) -> Optional[UserModel]:
-    code = (public_code or "").strip().upper()
-    if not is_valid_public_code(code):
+    code = _normalize_public_code_lookup(public_code)
+    if not code:
         return None
     return db.query(UserModel).filter(UserModel.public_code == code).first()
 

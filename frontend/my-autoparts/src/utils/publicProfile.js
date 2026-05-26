@@ -1,8 +1,10 @@
 /** Публичные страницы профиля участников и чатов. */
 
 export function getUserProfilePath(publicCode) {
-  const code = (publicCode || '').trim().toUpperCase();
-  return code ? `/users/${encodeURIComponent(code)}` : null;
+  const raw = (publicCode || '').trim();
+  if (!raw) return null;
+  const code = /^[A-Za-z]/.test(raw) ? raw.toUpperCase() : raw;
+  return `/users/${encodeURIComponent(code)}`;
 }
 
 /** @deprecated Используйте getUserProfilePath */
