@@ -1,16 +1,43 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiAxiosUnauth } from '../../utils/apiClient';
-
-const TYPE_LABELS = {
-  pickup: 'Самовывоз из магазина',
-  pvz: 'ПВЗ',
-  courier: 'Курьер',
-};
+import DeliveryFastIcon from '../../components/icons/DeliveryFastIcon';
+import PickupIcon from '../../components/icons/PickupIcon';
+import {
+  CHECKOUT_DELIVERY_REGIONS,
+  CHECKOUT_PVZ_METHODS,
+  findPickupDeliveryOption,
+  findPvzDeliveryOption,
+} from '../../utils/newPartsCheckoutDelivery';
 
 function formatMoney(value) {
   const num = Number(value);
-  if (!Number.isFinite(num) || num <= 0) return '—';
+  if (!Number.isFinite(num) || num <= 0) return null;
   return `${num.toLocaleString('ru-RU')} ₽`;
+}
+
+function ModeCard({ icon, title, description, children }) {
+  return (
+    <section className="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm sm:p-6">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+        </div>
+      </div>
+      {children ? <div className="mt-4 border-t border-gray-100 pt-4">{children}</div> : null}
+    </section>
+  );
+}
+
+function InfoChip({ children }) {
+  return (
+    <span className="inline-flex rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800">
+      {children}
+    </span>
+  );
 }
 
 export default function DeliveryPage() {
@@ -25,7 +52,9 @@ export default function DeliveryPage() {
         const res = await apiAxiosUnauth.get('/public/site-delivery');
         if (!cancelled) setRows(Array.isArray(res.data) ? res.data : []);
       } catch (e) {
-        if (!cancelled) setError(e?.response?.data?.detail || 'Не удалось загрузить способы доставки');
+        if (!cancelled) {
+          setError(e?.response?.data?.detail || 'Не удалось загрузить способы доставки');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -35,75 +64,113 @@ export default function DeliveryPage() {
     };
   }, []);
 
-  const grouped = useMemo(() => {
-    const map = new Map();
-    rows.forEach((row) => {
-      const key = row.region_name || `region-${row.region_id}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(row);
-    });
-    return map;
-  }, [rows]);
+  const pickupOption = useMemo(() => findPickupDeliveryOption(rows), [rows]);
+  const pickupAddress =
+    pickupOption?.pickup_point?.trim() || 'Адрес уточняется при оформлении заказа';
+  const pickupMin = formatMoney(pickupOption?.min_order_amount);
+
+  const regionPvzMatrix = useMemo(
+    () =>
+      CHECKOUT_DELIVERY_REGIONS.map((region) => ({
+        region,
+        methods: CHECKOUT_PVZ_METHODS.map((method) => {
+          const opt = findPvzDeliveryOption(rows, region, method.key);
+          return {
+            ...method,
+            minAmount: formatMoney(opt?.min_order_amount),
+          };
+        }),
+      })),
+    [rows]
+  );
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="mx-auto max-w-3xl px-4 py-8 pb-12">
       <header className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Доставка</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Доставка</h1>
         <p className="mt-3 text-gray-600 leading-relaxed">
-          Условия доставки интернет-магазина «Свой Гараж». Информация на этой странице
-          соответствует настройкам в Яндекс Товарах и доступна при оформлении заказа.
+          При оформлении заказа доступны те же способы получения, что указаны ниже. Точные условия
+          (минимальная сумма) могут зависеть от региона и состава корзины.
         </p>
       </header>
 
       {loading && <p className="text-sm text-gray-500">Загрузка…</p>}
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 text-red-800 text-sm px-4 py-3 border border-red-100">
+        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
         </div>
       )}
 
-      {!loading && !error && rows.length === 0 && (
-        <p className="text-sm text-gray-500">Способы доставки временно не опубликованы.</p>
+      {!loading && !error && (
+        <div className="space-y-5">
+          <ModeCard
+            icon={<PickupIcon />}
+            title="Самовывоз"
+            description="Забрать заказ в пункте выдачи магазина"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+              Адрес самовывоза
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-gray-900">{pickupAddress}</p>
+            {pickupMin && (
+              <p className="mt-2 text-sm text-gray-600">Минимальная сумма заказа: {pickupMin}</p>
+            )}
+          </ModeCard>
+
+          <ModeCard
+            icon={<DeliveryFastIcon />}
+            title="Доставка"
+            description="ПВЗ в выбранном регионе — как при оформлении заказа"
+          >
+            <div className="space-y-6">
+              <div>
+                <p className="mb-2 text-sm font-medium text-gray-800">Регион</p>
+                <div className="flex flex-wrap gap-2">
+                  {CHECKOUT_DELIVERY_REGIONS.map((name) => (
+                    <InfoChip key={name}>{name}</InfoChip>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-medium text-gray-800">Способ доставки</p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  {CHECKOUT_PVZ_METHODS.map((method) => (
+                    <InfoChip key={method.key}>{method.label}</InfoChip>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600">
+                При оформлении укажите адрес (город, улица, дом) — можно выбрать из подсказок или
+                ввести вручную.
+              </p>
+
+              <div className="rounded-xl border border-gray-100 bg-gray-50/80 p-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Минимальная сумма заказа по регионам
+                </p>
+                <div className="space-y-4">
+                  {regionPvzMatrix.map(({ region, methods }) => (
+                    <div key={region}>
+                      <p className="text-sm font-semibold text-gray-900">{region}</p>
+                      <ul className="mt-1.5 space-y-1">
+                        {methods.map((m) => (
+                          <li key={m.key} className="flex flex-wrap items-baseline gap-x-2 text-sm text-gray-700">
+                            <span>{m.label}</span>
+                            <span className="text-gray-400">—</span>
+                            <span>{m.minAmount ? `от ${m.minAmount}` : 'по условиям магазина'}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </ModeCard>
+        </div>
       )}
-
-      {[...grouped.entries()].map(([regionName, regionRows]) => (
-        <section key={regionName} className="mb-8 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-            <h2 className="text-lg font-semibold text-gray-900">{regionName}</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-white text-left text-gray-500">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Тип доставки</th>
-                  <th className="px-4 py-3 font-medium">Служба доставки</th>
-                  <th className="px-4 py-3 font-medium">Пункт / условия</th>
-                  <th className="px-4 py-3 font-medium">Мин. сумма заказа</th>
-                </tr>
-              </thead>
-              <tbody>
-                {regionRows.map((row) => (
-                  <tr key={row.id} className="border-t border-gray-100">
-                    <td className="px-4 py-3 text-gray-900">
-                      {TYPE_LABELS[row.delivery_type] || row.delivery_type}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">{row.carrier || '—'}</td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {row.pickup_point || row.notes || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">{formatMoney(row.min_order_amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ))}
-
-      <p className="text-sm text-gray-500">
-        Доступность способов доставки зависит от региона и состава заказа. Точный способ
-        выбирается на шаге оформления заказа.
-      </p>
     </div>
   );
 }
