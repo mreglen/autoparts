@@ -26,7 +26,7 @@ export default function SalesGarageOrderCard({
   const items = order.items || [];
   const isUsed = orderType === 'used';
   const isNew = orderType === 'new';
-  const statusCode = order.status_code || 'pending';
+  const statusCode = order.status_code || (isNew ? 'new_waiting_confirmation' : 'pending');
   const rosskoStatus = order.rossko_status;
   const rosskoOrderId = order.rossko_order_id;
   const rosskoSyncError = order.rossko_sync_error;
@@ -104,21 +104,7 @@ export default function SalesGarageOrderCard({
               >
                 {order.is_paid ? 'Оплачен' : 'Не оплачен'}
               </span>
-              {isNew ? (
-                // Для новых запчастей статус приходит от Rossko и меняется автоматически.
-                // Показываем его в выпадающем списке, но без редактирования.
-                <select
-                  value={statusCode}
-                  disabled
-                  className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700"
-                >
-                  {orderStatusOptions.map((status) => (
-                    <option key={status.code} value={status.code}>
-                      {status.name}
-                    </option>
-                  ))}
-                </select>
-              ) : statusEditable && isEditing ? (
+              {statusEditable && isEditing ? (
                 <select
                   value={statusCode}
                   onChange={(e) => onUpdateStatus(order.id, e.target.value)}

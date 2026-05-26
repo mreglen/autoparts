@@ -4,7 +4,7 @@ import { apiAxios } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import PurchaseOrderCard, { PurchaseOrdersEmptyState } from '../../components/PurchaseOrderCard/PurchaseOrderCard';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
-import { getGarageDeliveryInfo } from '../../utils/garageOrderUi';
+import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus } from '../../utils/garageOrderUi';
 
 const ACTIVE_STATUSES = new Set([
   'pending',
@@ -76,8 +76,10 @@ function getGarageStatusName(statusCode) {
   return statusMap[statusCode] || statusCode || 'В ожидании';
 }
 
-function matchesStatusFilter(order, filterId) {
-  const code = order.status_code || 'pending';
+function matchesStatusFilter(order, filterId, isNewOrder = false) {
+  const code = isNewOrder
+    ? normalizeNewPartsCustomerStatus(order.status_code)
+    : (order.status_code || 'pending');
   if (filterId === 'all') return true;
   if (filterId === 'active') return ACTIVE_STATUSES.has(code);
   if (filterId === 'completed') return COMPLETED_STATUSES.has(code);
@@ -163,10 +165,10 @@ export default function PurchasesOrdersPage() {
   }, [isReady, isAuthenticated, fetchAll]);
 
   const filterOrders = useCallback(
-    (orders, { includeOrganization = true } = {}) => {
+    (orders, { includeOrganization = true, isNewOrder = false } = {}) => {
       const q = searchQuery.trim().toLowerCase();
       return sortOrdersNewestFirst(orders).filter((order) => {
-        if (!matchesStatusFilter(order, statusFilter)) return false;
+        if (!matchesStatusFilter(order, statusFilter, isNewOrder)) return false;
         if (!q) return true;
         const haystack = [
           order.id,
@@ -189,15 +191,26 @@ export default function PurchasesOrdersPage() {
     [searchQuery, statusFilter]
   );
 
-  const filteredUsedOrders = useMemo(() => filterOrders(usedOrders), [filterOrders, usedOrders]);
-  const filteredNewOrders = useMemo(() => filterOrders(newOrders), [filterOrders, newOrders]);
+  const filteredUsedOrders = useMemo(
+    () => filterOrders(usedOrders, { includeOrganization: true, isNewOrder: false }),
+    [filterOrders, usedOrders]
+  );
+  const filteredNewOrders = useMemo(
+    () => filterOrders(newOrders, { includeOrganization: false, isNewOrder: true }),
+    [filterOrders, newOrders]
+  );
 
   const activeOrders = activeTab === 'used' ? filteredUsedOrders : filteredNewOrders;
   const totalInTab = activeTab === 'used' ? usedOrders.length : newOrders.length;
 
   const stats = useMemo(() => {
     const pool = activeTab === 'used' ? usedOrders : newOrders;
-    const activeCount = pool.filter((o) => ACTIVE_STATUSES.has(o.status_code || 'pending')).length;
+    const activeCount = pool.filter((o) => {
+      const code = activeTab === 'new'
+        ? normalizeNewPartsCustomerStatus(o.status_code)
+        : (o.status_code || 'pending');
+      return ACTIVE_STATUSES.has(code);
+    }).length;
     const totalSum = pool.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
     return { total: pool.length, activeCount, totalSum };
   }, [activeTab, usedOrders, newOrders]);
@@ -407,6 +420,9 @@ export default function PurchasesOrdersPage() {
                 order={{
                   ...order,
                   delivery_method_name: getGarageDeliveryInfo(order),
+                  ...(activeTab === 'new'
+                    ? { status_code: normalizeNewPartsCustomerStatus(order.status_code) }
+                    : {}),
                 }}
                 orderType={activeTab === 'used' ? 'used' : 'new'}
                 isExpanded={

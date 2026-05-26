@@ -103,6 +103,15 @@ export const GARAGE_ACTIVE_STATUSES = new Set([
 
 export const GARAGE_COMPLETED_STATUSES = new Set(['delivered', 'closed', 'new_received']);
 
+/** Статус для покупателя по умолчанию (новые запчасти), меняется только вручную. */
+export const DEFAULT_NEW_PARTS_CUSTOMER_STATUS = 'new_waiting_confirmation';
+
+export function normalizeNewPartsCustomerStatus(statusCode) {
+  const code = statusCode || '';
+  if (!code || code === 'pending') return DEFAULT_NEW_PARTS_CUSTOMER_STATUS;
+  return code;
+}
+
 export const AVITO_STATUS_COLORS = {
   on_confirmation: 'bg-amber-50 text-amber-800 ring-1 ring-amber-100',
   ready_to_ship: 'bg-blue-50 text-blue-800 ring-1 ring-blue-100',

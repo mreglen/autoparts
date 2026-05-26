@@ -136,7 +136,7 @@ async def fulfill_new_parts_order(
         delivery_region_name=payload.delivery_region_name,
         total_amount=total_amount,
         is_paid=bool(mark_paid),
-        status_code="pending",
+        status_code="new_waiting_confirmation",
         seller=seller_name,
         deliver_in_parts=bool(payload.deliver_in_parts),
         rossko_order_id=rossko_order_id,
@@ -156,7 +156,7 @@ async def fulfill_new_parts_order(
                 partnumber=item.partnumber,
                 quantity=int(item.quantity),
                 price=float(item.price),
-                status_code="pending",
+                status_code="new_waiting_confirmation",
             )
         )
 

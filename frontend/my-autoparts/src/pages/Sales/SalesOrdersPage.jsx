@@ -25,6 +25,7 @@ import {
   GARAGE_STATUS_NAMES,
   GARAGE_ACTIVE_STATUSES,
   GARAGE_COMPLETED_STATUSES,
+  normalizeNewPartsCustomerStatus,
   AVITO_STATUS_COLORS,
   AVITO_ACTIVE_STATUSES,
   AVITO_COMPLETED_STATUSES,
@@ -42,8 +43,10 @@ function sortOrdersNewestFirst(orders) {
   return [...orders].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 }
 
-function matchesGarageStatusFilter(order, filterId) {
-  const code = order.status_code || 'pending';
+function matchesGarageStatusFilter(order, filterId, tab = 'used') {
+  const code = tab === 'new'
+    ? normalizeNewPartsCustomerStatus(order.status_code)
+    : (order.status_code || 'pending');
   if (filterId === 'all') return true;
   if (filterId === 'active') return GARAGE_ACTIVE_STATUSES.has(code);
   if (filterId === 'completed') return GARAGE_COMPLETED_STATUSES.has(code);
@@ -136,7 +139,10 @@ export default function SalesOrdersPage() {
   const formatPrice = formatGarageOrderPrice;
 
   const getGarageStatusColor = (statusCode) => GARAGE_STATUS_COLORS[statusCode] || GARAGE_STATUS_COLORS.closed;
-  const getGarageStatusName = (statusCode) => GARAGE_STATUS_NAMES[statusCode] || statusCode || 'pending';
+  const getGarageStatusName = (statusCode, orderType = 'used') => {
+    const code = orderType === 'new' ? normalizeNewPartsCustomerStatus(statusCode) : (statusCode || 'pending');
+    return GARAGE_STATUS_NAMES[code] || code;
+  };
 
   const getAvitoStatusColor = (statusCode) => AVITO_STATUS_COLORS[statusCode] || AVITO_STATUS_COLORS.closed;
 
@@ -668,7 +674,7 @@ export default function SalesOrdersPage() {
         const statusOk =
           tab === 'avito'
             ? matchesAvitoStatusFilter(order, statusFilter)
-            : matchesGarageStatusFilter(order, statusFilter);
+            : matchesGarageStatusFilter(order, statusFilter, tab);
         if (!statusOk) return false;
         if (!q) return true;
 
@@ -722,7 +728,10 @@ export default function SalesOrdersPage() {
         if (AVITO_ACTIVE_STATUSES.has(order.avito_status_code)) activeCount += 1;
         totalSum += getAvitoDisplayTotal(order);
       } else {
-        if (GARAGE_ACTIVE_STATUSES.has(order.status_code || 'pending')) activeCount += 1;
+        const code = activeTab === 'new'
+          ? normalizeNewPartsCustomerStatus(order.status_code)
+          : (order.status_code || 'pending');
+        if (GARAGE_ACTIVE_STATUSES.has(code)) activeCount += 1;
         totalSum += Number(order.total_amount || 0);
       }
     });
@@ -977,7 +986,7 @@ export default function SalesOrdersPage() {
                   onEditStatus={setEditingStatus}
                   onUpdateStatus={updateUsedOrderStatus}
                   getStatusColor={getGarageStatusColor}
-                  getStatusName={getGarageStatusName}
+                  getStatusName={(code) => getGarageStatusName(code, 'used')}
                   orderStatusOptions={usedOrderStatusOptions}
                   formatDate={formatDate}
                   formatPrice={formatPrice}
@@ -997,7 +1006,7 @@ export default function SalesOrdersPage() {
                   onEditStatus={setEditingStatus}
                   onUpdateStatus={updateNewOrderStatus}
                   getStatusColor={getGarageStatusColor}
-                  getStatusName={getGarageStatusName}
+                  getStatusName={(code) => getGarageStatusName(code, 'new')}
                   orderStatusOptions={newOrderStatusOptions}
                   formatDate={formatDate}
                   formatPrice={formatPrice}

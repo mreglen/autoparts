@@ -26,7 +26,7 @@ class GarageNewOrder(Base):
 
     total_amount = Column(Float, nullable=False, default=0.0)
     is_paid = Column(Boolean, nullable=False, default=False)
-    status_code = Column(String(50), nullable=False, default="pending", index=True)
+    status_code = Column(String(50), nullable=False, default="new_waiting_confirmation", index=True)
 
     seller = Column(String(255), nullable=True)
     deliver_in_parts = Column(Boolean, nullable=False, default=False)
@@ -57,7 +57,7 @@ class GarageNewOrderItem(Base):
     partnumber = Column(String(100), nullable=True)
     quantity = Column(Integer, nullable=False, default=1)
     price = Column(Float, nullable=False, default=0.0)
-    status_code = Column(String(50), nullable=False, default="pending", index=True)
+    status_code = Column(String(50), nullable=False, default="new_waiting_confirmation", index=True)
 
     order = relationship("GarageNewOrder", back_populates="items")
 
