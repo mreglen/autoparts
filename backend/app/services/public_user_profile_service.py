@@ -117,6 +117,7 @@ def get_public_user_profile(db: Session, public_code: str) -> Optional[PublicUse
             catalog_count = _catalog_count_for_org(db, user.organization_id)
 
     return PublicUserProfile(
+        user_id=user.id,
         public_code=user.public_code,
         display_name=user_display_name(user),
         avatar_url=avatar_public_url(user.avatar_url),

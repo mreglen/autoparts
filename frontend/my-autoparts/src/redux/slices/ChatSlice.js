@@ -54,6 +54,88 @@ export const createOrGetChat = createAsyncThunk(
     }
 );
 
+export const createOrGetChatWithUser = createAsyncThunk(
+    'chats/createOrGetChatWithUser',
+    async (targetUserId, { rejectWithValue }) => {
+        try {
+            return await apiRequest(`/chats/with-user/${targetUserId}`, { method: 'POST' });
+        } catch (err) {
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Ошибка создания чата');
+        }
+    }
+);
+
+export const createCustomGroupChat = createAsyncThunk(
+    'chats/createCustomGroupChat',
+    async ({ title, participantIds, organizationId }, { rejectWithValue }) => {
+        try {
+            return await apiRequest('/chats/custom', {
+                method: 'POST',
+                body: JSON.stringify({
+                    title,
+                    participant_ids: participantIds || [],
+                    organization_id: organizationId || null,
+                }),
+            });
+        } catch (err) {
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Ошибка создания чата');
+        }
+    }
+);
+
+export const deleteCustomChat = createAsyncThunk(
+    'chats/deleteCustomChat',
+    async (chatId, { rejectWithValue, dispatch }) => {
+        try {
+            await apiRequest(`/chats/${chatId}`, { method: 'DELETE' });
+            dispatch(fetchUserChats({}));
+            return chatId;
+        } catch (err) {
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Ошибка удаления чата');
+        }
+    }
+);
+
+export const fetchManageableUsers = createAsyncThunk(
+    'chats/fetchManageableUsers',
+    async ({ q = '', chatId = null, limit = 30 }, { rejectWithValue }) => {
+        try {
+            const params = new URLSearchParams({ q, limit: String(limit) });
+            if (chatId != null) params.set('chat_id', String(chatId));
+            return await apiRequest(`/chats/manageable-users?${params.toString()}`);
+        } catch (err) {
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Ошибка загрузки пользователей');
+        }
+    }
+);
+
+export const addChatParticipant = createAsyncThunk(
+    'chats/addChatParticipant',
+    async ({ chatId, userId }, { rejectWithValue }) => {
+        try {
+            await apiRequest(`/chats/${chatId}/participants`, {
+                method: 'POST',
+                body: JSON.stringify({ user_id: userId }),
+            });
+            return { chatId, userId };
+        } catch (err) {
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Не удалось добавить участника');
+        }
+    }
+);
+
+export const removeChatParticipant = createAsyncThunk(
+    'chats/removeChatParticipant',
+    async ({ chatId, userId }, { rejectWithValue }) => {
+        try {
+            await apiRequest(`/chats/${chatId}/participants/${userId}`, { method: 'DELETE' });
+            return { chatId, userId };
+        } catch (err) {
+            return rejectWithValue(err?.response?.data?.detail || err?.message || 'Не удалось удалить участника');
+        }
+    }
+);
+
 // Получить сообщения чата
 export const fetchChatMessages = createAsyncThunk(
     'chats/fetchChatMessages',

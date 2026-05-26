@@ -18,6 +18,9 @@ from app.schemas.chat import (
     MessageResponse,
     ChatMediaResponse,
     ChatBlockResponse,
+    CustomChatCreate,
+    ChatParticipantAdd,
+    ManageableUserItem,
 )
 from app.schemas.public_user import ChatParticipantsResponse
 from app.services.public_user_profile_service import participant_from_user
@@ -30,6 +33,16 @@ from app.utils.chat_access import (
     get_chat_type,
 )
 from app.services.organization_chat_service import CHAT_TYPE_DIRECT
+from app.services.custom_chat_service import (
+    can_create_custom_chat,
+    can_manage_custom_chat,
+    can_delete_chat,
+    create_custom_chat,
+    delete_custom_chat,
+    add_participant_to_custom_chat,
+    remove_participant_from_custom_chat,
+    search_manageable_users,
+)
 from app.utils.user_avatar import avatar_public_url
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
@@ -179,6 +192,63 @@ def create_or_get_chat(
     return _build_chat_response(new_chat, db, current_user)
 
 
+def _resolve_direct_chat_pair(initiator: User, target: User) -> tuple[int, int]:
+    """Возвращает (buyer_id, seller_id) для личного чата без товара."""
+    if initiator.id == target.id:
+        raise HTTPException(status_code=400, detail="Нельзя написать самому себе")
+
+    if target.is_seller:
+        return initiator.id, target.id
+    if initiator.is_seller and target.is_buyer:
+        return target.id, initiator.id
+    if initiator.is_seller and not target.is_seller:
+        return target.id, initiator.id
+
+    raise HTTPException(
+        status_code=400,
+        detail="Личный чат доступен с продавцом или с покупателем (если вы продавец)",
+    )
+
+
+@router.post("/with-user/{target_user_id}", response_model=ChatResponse)
+def create_or_get_chat_with_user(
+    target_user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Личный чат с пользователем по профилю /users/ (без привязки к товару)."""
+    target = db.query(User).filter(User.id == target_user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    buyer_id, seller_id = _resolve_direct_chat_pair(current_user, target)
+
+    existing_chat = (
+        db.query(Chat)
+        .filter(
+            Chat.buyer_id == buyer_id,
+            Chat.seller_id == seller_id,
+            Chat.product_id.is_(None),
+            Chat.is_active == True,
+            or_(Chat.chat_type == CHAT_TYPE_DIRECT, Chat.chat_type.is_(None)),
+        )
+        .first()
+    )
+    if existing_chat:
+        return _build_chat_response(existing_chat, db, current_user)
+
+    new_chat = Chat(
+        chat_type=CHAT_TYPE_DIRECT,
+        buyer_id=buyer_id,
+        seller_id=seller_id,
+        product_id=None,
+    )
+    db.add(new_chat)
+    db.commit()
+    db.refresh(new_chat)
+    return _build_chat_response(new_chat, db, current_user)
+
+
 @router.get("/", response_model=ChatListResponse)
 def get_user_chats(
     skip: int = 0,
@@ -198,6 +268,43 @@ def get_user_chats(
         chat_responses.append(_build_chat_response(chat, db, current_user))
     
     return ChatListResponse(chats=chat_responses, total=total)
+
+
+@router.post("/custom", response_model=ChatResponse)
+def create_custom_group_chat(
+    body: CustomChatCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    chat = create_custom_chat(
+        db,
+        actor=current_user,
+        title=body.title,
+        participant_ids=body.participant_ids,
+        organization_id=body.organization_id,
+    )
+    return _build_chat_response(chat, db, current_user)
+
+
+@router.get("/manageable-users", response_model=List[ManageableUserItem])
+def list_manageable_users(
+    q: str = "",
+    chat_id: Optional[int] = None,
+    limit: int = 30,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    chat = None
+    if chat_id is not None:
+        chat = get_accessible_chat(db, chat_id, current_user.id)
+        if not chat:
+            raise HTTPException(status_code=404, detail="Чат не найден")
+    if not can_create_custom_chat(current_user) and not (
+        chat and can_manage_custom_chat(chat, current_user)
+    ):
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+    rows = search_manageable_users(db, current_user, query=q, chat=chat, limit=limit)
+    return [ManageableUserItem(**row) for row in rows]
 
 
 @router.get("/{chat_id}", response_model=ChatResponse)
@@ -874,6 +981,47 @@ def unblock_user_in_chat(
     return {"message": "Пользователь разблокирован", "is_blocked": False}
 
 
+@router.delete("/{chat_id}", status_code=204)
+def delete_chat_endpoint(
+    chat_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    chat = get_accessible_chat(db, chat_id, current_user.id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Чат не найден")
+    delete_custom_chat(db, chat, current_user)
+    return None
+
+
+@router.post("/{chat_id}/participants", status_code=204)
+def add_chat_participant(
+    chat_id: int,
+    body: ChatParticipantAdd,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    chat = get_accessible_chat(db, chat_id, current_user.id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Чат не найден")
+    add_participant_to_custom_chat(db, chat, current_user, body.user_id)
+    return None
+
+
+@router.delete("/{chat_id}/participants/{user_id}", status_code=204)
+def remove_chat_participant(
+    chat_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    chat = get_accessible_chat(db, chat_id, current_user.id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Чат не найден")
+    remove_participant_from_custom_chat(db, chat, current_user, user_id)
+    return None
+
+
 @router.get("/{chat_id}/participants", response_model=ChatParticipantsResponse)
 def list_chat_participants(
     chat_id: int,
@@ -1068,6 +1216,9 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
         )
         last_message_response.message = _last_message_list_preview(last_message)
     
+    can_manage = bool(current_user and can_manage_custom_chat(chat, current_user))
+    can_delete = bool(current_user and can_delete_chat(chat, current_user))
+
     return ChatResponse(
         id=chat.id,
         chat_type=chat_type,
@@ -1083,6 +1234,9 @@ def _build_chat_response(chat: Chat, db: Session, current_user: User = None) -> 
         participants_count=participants_count,
         last_message=last_message_response,
         unread_count=unread_count,
+        created_by_id=getattr(chat, "created_by_id", None),
+        can_manage=can_manage,
+        can_delete=can_delete,
         seller_name=seller_name,
         seller_phone=seller_phone,
         seller_organization=seller_organization,

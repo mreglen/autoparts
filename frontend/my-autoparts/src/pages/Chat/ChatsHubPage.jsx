@@ -7,6 +7,7 @@ import {
   subscribeToPushNotifications,
   setCurrentChat,
   fetchUserChats,
+  deleteCustomChat,
   fetchChatMessages,
   sendWebSocketMessage,
   sendChatMedia,
@@ -19,9 +20,9 @@ import ReplyPreview from './ReplyPreview';
 import SwipeableMessage from './SwipeableMessage';
 import ReplyArrow from './ReplyArrow';
 import { API_BASE } from '../../utils/apiClient';
-import PageIntro from '../../components/PageIntro/PageIntro';
 import UserAvatar from '../../components/UserAvatar/UserAvatar';
 import ChatParticipantsPanel from './ChatParticipantsPanel';
+import CreateGroupChatModal from './CreateGroupChatModal';
 import { getGarageCounterpartyProfilePath } from '../../utils/publicProfile';
 
 const formatTime = (dateString) => {
@@ -55,6 +56,8 @@ function formatListDate(dateString) {
 function getChatSearchHaystack(chat, source, avitoUserId, currentUserId) {
   const isAvito = source === 'avito';
   const isOrganization = source === 'organization';
+  const isSellers = source === 'sellers';
+  const isGroupSource = isOrganization || isSellers;
 
   const title = isAvito
     ? (() => {
@@ -62,7 +65,7 @@ function getChatSearchHaystack(chat, source, avitoUserId, currentUserId) {
         const others = (chat.participants || []).filter((p) => p.id && p.id !== mine);
         return others.map((p) => p.name).filter(Boolean).join(' ') || chat.title || '';
       })()
-    : isOrganization
+    : isGroupSource
       ? (chat.title || chat.organization_name || '')
       : (currentUserId === chat.seller_id
           ? (chat.buyer_name || '')
@@ -85,15 +88,36 @@ function isGroupGarageChat(chat) {
   return chat?.is_group || (chat?.chat_type && chat.chat_type !== 'direct');
 }
 
+function getGarageChatListSource(chat) {
+  const type = chat?.chat_type || (chat?.is_group ? 'organization' : 'direct');
+  if (type === 'direct') return 'garage';
+  if (type === 'sellers') return 'sellers';
+  if (type === 'organization' || type === 'custom') return 'organization';
+  return 'organization';
+}
+
+function isGarageGroupSource(source) {
+  return source === 'organization' || source === 'sellers';
+}
+
 function SourceBadge({ source, className = '' }) {
   const isAvito = source === 'avito';
   const isOrganization = source === 'organization';
-  const label = isAvito ? 'Авито' : isOrganization ? 'Организация' : 'Гараж';
+  const isSellers = source === 'sellers';
+  const label = isAvito
+    ? 'Авито'
+    : isSellers
+      ? 'Продавцы'
+      : isOrganization
+        ? 'Организация'
+        : 'Гараж';
   const badgeClass = isAvito
     ? 'bg-[#fff3e0] text-[#e65100]'
-    : isOrganization
-      ? 'bg-emerald-50 text-emerald-700'
-      : 'bg-indigo-50 text-indigo-700';
+    : isSellers
+      ? 'bg-amber-50 text-amber-800'
+      : isOrganization
+        ? 'bg-emerald-50 text-emerald-700'
+        : 'bg-indigo-50 text-indigo-700';
 
   return (
     <span
@@ -187,10 +211,15 @@ const ChatsHubPage = () => {
   const activeChatId = searchParams.get('chatId');
   const [searchQuery, setSearchQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState('all');
+  const [createChatOpen, setCreateChatOpen] = useState(false);
 
+  const canCreateGroupChat = Boolean(user?.is_director || user?.is_admin);
+
+  const hasSellersChat = (garageChats || []).some((c) => getGarageChatListSource(c) === 'sellers');
   const showOrganizationFilter = Boolean(
-    user?.organization_id || (garageChats || []).some(isGroupGarageChat),
+    user?.organization_id || (garageChats || []).some((c) => getGarageChatListSource(c) === 'organization'),
   );
+  const showSellersFilter = Boolean(user?.is_seller || hasSellersChat);
 
   // Подключаем WebSocket при загрузке
   useEffect(() => {
@@ -242,7 +271,7 @@ const ChatsHubPage = () => {
   // Объединяем чаты из обоих источников и сортируем по дате последнего сообщения
   const unifiedChats = useMemo(() => {
     const garage = (garageChats || [])
-      .filter((chat) => !isGroupGarageChat(chat))
+      .filter((chat) => getGarageChatListSource(chat) === 'garage')
       .map(chat => ({
         ...chat,
         _source: 'garage',
@@ -250,10 +279,18 @@ const ChatsHubPage = () => {
       }));
 
     const organization = (garageChats || [])
-      .filter(isGroupGarageChat)
+      .filter((chat) => getGarageChatListSource(chat) === 'organization')
       .map(chat => ({
         ...chat,
         _source: 'organization',
+        _lastMessageAt: chat.last_message?.created_at || chat.created_at || '',
+      }));
+
+    const sellers = (garageChats || [])
+      .filter((chat) => getGarageChatListSource(chat) === 'sellers')
+      .map(chat => ({
+        ...chat,
+        _source: 'sellers',
         _lastMessageAt: chat.last_message?.created_at || chat.created_at || '',
       }));
     
@@ -265,7 +302,7 @@ const ChatsHubPage = () => {
       }))
       : [];
     
-    return [...garage, ...organization, ...avito].sort((a, b) => {
+    return [...garage, ...organization, ...sellers, ...avito].sort((a, b) => {
       const dateA = new Date(a._lastMessageAt);
       const dateB = new Date(b._lastMessageAt);
       return dateB - dateA;
@@ -276,6 +313,7 @@ const ChatsHubPage = () => {
     all: unifiedChats.length,
     garage: unifiedChats.filter((c) => c._source === 'garage').length,
     organization: unifiedChats.filter((c) => c._source === 'organization').length,
+    sellers: unifiedChats.filter((c) => c._source === 'sellers').length,
     avito: unifiedChats.filter((c) => c._source === 'avito').length,
   }), [unifiedChats]);
 
@@ -285,6 +323,8 @@ const ChatsHubPage = () => {
       list = list.filter((c) => c._source === 'garage');
     } else if (sourceFilter === 'organization') {
       list = list.filter((c) => c._source === 'organization');
+    } else if (sourceFilter === 'sellers') {
+      list = list.filter((c) => c._source === 'sellers');
     } else if (sourceFilter === 'avito') {
       list = list.filter((c) => c._source === 'avito');
     }
@@ -306,11 +346,14 @@ const ChatsHubPage = () => {
     if (showOrganizationFilter) {
       items.push({ id: 'organization', label: 'Организация', count: chatCounts.organization });
     }
+    if (showSellersFilter) {
+      items.push({ id: 'sellers', label: 'Продавцы', count: chatCounts.sellers });
+    }
     if (avitoEnabled) {
       items.push({ id: 'avito', label: 'Авито', count: chatCounts.avito });
     }
     return items;
-  }, [chatCounts, avitoEnabled, showOrganizationFilter]);
+  }, [chatCounts, avitoEnabled, showOrganizationFilter, showSellersFilter]);
 
   useEffect(() => {
     if (sourceFilter === 'avito' && !avitoEnabled) {
@@ -319,7 +362,10 @@ const ChatsHubPage = () => {
     if (sourceFilter === 'organization' && !showOrganizationFilter) {
       setSourceFilter('all');
     }
-  }, [sourceFilter, avitoEnabled, showOrganizationFilter]);
+    if (sourceFilter === 'sellers' && !showSellersFilter) {
+      setSourceFilter('all');
+    }
+  }, [sourceFilter, avitoEnabled, showOrganizationFilter, showSellersFilter]);
 
   useEffect(() => {
     if (activeChatSource === 'avito' && !avitoEnabled) {
@@ -333,7 +379,12 @@ const ChatsHubPage = () => {
       next.set('source', 'garage');
       setSearchParams(next, { replace: true });
     }
-  }, [activeChatSource, avitoEnabled, showOrganizationFilter, searchParams, setSearchParams]);
+    if (activeChatSource === 'sellers' && !showSellersFilter) {
+      const next = new URLSearchParams(searchParams);
+      next.set('source', 'garage');
+      setSearchParams(next, { replace: true });
+    }
+  }, [activeChatSource, avitoEnabled, showOrganizationFilter, showSellersFilter, searchParams, setSearchParams]);
 
   const handleSelectChat = useCallback((chat) => {
     const source = chat._source;
@@ -367,25 +418,39 @@ const ChatsHubPage = () => {
   const activeGarageChat = activeChatId
     ? garageChats.find((c) => String(c.id) === activeChatId)
     : null;
-  const isOrganizationActive = activeChatSource === 'organization'
+  const isGroupChatActive = isGarageGroupSource(activeChatSource)
     || (activeChatSource !== 'avito' && activeChatSource !== 'garage' && isGroupGarageChat(activeGarageChat));
-  const selectedGarageChat = activeChatId && !isAvitoActive && !isOrganizationActive
-    ? garageChats.find(c => String(c.id) === activeChatId && !isGroupGarageChat(c))
+  const selectedGarageChat = activeChatId && !isAvitoActive && !isGroupChatActive
+    ? garageChats.find((c) => String(c.id) === activeChatId && getGarageChatListSource(c) === 'garage')
     : null;
-  const selectedOrganizationChat = activeChatId && isOrganizationActive
-    ? garageChats.find(c => String(c.id) === activeChatId && isGroupGarageChat(c))
+  const selectedGroupChat = activeChatId && isGroupChatActive
+    ? garageChats.find((c) => String(c.id) === activeChatId && isGarageGroupSource(getGarageChatListSource(c)))
     : null;
   const selectedAvitoChatObj = isAvitoActive && activeChatId
     ? avitoChats.find(c => String(c.id) === activeChatId)
     : null;
 
+  const handleChatCreated = useCallback(
+    (chat) => {
+      dispatch(fetchUserChats({}));
+      if (chat?.id) {
+        const next = new URLSearchParams(searchParams);
+        next.set('source', 'organization');
+        next.set('chatId', String(chat.id));
+        setSearchParams(next);
+      }
+    },
+    [dispatch, searchParams, setSearchParams]
+  );
+
   return (
     <div className="mx-auto flex w-full max-w-7xl min-h-0 flex-col max-md:min-h-0 md:h-full md:overflow-hidden">
-      {!activeChatId && (
-        <div className="mb-4 flex-shrink-0">
-          <PageIntro title="Сообщения" />
-        </div>
-      )}
+      <CreateGroupChatModal
+        isOpen={createChatOpen}
+        onClose={() => setCreateChatOpen(false)}
+        onCreated={handleChatCreated}
+        user={user}
+      />
 
       <div className="flex min-h-0 w-full flex-1 flex-col max-md:min-h-[calc(100dvh-7rem)] max-md:pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] md:h-0 md:overflow-hidden">
         <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden bg-white max-md:min-h-[calc(100dvh-7rem)] md:h-full md:max-h-full md:rounded-2xl md:border md:border-gray-200/80 md:shadow-lg md:shadow-gray-200/50">
@@ -396,6 +461,16 @@ const ChatsHubPage = () => {
             } min-h-0 w-full min-w-0 flex-col overflow-hidden border-gray-200/80 bg-white md:h-full md:max-h-full md:w-[22rem] lg:w-96 md:border-r`}
           >
             <div className="flex-shrink-0 border-b border-gray-100 bg-white px-3 pb-3 pt-3 sm:px-4">
+              {canCreateGroupChat ? (
+                <button
+                  type="button"
+                  onClick={() => setCreateChatOpen(true)}
+                  className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/50 py-2.5 text-sm font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-50"
+                >
+                  <span className="text-lg leading-none">+</span>
+                  Создать чат
+                </button>
+              ) : null}
               {(garageLoading || avitoLoading) && (
                 <div className="mb-3 flex justify-end md:hidden">
                   <span className="text-xs text-gray-400">Обновление…</span>
@@ -536,10 +611,11 @@ const ChatsHubPage = () => {
                 />
               ) : (
                 <GarageChatPanel
-                  chat={isOrganizationActive ? selectedOrganizationChat : selectedGarageChat}
+                  chat={isGroupChatActive ? selectedGroupChat : selectedGarageChat}
                   chatId={activeChatId}
-                  isGroupChat={isOrganizationActive}
+                  isGroupChat={isGroupChatActive}
                   onBack={handleBackToList}
+                  onChatDeleted={handleBackToList}
                 />
               )
             ) : (
@@ -570,14 +646,16 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
   const navigate = useNavigate();
   const isAvito = source === 'avito';
   const isOrganization = source === 'organization';
+  const isSellers = source === 'sellers';
+  const isGroupRow = isOrganization || isSellers;
 
-  const counterpartyAvatar = !isAvito && !isOrganization
+  const counterpartyAvatar = !isAvito && !isGroupRow
     ? (currentUserId === chat.seller_id ? chat.buyer_avatar_url : chat.seller_avatar_url)
     : null;
 
   const img = isAvito
     ? (chat.context_image_url || chat.avatar_url)
-    : isOrganization
+    : isGroupRow
       ? chat.product_photo_url
       : (counterpartyAvatar || chat.product_photo_url);
   
@@ -588,8 +666,8 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
         const joined = others.map((p) => p.name).filter(Boolean).join(', ');
         return joined || chat.title || 'Чат';
       })()
-    : isOrganization
-      ? (chat.title || chat.organization_name || 'Чат организации')
+    : isGroupRow
+      ? (chat.title || chat.organization_name || (isSellers ? 'Чат продавцов' : 'Чат организации'))
       : (currentUserId === chat.seller_id 
           ? (chat.buyer_name || 'Покупатель')
           : (chat.seller_name || chat.seller_organization || 'Продавец'));
@@ -611,7 +689,7 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
   // Handler for photo click - navigate to product
   const handlePhotoClick = async (e) => {
     e.stopPropagation();
-    if (isOrganization) return;
+    if (isGroupRow) return;
     
     if (isAvito) {
       // For Avito: check if product is linked
@@ -647,7 +725,7 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
   // Handler for source icon click
   const handleSourceIconClick = (e) => {
     e.stopPropagation();
-    if (isOrganization) return;
+    if (isGroupRow) return;
     
     if (isAvito) {
       // Avito icon: always open external URL
@@ -674,9 +752,9 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
     >
       <div className="flex items-start gap-3">
         <div
-          className={`relative flex-shrink-0 ${isOrganization ? '' : 'cursor-pointer'}`}
-          onClick={isOrganization ? undefined : handlePhotoClick}
-          title={isOrganization ? undefined : 'Перейти к товару'}
+          className={`relative flex-shrink-0 ${isGroupRow ? '' : 'cursor-pointer'}`}
+          onClick={isGroupRow ? undefined : handlePhotoClick}
+          title={isGroupRow ? undefined : 'Перейти к товару'}
         >
           {img ? (
             <img
@@ -691,10 +769,12 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
           )}
           <span
             className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow ring-1 ring-gray-200"
-            onClick={isOrganization ? undefined : handleSourceIconClick}
-            title={isAvito ? 'Открыть на Авито' : isOrganization ? 'Организация' : 'Перейти к товару'}
+            onClick={isGroupRow ? undefined : handleSourceIconClick}
+            title={isAvito ? 'Открыть на Авито' : isSellers ? 'Продавцы' : isOrganization ? 'Организация' : 'Перейти к товару'}
           >
-            {isOrganization ? (
+            {isSellers ? (
+              <span className="text-[9px] font-bold text-amber-700">П</span>
+            ) : isOrganization ? (
               <span className="text-[9px] font-bold text-emerald-700">О</span>
             ) : (
               <img
@@ -712,10 +792,10 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
               <h3 className={`truncate text-[15px] ${Number(chat.unread_count) > 0 ? 'font-bold text-gray-900' : 'font-semibold text-gray-900'}`}>
                 {title}
               </h3>
-              {!isAvito && !isOrganization && chat.product_name && (
+              {!isAvito && !isGroupRow && chat.product_name && (
                 <p className="truncate text-xs text-gray-500">{chat.product_name}</p>
               )}
-              {isOrganization && chat.participants_count > 0 && (
+              {isGroupRow && chat.participants_count > 0 && (
                 <p className="truncate text-xs text-gray-500">{chat.participants_count} участников</p>
               )}
               {isAvito && chat.context_title && (
@@ -754,7 +834,7 @@ function UnifiedChatListRow({ chat, source, isSelected, avitoUserId, currentUser
 }
 
 // Панель чата Свой Гараж - полноценная реализация
-function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
+function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDeleted }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
@@ -975,6 +1055,18 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
     ? getGarageCounterpartyProfilePath(chat, user?.id)
     : null;
 
+  const handleDeleteChat = async () => {
+    if (!chat?.can_delete || !chatId) return;
+    if (!window.confirm('Удалить этот чат? Сообщения будут недоступны.')) return;
+    try {
+      await dispatch(deleteCustomChat(parseInt(chatId, 10))).unwrap();
+      onChatDeleted?.();
+      onBack?.();
+    } catch (e) {
+      alert(typeof e === 'string' ? e : 'Не удалось удалить чат');
+    }
+  };
+
   const headerTrailing = (
     <div className="flex flex-shrink-0 items-center gap-2">
       {isGroupChat ? (
@@ -1000,6 +1092,15 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
           className="hidden rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:inline-flex"
         >
           К товару
+        </button>
+      ) : null}
+      {chat?.can_delete ? (
+        <button
+          type="button"
+          onClick={handleDeleteChat}
+          className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+        >
+          Удалить
         </button>
       ) : null}
     </div>
@@ -1055,7 +1156,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
             ? () => setShowParticipants(true)
             : undefined
         }
-        badge={<SourceBadge source={isGroupChat ? 'organization' : 'garage'} />}
+        badge={<SourceBadge source={isGroupChat ? getGarageChatListSource(chat) : 'garage'} />}
         trailing={headerTrailing}
       />
 
@@ -1063,6 +1164,8 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack }) {
         chatId={chatId ? parseInt(chatId, 10) : null}
         isOpen={isGroupChat && showParticipants}
         onClose={() => setShowParticipants(false)}
+        canManage={Boolean(chat?.can_manage)}
+        onChanged={() => dispatch(fetchUserChats({}))}
       />
 
       {/* Сообщения */}

@@ -124,6 +124,9 @@ class ChatResponse(BaseModel):
     
     # ID текущего пользователя (для определения роли)
     current_user_id: Optional[int] = None
+    created_by_id: Optional[int] = None
+    can_manage: bool = False
+    can_delete: bool = False
 
     class Config:
         from_attributes = True
@@ -132,3 +135,23 @@ class ChatResponse(BaseModel):
 class ChatListResponse(BaseModel):
     chats: List[ChatResponse]
     total: int
+
+
+class CustomChatCreate(BaseModel):
+    title: str
+    participant_ids: List[int] = []
+    organization_id: Optional[str] = None
+
+
+class ChatParticipantAdd(BaseModel):
+    user_id: int
+
+
+class ManageableUserItem(BaseModel):
+    user_id: int
+    public_code: Optional[str] = None
+    display_name: str
+    avatar_url: Optional[str] = None
+    organization_id: Optional[str] = None
+    is_seller: bool = False
+    is_buyer: bool = False

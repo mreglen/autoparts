@@ -23,6 +23,7 @@ class PublicBuyerProfile(PublicUserProfileBase):
 
 class PublicUserProfile(PublicUserProfileBase):
     """Единый публичный профиль по /users/{public_code}."""
+    user_id: int
     organization_id: Optional[str] = None
     organization_name: Optional[str] = None
     organization_logo: Optional[str] = None

@@ -553,6 +553,19 @@ def ensure_group_chat_columns() -> None:
         logger.info("Group chat schema already up to date")
 
 
+def ensure_chat_created_by_column() -> None:
+    """Колонка создателя для пользовательских групповых чатов."""
+    inspector = inspect(engine)
+    if "chats" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("chats")}
+    if "created_by_id" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE chats ADD COLUMN created_by_id INTEGER REFERENCES users(id)"))
+    logger.info("Applied chats.created_by_id column patch")
+
+
 def ensure_seo_product_url_exports_table() -> None:
     """Table tracking product URLs already included in daily SEO export batches."""
     inspector = inspect(engine)

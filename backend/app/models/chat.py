@@ -14,6 +14,7 @@ class Chat(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
     organization_id = Column(String(10), ForeignKey("organizations.id"), nullable=True)
     title = Column(String(255), nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     is_active = Column(Boolean, default=True)
@@ -23,6 +24,7 @@ class Chat(Base):
     seller = relationship("User", foreign_keys=[seller_id])
     product = relationship("Product")
     organization = relationship("Organization")
+    created_by = relationship("User", foreign_keys=[created_by_id])
     messages = relationship("Message", back_populates="chat", cascade="all, delete-orphan")
     participants = relationship("ChatParticipant", back_populates="chat", cascade="all, delete-orphan")
 
