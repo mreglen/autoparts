@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.auth import get_current_user
 from app.db.database import get_db
-from app.models.garage_new_orders import GarageNewOrder
-from app.models.garage_used_orders import GarageUsedOrder
+from app.models.garage_new_orders import GarageNewOrder, GarageNewOrderItem
+from app.models.garage_used_orders import GarageUsedOrder, GarageUsedOrderItem
 from app.models.avito_orders_cache import AvitoOrderCache
 from app.models.organization import Organization
 from app.models.organization_avito_integration import OrganizationAvitoIntegration
@@ -39,13 +39,18 @@ from app.services.rossko_get_orders_service import (
 )
 from app.services.rossko_status_labels import (
     NEW_PARTS_STATUS_CODES,
+    NEW_PARTS_STATUS_PRIORITY,
     format_rossko_status,
 )
 from app.services.avito_warehouse_fulfillment import (
     compute_warehouse_fulfillment,
     enrich_avito_orders_response,
 )
-from app.services.marketplace_used_fulfillment import fulfill_used_order_on_status_change
+from app.services.marketplace_used_fulfillment import (
+    FULFILLMENT_TRIGGER_STATUS,
+    fulfill_used_order_on_status_change,
+    fulfill_used_order_item_on_status_change,
+)
 from app.services.audit_service import log_audit
 from app.utils.client_buyers import order_matches_buyer
 from app.utils.user_avatar import avatar_public_url, resolve_user_by_contact
@@ -57,6 +62,39 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/sales", tags=["Sales"])
 
 ALLOWED_AVITO_TRANSITIONS = {"confirm", "reject", "perform", "receive"}
+
+USED_ORDER_STATUS_CODES = frozenset({
+    "pending",
+    "confirmed",
+    "rejected",
+    "assembled",
+    "shipped",
+    "delivered",
+    "closed",
+})
+
+USED_STATUS_PRIORITY: dict[str, int] = {
+    "rejected": 0,
+    "pending": 1,
+    "confirmed": 2,
+    "assembled": 3,
+    "shipped": 4,
+    "delivered": 5,
+    "closed": 6,
+}
+
+
+def _aggregate_order_status_from_items(
+    items: list,
+    *,
+    priority: dict[str, int],
+    default: str,
+) -> str:
+    codes = [str(getattr(i, "status_code", "") or "") for i in items]
+    codes = [c for c in codes if c]
+    if not codes:
+        return default
+    return min(codes, key=lambda c: priority.get(c, 999))
 
 
 def _extract_avito_delivery_type(avito_data: dict[str, Any]) -> str:
@@ -379,7 +417,7 @@ def update_new_parts_order_status(
         db,
         event_type="order_status_changed",
         category="orders",
-        summary=f"Заказ новых запчастей #{order_id}: {previous_status_code} → {payload.status_code}",
+        summary=f"Заказ новых запчастей #{order_id}: {previous_status_code} → {payload.status_code} (весь заказ)",
         user=current_user,
         organization_id=order.organization_id,
         details={
@@ -391,6 +429,153 @@ def update_new_parts_order_status(
         entity_id=order_id,
     )
     return {"status": "ok"}
+
+
+@router.put("/new-parts-orders/{order_id}/items/{item_id}/status")
+def update_new_parts_order_item_status(
+    order_id: int,
+    item_id: int,
+    payload: UpdateStatusRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _require_sales_orders_access(db, current_user)
+    org_id = current_user.organization_id
+    if not _can_view_new_parts_orders(db, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Новые заказы недоступны для организации")
+
+    if payload.status_code not in NEW_PARTS_STATUS_CODES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Недопустимый статус: {payload.status_code}",
+        )
+
+    order = (
+        db.query(GarageNewOrder)
+        .options(selectinload(GarageNewOrder.items))
+        .filter(GarageNewOrder.id == order_id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    if not current_user.is_admin and order.organization_id != org_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к заказу")
+
+    item = next((i for i in order.items if i.id == item_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Позиция заказа не найдена")
+
+    previous_status_code = item.status_code
+    item.status_code = payload.status_code
+    order.status_code = _aggregate_order_status_from_items(
+        order.items,
+        priority=NEW_PARTS_STATUS_PRIORITY,
+        default="new_waiting_confirmation",
+    )
+    db.commit()
+    log_audit(
+        db,
+        event_type="order_item_status_changed",
+        category="orders",
+        summary=f"Позиция #{item_id} заказа новых #{order_id}: {previous_status_code} → {payload.status_code}",
+        user=current_user,
+        organization_id=order.organization_id,
+        details={
+            "order_id": order_id,
+            "order_item_id": item_id,
+            "previous_status": previous_status_code,
+            "new_status": payload.status_code,
+        },
+        entity_type="garage_new_order_item",
+        entity_id=item_id,
+    )
+    return {"status": "ok", "order_status_code": order.status_code}
+
+
+@router.put("/used-parts-orders/{order_id}/items/{item_id}/status", response_model=UpdateUsedOrderStatusResponse)
+def update_used_parts_order_item_status(
+    order_id: int,
+    item_id: int,
+    payload: UpdateStatusRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _require_sales_orders_access(db, current_user)
+    if payload.status_code not in USED_ORDER_STATUS_CODES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Недопустимый статус: {payload.status_code}",
+        )
+
+    order = (
+        db.query(GarageUsedOrder)
+        .options(selectinload(GarageUsedOrder.items))
+        .filter(GarageUsedOrder.id == order_id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    if not current_user.is_admin and order.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к заказу")
+
+    item = next((i for i in order.items if i.id == item_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Позиция заказа не найдена")
+
+    previous_item_status = item.status_code
+    try:
+        summary = fulfill_used_order_item_on_status_change(
+            db,
+            order=order,
+            item=item,
+            new_status_code=payload.status_code,
+            previous_status_code=previous_item_status,
+            acting_user_id=current_user.id,
+        )
+        if payload.status_code != FULFILLMENT_TRIGGER_STATUS or summary is None:
+            item.status_code = payload.status_code
+
+        order.status_code = _aggregate_order_status_from_items(
+            order.items,
+            priority=USED_STATUS_PRIORITY,
+            default="pending",
+        )
+        db.commit()
+
+        fulfilled_out = []
+        if summary:
+            fulfilled_out.append(
+                FulfilledOrderItemOut(
+                    order_item_id=summary.order_item_id,
+                    stock_out_id=summary.stock_out_id,
+                    created=summary.created,
+                )
+            )
+
+        log_audit(
+            db,
+            event_type="order_item_status_changed",
+            category="orders",
+            summary=f"Позиция #{item_id} заказа Б/У #{order_id}: {previous_item_status} → {payload.status_code}",
+            user=current_user,
+            organization_id=order.organization_id,
+            details={
+                "order_id": order_id,
+                "order_item_id": item_id,
+                "previous_status": previous_item_status,
+                "new_status": payload.status_code,
+            },
+            entity_type="garage_used_order_item",
+            entity_id=item_id,
+        )
+
+        return UpdateUsedOrderStatusResponse(status="ok", fulfilled_items=fulfilled_out)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.get("/avito-orders", response_model=list[AvitoOrderResponseV2])

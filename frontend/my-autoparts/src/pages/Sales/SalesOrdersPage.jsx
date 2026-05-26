@@ -88,7 +88,7 @@ export default function SalesOrdersPage() {
   const [expandedNewOrderId, setExpandedNewOrderId] = useState(null);
   const [canViewNewOrders, setCanViewNewOrders] = useState(false);
 
-  const [editingStatus, setEditingStatus] = useState(null); // {type:'used'|'new'|'avito', id:number} | null
+  const [editingStatus, setEditingStatus] = useState(null); // garage: {type, orderId, itemId?} | avito: {type, id}
   const [availableStatuses, setAvailableStatuses] = useState([]);
   const [transitionLoadingByOrderId, setTransitionLoadingByOrderId] = useState({});
   const [warehouseRetryLoadingByOrderId, setWarehouseRetryLoadingByOrderId] = useState({});
@@ -274,23 +274,45 @@ export default function SalesOrdersPage() {
     return 'Не удалось обновить статус заказа';
   };
 
-  const updateUsedOrderStatus = async (orderId, statusCode) => {
+  const updateUsedOrderStatus = async (orderId, statusCode, itemId = null) => {
     setUsedOrderStatusMessage(null);
     try {
-      const response = await apiAxios.put(
-        `/sales/used-parts-orders/${orderId}/status`,
-        { status_code: statusCode }
-      );
+      const url = itemId
+        ? `/sales/used-parts-orders/${orderId}/items/${itemId}/status`
+        : `/sales/used-parts-orders/${orderId}/status`;
+      const response = await apiAxios.put(url, { status_code: statusCode });
       const fulfilled = Array.isArray(response.data?.fulfilled_items)
         ? response.data.fulfilled_items
         : [];
       const createdCount = fulfilled.filter((item) => item.created).length;
+      const orderStatusFromApi = response.data?.order_status_code;
+
       setUsedOrders((prev) =>
         prev.map((o) => {
           if (o.id !== orderId) return o;
+          if (itemId) {
+            const nextItems = (o.items || []).map((item) => {
+              if (item.id !== itemId) return item;
+              const match = fulfilled.find((f) => f.order_item_id === item.id);
+              return {
+                ...item,
+                status_code: statusCode,
+                ...(match
+                  ? { stock_out_id: match.stock_out_id }
+                  : {}),
+              };
+            });
+            return {
+              ...o,
+              status_code: orderStatusFromApi ?? o.status_code,
+              items: nextItems,
+            };
+          }
           const nextItems = (o.items || []).map((item) => {
             const match = fulfilled.find((f) => f.order_item_id === item.id);
-            if (!match) return item;
+            if (!match) {
+              return { ...item, status_code: statusCode };
+            }
             return {
               ...item,
               stock_out_id: match.stock_out_id,
@@ -306,6 +328,11 @@ export default function SalesOrdersPage() {
           type: 'success',
           text: `Списано со склада: ${createdCount} поз.`,
         });
+      } else {
+        setUsedOrderStatusMessage({
+          type: 'success',
+          text: itemId ? 'Статус позиции обновлён.' : 'Статус заказа обновлён.',
+        });
       }
     } catch (error) {
       const detail = error?.response?.data?.detail;
@@ -316,12 +343,26 @@ export default function SalesOrdersPage() {
     }
   };
 
-  const updateNewOrderStatus = async (orderId, statusCode) => {
+  const updateNewOrderStatus = async (orderId, statusCode, itemId = null) => {
     try {
-      await apiAxios.put(`/sales/new-parts-orders/${orderId}/status`, { status_code: statusCode });
+      const url = itemId
+        ? `/sales/new-parts-orders/${orderId}/items/${itemId}/status`
+        : `/sales/new-parts-orders/${orderId}/status`;
+      const response = await apiAxios.put(url, { status_code: statusCode });
+      const orderStatusFromApi = response.data?.order_status_code ?? statusCode;
+
       setNewOrders((prev) =>
         prev.map((o) => {
           if (o.id !== orderId) return o;
+          if (itemId) {
+            return {
+              ...o,
+              status_code: orderStatusFromApi,
+              items: (o.items || []).map((item) =>
+                item.id === itemId ? { ...item, status_code: statusCode } : item
+              ),
+            };
+          }
           return {
             ...o,
             status_code: statusCode,
@@ -332,7 +373,9 @@ export default function SalesOrdersPage() {
       setEditingStatus(null);
       setUsedOrderStatusMessage({
         type: 'success',
-        text: 'Статус заказа обновлён. Покупатель увидит его в «Мои заказы».',
+        text: itemId
+          ? 'Статус позиции обновлён. Покупатель увидит его в «Мои заказы».'
+          : 'Статус заказа обновлён. Покупатель увидит его в «Мои заказы».',
       });
     } catch (error) {
       setUsedOrderStatusMessage({

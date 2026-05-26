@@ -6,6 +6,105 @@ import { openAvitoProductFlow } from '../../utils/avitoProductFlow';
 import { getGarageDeliveryInfo } from '../../utils/garageOrderUi';
 import UserAvatar from '../UserAvatar/UserAvatar';
 
+const SVOYGARAGE_LOGO = '/logos/svoygarage.png';
+
+function SvoyGarageStatusIcon({ onClick, title, interactive = true, size = 'md' }) {
+  const boxClass =
+    size === 'sm'
+      ? 'inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-indigo-200 bg-white'
+      : 'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-indigo-200 bg-white shadow-sm';
+  const interactiveClass = interactive
+    ? ' transition hover:bg-indigo-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 cursor-pointer'
+    : ' opacity-80';
+
+  if (interactive && onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${boxClass}${interactiveClass}`}
+        title={title}
+        aria-label={title}
+      >
+        <img src={SVOYGARAGE_LOGO} alt="" className="h-3.5 w-3.5 object-contain" />
+      </button>
+    );
+  }
+
+  return (
+    <span className={`${boxClass}${interactiveClass}`} title={title}>
+      <img src={SVOYGARAGE_LOGO} alt="" className="h-3.5 w-3.5 object-contain" />
+    </span>
+  );
+}
+
+function GarageCustomerStatusControl({
+  statusCode,
+  statusEditable,
+  isEditing,
+  onToggleEdit,
+  onStatusChange,
+  onCloseEdit,
+  getStatusColor,
+  getStatusName,
+  orderStatusOptions,
+  size = 'md',
+  title = 'Статус для покупателя (Свой Гараж)',
+}) {
+  const toggleEdit = (e) => {
+    e.stopPropagation();
+    if (!statusEditable) return;
+    onToggleEdit();
+  };
+
+  const handleChange = (e) => {
+    e.stopPropagation();
+    onStatusChange(e.target.value);
+  };
+
+  const badgePadding = size === 'sm' ? 'px-2 py-0.5' : 'px-3 py-1';
+
+  return (
+    <div className="inline-flex items-center gap-1" title={title}>
+      <SvoyGarageStatusIcon
+        size={size}
+        interactive={statusEditable}
+        onClick={statusEditable ? toggleEdit : undefined}
+        title={statusEditable ? 'Нажмите, чтобы изменить статус' : 'Свой Гараж'}
+      />
+      {statusEditable && isEditing ? (
+        <select
+          value={statusCode}
+          onChange={handleChange}
+          onBlur={onCloseEdit}
+          onClick={(e) => e.stopPropagation()}
+          className={`max-w-[12rem] rounded-lg border border-indigo-300 bg-white text-xs font-medium text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${size === 'sm' ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}
+          autoFocus
+        >
+          {orderStatusOptions.map((status) => (
+            <option key={status.code} value={status.code}>
+              {status.name}
+            </option>
+          ))}
+        </select>
+      ) : statusEditable ? (
+        <button
+          type="button"
+          onClick={toggleEdit}
+          className={`inline-flex rounded-full text-xs font-medium transition hover:opacity-90 ${badgePadding} ${getStatusColor(statusCode)}`}
+          title="Нажмите, чтобы изменить статус"
+        >
+          {getStatusName(statusCode)}
+        </button>
+      ) : (
+        <span className={`inline-flex rounded-full text-xs font-medium ${badgePadding} ${getStatusColor(statusCode)}`}>
+          {getStatusName(statusCode)}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function SalesGarageOrderCard({
   order,
   orderType = 'used',
@@ -26,12 +125,39 @@ export default function SalesGarageOrderCard({
   const items = order.items || [];
   const isUsed = orderType === 'used';
   const isNew = orderType === 'new';
-  const statusCode = order.status_code || (isNew ? 'new_waiting_confirmation' : 'pending');
+  const defaultStatus = isNew ? 'new_waiting_confirmation' : 'pending';
+  const orderStatusCode = order.status_code || defaultStatus;
   const rosskoStatus = order.rossko_status;
   const rosskoOrderId = order.rossko_order_id;
   const rosskoSyncError = order.rossko_sync_error;
-  const isEditing = editingStatus?.type === orderType && editingStatus?.id === order.id;
+
+  const isEditingOrder =
+    editingStatus?.type === orderType &&
+    editingStatus?.orderId === order.id &&
+    editingStatus?.itemId == null;
+
+  const isEditingItem = (itemId) =>
+    editingStatus?.type === orderType &&
+    editingStatus?.orderId === order.id &&
+    editingStatus?.itemId === itemId;
+
   const deliveryText = getGarageDeliveryInfo(order);
+
+  const openOrderEditor = () => {
+    if (isEditingOrder) {
+      onEditStatus(null);
+      return;
+    }
+    onEditStatus({ type: orderType, orderId: order.id, itemId: null });
+  };
+
+  const openItemEditor = (itemId) => {
+    if (isEditingItem(itemId)) {
+      onEditStatus(null);
+      return;
+    }
+    onEditStatus({ type: orderType, orderId: order.id, itemId });
+  };
 
   const handleProductClick = async (item, e) => {
     e?.stopPropagation?.();
@@ -88,7 +214,7 @@ export default function SalesGarageOrderCard({
                 <p className="mt-1 text-sm text-gray-600 break-all">{order.buyer_phone || '—'}</p>
               </div>
             </div>
-              <p className="mt-1 text-sm text-gray-600 line-clamp-2">{deliveryText}</p>
+            <p className="mt-1 text-sm text-gray-600 line-clamp-2">{deliveryText}</p>
           </div>
 
           <div className="flex flex-wrap items-end gap-3 lg:flex-col lg:items-end">
@@ -104,45 +230,25 @@ export default function SalesGarageOrderCard({
               >
                 {order.is_paid ? 'Оплачен' : 'Не оплачен'}
               </span>
-              {statusEditable && isEditing ? (
-                <select
-                  value={statusCode}
-                  onChange={(e) => onUpdateStatus(order.id, e.target.value)}
-                  onBlur={() => onEditStatus(null)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs font-medium focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  autoFocus
-                >
-                  {orderStatusOptions.map((status) => (
-                    <option key={status.code} value={status.code}>
-                      {status.name}
-                    </option>
-                  ))}
-                </select>
-              ) : statusEditable ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEditStatus({ type: orderType, id: order.id });
-                  }}
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium transition hover:opacity-90 ${getStatusColor(statusCode)}`}
-                  title="Изменить статус для покупателя"
-                >
-                  {getStatusName(statusCode)}
-                </button>
-              ) : (
-                <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(statusCode)}`}
-                  title="Статус заказа"
-                >
-                  {getStatusName(statusCode)}
-                </span>
-              )}
+              <GarageCustomerStatusControl
+                statusCode={orderStatusCode}
+                statusEditable={statusEditable}
+                isEditing={isEditingOrder}
+                onToggleEdit={openOrderEditor}
+                onStatusChange={(code) => {
+                  onUpdateStatus(order.id, code, null);
+                  onEditStatus(null);
+                }}
+                onCloseEdit={() => onEditStatus(null)}
+                getStatusColor={getStatusColor}
+                getStatusName={getStatusName}
+                orderStatusOptions={orderStatusOptions}
+                title="Статус заказа для покупателя (Свой Гараж)"
+              />
               {isNew && rosskoStatus && (
                 <span
                   className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800 ring-1 ring-sky-100"
-                  title="Статус заказа в Rossko (из API)"
+                  title="Статус Rossko (только просмотр)"
                 >
                   {rosskoStatus}
                 </span>
@@ -178,6 +284,7 @@ export default function SalesGarageOrderCard({
             {items.map((item, idx) => {
               const lineTotal = (item.price || 0) * (item.quantity || 0);
               const title = item.product_name || item.name || 'Товар';
+              const itemStatusCode = item.status_code || orderStatusCode;
               return (
                 <li
                   key={item.id || `${order.id}-${idx}`}
@@ -214,18 +321,26 @@ export default function SalesGarageOrderCard({
                     </div>
                     <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                       <div className="text-base font-semibold tabular-nums text-gray-900">{formatPrice(lineTotal)}</div>
-                      {item.status_code && (
-                        <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(item.status_code)}`}
-                          title={isNew ? 'Статус для покупателя' : undefined}
-                        >
-                          {getStatusName(item.status_code)}
-                        </span>
-                      )}
+                      <GarageCustomerStatusControl
+                        statusCode={itemStatusCode}
+                        statusEditable={statusEditable}
+                        isEditing={isEditingItem(item.id)}
+                        onToggleEdit={() => openItemEditor(item.id)}
+                        onStatusChange={(code) => {
+                          onUpdateStatus(order.id, code, item.id);
+                          onEditStatus(null);
+                        }}
+                        onCloseEdit={() => onEditStatus(null)}
+                        getStatusColor={getStatusColor}
+                        getStatusName={getStatusName}
+                        orderStatusOptions={orderStatusOptions}
+                        size="sm"
+                        title="Статус позиции для покупателя (Свой Гараж)"
+                      />
                       {isNew && item.rossko_status && (
                         <span
                           className="inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-sky-100"
-                          title="Статус позиции в Rossko"
+                          title="Статус Rossko (только просмотр)"
                         >
                           {item.rossko_status}
                         </span>
