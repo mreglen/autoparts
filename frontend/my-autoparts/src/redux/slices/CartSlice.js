@@ -80,6 +80,50 @@ export const createNewPartsOrder = createAsyncThunk(
     }
 );
 
+export const createNewPartsPaymentSession = createAsyncThunk(
+    'cart/createNewPartsPaymentSession',
+    async (payload = {}, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.post('/payments/new-parts/sessions', payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка создания сессии оплаты'
+            );
+        }
+    }
+);
+
+export const fetchPaymentSession = createAsyncThunk(
+    'cart/fetchPaymentSession',
+    async (sessionId, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get(`/payments/new-parts/sessions/${sessionId}`);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки статуса оплаты'
+            );
+        }
+    }
+);
+
+export const createCardPayment = createAsyncThunk(
+    'cart/createCardPayment',
+    async (sessionId, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.post(
+                `/payments/new-parts/sessions/${sessionId}/card`
+            );
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка оплаты картой'
+            );
+        }
+    }
+);
+
 export const fetchCart = createAsyncThunk(
     'cart/fetchCart',
     async (_, { rejectWithValue }) => {
@@ -175,6 +219,9 @@ const cartSlice = createSlice({
         loading: false,
         quantityUpdatingIds: [],
         error: null,
+        paymentSession: null,
+        paymentSessionLoading: false,
+        paymentSessionError: null,
     },
     reducers: {
         clearCartError: (state) => {
@@ -283,6 +330,30 @@ const cartSlice = createSlice({
             .addCase(updateUsedCartItemQuantity.rejected, (state, action) => {
                 removeQuantityUpdatingId(state, action.meta.arg.itemId);
                 state.error = action.payload;
+            })
+            .addCase(createNewPartsPaymentSession.pending, (state) => {
+                state.paymentSessionLoading = true;
+                state.paymentSessionError = null;
+            })
+            .addCase(createNewPartsPaymentSession.fulfilled, (state, action) => {
+                state.paymentSessionLoading = false;
+                state.paymentSession = action.payload;
+            })
+            .addCase(createNewPartsPaymentSession.rejected, (state, action) => {
+                state.paymentSessionLoading = false;
+                state.paymentSessionError = action.payload;
+            })
+            .addCase(fetchPaymentSession.pending, (state) => {
+                state.paymentSessionLoading = true;
+            })
+            .addCase(fetchPaymentSession.fulfilled, (state, action) => {
+                state.paymentSessionLoading = false;
+                state.paymentSession = action.payload;
+                state.paymentSessionError = null;
+            })
+            .addCase(fetchPaymentSession.rejected, (state, action) => {
+                state.paymentSessionLoading = false;
+                state.paymentSessionError = action.payload;
             });
     },
 });
@@ -293,6 +364,9 @@ export const selectCart = (state) => state.cart.cart;
 export const selectCartLoading = (state) => state.cart.loading;
 export const selectCartQuantityUpdatingIds = (state) => state.cart.quantityUpdatingIds;
 export const selectCartError = (state) => state.cart.error;
+export const selectPaymentSession = (state) => state.cart.paymentSession;
+export const selectPaymentSessionLoading = (state) => state.cart.paymentSessionLoading;
+export const selectPaymentSessionError = (state) => state.cart.paymentSessionError;
 
 /** Счётчик и сумма для шапки: из корзины или из кэша, пока идёт загрузка. */
 export const selectCartSummary = (state) => {

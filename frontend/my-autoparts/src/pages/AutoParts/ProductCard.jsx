@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { normalizeImageUrl } from '../../utils/apiClient';
+import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 
 const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantity = false }) => {
   // Function to check if the file is a video
@@ -47,7 +48,8 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [hoverSide, setHoverSide] = useState(null); // 'left' or 'right'
   const navigate = useNavigate();
-  
+  const displayTitle = formatProductDisplayTitle(part.brand, part.article, part.title);
+
   // Combine photos and videos into a single media array
   const allMedia = React.useMemo(() => {
     const photos = (part.photos || []).map(photo => {
@@ -212,20 +214,13 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
               )}
             </div>
 
-            {/* Brand and Article */}
-            <div className="flex flex-wrap gap-0.5 text-[14px] text-gray-700">
-              <span className="font-medium truncate">{product.brand}</span>
-              <span className="text-gray-400">•</span>
-              <span className="truncate">{product.article}</span>
-            </div>
-
             {/* Product Title - Clickable with hover effect */}
             <div className="space-y-0.5 flex-1">
               <p 
                 className="text-[15px] text-gray-900 line-clamp-2 cursor-pointer hover:text-indigo-600 font-medium"
                 onClick={handleTitleClick}
               >
-                {product.title}
+                {displayTitle}
               </p>
             </div>
 

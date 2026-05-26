@@ -53,6 +53,23 @@ class Settings(BaseSettings):
     # Опционально: общий секрет для POST /webhooks/avito/messenger (?secret= или заголовок X-Webhook-Secret)
     AVITO_WEBHOOK_SECRET: Optional[str] = None
 
+    # ЮKassa (HTTP Basic: shopId + secret)
+    YOOKASSA_SHOP_ID: Optional[str] = None
+    YOOKASSA_SECRET_KEY: Optional[str] = None
+    YANDEX_YOOKASSA_SECRET: Optional[str] = None  # legacy alias
+    YOOKASSA_API_BASE: str = "https://api.yookassa.ru/v3"
+    YOOKASSA_TAX_SYSTEM_CODE: int = 2
+    YOOKASSA_DEFAULT_VAT_CODE: int = 1
+    YOOKASSA_PAYMENT_TTL_MINUTES: int = 60
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
+
+    @property
+    def yookassa_secret_key(self) -> Optional[str]:
+        return (self.YOOKASSA_SECRET_KEY or self.YANDEX_YOOKASSA_SECRET or "").strip() or None
+
+    @property
+    def yookassa_configured(self) -> bool:
+        return bool(self.YOOKASSA_SHOP_ID and self.yookassa_secret_key)
 
 settings = Settings()

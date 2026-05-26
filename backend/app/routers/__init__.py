@@ -37,6 +37,7 @@ from app.routers.audit import router as audit_router
 from app.routers.orders_meta import router as orders_meta_router
 from app.routers.orders_legacy import router as orders_legacy_router
 from app.routers.orders_new_parts import router as orders_new_parts_router
+from app.routers.payments_new_parts import router as payments_new_parts_router
 from app.routers.admin_rossko import router as admin_rossko_router
 from app.routers.yandex_feeds import router as yandex_feeds_router
 from app.routers.public_feeds import router as public_feeds_router
@@ -95,6 +96,7 @@ api_router.include_router(audit_router)
 api_router.include_router(orders_meta_router)
 api_router.include_router(orders_legacy_router)
 api_router.include_router(orders_new_parts_router)
+api_router.include_router(payments_new_parts_router)
 api_router.include_router(yandex_feeds_router)
 api_router.include_router(public_feeds_router)
 api_router.include_router(site_delivery_router)

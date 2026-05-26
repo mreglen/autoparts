@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectCatalogItems, selectCatalogLoading, selectCatalogTotal } from '../../../redux/slices/ProductSlice';
 import { normalizeImageUrl } from '../../../utils/apiClient';
+import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 
 const NewPartsLocalStock = ({ compact = false }) => {
   const navigate = useNavigate();
@@ -48,8 +49,9 @@ const NewPartsLocalStock = ({ compact = false }) => {
                 )}
               </div>
               <div className="p-3 flex-1 flex flex-col">
-                <p className="text-xs text-gray-500">{part.brand}</p>
-                <p className="text-sm font-medium text-gray-900 line-clamp-2 flex-1">{part.name || part.article}</p>
+                <p className="text-sm font-medium text-gray-900 line-clamp-2 flex-1">
+                  {formatProductDisplayTitle(part.brand, part.article, part.name)}
+                </p>
                 <p className="text-base font-bold text-indigo-600 mt-2">
                   {part.price ? `${Number(part.price).toLocaleString('ru-RU')} ₽` : '—'}
                 </p>

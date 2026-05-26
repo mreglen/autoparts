@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import ProductCard from '../ProductCard';
+import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import UsedPartsFiltersForm from './UsedPartsFiltersForm';
 import {
   fetchCatalogProducts,
@@ -355,7 +356,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
               <div className="min-w-0 flex-1">
                 <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-gray-900 sm:text-base sm:leading-normal lg:text-lg">
-                  {part.brand} {part.name || part.article}
+                  {formatProductDisplayTitle(part.brand, part.article, part.name)}
                 </h3>
                 <p className="mt-0.5 text-xs text-gray-500 sm:text-sm">
                   Артикул: <span className="font-medium text-gray-700">{part.article || '—'}</span>
@@ -471,7 +472,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   key={part.id}
                   part={{
                     id: part.id,
-                    title: part.name || part.article || '—',
+                    title: formatProductDisplayTitle(part.brand, part.article, part.name),
                     price: part.price ? `${part.price} ₽` : '—',
                     originalPrice: null, // No original price in current data
                     discount: null, // No discount info in current data
@@ -537,7 +538,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   key={`analog-${part.id}`}
                   part={{
                     id: part.id,
-                    title: part.name || part.article || '—',
+                    title: formatProductDisplayTitle(part.brand, part.article, part.name),
                     price: part.price ? `${part.price} ₽` : '—',
                     originalPrice: null, // No original price in current data
                     discount: null, // No discount info in current data

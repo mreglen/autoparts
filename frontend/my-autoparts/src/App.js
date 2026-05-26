@@ -36,6 +36,7 @@ import { StockOutList } from './pages/StockOut';
 import CartPage from './pages/Cart/CartPage';
 import OrderRegistration from './pages/Cart/OrderRegistration';
 import NewPartsOrderRegistration from './pages/Cart/NewPartsOrderRegistration';
+import NewPartsPaymentPage from './pages/Cart/NewPartsPaymentPage';
 import SalesOrdersPage from './pages/Sales/SalesOrdersPage';
 import SalesReturnsPage from './pages/Sales/SalesReturnsPage';
 import PurchasesOrdersPage from './pages/Sales/PurchasesOrdersPage';
@@ -199,6 +200,7 @@ function App() {
           <Route path="/cart" element={<CartPage />} />
           <Route path="/order-reg" element={<OrderRegistration />} />
           <Route path="/cart/new/checkout" element={<NewPartsOrderRegistration />} />
+          <Route path="/cart/new/pay/:sessionId" element={<NewPartsPaymentPage />} />
           <Route path="/my-parts/add" element={<AddPart />} />
           <Route path="/my-parts/edit/:id" element={<EditPart />} />
           <Route path="/part/:productId" element={<PartDetail />} />

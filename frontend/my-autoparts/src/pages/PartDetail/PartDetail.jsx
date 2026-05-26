@@ -8,6 +8,7 @@ import { createOrGetChat } from '../../redux/slices/ChatSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
 import { buildPartDetailPath } from '../../utils/partRoutes';
+import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
 
@@ -16,7 +17,7 @@ const SITE_ORIGIN = 'https://svoygarage.ru';
 function buildProductSeo(product) {
   const brand = (product?.brand || '').trim();
   const article = (product?.article || '').trim();
-  const name = (product?.name || '').trim() || `${brand} ${article}`.trim() || 'Автозапчасть';
+  const name = formatProductDisplayTitle(brand, article, product?.name) || 'Автозапчасть';
   const conditionLabel = product?.is_new ? 'новая' : 'б/у';
   const path = buildPartDetailPath(product);
   const canonicalUrl = `${SITE_ORIGIN}${path}`;
@@ -433,7 +434,11 @@ const PartDetail = () => {
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="flex-1">
                 <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 max-md:hidden sm:text-3xl">
-                  {currentProduct.name || '—'}
+                  {formatProductDisplayTitle(
+                    currentProduct.brand,
+                    currentProduct.article,
+                    currentProduct.name,
+                  )}
                 </h1>
                 <div className="flex flex-wrap gap-2 items-center">
                   <div className="flex items-center bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium">

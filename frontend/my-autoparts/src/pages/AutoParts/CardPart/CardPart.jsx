@@ -3,6 +3,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { addNewPartsToCart, selectCartLoading, selectCart, updateCartItemQuantity, removeFromCart } from '../../../redux/slices/CartSlice';
 import { isRosskoFastDelivery } from '../NewParts/rosskoHelpers';
+import {
+  extractProductDescription,
+  formatProductDisplayTitle,
+} from '../../../utils/productDisplayName';
 
 
 const formatDeliveryTime = (deliveryStart, deliveryEnd) => {
@@ -90,7 +94,9 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
 
     const brand = part.brand || '—';
     const number = part.partnumber || '—';
-    const title = part.name || '—';
+    const rawName = part.name || '';
+    const title = extractProductDescription(rawName, brand, number) || rawName || '—';
+    const displayTitle = formatProductDisplayTitle(brand, number, rawName);
 
     const renderSectionBadges = () => {
         const showDirect = sectionType === 'available';
@@ -231,8 +237,8 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
         };
         
         // Add optional fields only if they have valid values
-        if (title && title.trim()) {
-            cartItem.name = title.trim();
+        if (displayTitle && displayTitle.trim() && displayTitle !== '—') {
+            cartItem.name = displayTitle.trim();
         }
         
         // Format dates properly for the backend
@@ -592,27 +598,12 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
             <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
                 <div className="flex justify-between items-start mb-4">
                     <div className="flex-1 pr-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span 
-                                className="text-base font-semibold text-gray-900 cursor-pointer hover:text-indigo-800 border-b border-gray-900"
-                                onClick={handleNavigateToDetail}
-                            >
-                                {brand}
-                            </span>
-                            <span className="text-sm text-gray-400">•</span>
-                            <span 
-                                className="text-sm text-indigo-600 font-mono border-b border-gray-500 cursor-pointer hover:text-indigo-800"
-                                onClick={handleNavigateToDetail}
-                            >
-                                {number}
-                            </span>
-                        </div>
                         {renderSectionBadges()}
-                        <h3 
-                            className="text-base font-medium text-gray-800 mb-2 leading-tight cursor-pointer hover:text-indigo-800"
+                        <h3
+                            className="text-base font-semibold text-gray-900 mb-2 leading-snug cursor-pointer hover:text-indigo-800"
                             onClick={handleNavigateToDetail}
                         >
-                            {title}
+                            {displayTitle}
                         </h3>
                     </div>
                     <div className="text-right flex-shrink-0">

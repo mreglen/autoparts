@@ -11,6 +11,7 @@ import {
   removeFromCart,
   removeUsedFromCart,
 } from '../../redux/slices/CartSlice';
+import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price);
@@ -158,9 +159,11 @@ function CartItemRow({
           <PartTypeBadge type={item.type} />
           <h3 className="min-w-0 flex-1 text-sm font-medium text-gray-900 sm:text-base">{item.name}</h3>
         </div>
-        <p className="mt-1 text-xs text-gray-500 sm:text-sm">
-          {item.brand} · {item.number}
-        </p>
+        {item.type !== 'new' && (
+          <p className="mt-1 text-xs text-gray-500 sm:text-sm">
+            {item.brand} · {item.number}
+          </p>
+        )}
         {showDelivery && (
           <p className="mt-1.5 flex items-start gap-1.5 text-xs text-gray-600 sm:text-sm">
             <svg
@@ -376,7 +379,7 @@ export default function CartPage() {
     seller: 'Новые запчасти',
     brand: item.brand,
     number: item.partnumber,
-    name: item.name || `${item.brand} ${item.partnumber}`,
+    name: formatProductDisplayTitle(item.brand, item.partnumber, item.name),
     deliveryDate: item.delivery,
     price: item.price,
     quantity: item.quantity,

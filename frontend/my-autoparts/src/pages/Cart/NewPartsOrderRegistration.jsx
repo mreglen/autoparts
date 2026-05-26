@@ -5,7 +5,7 @@ import {
     selectCart,
     selectCartLoading,
     fetchCart,
-    createNewPartsOrder,
+    createNewPartsPaymentSession,
 } from '../../redux/slices/CartSlice';
 import { apiAxios } from '../../utils/apiClient';
 import { apiAxiosUnauth } from '../../utils/apiClient';
@@ -23,6 +23,7 @@ import {
     formatPhoneFromRaw,
 } from '../../utils/contactValidation';
 import CheckoutPaymentAndOffer from '../../components/Legal/CheckoutPaymentAndOffer';
+import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 
 function formatApiErrorDetail(detail) {
     if (!detail) return 'Ошибка при оформлении заказа. Попробуйте ещё раз.';
@@ -139,7 +140,7 @@ export default function NewPartsOrderRegistration() {
             type: 'new',
             brand: item.brand,
             number: item.partnumber,
-            name: item.name || `${item.brand} ${item.partnumber}`,
+            name: formatProductDisplayTitle(item.brand, item.partnumber, item.name),
             price: Number(item.price),
             quantity: item.quantity,
         }));
@@ -353,6 +354,25 @@ export default function NewPartsOrderRegistration() {
         );
     };
 
+    const buildOrderPayload = () => ({
+        recipient_name: normalizeFullName(recipient.fullName),
+        recipient_phone: recipient.phone,
+        recipient_email: normalizeEmail(recipient.email),
+        delivery_type: deliveryType || 'pickup',
+        delivery_region_id: selectedDeliveryOption
+            ? Number(selectedDeliveryOption.region_id)
+            : null,
+        delivery_region_name: selectedDeliveryOption?.region_name || null,
+        delivery_option_id: selectedDeliveryOption
+            ? Number(selectedDeliveryOption.id)
+            : null,
+        ...(deliveryType === 'pickup' && { pickup_address: pickupAddress }),
+        ...((deliveryType === 'pvz' || deliveryType === 'courier') && {
+            transport_company: selectedTransportCompany,
+            delivery_address: deliveryAddress.trim(),
+        }),
+    });
+
     const handleSubmitOrder = async () => {
         if (submitting || orderSuccess) return;
         if (!validateBeforeSubmit()) return;
@@ -362,30 +382,9 @@ export default function NewPartsOrderRegistration() {
         setNotification(null);
         try {
             const result = await dispatch(
-                createNewPartsOrder({
-                    recipient_name: normalizeFullName(recipient.fullName),
-                    recipient_phone: recipient.phone,
-                    recipient_email: normalizeEmail(recipient.email),
-                    delivery_type: deliveryType || 'pickup',
-                    delivery_region_id: selectedDeliveryOption
-                        ? Number(selectedDeliveryOption.region_id)
-                        : null,
-                    delivery_region_name: selectedDeliveryOption?.region_name || null,
-                    delivery_option_id: selectedDeliveryOption
-                        ? Number(selectedDeliveryOption.id)
-                        : null,
-                    ...(deliveryType === 'pickup' && { pickup_address: pickupAddress }),
-                    ...((deliveryType === 'pvz' || deliveryType === 'courier') && {
-                        transport_company: selectedTransportCompany,
-                        delivery_address: deliveryAddress.trim(),
-                    }),
-                })
+                createNewPartsPaymentSession(buildOrderPayload())
             ).unwrap();
-            setOrderSuccess(result);
-            setNotification({
-                type: 'success',
-                message: result.message || `Заказ №${result.order_id} оформлен`,
-            });
+            navigate(`/cart/new/pay/${result.session_id}`);
         } catch (err) {
             setNotification({
                 type: 'error',
@@ -477,7 +476,7 @@ export default function NewPartsOrderRegistration() {
                 disabled={submitting || !isFormValid}
                 className="hidden w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 md:flex"
             >
-                {submitting ? 'Оформление...' : 'Подтвердить заказ'}
+                {submitting ? 'Переход к оплате...' : 'Оплата'}
             </button>
         </div>
     );
@@ -534,9 +533,6 @@ export default function NewPartsOrderRegistration() {
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-medium text-gray-900 line-clamp-2">
                                             {item.name}
-                                        </p>
-                                        <p className="mt-0.5 text-xs text-gray-500">
-                                            {item.brand} · {item.number}
                                         </p>
                                         <p className="mt-1 text-xs text-gray-600">
                                             {item.quantity} шт. × {formatPrice(item.price)}
@@ -762,7 +758,7 @@ export default function NewPartsOrderRegistration() {
                         disabled={submitting || !isFormValid}
                         className="shrink-0 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
                     >
-                        {submitting ? '...' : 'Оформить'}
+                        {submitting ? '...' : 'Оплата'}
                     </button>
                 </div>
             </div>

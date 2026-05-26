@@ -32,6 +32,8 @@ class GarageNewOrder(Base):
     deliver_in_parts = Column(Boolean, nullable=False, default=False)
     rossko_order_id = Column(String(64), nullable=True, index=True)
     rossko_response_raw = Column(Text, nullable=True)
+    checkout_session_id = Column(String(36), nullable=True, index=True)
+    yookassa_payment_id = Column(String(64), nullable=True, index=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
