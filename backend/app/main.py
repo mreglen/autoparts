@@ -23,6 +23,7 @@ from app.db.schema_patches import (
     ensure_garage_new_order_user_id_column,
     ensure_cart_max_quantity_columns,
     ensure_yookassa_payment_tables,
+    ensure_yookassa_refund_columns,
     ensure_garage_new_order_yookassa_columns,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -118,6 +119,7 @@ try:
     ensure_garage_new_order_user_id_column()
     ensure_cart_max_quantity_columns()
     ensure_yookassa_payment_tables()
+    ensure_yookassa_refund_columns()
     ensure_garage_new_order_yookassa_columns()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")

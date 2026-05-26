@@ -49,6 +49,7 @@ from app.routers.public_organizations import router as public_organizations_rout
 from app.routers.public_users import router as public_users_router
 from app.routers.site_analytics_public import router as site_analytics_public_router
 from app.routers.admin_analytics import router as admin_analytics_router
+from app.routers.dadata import router as dadata_router
 
 
 
@@ -107,4 +108,5 @@ api_router.include_router(public_organizations_router)
 api_router.include_router(public_users_router)
 api_router.include_router(site_analytics_public_router)
 api_router.include_router(admin_analytics_router)
+api_router.include_router(dadata_router)
 

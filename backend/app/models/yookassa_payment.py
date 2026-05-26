@@ -34,6 +34,8 @@ class YookassaPayment(Base):
     raw_webhook_payload = Column(Text, nullable=True)
     captured = Column(Boolean, nullable=True)
     refundable = Column(Boolean, nullable=True)
+    refund_id = Column(String(64), nullable=True, index=True)
+    refund_status = Column(String(32), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True),

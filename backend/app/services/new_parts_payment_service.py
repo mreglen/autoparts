@@ -16,6 +16,7 @@ from app.models.new_parts_checkout_session import NewPartsCheckoutSession
 from app.models.user import User as UserModel
 from app.models.yookassa_payment import YookassaPayment
 from app.schemas.rossko_settings import NewPartsOrderCreateIn
+from app.services.audit_service import log_audit
 from app.services.new_parts_order_fulfillment import (
     fulfill_new_parts_order,
     parse_cart_snapshot,
@@ -313,6 +314,16 @@ def build_session_view(
         .first()
     )
 
+    paid_payment = (
+        db.query(YookassaPayment)
+        .filter(
+            YookassaPayment.session_id == session.id,
+            YookassaPayment.status == "succeeded",
+        )
+        .order_by(YookassaPayment.created_at.desc())
+        .first()
+    )
+
     return {
         "session_id": session.id,
         "status": session.status,
@@ -324,6 +335,7 @@ def build_session_view(
         "card_confirmation_url": card_payment.confirmation_url if card_payment else None,
         "sbp_payment_status": sbp_payment.status if sbp_payment else None,
         "card_payment_status": card_payment.status if card_payment else None,
+        "refund_status": paid_payment.refund_status if paid_payment else None,
     }
 
 
@@ -333,13 +345,44 @@ async def get_session_for_user(
     session_id: str,
 ) -> dict[str, Any]:
     session = _session_or_404(db, session_id, user.id)
-    if session.status == "awaiting_payment":
+    if session.status in ("awaiting_payment", "refund_pending"):
         await try_sync_session_payments(db, session)
     return build_session_view(db, session, user)
 
 
+async def _sync_pending_refund(db: Session, session: NewPartsCheckoutSession) -> None:
+    if session.status != "refund_pending":
+        return
+    paid = (
+        db.query(YookassaPayment)
+        .filter(
+            YookassaPayment.session_id == session.id,
+            YookassaPayment.status == "succeeded",
+            YookassaPayment.refund_id.isnot(None),
+        )
+        .order_by(YookassaPayment.created_at.desc())
+        .first()
+    )
+    if not paid or not paid.refund_id:
+        return
+    client = get_yookassa_client()
+    refund = await client.get_refund(paid.refund_id)
+    paid.refund_status = str(refund.get("status") or paid.refund_status)
+    if paid.refund_status == "succeeded":
+        session.status = "refunded"
+        session.garage_order_id = None
+    elif paid.refund_status == "canceled":
+        session.status = "fulfillment_failed"
+        paid.refund_status = "failed"
+
+
 async def try_sync_session_payments(db: Session, session: NewPartsCheckoutSession) -> None:
     """Подтянуть статус из API (polling с фронта)."""
+    if session.status == "refund_pending":
+        await _sync_pending_refund(db, session)
+        db.commit()
+        return
+
     pending = (
         db.query(YookassaPayment)
         .filter(
@@ -401,30 +444,159 @@ async def handle_yookassa_webhook(db: Session, event: dict[str, Any]) -> None:
     db.commit()
 
 
+def _reload_checkout_entities(
+    db: Session,
+    session_id: str,
+    payment_row_id: str,
+) -> tuple[NewPartsCheckoutSession, YookassaPayment] | tuple[None, None]:
+    session = (
+        db.query(NewPartsCheckoutSession)
+        .filter(NewPartsCheckoutSession.id == session_id)
+        .first()
+    )
+    payment_row = (
+        db.query(YookassaPayment).filter(YookassaPayment.id == payment_row_id).first()
+    )
+    if not session or not payment_row:
+        return None, None
+    return session, payment_row
+
+
+async def _refund_after_failed_fulfillment(
+    db: Session,
+    session: NewPartsCheckoutSession,
+    payment_row: YookassaPayment,
+    *,
+    reason: str,
+) -> None:
+    """Возврат оплаты, если заказ не удалось создать."""
+    if payment_row.refund_status == "succeeded":
+        session.status = "refunded"
+        session.garage_order_id = None
+        return
+
+    if not payment_row.yookassa_payment_id:
+        session.status = "fulfillment_failed"
+        logger.error(
+            "Cannot refund session %s: missing YooKassa payment id",
+            session.id,
+        )
+        return
+
+    client = get_yookassa_client()
+    refund_body = {
+        "amount": {
+            "value": _format_amount(payment_row.amount_value),
+            "currency": payment_row.amount_currency or "RUB",
+        },
+        "payment_id": payment_row.yookassa_payment_id,
+        "description": reason[:250],
+    }
+
+    try:
+        refund = await client.create_refund(refund_body, str(uuid.uuid4()))
+        payment_row.refund_id = refund.get("id")
+        payment_row.refund_status = str(refund.get("status") or "pending")
+        refund_status = payment_row.refund_status
+
+        if refund_status == "succeeded":
+            session.status = "refunded"
+            session.garage_order_id = None
+            log_audit(
+                db,
+                event_type="new_parts_payment_refunded",
+                category="payments",
+                summary=f"Возврат после ошибки оформления (сессия {session.id[:8]})",
+                user_id=session.user_id,
+                details={
+                    "checkout_session_id": session.id,
+                    "payment_id": payment_row.yookassa_payment_id,
+                    "refund_id": payment_row.refund_id,
+                    "reason": reason,
+                },
+            )
+            logger.info(
+                "Refunded payment %s for session %s after fulfillment failure",
+                payment_row.yookassa_payment_id,
+                session.id,
+            )
+        elif refund_status == "canceled":
+            payment_row.refund_status = "failed"
+            session.status = "fulfillment_failed"
+            logger.error(
+                "Refund canceled for payment %s session %s",
+                payment_row.yookassa_payment_id,
+                session.id,
+            )
+        else:
+            session.status = "refund_pending"
+            logger.info(
+                "Refund pending for payment %s session %s",
+                payment_row.yookassa_payment_id,
+                session.id,
+            )
+    except Exception:
+        payment_row.refund_status = "failed"
+        session.status = "fulfillment_failed"
+        logger.exception(
+            "Refund API failed for payment %s session %s",
+            payment_row.yookassa_payment_id,
+            session.id,
+        )
+
+
 async def _on_payment_succeeded(
     db: Session,
     session: NewPartsCheckoutSession,
     payment_row: YookassaPayment,
     api_payment: dict[str, Any],
 ) -> None:
-    if session.status == "fulfilled":
+    if session.status in ("fulfilled", "refunded"):
         return
+
+    if session.garage_order_id:
+        session.status = "fulfilled"
+        return
+
+    session_id = session.id
+    payment_row_id = payment_row.id
 
     session.status = "paid"
     payment_row.status = "succeeded"
 
-    if session.garage_order_id:
-        return
-
     user = db.query(UserModel).filter(UserModel.id == session.user_id).first()
     if not user:
-        session.status = "fulfillment_failed"
+        db.rollback()
+        reloaded = _reload_checkout_entities(db, session_id, payment_row_id)
+        if not reloaded[0]:
+            return
+        session, payment_row = reloaded
+        session.status = "paid"
+        payment_row.status = "succeeded"
+        await _refund_after_failed_fulfillment(
+            db,
+            session,
+            payment_row,
+            reason="Не найден пользователь для оформления заказа",
+        )
         return
 
     try:
         payload = NewPartsOrderCreateIn.model_validate_json(session.order_payload)
     except Exception:
-        session.status = "fulfillment_failed"
+        db.rollback()
+        reloaded = _reload_checkout_entities(db, session_id, payment_row_id)
+        if not reloaded[0]:
+            return
+        session, payment_row = reloaded
+        session.status = "paid"
+        payment_row.status = "succeeded"
+        await _refund_after_failed_fulfillment(
+            db,
+            session,
+            payment_row,
+            reason="Некорректные данные заказа",
+        )
         return
 
     cart_items = parse_cart_snapshot(session.cart_snapshot)
@@ -441,10 +613,42 @@ async def _on_payment_succeeded(
         session.garage_order_id = order.id
         session.status = "fulfilled"
     except HTTPException as exc:
-        session.status = "fulfillment_failed"
+        db.rollback()
+        reloaded = _reload_checkout_entities(db, session_id, payment_row_id)
+        if not reloaded[0]:
+            return
+        session, payment_row = reloaded
+        session.status = "paid"
+        payment_row.status = "succeeded"
+        detail = exc.detail if isinstance(exc.detail, str) else "Ошибка оформления заказа"
         logger.error(
             "Fulfillment failed after payment %s session %s: %s",
             payment_row.yookassa_payment_id,
             session.id,
-            exc.detail,
+            detail,
+        )
+        await _refund_after_failed_fulfillment(
+            db,
+            session,
+            payment_row,
+            reason=f"Заказ не создан: {detail}",
+        )
+    except Exception:
+        db.rollback()
+        reloaded = _reload_checkout_entities(db, session_id, payment_row_id)
+        if not reloaded[0]:
+            return
+        session, payment_row = reloaded
+        session.status = "paid"
+        payment_row.status = "succeeded"
+        logger.exception(
+            "Unexpected fulfillment error after payment %s session %s",
+            payment_row.yookassa_payment_id,
+            session.id,
+        )
+        await _refund_after_failed_fulfillment(
+            db,
+            session,
+            payment_row,
+            reason="Заказ не создан: внутренняя ошибка сервера",
         )

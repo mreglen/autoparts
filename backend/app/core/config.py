@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     YOOKASSA_DEFAULT_VAT_CODE: int = 1
     YOOKASSA_PAYMENT_TTL_MINUTES: int = 60
 
+    # DaData (подсказки адреса)
+    DADATA_API_KEY: Optional[str] = None
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
 
     @property

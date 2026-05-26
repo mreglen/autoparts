@@ -1,40 +1,29 @@
-const DADATA_SUGGEST_URL =
-  'https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address';
-
-const DADATA_TOKEN =
-  process.env.REACT_APP_DADATA_TOKEN || 'a1a8fbcf263bb8a2e549b1aa7fe56c08c1a2da1d';
+import { apiAxiosUnauth } from './apiClient';
 
 /**
- * Подсказки адреса: город → улица → дом (без квартиры в подсказках).
+ * Подсказки адреса через backend-прокси DaData.
  * @param {string} query
  * @param {{ count?: number, locations?: Array<Record<string, string>> }} options
+ * @returns {Promise<{ suggestions: Array, error: string | null }>}
  */
 export async function fetchAddressSuggestions(query, options = {}) {
   const { count = 7, locations } = options;
-  const body = {
-    query,
-    count,
-    from_bound: { value: 'city' },
-    to_bound: { value: 'house' },
-  };
-  if (locations?.length) {
-    body.locations = locations;
+  try {
+    const response = await apiAxiosUnauth.post('/public/dadata/suggest/address', {
+      query,
+      count,
+      locations: locations?.length ? locations : undefined,
+    });
+    const suggestions = Array.isArray(response.data?.suggestions)
+      ? response.data.suggestions
+      : [];
+    return { suggestions, error: null };
+  } catch (err) {
+    const detail = err?.response?.data?.detail;
+    const message =
+      typeof detail === 'string'
+        ? detail
+        : 'Не удалось загрузить подсказки адреса';
+    return { suggestions: [], error: message };
   }
-
-  const response = await fetch(DADATA_SUGGEST_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      Authorization: `Token ${DADATA_TOKEN}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    return [];
-  }
-
-  const data = await response.json();
-  return Array.isArray(data.suggestions) ? data.suggestions : [];
 }

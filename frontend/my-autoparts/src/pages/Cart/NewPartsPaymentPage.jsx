@@ -35,7 +35,7 @@ export default function NewPartsPaymentPage() {
     }, [loadSession]);
 
     useEffect(() => {
-        const terminal = ['fulfilled', 'expired', 'fulfillment_failed'];
+        const terminal = ['fulfilled', 'expired', 'fulfillment_failed', 'refunded'];
         if (terminal.includes(session?.status)) {
             return undefined;
         }
@@ -102,13 +102,58 @@ export default function NewPartsPaymentPage() {
         );
     }
 
+    if (session?.status === 'refunded') {
+        return (
+            <div className="mx-auto max-w-lg rounded-2xl border border-blue-200 bg-blue-50 p-6 text-center">
+                <h1 className="text-xl font-bold text-gray-900">Заказ не оформлен</h1>
+                <p className="mt-2 text-sm text-gray-700">
+                    Оплата прошла, но создать заказ не удалось. Средства возвращены на тот же
+                    способ оплаты. Срок зачисления зависит от банка (обычно до нескольких дней).
+                </p>
+                <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+                    <Link
+                        to="/cart/new/checkout"
+                        className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+                    >
+                        Оформить снова
+                    </Link>
+                    <Link
+                        to="/cart"
+                        className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                        В корзину
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    if (session?.status === 'refund_pending') {
+        return (
+            <div className="mx-auto max-w-lg rounded-2xl border border-blue-200 bg-blue-50 p-6 text-center">
+                <h1 className="text-xl font-bold text-gray-900">Возврат средств</h1>
+                <p className="mt-2 text-sm text-gray-700">
+                    Заказ не был создан. Возврат оплаты обрабатывается — обновите страницу через
+                    минуту.
+                </p>
+                <button
+                    type="button"
+                    onClick={loadSession}
+                    className="mt-4 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+                >
+                    Обновить статус
+                </button>
+            </div>
+        );
+    }
+
     if (session?.status === 'fulfillment_failed') {
         return (
             <div className="mx-auto max-w-lg rounded-2xl border border-amber-200 bg-amber-50 p-6">
-                <h1 className="text-xl font-bold text-gray-900">Оплата получена</h1>
+                <h1 className="text-xl font-bold text-gray-900">Заказ не оформлен</h1>
                 <p className="mt-2 text-sm text-gray-700">
-                    Платёж прошёл, но при оформлении заказа у поставщика возникла ошибка.
-                    Свяжитесь с поддержкой — мы поможем завершить заказ или вернём средства.
+                    Оплата прошла, но заказ создать не удалось. Автоматический возврат не
+                    выполнен — свяжитесь с поддержкой, мы вернём средства вручную.
                 </p>
                 <Link
                     to="/about"

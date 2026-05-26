@@ -12,10 +12,13 @@ export default function DadataAddressInput({
   hasError = false,
   locations,
   minLength = 3,
+  multiline = false,
+  rows = 2,
 }) {
   const [suggestions, setSuggestions] = useState([]);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
   const inputRef = useRef(null);
   const wrapperRef = useRef(null);
   const requestIdRef = useRef(0);
@@ -37,19 +40,23 @@ export default function DadataAddressInput({
       if (!query || query.length < minLength) {
         setSuggestions([]);
         setHighlightedIndex(-1);
+        setFetchError(null);
         return;
       }
 
       const requestId = ++requestIdRef.current;
       setLoading(true);
+      setFetchError(null);
       try {
-        const items = await fetchAddressSuggestions(query, { locations });
+        const { suggestions: items, error } = await fetchAddressSuggestions(query, { locations });
         if (requestId !== requestIdRef.current) return;
         setSuggestions(items);
+        setFetchError(error);
         setHighlightedIndex(-1);
       } catch {
         if (requestId !== requestIdRef.current) return;
         setSuggestions([]);
+        setFetchError('Не удалось загрузить подсказки адреса');
         setHighlightedIndex(-1);
       } finally {
         if (requestId === requestIdRef.current) setLoading(false);
@@ -73,6 +80,10 @@ export default function DadataAddressInput({
   );
 
   const handleKeyDown = (e) => {
+    if (multiline && e.key === 'Enter' && e.shiftKey) {
+      return;
+    }
+
     if (suggestions.length === 0) return;
 
     if (e.key === 'ArrowDown') {
@@ -85,9 +96,9 @@ export default function DadataAddressInput({
       if (highlightedIndex >= 0) {
         e.preventDefault();
         selectSuggestion(suggestions[highlightedIndex]);
-      } else if (suggestions.length > 0) {
-        e.preventDefault();
-        selectSuggestion(suggestions[0]);
+      } else {
+        setSuggestions([]);
+        setHighlightedIndex(-1);
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -107,26 +118,34 @@ export default function DadataAddressInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const inputProps = {
+    ref: inputRef,
+    id,
+    value,
+    onChange: handleInputChange,
+    onKeyDown: handleKeyDown,
+    onBlur,
+    placeholder,
+    autoComplete: 'off',
+    role: 'combobox',
+    'aria-expanded': suggestions.length > 0,
+    'aria-autocomplete': 'list',
+    'aria-controls': suggestions.length > 0 ? `${id}-suggestions` : undefined,
+    className,
+  };
+
   return (
     <div className="relative" ref={wrapperRef}>
-      <input
-        ref={inputRef}
-        id={id}
-        type="text"
-        value={value}
-        onChange={handleInputChange}
-        onKeyDown={handleKeyDown}
-        onBlur={onBlur}
-        placeholder={placeholder}
-        autoComplete="off"
-        role="combobox"
-        aria-expanded={suggestions.length > 0}
-        aria-autocomplete="list"
-        aria-controls={suggestions.length > 0 ? `${id}-suggestions` : undefined}
-        className={className}
-      />
+      {multiline ? (
+        <textarea {...inputProps} rows={rows} />
+      ) : (
+        <input {...inputProps} type="text" />
+      )}
       {loading && suggestions.length === 0 && value.length >= minLength ? (
         <p className="mt-1 text-xs text-gray-400">Поиск адреса…</p>
+      ) : null}
+      {!loading && fetchError && value.length >= minLength ? (
+        <p className="mt-1 text-xs text-amber-700">{fetchError}</p>
       ) : null}
       {suggestions.length > 0 && (
         <ul
@@ -152,11 +171,6 @@ export default function DadataAddressInput({
             </li>
           ))}
         </ul>
-      )}
-      {hasError ? null : (
-        <p className="mt-1 text-xs text-gray-400">
-          Начните вводить город, улицу или дом — выберите из списка стрелками и Enter
-        </p>
       )}
     </div>
   );

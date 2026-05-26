@@ -36,6 +36,21 @@ class YookassaClient:
     async def get_payment(self, payment_id: str) -> dict[str, Any]:
         return await self._request("GET", f"/payments/{payment_id}")
 
+    async def create_refund(
+        self,
+        payload: dict[str, Any],
+        idempotence_key: str,
+    ) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/refunds",
+            json_body=payload,
+            idempotence_key=idempotence_key,
+        )
+
+    async def get_refund(self, refund_id: str) -> dict[str, Any]:
+        return await self._request("GET", f"/refunds/{refund_id}")
+
     async def _request(
         self,
         method: str,

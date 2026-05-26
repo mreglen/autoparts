@@ -22,6 +22,7 @@ class NewPartsPaymentSessionOut(BaseModel):
     card_confirmation_url: Optional[str] = None
     sbp_payment_status: Optional[str] = None
     card_payment_status: Optional[str] = None
+    refund_status: Optional[str] = None
 
 
 class CardPaymentOut(BaseModel):

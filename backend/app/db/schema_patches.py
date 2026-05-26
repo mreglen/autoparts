@@ -975,6 +975,27 @@ def ensure_yookassa_payment_tables() -> None:
     logger.info("Applied YooKassa payment tables patch")
 
 
+def ensure_yookassa_refund_columns() -> None:
+    """Колонки возврата в yookassa_payments."""
+    inspector = inspect(engine)
+    if "yookassa_payments" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("yookassa_payments")}
+    statements: list[str] = []
+    if "refund_id" not in columns:
+        statements.append("ALTER TABLE yookassa_payments ADD COLUMN refund_id VARCHAR(64)")
+    if "refund_status" not in columns:
+        statements.append("ALTER TABLE yookassa_payments ADD COLUMN refund_status VARCHAR(32)")
+
+    if not statements:
+        return
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.info("Applied yookassa_payments refund column patches: %s", statements)
+
+
 def ensure_garage_new_order_yookassa_columns() -> None:
     """Add YooKassa linkage columns to garage_new_orders."""
     inspector = inspect(engine)
