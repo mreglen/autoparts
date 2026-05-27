@@ -6,6 +6,7 @@ import { fetchProduct, searchAllProducts } from '../../redux/slices/ProductSlice
 import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart } from '../../redux/slices/CartSlice';
 import { createOrGetChat } from '../../redux/slices/ChatSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
+import { stripHtmlTags } from '../../utils/text';
 import { buildPartDetailPath, parsePartDetailParam } from '../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { buildPreliminaryPartTitle, buildProductSeo } from '../../utils/productSeo';
