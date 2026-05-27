@@ -28,7 +28,7 @@ import {
   CHECKOUT_PVZ_METHODS,
   findPickupDeliveryOption,
   findPvzDeliveryOption,
-  pvzMethodLabel,
+  pvzCarrierName,
   regionIdForCheckout,
 } from '../../utils/newPartsCheckoutDelivery';
 import DeliveryFastIcon from '../../components/icons/DeliveryFastIcon';
@@ -325,13 +325,13 @@ export default function NewPartsOrderRegistration() {
 
     const opt = matchedPvzOption;
     const regionId = regionIdForCheckout(deliveryOptions, deliveryRegion, opt);
-    const transportLabel = pvzMethodLabel(pvzMethod) || opt?.carrier || null;
+    const transportLabel = pvzCarrierName(pvzMethod) || opt?.carrier || null;
 
     return {
       ...base,
-      delivery_type: opt?.delivery_type === 'courier' ? 'courier' : 'pvz',
+      delivery_type: 'pvz',
       delivery_address: deliveryAddress.trim(),
-      transport_company: opt?.carrier || transportLabel,
+      transport_company: transportLabel,
       delivery_region_id: regionId,
       delivery_region_name: deliveryRegion,
       delivery_option_id: opt?.id ?? null,

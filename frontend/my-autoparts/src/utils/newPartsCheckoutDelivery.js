@@ -10,11 +10,24 @@ export const CHECKOUT_DELIVERY_REGIONS = [
   'Северный Кавказ',
 ];
 
-/** Способы доставки до ПВЗ (подписи как в ТЗ). */
+/** Как в кабинете Яндекс Товаров для типа «ПВЗ служб доставки». */
+export const YANDEX_PVZ_DELIVERY_TYPE_LABEL = 'ПВЗ службы доставки';
+
+/** Способы доставки до ПВЗ: label — UI, carrierName — для Яндекса и БД. */
 export const CHECKOUT_PVZ_METHODS = [
-  { key: 'cdek', label: 'ПВЗ СДЭК', carriers: ['сдэк', 'cdek'] },
-  { key: 'yandex', label: 'ПВЗ Яндекс доставка', carriers: ['яндекс', 'yandex'] },
-  { key: 'pochta', label: 'ПВЗ Почта России', carriers: ['почта', 'почты', 'russian post'] },
+  { key: 'cdek', label: 'ПВЗ СДЭК', carrierName: 'СДЭК', carriers: ['сдэк', 'cdek'] },
+  {
+    key: 'yandex',
+    label: 'ПВЗ Яндекс Доставка',
+    carrierName: 'Яндекс Доставка',
+    carriers: ['яндекс доставка', 'яндекс', 'yandex'],
+  },
+  {
+    key: 'pochta',
+    label: 'ПВЗ Почта России',
+    carrierName: 'Почта России',
+    carriers: ['почта россии', 'почта', 'почты', 'russian post'],
+  },
 ];
 
 const norm = (s) =>
@@ -27,6 +40,7 @@ export function carrierMatchesOption(carrierKey, option) {
   const def = CHECKOUT_PVZ_METHODS.find((m) => m.key === carrierKey);
   if (!def) return false;
   const carrier = norm(option?.carrier);
+  if (carrier === norm(def.carrierName)) return true;
   return def.carriers.some((needle) => carrier.includes(needle));
 }
 
@@ -77,6 +91,10 @@ export function findPickupDeliveryOption(options) {
 
 export function pvzMethodLabel(pvzKey) {
   return CHECKOUT_PVZ_METHODS.find((m) => m.key === pvzKey)?.label || '';
+}
+
+export function pvzCarrierName(pvzKey) {
+  return CHECKOUT_PVZ_METHODS.find((m) => m.key === pvzKey)?.carrierName || '';
 }
 
 export function regionIdForCheckout(options, regionName, matchedOption) {

@@ -19,6 +19,7 @@ from app.services.site_delivery_service import (
     DELIVERY_TYPE_LABELS,
     PAYMENT_METHODS,
     PAYMENT_NOTES,
+    ensure_checkout_delivery_matrix,
     ensure_default_delivery_options,
     list_delivery_options,
     region_ids_csv_from_delivery,
@@ -41,6 +42,7 @@ def _validate_delivery_type(value: str) -> str:
 
 @router.get("/public/site-delivery", response_model=list[SiteDeliveryOptionView])
 def get_public_site_delivery(db: Session = Depends(get_db)):
+    ensure_checkout_delivery_matrix(db)
     rows = list_delivery_options(db, enabled_only=True)
     return rows
 
@@ -174,4 +176,19 @@ def ensure_defaults(
 ):
     del current_user
     ensure_default_delivery_options(db)
-    return {"ok": True, "count": db.query(SiteDeliveryOption).count()}
+    matrix = ensure_checkout_delivery_matrix(db)
+    return {
+        "ok": True,
+        "count": db.query(SiteDeliveryOption).count(),
+        "matrix": matrix,
+    }
+
+
+@router.post("/admin/site-delivery/sync-checkout-matrix")
+def sync_checkout_delivery_matrix(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    stats = ensure_checkout_delivery_matrix(db)
+    return {"ok": True, **stats}
