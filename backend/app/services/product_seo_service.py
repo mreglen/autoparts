@@ -146,6 +146,46 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
     if meta.price:
         price_line = f"<p>Цена: {html.escape(meta.price)} ₽</p>"
 
+    # Добавляем BreadcrumbList в JSON-LD, чтобы ботам (которые не исполняют JS) приходила
+    # та же базовая разметка, что и на фронтенде.
+    try:
+        product_obj = json.loads(meta.json_ld)
+    except Exception:
+        product_obj = None
+
+    site_origin = meta.canonical_url.split('/part/')[0]
+    breadcrumb_obj = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Свой Гараж",
+                "item": site_origin,
+            },
+            {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Каталог",
+                "item": f"{site_origin}/catalog",
+            },
+            {
+                "@type": "ListItem",
+                "position": 3,
+                "name": meta.h1,
+                "item": meta.canonical_url,
+            },
+        ],
+    }
+
+    if product_obj:
+        graph_obj = {"@context": "https://schema.org", "@graph": [product_obj, breadcrumb_obj]}
+    else:
+        graph_obj = breadcrumb_obj
+
+    json_ld_graph = json.dumps(graph_obj, ensure_ascii=False)
+
     return f"""<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -161,7 +201,7 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
   <meta property="og:url" content="{canonical}" />
   <meta property="og:locale" content="ru_RU" />
   {image_tag}
-  <script type="application/ld+json">{meta.json_ld}</script>
+  <script type="application/ld+json">{json_ld_graph}</script>
 </head>
 <body>
   <article>

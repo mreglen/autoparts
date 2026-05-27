@@ -162,7 +162,18 @@ export default function SalesGarageOrderCard({
   const handleProductClick = async (item, e) => {
     e?.stopPropagation?.();
     if (item.product_id) {
-      navigate(`/part/${item.product_id}`);
+      const productId = item.product_id;
+      const brand = item.brand || item.product?.brand;
+      const article = item.partnumber || item.product?.partnumber;
+
+      if (brand && article) {
+        navigate(
+          `/part/${productId}-${encodeURIComponent(String(brand))}-${encodeURIComponent(String(article))}`
+        );
+        return;
+      }
+
+      navigate(`/part/${productId}`);
       return;
     }
     await openAvitoProductFlow({

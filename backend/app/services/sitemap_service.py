@@ -293,6 +293,9 @@ def generate_product_urls_text_file(
 
 def generate_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:
     site_origin = _resolve_origin(db, preferred_host_url)
+    # В sitemap-products.xml иногда важно наличие lastmod для более предсказуемого переобхода.
+    # Так как у Product нет отдельного updated_at, используем дату формирования sitemap (UTC).
+    today = _export_date_today()
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
@@ -307,6 +310,7 @@ def generate_products_sitemap_xml(db: Session, *, preferred_host_url: str | None
             [
                 "  <url>",
                 f"    <loc>{loc}</loc>",
+                f"    <lastmod>{today.isoformat()}</lastmod>",
                 "    <changefreq>weekly</changefreq>",
                 f"    <priority>{priority}</priority>",
                 "  </url>",

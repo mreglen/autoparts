@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import {
   selectRosskoStatus,
   selectSearchQuery,
@@ -92,6 +93,11 @@ export default function NewPartsFiltersPage() {
 
   return (
     <div className="mt-0 w-full px-0 pb-40 sm:pb-8">
+      <Helmet>
+        <title>Фильтры — Свой Гараж</title>
+        <meta name="robots" content="noindex, nofollow" />
+        <link rel="canonical" href="https://svoygarage.ru/autoparts/new" />
+      </Helmet>
       <div className="px-3 sm:px-0">
         <h1 className="text-lg font-semibold text-gray-900 mb-3 md:hidden">Фильтры</h1>
         <p className="text-sm text-gray-600 mb-3 truncate" title={searchQuery || urlQuery}>
