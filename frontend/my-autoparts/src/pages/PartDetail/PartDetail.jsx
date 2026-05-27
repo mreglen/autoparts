@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
@@ -6,85 +6,43 @@ import { fetchProduct, searchAllProducts } from '../../redux/slices/ProductSlice
 import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart } from '../../redux/slices/CartSlice';
 import { createOrGetChat } from '../../redux/slices/ChatSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
-import { stripHtmlTags } from '../../utils/text';
-import { buildPartDetailPath } from '../../utils/partRoutes';
+import { buildPartDetailPath, parsePartDetailParam } from '../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
+import { buildPreliminaryPartTitle, buildProductSeo } from '../../utils/productSeo';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
 
-const SITE_ORIGIN = 'https://svoygarage.ru';
-
-function buildProductSeo(product) {
-  const brand = (product?.brand || '').trim();
-  const article = (product?.article || '').trim();
-  const name = formatProductDisplayTitle(brand, article, product?.name) || 'Автозапчасть';
-  const conditionLabel = product?.is_new ? 'новая' : 'б/у';
-  const path = buildPartDetailPath(product);
-  const canonicalUrl = `${SITE_ORIGIN}${path}`;
-  const title = `${name} | Свой Гараж`.replace(/\s+/g, ' ').trim();
-
-  const uniqueDesc = stripHtmlTags(product?.description || '').replace(/\s+/g, ' ').trim();
-  const description = uniqueDesc.length > 40
-    ? uniqueDesc.slice(0, 160)
-    : `${conditionLabel.charAt(0).toUpperCase()}${conditionLabel.slice(1)} автозапчасть с доставкой по России.`;
-
-  const firstPhoto = product?.photos?.[0]?.photo_url;
-  const imageUrl = firstPhoto ? normalizeImageUrl(firstPhoto) : null;
-
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name,
-    sku: article || undefined,
-    description: uniqueDesc.slice(0, 500) || description,
-    brand: brand ? { '@type': 'Brand', name: brand } : undefined,
-    image: imageUrl ? [imageUrl] : undefined,
-    offers: product?.price
-      ? {
-          '@type': 'Offer',
-          url: canonicalUrl,
-          priceCurrency: 'RUB',
-          price: Number(product.price).toFixed(2),
-          availability: (product.quantity || 0) > 0
-            ? 'https://schema.org/InStock'
-            : 'https://schema.org/OutOfStock',
-          itemCondition: product?.is_new
-            ? 'https://schema.org/NewCondition'
-            : 'https://schema.org/UsedCondition',
-        }
-      : undefined,
-  };
-
-  return { title, description, canonicalUrl, imageUrl, jsonLd };
+function PartProductSeoHelmet({ seo, structuredData, product }) {
+  if (!seo) return null;
+  return (
+    <Helmet>
+      <title>{seo.title}</title>
+      <meta name="description" content={seo.description} />
+      <link rel="canonical" href={seo.canonicalUrl} />
+      <meta property="og:type" content="product" />
+      <meta property="og:site_name" content="Свой Гараж" />
+      <meta property="og:title" content={seo.title} />
+      <meta property="og:description" content={seo.description} />
+      <meta property="og:url" content={seo.canonicalUrl} />
+      <meta property="og:locale" content="ru_RU" />
+      {seo.imageUrl ? <meta property="og:image" content={seo.imageUrl} /> : null}
+      {product?.price ? (
+        <>
+          <meta property="product:price:amount" content={String(product.price)} />
+          <meta property="product:price:currency" content="RUB" />
+        </>
+      ) : null}
+      {structuredData ? (
+        <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
+      ) : null}
+    </Helmet>
+  );
 }
 
 const PartDetail = () => {
-  // Parse the combined productId parameter
-  // Format: "123-BOSCH-ABC123" where 123 is product ID, BOSCH is brand, ABC123 is article
   const { productId: combinedParam } = useParams();
-  
-  // Extract product ID, brand and article from the combined parameter
-  // The format is: id-brand-article (e.g., "123-BOSCH-ABC123")
-  let extractedProductId = null;
-  let extractedBrand = null;
-  let extractedArticle = null;
-  
-  if (combinedParam) {
-    const parts = combinedParam.split('-');
-    if (parts.length >= 3) {
-      // New format: id-brand-article
-      extractedProductId = parts[0];
-      extractedArticle = parts[parts.length - 1]; // Last part is article
-      // Brand is everything between ID and article (to handle brands with hyphens)
-      extractedBrand = parts.slice(1, parts.length - 1).join('-');
-    } else if (parts.length === 1) {
-      // Just ID provided (backward compatibility or old format)
-      extractedProductId = parts[0];
-    } else {
-      // Malformed - try to use as ID only
-      extractedProductId = combinedParam;
-    }
-  }
+  const { productId: extractedProductId, brand: extractedBrand, article: extractedArticle } =
+    parsePartDetailParam(combinedParam);
   
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -102,6 +60,27 @@ const PartDetail = () => {
   const [currentMainMediaIndex, setCurrentMainMediaIndex] = useState(0);
   const [creatingChat, setCreatingChat] = useState(false);
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
+
+  const preliminaryTitle = useMemo(
+    () => buildPreliminaryPartTitle({ brand: extractedBrand, article: extractedArticle }),
+    [extractedBrand, extractedArticle]
+  );
+
+  const preliminarySeo = useMemo(() => {
+    if (!preliminaryTitle) return null;
+    return {
+      title: preliminaryTitle,
+      description: 'Автозапчасть на «Свой Гараж» — каталог, доставка по России.',
+      canonicalUrl: `https://svoygarage.ru${location.pathname}`,
+      imageUrl: null,
+    };
+  }, [preliminaryTitle, location.pathname]);
+
+  useLayoutEffect(() => {
+    if (preliminaryTitle && loading && !currentProduct) {
+      document.title = preliminaryTitle;
+    }
+  }, [preliminaryTitle, loading, currentProduct]);
 
   useEffect(() => {
     if (extractedProductId) {
@@ -336,6 +315,7 @@ const PartDetail = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
+        <PartProductSeoHelmet seo={preliminarySeo} />
         <div className="text-center">
           <p className="text-lg text-gray-600">Загрузка информации о запчасти...</p>
         </div>
@@ -394,25 +374,7 @@ const PartDetail = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 max-md:pb-28">
-      <Helmet>
-        <title>{seo.title}</title>
-        <meta name="description" content={seo.description} />
-        <link rel="canonical" href={seo.canonicalUrl} />
-        <meta property="og:type" content="product" />
-        <meta property="og:site_name" content="Свой Гараж" />
-        <meta property="og:title" content={seo.title} />
-        <meta property="og:description" content={seo.description} />
-        <meta property="og:url" content={seo.canonicalUrl} />
-        <meta property="og:locale" content="ru_RU" />
-        {seo.imageUrl ? <meta property="og:image" content={seo.imageUrl} /> : null}
-        {currentProduct.price ? (
-          <>
-            <meta property="product:price:amount" content={String(currentProduct.price)} />
-            <meta property="product:price:currency" content="RUB" />
-          </>
-        ) : null}
-        <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
-      </Helmet>
+      <PartProductSeoHelmet seo={seo} structuredData={structuredData} product={currentProduct} />
       {/* Back Button */}
       <div className="max-w-6xl mx-auto px-4 py-4">
         <button

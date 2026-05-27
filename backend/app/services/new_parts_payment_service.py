@@ -27,6 +27,9 @@ from app.utils.guest_cart import get_or_create_user_cart
 
 logger = logging.getLogger(__name__)
 
+# Назначение платежа в банке / ЮKassa (поле description).
+YOOKASSA_PAYMENT_DESCRIPTION = "Оплата svoygarage.ru"
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -178,7 +181,7 @@ async def create_checkout_session(
     payment_body: dict[str, Any] = {
         "amount": {"value": _format_amount(total), "currency": "RUB"},
         "capture": True,
-        "description": f"Заказ новых запчастей (сессия {session_id[:8]})",
+        "description": YOOKASSA_PAYMENT_DESCRIPTION,
         "metadata": {
             "checkout_session_id": session_id,
             "user_id": str(user.id),
@@ -247,7 +250,7 @@ async def create_card_payment(
     payment_body: dict[str, Any] = {
         "amount": {"value": _format_amount(session.amount), "currency": "RUB"},
         "capture": True,
-        "description": f"Заказ новых запчастей (сессия {session_id[:8]})",
+        "description": YOOKASSA_PAYMENT_DESCRIPTION,
         "metadata": {
             "checkout_session_id": session_id,
             "user_id": str(user.id),
