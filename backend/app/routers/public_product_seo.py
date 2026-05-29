@@ -10,6 +10,7 @@ from app.services.product_seo_service import (
     get_product_seo_for_path,
     render_product_prerender_html,
 )
+from app.services.spa_page_check_service import render_not_found_html
 
 router = APIRouter(tags=["Public product SEO"])
 
@@ -55,7 +56,11 @@ def public_part_prerender(
     """
     meta = get_product_seo_for_path(db, path)
     if meta is None:
-        raise HTTPException(status_code=404, detail="Product not found")
+        return HTMLResponse(
+            content=render_not_found_html(title="404 — запчасть не найдена | Свой Гараж"),
+            status_code=404,
+            headers={"Cache-Control": "no-store"},
+        )
     return HTMLResponse(
         content=render_product_prerender_html(meta),
         headers={"Cache-Control": "public, max-age=300"},

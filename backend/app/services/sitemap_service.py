@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Iterable
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.product import Product as ProductModel
 from app.models.seo_product_url_export import SeoProductUrlExport
+from app.models.seo_sitemap_cache import SeoSitemapCache
 from app.services.yandex_feed_xml_service import _iter_catalog_products, _resolve_site_origin
 from app.utils.product_urls import build_product_page_url
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
@@ -16,6 +19,15 @@ from app.services.public_user_profile_service import (
 )
 
 DEFAULT_PRODUCT_URLS_LIMIT = 150
+PRODUCTS_SITEMAP_CACHE_KEY = "products"
+SITEMAP_CACHE_MAX_AGE_SECONDS = 86400
+
+
+@dataclass(frozen=True)
+class ProductsSitemapSnapshot:
+    xml_content: str
+    url_count: int
+    generated_at: datetime
 
 
 def build_organization_page_url(org_id: str, site_origin: str) -> str:
@@ -38,9 +50,7 @@ def count_public_organizations(db: Session) -> int:
 
 def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None) -> list[dict[str, str | int]]:
     site_origin = _resolve_origin(db, preferred_host_url)
-    org_count = count_public_organizations(db)
     product_count = count_working_catalog_products(db)
-    profile_count = count_public_user_profiles(db)
     static_pages_count = 10
 
     return [
@@ -50,8 +60,8 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
             "description": "Корневой файл со списком всех sitemap сайта",
             "url": f"{site_origin}/sitemap.xml",
             "type": "index",
-            "url_count": 4,
-            "location": "frontend/public",
+            "url_count": 2,
+            "location": "backend",
         },
         {
             "id": "pages",
@@ -69,24 +79,6 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
             "url": f"{site_origin}/api/feeds/sitemap-products.xml",
             "type": "dynamic",
             "url_count": product_count,
-            "location": "backend",
-        },
-        {
-            "id": "organizations",
-            "title": "Организации",
-            "description": "Публичные страницы зарегистрированных организаций",
-            "url": f"{site_origin}/api/feeds/sitemap-organizations.xml",
-            "type": "dynamic",
-            "url_count": org_count,
-            "location": "backend",
-        },
-        {
-            "id": "profiles",
-            "title": "Профили продавцов и покупателей",
-            "description": "Публичные страницы пользователей по ID",
-            "url": f"{site_origin}/api/feeds/sitemap-profiles.xml",
-            "type": "dynamic",
-            "url_count": profile_count,
             "location": "backend",
         },
     ]
@@ -117,6 +109,53 @@ def is_working_catalog_product(product) -> bool:
     if not str(product.name or "").strip():
         return False
     return _product_has_working_photo(product)
+
+
+def _as_utc_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _product_lastmod_date(product) -> date | None:
+    """lastmod для URL товара: updated_at или created_at (UTC date)."""
+    ts = _as_utc_datetime(getattr(product, "updated_at", None)) or _as_utc_datetime(
+        getattr(product, "created_at", None)
+    )
+    return ts.date() if ts else None
+
+
+def touch_product_seo_timestamp_if_newly_working_from_photo(
+    db: Session,
+    product,
+    photo_record,
+) -> None:
+    """
+    Сдвигает updated_at, когда товар впервые становится «рабочим» после обработки фото.
+    """
+    if product is None or photo_record is None or not is_working_catalog_product(product):
+        return
+    has_other_working_photo = any(
+        int(getattr(p, "id", 0) or 0) != int(getattr(photo_record, "id", 0) or 0)
+        and str(getattr(p, "photo_url", "") or "").strip()
+        for p in (product.photos or [])
+    )
+    if has_other_working_photo:
+        return
+    product.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+
+def is_sitemap_cache_stale(generated_at: datetime | None) -> bool:
+    if generated_at is None:
+        return True
+    ts = _as_utc_datetime(generated_at)
+    if ts is None:
+        return True
+    age = datetime.now(timezone.utc) - ts
+    return age.total_seconds() > SITEMAP_CACHE_MAX_AGE_SECONDS
 
 
 def _export_date_today() -> date:
@@ -291,34 +330,140 @@ def generate_product_urls_text_file(
     return "\n".join(lines) + "\n"
 
 
-def generate_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:
+def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
     site_origin = _resolve_origin(db, preferred_host_url)
-    # В sitemap-products.xml иногда важно наличие lastmod для более предсказуемого переобхода.
-    # Так как у Product нет отдельного updated_at, используем дату формирования sitemap (UTC).
-    today = _export_date_today()
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
     ]
+    url_count = 0
 
     for product in _iter_catalog_products(db):
         if not is_working_catalog_product(product):
             continue
         loc = build_product_page_url(product, site_origin)
         priority = "0.8" if product.is_new else "0.85"
-        lines.extend(
+        lastmod = _product_lastmod_date(product)
+        url_lines = [
+            "  <url>",
+            f"    <loc>{loc}</loc>",
+        ]
+        if lastmod is not None:
+            url_lines.append(f"    <lastmod>{lastmod.isoformat()}</lastmod>")
+        url_lines.extend(
             [
-                "  <url>",
-                f"    <loc>{loc}</loc>",
-                f"    <lastmod>{today.isoformat()}</lastmod>",
                 "    <changefreq>weekly</changefreq>",
                 f"    <priority>{priority}</priority>",
                 "  </url>",
             ]
         )
+        lines.extend(url_lines)
+        url_count += 1
 
     lines.append("</urlset>")
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + "\n", url_count
+
+
+def rebuild_products_sitemap_cache(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> ProductsSitemapSnapshot:
+    xml_content, url_count = build_products_sitemap_xml(db, preferred_host_url=preferred_host_url)
+    generated_at = datetime.now(timezone.utc)
+
+    row = (
+        db.query(SeoSitemapCache)
+        .filter(SeoSitemapCache.cache_key == PRODUCTS_SITEMAP_CACHE_KEY)
+        .first()
+    )
+    if row is None:
+        row = SeoSitemapCache(
+            cache_key=PRODUCTS_SITEMAP_CACHE_KEY,
+            xml_content=xml_content,
+            url_count=url_count,
+            generated_at=generated_at,
+        )
+        db.add(row)
+    else:
+        row.xml_content = xml_content
+        row.url_count = url_count
+        row.generated_at = generated_at
+    db.commit()
+    db.refresh(row)
+
+    return ProductsSitemapSnapshot(
+        xml_content=row.xml_content,
+        url_count=int(row.url_count or 0),
+        generated_at=_as_utc_datetime(row.generated_at) or generated_at,
+    )
+
+
+def get_products_sitemap_cache_row(db: Session) -> SeoSitemapCache | None:
+    return (
+        db.query(SeoSitemapCache)
+        .filter(SeoSitemapCache.cache_key == PRODUCTS_SITEMAP_CACHE_KEY)
+        .first()
+    )
+
+
+def get_products_sitemap_snapshot(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> ProductsSitemapSnapshot:
+    row = get_products_sitemap_cache_row(db)
+    if row is not None and row.xml_content:
+        return ProductsSitemapSnapshot(
+            xml_content=row.xml_content,
+            url_count=int(row.url_count or 0),
+            generated_at=_as_utc_datetime(row.generated_at) or datetime.now(timezone.utc),
+        )
+    return rebuild_products_sitemap_cache(db, preferred_host_url=preferred_host_url)
+
+
+def get_products_sitemap_cache_meta(db: Session) -> dict[str, object]:
+    row = get_products_sitemap_cache_row(db)
+    generated_at = _as_utc_datetime(row.generated_at) if row else None
+    return {
+        "generated_at": generated_at.isoformat() if generated_at else None,
+        "url_count": int(row.url_count or 0) if row else 0,
+        "is_stale": is_sitemap_cache_stale(generated_at),
+    }
+
+
+def build_sitemap_index_xml(
+    site_origin: str,
+    *,
+    products_generated_at: datetime | None,
+    pages_lastmod: str | None = None,
+) -> str:
+    origin = site_origin.rstrip("/")
+    pages_mod = (pages_lastmod or settings.SITEMAP_PAGES_LASTMOD).strip()
+    products_mod = ""
+    if products_generated_at is not None:
+        ts = _as_utc_datetime(products_generated_at)
+        if ts is not None:
+            products_mod = f"    <lastmod>{ts.date().isoformat()}</lastmod>\n"
+
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        "  <sitemap>\n"
+        f"    <loc>{origin}/sitemap-pages.xml</loc>\n"
+        f"    <lastmod>{pages_mod}</lastmod>\n"
+        "  </sitemap>\n"
+        "  <sitemap>\n"
+        f"    <loc>{origin}/api/feeds/sitemap-products.xml</loc>\n"
+        f"{products_mod}"
+        "  </sitemap>\n"
+        "</sitemapindex>\n"
+    )
+
+
+def generate_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:
+    """Backward-compatible alias: returns cached snapshot XML."""
+    return get_products_sitemap_snapshot(db, preferred_host_url=preferred_host_url).xml_content
 
 
 def generate_organizations_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:

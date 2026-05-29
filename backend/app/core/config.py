@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     # DaData (подсказки адреса)
     DADATA_API_KEY: Optional[str] = None
 
+    # SEO sitemap: lastmod статического sitemap-pages.xml (обновлять при правке файла)
+    SITEMAP_PAGES_LASTMOD: str = "2026-05-29"
+    SITEMAP_REBUILD_HOUR_UTC: int = 3
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
 
     @property

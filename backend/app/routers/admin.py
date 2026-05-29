@@ -53,7 +53,9 @@ from app.services.sitemap_service import (
     DEFAULT_PRODUCT_URLS_LIMIT,
     generate_product_urls_text_file,
     get_daily_product_url_batch,
+    get_products_sitemap_cache_meta,
     get_site_sitemap_files,
+    rebuild_products_sitemap_cache,
 )
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
 from app.schemas.client import ClientBuyerOrdersResponse, ClientListItemResponse
@@ -1080,6 +1082,21 @@ def list_site_sitemaps(
     return {
         "site_origin": site_origin.rstrip("/"),
         "items": get_site_sitemap_files(db, preferred_host_url=integration.host_url),
+        "products_cache": get_products_sitemap_cache_meta(db),
+    }
+
+
+@router.post("/seo/sitemaps/rebuild")
+def rebuild_products_sitemap(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    integration = get_or_create_yandex_integration(db)
+    snapshot = rebuild_products_sitemap_cache(db, preferred_host_url=integration.host_url)
+    return {
+        "ok": True,
+        "url_count": snapshot.url_count,
+        "generated_at": snapshot.generated_at.isoformat(),
     }
 
 

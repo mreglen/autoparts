@@ -1,3 +1,5 @@
+from email.utils import format_datetime
+
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
@@ -5,12 +7,21 @@ from app.db.database import get_db
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
 from app.services.yandex_feed_xml_service import generate_used_yml_feed
 from app.services.sitemap_service import (
-    generate_products_sitemap_xml,
-    generate_organizations_sitemap_xml,
-    generate_profiles_sitemap_xml,
+    build_sitemap_index_xml,
+    get_products_sitemap_snapshot,
 )
+from app.services.yandex_feed_xml_service import _resolve_site_origin
 
 router = APIRouter(prefix="/feeds", tags=["Public feeds"])
+
+_SITEMAP_CACHE_HEADERS = {"Cache-Control": "public, max-age=3600"}
+
+
+def _xml_response(content: str, *, last_modified=None) -> Response:
+    headers = dict(_SITEMAP_CACHE_HEADERS)
+    if last_modified is not None:
+        headers["Last-Modified"] = format_datetime(last_modified, usegmt=True)
+    return Response(content=content, media_type="application/xml", headers=headers)
 
 
 @router.get("/yandex/used.yml")
@@ -28,19 +39,17 @@ def public_yandex_used_feed(db: Session = Depends(get_db)):
 @router.get("/sitemap-products.xml")
 def public_products_sitemap(db: Session = Depends(get_db)):
     row = get_or_create_yandex_integration(db)
-    xml = generate_products_sitemap_xml(db, preferred_host_url=row.host_url)
-    return Response(content=xml, media_type="application/xml")
+    snapshot = get_products_sitemap_snapshot(db, preferred_host_url=row.host_url)
+    return _xml_response(snapshot.xml_content, last_modified=snapshot.generated_at)
 
 
-@router.get("/sitemap-organizations.xml")
-def public_organizations_sitemap(db: Session = Depends(get_db)):
+@router.get("/sitemap.xml")
+def public_sitemap_index(db: Session = Depends(get_db)):
     row = get_or_create_yandex_integration(db)
-    xml = generate_organizations_sitemap_xml(db, preferred_host_url=row.host_url)
-    return Response(content=xml, media_type="application/xml")
-
-
-@router.get("/sitemap-profiles.xml")
-def public_profiles_sitemap(db: Session = Depends(get_db)):
-    row = get_or_create_yandex_integration(db)
-    xml = generate_profiles_sitemap_xml(db, preferred_host_url=row.host_url)
-    return Response(content=xml, media_type="application/xml")
+    site_origin = _resolve_site_origin(row.host_url)
+    snapshot = get_products_sitemap_snapshot(db, preferred_host_url=row.host_url)
+    xml = build_sitemap_index_xml(
+        site_origin,
+        products_generated_at=snapshot.generated_at,
+    )
+    return _xml_response(xml, last_modified=snapshot.generated_at)

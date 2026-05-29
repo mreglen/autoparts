@@ -16,6 +16,7 @@ from app.db.schema_patches import (
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
     ensure_seo_product_url_exports_table,
+    ensure_seo_sitemap_cache_table,
     ensure_user_avatar_column,
     ensure_rossko_settings_table,
     ensure_rossko_settings_row_defaults,
@@ -51,6 +52,7 @@ import app.models.site_quick_link  # noqa: F401 — site quick links
 import app.models.site_analytics  # noqa: F401 — site analytics
 import app.models.site_review  # noqa: F401 — site reviews
 import app.models.seo_product_url_export  # noqa: F401 — SEO URL export tracking
+import app.models.seo_sitemap_cache  # noqa: F401 — SEO sitemap cache
 import app.models.rossko_settings  # noqa: F401 — Rossko checkout settings
 import app.models.new_parts_checkout_session  # noqa: F401 — YooKassa checkout sessions
 import app.models.yookassa_payment  # noqa: F401 — YooKassa payments
@@ -60,6 +62,7 @@ from app.core.config import settings
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 from app.db.database import get_db
 from app.core.auth import cleanup_expired_sessions
 from app.utils.guest_cart import cleanup_expired_guest_carts
@@ -112,6 +115,7 @@ try:
     ensure_group_chat_columns()
     ensure_chat_created_by_column()
     ensure_seo_product_url_exports_table()
+    ensure_seo_sitemap_cache_table()
     ensure_user_avatar_column()
     ensure_rossko_settings_table()
     ensure_rossko_settings_row_defaults()
@@ -195,6 +199,13 @@ async def startup_event():
         trigger=IntervalTrigger(minutes=5),
         id='yandex_feed_sync_tick',
         name='Yandex feed event-driven sync tick',
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        func=run_rebuild_products_sitemap_cache,
+        trigger=CronTrigger(hour=settings.SITEMAP_REBUILD_HOUR_UTC, minute=0),
+        id="rebuild_products_sitemap_cache",
+        name="Rebuild cached products sitemap daily",
         replace_existing=True,
     )
     
@@ -291,6 +302,29 @@ async def run_cleanup_expired_guest_carts():
             db.close()
     except Exception as e:
         logger.error(f"Ошибка при очистке гостевых корзин: {str(e)}")
+
+
+async def run_rebuild_products_sitemap_cache():
+    try:
+        from app.services.sitemap_service import rebuild_products_sitemap_cache
+
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            integration = get_or_create_yandex_integration(db)
+            snapshot = rebuild_products_sitemap_cache(
+                db,
+                preferred_host_url=integration.host_url,
+            )
+            logger.info(
+                "Products sitemap cache rebuilt: url_count=%s generated_at=%s",
+                snapshot.url_count,
+                snapshot.generated_at.isoformat(),
+            )
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error("Ошибка при пересборке кэша sitemap товаров: %s", e)
 
 
 async def run_yandex_feed_scheduler_tick():

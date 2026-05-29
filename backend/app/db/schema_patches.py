@@ -618,6 +618,59 @@ def ensure_seo_product_url_exports_table() -> None:
     logger.info("Created seo_product_url_exports table")
 
 
+def ensure_seo_sitemap_cache_table() -> None:
+    """Table storing cached product sitemap XML."""
+    inspector = inspect(engine)
+    if "seo_sitemap_cache" in inspector.get_table_names():
+        return
+
+    dialect = engine.dialect.name
+    with engine.begin() as conn:
+        if dialect == "postgresql":
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_sitemap_cache (
+                        id SERIAL PRIMARY KEY,
+                        cache_key VARCHAR(32) NOT NULL,
+                        xml_content TEXT NOT NULL,
+                        url_count INTEGER NOT NULL DEFAULT 0,
+                        generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        CONSTRAINT uq_seo_sitemap_cache_cache_key UNIQUE (cache_key)
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_seo_sitemap_cache_cache_key "
+                    "ON seo_sitemap_cache (cache_key)"
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_sitemap_cache (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        cache_key VARCHAR(32) NOT NULL UNIQUE,
+                        xml_content TEXT NOT NULL,
+                        url_count INTEGER NOT NULL DEFAULT 0,
+                        generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_seo_sitemap_cache_cache_key "
+                    "ON seo_sitemap_cache (cache_key)"
+                )
+            )
+
+    logger.info("Created seo_sitemap_cache table")
+
+
 def ensure_user_avatar_column() -> None:
     """Add avatar_url column to users if missing."""
     inspector = inspect(engine)

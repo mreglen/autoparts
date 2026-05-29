@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
-import { fetchProduct, searchAllProducts } from '../../redux/slices/ProductSlice';
+import { fetchPublicProduct, searchAllProducts } from '../../redux/slices/ProductSlice';
 import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart } from '../../redux/slices/CartSlice';
 import { createOrGetChat } from '../../redux/slices/ChatSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
@@ -86,7 +86,7 @@ const PartDetail = () => {
   useEffect(() => {
     if (extractedProductId) {
       // Use the extracted product ID to fetch directly
-      dispatch(fetchProduct(parseInt(extractedProductId, 10)));
+      dispatch(fetchPublicProduct(parseInt(extractedProductId, 10)));
     } else if (extractedBrand && extractedArticle) {
       const fetchByBrandAndArticle = async () => {
         try {
@@ -103,13 +103,13 @@ const PartDetail = () => {
           );
           
           if (matchedProduct) {
-            dispatch(fetchProduct(matchedProduct.id));
+            dispatch(fetchPublicProduct(matchedProduct.id));
           } else {
             const articleMatch = data.find(p => 
               p.article?.toLowerCase() === decodedArticle.toLowerCase()
             );
             if (articleMatch) {
-              dispatch(fetchProduct(articleMatch.id));
+              dispatch(fetchPublicProduct(articleMatch.id));
             }
           }
         } catch (err) {

@@ -57,6 +57,19 @@ function formatDay(value) {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
 }
 
+function formatDateTime(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function pageLabel(path) {
   return PAGE_LABELS[path] || path;
 }
@@ -155,6 +168,7 @@ export default function AnalyticsPage() {
   const [productUrlsDownloadBusy, setProductUrlsDownloadBusy] = useState(false);
   const [productUrlsNotice, setProductUrlsNotice] = useState(null);
   const [sitemapLoading, setSitemapLoading] = useState(false);
+  const [sitemapRebuildBusy, setSitemapRebuildBusy] = useState(false);
   const [sitemapData, setSitemapData] = useState(null);
 
   const loadOverview = useCallback(async () => {
@@ -220,6 +234,19 @@ export default function AnalyticsPage() {
       setSitemapLoading(false);
     }
   }, []);
+
+  const rebuildProductsSitemap = async () => {
+    setSitemapRebuildBusy(true);
+    setError(null);
+    try {
+      await apiRequest('/admin/seo/sitemaps/rebuild', { method: 'POST' });
+      await loadSitemaps();
+    } catch (e) {
+      setError(e?.message || 'Ошибка пересборки sitemap');
+    } finally {
+      setSitemapRebuildBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!isReady || !user?.is_admin) return;
@@ -626,16 +653,42 @@ export default function AnalyticsPage() {
         <Panel
           title="Файлы sitemap на сайте"
           action={
-            <button
-              type="button"
-              onClick={loadSitemaps}
-              disabled={sitemapLoading}
-              className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-            >
-              Обновить
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={rebuildProductsSitemap}
+                disabled={sitemapRebuildBusy || sitemapLoading}
+                className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {sitemapRebuildBusy ? '…' : 'Пересобрать sitemap товаров'}
+              </button>
+              <button
+                type="button"
+                onClick={loadSitemaps}
+                disabled={sitemapLoading}
+                className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Обновить
+              </button>
+            </div>
           }
         >
+          {sitemapData?.products_cache && (
+            <div className="border-b border-gray-100 bg-indigo-50/40 px-4 py-3 text-sm text-gray-700">
+              <span className="font-medium">Кэш sitemap товаров:</span>{' '}
+              {formatNumber(sitemapData.products_cache.url_count)} URL, пересборка{' '}
+              {formatDateTime(sitemapData.products_cache.generated_at)}
+              {sitemapData.products_cache.is_stale ? (
+                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  устарел (&gt;24 ч)
+                </span>
+              ) : (
+                <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                  актуален
+                </span>
+              )}
+            </div>
+          )}
           {sitemapLoading ? (
             <LoadingBlock />
           ) : (

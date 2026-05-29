@@ -341,15 +341,43 @@ export const fetchMyProducts = createAsyncThunk(
     }
 );
 
-export const fetchProduct = createAsyncThunk(
-    'products/fetchProduct',
+export const fetchPublicProduct = createAsyncThunk(
+    'products/fetchPublicProduct',
     async (productId, { rejectWithValue }) => {
         try {
-            const hasToken = Boolean(localStorage.getItem('token'));
-            const response = hasToken
-                ? await apiAxios.get(`/products/${productId}`)
-                : await apiAxiosUnauth.get(`/products/public/${productId}`);
+            const response = await apiAxiosUnauth.get(`/products/public/${productId}`);
             return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.detail || 'Ошибка загрузки товара'
+            );
+        }
+    }
+);
+
+export const fetchProduct = createAsyncThunk(
+    'products/fetchProduct',
+    async (productId, { rejectWithValue, getState }) => {
+        try {
+            const token = localStorage.getItem('token');
+            const user = getState()?.auth?.user;
+            const useAuth = Boolean(token && user);
+
+            if (!useAuth) {
+                const response = await apiAxiosUnauth.get(`/products/public/${productId}`);
+                return response.data;
+            }
+
+            try {
+                const response = await apiAxios.get(`/products/${productId}`);
+                return response.data;
+            } catch (error) {
+                if (error.response?.status === 401) {
+                    const response = await apiAxiosUnauth.get(`/products/public/${productId}`);
+                    return response.data;
+                }
+                throw error;
+            }
         } catch (error) {
             return rejectWithValue(
                 error.response?.data?.detail || 'Ошибка загрузки товара'
@@ -1176,6 +1204,18 @@ const productSlice = createSlice({
                 state.currentProduct = action.payload;
             })
             .addCase(fetchProduct.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+            .addCase(fetchPublicProduct.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(fetchPublicProduct.fulfilled, (state, action) => {
+                state.loading = false;
+                state.currentProduct = action.payload;
+            })
+            .addCase(fetchPublicProduct.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })

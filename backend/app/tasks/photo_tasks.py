@@ -151,10 +151,19 @@ def _mark_yandex_feed_after_product_photo(db, photo_record) -> None:
     if not photo_record or not getattr(photo_record, "product_id", None):
         return
     from app.models.product import Product
+    from sqlalchemy.orm import selectinload
+    from app.services.sitemap_service import touch_product_seo_timestamp_if_newly_working_from_photo
     from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty_for_used_product
 
-    product = db.query(Product).filter(Product.id == photo_record.product_id).first()
+    product = (
+        db.query(Product)
+        .options(selectinload(Product.photos))
+        .filter(Product.id == photo_record.product_id)
+        .first()
+    )
     mark_yandex_feed_dirty_for_used_product(db, product, "product_photo_processed")
+    if product is not None:
+        touch_product_seo_timestamp_if_newly_working_from_photo(db, product, photo_record)
 
 
 @celery_app.task(bind=True, max_retries=3)
