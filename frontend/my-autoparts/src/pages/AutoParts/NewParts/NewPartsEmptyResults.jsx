@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { QUICK_SEARCH_CHIPS } from './rosskoHelpers';
+import UsedPartsSearchCount from './UsedPartsSearchCount';
 
 const NewPartsEmptyResults = ({ query, onSearch }) => (
   <div className="mt-12 sm:mt-16 flex flex-col items-center text-center max-w-2xl mx-auto px-4">
@@ -16,6 +17,7 @@ const NewPartsEmptyResults = ({ query, onSearch }) => (
     <p className="text-sm text-gray-500 mt-4 max-w-md">
       Проверьте артикул, попробуйте другой бренд или поищите аналог.
     </p>
+    <UsedPartsSearchCount query={query} variant="block" />
     <div className="flex flex-wrap gap-2 justify-center mt-6">
       {QUICK_SEARCH_CHIPS.slice(0, 5).map((chip) => (
         <button

@@ -57,7 +57,6 @@ export default function NewPartsFiltersPage() {
       vmin: null,
       vmax: null,
       in_stock: null,
-      sort: 'price_asc',
       show_analogs: null,
     });
   }, [updateNewPartsUrl]);
@@ -105,7 +104,7 @@ export default function NewPartsFiltersPage() {
         </p>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <h2 className="font-semibold text-gray-900 mb-3 hidden md:block">Фильтры</h2>
-          <NewPartsFiltersForm updateNewPartsUrl={updateNewPartsUrl} />
+          <NewPartsFiltersForm updateNewPartsUrl={updateNewPartsUrl} showClearInPanel={false} />
         </div>
       </div>
 

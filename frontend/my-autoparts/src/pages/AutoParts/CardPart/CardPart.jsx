@@ -99,17 +99,11 @@ function CardPart({ part, stocksData, showAllStocks = false, expandedPartId, onT
     const displayTitle = formatProductDisplayTitle(brand, number, rawName);
 
     const renderSectionBadges = () => {
-        const showDirect = sectionType === 'available';
         const showAnalog = sectionType === 'analog';
         const fastDelivery = isRosskoFastDelivery(part);
-        if (!showDirect && !showAnalog && !fastDelivery) return null;
+        if (!showAnalog && !fastDelivery) return null;
         return (
             <div className="flex flex-wrap gap-1 mb-1">
-                {showDirect && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
-                        Прямое
-                    </span>
-                )}
                 {showAnalog && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
                         Аналог

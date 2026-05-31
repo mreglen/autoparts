@@ -5,6 +5,7 @@ import { selectRosskoItems, selectSearchQuery, selectRosskoStatus } from '../../
 import CardPart from '../CardPart/CardPart';
 import NewPartsEmptyResults from './NewPartsEmptyResults';
 import NewPartsFiltersForm from './NewPartsFiltersForm';
+import UsedPartsSearchCount from './UsedPartsSearchCount';
 import {
   getRosskoStockCount,
   getRosskoMinPrice,
@@ -114,90 +115,91 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch, expandedPartId, onToggle
   }
 
   return (
-    <>
+    <div className="mt-0 w-full px-0 max-md:pb-2">
       <h1 className="sr-only">
         {searchQuery ? `Результаты поиска: ${searchQuery}` : 'Новые запчасти с доставкой'}
       </h1>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0 md:hidden">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0">
         <p className="text-sm text-gray-600">
           Найдено: <span className="font-semibold text-gray-900">{filteredRosskoParts.length}</span>
           {showAnalogs && filteredCrossParts.length > 0 && (
             <span className="text-gray-500"> · аналогов: {filteredCrossParts.length}</span>
           )}
+          <UsedPartsSearchCount query={searchQuery || searchParams.get('q')} />
         </p>
         <Link
           to={{ pathname: '/autoparts/new/filters', search: location.search }}
-          className="rounded-full bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800"
+          className="rounded-full bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 lg:hidden"
         >
           Фильтры
         </Link>
       </div>
 
-      <p className="mb-4 hidden px-3 text-sm text-gray-600 sm:px-0 md:block">
-        Найдено: <span className="font-semibold text-gray-900">{filteredRosskoParts.length}</span>
-        {showAnalogs && filteredCrossParts.length > 0 && (
-          <span className="text-gray-500"> · аналогов: {filteredCrossParts.length}</span>
-        )}
-      </p>
+      <div className="flex flex-col gap-4 px-3 sm:gap-6 sm:px-0 lg:flex-row">
+        <aside className="hidden w-full flex-shrink-0 lg:block lg:w-64">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 lg:sticky lg:top-4">
+            <h3 className="mb-3 font-semibold text-gray-900">Фильтры</h3>
+            <NewPartsFiltersForm updateNewPartsUrl={updateNewPartsUrl} showClearInPanel />
+          </div>
+        </aside>
 
-      <div className="mx-3 mb-4 hidden space-y-4 rounded-lg border border-gray-200 bg-white p-4 sm:mx-0 md:block">
-        <NewPartsFiltersForm updateNewPartsUrl={updateNewPartsUrl} />
+        <div className="min-w-0 flex-1">
+          {filteredRosskoParts.length > 0 && (
+            <>
+              <div className="my-4 text-lg font-medium">
+                <h2 className="inline-block border-b-4 border-indigo-500 pb-2">По вашему запросу</h2>
+              </div>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="min-w-full table-fixed divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="w-20 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Бренд</th>
+                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Номер</th>
+                      <th className="w-64 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Наименование</th>
+                      <th className="w-36 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Поставка</th>
+                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Остаток</th>
+                      <th className="w-20 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Цена, ₽</th>
+                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">К заказу</th>
+                    </tr>
+                  </thead>
+                  {renderPartRows(filteredRosskoParts, 'available', 'available', false)}
+                </table>
+              </div>
+              <div className="space-y-5 md:hidden">
+                {renderPartRows(filteredRosskoParts, 'mobile-available', 'available', true)}
+              </div>
+            </>
+          )}
+
+          {showAnalogs && filteredCrossParts.length > 0 && (
+            <>
+              <div className="my-6 text-lg font-medium">
+                <h2 className="inline-block border-b-4 border-blue-500 pb-2">Аналоги</h2>
+              </div>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="min-w-full table-fixed divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="w-20 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Бренд</th>
+                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Номер</th>
+                      <th className="w-64 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Наименование</th>
+                      <th className="w-36 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Поставка</th>
+                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Остаток</th>
+                      <th className="w-20 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Цена, ₽</th>
+                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">К заказу</th>
+                    </tr>
+                  </thead>
+                  {renderPartRows(filteredCrossParts, 'analog', 'analog', false)}
+                </table>
+              </div>
+              <div className="space-y-5 md:hidden">
+                {renderPartRows(filteredCrossParts, 'mobile-analog', 'analog', true)}
+              </div>
+            </>
+          )}
+        </div>
       </div>
-
-      {filteredRosskoParts.length > 0 && (
-        <>
-          <div className="font-medium text-lg my-4">
-            <h2 className="border-b-4 border-indigo-500 pb-2 inline-block">По вашему запросу</h2>
-          </div>
-          <div className="hidden md:block overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 table-fixed">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-20">Бренд</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-24">Номер</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-64">Наименование</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-36">Поставка</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-24">Остаток</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-20">Цена, ₽</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-24">К заказу</th>
-                </tr>
-              </thead>
-              {renderPartRows(filteredRosskoParts, 'available', 'available', false)}
-            </table>
-          </div>
-          <div className="md:hidden space-y-5">
-            {renderPartRows(filteredRosskoParts, 'mobile-available', 'available', true)}
-          </div>
-        </>
-      )}
-
-      {showAnalogs && filteredCrossParts.length > 0 && (
-        <>
-          <div className="font-medium text-lg my-6">
-            <h2 className="border-b-4 border-blue-500 pb-2 inline-block">Аналоги</h2>
-          </div>
-          <div className="hidden md:block overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 table-fixed">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-20">Бренд</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-24">Номер</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-64">Наименование</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-36">Поставка</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-24">Остаток</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-20">Цена, ₽</th>
-                  <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 uppercase w-24">К заказу</th>
-                </tr>
-              </thead>
-              {renderPartRows(filteredCrossParts, 'analog', 'analog', false)}
-            </table>
-          </div>
-          <div className="md:hidden space-y-5">
-            {renderPartRows(filteredCrossParts, 'mobile-analog', 'analog', true)}
-          </div>
-        </>
-      )}
-    </>
+    </div>
   );
 };
 

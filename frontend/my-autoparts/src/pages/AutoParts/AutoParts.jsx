@@ -84,6 +84,9 @@ function AutoParts() {
   const [usedPartsSort, setUsedPartsSort] = useState(
     () => apiSortToUi(searchParams.get('sort') || 'created_at_desc')
   );
+  const [newPartsSort, setNewPartsSort] = useState(
+    () => searchParams.get('sort') || 'price_asc'
+  );
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
   const updateCatalogUrl = useCallback((updates) => {
@@ -177,6 +180,12 @@ function AutoParts() {
     updateCatalogUrl({ sort: uiSortToApi(uiSort) });
     setShowSortDropdown(false);
   }, [updateCatalogUrl]);
+
+  const applyNewPartsSort = useCallback((sort) => {
+    setNewPartsSort(sort);
+    updateNewPartsUrl({ sort: sort === 'price_asc' ? null : sort });
+    setShowSortDropdown(false);
+  }, [updateNewPartsUrl]);
   
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -214,6 +223,10 @@ function AutoParts() {
 
   useEffect(() => {
     setUsedPartsSort(apiSortToUi(searchParams.get('sort') || 'created_at_desc'));
+  }, [searchParams]);
+
+  useEffect(() => {
+    setNewPartsSort(searchParams.get('sort') || 'price_asc');
   }, [searchParams]);
 
   const usedCatalogFilterKey = useMemo(
@@ -262,6 +275,31 @@ function AutoParts() {
     if (!trimmed) return;
     dispatch(setSearchQuery(trimmed));
     dispatch(fetchSearchResults({ text: trimmed }));
+  }, [activeTab, urlQuery, dispatch]);
+
+  useEffect(() => {
+    if (activeTab !== 'rossko') return;
+    const trimmed = (urlQuery ? decodeURIComponent(urlQuery) : '').trim();
+    if (!trimmed) {
+      dispatch(resetCatalogCatalog());
+      dispatch(clearUsedPartsSearch());
+      return undefined;
+    }
+
+    dispatch(resetCatalogCatalog());
+    dispatch(fetchCatalogProducts({
+      q: trimmed,
+      page: 1,
+      page_size: 1,
+      sort: 'created_at_desc',
+    }));
+
+    dispatch(clearUsedPartsSearch());
+    const timer = setTimeout(() => {
+      dispatch(searchUsedAnalogs(trimmed));
+    }, 650);
+
+    return () => clearTimeout(timer);
   }, [activeTab, urlQuery, dispatch]);
 
   // Загружаем корзину при монтировании компонента
@@ -336,6 +374,77 @@ function AutoParts() {
           >
             Б/У
           </button>
+
+          {activeTab === 'rossko' && effectiveQuery && (
+            <div className="relative ml-auto shrink-0">
+              <button
+                onClick={() => setShowSortDropdown(!showSortDropdown)}
+                className="flex items-center justify-center rounded-lg bg-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-300 sm:px-4 sm:py-2"
+                title="Сортировка"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                </svg>
+              </button>
+
+              {showSortDropdown && (
+                <div className="absolute right-0 z-30 mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+                  <button
+                    onClick={() => applyNewPartsSort('price_asc')}
+                    className={`w-full px-4 py-2 text-left transition-colors hover:bg-gray-100 ${newPartsSort === 'price_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>Дешевле</span>
+                      {newPartsSort === 'price_asc' && (
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => applyNewPartsSort('price_desc')}
+                    className={`w-full px-4 py-2 text-left transition-colors hover:bg-gray-100 ${newPartsSort === 'price_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>Дороже</span>
+                      {newPartsSort === 'price_desc' && (
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => applyNewPartsSort('delivery_asc')}
+                    className={`w-full px-4 py-2 text-left transition-colors hover:bg-gray-100 ${newPartsSort === 'delivery_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>Быстрее по поставке</span>
+                      {newPartsSort === 'delivery_asc' && (
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => applyNewPartsSort('brand')}
+                    className={`w-full px-4 py-2 text-left transition-colors hover:bg-gray-100 ${newPartsSort === 'brand' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>По бренду</span>
+                      {newPartsSort === 'brand' && (
+                        <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {activeTab === 'my' && (
             <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
