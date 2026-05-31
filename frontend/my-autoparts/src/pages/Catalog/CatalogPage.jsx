@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchSearchResults, setSearchQuery as setGlobalSearchQuery } from '../../redux/slices/RosskoSlice';
 import { searchUsedParts } from '../../redux/slices/ProductSlice';
 import { fetchPublicPartTypes } from '../../redux/slices/PartTypeSlice';
+import { buildCatalogSeo, PageSeoHelmet } from '../../utils/pageSeo';
 
 const catalogCards = [
   {
@@ -131,9 +132,11 @@ export default function CatalogPage() {
   };
 
   const visibleCards = catalogCards.filter((c) => c.id !== 'new' || showNewAutoparts);
+  const seo = buildCatalogSeo();
 
   return (
     <div className="pb-10">
+      <PageSeoHelmet seo={seo} />
       <div className="mb-8">
         <p className="text-sm font-medium text-indigo-600">Каталог</p>
         <h1 className="mt-1 text-2xl font-bold text-gray-900 sm:text-3xl">Все запчасти в одном месте</h1>

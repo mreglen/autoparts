@@ -432,6 +432,25 @@ def get_products_sitemap_cache_meta(db: Session) -> dict[str, object]:
     }
 
 
+def build_fallback_sitemap_index_xml(
+    site_origin: str,
+    *,
+    pages_lastmod: str | None = None,
+) -> str:
+    """Minimal sitemap index when products cache is unavailable."""
+    origin = site_origin.rstrip("/")
+    pages_mod = (pages_lastmod or settings.SITEMAP_PAGES_LASTMOD).strip()
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        "  <sitemap>\n"
+        f"    <loc>{origin}/sitemap-pages.xml</loc>\n"
+        f"    <lastmod>{pages_mod}</lastmod>\n"
+        "  </sitemap>\n"
+        "</sitemapindex>\n"
+    )
+
+
 def build_sitemap_index_xml(
     site_origin: str,
     *,

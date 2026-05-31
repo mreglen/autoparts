@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPublicSiteConfig } from '../../redux/slices/PublicInfoSlice';
+import { buildAboutSeo, PageSeoHelmet } from '../../utils/pageSeo';
 
 const LEGAL = {
     fullName: 'Общество с ограниченной ответственностью «Кроан»',
@@ -46,8 +47,11 @@ export default function AboutCompany() {
         dispatch(fetchPublicSiteConfig());
     }, [dispatch]);
 
+    const seo = buildAboutSeo();
+
     return (
         <div className="max-w-4xl mx-auto">
+            <PageSeoHelmet seo={seo} />
             <header className="mb-8">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">О компании</h1>
                 <p className="mt-3 text-gray-600 leading-relaxed">

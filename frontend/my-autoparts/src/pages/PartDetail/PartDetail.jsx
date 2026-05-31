@@ -9,7 +9,7 @@ import { normalizeImageUrl } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
 import { buildPartDetailPath, parsePartDetailParam } from '../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
-import { buildPreliminaryPartTitle, buildProductSeo } from '../../utils/productSeo';
+import { buildPreliminaryPartTitle, buildPreliminaryPartDescription, buildProductSeo } from '../../utils/productSeo';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
 
@@ -69,13 +69,20 @@ const PartDetail = () => {
 
   const preliminarySeo = useMemo(() => {
     if (!preliminaryTitle) return null;
+    const description =
+      buildPreliminaryPartDescription({
+        brand: extractedBrand,
+        article: extractedArticle,
+        organization: organization?.address ? organization : null,
+      }) ||
+      'Автозапчасть на «Свой Гараж» — каталог, доставка по России.';
     return {
       title: preliminaryTitle,
-      description: 'Автозапчасть на «Свой Гараж» — каталог, доставка по России.',
+      description,
       canonicalUrl: `https://svoygarage.ru${location.pathname}`,
       imageUrl: null,
     };
-  }, [preliminaryTitle, location.pathname]);
+  }, [preliminaryTitle, extractedBrand, extractedArticle, organization, location.pathname]);
 
   useLayoutEffect(() => {
     if (preliminaryTitle && loading && !currentProduct) {

@@ -115,6 +115,9 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch, expandedPartId, onToggle
 
   return (
     <>
+      <h1 className="sr-only">
+        {searchQuery ? `Результаты поиска: ${searchQuery}` : 'Новые запчасти с доставкой'}
+      </h1>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0 md:hidden">
         <p className="text-sm text-gray-600">
           Найдено: <span className="font-semibold text-gray-900">{filteredRosskoParts.length}</span>

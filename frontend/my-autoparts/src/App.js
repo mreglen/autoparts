@@ -196,7 +196,6 @@ function App() {
           <Route path="/users/:publicCode" element={<PublicUserProfilePage />} />
           <Route path="/seller/:publicCode" element={<RedirectLegacyProfileRoute />} />
           <Route path="/buyer/:publicCode" element={<RedirectLegacyProfileRoute />} />
-          <Route path="/autoservice" element={<Navigate to="/about" replace />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/order-reg" element={<OrderRegistration />} />
           <Route path="/cart/new/checkout" element={<NewPartsOrderRegistration />} />

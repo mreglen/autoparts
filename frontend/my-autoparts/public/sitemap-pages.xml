@@ -25,18 +25,6 @@
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://svoygarage.ru/autoparts/new/filters</loc>
-    <lastmod>2026-05-23</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://svoygarage.ru/autoparts/used/filters</loc>
-    <lastmod>2026-05-23</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://svoygarage.ru/about</loc>
     <lastmod>2026-05-23</lastmod>
     <changefreq>monthly</changefreq>

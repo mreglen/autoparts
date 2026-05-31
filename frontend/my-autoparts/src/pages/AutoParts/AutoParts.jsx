@@ -27,6 +27,7 @@ import {
   buildUsedCatalogFilterParams,
   getUsedPartsUrlQuery,
 } from '../../utils/autopartsPublic';
+import { buildAutoPartsSeo, PageSeoHelmet } from '../../utils/pageSeo';
 
 const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs'];
 
@@ -268,9 +269,15 @@ function AutoParts() {
     dispatch(fetchCart());
   }, [dispatch]);
 
+  const seo = useMemo(
+    () => buildAutoPartsSeo(location.pathname, searchParams),
+    [location.pathname, searchParams]
+  );
+
   if (status === 'loading' && activeTab === 'rossko' && effectiveQuery) {
     return (
       <div className="mt-5 text-center py-10 px-4">
+        <PageSeoHelmet seo={seo} />
         <p className="text-base sm:text-lg text-gray-600">Загрузка данных...</p>
       </div>
     );
@@ -279,6 +286,7 @@ function AutoParts() {
   if (status === 'failed' && activeTab === 'rossko' && effectiveQuery) {
     return (
       <div className="mt-5 text-center py-10 px-4">
+        <PageSeoHelmet seo={seo} />
         <p className="text-base sm:text-lg text-red-600">Ошибка загрузки данных</p>
         <p className="text-sm text-gray-500 mt-2">{error}</p>
       </div>
@@ -287,6 +295,7 @@ function AutoParts() {
 
   return (
     <div className="mt-0 sm:mt-5 px-0 w-full">
+      <PageSeoHelmet seo={seo} />
       <div className="max-md:sticky max-md:top-0 max-md:z-20 max-md:bg-gray-50">
         {activeTab === 'my' && (
           <MobileCompactSearch

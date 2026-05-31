@@ -7,6 +7,7 @@ import StockOutModal from '../MyParts/StockOutModal/StockOutModal';
 import PrintReceiptModal from '../MyParts/PrintReceiptModal/PrintReceiptModal';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
+import { buildSellerPartCardSeo, PageSeoHelmet } from '../../utils/pageSeo';
 
 const SellerPartCardPage = () => {
   const { id } = useParams();
@@ -144,10 +145,12 @@ const SellerPartCardPage = () => {
     return null;
   }
 
+  const seo = buildSellerPartCardSeo(part);
   const previewMedia = mediaItems[0];
 
   return (
     <div className="min-h-screen bg-gray-50 py-6">
+      <PageSeoHelmet seo={seo} />
       <div className="max-w-6xl mx-auto px-4 space-y-5">
         <button
           onClick={() => navigate(-1)}

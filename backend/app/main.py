@@ -211,6 +211,9 @@ async def startup_event():
     
     scheduler.start()
     logger.info("Scheduler started. Expired session cleanup job scheduled.")
+
+    asyncio.create_task(run_rebuild_products_sitemap_cache())
+    logger.info("Products sitemap cache warm-up scheduled on startup.")
     
     
     try:

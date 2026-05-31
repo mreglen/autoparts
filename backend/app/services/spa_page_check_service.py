@@ -55,7 +55,6 @@ _SPA_ROUTE_RULES: tuple[_RouteRule, ...] = (
     _RouteRule(re.compile(rf"^/users/(?P<public_code>{_PUBLIC_CODE})$"), "user"),
     _RouteRule(re.compile(rf"^/seller/(?P<public_code>{_LEGACY_CODE})$"), "seller"),
     _RouteRule(re.compile(rf"^/buyer/(?P<public_code>{_LEGACY_CODE})$"), "buyer"),
-    _RouteRule(re.compile(r"^/autoservice$")),
     _RouteRule(re.compile(r"^/cart$")),
     _RouteRule(re.compile(r"^/order-reg$")),
     _RouteRule(re.compile(r"^/cart/new/checkout$")),

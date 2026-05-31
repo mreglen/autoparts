@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from app.services.sitemap_service import (
     PRODUCTS_SITEMAP_CACHE_KEY,
     _product_lastmod_date,
+    build_fallback_sitemap_index_xml,
     build_products_sitemap_xml,
     build_sitemap_index_xml,
     get_products_sitemap_snapshot,
@@ -67,6 +68,11 @@ class BuildProductsSitemapXmlTests(unittest.TestCase):
 
 
 class SitemapIndexXmlTests(unittest.TestCase):
+    def test_fallback_index_contains_pages_only(self):
+        xml = build_fallback_sitemap_index_xml("https://svoygarage.ru")
+        self.assertIn("<loc>https://svoygarage.ru/sitemap-pages.xml</loc>", xml)
+        self.assertNotIn("sitemap-products", xml)
+
     def test_index_uses_products_generated_at_and_pages_config(self):
         generated_at = datetime(2026, 5, 28, 3, 0, tzinfo=timezone.utc)
         with patch("app.services.sitemap_service.settings") as mock_settings:

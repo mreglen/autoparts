@@ -45,6 +45,7 @@ from app.routers.site_delivery import router as site_delivery_router
 from app.routers.site_quick_links import router as site_quick_links_router
 from app.routers.site_reviews import router as site_reviews_router
 from app.routers.public_pages import router as public_pages_router
+from app.routers.public_pages_seo import router as public_pages_seo_router
 from app.routers.public_product_seo import router as public_product_seo_router
 from app.routers.public_organizations import router as public_organizations_router
 from app.routers.public_users import router as public_users_router
@@ -105,6 +106,7 @@ api_router.include_router(site_delivery_router)
 api_router.include_router(site_quick_links_router)
 api_router.include_router(site_reviews_router)
 api_router.include_router(public_pages_router)
+api_router.include_router(public_pages_seo_router)
 api_router.include_router(public_product_seo_router)
 api_router.include_router(public_organizations_router)
 api_router.include_router(public_users_router)

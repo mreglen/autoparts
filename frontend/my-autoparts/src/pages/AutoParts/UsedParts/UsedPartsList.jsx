@@ -425,6 +425,9 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
   return (
     <div className="mt-0 w-full px-0 max-md:pb-2">
+      <h1 className="sr-only">
+        {urlQ ? `Б/у запчасти: ${urlQ}` : 'Б/у автозапчасти'}
+      </h1>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0">
         <p className="text-sm text-gray-600">Найдено: <span className="font-semibold text-gray-900">{visibleTotal}</span></p>
         <Link
