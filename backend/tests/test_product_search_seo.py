@@ -14,14 +14,25 @@ from app.utils.product_search_seo import (
 class ProductSearchTitleTests(unittest.TestCase):
     def test_brand_and_article_title(self):
         title = build_product_search_title(brand="MANN", article="IF1009")
-        self.assertEqual(title, "IF1009 MANN — купить | Свой Гараж")
-        self.assertTrue(title.startswith("IF1009"))
-        self.assertIn("MANN", title)
+        self.assertEqual(title, "MANN IF1009 | Свой Гараж")
+        self.assertTrue(title.startswith("MANN"))
+        self.assertIn("IF1009", title)
         self.assertIn("Свой Гараж", title)
+
+    def test_brand_article_and_name_title(self):
+        title = build_product_search_title(
+            brand="KRAFT",
+            article="KT 100529",
+            fallback_display_name="KRAFT KT 100529 Подшипник сцепления ВАЗ 2110-2115",
+        )
+        self.assertEqual(
+            title,
+            "KRAFT KT 100529 Подшипник сцепления ВАЗ 2110-2115 | Свой Гараж",
+        )
 
     def test_article_only_title(self):
         title = build_product_search_title(brand="", article="24410-3E500")
-        self.assertEqual(title, "24410-3E500 — купить | Свой Гараж")
+        self.assertEqual(title, "24410-3E500 | Свой Гараж")
 
     def test_fallback_title(self):
         title = build_product_search_title(
@@ -111,7 +122,7 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
 
     def test_build_product_seo_meta_uses_search_templates(self):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
-        self.assertEqual(meta.title, "IF1009 MANN — купить | Свой Гараж")
+        self.assertEqual(meta.title, "MANN IF1009 Масляный фильтр | Свой Гараж")
         self.assertIn("Купить MANN IF1009.", meta.description)
         self.assertIn("в Екатеринбурге.", meta.description)
         self.assertIn("1 200 ₽.", meta.description)
@@ -128,9 +139,12 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
     def test_prerender_html_has_no_noindex(self):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
         html = render_product_prerender_html(meta)
-        self.assertIn("IF1009 MANN — купить", html)
+        self.assertIn("MANN IF1009 Масляный фильтр", html)
         self.assertIn("в Екатеринбурге.", html)
+        self.assertIn("Оригинальный фильтр в отличном состоянии.", html)
         self.assertNotIn("noindex", html)
+        self.assertNotIn("Открыть карточку", html)
+        self.assertNotIn("Цена:", html)
 
 
 if __name__ == "__main__":

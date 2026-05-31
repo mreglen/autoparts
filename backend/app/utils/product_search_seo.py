@@ -39,16 +39,20 @@ def build_product_search_title(
 ) -> str:
     brand_str = (brand or "").strip()
     article_str = (article or "").strip()
+    fallback = (fallback_display_name or "").strip()
 
-    if article_str and brand_str:
-        title = f"{article_str} {brand_str} — купить{_TITLE_SUFFIX}"
+    if fallback:
+        core = fallback
+    elif brand_str and article_str:
+        core = f"{brand_str} {article_str}"
     elif article_str:
-        title = f"{article_str} — купить{_TITLE_SUFFIX}"
-    elif fallback_display_name:
-        title = f"{fallback_display_name.strip()}{_TITLE_SUFFIX}"
+        core = article_str
+    elif brand_str:
+        core = brand_str
     else:
-        title = f"Автозапчасть{_TITLE_SUFFIX}"
+        core = "Автозапчасть"
 
+    title = f"{core}{_TITLE_SUFFIX}"
     return re.sub(r"\s+", " ", title).strip()
 
 

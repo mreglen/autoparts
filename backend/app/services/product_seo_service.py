@@ -32,11 +32,23 @@ class ProductSeoMeta:
     price: str | None
     in_stock: bool
     json_ld: str
+    product_description: str | None = None
 
 
 def _strip_html(value: str | None) -> str:
     text = re.sub(r"<[^>]+>", " ", str(value or ""))
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _body_product_description(unique_desc: str | None, meta_description: str, *, max_len: int = 500) -> str | None:
+    text = re.sub(r"\s+", " ", (unique_desc or "")).strip()
+    if not text or len(text) < 20:
+        return None
+    if text in meta_description:
+        return None
+    if len(text) <= max_len:
+        return text
+    return f"{text[: max_len - 1].strip()}…"
 
 
 def parse_part_path_product_id(path: str) -> int | None:
@@ -144,6 +156,7 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
         price=price,
         in_stock=in_stock,
         json_ld=json_ld,
+        product_description=_body_product_description(unique_desc, description),
     )
 
 
@@ -163,15 +176,14 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
     canonical = html.escape(meta.canonical_url, quote=True)
     h1 = html.escape(meta.h1)
     body_desc = html.escape(meta.description)
+    product_desc_block = ""
+    if meta.product_description:
+        product_desc_block = f"\n    <p>{html.escape(meta.product_description)}</p>"
     image_tag = (
         f'<meta property="og:image" content="{html.escape(meta.image_url, quote=True)}" />'
         if meta.image_url
         else ""
     )
-    price_line = ""
-    if meta.price:
-        price_line = f"<p>Цена: {html.escape(meta.price)} ₽</p>"
-
     try:
         product_obj = json.loads(meta.json_ld)
     except Exception:
@@ -230,9 +242,7 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
 <body>
   <article>
     <h1>{h1}</h1>
-    <p>{body_desc}</p>
-    {price_line}
-    <p><a href="{canonical}">Открыть карточку на Свой Гараж</a></p>
+    <p>{body_desc}</p>{product_desc_block}
   </article>
 </body>
 </html>

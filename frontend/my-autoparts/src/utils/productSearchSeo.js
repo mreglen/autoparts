@@ -23,19 +23,22 @@ function formatPriceRub(price) {
 export function buildProductSearchTitle({ brand, article, fallbackDisplayName }) {
   const brandStr = String(brand || '').trim();
   const articleStr = String(article || '').trim();
+  const fallback = String(fallbackDisplayName || '').trim();
 
-  let title;
-  if (articleStr && brandStr) {
-    title = `${articleStr} ${brandStr} — купить${TITLE_SUFFIX}`;
+  let core;
+  if (fallback) {
+    core = fallback;
+  } else if (brandStr && articleStr) {
+    core = `${brandStr} ${articleStr}`;
   } else if (articleStr) {
-    title = `${articleStr} — купить${TITLE_SUFFIX}`;
-  } else if (fallbackDisplayName) {
-    title = `${String(fallbackDisplayName).trim()}${TITLE_SUFFIX}`;
+    core = articleStr;
+  } else if (brandStr) {
+    core = brandStr;
   } else {
-    title = `Автозапчасть${TITLE_SUFFIX}`;
+    core = 'Автозапчасть';
   }
 
-  return title.replace(/\s+/g, ' ').trim();
+  return `${core}${TITLE_SUFFIX}`.replace(/\s+/g, ' ').trim();
 }
 
 export function buildProductSearchDescription({

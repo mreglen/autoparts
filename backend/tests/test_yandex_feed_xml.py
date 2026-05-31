@@ -44,6 +44,8 @@ class YandexFeedXmlTests(unittest.TestCase):
         )
         self.assertIsNotNone(lines)
         xml = "\n".join(lines)
+        self.assertIn("<name>Brand 45G Тестовая запчасть</name>", xml)
+        self.assertNotIn("typePrefix", xml)
         self.assertIn('<condition type="preowned">', xml)
         self.assertIn("<quality>good</quality>", xml)
         self.assertIn("<reason>", xml)

@@ -8,6 +8,7 @@ from typing import Iterable
 from urllib.parse import urlparse
 from xml.sax.saxutils import escape
 
+from app.utils.product_display_name import format_product_display_title
 from app.utils.product_urls import build_product_page_url
 
 from sqlalchemy.orm import Session, selectinload
@@ -127,8 +128,12 @@ def _offer_lines(
     used_condition_reason: str,
 ) -> list[str] | None:
     category_id = int(product.part_type_id or 1)
-    title = (product.name or "").strip() or f"{(product.brand or '').strip()} {(product.article or '').strip()}".strip()
-    title = title or f"Запчасть #{product.id}"
+    display_name = format_product_display_title(
+        product.brand,
+        product.article,
+        product.name,
+    )
+    offer_name = (display_name or f"Запчасть #{product.id}")[:255]
     product_url = build_product_page_url(product, site_origin)
     price_value = _format_price(product.price)
     available = "true" if (product.quantity or 0) > 0 else "false"
@@ -143,21 +148,16 @@ def _offer_lines(
     if not primary_photo:
         return None
 
-    type_prefix = (product.part_type.name if product.part_type else "Автозапчасти") or "Автозапчасти"
-    vendor = (product.brand or "Unknown")[:255]
-    model = title[:255]
     if is_new_item:
-        desc = (product.description or "").strip() or f"Новая автозапчасть {title}"
+        desc = (product.description or "").strip() or f"Новая автозапчасть {offer_name}"
         condition_label = "Новая"
     else:
-        desc = (product.description or "").strip() or f"Б/у автозапчасть {title}"
+        desc = (product.description or "").strip() or f"Б/у автозапчасть {offer_name}"
         condition_label = "Б/у"
 
     lines = [
-        f'      <offer id="{product.id}" available="{available}" type="vendor.model">',
-        f"        <typePrefix>{escape(type_prefix)}</typePrefix>",
-        f"        <vendor>{escape(vendor)}</vendor>",
-        f"        <model>{escape(model)}</model>",
+        f'      <offer id="{product.id}" available="{available}">',
+        f"        <name>{escape(offer_name)}</name>",
         f"        <url>{escape(product_url)}</url>",
         f"        <price>{price_value}</price>",
         "        <currencyId>RUR</currencyId>",
