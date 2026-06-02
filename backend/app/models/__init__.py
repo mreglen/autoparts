@@ -42,6 +42,7 @@ from app.models.yandex_feed_sync_state import YandexFeedSyncState
 from app.models.yandex_oauth_state import YandexOAuthState
 from app.models.chat import Chat, Message, ChatParticipant
 from app.models.part_type import PartType
+from app.models.new_parts_seo_card import NewPartsSeoCard
 
 
 from sqlalchemy.orm import relationship

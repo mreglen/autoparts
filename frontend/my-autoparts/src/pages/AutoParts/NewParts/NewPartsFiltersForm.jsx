@@ -6,6 +6,18 @@ import { trackFormField } from '../../../utils/siteAnalytics';
 
 const COLLAPSED_FILTER_LIMIT = 3;
 
+const toSafeText = (value, fallback = '') => {
+  if (typeof value === 'string') return value.trim() || fallback;
+  if (typeof value === 'number') return String(value);
+  if (!value) return fallback;
+  if (typeof value === 'object') {
+    if (typeof value.msg === 'string' && value.msg.trim()) return value.msg.trim();
+    if (typeof value.input === 'string' && value.input.trim()) return value.input.trim();
+    return fallback;
+  }
+  return fallback;
+};
+
 /**
  * Фильтры результатов Rossko (новые запчасти).
  * @param {function} props.updateNewPartsUrl
@@ -31,14 +43,16 @@ export default function NewPartsFiltersForm({ updateNewPartsUrl, showClearInPane
   const rosskoBrands = useMemo(() => {
     const brands = new Set();
     allParts.forEach((p) => {
-      if (p?.brand) brands.add(p.brand);
+      const brand = toSafeText(p?.brand);
+      if (brand) brands.add(brand);
     });
     allParts.forEach((part) => {
       let crossParts = part?.crosses?.Part;
       if (crossParts) {
         if (!Array.isArray(crossParts)) crossParts = [crossParts];
         crossParts.forEach((cp) => {
-          if (cp?.brand) brands.add(cp.brand);
+          const brand = toSafeText(cp?.brand);
+          if (brand) brands.add(brand);
         });
       }
     });

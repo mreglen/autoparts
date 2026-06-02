@@ -13,6 +13,26 @@ import { buildPreliminaryPartTitle, buildPreliminaryPartDescription, buildProduc
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
 
+const formatErrorText = (value) => {
+  if (!value) return 'Ошибка загрузки товара';
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    const text = value
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') return item.msg || item.input || '';
+        return '';
+      })
+      .filter(Boolean)
+      .join('; ');
+    return text || 'Ошибка загрузки товара';
+  }
+  if (typeof value === 'object') {
+    return value.msg || value.input || 'Ошибка загрузки товара';
+  }
+  return 'Ошибка загрузки товара';
+};
+
 function PartProductSeoHelmet({ seo, structuredData, product }) {
   if (!seo) return null;
   return (
@@ -92,9 +112,15 @@ const PartDetail = () => {
 
   useEffect(() => {
     if (extractedProductId) {
+      const numericId = parseInt(extractedProductId, 10);
+      if (!Number.isNaN(numericId) && numericId > 0) {
       // Use the extracted product ID to fetch directly
-      dispatch(fetchPublicProduct(parseInt(extractedProductId, 10)));
-    } else if (extractedBrand && extractedArticle) {
+        dispatch(fetchPublicProduct(numericId));
+        return;
+      }
+    }
+
+    if (extractedBrand && extractedArticle) {
       const fetchByBrandAndArticle = async () => {
         try {
           // Decode brand and article in case they contain encoded characters
@@ -340,7 +366,7 @@ const PartDetail = () => {
         </Helmet>
         <div className="text-center">
           <p className="text-lg text-red-600">Ошибка загрузки информации о запчасти</p>
-          <p className="text-sm text-gray-500 mt-2">{error}</p>
+          <p className="text-sm text-gray-500 mt-2">{formatErrorText(error)}</p>
           <button 
             onClick={() => navigate(-1)}
             className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"

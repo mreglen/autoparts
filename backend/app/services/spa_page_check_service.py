@@ -8,6 +8,7 @@ from urllib.parse import unquote, urlparse
 from sqlalchemy.orm import Session
 
 from app.models.organization import Organization as OrganizationModel
+from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.models.product import Product as ProductModel
 from app.services.public_user_profile_service import (
     get_public_buyer_profile,
@@ -38,6 +39,7 @@ _SPA_ROUTE_RULES: tuple[_RouteRule, ...] = (
     _RouteRule(re.compile(r"^/autoparts$")),
     _RouteRule(re.compile(r"^/autoparts/new/filters$")),
     _RouteRule(re.compile(r"^/autoparts/new$")),
+    _RouteRule(re.compile(rf"^/autoparts/new/part/(?P<card_id>{_NUM})(?:[-/][^/]*)?$"), "new_part_card"),
     _RouteRule(re.compile(r"^/autoparts/used/filters$")),
     _RouteRule(re.compile(r"^/autoparts/used$")),
     _RouteRule(re.compile(r"^/catalog$")),
@@ -132,6 +134,15 @@ def _organization_exists(db: Session, org_id: str) -> bool:
     return row is not None
 
 
+def _new_part_card_exists(db: Session, card_id: int) -> bool:
+    row = (
+        db.query(NewPartsSeoCard.id)
+        .filter(NewPartsSeoCard.id == card_id, NewPartsSeoCard.is_active.is_(True))
+        .first()
+    )
+    return row is not None
+
+
 def _match_spa_route(path: str) -> tuple[_RouteRule, re.Match[str]] | None:
     for rule in _SPA_ROUTE_RULES:
         match = rule.pattern.match(path)
@@ -154,6 +165,8 @@ def _validate_route(db: Session, rule: _RouteRule, match: re.Match[str]) -> bool
         return get_public_buyer_profile(db, match.group("public_code")) is not None
     if rule.validator == "user":
         return get_public_user_profile(db, match.group("public_code")) is not None
+    if rule.validator == "new_part_card":
+        return _new_part_card_exists(db, int(match.group("card_id")))
 
     return False
 

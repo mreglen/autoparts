@@ -1,10 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import UsedPartsSearchCount from './UsedPartsSearchCount';
-import { fetchPopularNewPartQueries } from './popularQueriesApi';
+import { fetchPopularNewPartQueries, getDefaultPopularNewPartQueries } from './popularQueriesApi';
+
+const toSafeText = (value, fallback = '') => {
+  if (typeof value === 'string') return value.trim() || fallback;
+  if (typeof value === 'number') return String(value);
+  if (!value) return fallback;
+  if (typeof value === 'object') {
+    if (typeof value.msg === 'string' && value.msg.trim()) return value.msg.trim();
+    if (typeof value.input === 'string' && value.input.trim()) return value.input.trim();
+    return fallback;
+  }
+  return fallback;
+};
 
 const NewPartsEmptyResults = ({ query, onSearch }) => {
-  const [popularQueries, setPopularQueries] = useState([]);
+  const [popularQueries, setPopularQueries] = useState(() => getDefaultPopularNewPartQueries(5));
+  const safeQuery = toSafeText(query, '');
 
   useEffect(() => {
     let active = true;
@@ -25,12 +38,12 @@ const NewPartsEmptyResults = ({ query, onSearch }) => {
     </div>
     <h2 className="text-2xl font-bold text-gray-800 mb-3">Ничего не найдено</h2>
     <p className="text-gray-600 text-base leading-relaxed">
-      По запросу <span className="font-semibold text-indigo-600">«{query}»</span> не найдено позиций.
+      По запросу <span className="font-semibold text-indigo-600">«{safeQuery}»</span> не найдено позиций.
     </p>
     <p className="text-sm text-gray-500 mt-4 max-w-md">
       Проверьте артикул, попробуйте другой бренд или поищите аналог.
     </p>
-    <UsedPartsSearchCount query={query} variant="block" />
+    <UsedPartsSearchCount query={safeQuery} variant="block" />
     <div className="flex flex-wrap gap-2 justify-center mt-6">
       {popularQueries.map((chip) => (
         <button

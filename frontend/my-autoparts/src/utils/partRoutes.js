@@ -39,3 +39,26 @@ export function buildPartDetailPath(product) {
 
   return '/autoparts/used';
 }
+
+/** Разбор сегмента `/autoparts/new/part/:cardId` (id-brand-article или только id). */
+export function parseNewPartDetailParam(combinedParam) {
+  return parsePartDetailParam(combinedParam);
+}
+
+export function buildNewPartDetailPath(card) {
+  if (!card) return '/autoparts/new';
+
+  const id = card.id ?? card.card_id;
+  const brand = card.brand || '';
+  const article = card.article || '';
+
+  if (id && brand && article) {
+    return `/autoparts/new/part/${id}-${encodeURIComponent(brand)}-${encodeURIComponent(article)}`;
+  }
+
+  if (id) {
+    return `/autoparts/new/part/${id}`;
+  }
+
+  return '/autoparts/new';
+}

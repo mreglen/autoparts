@@ -24,6 +24,7 @@ import ReviewsPage from './pages/About/ReviewsPage';
 import { useShowSiteReviews } from './utils/siteReviewsPublic';
 import UsedPartsFiltersPage from './pages/AutoParts/UsedParts/UsedPartsFiltersPage';
 import NewPartsFiltersPage from './pages/AutoParts/NewParts/NewPartsFiltersPage';
+import NewPartDetailPage from './pages/AutoParts/NewParts/NewPartDetailPage';
 import Main from './pages/Main/Main';
 import CatalogPage from './pages/Catalog/CatalogPage';
 import MyParts from './pages/MyParts/MyParts';
@@ -179,6 +180,7 @@ function App() {
           <Route path="/autoparts" element={<Navigate to="/autoparts/new" replace />} />
           <Route path="/autoparts/new/filters" element={<NewPartsFiltersPage />} />
           <Route path="/autoparts/new" element={<AutoParts />} />
+          <Route path="/autoparts/new/part/:cardId" element={<NewPartDetailPage />} />
           <Route path="/autoparts/used/filters" element={<UsedPartsFiltersPage />} />
           <Route path="/autoparts/used" element={<AutoParts />} />
           <Route path="/catalog" element={<CatalogPage />} />

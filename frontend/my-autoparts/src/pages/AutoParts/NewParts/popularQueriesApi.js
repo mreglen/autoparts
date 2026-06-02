@@ -17,15 +17,20 @@ function normalizeQueries(items) {
   return normalized;
 }
 
+export function getDefaultPopularNewPartQueries(limit = FALLBACK_LIMIT) {
+  return normalizeQueries(QUICK_SEARCH_CHIPS).slice(0, limit);
+}
+
 export async function fetchPopularNewPartQueries(limit = FALLBACK_LIMIT) {
+  const fallback = getDefaultPopularNewPartQueries(limit);
   try {
     const response = await apiAxiosUnauth.get('/public/autoparts/new/popular-queries', {
       params: { limit },
     });
     const fromApi = normalizeQueries(response?.data?.items || []);
-    if (fromApi.length > 0) return fromApi;
+    if (fromApi.length >= limit) return fromApi.slice(0, limit);
+    return normalizeQueries([...fromApi, ...fallback]).slice(0, limit);
   } catch (_e) {
-    // ignore and fallback to static chips
+    return fallback;
   }
-  return normalizeQueries(QUICK_SEARCH_CHIPS).slice(0, limit);
 }

@@ -61,6 +61,7 @@ PATH_NORMALIZATION_RULES: list[tuple[re.Pattern[str], str]] = [
 ]
 
 AUTOPARTS_NEW_PATH_TEMPLATE = "/autoparts/new"
+AUTOPARTS_NEW_PATH_TEMPLATES = frozenset({"/autoparts/new", "/autoparts/new/filters"})
 POPULAR_NEW_QUERIES_DEFAULT_DAYS = 30
 POPULAR_NEW_QUERIES_MAX_LIMIT = 20
 POPULAR_QUERY_STOPLIST = frozenset(
@@ -92,15 +93,16 @@ def extract_product_id_from_path(path: str) -> Optional[int]:
 
 
 def normalize_path(path: str) -> tuple[str, str]:
-    raw = (path or "/").split("?")[0].strip() or "/"
-    if len(raw) > 2048:
-        raw = raw[:2048]
-    template = raw
+    full = (path or "/").strip() or "/"
+    if len(full) > 2048:
+        full = full[:2048]
+    pathname = full.split("?", 1)[0].strip() or "/"
+    template = pathname
     for pattern, replacement in PATH_NORMALIZATION_RULES:
-        if pattern.match(raw):
+        if pattern.match(pathname):
             template = replacement
             break
-    return template, raw
+    return template, full
 
 
 def _utcnow() -> datetime:
@@ -658,7 +660,7 @@ def get_popular_new_part_queries(
             SiteAnalyticsSession.id == SiteAnalyticsPageView.session_id,
         )
         .filter(
-            SiteAnalyticsPageView.path_template == AUTOPARTS_NEW_PATH_TEMPLATE,
+            SiteAnalyticsPageView.path_template.in_(AUTOPARTS_NEW_PATH_TEMPLATES),
             SiteAnalyticsPageView.entered_at >= since,
         )
         .all()

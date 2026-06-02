@@ -1,17 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchPopularNewPartQueries } from './popularQueriesApi';
+import { fetchPopularNewPartQueries, getDefaultPopularNewPartQueries } from './popularQueriesApi';
 
 const NewPartsLanding = ({ onSearch }) => {
   const [term, setTerm] = useState('');
   const [searching, setSearching] = useState(false);
-  const [popularQueries, setPopularQueries] = useState([]);
+  const [popularQueries, setPopularQueries] = useState(() => getDefaultPopularNewPartQueries(8));
+  const [popularLoading, setPopularLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    fetchPopularNewPartQueries(8).then((items) => {
-      if (active) setPopularQueries(items);
-    });
+    setPopularLoading(true);
+    fetchPopularNewPartQueries(8)
+      .then((items) => {
+        if (active) setPopularQueries(items);
+      })
+      .finally(() => {
+        if (active) setPopularLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -20,6 +26,7 @@ const NewPartsLanding = ({ onSearch }) => {
   const runSearch = async (query) => {
     const trimmed = (query || term).trim();
     if (!trimmed || searching) return;
+    setTerm(trimmed);
     setSearching(true);
     try {
       await onSearch(trimmed);
@@ -59,7 +66,10 @@ const NewPartsLanding = ({ onSearch }) => {
       </section>
 
       <section className="mb-8">
-        <p className="text-sm font-medium text-gray-700 mb-2">Популярные запросы</p>
+        <p className="text-sm font-medium text-gray-700 mb-2">
+          Популярные запросы
+          {popularLoading && <span className="ml-2 text-xs font-normal text-gray-400">обновление…</span>}
+        </p>
         <div className="flex flex-wrap gap-2">
           {popularQueries.map((chip) => (
             <button

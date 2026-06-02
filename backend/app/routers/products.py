@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 from app.models.product import ProductPhoto, ProductVideo, Product as ProductModel
 from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
 from app.models.product_vehicle import ProductVehicleAssociation
@@ -17,9 +18,19 @@ from app.services.yandex_feed_sync_service import (
     mark_yandex_feed_dirty_for_used_product,
 )
 from sqlalchemy.orm import selectinload
+from app.routers.search_products import normalize_partnumber, get_sql_normalize
 
 
 router = APIRouter(prefix="/products", tags=["Products"])
+
+
+class PublicUsedProductMatchOut(BaseModel):
+    id: int
+    brand: str | None = None
+    article: str | None = None
+    name: str | None = None
+    price: float | None = None
+    quantity: int = 0
 
 
 
@@ -227,6 +238,60 @@ def read_product(
     if not product:
         raise HTTPException(status_code=404, detail="Продукт не найден или недоступен")
     return product
+
+
+@router.get("/public/find-used-match", response_model=list[PublicUsedProductMatchOut])
+def find_public_used_product_match(
+    brand: str = Query(..., min_length=1, max_length=120),
+    article: str = Query(..., min_length=1, max_length=120),
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    brand_text = str(brand or "").strip()
+    article_text = str(article or "").strip()
+    if not brand_text or not article_text:
+        return []
+
+    exact_query = (
+        db.query(ProductModel)
+        .filter(
+            ProductModel.quantity > 0,
+            ProductModel.is_new.is_(False),
+            ProductModel.brand.ilike(brand_text),
+            ProductModel.article.ilike(article_text),
+        )
+        .order_by(ProductModel.id.desc())
+    )
+    products = exact_query.limit(limit).all()
+    if not products:
+        normalized_article = normalize_partnumber(article_text)
+        if normalized_article:
+            products = (
+                db.query(ProductModel)
+                .filter(
+                    ProductModel.quantity > 0,
+                    ProductModel.is_new.is_(False),
+                    ProductModel.brand.ilike(brand_text),
+                    get_sql_normalize(ProductModel.article) == normalized_article,
+                )
+                .order_by(ProductModel.id.desc())
+                .limit(limit)
+                .all()
+            )
+    if not products:
+        return []
+
+    return [
+        PublicUsedProductMatchOut(
+            id=product.id,
+            brand=product.brand,
+            article=product.article,
+            name=product.name,
+            price=float(product.price) if product.price is not None else None,
+            quantity=int(product.quantity or 0),
+        )
+        for product in products
+    ]
 
 
 @router.get("/public/{product_id}", response_model=ProductSchema)

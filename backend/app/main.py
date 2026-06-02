@@ -56,6 +56,7 @@ import app.models.seo_sitemap_cache  # noqa: F401 — SEO sitemap cache
 import app.models.rossko_settings  # noqa: F401 — Rossko checkout settings
 import app.models.new_parts_checkout_session  # noqa: F401 — YooKassa checkout sessions
 import app.models.yookassa_payment  # noqa: F401 — YooKassa payments
+import app.models.new_parts_seo_card  # noqa: F401 — SEO cards for supplier new parts
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings

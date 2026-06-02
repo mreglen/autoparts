@@ -2,10 +2,10 @@ import React, { useMemo, useCallback } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectRosskoItems, selectSearchQuery, selectRosskoStatus } from '../../../redux/slices/RosskoSlice';
-import CardPart from '../CardPart/CardPart';
 import NewPartsEmptyResults from './NewPartsEmptyResults';
 import NewPartsFiltersForm from './NewPartsFiltersForm';
 import UsedPartsSearchCount from './UsedPartsSearchCount';
+import NewPartProductCard from './NewPartProductCard';
 import {
   getRosskoStockCount,
   getRosskoMinPrice,
@@ -13,7 +13,19 @@ import {
   mapPartToStocksData,
 } from './rosskoHelpers';
 
-const NewPartsResults = ({ updateNewPartsUrl, onSearch, expandedPartId, onToggleExpand }) => {
+const toSafeText = (value, fallback = '') => {
+  if (typeof value === 'string') return value.trim() || fallback;
+  if (typeof value === 'number') return String(value);
+  if (!value) return fallback;
+  if (typeof value === 'object') {
+    if (typeof value.msg === 'string' && value.msg.trim()) return value.msg.trim();
+    if (typeof value.input === 'string' && value.input.trim()) return value.input.trim();
+    return fallback;
+  }
+  return fallback;
+};
+
+const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const partsData = useSelector(selectRosskoItems);
@@ -82,33 +94,36 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch, expandedPartId, onToggle
   );
 
   const hasResults = filteredRosskoParts.length > 0 || filteredCrossParts.length > 0;
+  const safeSearchQuery = toSafeText(searchQuery, '');
+  const safeUrlQuery = toSafeText(searchParams.get('q'), '');
 
-  const renderPartRows = (parts, idPrefix, sectionType, isMobile) => {
-    const Container = isMobile ? 'div' : 'tbody';
-    const containerProps = isMobile ? { className: 'space-y-5' } : { className: 'bg-white divide-y divide-gray-200' };
+  const renderPartCards = (parts, idPrefix, sectionType) => (
+    <div className="space-y-4">
+      {parts.map((part, idx) => {
+        const baseKey = toSafeText(part?.guid, '') || toSafeText(part?.id, '') || toSafeText(part?.partnumber, '') || 'row';
+        const uniqueId = `${idPrefix}-${baseKey}-${idx}`;
+        const stocksData = mapPartToStocksData(part);
+        return (
+          <NewPartProductCard
+            key={uniqueId}
+            part={part}
+            stocksData={stocksData}
+            sectionType={sectionType}
+            uniqueId={uniqueId}
+          />
+        );
+      })}
+    </div>
+  );
 
-    return (
-      <Container {...containerProps}>
-        {parts.map((part, idx) => {
-          const uniqueId = `${idPrefix}-${part.guid || part.id || idx}`;
-          const stocksData = mapPartToStocksData(part);
-          return (
-            <CardPart
-              key={uniqueId}
-              part={part}
-              stocksData={stocksData}
-              showAllStocks
-              sectionType={sectionType}
-              uniqueId={uniqueId}
-              expandedPartId={expandedPartId}
-              onToggleExpand={onToggleExpand}
-              isMobile={isMobile}
-            />
-          );
-        })}
-      </Container>
-    );
-  };
+  const renderSection = (title, parts, idPrefix, sectionType, accentClass) => (
+    <>
+      <div className="my-4 text-lg font-medium">
+        <h2 className={`inline-block border-b-4 pb-2 ${accentClass}`}>{title}</h2>
+      </div>
+      {renderPartCards(parts, idPrefix, sectionType)}
+    </>
+  );
 
   if (status === 'succeeded' && !hasResults) {
     return <NewPartsEmptyResults query={searchQuery} onSearch={onSearch} />;
@@ -117,7 +132,7 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch, expandedPartId, onToggle
   return (
     <div className="mt-0 w-full px-0 max-md:pb-2">
       <h1 className="sr-only">
-        {searchQuery ? `Результаты поиска: ${searchQuery}` : 'Новые запчасти с доставкой'}
+        {safeSearchQuery ? `Результаты поиска: ${safeSearchQuery}` : 'Новые запчасти с доставкой'}
       </h1>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0">
         <p className="text-sm text-gray-600">
@@ -125,7 +140,7 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch, expandedPartId, onToggle
           {showAnalogs && filteredCrossParts.length > 0 && (
             <span className="text-gray-500"> · аналогов: {filteredCrossParts.length}</span>
           )}
-          <UsedPartsSearchCount query={searchQuery || searchParams.get('q')} />
+          <UsedPartsSearchCount query={safeSearchQuery || safeUrlQuery} />
         </p>
         <Link
           to={{ pathname: '/autoparts/new/filters', search: location.search }}
@@ -145,57 +160,11 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch, expandedPartId, onToggle
 
         <div className="min-w-0 flex-1">
           {filteredRosskoParts.length > 0 && (
-            <>
-              <div className="my-4 text-lg font-medium">
-                <h2 className="inline-block border-b-4 border-indigo-500 pb-2">По вашему запросу</h2>
-              </div>
-              <div className="hidden overflow-x-auto md:block">
-                <table className="min-w-full table-fixed divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="w-20 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Бренд</th>
-                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Номер</th>
-                      <th className="w-64 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Наименование</th>
-                      <th className="w-36 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Поставка</th>
-                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Остаток</th>
-                      <th className="w-20 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Цена, ₽</th>
-                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">К заказу</th>
-                    </tr>
-                  </thead>
-                  {renderPartRows(filteredRosskoParts, 'available', 'available', false)}
-                </table>
-              </div>
-              <div className="space-y-5 md:hidden">
-                {renderPartRows(filteredRosskoParts, 'mobile-available', 'available', true)}
-              </div>
-            </>
+            renderSection('По вашему запросу', filteredRosskoParts, 'available', 'available', 'border-indigo-500')
           )}
 
           {showAnalogs && filteredCrossParts.length > 0 && (
-            <>
-              <div className="my-6 text-lg font-medium">
-                <h2 className="inline-block border-b-4 border-blue-500 pb-2">Аналоги</h2>
-              </div>
-              <div className="hidden overflow-x-auto md:block">
-                <table className="min-w-full table-fixed divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="w-20 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Бренд</th>
-                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Номер</th>
-                      <th className="w-64 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Наименование</th>
-                      <th className="w-36 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Поставка</th>
-                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Остаток</th>
-                      <th className="w-20 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">Цена, ₽</th>
-                      <th className="w-24 px-4 py-2 text-left text-sm font-medium uppercase text-gray-500">К заказу</th>
-                    </tr>
-                  </thead>
-                  {renderPartRows(filteredCrossParts, 'analog', 'analog', false)}
-                </table>
-              </div>
-              <div className="space-y-5 md:hidden">
-                {renderPartRows(filteredCrossParts, 'mobile-analog', 'analog', true)}
-              </div>
-            </>
+            renderSection('Аналоги', filteredCrossParts, 'analog', 'analog', 'border-blue-500')
           )}
         </div>
       </div>

@@ -111,6 +111,11 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
         self.assertEqual(template, "/catalog")
         self.assertEqual(raw, "/catalog")
 
+    def test_normalize_path_keeps_query_in_raw(self):
+        template, raw = normalize_path("/autoparts/new?q=mann%20w712")
+        self.assertEqual(template, "/autoparts/new")
+        self.assertEqual(raw, "/autoparts/new?q=mann%20w712")
+
     def test_ingest_page_view_and_heartbeat_updates_duration(self):
         visitor_id = "visitor-test-001"
         view_id = "view-test-001"

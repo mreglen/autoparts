@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.product import Product as ProductModel
+from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.models.seo_product_url_export import SeoProductUrlExport
 from app.models.seo_sitemap_cache import SeoSitemapCache
+from app.services.new_parts_seo_card_service import build_new_part_card_path
 from app.services.yandex_feed_xml_service import _iter_catalog_products, _resolve_site_origin
 from app.utils.product_urls import build_product_page_url
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
@@ -48,9 +50,17 @@ def count_public_organizations(db: Session) -> int:
     return db.query(OrganizationModel).count()
 
 
+def count_active_new_part_cards(db: Session) -> int:
+    return (
+        db.query(NewPartsSeoCard.id)
+        .filter(NewPartsSeoCard.is_active.is_(True))
+        .count()
+    )
+
+
 def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None) -> list[dict[str, str | int]]:
     site_origin = _resolve_origin(db, preferred_host_url)
-    product_count = count_working_catalog_products(db)
+    product_count = count_working_catalog_products(db) + count_active_new_part_cards(db)
     static_pages_count = 10
 
     return [
@@ -75,11 +85,20 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
         {
             "id": "products",
             "title": "Карточки товаров",
-            "description": "Рабочие карточки товаров в наличии с фото и заполненными полями",
+            "description": "Карточки б/у/новых товаров и SEO-карточки новых запчастей",
             "url": f"{site_origin}/api/feeds/sitemap-products.xml",
             "type": "dynamic",
             "url_count": product_count,
             "location": "backend",
+        },
+        {
+            "id": "admin-analytics",
+            "title": "Админ-страница аналитики",
+            "description": "Маршрут панели администратора для SEO/аналитики",
+            "url": f"{site_origin}/admin/analytics",
+            "type": "admin",
+            "url_count": 1,
+            "location": "frontend",
         },
     ]
 
@@ -354,6 +373,35 @@ def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = 
             [
                 "    <changefreq>weekly</changefreq>",
                 f"    <priority>{priority}</priority>",
+                "  </url>",
+            ]
+        )
+        lines.extend(url_lines)
+        url_count += 1
+
+    new_cards = (
+        db.query(NewPartsSeoCard)
+        .filter(NewPartsSeoCard.is_active.is_(True))
+        .order_by(NewPartsSeoCard.updated_at.desc().nullslast(), NewPartsSeoCard.id.desc())
+        .all()
+    )
+    for card in new_cards:
+        loc = f"{site_origin.rstrip('/')}{build_new_part_card_path(int(card.id), card.brand, card.article)}"
+        lastmod_date = None
+        if card.updated_at is not None:
+            ts = _as_utc_datetime(card.updated_at)
+            if ts is not None:
+                lastmod_date = ts.date().isoformat()
+        url_lines = [
+            "  <url>",
+            f"    <loc>{loc}</loc>",
+        ]
+        if lastmod_date:
+            url_lines.append(f"    <lastmod>{lastmod_date}</lastmod>")
+        url_lines.extend(
+            [
+                "    <changefreq>weekly</changefreq>",
+                "    <priority>0.75</priority>",
                 "  </url>",
             ]
         )
