@@ -239,7 +239,7 @@ export default function AnalyticsPage() {
     setSitemapRebuildBusy(true);
     setError(null);
     try {
-      await apiRequest('/admin/seo/sitemaps/rebuild', { method: 'POST' });
+      await apiRequest('/admin/seo/sitemaps/rebuild?scope=new_parts', { method: 'POST' });
       await loadSitemaps();
     } catch (e) {
       setError(e?.message || 'Ошибка пересборки sitemap');
@@ -660,7 +660,7 @@ export default function AnalyticsPage() {
                 disabled={sitemapRebuildBusy || sitemapLoading}
                 className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
               >
-                {sitemapRebuildBusy ? '…' : 'Пересобрать sitemap'}
+                {sitemapRebuildBusy ? '…' : 'Пересобрать sitemap новых запчастей'}
               </button>
               <button
                 type="button"

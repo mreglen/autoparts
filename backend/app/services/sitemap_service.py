@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Iterable
@@ -11,7 +12,12 @@ from app.models.product import Product as ProductModel
 from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.models.seo_product_url_export import SeoProductUrlExport
 from app.models.seo_sitemap_cache import SeoSitemapCache
-from app.services.new_parts_seo_card_service import build_new_part_card_path
+from app.services.new_parts_seo_card_service import (
+    build_new_part_card_path,
+    count_rossko_new_part_cards_for_sitemap,
+    is_rossko_new_part_sitemap_eligible,
+    iter_rossko_new_part_cards_for_sitemap,
+)
 from app.services.yandex_feed_xml_service import _iter_catalog_products, _resolve_site_origin
 from app.utils.product_urls import build_product_page_url
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
@@ -24,6 +30,8 @@ DEFAULT_PRODUCT_URLS_LIMIT = 150
 PRODUCTS_SITEMAP_CACHE_KEY = "products"
 NEW_PARTS_SITEMAP_CACHE_KEY = "new_parts"
 SITEMAP_CACHE_MAX_AGE_SECONDS = 86400
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -56,11 +64,7 @@ def count_public_organizations(db: Session) -> int:
 
 
 def count_active_new_part_cards(db: Session) -> int:
-    return (
-        db.query(NewPartsSeoCard.id)
-        .filter(NewPartsSeoCard.is_active.is_(True))
-        .count()
-    )
+    return count_rossko_new_part_cards_for_sitemap(db)
 
 
 def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None) -> list[dict[str, str | int]]:
@@ -100,7 +104,7 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
         {
             "id": "new-parts",
             "title": "Новые запчасти (Rossko)",
-            "description": "SEO-карточки раздела /autoparts/new/part/…",
+            "description": "SEO-карточки Rossko из раздела /autoparts/new (только source=rossko с данными API)",
             "url": f"{site_origin}/api/feeds/sitemap-new-parts.xml",
             "type": "dynamic",
             "url_count": new_parts_count,
@@ -405,6 +409,71 @@ def _new_part_card_lastmod(card: NewPartsSeoCard) -> str | None:
     return ts.date().isoformat() if ts is not None else None
 
 
+def _new_part_sitemap_url_block(site_origin: str, card: NewPartsSeoCard) -> tuple[str, str]:
+    loc = f"{site_origin.rstrip('/')}{build_new_part_card_path(int(card.id), card.brand, card.article)}"
+    lastmod_date = _new_part_card_lastmod(card)
+    lines = [
+        "  <url>",
+        f"    <loc>{loc}</loc>",
+    ]
+    if lastmod_date:
+        lines.append(f"    <lastmod>{lastmod_date}</lastmod>")
+    lines.extend(
+        [
+            "    <changefreq>weekly</changefreq>",
+            "    <priority>0.75</priority>",
+            "  </url>",
+        ]
+    )
+    return loc, "\n".join(lines)
+
+
+def append_new_part_card_to_sitemap_cache(
+    db: Session,
+    card: NewPartsSeoCard,
+    *,
+    preferred_host_url: str | None = None,
+) -> bool:
+    """
+    Добавляет URL карточки в кэш sitemap-new-parts без пересборки products.
+    Возвращает True, если URL добавлен или уже был в файле.
+    """
+    if not is_rossko_new_part_sitemap_eligible(card):
+        return False
+
+    site_origin = _resolve_origin(db, preferred_host_url)
+    loc, entry = _new_part_sitemap_url_block(site_origin, card)
+    row = get_new_parts_sitemap_cache_row(db)
+    if row is None or not row.xml_content or "</urlset>" not in row.xml_content:
+        rebuild_new_parts_sitemap_cache(db, preferred_host_url=preferred_host_url)
+        return True
+
+    if loc in row.xml_content:
+        return True
+
+    xml_content = row.xml_content.replace("</urlset>", f"{entry}\n</urlset>", 1)
+    _persist_sitemap_cache(
+        db,
+        cache_key=NEW_PARTS_SITEMAP_CACHE_KEY,
+        xml_content=xml_content,
+        url_count=int(row.url_count or 0) + 1,
+    )
+    return True
+
+
+def try_refresh_new_parts_sitemap_for_card(
+    db: Session,
+    card: NewPartsSeoCard,
+    *,
+    preferred_host_url: str | None = None,
+) -> None:
+    """Обновляет только sitemap-new-parts; ошибки не пробрасываются."""
+    try:
+        append_new_part_card_to_sitemap_cache(db, card, preferred_host_url=preferred_host_url)
+    except Exception:
+        logger.exception("Failed to refresh new parts sitemap for card id=%s", card.id)
+
+
 def build_new_parts_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
     site_origin = _resolve_origin(db, preferred_host_url)
     lines = [
@@ -413,29 +482,9 @@ def build_new_parts_sitemap_xml(db: Session, *, preferred_host_url: str | None =
     ]
     url_count = 0
 
-    new_cards = (
-        db.query(NewPartsSeoCard)
-        .filter(NewPartsSeoCard.is_active.is_(True))
-        .order_by(NewPartsSeoCard.updated_at.desc().nullslast(), NewPartsSeoCard.id.desc())
-        .all()
-    )
-    for card in new_cards:
-        loc = f"{site_origin.rstrip('/')}{build_new_part_card_path(int(card.id), card.brand, card.article)}"
-        lastmod_date = _new_part_card_lastmod(card)
-        url_lines = [
-            "  <url>",
-            f"    <loc>{loc}</loc>",
-        ]
-        if lastmod_date:
-            url_lines.append(f"    <lastmod>{lastmod_date}</lastmod>")
-        url_lines.extend(
-            [
-                "    <changefreq>weekly</changefreq>",
-                "    <priority>0.75</priority>",
-                "  </url>",
-            ]
-        )
-        lines.extend(url_lines)
+    for card in iter_rossko_new_part_cards_for_sitemap(db):
+        _loc, entry = _new_part_sitemap_url_block(site_origin, card)
+        lines.append(entry)
         url_count += 1
 
     lines.append("</urlset>")

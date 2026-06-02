@@ -6,10 +6,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import quote, unquote
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.services.yandex_feed_xml_service import _resolve_site_origin
+
+ROSSKO_NEW_PART_SOURCE = "rossko"
 
 
 @dataclass(frozen=True)
@@ -167,8 +170,48 @@ def _merge_payload(existing_payload: dict, incoming: dict) -> dict:
     return merged
 
 
+def is_rossko_new_part_sitemap_eligible(card: NewPartsSeoCard) -> bool:
+    """
+    Карточка раздела /autoparts/new, созданная из ответа Rossko API
+    (не каталог б/у и не другие источники).
+    """
+    if not card.is_active:
+        return False
+    if _safe_text(card.source).casefold() != ROSSKO_NEW_PART_SOURCE:
+        return False
+    if not _safe_text(card.brand) or not _safe_text(card.article):
+        return False
+    payload = _payload_from_raw(card)
+    stocks = _stocks_from_card(card)
+    if stocks:
+        return True
+    return bool(
+        _safe_text(payload.get("supplier_stock_id"))
+        or _safe_text(payload.get("guid"))
+    )
+
+
+def iter_rossko_new_part_cards_for_sitemap(db: Session):
+    rows = (
+        db.query(NewPartsSeoCard)
+        .filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.source) == ROSSKO_NEW_PART_SOURCE,
+        )
+        .order_by(NewPartsSeoCard.updated_at.desc().nullslast(), NewPartsSeoCard.id.desc())
+        .all()
+    )
+    for card in rows:
+        if is_rossko_new_part_sitemap_eligible(card):
+            yield card
+
+
+def count_rossko_new_part_cards_for_sitemap(db: Session) -> int:
+    return sum(1 for _ in iter_rossko_new_part_cards_for_sitemap(db))
+
+
 def create_or_get_new_part_card(db: Session, payload: dict) -> NewPartsSeoCard:
-    source = _safe_text(payload.get("source"), default="rossko") or "rossko"
+    source = _safe_text(payload.get("source"), default=ROSSKO_NEW_PART_SOURCE) or ROSSKO_NEW_PART_SOURCE
     brand = _safe_text(payload.get("brand"), default="Неизвестный бренд")
     article = _safe_text(payload.get("article"), default="Без артикула")
     stable_key = _stable_key(source, brand, article)

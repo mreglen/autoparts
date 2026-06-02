@@ -13,6 +13,8 @@ from app.services.new_parts_seo_card_service import (
     create_or_get_new_part_card,
     get_new_part_card,
 )
+from app.services.sitemap_service import try_refresh_new_parts_sitemap_for_card
+from app.utils.yandex_integration_db import get_or_create_yandex_integration
 
 router = APIRouter(tags=["Public new parts cards"])
 
@@ -106,6 +108,8 @@ def _card_to_out(card: NewPartsSeoCard) -> NewPartCardOut:
 @router.post("/public/new-parts/cards/create-or-get", response_model=NewPartCardOut)
 def public_create_or_get_new_part_card(payload: NewPartCardCreateIn, db: Session = Depends(get_db)):
     card = create_or_get_new_part_card(db, payload.model_dump())
+    integration = get_or_create_yandex_integration(db)
+    try_refresh_new_parts_sitemap_for_card(db, card, preferred_host_url=integration.host_url)
     return _card_to_out(card)
 
 

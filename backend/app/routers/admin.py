@@ -57,6 +57,8 @@ from app.services.sitemap_service import (
     get_products_sitemap_cache_meta,
     get_site_sitemap_files,
     rebuild_all_sitemaps_cache,
+    rebuild_new_parts_sitemap_cache,
+    rebuild_products_sitemap_cache,
 )
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
 from app.schemas.client import ClientBuyerOrdersResponse, ClientListItemResponse
@@ -1089,26 +1091,40 @@ def list_site_sitemaps(
 
 
 @router.post("/seo/sitemaps/rebuild")
-def rebuild_products_sitemap(
+def rebuild_sitemaps(
+    scope: str = Query(
+        "new_parts",
+        description="new_parts — только Rossko (/autoparts/new); products — каталог; all — оба",
+    ),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
+    normalized_scope = (scope or "new_parts").strip().lower()
+    if normalized_scope not in {"new_parts", "products", "all"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="scope must be one of: new_parts, products, all",
+        )
+
     integration = get_or_create_yandex_integration(db)
-    products_snapshot, new_parts_snapshot = rebuild_all_sitemaps_cache(
-        db,
-        preferred_host_url=integration.host_url,
-    )
-    return {
-        "ok": True,
-        "products": {
+    host = integration.host_url
+    result: dict[str, object] = {"ok": True, "scope": normalized_scope}
+
+    if normalized_scope in {"products", "all"}:
+        products_snapshot = rebuild_products_sitemap_cache(db, preferred_host_url=host)
+        result["products"] = {
             "url_count": products_snapshot.url_count,
             "generated_at": products_snapshot.generated_at.isoformat(),
-        },
-        "new_parts": {
+        }
+
+    if normalized_scope in {"new_parts", "all"}:
+        new_parts_snapshot = rebuild_new_parts_sitemap_cache(db, preferred_host_url=host)
+        result["new_parts"] = {
             "url_count": new_parts_snapshot.url_count,
             "generated_at": new_parts_snapshot.generated_at.isoformat(),
-        },
-    }
+        }
+
+    return result
 
 
 @router.get("/seo/product-card-urls")

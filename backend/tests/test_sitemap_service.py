@@ -1,3 +1,4 @@
+import json
 import unittest
 from datetime import date, datetime, timezone
 from unittest.mock import MagicMock, patch
@@ -6,6 +7,7 @@ from app.services.sitemap_service import (
     NEW_PARTS_SITEMAP_CACHE_KEY,
     PRODUCTS_SITEMAP_CACHE_KEY,
     _product_lastmod_date,
+    append_new_part_card_to_sitemap_cache,
     build_fallback_sitemap_index_xml,
     build_new_parts_sitemap_xml,
     build_products_sitemap_xml,
@@ -95,25 +97,89 @@ class SitemapIndexXmlTests(unittest.TestCase):
         self.assertIn("<lastmod>2026-05-27</lastmod>", xml)
 
 
+class RosskoNewPartSitemapEligibilityTests(unittest.TestCase):
+    def test_requires_rossko_source_and_api_payload(self):
+        from app.services.new_parts_seo_card_service import is_rossko_new_part_sitemap_eligible
+
+        card = MagicMock()
+        card.is_active = True
+        card.source = "rossko"
+        card.brand = "MANN"
+        card.article = "W712"
+        card.raw_payload = json.dumps({"guid": "abc-123", "stocks": []})
+
+        with patch(
+            "app.services.new_parts_seo_card_service._stocks_from_card",
+            return_value=[],
+        ):
+            self.assertTrue(is_rossko_new_part_sitemap_eligible(card))
+
+        card.source = "manual"
+        self.assertFalse(is_rossko_new_part_sitemap_eligible(card))
+
+
 class BuildNewPartsSitemapXmlTests(unittest.TestCase):
     @patch("app.services.sitemap_service._resolve_origin", return_value="https://svoygarage.ru")
     @patch("app.services.sitemap_service.build_new_part_card_path", return_value="/autoparts/new/part/5-mann-w712")
-    def test_includes_active_cards(self, _path, _origin):
+    @patch(
+        "app.services.sitemap_service.iter_rossko_new_part_cards_for_sitemap",
+    )
+    def test_includes_rossko_cards(self, mock_iter, _path, _origin):
         card = MagicMock()
         card.id = 5
         card.brand = "MANN"
         card.article = "W712"
         card.updated_at = datetime(2026, 5, 20, tzinfo=timezone.utc)
-        card.is_active = True
+        mock_iter.return_value = [card]
 
-        db = MagicMock()
-        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [card]
-
-        xml, url_count = build_new_parts_sitemap_xml(db)
+        xml, url_count = build_new_parts_sitemap_xml(MagicMock())
 
         self.assertEqual(url_count, 1)
         self.assertIn("https://svoygarage.ru/autoparts/new/part/5-mann-w712", xml)
         self.assertIn("<lastmod>2026-05-20</lastmod>", xml)
+
+
+class AppendNewPartSitemapCacheTests(unittest.TestCase):
+    @patch("app.services.sitemap_service.is_rossko_new_part_sitemap_eligible", return_value=True)
+    @patch("app.services.sitemap_service._resolve_origin", return_value="https://svoygarage.ru")
+    @patch("app.services.sitemap_service.build_new_part_card_path", return_value="/autoparts/new/part/9-mann-w712")
+    @patch("app.services.sitemap_service.rebuild_new_parts_sitemap_cache")
+    @patch("app.services.sitemap_service.get_new_parts_sitemap_cache_row")
+    @patch("app.services.sitemap_service._persist_sitemap_cache")
+    def test_appends_url_without_touching_products_cache(
+        self,
+        mock_persist,
+        mock_get_row,
+        mock_rebuild,
+        _path,
+        _origin,
+        _eligible,
+    ):
+        card = MagicMock()
+        card.id = 9
+        card.brand = "MANN"
+        card.article = "W712"
+        card.updated_at = datetime(2026, 6, 2, tzinfo=timezone.utc)
+
+        row = MagicMock()
+        row.xml_content = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            "</urlset>\n"
+        )
+        row.url_count = 0
+        mock_get_row.return_value = row
+
+        db = MagicMock()
+        added = append_new_part_card_to_sitemap_cache(db, card)
+
+        self.assertTrue(added)
+        mock_rebuild.assert_not_called()
+        mock_persist.assert_called_once()
+        persist_kwargs = mock_persist.call_args.kwargs
+        self.assertEqual(persist_kwargs["cache_key"], NEW_PARTS_SITEMAP_CACHE_KEY)
+        self.assertIn("https://svoygarage.ru/autoparts/new/part/9-mann-w712", persist_kwargs["xml_content"])
+        self.assertNotIn("/part/211-", persist_kwargs["xml_content"])
 
 
 class SitemapCacheTests(unittest.TestCase):
