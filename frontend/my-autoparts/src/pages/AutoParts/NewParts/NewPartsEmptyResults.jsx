@@ -1,10 +1,23 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { QUICK_SEARCH_CHIPS } from './rosskoHelpers';
 import UsedPartsSearchCount from './UsedPartsSearchCount';
+import { fetchPopularNewPartQueries } from './popularQueriesApi';
 
-const NewPartsEmptyResults = ({ query, onSearch }) => (
-  <div className="mt-12 sm:mt-16 flex flex-col items-center text-center max-w-2xl mx-auto px-4">
+const NewPartsEmptyResults = ({ query, onSearch }) => {
+  const [popularQueries, setPopularQueries] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    fetchPopularNewPartQueries(5).then((items) => {
+      if (active) setPopularQueries(items);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return (
+    <div className="mt-12 sm:mt-16 flex flex-col items-center text-center max-w-2xl mx-auto px-4">
     <div className="bg-gray-100 p-6 rounded-full mb-8">
       <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 sm:h-12 sm:w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -19,7 +32,7 @@ const NewPartsEmptyResults = ({ query, onSearch }) => (
     </p>
     <UsedPartsSearchCount query={query} variant="block" />
     <div className="flex flex-wrap gap-2 justify-center mt-6">
-      {QUICK_SEARCH_CHIPS.slice(0, 5).map((chip) => (
+      {popularQueries.map((chip) => (
         <button
           key={chip}
           type="button"
@@ -36,7 +49,8 @@ const NewPartsEmptyResults = ({ query, onSearch }) => (
     >
       Посмотреть б/у запчасти →
     </Link>
-  </div>
-);
+    </div>
+  );
+};
 
 export default NewPartsEmptyResults;

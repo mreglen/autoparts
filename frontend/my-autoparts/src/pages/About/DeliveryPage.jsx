@@ -9,6 +9,7 @@ import {
   findPickupDeliveryOption,
   findPvzDeliveryOption,
 } from '../../utils/newPartsCheckoutDelivery';
+import { buildDeliverySeo, PageSeoHelmet } from '../../utils/pageSeo';
 
 function formatMoney(value) {
   const num = Number(value);
@@ -87,6 +88,7 @@ function YandexDeliveryMatrixTable({ rows }) {
 }
 
 export default function DeliveryPage() {
+  const seo = buildDeliverySeo();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -117,6 +119,7 @@ export default function DeliveryPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 pb-12">
+      <PageSeoHelmet seo={seo} />
       <header className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Доставка</h1>
         <p className="mt-3 text-gray-600 leading-relaxed">

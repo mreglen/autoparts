@@ -1,10 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { QUICK_SEARCH_CHIPS } from './rosskoHelpers';
+import { fetchPopularNewPartQueries } from './popularQueriesApi';
 
 const NewPartsLanding = ({ onSearch }) => {
   const [term, setTerm] = useState('');
   const [searching, setSearching] = useState(false);
+  const [popularQueries, setPopularQueries] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    fetchPopularNewPartQueries(8).then((items) => {
+      if (active) setPopularQueries(items);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const runSearch = async (query) => {
     const trimmed = (query || term).trim();
@@ -50,7 +61,7 @@ const NewPartsLanding = ({ onSearch }) => {
       <section className="mb-8">
         <p className="text-sm font-medium text-gray-700 mb-2">Популярные запросы</p>
         <div className="flex flex-wrap gap-2">
-          {QUICK_SEARCH_CHIPS.map((chip) => (
+          {popularQueries.map((chip) => (
             <button
               key={chip}
               type="button"

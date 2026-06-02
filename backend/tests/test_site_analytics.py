@@ -17,6 +17,7 @@ from app.services.site_analytics_service import (
     get_forms,
     get_page_detail,
     get_pages,
+    get_popular_new_part_queries,
     get_product_cards,
     get_summary,
     ingest_events,
@@ -256,6 +257,45 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
         self.assertEqual(catalog_row.views, 2)
         part_row = next(row for row in pages.items if row.path_template == "/part/:productId")
         self.assertEqual(part_row.views, 1)
+
+    def test_popular_new_part_queries_aggregates_and_filters_noise(self):
+        ingest_events(
+            self.db,
+            [
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id="v-a",
+                    path="/autoparts/new?q=KRAFT%20KT%20100529",
+                    view_id="q1",
+                ),
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id="v-b",
+                    path="/autoparts/new?q=KRAFT%20KT%20100529",
+                    view_id="q2",
+                ),
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id="v-c",
+                    path="/autoparts/new?q=масляный%20фильтр",
+                    view_id="q3",
+                ),
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id="v-d",
+                    path="/autoparts/new?q=запчасти",
+                    view_id="q4",
+                ),
+            ],
+            user_id=None,
+        )
+
+        items, generated_at = get_popular_new_part_queries(self.db, limit=8, days=30)
+        self.assertGreaterEqual(len(items), 2)
+        self.assertEqual(items[0], "KRAFT KT 100529")
+        self.assertIn("масляный фильтр", items)
+        self.assertNotIn("запчасти", [item.lower() for item in items])
+        self.assertIsNotNone(generated_at)
 
 
 class SiteAnalyticsAdminAccessTests(unittest.TestCase):

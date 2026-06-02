@@ -31,6 +31,29 @@ def _format_price_rub(price: float | int | str | None) -> str | None:
     return f"{amount:,.2f}".replace(",", " ")
 
 
+def _merge_content_snippet(
+    *,
+    short_name: str | None,
+    unique_description: str | None,
+    max_len: int = 120,
+) -> str:
+    short = re.sub(r"\s+", " ", (short_name or "")).strip()
+    unique = re.sub(r"\s+", " ", (unique_description or "")).strip()
+
+    parts: list[str] = []
+    if short:
+        parts.append(short)
+    if unique and unique.casefold() not in short.casefold():
+        parts.append(unique)
+
+    if not parts:
+        return ""
+    merged = ". ".join(parts)
+    if len(merged) <= max_len:
+        return merged
+    return _truncate(merged, max_len)
+
+
 def build_product_search_title(
     *,
     brand: str | None,
@@ -71,9 +94,10 @@ def build_product_search_description(
     article_str = (article or "").strip()
     condition = "Новая" if is_new else "Б/у"
     city_prep = format_city_in_prepositional(city or DEFAULT_CITY)
-    unique_desc = re.sub(r"\s+", " ", (unique_description or "")).strip()
-    short = (short_name or "").strip()
-    snippet_source = unique_desc or short
+    snippet_source = _merge_content_snippet(
+        short_name=short_name,
+        unique_description=unique_description,
+    )
 
     if brand_str and article_str:
         buy_line = f"Купить {brand_str} {article_str}."

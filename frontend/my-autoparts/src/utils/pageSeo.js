@@ -37,10 +37,23 @@ export function buildCatalogSeo() {
 
 export function buildNewPartsSeo(searchParams) {
   const q = (searchParams?.get('q') || '').trim();
+  const brands = searchParams?.getAll('brand') || [];
+  const inStock = searchParams?.get('in_stock') === '1';
+  const titleSuffixParts = [];
+  if (brands.length > 0) {
+    titleSuffixParts.push(`бренд: ${brands.slice(0, 2).join(', ')}`);
+  }
+  if (inStock) {
+    titleSuffixParts.push('в наличии');
+  }
+  const titleSuffix = titleSuffixParts.length ? ` (${titleSuffixParts.join('; ')})` : '';
   if (q) {
-    const params = new URLSearchParams({ q });
+    const params = new URLSearchParams();
+    params.set('q', q);
+    brands.forEach((b) => params.append('brand', b));
+    if (inStock) params.set('in_stock', '1');
     return {
-      title: `${q} — новые запчасти | Свой Гараж`,
+      title: `${q}${titleSuffix} — новые запчасти | Свой Гараж`,
       description: truncate(
         `Результаты поиска новых автозапчастей по запросу «${q}»: оригиналы и аналоги с доставкой по России.`,
         160
@@ -60,10 +73,14 @@ export function buildNewPartsSeo(searchParams) {
 
 export function buildUsedPartsSeo(searchParams) {
   const q = (searchParams?.get('q') || '').trim();
+  const brands = searchParams?.getAll('brand') || [];
+  const titleSuffix = brands.length ? ` (бренд: ${brands.slice(0, 2).join(', ')})` : '';
   if (q) {
-    const params = new URLSearchParams({ q });
+    const params = new URLSearchParams();
+    params.set('q', q);
+    brands.forEach((b) => params.append('brand', b));
     return {
-      title: `${q} — б/у запчасти | Свой Гараж`,
+      title: `${q}${titleSuffix} — б/у запчасти | Свой Гараж`,
       description: truncate(
         `Результаты поиска б/у автозапчастей по запросу «${q}»: фото, описание и чат с продавцом.`,
         160
@@ -94,6 +111,16 @@ export function buildAboutSeo() {
     description:
       'ООО «Кроан» — оператор маркетплейса «Свой Гараж» в Екатеринбурге. Автозапчасти новые и б/у, доставка по России.',
     canonicalUrl: absoluteUrl('/about'),
+    robots: 'index, follow',
+  };
+}
+
+export function buildDeliverySeo() {
+  return {
+    title: 'Доставка автозапчастей — условия и регионы | Свой Гараж',
+    description:
+      'Условия доставки «Свой Гараж»: самовывоз и ПВЗ, регионы доставки, минимальная сумма и службы доставки.',
+    canonicalUrl: absoluteUrl('/delivery'),
     robots: 'index, follow',
   };
 }

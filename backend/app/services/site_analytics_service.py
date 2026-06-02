@@ -4,6 +4,7 @@ import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from typing import Iterable, Optional
+from urllib.parse import parse_qs
 
 from fastapi import HTTPException, status
 from sqlalchemy import bindparam, func, text
@@ -59,6 +60,25 @@ PATH_NORMALIZATION_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^/moderation/products/[^/]+$"), "/moderation/products/:organizationId"),
 ]
 
+AUTOPARTS_NEW_PATH_TEMPLATE = "/autoparts/new"
+POPULAR_NEW_QUERIES_DEFAULT_DAYS = 30
+POPULAR_NEW_QUERIES_MAX_LIMIT = 20
+POPULAR_QUERY_STOPLIST = frozenset(
+    {
+        "запчасти",
+        "автозапчасти",
+        "новые запчасти",
+        "новая запчасть",
+        "купить запчасти",
+        "каталог",
+    }
+)
+_POPULAR_NEW_QUERIES_CACHE: dict[str, object] = {
+    "date": None,
+    "days": None,
+    "items": [],
+}
+
 
 def extract_product_id_from_path(path: str) -> Optional[int]:
     raw = (path or "").split("?")[0].strip()
@@ -94,6 +114,28 @@ def _period_start(days: int) -> datetime:
 def _today_start() -> datetime:
     now = _utcnow()
     return datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+
+
+def _normalize_popular_query(value: str | None) -> str | None:
+    text = re.sub(r"\s+", " ", (value or "")).strip()
+    if not text:
+        return None
+    text = text[:60].strip()
+    low = text.casefold()
+    if low in POPULAR_QUERY_STOPLIST:
+        return None
+    if len(text) < 3 and not any(ch.isdigit() for ch in text):
+        return None
+    return text
+
+
+def _extract_q_from_path_raw(path_raw: str | None) -> str | None:
+    raw = str(path_raw or "").strip()
+    if "?" not in raw:
+        return None
+    query_string = raw.split("?", 1)[1]
+    q_value = parse_qs(query_string).get("q", [None])[0]
+    return _normalize_popular_query(q_value)
 
 
 def _sanitize_field_name(field_name: Optional[str]) -> Optional[str]:
@@ -590,6 +632,66 @@ def get_product_cards(db: Session, days: int, limit: int = 100) -> AnalyticsProd
         unique_cards=len(items),
         items=items,
     )
+
+
+def get_popular_new_part_queries(
+    db: Session,
+    *,
+    days: int = POPULAR_NEW_QUERIES_DEFAULT_DAYS,
+    limit: int = 8,
+) -> tuple[list[str], datetime]:
+    validate_days(days)
+    safe_limit = max(1, min(int(limit), POPULAR_NEW_QUERIES_MAX_LIMIT))
+    today = _utcnow().date()
+
+    cache_date = _POPULAR_NEW_QUERIES_CACHE.get("date")
+    cache_days = _POPULAR_NEW_QUERIES_CACHE.get("days")
+    cache_items = _POPULAR_NEW_QUERIES_CACHE.get("items")
+    if cache_date == today and cache_days == days and isinstance(cache_items, list):
+        return cache_items[:safe_limit], datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+
+    since = _period_start(days)
+    rows = (
+        db.query(SiteAnalyticsPageView.path_raw, SiteAnalyticsSession.visitor_id)
+        .join(
+            SiteAnalyticsSession,
+            SiteAnalyticsSession.id == SiteAnalyticsPageView.session_id,
+        )
+        .filter(
+            SiteAnalyticsPageView.path_template == AUTOPARTS_NEW_PATH_TEMPLATE,
+            SiteAnalyticsPageView.entered_at >= since,
+        )
+        .all()
+    )
+
+    aggregated: dict[str, dict[str, object]] = {}
+    for path_raw, visitor_id in rows:
+        query = _extract_q_from_path_raw(path_raw)
+        if not query:
+            continue
+        bucket = aggregated.setdefault(query, {"views": 0, "visitors": set()})
+        bucket["views"] = int(bucket["views"]) + 1
+        if visitor_id:
+            visitors = bucket["visitors"]
+            if isinstance(visitors, set):
+                visitors.add(str(visitor_id))
+
+    ranked = sorted(
+        aggregated.items(),
+        key=lambda item: (
+            len(item[1]["visitors"]) if isinstance(item[1]["visitors"], set) else 0,
+            int(item[1]["views"]),
+            item[0],
+        ),
+        reverse=True,
+    )
+    items = [query for query, _meta in ranked[:POPULAR_NEW_QUERIES_MAX_LIMIT]]
+
+    _POPULAR_NEW_QUERIES_CACHE["date"] = today
+    _POPULAR_NEW_QUERIES_CACHE["days"] = days
+    _POPULAR_NEW_QUERIES_CACHE["items"] = items
+
+    return items[:safe_limit], datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
 
 
 def validate_days(days: int) -> int:
