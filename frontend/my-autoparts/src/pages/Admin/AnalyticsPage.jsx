@@ -660,7 +660,7 @@ export default function AnalyticsPage() {
                 disabled={sitemapRebuildBusy || sitemapLoading}
                 className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
               >
-                {sitemapRebuildBusy ? '…' : 'Пересобрать sitemap товаров'}
+                {sitemapRebuildBusy ? '…' : 'Пересобрать sitemap'}
               </button>
               <button
                 type="button"
@@ -673,19 +673,39 @@ export default function AnalyticsPage() {
             </div>
           }
         >
-          {sitemapData?.products_cache && (
-            <div className="border-b border-gray-100 bg-indigo-50/40 px-4 py-3 text-sm text-gray-700">
-              <span className="font-medium">Кэш sitemap товаров:</span>{' '}
-              {formatNumber(sitemapData.products_cache.url_count)} URL, пересборка{' '}
-              {formatDateTime(sitemapData.products_cache.generated_at)}
-              {sitemapData.products_cache.is_stale ? (
-                <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                  устарел (&gt;24 ч)
-                </span>
-              ) : (
-                <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-                  актуален
-                </span>
+          {(sitemapData?.products_cache || sitemapData?.new_parts_cache) && (
+            <div className="border-b border-gray-100 bg-indigo-50/40 px-4 py-3 text-sm text-gray-700 space-y-2">
+              {sitemapData?.products_cache && (
+                <p>
+                  <span className="font-medium">Кэш sitemap товаров:</span>{' '}
+                  {formatNumber(sitemapData.products_cache.url_count)} URL, пересборка{' '}
+                  {formatDateTime(sitemapData.products_cache.generated_at)}
+                  {sitemapData.products_cache.is_stale ? (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      устарел (&gt;24 ч)
+                    </span>
+                  ) : (
+                    <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                      актуален
+                    </span>
+                  )}
+                </p>
+              )}
+              {sitemapData?.new_parts_cache && (
+                <p>
+                  <span className="font-medium">Кэш sitemap новых запчастей:</span>{' '}
+                  {formatNumber(sitemapData.new_parts_cache.url_count)} URL, пересборка{' '}
+                  {formatDateTime(sitemapData.new_parts_cache.generated_at)}
+                  {sitemapData.new_parts_cache.is_stale ? (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      устарел (&gt;24 ч)
+                    </span>
+                  ) : (
+                    <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                      актуален
+                    </span>
+                  )}
+                </p>
               )}
             </div>
           )}

@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchPopularNewPartQueries, getDefaultPopularNewPartQueries } from './popularQueriesApi';
+import { fetchPopularNewPartQueries } from './popularQueriesApi';
 
 const NewPartsLanding = ({ onSearch }) => {
   const [term, setTerm] = useState('');
   const [searching, setSearching] = useState(false);
-  const [popularQueries, setPopularQueries] = useState(() => getDefaultPopularNewPartQueries(8));
+  const [popularQueries, setPopularQueries] = useState([]);
   const [popularLoading, setPopularLoading] = useState(true);
 
   useEffect(() => {
@@ -71,16 +71,20 @@ const NewPartsLanding = ({ onSearch }) => {
           {popularLoading && <span className="ml-2 text-xs font-normal text-gray-400">обновление…</span>}
         </p>
         <div className="flex flex-wrap gap-2">
-          {popularQueries.map((chip) => (
-            <button
-              key={chip}
-              type="button"
-              onClick={() => runSearch(chip)}
-              className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-indigo-50 hover:text-indigo-700 rounded-full border border-gray-200"
-            >
-              {chip}
-            </button>
-          ))}
+          {popularLoading && popularQueries.length === 0 ? (
+            <span className="text-sm text-gray-400">загрузка…</span>
+          ) : (
+            popularQueries.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                onClick={() => runSearch(chip)}
+                className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-indigo-50 hover:text-indigo-700 rounded-full border border-gray-200"
+              >
+                {chip}
+              </button>
+            ))
+          )}
         </div>
       </section>
 

@@ -3,13 +3,16 @@ from datetime import date, datetime, timezone
 from unittest.mock import MagicMock, patch
 
 from app.services.sitemap_service import (
+    NEW_PARTS_SITEMAP_CACHE_KEY,
     PRODUCTS_SITEMAP_CACHE_KEY,
     _product_lastmod_date,
     build_fallback_sitemap_index_xml,
+    build_new_parts_sitemap_xml,
     build_products_sitemap_xml,
     build_sitemap_index_xml,
     get_products_sitemap_snapshot,
     is_sitemap_cache_stale,
+    rebuild_new_parts_sitemap_cache,
     rebuild_products_sitemap_cache,
 )
 
@@ -74,18 +77,43 @@ class SitemapIndexXmlTests(unittest.TestCase):
         self.assertNotIn("sitemap-products", xml)
 
     def test_index_uses_products_generated_at_and_pages_config(self):
-        generated_at = datetime(2026, 5, 28, 3, 0, tzinfo=timezone.utc)
+        products_at = datetime(2026, 5, 28, 3, 0, tzinfo=timezone.utc)
+        new_parts_at = datetime(2026, 5, 27, 12, 0, tzinfo=timezone.utc)
         with patch("app.services.sitemap_service.settings") as mock_settings:
             mock_settings.SITEMAP_PAGES_LASTMOD = "2026-05-23"
             xml = build_sitemap_index_xml(
                 "https://svoygarage.ru",
-                products_generated_at=generated_at,
+                products_generated_at=products_at,
+                new_parts_generated_at=new_parts_at,
             )
 
         self.assertIn("<loc>https://svoygarage.ru/sitemap-pages.xml</loc>", xml)
         self.assertIn("<lastmod>2026-05-23</lastmod>", xml)
         self.assertIn("<loc>https://svoygarage.ru/api/feeds/sitemap-products.xml</loc>", xml)
         self.assertIn("<lastmod>2026-05-28</lastmod>", xml)
+        self.assertIn("<loc>https://svoygarage.ru/api/feeds/sitemap-new-parts.xml</loc>", xml)
+        self.assertIn("<lastmod>2026-05-27</lastmod>", xml)
+
+
+class BuildNewPartsSitemapXmlTests(unittest.TestCase):
+    @patch("app.services.sitemap_service._resolve_origin", return_value="https://svoygarage.ru")
+    @patch("app.services.sitemap_service.build_new_part_card_path", return_value="/autoparts/new/part/5-mann-w712")
+    def test_includes_active_cards(self, _path, _origin):
+        card = MagicMock()
+        card.id = 5
+        card.brand = "MANN"
+        card.article = "W712"
+        card.updated_at = datetime(2026, 5, 20, tzinfo=timezone.utc)
+        card.is_active = True
+
+        db = MagicMock()
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [card]
+
+        xml, url_count = build_new_parts_sitemap_xml(db)
+
+        self.assertEqual(url_count, 1)
+        self.assertIn("https://svoygarage.ru/autoparts/new/part/5-mann-w712", xml)
+        self.assertIn("<lastmod>2026-05-20</lastmod>", xml)
 
 
 class SitemapCacheTests(unittest.TestCase):
@@ -129,6 +157,21 @@ class SitemapCacheTests(unittest.TestCase):
 
         mock_rebuild.assert_called_once_with(db, preferred_host_url=None)
         self.assertEqual(snapshot.url_count, 1)
+
+    @patch("app.services.sitemap_service.SeoSitemapCache")
+    @patch("app.services.sitemap_service.build_new_parts_sitemap_xml")
+    def test_rebuild_new_parts_sitemap_cache_persists_row(self, mock_build, mock_cache_cls):
+        mock_build.return_value = ("<urlset></urlset>", 2)
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = None
+        row = MagicMock(cache_key=NEW_PARTS_SITEMAP_CACHE_KEY, xml_content="<urlset></urlset>", url_count=2)
+        row.generated_at = datetime.now(timezone.utc)
+        mock_cache_cls.return_value = row
+
+        snapshot = rebuild_new_parts_sitemap_cache(db)
+
+        self.assertEqual(snapshot.url_count, 2)
+        self.assertEqual(mock_cache_cls.call_args.kwargs["cache_key"], NEW_PARTS_SITEMAP_CACHE_KEY)
 
 
 if __name__ == "__main__":

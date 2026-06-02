@@ -28,6 +28,7 @@ export async function fetchPopularNewPartQueries(limit = FALLBACK_LIMIT) {
       params: { limit },
     });
     const fromApi = normalizeQueries(response?.data?.items || []);
+    if (!fromApi.length) return fallback;
     if (fromApi.length >= limit) return fromApi.slice(0, limit);
     return normalizeQueries([...fromApi, ...fallback]).slice(0, limit);
   } catch (_e) {

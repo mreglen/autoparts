@@ -13,6 +13,7 @@ from app.models.site_analytics import (
 )
 from app.schemas.site_analytics import AnalyticsEventIn
 from app.services.site_analytics_service import (
+    clear_popular_new_part_queries_cache,
     extract_product_id_from_path,
     get_forms,
     get_page_detail,
@@ -264,32 +265,33 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
         self.assertEqual(part_row.views, 1)
 
     def test_popular_new_part_queries_aggregates_and_filters_noise(self):
+        clear_popular_new_part_queries_cache()
         ingest_events(
             self.db,
             [
                 AnalyticsEventIn(
                     type="page_view",
-                    visitor_id="v-a",
+                    visitor_id="visitor-a",
                     path="/autoparts/new?q=KRAFT%20KT%20100529",
-                    view_id="q1",
+                    view_id="view-pop-01",
                 ),
                 AnalyticsEventIn(
                     type="page_view",
-                    visitor_id="v-b",
-                    path="/autoparts/new?q=KRAFT%20KT%20100529",
-                    view_id="q2",
+                    visitor_id="visitor-b",
+                    path="/autoparts/new?q=kraft%20kt%20100529",
+                    view_id="view-pop-02",
                 ),
                 AnalyticsEventIn(
                     type="page_view",
-                    visitor_id="v-c",
+                    visitor_id="visitor-c",
                     path="/autoparts/new?q=масляный%20фильтр",
-                    view_id="q3",
+                    view_id="view-pop-03",
                 ),
                 AnalyticsEventIn(
                     type="page_view",
-                    visitor_id="v-d",
+                    visitor_id="visitor-d",
                     path="/autoparts/new?q=запчасти",
-                    view_id="q4",
+                    view_id="view-pop-04",
                 ),
             ],
             user_id=None,

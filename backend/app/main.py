@@ -310,25 +310,30 @@ async def run_cleanup_expired_guest_carts():
 
 async def run_rebuild_products_sitemap_cache():
     try:
-        from app.services.sitemap_service import rebuild_products_sitemap_cache
+        from app.services.sitemap_service import rebuild_all_sitemaps_cache
 
         db_gen = get_db()
         db = next(db_gen)
         try:
             integration = get_or_create_yandex_integration(db)
-            snapshot = rebuild_products_sitemap_cache(
+            products_snapshot, new_parts_snapshot = rebuild_all_sitemaps_cache(
                 db,
                 preferred_host_url=integration.host_url,
             )
             logger.info(
                 "Products sitemap cache rebuilt: url_count=%s generated_at=%s",
-                snapshot.url_count,
-                snapshot.generated_at.isoformat(),
+                products_snapshot.url_count,
+                products_snapshot.generated_at.isoformat(),
+            )
+            logger.info(
+                "New parts sitemap cache rebuilt: url_count=%s generated_at=%s",
+                new_parts_snapshot.url_count,
+                new_parts_snapshot.generated_at.isoformat(),
             )
         finally:
             db.close()
     except Exception as e:
-        logger.error("Ошибка при пересборке кэша sitemap товаров: %s", e)
+        logger.error("Ошибка при пересборке кэша sitemap: %s", e)
 
 
 async def run_yandex_feed_scheduler_tick():

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import UsedPartsSearchCount from './UsedPartsSearchCount';
-import { fetchPopularNewPartQueries, getDefaultPopularNewPartQueries } from './popularQueriesApi';
+import { fetchPopularNewPartQueries } from './popularQueriesApi';
 
 const toSafeText = (value, fallback = '') => {
   if (typeof value === 'string') return value.trim() || fallback;
@@ -16,14 +16,20 @@ const toSafeText = (value, fallback = '') => {
 };
 
 const NewPartsEmptyResults = ({ query, onSearch }) => {
-  const [popularQueries, setPopularQueries] = useState(() => getDefaultPopularNewPartQueries(5));
+  const [popularQueries, setPopularQueries] = useState([]);
+  const [popularLoading, setPopularLoading] = useState(true);
   const safeQuery = toSafeText(query, '');
 
   useEffect(() => {
     let active = true;
-    fetchPopularNewPartQueries(5).then((items) => {
-      if (active) setPopularQueries(items);
-    });
+    setPopularLoading(true);
+    fetchPopularNewPartQueries(5)
+      .then((items) => {
+        if (active) setPopularQueries(items);
+      })
+      .finally(() => {
+        if (active) setPopularLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -45,16 +51,20 @@ const NewPartsEmptyResults = ({ query, onSearch }) => {
     </p>
     <UsedPartsSearchCount query={safeQuery} variant="block" />
     <div className="flex flex-wrap gap-2 justify-center mt-6">
-      {popularQueries.map((chip) => (
-        <button
-          key={chip}
-          type="button"
-          onClick={() => onSearch(chip)}
-          className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-indigo-50 rounded-full border border-gray-200"
-        >
-          {chip}
-        </button>
-      ))}
+      {popularLoading && popularQueries.length === 0 ? (
+        <span className="text-sm text-gray-400">загрузка…</span>
+      ) : (
+        popularQueries.map((chip) => (
+          <button
+            key={chip}
+            type="button"
+            onClick={() => onSearch(chip)}
+            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-indigo-50 rounded-full border border-gray-200"
+          >
+            {chip}
+          </button>
+        ))
+      )}
     </div>
     <Link
       to="/autoparts/used"

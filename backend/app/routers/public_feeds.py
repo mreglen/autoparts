@@ -10,7 +10,9 @@ from app.services.yandex_feed_xml_service import generate_used_yml_feed
 from app.services.sitemap_service import (
     build_fallback_sitemap_index_xml,
     build_sitemap_index_xml,
+    get_new_parts_sitemap_snapshot,
     get_products_sitemap_snapshot,
+    latest_sitemap_generated_at,
 )
 from app.services.yandex_feed_xml_service import _resolve_site_origin
 
@@ -62,18 +64,40 @@ def public_products_sitemap(db: Session = Depends(get_db)):
         return _xml_response(xml)
 
 
+@router.get("/sitemap-new-parts.xml")
+def public_new_parts_sitemap(db: Session = Depends(get_db)):
+    try:
+        row = get_or_create_yandex_integration(db)
+        snapshot = get_new_parts_sitemap_snapshot(db, preferred_host_url=row.host_url)
+        return _xml_response(snapshot.xml_content, last_modified=snapshot.generated_at)
+    except Exception as exc:
+        logger.exception("Failed to serve new parts sitemap: %s", exc)
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            "</urlset>\n"
+        )
+        return _xml_response(xml)
+
+
 @router.get("/sitemap.xml")
 def public_sitemap_index(db: Session = Depends(get_db)):
     site_origin = _resolve_site_origin(None)
     try:
         row = get_or_create_yandex_integration(db)
         site_origin = _resolve_site_origin(row.host_url)
-        snapshot = get_products_sitemap_snapshot(db, preferred_host_url=row.host_url)
+        products_snapshot = get_products_sitemap_snapshot(db, preferred_host_url=row.host_url)
+        new_parts_snapshot = get_new_parts_sitemap_snapshot(db, preferred_host_url=row.host_url)
         xml = build_sitemap_index_xml(
             site_origin,
-            products_generated_at=snapshot.generated_at,
+            products_generated_at=products_snapshot.generated_at,
+            new_parts_generated_at=new_parts_snapshot.generated_at,
         )
-        return _xml_response(xml, last_modified=snapshot.generated_at)
+        last_modified = latest_sitemap_generated_at(
+            products_snapshot.generated_at,
+            new_parts_snapshot.generated_at,
+        )
+        return _xml_response(xml, last_modified=last_modified)
     except Exception as exc:
         logger.exception("Failed to serve sitemap index, returning fallback: %s", exc)
         xml = build_fallback_sitemap_index_xml(site_origin)

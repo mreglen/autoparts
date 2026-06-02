@@ -81,6 +81,12 @@ _POPULAR_NEW_QUERIES_CACHE: dict[str, object] = {
 }
 
 
+def clear_popular_new_part_queries_cache() -> None:
+    _POPULAR_NEW_QUERIES_CACHE["date"] = None
+    _POPULAR_NEW_QUERIES_CACHE["days"] = None
+    _POPULAR_NEW_QUERIES_CACHE["items"] = []
+
+
 def extract_product_id_from_path(path: str) -> Optional[int]:
     raw = (path or "").split("?")[0].strip()
     match = PRODUCT_CARD_PATH_RE.match(raw)
@@ -649,7 +655,12 @@ def get_popular_new_part_queries(
     cache_date = _POPULAR_NEW_QUERIES_CACHE.get("date")
     cache_days = _POPULAR_NEW_QUERIES_CACHE.get("days")
     cache_items = _POPULAR_NEW_QUERIES_CACHE.get("items")
-    if cache_date == today and cache_days == days and isinstance(cache_items, list):
+    if (
+        cache_date == today
+        and cache_days == days
+        and isinstance(cache_items, list)
+        and cache_items
+    ):
         return cache_items[:safe_limit], datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
 
     since = _period_start(days)
@@ -671,27 +682,52 @@ def get_popular_new_part_queries(
         query = _extract_q_from_path_raw(path_raw)
         if not query:
             continue
-        bucket = aggregated.setdefault(query, {"views": 0, "visitors": set()})
+        key = query.casefold()
+        bucket = aggregated.setdefault(
+            key,
+            {"views": 0, "visitors": set(), "labels": defaultdict(int)},
+        )
         bucket["views"] = int(bucket["views"]) + 1
+        labels = bucket["labels"]
+        if isinstance(labels, defaultdict):
+            labels[query] += 1
         if visitor_id:
             visitors = bucket["visitors"]
             if isinstance(visitors, set):
                 visitors.add(str(visitor_id))
+
+    def _display_label(meta: dict[str, object]) -> str:
+        labels = meta.get("labels")
+        if isinstance(labels, defaultdict) and labels:
+            return max(
+                labels.items(),
+                key=lambda item: (
+                    item[1],
+                    any(ch.isupper() for ch in item[0]),
+                    len(item[0]),
+                ),
+            )[0]
+        return ""
 
     ranked = sorted(
         aggregated.items(),
         key=lambda item: (
             len(item[1]["visitors"]) if isinstance(item[1]["visitors"], set) else 0,
             int(item[1]["views"]),
-            item[0],
+            _display_label(item[1]),
         ),
         reverse=True,
     )
-    items = [query for query, _meta in ranked[:POPULAR_NEW_QUERIES_MAX_LIMIT]]
+    items = [
+        _display_label(meta)
+        for _key, meta in ranked[:POPULAR_NEW_QUERIES_MAX_LIMIT]
+        if _display_label(meta)
+    ]
 
-    _POPULAR_NEW_QUERIES_CACHE["date"] = today
-    _POPULAR_NEW_QUERIES_CACHE["days"] = days
-    _POPULAR_NEW_QUERIES_CACHE["items"] = items
+    if items:
+        _POPULAR_NEW_QUERIES_CACHE["date"] = today
+        _POPULAR_NEW_QUERIES_CACHE["days"] = days
+        _POPULAR_NEW_QUERIES_CACHE["items"] = items
 
     return items[:safe_limit], datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
 
