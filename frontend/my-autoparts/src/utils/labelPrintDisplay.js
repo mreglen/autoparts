@@ -1,6 +1,16 @@
+/** Сокращает текст: каждое слово — до maxLen символов (длинные слова обрезаются). */
+export function shortStorageCellText(text, maxLen = 5) {
+  const raw = String(text ?? '').trim();
+  if (!raw) return '—';
+  const words = raw.split(/\s+/).filter(Boolean);
+  if (!words.length) return '—';
+  return words
+    .map((word) => (word.length > maxLen ? word.slice(0, maxLen) : word))
+    .join(' ');
+}
+
 export function shortCellName(name) {
-  const text = (name || '').trim();
-  return text ? text.slice(0, 4) : '—';
+  return shortStorageCellText(name, 4);
 }
 
 export function storageCellsPerRow(widthMm, { fullWidth = false } = {}) {

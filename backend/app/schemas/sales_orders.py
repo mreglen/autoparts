@@ -63,6 +63,7 @@ class NewPartsOrderItemResponse(BaseModel):
     price: float
     status_code: str
     rossko_status: Optional[str] = None
+    seo_card_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -190,6 +191,7 @@ class PurchasedNewOrderItemResponse(BaseModel):
     quantity: int
     price: float
     status_code: str
+    seo_card_id: Optional[int] = None
 
     class Config:
         from_attributes = True

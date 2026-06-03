@@ -20,6 +20,7 @@ from app.utils.product_search_seo import (
     resolve_product_city,
 )
 from app.utils.product_urls import build_product_page_url
+from app.utils.seo_constants import resolve_default_og_image_url
 
 
 @dataclass(frozen=True)
@@ -116,9 +117,17 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
 
     image_url = None
     for photo in product.photos or []:
-        image_url = _absolute_photo_url(getattr(photo, "photo_url", None), origin)
+        raw_url = getattr(photo, "photo_url", None)
+        if not raw_url:
+            continue
+        path = raw_url
+        if not str(raw_url).startswith(("http://", "https://")):
+            path = photo.full_url if hasattr(photo, "full_url") else raw_url
+        image_url = _absolute_photo_url(path, origin)
         if image_url:
             break
+    if not image_url:
+        image_url = resolve_default_og_image_url(origin)
 
     offer = build_product_offer_json_ld(
         canonical_url=canonical_url,

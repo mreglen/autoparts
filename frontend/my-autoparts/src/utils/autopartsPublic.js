@@ -39,6 +39,35 @@ export function isUsedCatalogBrowseMode() {
 const CATALOG_PAGE_SIZE = 20;
 
 /** Фильтры и сортировка каталога (без номера страницы — для бесконечной прокрутки). */
+export const USED_SORT_OPTIONS = [
+  { value: 'date', label: 'По дате' },
+  { value: 'price_asc', label: 'Цена: по возрастанию' },
+  { value: 'price_desc', label: 'Цена: по убыванию' },
+];
+
+export const NEW_SORT_OPTIONS = [
+  { value: 'price_asc', label: 'Цена: по возрастанию' },
+  { value: 'price_desc', label: 'Цена: по убыванию' },
+  { value: 'delivery_asc', label: 'По дате поставки' },
+];
+
+export function apiSortToUi(sort) {
+  if (sort === 'price_asc' || sort === 'price_desc') return sort;
+  return 'date';
+}
+
+export function uiSortToApi(sort) {
+  return sort === 'date' ? 'created_at_desc' : sort;
+}
+
+export function getUsedUiSort(searchParams) {
+  return apiSortToUi(searchParams.get('sort') || 'created_at_desc');
+}
+
+export function getNewUiSort(searchParams) {
+  return searchParams.get('sort') || 'price_asc';
+}
+
 export function buildUsedCatalogFilterParams(searchParams) {
   const params = {
     page_size: CATALOG_PAGE_SIZE,

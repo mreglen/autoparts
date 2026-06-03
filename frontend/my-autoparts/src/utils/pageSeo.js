@@ -1,5 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { SITE_ORIGIN } from './breadcrumbs';
+import { DEFAULT_OG_IMAGE_URL } from './seoConstants';
 import { formatProductDisplayTitle } from './productDisplayName';
 import { buildPartDetailPath } from './partRoutes';
 
@@ -155,6 +156,7 @@ export function PageSeoHelmet({ seo }) {
       <meta property="og:description" content={seo.description} />
       <meta property="og:url" content={seo.canonicalUrl} />
       <meta property="og:locale" content="ru_RU" />
+      <meta property="og:image" content={DEFAULT_OG_IMAGE_URL} />
     </Helmet>
   );
 }

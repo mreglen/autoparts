@@ -21,10 +21,6 @@ from app.services.new_parts_seo_card_service import (
 from app.services.yandex_feed_xml_service import _iter_catalog_products, _resolve_site_origin
 from app.utils.product_urls import build_product_page_url
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
-from app.services.public_user_profile_service import (
-    count_public_user_profiles,
-    iter_public_profile_urls,
-)
 
 DEFAULT_PRODUCT_URLS_LIMIT = 150
 PRODUCTS_SITEMAP_CACHE_KEY = "products"
@@ -723,28 +719,6 @@ def generate_organizations_sitemap_xml(db: Session, *, preferred_host_url: str |
                 f"    <loc>{loc}</loc>",
                 "    <changefreq>weekly</changefreq>",
                 "    <priority>0.7</priority>",
-                "  </url>",
-            ]
-        )
-
-    lines.append("</urlset>")
-    return "\n".join(lines) + "\n"
-
-
-def generate_profiles_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:
-    site_origin = _resolve_origin(db, preferred_host_url)
-    lines = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ]
-
-    for loc, priority in iter_public_profile_urls(db, site_origin):
-        lines.extend(
-            [
-                "  <url>",
-                f"    <loc>{loc}</loc>",
-                "    <changefreq>monthly</changefreq>",
-                f"    <priority>{priority}</priority>",
                 "  </url>",
             ]
         )

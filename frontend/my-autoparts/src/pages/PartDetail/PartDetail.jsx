@@ -10,6 +10,7 @@ import { stripHtmlTags } from '../../utils/text';
 import { buildPartDetailPath, parsePartDetailParam } from '../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { buildPreliminaryPartTitle, buildPreliminaryPartDescription, buildProductSeo } from '../../utils/productSeo';
+import { DEFAULT_OG_IMAGE_URL } from '../../utils/seoConstants';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
 
@@ -46,7 +47,7 @@ function PartProductSeoHelmet({ seo, structuredData, product }) {
       <meta property="og:description" content={seo.description} />
       <meta property="og:url" content={seo.canonicalUrl} />
       <meta property="og:locale" content="ru_RU" />
-      {seo.imageUrl ? <meta property="og:image" content={seo.imageUrl} /> : null}
+      <meta property="og:image" content={seo.imageUrl || DEFAULT_OG_IMAGE_URL} />
       {product?.price ? (
         <>
           <meta property="product:price:amount" content={String(product.price)} />
@@ -100,7 +101,7 @@ const PartDetail = () => {
       title: preliminaryTitle,
       description,
       canonicalUrl: `https://svoygarage.ru${location.pathname}`,
-      imageUrl: null,
+      imageUrl: DEFAULT_OG_IMAGE_URL,
     };
   }, [preliminaryTitle, extractedBrand, extractedArticle, organization, location.pathname]);
 

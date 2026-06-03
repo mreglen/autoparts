@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectRosskoItems } from '../../../redux/slices/RosskoSlice';
 import { trackFormField } from '../../../utils/siteAnalytics';
+import { NEW_SORT_OPTIONS, getNewUiSort } from '../../../utils/autopartsPublic';
+import SortFilterSection from '../../../components/Autoparts/SortFilterSection';
 
 const COLLAPSED_FILTER_LIMIT = 3;
 
@@ -33,6 +35,7 @@ export default function NewPartsFiltersForm({ updateNewPartsUrl, showClearInPane
   const priceMax = searchParams.get('vmax') || '';
   const inStockOnly = searchParams.get('in_stock') === '1';
   const showAnalogs = searchParams.get('show_analogs') !== '0';
+  const currentSort = getNewUiSort(searchParams);
 
   let rawParts = partsData?.PartsList?.Part;
   if (!Array.isArray(rawParts)) {
@@ -75,6 +78,10 @@ export default function NewPartsFiltersForm({ updateNewPartsUrl, showClearInPane
     setFilter('brand', next.length ? next : null);
   };
 
+  const setSort = (sort) => {
+    setFilter('sort', sort === 'price_asc' ? null : sort);
+  };
+
   const clearFilters = () => {
     if (!updateNewPartsUrl) return;
     updateNewPartsUrl({
@@ -83,6 +90,7 @@ export default function NewPartsFiltersForm({ updateNewPartsUrl, showClearInPane
       vmax: null,
       in_stock: null,
       show_analogs: null,
+      sort: null,
     });
   };
 
@@ -171,6 +179,12 @@ export default function NewPartsFiltersForm({ updateNewPartsUrl, showClearInPane
         />
         Показать аналоги
       </label>
+      <SortFilterSection
+        options={NEW_SORT_OPTIONS}
+        value={currentSort}
+        defaultValue="price_asc"
+        onChange={setSort}
+      />
       {showClearInPanel && (
         <button
           type="button"

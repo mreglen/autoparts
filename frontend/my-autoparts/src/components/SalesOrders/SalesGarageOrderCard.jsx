@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
 import { openAvitoProductFlow } from '../../utils/avitoProductFlow';
 import { getGarageDeliveryInfo } from '../../utils/garageOrderUi';
+import { navigateGarageOrderItem } from '../../utils/partRoutes';
 import UserAvatar from '../UserAvatar/UserAvatar';
 
 const SVOYGARAGE_LOGO = '/logos/svoygarage.png';

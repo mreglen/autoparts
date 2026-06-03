@@ -26,17 +26,13 @@ import {
   buildUsedCatalogParams,
   buildUsedCatalogFilterParams,
   getUsedPartsUrlQuery,
+  apiSortToUi,
+  uiSortToApi,
+  getNewUiSort,
 } from '../../utils/autopartsPublic';
 import { buildAutoPartsSeo, PageSeoHelmet } from '../../utils/pageSeo';
 
 const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs'];
-
-const apiSortToUi = (sort) => {
-  if (sort === 'price_asc' || sort === 'price_desc') return sort;
-  return 'date';
-};
-
-const uiSortToApi = (sort) => (sort === 'date' ? 'created_at_desc' : sort);
 
 function AutoParts() {
   const [searchParams] = useSearchParams();
@@ -84,9 +80,7 @@ function AutoParts() {
   const [usedPartsSort, setUsedPartsSort] = useState(
     () => apiSortToUi(searchParams.get('sort') || 'created_at_desc')
   );
-  const [newPartsSort, setNewPartsSort] = useState(
-    () => searchParams.get('sort') || 'price_asc'
-  );
+  const [newPartsSort, setNewPartsSort] = useState(() => getNewUiSort(searchParams));
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
   const updateCatalogUrl = useCallback((updates) => {
@@ -226,7 +220,7 @@ function AutoParts() {
   }, [searchParams]);
 
   useEffect(() => {
-    setNewPartsSort(searchParams.get('sort') || 'price_asc');
+    setNewPartsSort(getNewUiSort(searchParams));
   }, [searchParams]);
 
   const usedCatalogFilterKey = useMemo(

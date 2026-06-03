@@ -21,6 +21,7 @@ from app.db.schema_patches import (
     ensure_rossko_settings_table,
     ensure_rossko_settings_row_defaults,
     ensure_garage_new_order_rossko_columns,
+    ensure_garage_new_order_item_seo_card_column,
     ensure_garage_new_order_user_id_column,
     ensure_cart_max_quantity_columns,
     ensure_yookassa_payment_tables,

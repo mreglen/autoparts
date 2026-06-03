@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import dataclass
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlsplit, urlparse
 
 from sqlalchemy.orm import Session, selectinload
 
@@ -12,6 +12,7 @@ from app.services.spa_page_check_service import PART_PATH_RE, _normalize_path
 from app.services.yandex_feed_xml_service import _resolve_site_origin
 from app.utils.product_display_name import format_product_display_title
 from app.utils.product_urls import build_product_page_url
+from app.utils.seo_constants import resolve_default_og_image_url
 
 DEFAULT_SITE_ORIGIN = "https://svoygarage.ru"
 SELLER_PART_CARD_RE = re.compile(r"^/seller/part-card/(?P<product_id>\d+)$")
@@ -225,6 +226,9 @@ def render_static_page_prerender_html(meta: StaticPageSeoMeta) -> str:
     h1 = html.escape(meta.h1)
     robots = html.escape(meta.robots, quote=True)
     body_desc = html.escape(meta.description)
+    parsed = urlsplit(meta.canonical_url or "")
+    page_origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else None
+    og_image = html.escape(resolve_default_og_image_url(page_origin), quote=True)
 
     return f"""<!DOCTYPE html>
 <html lang="ru">
@@ -241,6 +245,7 @@ def render_static_page_prerender_html(meta: StaticPageSeoMeta) -> str:
   <meta property="og:description" content="{description}" />
   <meta property="og:url" content="{canonical}" />
   <meta property="og:locale" content="ru_RU" />
+  <meta property="og:image" content="{og_image}" />
 </head>
 <body>
   <main>

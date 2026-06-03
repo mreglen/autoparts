@@ -58,6 +58,7 @@ export default function NewPartsFiltersPage() {
       vmax: null,
       in_stock: null,
       show_analogs: null,
+      sort: null,
     });
   }, [updateNewPartsUrl]);
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { canLinkGarageOrderItem } from '../../utils/partRoutes';
 
 const STATUS_ICONS = {
   pending: (

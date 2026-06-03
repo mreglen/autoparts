@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models.carts.new_parts_cart import NewPartsCart
 from app.models.garage_new_orders import GarageNewOrder, GarageNewOrderItem
+from app.services.new_parts_seo_card_service import find_active_new_part_card_by_brand_article
 from app.models.organization import Organization
 from app.models.user import User as UserModel
 from app.schemas.rossko_settings import NewPartsOrderCreateIn
@@ -150,6 +151,7 @@ async def fulfill_new_parts_order(
         db.flush()
 
         for item in cart_items:
+            card = find_active_new_part_card_by_brand_article(db, item.brand, item.partnumber)
             db.add(
                 GarageNewOrderItem(
                     order_id=new_order.id,
@@ -159,6 +161,7 @@ async def fulfill_new_parts_order(
                     quantity=int(item.quantity),
                     price=float(item.price),
                     status_code="new_waiting_confirmation",
+                    seo_card_id=card.id if card else None,
                 )
             )
 

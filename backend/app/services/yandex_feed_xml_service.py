@@ -77,9 +77,11 @@ def _absolute_photo_url(photo_url: str | None, site_origin: str) -> str | None:
         return None
     if url.startswith("http://") or url.startswith("https://"):
         return url
+    if url.startswith("/temp/"):
+        return f"{site_origin}/server/uploads{url}"
     if url.startswith("/uploads/"):
         return f"{site_origin}{url}"
-    if url.startswith("/pictures/") or url.startswith("/videos/"):
+    if url.startswith("/pictures/") or url.startswith("/videos/") or url.startswith("/vehicle_pictures/"):
         return f"{site_origin}/uploads{url}"
     if url.startswith("/"):
         return f"{site_origin}{url}"

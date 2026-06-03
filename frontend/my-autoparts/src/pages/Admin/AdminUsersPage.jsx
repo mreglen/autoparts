@@ -295,31 +295,91 @@ export default function AdminUsersPage() {
                 </div>
             )}
 
-            <div className="md:hidden space-y-3 mt-4">
-                {filteredUsers.map((u) => (
-                    <div
-                        key={u.id}
-                        className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm"
-                        onDoubleClick={() => openUserDetail(u.id)}
-                    >
-                        <div className="flex gap-3">
-                            <UserAvatar avatarUrl={u.avatar_url} firstName={u.first_name} lastName={u.last_name} size="lg" />
-                            <div className="min-w-0 flex-1">
-                                <h3 className="font-semibold text-gray-900">{userFullName(u)}</h3>
-                                <p className="text-xs font-mono text-gray-500 mt-0.5">ID {u.public_code}</p>
-                                <p className="text-sm text-gray-600 mt-1">{u.email}</p>
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                    {roleBadges(u).map((b) => (
-                                        <span key={b.label} className={`inline-flex px-2 py-0.5 rounded-full text-xs ${b.className}`}>
-                                            {b.label}
-                                        </span>
-                                    ))}
+            {filteredUsers.length > 0 && (
+                <div className={`md:hidden space-y-3 mt-4 ${showActionsPopup ? 'overflow-visible' : ''}`}>
+                    {filteredUsers.map((u) => {
+                        const isMenuOpen = showActionsPopup === u.id;
+                        return (
+                            <div
+                                key={u.id}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => openUserDetail(u.id)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        openUserDetail(u.id);
+                                    }
+                                }}
+                                className={`w-full rounded-lg border border-gray-200 bg-white p-4 text-left shadow-sm cursor-pointer active:bg-indigo-50/40 ${
+                                    isMenuOpen ? 'relative z-30' : ''
+                                }`}
+                            >
+                                <div className="flex gap-3">
+                                    <UserAvatar
+                                        avatarUrl={u.avatar_url}
+                                        firstName={u.first_name}
+                                        lastName={u.last_name}
+                                        size="lg"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="font-semibold text-gray-900">{userFullName(u)}</h3>
+                                        <p className="text-xs font-mono text-gray-500 mt-0.5">ID {u.public_code || '—'}</p>
+                                        <p className="text-sm text-gray-600 mt-1">{u.email}</p>
+                                        {u.phone && <p className="text-sm text-gray-500">{u.phone}</p>}
+                                        {u.organization_name && (
+                                            <p className="text-sm text-gray-700 mt-1">{u.organization_name}</p>
+                                        )}
+                                        <div className="flex flex-wrap gap-1 mt-2">
+                                            {roleBadges(u).map((b) => (
+                                                <span
+                                                    key={b.label}
+                                                    className={`inline-flex px-2 py-0.5 rounded-full text-xs ${b.className}`}
+                                                >
+                                                    {b.label}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div
+                                        className={`flex-shrink-0 self-start ${isMenuOpen ? 'relative z-30' : ''}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onKeyDown={(e) => e.stopPropagation()}
+                                    >
+                                        <ActionsDropdown
+                                            isOpen={isMenuOpen}
+                                            onOpenChange={(next) => setShowActionsPopup(next ? u.id : null)}
+                                            menuClassName="w-52 z-50"
+                                            estimatedMenuHeight={120}
+                                            showLabel={false}
+                                        >
+                                            <ActionsDropdownItem
+                                                onClick={() => {
+                                                    setShowActionsPopup(null);
+                                                    openUserDetail(u.id);
+                                                }}
+                                            >
+                                                Подробности
+                                            </ActionsDropdownItem>
+                                            <ActionsDropdownItem
+                                                onClick={() => {
+                                                    setShowActionsPopup(null);
+                                                    openUserDetail(u.id, 'audit');
+                                                }}
+                                            >
+                                                Журнал аудита
+                                            </ActionsDropdownItem>
+                                            <ActionsDropdownItem onClick={() => handleRevokeSessions(u.id)}>
+                                                Завершить все сессии
+                                            </ActionsDropdownItem>
+                                        </ActionsDropdown>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             {selectedUserId && (
                 <UserDetailModal

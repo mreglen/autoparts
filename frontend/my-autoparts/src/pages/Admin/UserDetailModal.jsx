@@ -34,8 +34,8 @@ export default function UserDetailModal({
 }) {
     if (!user) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                <div className="rounded-2xl bg-white p-8">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-0 sm:p-4">
+                <div className="rounded-none sm:rounded-2xl bg-white p-8 w-full sm:w-auto min-h-[12rem] sm:min-h-0 flex items-center justify-center">
                     <div className="animate-spin h-10 w-10 border-b-2 border-indigo-600 rounded-full mx-auto" />
                 </div>
             </div>
@@ -48,9 +48,19 @@ export default function UserDetailModal({
     ];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
-                <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
+        <div
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
+            onClick={onClose}
+            role="presentation"
+        >
+            <div
+                className="flex max-h-[100dvh] sm:max-h-[90vh] h-full sm:h-auto w-full max-w-4xl flex-col overflow-hidden rounded-none sm:rounded-2xl border-0 sm:border border-gray-200 bg-white shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="user-detail-modal-title"
+            >
+                <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-4 sm:px-6 py-4 sm:py-5">
                     <div className="flex items-center gap-4 min-w-0">
                         <UserAvatar
                             avatarUrl={user.avatar_url}
@@ -59,7 +69,7 @@ export default function UserDetailModal({
                             size="lg"
                         />
                         <div className="min-w-0">
-                            <h3 className="text-lg font-semibold text-gray-900 truncate">{userFullName(user)}</h3>
+                            <h3 id="user-detail-modal-title" className="text-lg font-semibold text-gray-900 truncate">{userFullName(user)}</h3>
                             <p className="text-sm text-gray-500">{user.email}</p>
                             {user.public_code && (
                                 <p className="text-xs font-mono text-gray-400 mt-0.5">ID {user.public_code}</p>
@@ -78,7 +88,7 @@ export default function UserDetailModal({
                     </button>
                 </div>
 
-                <div className="flex gap-1 border-b border-gray-100 px-6">
+                <div className="flex gap-1 border-b border-gray-100 px-4 sm:px-6 overflow-x-auto">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
@@ -95,7 +105,7 @@ export default function UserDetailModal({
                     ))}
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-6 py-5">
+                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5">
                     {activeTab === 'overview' && (
                         <div className="space-y-6 text-sm">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -247,7 +257,7 @@ export default function UserDetailModal({
                     )}
                 </div>
 
-                <div className="border-t border-gray-100 px-6 py-4">
+                <div className="border-t border-gray-100 px-4 sm:px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                     <button
                         type="button"
                         onClick={onClose}

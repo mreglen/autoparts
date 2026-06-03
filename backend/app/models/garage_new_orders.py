@@ -58,6 +58,7 @@ class GarageNewOrderItem(Base):
     quantity = Column(Integer, nullable=False, default=1)
     price = Column(Float, nullable=False, default=0.0)
     status_code = Column(String(50), nullable=False, default="new_waiting_confirmation", index=True)
+    seo_card_id = Column(Integer, ForeignKey("new_parts_seo_cards.id"), nullable=True, index=True)
 
     order = relationship("GarageNewOrder", back_populates="items")
 

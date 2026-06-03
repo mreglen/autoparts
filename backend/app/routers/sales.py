@@ -31,6 +31,7 @@ from app.schemas.sales_orders import (
     UsedPartsOrderResponse,
     PurchasedUsedOrderResponse,
     PurchasedNewOrderResponse,
+    PurchasedNewOrderItemResponse,
 )
 from app.services.rossko_get_orders_service import (
     RosskoOrderLine,
@@ -171,7 +172,18 @@ def _item_match_key(brand: str | None, partnumber: str | None) -> tuple[str, str
     return ((partnumber or "").strip().lower(), (brand or "").strip().lower())
 
 
+def _resolve_new_part_seo_card_id(db: Session, item: GarageNewOrderItem) -> int | None:
+    stored = getattr(item, "seo_card_id", None)
+    if stored:
+        return int(stored)
+    from app.services.new_parts_seo_card_service import find_active_new_part_card_by_brand_article
+
+    card = find_active_new_part_card_by_brand_article(db, item.brand, item.partnumber)
+    return int(card.id) if card else None
+
+
 def _merge_db_items_with_rossko(
+    db: Session,
     order: GarageNewOrder,
     snapshot: RosskoOrderSnapshot | None,
 ) -> list[NewPartsOrderItemResponse]:
@@ -194,6 +206,7 @@ def _merge_db_items_with_rossko(
                 price=float(item.price),
                 status_code=item.status_code,
                 rossko_status=format_rossko_status(line.status_code) if line else None,
+                seo_card_id=_resolve_new_part_seo_card_id(db, item),
             )
         )
     return merged
@@ -209,26 +222,25 @@ def _new_order_response(
     base = NewPartsOrderResponse.model_validate(order)
     result = base.model_copy(update={"buyer_avatar_url": _buyer_avatar_for_order(db, order)})
     rossko_id = order.rossko_order_id
-    if not rossko_id:
-        return result
-
-    snapshot = (rossko_by_id or {}).get(str(rossko_id))
+    snapshot = (rossko_by_id or {}).get(str(rossko_id)) if rossko_id else None
     per_order_error: str | None = None
-    items = _merge_db_items_with_rossko(order, snapshot)
+    items = _merge_db_items_with_rossko(db, order, snapshot)
 
     if snapshot and not snapshot.lines:
         per_order_error = "Позиции Rossko не найдены"
     elif rossko_sync_error:
         per_order_error = rossko_sync_error
 
-    return result.model_copy(
-        update={
-            "rossko_order_id": rossko_id,
-            "rossko_status": format_rossko_status(snapshot.status) if snapshot else None,
-            "rossko_sync_error": per_order_error,
-            "items": items,
-        }
-    )
+    update: dict = {"items": items}
+    if rossko_id:
+        update.update(
+            {
+                "rossko_order_id": rossko_id,
+                "rossko_status": format_rossko_status(snapshot.status) if snapshot else None,
+                "rossko_sync_error": per_order_error,
+            }
+        )
+    return result.model_copy(update=update)
 
 
 @router.get("/used-parts-orders", response_model=list[UsedPartsOrderResponse])
@@ -966,6 +978,19 @@ def list_purchased_new_orders(
 
     result = []
     for order in orders:
+        enriched_items = [
+            PurchasedNewOrderItemResponse(
+                id=item.id,
+                name=item.name,
+                brand=item.brand,
+                partnumber=item.partnumber,
+                quantity=int(item.quantity),
+                price=float(item.price),
+                status_code=item.status_code,
+                seo_card_id=_resolve_new_part_seo_card_id(db, item),
+            )
+            for item in order.items
+        ]
         order_dict = {
             "id": order.id,
             "organization_id": order.organization_id,
@@ -985,7 +1010,7 @@ def list_purchased_new_orders(
             "seller": order.seller,
             "deliver_in_parts": order.deliver_in_parts,
             "created_at": order.created_at,
-            "items": order.items,
+            "items": enriched_items,
         }
         result.append(order_dict)
 

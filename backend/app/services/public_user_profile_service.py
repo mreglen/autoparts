@@ -15,7 +15,6 @@ from app.schemas.public_user import (
     PublicUserProfile,
 )
 from app.utils.user_avatar import avatar_public_url
-from app.utils.user_public_code import is_valid_public_code
 
 
 def user_display_name(user: UserModel) -> str:
@@ -153,51 +152,3 @@ def participant_from_user(user: UserModel) -> ChatParticipantPublic:
         is_seller=bool(user.is_seller),
         is_buyer=bool(user.is_buyer),
     )
-
-
-def count_public_user_profiles(db: Session) -> int:
-    rows = (
-        db.query(UserModel.public_code)
-        .filter(UserModel.public_code.isnot(None))
-        .all()
-    )
-    return sum(1 for (code,) in rows if code and is_valid_public_code(code))
-
-
-def count_public_seller_profiles(db: Session) -> int:
-    return (
-        db.query(func.count(UserModel.id))
-        .filter(UserModel.is_seller == True, UserModel.public_code.isnot(None))
-        .scalar()
-        or 0
-    )
-
-
-def count_public_buyer_profiles(db: Session) -> int:
-    return (
-        db.query(func.count(UserModel.id))
-        .filter(UserModel.is_buyer == True, UserModel.public_code.isnot(None))
-        .scalar()
-        or 0
-    )
-
-
-def iter_public_profile_urls(db: Session, site_origin: str) -> list[tuple[str, str]]:
-    """Returns list of (loc, priority) for sitemap."""
-    origin = site_origin.rstrip("/")
-    items: list[tuple[str, str]] = []
-
-    rows = (
-        db.query(UserModel.public_code)
-        .filter(UserModel.public_code.isnot(None))
-        .order_by(UserModel.public_code.asc())
-        .all()
-    )
-    seen: set[str] = set()
-    for (code,) in rows:
-        if not code or not is_valid_public_code(code) or code in seen:
-            continue
-        seen.add(code)
-        items.append((f"{origin}/users/{code}", "0.55"))
-
-    return items

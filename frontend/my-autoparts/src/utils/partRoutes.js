@@ -62,3 +62,51 @@ export function buildNewPartDetailPath(card) {
 
   return '/autoparts/new';
 }
+
+export function canLinkGarageOrderItem(item, orderType) {
+  if (orderType === 'new') {
+    const article = item?.partnumber || item?.article;
+    return Boolean(item?.seo_card_id || (item?.brand && article));
+  }
+  return Boolean(item?.product_id);
+}
+
+export function buildNewPartSearchFallbackPath(item) {
+  const brand = item?.brand;
+  const article = item?.partnumber || item?.article;
+  if (!brand || !article) return '/autoparts/new';
+  return `/autoparts/new?q=${encodeURIComponent(`${brand} ${article}`.trim())}`;
+}
+
+/** Переход к карточке товара из заказа (б/у — /part/..., новые — /autoparts/new/part/...). */
+export function navigateGarageOrderItem(navigate, item, orderType) {
+  if (orderType === 'new') {
+    if (item?.seo_card_id) {
+      navigate(
+        buildNewPartDetailPath({
+          id: item.seo_card_id,
+          brand: item.brand,
+          article: item.partnumber || item.article,
+        })
+      );
+      return;
+    }
+    navigate(buildNewPartSearchFallbackPath(item));
+    return;
+  }
+
+  if (!item?.product_id) return;
+
+  const productId = item.product_id;
+  const brand = item.brand || item.product?.brand;
+  const article = item.partnumber || item.product?.partnumber;
+
+  if (brand && article) {
+    navigate(
+      `/part/${productId}-${encodeURIComponent(String(brand))}-${encodeURIComponent(String(article))}`
+    );
+    return;
+  }
+
+  navigate(`/part/${productId}`);
+}

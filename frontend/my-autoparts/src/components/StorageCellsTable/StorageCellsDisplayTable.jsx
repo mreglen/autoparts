@@ -1,0 +1,80 @@
+import React, { useMemo } from 'react';
+import { shortStorageCellText } from '../../utils/labelPrintDisplay';
+
+export function buildStorageCellsForDisplay(productStorageCells, getCellName) {
+  if (!productStorageCells?.length) return [];
+
+  return productStorageCells
+    .map((link) => {
+      const value = link.value;
+      if (value == null || String(value).trim() === '') return null;
+      const cellId = link.storage_cell_id ?? link.id;
+      const name =
+        link.name
+        || link.storage_cell_name
+        || link.cell_name
+        || (typeof getCellName === 'function' ? getCellName(cellId) : '');
+      return {
+        id: cellId,
+        nameShort: shortStorageCellText(name),
+        value: shortStorageCellText(String(value).trim()),
+        nameFull: String(name || '').trim(),
+        valueFull: String(value).trim(),
+      };
+    })
+    .filter(Boolean);
+}
+
+export default function StorageCellsDisplayTable({
+  productStorageCells = [],
+  getCellName,
+  compact = false,
+  className = '',
+}) {
+  const cells = useMemo(
+    () => buildStorageCellsForDisplay(productStorageCells, getCellName),
+    [productStorageCells, getCellName]
+  );
+
+  if (!cells.length) return null;
+
+  const thClass = compact
+    ? 'px-2 py-1 text-[10px] font-semibold text-gray-600 uppercase border border-gray-200 bg-gray-50 text-center'
+    : 'px-3 py-2 text-xs font-semibold text-gray-600 uppercase border border-gray-200 bg-gray-50 text-center';
+  const tdClass = compact
+    ? 'px-2 py-1 text-xs font-medium text-gray-900 border border-gray-200 text-center'
+    : 'px-3 py-2 text-sm font-medium text-gray-900 border border-gray-200 text-center';
+
+  return (
+    <div className={`overflow-x-auto ${className}`.trim()}>
+      <table className="min-w-full border-collapse table-fixed border border-gray-200 rounded-lg overflow-hidden">
+        <thead>
+          <tr>
+            {cells.map((cell) => (
+              <th
+                key={`head-${cell.id}`}
+                className={thClass}
+                title={cell.nameFull || undefined}
+              >
+                {cell.nameShort}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {cells.map((cell) => (
+              <td
+                key={`val-${cell.id}`}
+                className={tdClass}
+                title={cell.valueFull || undefined}
+              >
+                {cell.value}
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}

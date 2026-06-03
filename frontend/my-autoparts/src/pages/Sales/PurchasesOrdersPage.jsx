@@ -5,6 +5,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import PurchaseOrderCard, { PurchaseOrdersEmptyState } from '../../components/PurchaseOrderCard/PurchaseOrderCard';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus } from '../../utils/garageOrderUi';
+import { navigateGarageOrderItem } from '../../utils/partRoutes';
 
 const ACTIVE_STATUSES = new Set([
   'pending',

@@ -7,7 +7,13 @@ import {
   selectCatalogFacets,
   selectPublicPartTypes,
 } from '../../../redux/slices/ProductSlice';
-import { isUsedCatalogBrowseMode } from '../../../utils/autopartsPublic';
+import {
+  isUsedCatalogBrowseMode,
+  USED_SORT_OPTIONS,
+  getUsedUiSort,
+  uiSortToApi,
+} from '../../../utils/autopartsPublic';
+import SortFilterSection from '../../../components/Autoparts/SortFilterSection';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
@@ -95,6 +101,13 @@ export default function UsedPartsFiltersForm({ updateCatalogUrl, showClearInPane
     setFilter(key, nextValues);
   };
 
+  const currentSort = getUsedUiSort(searchParams);
+
+  const setSort = (uiSort) => {
+    const apiValue = uiSortToApi(uiSort);
+    setFilter('sort', apiValue === 'created_at_desc' ? null : apiValue);
+  };
+
   const clearFilters = () => {
     if (!updateCatalogUrl) return;
     updateCatalogUrl({
@@ -106,6 +119,7 @@ export default function UsedPartsFiltersForm({ updateCatalogUrl, showClearInPane
       vm: null,
       vehicle_id: null,
       has_photos: null,
+      sort: null,
     });
   };
 
@@ -235,6 +249,12 @@ export default function UsedPartsFiltersForm({ updateCatalogUrl, showClearInPane
         <input type="checkbox" checked={searchParams.get('has_photos') === '1'} onChange={(e) => setFilter('has_photos', e.target.checked ? '1' : null)} />
         Только с фото
       </label>
+      <SortFilterSection
+        options={USED_SORT_OPTIONS}
+        value={currentSort}
+        defaultValue="date"
+        onChange={setSort}
+      />
       {showClearInPanel && (
         <button type="button" onClick={clearFilters} className="w-full text-sm text-indigo-600 hover:text-indigo-800 font-medium">Сбросить фильтры</button>
       )}

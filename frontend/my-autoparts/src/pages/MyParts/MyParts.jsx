@@ -13,6 +13,7 @@ import StockOutModal from './StockOutModal/StockOutModal';
 import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
 import { useActionsDropdownPlacement } from '../../hooks/useActionsDropdownPlacement';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
+import StorageCellsDisplayTable from '../../components/StorageCellsTable/StorageCellsDisplayTable';
 
 const CardPart = ({
   part,
@@ -288,6 +289,19 @@ const CardPart = ({
                 </>
               )}
             </div>
+
+            {productStorageCells?.length > 0 && (
+              <div className="mt-2 max-w-lg" onClick={(e) => e.stopPropagation()}>
+                <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                  Адресное хранение
+                </div>
+                <StorageCellsDisplayTable
+                  productStorageCells={productStorageCells}
+                  getCellName={getCellName}
+                  compact
+                />
+              </div>
+            )}
           </div>
         </div>
       </td>
@@ -441,6 +455,19 @@ const CardPart = ({
                 </>
               )}
             </div>
+
+            {productStorageCells?.length > 0 && (
+              <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                  Адресное хранение
+                </div>
+                <StorageCellsDisplayTable
+                  productStorageCells={productStorageCells}
+                  getCellName={getCellName}
+                  compact
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -499,20 +526,6 @@ const CardPart = ({
                 <p className="text-sm text-gray-900">{part.creator_name || '—'}</p>
               </div>
             </div>
-
-            {/* Storage Location */}
-            {productStorageCells && productStorageCells.length > 0 && (
-              <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Адрес хранения</h4>
-                <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 text-sm text-gray-700">
-                  {productStorageCells
-                    .map((cellLink) => cellLink.value)
-                    .filter(value => value)
-                    .join('; ')
-                  }
-                </div>
-              </div>
-            )}
 
             {/* Photos and Videos */}
             <PhotoThumbnail 
@@ -638,20 +651,6 @@ const CardPart = ({
                   <p className="text-sm text-gray-900">{part.creator_name || '—'}</p>
                 </div>
               </div>
-
-              {/* Storage Location */}
-              {productStorageCells && productStorageCells.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Адрес хранения</h4>
-                  <div className="px-3 py-2 bg-white rounded-lg border border-gray-200 text-sm text-gray-700">
-                    {productStorageCells
-                      .map((cellLink) => cellLink.value)
-                      .filter(value => value)
-                      .join('; ')
-                    }
-                  </div>
-                </div>
-              )}
 
               {/* Compatible Vehicles */}
               {part.compatible_vehicles && part.compatible_vehicles.length > 0 && (

@@ -51,6 +51,7 @@ export default function UsedPartsFiltersPage() {
       vm: null,
       vehicle_id: null,
       has_photos: null,
+      sort: null,
     });
   }, [updateCatalogUrl]);
 

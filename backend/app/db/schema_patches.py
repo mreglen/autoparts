@@ -828,6 +828,32 @@ def ensure_garage_new_order_rossko_columns() -> None:
     logger.info("Applied garage_new_orders Rossko column patches: %s", statements)
 
 
+def ensure_garage_new_order_item_seo_card_column() -> None:
+    """Ссылка на SEO-карточку новой запчасти в позиции заказа."""
+    inspector = inspect(engine)
+    if "garage_new_order_items" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("garage_new_order_items")}
+    if "seo_card_id" in columns:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE garage_new_order_items "
+                "ADD COLUMN seo_card_id INTEGER REFERENCES new_parts_seo_cards(id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_garage_new_order_items_seo_card_id "
+                "ON garage_new_order_items (seo_card_id)"
+            )
+        )
+    logger.info("Applied garage_new_order_items.seo_card_id column patch")
+
+
 def ensure_garage_new_order_user_id_column() -> None:
     """Add user_id column to garage_new_orders for buyer linkage."""
     inspector = inspect(engine)

@@ -146,6 +146,21 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         self.assertNotIn("Открыть карточку", html)
         self.assertNotIn("Цена:", html)
 
+    def test_prerender_html_includes_og_image(self):
+        meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
+        html = render_product_prerender_html(meta)
+        self.assertIn('property="og:image"', html)
+        self.assertIsNotNone(meta.image_url)
+        self.assertIn(meta.image_url, html)
+
+    def test_prerender_html_og_image_fallback_without_photos(self):
+        product = self._make_product()
+        product.photos = []
+        meta = build_product_seo_meta(product, site_origin="https://svoygarage.ru")
+        html = render_product_prerender_html(meta)
+        self.assertIn('property="og:image"', html)
+        self.assertIn("/favicons/apple-touch-icon.png", html)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,6 +2,7 @@ import { stripHtmlTags } from './text';
 import { buildPartDetailPath } from './partRoutes';
 import { formatProductDisplayTitle, extractProductDescription } from './productDisplayName';
 import { normalizeImageUrl } from './apiClient';
+import { resolveOgImageUrl } from './seoConstants';
 import {
   buildProductAlternateNames,
   buildProductOfferJsonLd,
@@ -56,7 +57,7 @@ export function buildProductSeo(product) {
   });
 
   const firstPhoto = product?.photos?.[0]?.photo_url;
-  const imageUrl = firstPhoto ? normalizeImageUrl(firstPhoto) : null;
+  const imageUrl = resolveOgImageUrl(firstPhoto ? normalizeImageUrl(firstPhoto) : null);
   const alternateName = buildProductAlternateNames({ brand, article });
   const priceValue =
     product?.price != null && Number(product.price) > 0

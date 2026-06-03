@@ -10,7 +10,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.new_parts_seo_card import NewPartsSeoCard
-from app.services.yandex_feed_xml_service import _resolve_site_origin
+from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
+from app.utils.seo_constants import resolve_default_og_image_url
 
 ROSSKO_NEW_PART_SOURCE = "rossko"
 
@@ -308,6 +309,30 @@ def get_new_part_card(db: Session, card_id: int) -> NewPartsSeoCard | None:
     )
 
 
+def find_active_new_part_card_by_brand_article(
+    db: Session,
+    brand: str | None,
+    article: str | None,
+) -> NewPartsSeoCard | None:
+    """Активная SEO-карточка по бренду и артикулу (для ссылок из заказов)."""
+    brand_text = _safe_text(brand)
+    article_text = _safe_text(article)
+    if not brand_text or not article_text:
+        return None
+    from sqlalchemy import func
+
+    return (
+        db.query(NewPartsSeoCard)
+        .filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.brand) == brand_text.lower(),
+            func.lower(NewPartsSeoCard.article) == article_text.lower(),
+        )
+        .order_by(NewPartsSeoCard.id.desc())
+        .first()
+    )
+
+
 def build_new_part_seo_meta(card: NewPartsSeoCard, *, site_origin: str | None = None) -> NewPartSeoMeta:
     origin = _resolve_site_origin(site_origin)
     display_name = _safe_text(card.name) or f"{card.brand} {card.article}"
@@ -322,6 +347,7 @@ def build_new_part_seo_meta(card: NewPartsSeoCard, *, site_origin: str | None = 
         160,
     )
     canonical = f"{origin}{build_new_part_card_path(card.id, card.brand, card.article)}"
+    image_url = _absolute_photo_url(_safe_text(card.image_url), origin) or resolve_default_og_image_url(origin)
 
     product_json = {
         "@context": "https://schema.org",
@@ -331,7 +357,7 @@ def build_new_part_seo_meta(card: NewPartsSeoCard, *, site_origin: str | None = 
         "mpn": card.article,
         "description": description,
         "brand": {"@type": "Brand", "name": card.brand},
-        "image": [card.image_url] if card.image_url else None,
+        "image": [image_url],
         "offers": {
             "@type": "Offer",
             "url": canonical,
@@ -351,7 +377,7 @@ def build_new_part_seo_meta(card: NewPartsSeoCard, *, site_origin: str | None = 
         description=description,
         canonical_url=canonical,
         h1=display_name,
-        image_url=card.image_url,
+        image_url=image_url,
         price=price_text,
         in_stock=in_stock,
         json_ld=json.dumps(product_json, ensure_ascii=False),
@@ -390,11 +416,7 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
     description = html.escape(meta.description, quote=True)
     canonical = html.escape(meta.canonical_url, quote=True)
     h1 = html.escape(meta.h1)
-    image_tag = (
-        f'<meta property="og:image" content="{html.escape(meta.image_url, quote=True)}" />'
-        if meta.image_url
-        else ""
-    )
+    image_tag = f'<meta property="og:image" content="{html.escape(meta.image_url or resolve_default_og_image_url(), quote=True)}" />'
 
     return f"""<!DOCTYPE html>
 <html lang="ru">
