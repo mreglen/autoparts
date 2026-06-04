@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel
 from app.schemas.storage_location import StorageLocation
@@ -37,10 +38,48 @@ class Product(ProductBase):
         from_attributes = True
 
 
+class ProductListOrganizationSummary(BaseModel):
+    id: str
+    name: Optional[str] = None
+    phone: Optional[str] = None
+
+
+class ProductListStorageSummary(BaseModel):
+    id: int
+    address: Optional[str] = None
+
+
+class ProductListPhotoSummary(BaseModel):
+    id: int
+    photo_url: str
+    full_url: str
+    thumb_url: Optional[str] = None
+    list_photo_url: str
+
+
+class ProductListItem(BaseModel):
+    id: int
+    brand: str
+    article: str
+    name: str
+    price: float
+    quantity: int
+    is_new: bool
+    organization_id: str
+    storage_location_id: int
+    created_at: Optional[datetime] = None
+    list_photo_url: Optional[str] = None
+    photos: List[ProductListPhotoSummary] = []
+    organization: Optional[ProductListOrganizationSummary] = None
+    storage_location: Optional[ProductListStorageSummary] = None
+
+
 class ProductPhoto(BaseModel):
     id: int
     photo_url: str
     full_url: str
+    thumb_url: Optional[str] = None
+    list_photo_url: Optional[str] = None
     organization_id: Optional[str] = None
     processing_status: Optional[str] = None
 
@@ -50,7 +89,9 @@ class ProductPhoto(BaseModel):
     @classmethod
     def from_orm(cls, obj):
         data = super().from_orm(obj)
-        data.full_url = obj.full_url  
+        data.full_url = obj.full_url
+        data.thumb_url = getattr(obj, "thumb_url", None) or None
+        data.list_photo_url = getattr(obj, "list_photo_url", None) or obj.photo_url
         return data
 
 

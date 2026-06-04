@@ -1,83 +1,65 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { normalizeImageUrl } from '../../utils/apiClient';
+import { pickListImageUrlNormalized } from '../../utils/apiClient';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 
-const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantity = false }) => {
-  // Function to check if the file is a video
-  const isVideo = (item) => {
-    if (typeof item === 'string') {
-      return item.toLowerCase().endsWith('.mp4') ||
-             item.toLowerCase().endsWith('.avi') ||
-             item.toLowerCase().endsWith('.mov') ||
-             item.toLowerCase().endsWith('.wmv') ||
-             item.toLowerCase().endsWith('.flv') ||
-             item.toLowerCase().endsWith('.mkv') ||
-             item.toLowerCase().endsWith('.webm') ||
-             item.toLowerCase().endsWith('.m4v') ||
-             item.toLowerCase().endsWith('.3gp') ||
-             item.toLowerCase().endsWith('.mpeg') ||
-             item.toLowerCase().endsWith('.mpg') ||
-             item.toLowerCase().endsWith('.3gpp') ||
-             item.toLowerCase().endsWith('.3gpp2') ||
-             item.includes('/uploads/videos/') ||
-             item.includes('video/');
-    }
-    if (item instanceof File) {
-      return item.type && item.type.startsWith('video/');
-    }
-    if (item?.photo_url) {
-      return item.photo_url.toLowerCase().endsWith('.mp4') ||
-             item.photo_url.toLowerCase().endsWith('.avi') ||
-             item.photo_url.toLowerCase().endsWith('.mov') ||
-             item.photo_url.toLowerCase().endsWith('.wmv') ||
-             item.photo_url.toLowerCase().endsWith('.flv') ||
-             item.photo_url.toLowerCase().endsWith('.mkv') ||
-             item.photo_url.toLowerCase().endsWith('.webm') ||
-             item.photo_url.toLowerCase().endsWith('.m4v') ||
-             item.photo_url.toLowerCase().endsWith('.3gp') ||
-             item.photo_url.toLowerCase().endsWith('.mpeg') ||
-             item.photo_url.toLowerCase().endsWith('.mpg') ||
-             item.photo_url.toLowerCase().endsWith('.3gpp') ||
-             item.photo_url.toLowerCase().endsWith('.3gpp2') ||
-             item.photo_url.includes('/uploads/videos/') ||
-             item.photo_url.includes('video/');
-    }
-    return false;
-  };
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [hoverSide, setHoverSide] = useState(null); // 'left' or 'right'
+const isVideoUrl = (value) => {
+  if (!value || typeof value !== 'string') return false;
+  const lower = value.toLowerCase();
+  return (
+    lower.endsWith('.mp4')
+    || lower.endsWith('.avi')
+    || lower.endsWith('.mov')
+    || lower.endsWith('.wmv')
+    || lower.endsWith('.flv')
+    || lower.endsWith('.mkv')
+    || lower.endsWith('.webm')
+    || lower.endsWith('.m4v')
+    || lower.endsWith('.3gp')
+    || lower.endsWith('.mpeg')
+    || lower.endsWith('.mpg')
+    || lower.endsWith('.3gpp')
+    || lower.endsWith('.3gpp2')
+    || lower.includes('/uploads/videos/')
+    || lower.includes('video/')
+  );
+};
+
+const isVideoItem = (item) => {
+  if (typeof item === 'string') return isVideoUrl(item);
+  if (item instanceof File) return item.type && item.type.startsWith('video/');
+  if (item?.photo_url) return isVideoUrl(item.photo_url);
+  if (item?.video_url) return true;
+  return false;
+};
+
+const ProductCard = ({
+  part,
+  isTestOrganization = false,
+  hideConditionAndQuantity = false,
+  listPriority = false,
+}) => {
   const navigate = useNavigate();
   const displayTitle = formatProductDisplayTitle(part.brand, part.article, part.title);
-
-  // Combine photos and videos into a single media array
-  const allMedia = React.useMemo(() => {
-    const photos = (part.photos || []).map(photo => {
-      const url = typeof photo === 'string' ? photo : (photo.full_url || photo.photo_url || photo.url || '');
-      return {
-        type: isVideo(photo) || isVideo(url) ? 'video' : 'photo',
-        url: url,
-        original: photo
-      };
-    });
-    
-    const videos = (part.videos || []).map(video => ({
-      type: 'video',
-      url: typeof video === 'string' ? video : (video.full_url || video.video_url || video.url || ''),
-      original: video
-    }));
-    
-    return [...photos, ...videos];
-  }, [part.photos, part.videos]);
-  
-  // Update current image index when product media changes
-  useEffect(() => {
-    if (allMedia.length > 0 && currentImageIndex >= allMedia.length) {
-      setCurrentImageIndex(Math.max(0, allMedia.length - 1));
-    }
-  }, [allMedia, currentImageIndex]);
-
   const product = part;
+
+  const listPreview = useMemo(() => {
+    const photos = part.photos || [];
+    for (let i = 0; i < photos.length; i += 1) {
+      const photo = photos[i];
+      if (!isVideoItem(photo)) {
+        const url = pickListImageUrlNormalized(photo);
+        if (url) {
+          return { type: 'photo', url };
+        }
+      }
+    }
+    const videos = part.videos || [];
+    if (videos.length > 0) {
+      return { type: 'video', url: null };
+    }
+    return null;
+  }, [part.photos, part.videos]);
 
   const handleTitleClick = () => {
     const productId = product.id || 'unknown';
@@ -88,135 +70,73 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
 
   return (
     <div className="w-full">
-      <div 
-        className="h-full flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
-      >
-        {/* Product Image - Large placeholder area */}
-        <div 
-          className="bg-gray-50 aspect-[4/3] w-full flex items-center justify-center relative overflow-hidden"
+      <div className="h-full flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div
+          className="bg-gray-50 aspect-[4/3] w-full flex items-center justify-center relative overflow-hidden cursor-pointer"
           onClick={handleTitleClick}
-          onMouseEnter={() => {
-            // Reset to first image on mouse enter
-            if (allMedia && allMedia.length > 0) {
-              setCurrentImageIndex(0);
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleTitleClick();
             }
           }}
         >
-            {allMedia && allMedia.length > 0 ? (
-            (() => {
-              // Get current media item from allMedia array
-              const currentIndex = Math.min(currentImageIndex, allMedia.length - 1);
-              const currentMediaItem = allMedia[currentIndex];
-              const currentMediaUrl = currentMediaItem ? currentMediaItem.url : '';
-              const normalizedMediaUrl = normalizeImageUrl(currentMediaUrl);
-              
-              // Check if current media is video (use the type from allMedia)
-              const currentMediaIsVideo = currentMediaItem && currentMediaItem.type === 'video';
-              
-              return (
-                <div 
-                  className="relative w-full h-full"
-                  onMouseLeave={() => setHoverSide(null)}
-                >
-                  {/* Navigation arrows for multiple media */}
-                  {allMedia && allMedia.length > 1 && (
-                    <>
-                      {/* Left arrow */}
-                      <button
-                        className={`absolute left-0 top-1/2 transform -translate-y-1/2 z-20 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-r-md transition-opacity duration-200 ${hoverSide === 'left' ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentImageIndex(prev => prev > 0 ? prev - 1 : allMedia.length - 1);
-                        }}
-                        onMouseEnter={() => setHoverSide('left')}
-                      >
-                        <svg className="w-6 h-6"fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                        </svg>
-                      </button>
-                      {/* Right arrow */}
-                      <button
-                        className={`absolute right-0 top-1/2 transform -translate-y-1/2 z-20 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-l-md transition-opacity duration-200 ${hoverSide === 'right' ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentImageIndex(prev => prev < allMedia.length - 1 ? prev + 1 : 0);
-                        }}
-                        onMouseEnter={() => setHoverSide('right')}
-                      >
-                        <svg className="w-6 h-6"fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    </>
-                  )}
-    
-                  
-                  {currentMediaIsVideo ? (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <video
-                        key={`product-video-${currentImageIndex}`}
-                        src={normalizedMediaUrl}
-                        className="max-h-full max-w-full object-contain"
-                        controls
-                        muted
-                        playsInline
-                        preload="metadata"
-                      />
-                    </div>
-                  ) : (
-                    <img 
-                      key={`product-media-${currentImageIndex}`}
-                      src={normalizedMediaUrl}
-                      alt={product.title} 
-                      className="max-h-full max-w-full object-contain m-auto"
-                      loading="lazy"
-                    />
-                  )}
-                </div>
-              );
-            })()
+          {listPreview?.type === 'photo' && listPreview.url ? (
+            <img
+              src={listPreview.url}
+              alt={displayTitle}
+              className="h-full w-full object-contain"
+              width={400}
+              height={300}
+              loading={listPriority ? 'eager' : 'lazy'}
+              decoding="async"
+              fetchPriority={listPriority ? 'high' : 'auto'}
+            />
+          ) : listPreview?.type === 'video' ? (
+            <div className="flex flex-col items-center text-gray-500" aria-label="Есть видео">
+              <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="text-xs mt-1">Видео</span>
+            </div>
           ) : (
             <div className="text-gray-400">
               <svg className="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
-          )}
-          
-          {/* Simple dots indicator for multiple media */}
-          {allMedia && allMedia.length > 1 && (
-            <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-2">
-              {allMedia.map((media, index) => (
-                <button
-                  key={index}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    currentImageIndex === index ? 'bg-white w-4' : 'bg-white/50'
-                  }`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentImageIndex(index);
-                  }}
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                 />
-              ))}
+              </svg>
             </div>
           )}
         </div>
 
         <div className="flex flex-col flex-1">
-          {/* Product Info - Takes up available space */}
           <div className="p-2 space-y-0.5 flex-[2]">
-            {/* Price */}
             <div className="flex items-center gap-1">
               <span className="text-[17px] font-bold text-gray-900">{product.price}</span>
-            
               {product.originalPrice && (
                 <span className="text-gray-400 line-through text-[16px]">{product.originalPrice}</span>
               )}
             </div>
 
-            {/* Product Title - Clickable with hover effect */}
             <div className="space-y-0.5 flex-1">
-              <p 
+              <p
                 className="text-[15px] text-gray-900 line-clamp-2 cursor-pointer hover:text-indigo-600 font-medium"
                 onClick={handleTitleClick}
               >
@@ -224,19 +144,19 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
               </p>
             </div>
 
-            {/* Stock/Warehouse Info */}
             <div className="flex items-center gap-0.5 text-[14px] text-gray-600">
               <span>{product.location || 'Скл'}</span>
               {product.stock && (
-                <span className={`text-[14px] px-0.5 py-0.5 rounded-full ${
-                  product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                }`}>
+                <span
+                  className={`text-[14px] px-0.5 py-0.5 rounded-full ${
+                    product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                  }`}
+                >
                   {product.stock > 0 ? `В н: ${product.stock}` : 'Нет'}
                 </span>
               )}
             </div>
 
-            {/* Condition Badge and Quantity - Hidden for used parts */}
             {!hideConditionAndQuantity && (
               <div className="flex gap-0.5 pt-0.5 flex-wrap">
                 {product.isNew ? (
@@ -260,7 +180,6 @@ const ProductCard = ({ part, isTestOrganization = false, hideConditionAndQuantit
                 )}
               </div>
             )}
-
           </div>
         </div>
       </div>

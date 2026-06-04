@@ -11,6 +11,7 @@ from app.routers.rossko_api.rossko_api import rossko_search, rossko_delivery_id,
 from app.schemas.rossko import SearchRequest
 from app.utils.search_cache import build_cache_key, get_cached_json, set_cached_json
 from app.utils.singleflight import SingleFlight
+from app.utils.product_list_item import map_product_to_list_item
 
 router = APIRouter(prefix="/search-products", tags=["Search-Products"])
 logger = logging.getLogger(__name__)
@@ -330,8 +331,8 @@ async def search_used_parts(
             logger.warning("ROSSKO error in used search: %s", e)
 
     payload = jsonable_encoder({
-        "available_parts": available_parts,
-        "analog_parts": analog_parts,
+        "available_parts": [map_product_to_list_item(p) for p in available_parts],
+        "analog_parts": [map_product_to_list_item(p) for p in analog_parts],
         "rossko_data": rossko_response
     })
     await set_cached_json(cache_key, payload, _SEARCH_CACHE_TTL_SECONDS)

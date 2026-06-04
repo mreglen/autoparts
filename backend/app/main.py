@@ -18,6 +18,7 @@ from app.db.schema_patches import (
     ensure_seo_product_url_exports_table,
     ensure_seo_sitemap_cache_table,
     ensure_user_avatar_column,
+    ensure_product_photo_thumb_url_column,
     ensure_rossko_settings_table,
     ensure_rossko_settings_row_defaults,
     ensure_garage_new_order_rossko_columns,
@@ -119,6 +120,7 @@ try:
     ensure_seo_product_url_exports_table()
     ensure_seo_sitemap_cache_table()
     ensure_user_avatar_column()
+    ensure_product_photo_thumb_url_column()
     ensure_rossko_settings_table()
     ensure_rossko_settings_row_defaults()
     ensure_garage_new_order_rossko_columns()

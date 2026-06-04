@@ -8,14 +8,25 @@
       name="description"
       content="Свой Гараж — маркетплейс новых и б/у автозапчастей. Каталог, доставка по России, оплата и чаты с продавцами."
     />
-    <script src="%PUBLIC_URL%/seo-head-bootstrap.js"></script>
+    <script>
+      (function () {
+        var p = window.location.pathname || '';
+        if (p.indexOf('/part/') !== -1 || p.indexOf('/autoparts/new/part/') !== -1) {
+          var s = document.createElement('script');
+          s.src = '%PUBLIC_URL%/seo-head-bootstrap.js';
+          document.head.appendChild(s);
+        }
+      })();
+    </script>
     <meta name="yandex-verification" content="ce766610ecf7435a" />
     <meta name="yandex-verification" content="e43380c08713ac91" />
     <meta name="google-site-verification" content="KJxyNSpEQ19FqegFqDs6WwYVsjl8MsIzJaf0JWl5nBI" />
-    <!-- Yandex.Metrika counter -->
+    <!-- Yandex.Metrika counter (после load, без webvisor — меньше блокировки main thread) -->
     <script type="text/javascript">
-       // Only load Yandex.Metrika in production
-       if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+       function sgInitYandexMetrika() {
+           if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+               return;
+           }
            (function(m,e,t,r,i,k,a){
                m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
                m[i].l=1*new Date();
@@ -23,7 +34,12 @@
                k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
            })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=107023580', 'ym');
 
-           ym(107023580, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+           ym(107023580, 'init', {ssr:true, webvisor:false, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+       }
+       if (document.readyState === 'complete') {
+           sgInitYandexMetrika();
+       } else {
+           window.addEventListener('load', sgInitYandexMetrika);
        }
     </script>
     <!-- /Yandex.Metrika counter -->

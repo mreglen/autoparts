@@ -687,6 +687,22 @@ def ensure_user_avatar_column() -> None:
     logger.info("Applied users.avatar_url column patch")
 
 
+def ensure_product_photo_thumb_url_column() -> None:
+    """Add thumb_url column to product_photos if missing."""
+    inspector = inspect(engine)
+    if "product_photos" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("product_photos")}
+    if "thumb_url" in columns:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE product_photos ADD COLUMN thumb_url TEXT"))
+
+    logger.info("Applied product_photos.thumb_url column patch")
+
+
 def ensure_rossko_settings_table() -> None:
     """Create rossko_settings table and default row id=1."""
     inspector = inspect(engine)

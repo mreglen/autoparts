@@ -91,6 +91,17 @@ export const normalizeImageUrl = (imageUrl) => {
     return imageUrl;
 };
 
+/** URL for catalog/list previews: thumb when present, else full photo. */
+export const pickListImageUrl = (photo) => {
+    if (!photo) return '';
+    if (typeof photo === 'string') return photo;
+    const thumb = photo.thumb_url || photo.list_photo_url;
+    if (thumb) return thumb;
+    return photo.full_url || photo.photo_url || photo.url || photo.image_url || '';
+};
+
+export const pickListImageUrlNormalized = (photo) => normalizeImageUrl(pickListImageUrl(photo));
+
 
 function formatApiDetail(detail) {
     if (detail == null) return null;

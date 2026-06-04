@@ -49,6 +49,7 @@ class ProductPhoto(Base):
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"))
     photo_url = Column(Text, nullable=False)
+    thumb_url = Column(Text, nullable=True)
     organization_id = Column(String, ForeignKey("organizations.id"), nullable=True, index=True)
     processing_status = Column(String(20), default='pending')  # pending, processing, completed, failed
     
@@ -65,6 +66,10 @@ class ProductPhoto(Base):
             if not self.photo_url.startswith('/uploads/'):
                 return f"/uploads{self.photo_url}"
             return self.photo_url
+
+    @property
+    def list_photo_url(self) -> str:
+        return (self.thumb_url or self.photo_url or "").strip()
 
 
 class ProductVideo(Base):

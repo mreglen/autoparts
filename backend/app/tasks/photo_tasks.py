@@ -8,9 +8,18 @@ import json
 import exifread
 from pillow_heif import register_heif_opener
 
+from app.utils.photo_thumb_paths import (
+    THUMB_IMAGE_MAX_SIZE,
+    THUMB_IMAGE_QUALITY,
+    build_thumb_filename,
+    build_thumb_media_path,
+)
 
 # Register HEIF opener for .heic/.heif support
 register_heif_opener()
+
+FULL_IMAGE_MAX_SIZE = (1920, 1920)
+FULL_IMAGE_QUALITY = 85
 
 
 def remove_exif_data(image: Image.Image) -> Image.Image:
@@ -91,7 +100,12 @@ def add_watermark(image: Image.Image, logo_path: str) -> Image.Image:
         return image
 
 
-def optimize_image(image_data: bytes, max_size: tuple = (1920, 1920), quality: int = 85, watermark_logo_path: str = None):
+def optimize_image(
+    image_data: bytes,
+    max_size: tuple = FULL_IMAGE_MAX_SIZE,
+    quality: int = FULL_IMAGE_QUALITY,
+    watermark_logo_path: str = None,
+):
     """
     Optimizes an image using Pillow, removes metadata, converts to WebP.
     Preserves original aspect ratio while reducing file size.
@@ -225,7 +239,18 @@ def process_and_upload_photo(
         # Apply watermark if requested
         watermark_path = logo_path if add_watermark else None
         processed_bytes = optimize_image(image_data, watermark_logo_path=watermark_path)
-        
+        thumb_media_path = None
+        try:
+            thumb_bytes = optimize_image(
+                image_data,
+                max_size=THUMB_IMAGE_MAX_SIZE,
+                quality=THUMB_IMAGE_QUALITY,
+                watermark_logo_path=watermark_path,
+            )
+        except Exception as thumb_err:
+            print(f"⚠️ Warning: Could not generate thumbnail: {thumb_err}")
+            thumb_bytes = None
+
         # Generate final path with organization ID
         # Change extension to .webp
         base_name = os.path.splitext(original_filename)[0]
@@ -263,15 +288,22 @@ def process_and_upload_photo(
         if not os.path.isfile(final_path) or os.path.getsize(final_path) == 0:
             raise Exception(f"Final file missing or empty after write: {final_path}")
 
-        # Construct relative path (without domain) - frontend will add backend base URL
-        # IMPORTANT: This path is relative to web root, NOT including /server/ prefix
-        # On hosting:
-        #   - media_path = /uploads/pictures/org_id/file.webp
-        #   - PUBLIC_BASE_URL = https://svoygarage.ru/server
-        #   - Final URL = https://svoygarage.ru/server/uploads/pictures/org_id/file.webp
-        #
-        # nginx serves /server/uploads/ -> /home/fast/autoparts/backend/uploads/
         media_path = f"/uploads/{subfolder}/{organization_id}/{final_filename}"
+
+        if thumb_bytes:
+            thumb_filename = build_thumb_filename(final_filename)
+            thumb_path = os.path.join(upload_dir, thumb_filename)
+            try:
+                with open(thumb_path, 'wb') as f:
+                    f.write(thumb_bytes)
+                if os.path.isfile(thumb_path) and os.path.getsize(thumb_path) > 0:
+                    thumb_media_path = build_thumb_media_path(media_path)
+                    print(f"✓ Thumbnail saved: {thumb_path}")
+                else:
+                    thumb_media_path = None
+            except Exception as thumb_save_err:
+                print(f"⚠️ Warning: Could not save thumbnail file: {thumb_save_err}")
+                thumb_media_path = None
         
         print(f"✓ Photo saved successfully!")
         print(f"  Final path: {final_path}")
@@ -380,6 +412,7 @@ def process_and_upload_photo(
                         update_query = text("""
                             UPDATE product_photos
                             SET photo_url = :photo_url,
+                                thumb_url = :thumb_url,
                                 processing_status = :status,
                                 updated_at = NOW()
                             WHERE id = :photo_id
@@ -390,6 +423,7 @@ def process_and_upload_photo(
                             update_query,
                             {
                                 "photo_url": media_path,
+                                "thumb_url": thumb_media_path,
                                 "status": "completed",
                                 "photo_id": photo_record.id
                             }
@@ -441,6 +475,7 @@ def process_and_upload_photo(
                     if photo_records and len(photo_records) > 0:
                         photo_record = photo_records[0]
                         photo_record.photo_url = media_path
+                        photo_record.thumb_url = thumb_media_path
                         photo_record.processing_status = 'completed'
                         db.commit()
 

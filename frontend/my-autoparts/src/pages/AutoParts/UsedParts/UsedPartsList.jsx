@@ -15,7 +15,7 @@ import {
   selectAnalogsLoading,
 } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
-import { normalizeImageUrl } from '../../../utils/apiClient';
+import { normalizeImageUrl, pickListImageUrlNormalized } from '../../../utils/apiClient';
 import {
   buildUsedCatalogParams,
   getUsedPartsUrlQuery,
@@ -237,15 +237,17 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
     // Combine photos and videos
     const allMedia = React.useMemo(() => {
-      const photos = (part.photos || []).map(photo => ({
+      const photos = (part.photos || []).slice(0, 1).map((photo) => ({
         type: 'photo',
-        url: normalizeImageUrl(photo.full_url || photo.photo_url || photo)
+        url: pickListImageUrlNormalized(photo),
       }));
-      const videos = (part.videos || []).map(video => ({
-        type: 'video',
-        url: normalizeImageUrl(video.full_url || video.video_url || video)
-      }));
-      return [...photos, ...videos];
+      if (photos.length > 0) {
+        return photos;
+      }
+      if ((part.videos || []).length > 0) {
+        return [{ type: 'video', url: null }];
+      }
+      return [];
     }, [part.photos, part.videos]);
 
     if (!allMedia || allMedia.length === 0) {
@@ -470,9 +472,10 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           {/* Grid view - карточки */}
           {viewMode === 'grid' && (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {sortedAvailableParts.map((part) => (
+              {sortedAvailableParts.map((part, index) => (
                 <ProductCard
                   key={part.id}
+                  listPriority={index < 2}
                   part={{
                     id: part.id,
                     title: formatProductDisplayTitle(part.brand, part.article, part.name),
@@ -536,9 +539,10 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           {/* Grid view - карточки */}
           {viewMode === 'grid' && (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {sortedAnalogParts.map((part) => (
-                <ProductCard 
+              {sortedAnalogParts.map((part, index) => (
+                <ProductCard
                   key={`analog-${part.id}`}
+                  listPriority={index < 2}
                   part={{
                     id: part.id,
                     title: formatProductDisplayTitle(part.brand, part.article, part.name),

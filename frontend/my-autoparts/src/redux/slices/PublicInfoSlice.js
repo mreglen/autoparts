@@ -2,12 +2,42 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiRequestUnauth } from '../../utils/apiClient';
 
+const PUBLIC_INFO_CACHE_TTL_MS = 10 * 60 * 1000;
+const SITE_CONFIG_CACHE_KEY = 'sg_public_site_config_v1';
+const QUICK_LINKS_CACHE_KEY = 'sg_site_quick_links_v1';
+
+function readSessionCache(key) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (!ts || Date.now() - ts > PUBLIC_INFO_CACHE_TTL_MS) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionCache(key, data) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+  } catch {
+    // quota / private mode
+  }
+}
+
 /** Публичный конфиг: телефон админ-орг., флаг «новые запчасти», наценка на новые (всегда 200). */
 export const fetchPublicSiteConfig = createAsyncThunk(
   'publicInfo/fetchPublicSiteConfig',
   async (_, { rejectWithValue }) => {
+    const cached = readSessionCache(SITE_CONFIG_CACHE_KEY);
+    if (cached) return cached;
     try {
       const result = await apiRequestUnauth('/auth/public-site-config');
+      writeSessionCache(SITE_CONFIG_CACHE_KEY, result);
       return result;
     } catch (err) {
       return rejectWithValue(err?.message || 'Ошибка загрузки информации');
@@ -21,9 +51,13 @@ export const fetchAdminOrganizationPhone = fetchPublicSiteConfig;
 export const fetchSiteQuickLinks = createAsyncThunk(
   'publicInfo/fetchSiteQuickLinks',
   async (_, { rejectWithValue }) => {
+    const cached = readSessionCache(QUICK_LINKS_CACHE_KEY);
+    if (cached) return cached;
     try {
       const result = await apiRequestUnauth('/public/site-quick-links');
-      return Array.isArray(result) ? result : [];
+      const links = Array.isArray(result) ? result : [];
+      writeSessionCache(QUICK_LINKS_CACHE_KEY, links);
+      return links;
     } catch (err) {
       return rejectWithValue(err?.message || 'Ошибка загрузки быстрых ссылок');
     }
