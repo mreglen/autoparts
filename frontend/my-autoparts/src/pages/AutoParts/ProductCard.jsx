@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { pickListImageUrlNormalized } from '../../utils/apiClient';
+import { pickListImageUrlNormalized, pickFullImageUrlNormalized } from '../../utils/apiClient';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 
 const isVideoUrl = (value) => {
@@ -50,7 +50,7 @@ const ProductCard = ({
       if (!isVideoItem(photo)) {
         const url = pickListImageUrlNormalized(photo);
         if (url) {
-          return { type: 'photo', url };
+          return { type: 'photo', url, photo };
         }
       }
     }
@@ -60,6 +60,17 @@ const ProductCard = ({
     }
     return null;
   }, [part.photos, part.videos]);
+
+  const fallbackPhotoUrl = useMemo(() => {
+    if (!listPreview?.photo) return '';
+    return pickFullImageUrlNormalized(listPreview.photo);
+  }, [listPreview]);
+
+  const [photoSrc, setPhotoSrc] = useState(listPreview?.url || '');
+
+  useEffect(() => {
+    setPhotoSrc(listPreview?.url || '');
+  }, [listPreview?.url]);
 
   const handleTitleClick = () => {
     const productId = product.id || 'unknown';
@@ -83,9 +94,9 @@ const ProductCard = ({
             }
           }}
         >
-          {listPreview?.type === 'photo' && listPreview.url ? (
+          {listPreview?.type === 'photo' && photoSrc ? (
             <img
-              src={listPreview.url}
+              src={photoSrc}
               alt={displayTitle}
               className="h-full w-full object-contain"
               width={400}
@@ -93,6 +104,11 @@ const ProductCard = ({
               loading={listPriority ? 'eager' : 'lazy'}
               decoding="async"
               fetchPriority={listPriority ? 'high' : 'auto'}
+              onError={() => {
+                if (fallbackPhotoUrl && photoSrc !== fallbackPhotoUrl) {
+                  setPhotoSrc(fallbackPhotoUrl);
+                }
+              }}
             />
           ) : listPreview?.type === 'video' ? (
             <div className="flex flex-col items-center text-gray-500" aria-label="Есть видео">
