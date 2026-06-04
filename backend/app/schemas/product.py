@@ -54,7 +54,7 @@ class ProductListPhotoSummary(BaseModel):
     photo_url: str
     full_url: str
     thumb_url: Optional[str] = None
-    list_photo_url: str
+    list_photo_url: Optional[str] = None
 
 
 class ProductListItem(BaseModel):
@@ -167,6 +167,16 @@ class DeleteVideosRequest(BaseModel):
     video_ids: List[int]  
 
 
+class QrProductStorageCellOut(BaseModel):
+    id: int
+    storage_cell_id: int
+    value: Optional[str] = None
+    storage_cell_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class QrPartCardResponse(BaseModel):
     id: int
     name: str
@@ -177,6 +187,7 @@ class QrPartCardResponse(BaseModel):
     price: Optional[float] = None
     storage_location_name: Optional[str] = None
     storage_addresses: List[str] = []
+    product_storage_cells: List[QrProductStorageCellOut] = []
     photos: List[ProductPhoto] = []
     videos: List[ProductVideo] = []
 

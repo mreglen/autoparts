@@ -340,7 +340,25 @@ def read_qr_part_card(
     if not product:
         raise HTTPException(status_code=404, detail="Not found")
 
-    storage_addresses = [link.value for link in (product.product_storage_cells or []) if link.value]
+    product_storage_cells_out = []
+    storage_addresses = []
+    for link in product.product_storage_cells or []:
+        value = (link.value or "").strip()
+        if not value:
+            continue
+        cell_name = link.storage_cell.name if link.storage_cell else None
+        product_storage_cells_out.append(
+            {
+                "id": link.id,
+                "storage_cell_id": link.storage_cell_id,
+                "value": value,
+                "storage_cell_name": cell_name,
+            }
+        )
+        if cell_name:
+            storage_addresses.append(f"{cell_name}: {value}")
+        else:
+            storage_addresses.append(value)
 
     return QrPartCardResponse(
         id=product.id,
@@ -352,6 +370,7 @@ def read_qr_part_card(
         price=float(product.price) if product.price is not None else None,
         storage_location_name=(product.storage_location.address if product.storage_location else None),
         storage_addresses=storage_addresses,
+        product_storage_cells=product_storage_cells_out,
         photos=product.photos or [],
         videos=product.videos or [],
     )

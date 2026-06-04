@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import ProductCard from '../ProductCard';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import UsedPartsFiltersForm from './UsedPartsFiltersForm';
@@ -21,6 +21,7 @@ import {
   getUsedPartsUrlQuery,
   isUsedCatalogBrowseMode,
 } from '../../../utils/autopartsPublic';
+import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
@@ -57,30 +58,34 @@ const formatPhoneNumber = (phone) => {
 const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl }) => {
   const dispatch = useDispatch();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const catalogError = useSelector((state) => state.products.error);
 
   const usedPartsData = useSelector(selectUsedPartsData);
   const catalogItems = useSelector(selectCatalogItems);
   const catalogTotal = useSelector(selectCatalogTotal);
   const catalogPage = useSelector(selectCatalogPage);
   const urlQ = getUsedPartsUrlQuery(searchParams);
-  const isCatalogMode = isUsedCatalogBrowseMode(searchParams);
+  const isCatalogMode = isUsedCatalogBrowseMode();
   const catalogLoading = useSelector(selectCatalogLoading);
   const catalogLoadingMore = useSelector(selectCatalogLoadingMore);
   const catalogHasMoreFromStore = useSelector(selectCatalogHasMore);
   const analogsLoading = useSelector(selectAnalogsLoading);
   const loadMoreSentinelRef = useRef(null);
   const catalogHasMore = isCatalogMode && catalogHasMoreFromStore;
-  const status = catalogLoading && catalogItems.length === 0 ? 'loading' : 'idle';
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
 
   const availableParts = useMemo(() => catalogItems, [catalogItems]);
+
   const analogParts = useMemo(() => {
     if (!urlQ) return [];
     const catalogIds = new Set(catalogItems.map((p) => p.id));
     return (usedPartsData?.analog_parts || []).filter((p) => !catalogIds.has(p.id));
   }, [urlQ, usedPartsData, catalogItems]);
+
+  const status = catalogLoading && catalogItems.length === 0 ? 'loading' : 'idle';
 
   const loadMoreCatalog = useCallback(() => {
     if (
@@ -460,8 +465,38 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-3">Нет б/у запчастей</h2>
-          <p className="text-gray-600 text-base leading-relaxed">Б/у запчасти по данному поисковому запросу не найдены.</p>
+          {catalogError ? (
+            <p className="text-red-600 text-base leading-relaxed">{String(catalogError)}</p>
+          ) : (
+            <p className="text-gray-600 text-base leading-relaxed">
+              {urlQ
+                ? `По запросу «${urlQ}» ничего не найдено.`
+                : 'Сейчас нет запчастей в наличии по выбранным условиям.'}
+            </p>
+          )}
           <p className="text-sm text-gray-500 mt-4">Попробуйте изменить поисковый запрос или фильтры.</p>
+          {(urlQ || usedHasActiveFilters(searchParams)) && updateCatalogUrl && (
+            <button
+              type="button"
+              onClick={() => {
+                updateCatalogUrl({
+                  q: null,
+                  part_type: null,
+                  brand: null,
+                  vmin: null,
+                  vmax: null,
+                  vb: null,
+                  vm: null,
+                  vehicle_id: null,
+                  has_photos: null,
+                });
+                navigate('/autoparts/used');
+              }}
+              className="mt-6 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              Сбросить поиск и фильтры
+            </button>
+          )}
         </div>
       )}
       {status !== 'loading' && (

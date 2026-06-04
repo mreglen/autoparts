@@ -20,12 +20,12 @@ def _first_list_photo(product: ProductModel) -> ProductListPhotoSummary | None:
             ".mp4", ".avi", ".mov", ".wmv", ".flv", ".mkv", ".webm",
         )) or "/uploads/videos/" in lower:
             continue
-        list_url = photo.list_photo_url
+        list_url = (photo.list_photo_url or photo.photo_url or "").strip()
         return ProductListPhotoSummary(
             id=photo.id,
             photo_url=photo.photo_url,
             thumb_url=getattr(photo, "thumb_url", None),
-            list_photo_url=list_url,
+            list_photo_url=list_url or photo.photo_url,
             full_url=photo.full_url,
         )
     return None

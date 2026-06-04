@@ -7,6 +7,7 @@ import StockOutModal from '../MyParts/StockOutModal/StockOutModal';
 import PrintReceiptModal from '../MyParts/PrintReceiptModal/PrintReceiptModal';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
+import StorageCellsDisplayTable from '../../components/StorageCellsTable/StorageCellsDisplayTable';
 import { buildSellerPartCardSeo, PageSeoHelmet } from '../../utils/pageSeo';
 
 const SellerPartCardPage = () => {
@@ -247,10 +248,17 @@ const SellerPartCardPage = () => {
                 </div>
               </div>
 
-              {part.storage_addresses?.length > 0 && (
+              {(part.product_storage_cells?.length > 0 || part.storage_addresses?.length > 0) && (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Адресное хранение</div>
-                  <div className="text-sm text-gray-800 break-words">{part.storage_addresses.join('; ')}</div>
+                  {part.product_storage_cells?.length > 0 ? (
+                    <StorageCellsDisplayTable
+                      productStorageCells={part.product_storage_cells}
+                      compact
+                    />
+                  ) : (
+                    <div className="text-sm text-gray-800 break-words">{part.storage_addresses.join('; ')}</div>
+                  )}
                 </div>
               )}
             </div>
@@ -273,7 +281,11 @@ const SellerPartCardPage = () => {
         isOpen={printModalOpen}
         onClose={() => setPrintModalOpen(false)}
         selectedPart={part}
-        productStorageCells={(part.storage_addresses || []).map((value, idx) => ({ id: idx + 1, value }))}
+        productStorageCells={
+          part.product_storage_cells?.length > 0
+            ? part.product_storage_cells
+            : (part.storage_addresses || []).map((value, idx) => ({ id: idx + 1, value }))
+        }
       />
 
       <MediaModal

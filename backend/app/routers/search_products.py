@@ -318,7 +318,7 @@ async def search_used_parts(
                     selectinload(ProductModel.organization)
                 ).filter(
                     get_sql_normalize(ProductModel.article).in_(list(analog_pns)),
-                    func.coalesce(ProductModel.quantity, 0) > 0
+                    func.coalesce(ProductModel.quantity, 0) > 0,
                 ).all()
                 
                 # Исключаем те, что уже найдены как прямые соответствия

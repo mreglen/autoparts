@@ -9,8 +9,7 @@ from app.db.database import get_db
 from app.models.product import Product as ProductModel, ProductPhoto
 from app.models.vehicle import Vehicle as VehicleModel
 from app.routers.search_products import search_local_products_query
-from app.schemas.product import ProductListItem
-from app.utils.product_list_item import map_product_to_list_item
+from app.schemas.product import Product as ProductSchema
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
@@ -18,7 +17,7 @@ SORT_OPTIONS = {"created_at_desc", "price_asc", "price_desc"}
 
 
 class CatalogProductsResponse(BaseModel):
-    items: List[ProductListItem]
+    items: List[ProductSchema]
     total: int
     page: int
     page_size: int
@@ -38,8 +37,11 @@ class CatalogFacetsResponse(BaseModel):
 def _catalog_load_options():
     return [
         selectinload(ProductModel.photos),
+        selectinload(ProductModel.videos),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization),
+        selectinload(ProductModel.part_type),
+        selectinload(ProductModel.compatible_vehicles),
     ]
 
 
@@ -167,7 +169,7 @@ def list_catalog_products(
     items = query.offset(offset).limit(page_size).all()
 
     return CatalogProductsResponse(
-        items=[map_product_to_list_item(item) for item in items],
+        items=items,
         total=int(total),
         page=page,
         page_size=page_size,

@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { PageSeoHelmet } from '../../../utils/pageSeo';
 import { SITE_ORIGIN } from '../../../utils/breadcrumbs';
-import { buildNewPartDetailPath, buildPartDetailPath, parseNewPartDetailParam } from '../../../utils/partRoutes';
+import { buildNewPartDetailPath, parseNewPartDetailParam } from '../../../utils/partRoutes';
 import NewPartProductCard from './NewPartProductCard';
 import ProductCard from '../ProductCard';
 import {
@@ -294,6 +294,23 @@ export default function NewPartDetailPage() {
   };
 
   const analogsLoading = rosskoStatus === 'loading' && analogParts.length === 0;
+  const hasLiveStocks = Boolean(livePart) && liveStocks.length > 0;
+
+  const mainProductBlock = hasLiveStocks ? (
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+      <NewPartProductCard
+        part={livePart}
+        stocksData={liveStocks}
+        sectionType="available"
+        uniqueId={`detail-${numericCardId}`}
+        isDetailView
+      />
+    </section>
+  ) : (
+    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <p className="text-gray-600">Нет доступных складов для заказа.</p>
+    </section>
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
@@ -312,26 +329,10 @@ export default function NewPartDetailPage() {
         <div className="mt-3 flex flex-wrap gap-2 text-xs sm:text-sm">
           <span className="rounded-full bg-white px-3 py-1 text-gray-700 shadow-sm">Бренд: {brand}</span>
           <span className="rounded-full bg-white px-3 py-1 text-gray-700 shadow-sm">Артикул: {article}</span>
-          
         </div>
       </section>
 
-      {livePart && liveStocks.length > 0 ? (
-        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <NewPartProductCard
-            part={livePart}
-            stocksData={liveStocks}
-            sectionType="available"
-            uniqueId={`detail-${numericCardId}`}
-            isDetailView
-          />
-        </section>
-      ) : (
-        <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h1 className="text-2xl font-bold text-gray-900">{name}</h1>
-          <p className="mt-2 text-gray-600">Нет доступных складов для заказа.</p>
-        </article>
-      )}
+      {mainProductBlock}
 
       {!usedMatchLoading && usedMatches.length > 0 && (
         <section className="mt-8">
