@@ -21,6 +21,23 @@ if (process.env.NODE_ENV !== 'production') {
 
 export { API_BASE, BACKEND_BASE };
 
+/** База для статики (/uploads): на проде — origin сайта, в dev — FastAPI (BACKEND_BASE). */
+export const getMediaBaseUrl = () => {
+    if (typeof window !== 'undefined' && window.location?.hostname) {
+        const host = window.location.hostname;
+        if ((host === 'localhost' || host === '127.0.0.1') && BACKEND_BASE) {
+            return BACKEND_BASE;
+        }
+        return window.location.origin;
+    }
+    if (BACKEND_BASE) {
+        return BACKEND_BASE.replace(/\/server\/?$/, '') || BACKEND_BASE;
+    }
+    return '';
+};
+
+const MEDIA_SUBPATH_PREFIXES = ['/pictures/', '/videos/', '/vehicle_pictures/'];
+
 // WebSocket URL configuration
 export const getWebSocketBaseUrl = () => {
     // Get the backend base URL and convert http/https to ws/wss
@@ -53,42 +70,82 @@ export const getAuthHeaders = () => {
 };
 
 
+/** Убирает /server/uploads → /uploads (nginx отдаёт файлы с корня сайта). */
+export const fixServerUploadsPath = (url) => {
+    if (!url || typeof url !== 'string') return url;
+    return url.replace('/server/uploads/', '/uploads/');
+};
+
 export const normalizeImageUrl = (imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return imageUrl;
 
-    // Don't modify full URLs with backend base or blob/data URLs
-    if (imageUrl.startsWith(BACKEND_BASE) ||
-        imageUrl.startsWith('blob:') ||
-        imageUrl.startsWith('data:')) {
-        return imageUrl;
+    const url = imageUrl.trim();
+    if (!url) return url;
+
+    if (url.startsWith('blob:') || url.startsWith('data:')) {
+        return url;
+    }
+
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        return fixServerUploadsPath(url);
+    }
+
+    const mediaBase = getMediaBaseUrl();
+    if (!mediaBase) return url;
+
+    if (BACKEND_BASE && url.startsWith(BACKEND_BASE)) {
+        return fixServerUploadsPath(url);
     }
 
     // Temp uploads live under uploads/temp (API returns /temp/org/file)
-    if (imageUrl.startsWith('/temp/')) {
-        return `${BACKEND_BASE}/uploads${imageUrl}`;
+    if (url.startsWith('/temp/')) {
+        return fixServerUploadsPath(`${mediaBase}/uploads${url}`);
     }
 
-    // If path starts with /pictures/, /videos/, or /vehicle_pictures/, add /uploads prefix if missing
-    if (
-        imageUrl.startsWith('/pictures/') ||
-        imageUrl.startsWith('/videos/') ||
-        imageUrl.startsWith('/vehicle_pictures/')
-    ) {
-        return `${BACKEND_BASE}/uploads${imageUrl}`;
-    }
-    
-    // If path already starts with /uploads/, just add backend base
-    if (imageUrl.startsWith('/uploads/')) {
-        return `${BACKEND_BASE}${imageUrl}`;
+    if (MEDIA_SUBPATH_PREFIXES.some((prefix) => url.startsWith(prefix))) {
+        return fixServerUploadsPath(`${mediaBase}/uploads${url}`);
     }
 
-    // For other paths starting with /, just add backend base
-    if (imageUrl.startsWith('/')) {
-        return `${BACKEND_BASE}${imageUrl}`;
+    if (url.startsWith('/uploads/')) {
+        return fixServerUploadsPath(`${mediaBase}${url}`);
     }
 
-    // Return as-is for relative URLs or other formats
-    return imageUrl;
+    if (url.startsWith('/')) {
+        return fixServerUploadsPath(`${mediaBase}${url}`);
+    }
+
+    if (!url.startsWith('http')) {
+        return normalizeImageUrl(`/${url}`);
+    }
+
+    return url;
+};
+
+/** Уникальные URL для <img onError> — full → thumb → list → photo_url. */
+export const buildImageUrlFallbackChain = (photo) => {
+    if (!photo) return [];
+    if (typeof photo === 'string') {
+        const one = normalizeImageUrl(photo);
+        return one ? [one] : [];
+    }
+    const raw = [
+        pickFullImageUrl(photo),
+        photo.thumb_url,
+        photo.list_photo_url,
+        photo.photo_url,
+        photo.url,
+        photo.image_url,
+    ];
+    const seen = new Set();
+    const chain = [];
+    for (const item of raw) {
+        if (!item || typeof item !== 'string') continue;
+        const normalized = normalizeImageUrl(item.trim());
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        chain.push(normalized);
+    }
+    return chain;
 };
 
 /** Полноразмерное фото для fallback, если превью недоступно. */

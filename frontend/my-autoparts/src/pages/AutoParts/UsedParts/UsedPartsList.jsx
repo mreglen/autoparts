@@ -15,7 +15,7 @@ import {
   selectAnalogsLoading,
 } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
-import { pickListImageUrlNormalized, pickFullImageUrlNormalized } from '../../../utils/apiClient';
+import { buildImageUrlFallbackChain } from '../../../utils/apiClient';
 import {
   buildUsedCatalogParams,
   getUsedPartsUrlQuery,
@@ -240,15 +240,19 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
     const [hoverSide, setHoverSide] = useState(null);
     const [resolvedUrl, setResolvedUrl] = useState('');
+    const [urlFallbackIndex, setUrlFallbackIndex] = useState(0);
 
     // Combine photos and videos
     const allMedia = React.useMemo(() => {
-      const photos = (part.photos || []).slice(0, 1).map((photo) => ({
-        type: 'photo',
-        url: pickListImageUrlNormalized(photo),
-        fallbackUrl: pickFullImageUrlNormalized(photo),
-        photo,
-      }));
+      const photos = (part.photos || []).slice(0, 1).map((photo) => {
+        const urlChain = buildImageUrlFallbackChain(photo);
+        return {
+          type: 'photo',
+          url: urlChain[0] || '',
+          urlChain,
+          photo,
+        };
+      });
       if (photos.length > 0) {
         return photos;
       }
@@ -260,6 +264,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
     React.useEffect(() => {
       setResolvedUrl(allMedia[currentMediaIndex]?.url || '');
+      setUrlFallbackIndex(0);
     }, [allMedia, currentMediaIndex]);
 
     if (!allMedia || allMedia.length === 0) {
@@ -333,9 +338,11 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             alt={part.name || part.article}
             className="w-full h-full object-cover rounded-lg"
             onError={() => {
-              const fallback = currentMedia.fallbackUrl;
-              if (fallback && resolvedUrl !== fallback) {
-                setResolvedUrl(fallback);
+              const chain = currentMedia.urlChain || [];
+              const nextIndex = urlFallbackIndex + 1;
+              if (nextIndex < chain.length && chain[nextIndex] !== resolvedUrl) {
+                setUrlFallbackIndex(nextIndex);
+                setResolvedUrl(chain[nextIndex]);
               }
             }}
           />

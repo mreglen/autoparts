@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { pickListImageUrlNormalized, pickFullImageUrlNormalized } from '../../utils/apiClient';
+import { buildImageUrlFallbackChain } from '../../utils/apiClient';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 
 const isVideoUrl = (value) => {
@@ -48,9 +48,9 @@ const ProductCard = ({
     for (let i = 0; i < photos.length; i += 1) {
       const photo = photos[i];
       if (!isVideoItem(photo)) {
-        const url = pickListImageUrlNormalized(photo);
-        if (url) {
-          return { type: 'photo', url, photo };
+        const chain = buildImageUrlFallbackChain(photo);
+        if (chain.length > 0) {
+          return { type: 'photo', url: chain[0], photo, urlChain: chain };
         }
       }
     }
@@ -61,15 +61,12 @@ const ProductCard = ({
     return null;
   }, [part.photos, part.videos]);
 
-  const fallbackPhotoUrl = useMemo(() => {
-    if (!listPreview?.photo) return '';
-    return pickFullImageUrlNormalized(listPreview.photo);
-  }, [listPreview]);
-
   const [photoSrc, setPhotoSrc] = useState(listPreview?.url || '');
+  const [photoFallbackIndex, setPhotoFallbackIndex] = useState(0);
 
   useEffect(() => {
     setPhotoSrc(listPreview?.url || '');
+    setPhotoFallbackIndex(0);
   }, [listPreview?.url]);
 
   const handleTitleClick = () => {
@@ -105,8 +102,11 @@ const ProductCard = ({
               decoding="async"
               fetchPriority={listPriority ? 'high' : 'auto'}
               onError={() => {
-                if (fallbackPhotoUrl && photoSrc !== fallbackPhotoUrl) {
-                  setPhotoSrc(fallbackPhotoUrl);
+                const chain = listPreview?.urlChain || [];
+                const nextIndex = photoFallbackIndex + 1;
+                if (nextIndex < chain.length && chain[nextIndex] !== photoSrc) {
+                  setPhotoFallbackIndex(nextIndex);
+                  setPhotoSrc(chain[nextIndex]);
                 }
               }}
             />
