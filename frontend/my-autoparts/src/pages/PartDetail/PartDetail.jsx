@@ -8,7 +8,7 @@ import { createOrGetChat } from '../../redux/slices/ChatSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
 import { buildPartDetailPath, parsePartDetailParam } from '../../utils/partRoutes';
-import { formatProductDisplayTitle } from '../../utils/productDisplayName';
+import { extractProductDescription, formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { buildPreliminaryPartTitle, buildPreliminaryPartDescription, buildProductSeo } from '../../utils/productSeo';
 import { DEFAULT_OG_IMAGE_URL } from '../../utils/seoConstants';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
@@ -407,6 +407,17 @@ const PartDetail = () => {
     ? { '@context': 'https://schema.org', '@graph': [seo.jsonLd, breadcrumbJsonLd] }
     : seo.jsonLd;
 
+  const partBrand = (currentProduct.brand || '').trim();
+  const partArticle = (currentProduct.article || '').trim();
+  const h1Primary =
+    [partBrand, partArticle].filter(Boolean).join(' ') ||
+    formatProductDisplayTitle(partBrand, partArticle, currentProduct.name);
+  const h1Subtitle = extractProductDescription(
+    currentProduct.name,
+    partBrand,
+    partArticle,
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 max-md:pb-28">
       <PartProductSeoHelmet seo={seo} structuredData={structuredData} product={currentProduct} />
@@ -430,12 +441,13 @@ const PartDetail = () => {
           <div className="p-5 border-b border-gray-100">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="flex-1">
-                <h1 className="mb-3 text-2xl font-bold leading-tight text-gray-900 max-md:hidden sm:text-3xl">
-                  {formatProductDisplayTitle(
-                    currentProduct.brand,
-                    currentProduct.article,
-                    currentProduct.name,
-                  )}
+                <h1 className="mb-3 text-xl font-bold leading-tight text-gray-900 sm:text-2xl md:text-3xl">
+                  <span className="block">{h1Primary}</span>
+                  {h1Subtitle ? (
+                    <span className="mt-1 block text-base font-medium text-gray-600 sm:text-lg">
+                      {h1Subtitle}
+                    </span>
+                  ) : null}
                 </h1>
                 <div className="flex flex-wrap gap-2 items-center">
                   <div className="flex items-center bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium">
