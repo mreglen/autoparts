@@ -52,11 +52,11 @@ export default function ProfileWithMenuLayout() {
     if (!isReady) {
         return (
             <div className="min-h-screen bg-gray-50">
-                <div className="hidden md:block">
+                <div className="hidden lg:block">
                     <Navigation />
                 </div>
                 <MobileHeader onMenuClick={() => {}} />
-                <main className="max-w-7xl mx-auto max-md:px-3 max-md:py-4 px-3 py-12">
+                <main className="max-w-7xl mx-auto max-lg:px-3 max-lg:py-4 px-3 py-12">
                     <AuthLoadingScreen className="h-48" />
                 </main>
             </div>
@@ -64,8 +64,8 @@ export default function ProfileWithMenuLayout() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-[4.5rem] md:pb-0">
-            <div className="hidden md:block">
+        <div className="min-h-screen bg-gray-50 pb-[4.5rem] lg:pb-0">
+            <div className="hidden lg:block">
                 <Navigation />
             </div>
 
@@ -83,14 +83,14 @@ export default function ProfileWithMenuLayout() {
             <main
                 className={`mx-auto ${
                     isChatsPage
-                        ? 'max-w-full max-md:px-0 max-md:py-0 px-3 py-6 sm:py-8 md:flex md:max-h-[calc(100dvh-4rem)] md:min-h-0 md:flex-col md:overflow-hidden md:py-4 md:max-w-7xl'
-                        : 'max-w-7xl max-md:px-3 max-md:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
+                        ? 'max-w-full max-lg:px-0 max-lg:py-0 px-3 py-6 sm:py-8 lg:flex lg:max-h-[calc(100dvh-4rem)] lg:min-h-0 lg:flex-col lg:overflow-hidden lg:py-4 lg:max-w-7xl'
+                        : 'max-w-7xl max-lg:px-3 max-lg:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                 }`}
             >
                 <div
                     className={`grid min-h-0 grid-cols-1 lg:grid-cols-[minmax(15.5rem,17.5rem)_1fr] ${
                         isChatsPage
-                            ? 'max-md:gap-0 flex-1 gap-6 md:overflow-hidden'
+                            ? 'max-lg:gap-0 flex-1 gap-6 lg:overflow-hidden'
                             : 'gap-6'
                     }`}
                 >
@@ -105,7 +105,7 @@ export default function ProfileWithMenuLayout() {
 
                     <div
                         className={`min-h-0 min-w-0 ${
-                            isChatsPage ? 'flex min-h-0 flex-col md:h-full md:overflow-hidden' : ''
+                            isChatsPage ? 'flex min-h-0 flex-col lg:h-full lg:overflow-hidden' : ''
                         }`}
                     >
                         <Outlet />

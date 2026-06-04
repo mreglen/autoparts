@@ -213,6 +213,12 @@ export default function UsedPartsFiltersForm({ updateCatalogUrl, showClearInPane
 
   return (
     <div className="space-y-4">
+      <SortFilterSection
+        options={USED_SORT_OPTIONS}
+        value={currentSort}
+        defaultValue="date"
+        onChange={setSort}
+      />
       {renderCheckboxGroup({
         title: 'Категории',
         groupKey: 'partTypes',
@@ -249,12 +255,6 @@ export default function UsedPartsFiltersForm({ updateCatalogUrl, showClearInPane
         <input type="checkbox" checked={searchParams.get('has_photos') === '1'} onChange={(e) => setFilter('has_photos', e.target.checked ? '1' : null)} />
         Только с фото
       </label>
-      <SortFilterSection
-        options={USED_SORT_OPTIONS}
-        value={currentSort}
-        defaultValue="date"
-        onChange={setSort}
-      />
       {showClearInPanel && (
         <button type="button" onClick={clearFilters} className="w-full text-sm text-indigo-600 hover:text-indigo-800 font-medium">Сбросить фильтры</button>
       )}

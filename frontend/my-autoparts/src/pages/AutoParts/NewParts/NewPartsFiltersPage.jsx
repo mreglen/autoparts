@@ -92,7 +92,7 @@ export default function NewPartsFiltersPage() {
   }
 
   return (
-    <div className="mt-0 w-full px-0 pb-40 sm:pb-8">
+    <div className="mt-0 w-full px-0 pb-[calc(11rem+env(safe-area-inset-bottom,0px))] sm:pb-8">
       <Helmet>
         <title>Фильтры — Свой Гараж</title>
         <meta name="robots" content="noindex, nofollow" />
@@ -103,7 +103,7 @@ export default function NewPartsFiltersPage() {
         <p className="text-sm text-gray-600 mb-3 truncate" title={searchQuery || urlQuery}>
           Запрос: <span className="font-medium text-gray-900">{searchQuery || decodeURIComponent(urlQuery || '')}</span>
         </p>
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <div className="relative z-10 rounded-lg border border-gray-200 bg-white p-4">
           <h2 className="font-semibold text-gray-900 mb-3 hidden md:block">Фильтры</h2>
           <NewPartsFiltersForm updateNewPartsUrl={updateNewPartsUrl} showClearInPanel={false} />
         </div>

@@ -19,16 +19,16 @@ export default function SortFilterSection({
   }, [value, defaultValue]);
 
   return (
-    <div className="border-t border-gray-100 pt-4">
+    <div className="relative z-10 border-t border-gray-100 pt-4 first:border-t-0 first:pt-0">
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
-        className="mb-2 flex w-full items-center justify-between text-xs font-medium text-gray-600"
+        className="mb-2 flex min-h-11 w-full touch-manipulation items-center justify-between rounded-lg px-1 text-sm font-medium text-gray-700 active:bg-gray-50"
         aria-expanded={expanded}
       >
         <span>{title}</span>
         <svg
-          className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          className={`h-5 w-5 shrink-0 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -38,18 +38,18 @@ export default function SortFilterSection({
         </svg>
       </button>
       {expanded && (
-        <div className="space-y-2">
+        <div className="space-y-1 pb-1">
           {options.map((option) => (
             <label
               key={option.value}
-              className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"
+              className="flex min-h-11 touch-manipulation cursor-pointer items-center gap-3 rounded-lg px-1 text-sm text-gray-700 active:bg-gray-50"
             >
               <input
                 type="radio"
                 name={`sort-filter-${title}`}
                 checked={value === option.value}
                 onChange={() => onChange(option.value)}
-                className="border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="h-4 w-4 shrink-0 border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
               <span>{option.label}</span>
             </label>

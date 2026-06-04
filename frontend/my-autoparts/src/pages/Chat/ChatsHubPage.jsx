@@ -155,7 +155,7 @@ function ChatPanelHeader({ onBack, avatar, title, subtitle, subtitleAction, badg
         <button
           type="button"
           onClick={onBack}
-          className="-ml-1 flex-shrink-0 rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 md:hidden"
+          className="-ml-1 flex-shrink-0 rounded-full p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 lg:hidden"
           aria-label="Назад к списку"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -457,7 +457,7 @@ const ChatsHubPage = () => {
           {/* Левая панель — список чатов */}
           <div
             className={`${
-              activeChatId ? 'hidden md:flex' : 'flex'
+              activeChatId ? 'hidden lg:flex' : 'flex'
             } min-h-0 w-full min-w-0 flex-col overflow-hidden border-gray-200/80 bg-white md:h-full md:max-h-full md:w-[22rem] lg:w-96 md:border-r`}
           >
             <div className="flex-shrink-0 border-b border-gray-100 bg-white px-3 pb-3 pt-3 sm:px-4">
@@ -472,7 +472,7 @@ const ChatsHubPage = () => {
                 </button>
               ) : null}
               {(garageLoading || avitoLoading) && (
-                <div className="mb-3 flex justify-end md:hidden">
+                <div className="mb-3 flex justify-end lg:hidden">
                   <span className="text-xs text-gray-400">Обновление…</span>
                 </div>
               )}
@@ -598,7 +598,7 @@ const ChatsHubPage = () => {
           {/* Правая панель — активный чат */}
           <div
             className={`${
-              activeChatId ? 'flex' : 'hidden md:flex'
+              activeChatId ? 'flex' : 'hidden lg:flex'
             } min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] md:h-full md:max-h-full`}
           >
             {activeChatId ? (

@@ -27,7 +27,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true }) {
     };
 
     return (
-        <header className="md:hidden sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 pt-safe-top">
+        <header className="lg:hidden sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 pt-safe-top">
             <div className="flex h-14 items-center gap-2 px-3">
                 {showBack ? (
                     <button

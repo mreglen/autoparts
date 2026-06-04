@@ -33,6 +33,7 @@ class ProductSeoMeta:
     price: str | None
     in_stock: bool
     json_ld: str
+    json_ld_graph: str
     product_description: str | None = None
 
 
@@ -155,6 +156,11 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
     }
     json_ld_obj = {k: v for k, v in json_ld_obj.items() if v is not None}
     json_ld = json.dumps(json_ld_obj, ensure_ascii=False)
+    json_ld_graph = build_product_json_ld_graph(
+        json_ld=json_ld,
+        canonical_url=canonical_url,
+        h1=name,
+    )
 
     return ProductSeoMeta(
         title=title,
@@ -165,8 +171,50 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
         price=price,
         in_stock=in_stock,
         json_ld=json_ld,
+        json_ld_graph=json_ld_graph,
         product_description=_body_product_description(unique_desc, description),
     )
+
+
+def build_product_json_ld_graph(*, json_ld: str, canonical_url: str, h1: str) -> str:
+    """Product + BreadcrumbList для JSON-LD (Яндекс.Вебмастер, Google)."""
+    try:
+        product_obj = json.loads(json_ld)
+    except Exception:
+        product_obj = None
+
+    site_origin = canonical_url.split("/part/")[0]
+    breadcrumb_obj = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Свой Гараж",
+                "item": site_origin,
+            },
+            {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Каталог",
+                "item": f"{site_origin}/catalog",
+            },
+            {
+                "@type": "ListItem",
+                "position": 3,
+                "name": h1,
+                "item": canonical_url,
+            },
+        ],
+    }
+
+    if product_obj:
+        graph_obj = {"@context": "https://schema.org", "@graph": [product_obj, breadcrumb_obj]}
+    else:
+        graph_obj = breadcrumb_obj
+
+    return json.dumps(graph_obj, ensure_ascii=False)
 
 
 def get_product_seo_for_path(db: Session, raw_path: str) -> ProductSeoMeta | None:
@@ -193,43 +241,11 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
         if meta.image_url
         else ""
     )
-    try:
-        product_obj = json.loads(meta.json_ld)
-    except Exception:
-        product_obj = None
-
-    site_origin = meta.canonical_url.split('/part/')[0]
-    breadcrumb_obj = {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        "itemListElement": [
-            {
-                "@type": "ListItem",
-                "position": 1,
-                "name": "Свой Гараж",
-                "item": site_origin,
-            },
-            {
-                "@type": "ListItem",
-                "position": 2,
-                "name": "Каталог",
-                "item": f"{site_origin}/catalog",
-            },
-            {
-                "@type": "ListItem",
-                "position": 3,
-                "name": meta.h1,
-                "item": meta.canonical_url,
-            },
-        ],
-    }
-
-    if product_obj:
-        graph_obj = {"@context": "https://schema.org", "@graph": [product_obj, breadcrumb_obj]}
-    else:
-        graph_obj = breadcrumb_obj
-
-    json_ld_graph = json.dumps(graph_obj, ensure_ascii=False)
+    json_ld_graph = meta.json_ld_graph or build_product_json_ld_graph(
+        json_ld=meta.json_ld,
+        canonical_url=meta.canonical_url,
+        h1=meta.h1,
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="ru">

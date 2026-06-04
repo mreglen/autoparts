@@ -27,6 +27,7 @@ import {
   buildRosskoLookupText,
   getRosskoMinPrice,
   pickBestRosskoPart,
+  roundRosskoSalePrice,
 } from '../../AutoParts/NewParts/rosskoHelpers';
 
 import VehicleModal from './VehicleModal';
@@ -584,7 +585,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
         return;
       }
 
-      const minPrice = getRosskoMinPrice(best);
+      const minPrice = roundRosskoSalePrice(getRosskoMinPrice(best));
       const filledArticle = best.partnumber || article;
       const filledBrand = best.brand || brand;
       const filledName = best.name || formData.name;
@@ -1090,7 +1091,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
             <div>
               <p className="text-sm font-medium text-gray-900">Заполнение из Rossko</p>
               <p className="text-xs text-gray-600 mt-1">
-                Введите артикул и при необходимости бренд, затем подгрузите название и цену.
+                Введите артикул и при необходимости бренд, затем подгрузите название и цену (округление до 5 или 10 ₽, без копеек).
               </p>
             </div>
             <button

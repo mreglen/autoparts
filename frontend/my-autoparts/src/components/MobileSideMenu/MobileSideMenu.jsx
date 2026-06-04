@@ -77,7 +77,7 @@ export default function MobileSideMenu({
     };
 
     return (
-        <div className="fixed inset-0 z-[60] md:hidden" role="dialog" aria-modal="true" aria-label="Меню">
+        <div className="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal="true" aria-label="Меню">
             <button
                 type="button"
                 aria-label="Закрыть меню"

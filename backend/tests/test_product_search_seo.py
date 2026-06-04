@@ -136,6 +136,13 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         self.assertIn("seller", json_ld["offers"])
         self.assertIn("shippingDetails", json_ld["offers"])
 
+    def test_prerender_html_includes_json_ld_product(self):
+        meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
+        html = render_product_prerender_html(meta)
+        self.assertIn('type="application/ld+json"', html)
+        self.assertIn('"@type": "Product"', html)
+        self.assertIn('"@type": "BreadcrumbList"', html)
+
     def test_prerender_html_has_no_noindex(self):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
         html = render_product_prerender_html(meta)

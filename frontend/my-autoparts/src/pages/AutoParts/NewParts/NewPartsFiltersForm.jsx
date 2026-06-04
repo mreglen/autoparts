@@ -116,6 +116,12 @@ export default function NewPartsFiltersForm({ updateNewPartsUrl, showClearInPane
 
   return (
     <div className="space-y-4">
+      <SortFilterSection
+        options={NEW_SORT_OPTIONS}
+        value={currentSort}
+        defaultValue="price_asc"
+        onChange={setSort}
+      />
       <div>
         <p className="mb-2 block text-xs font-medium text-gray-600">Бренды</p>
         <div className="space-y-2">
@@ -179,12 +185,6 @@ export default function NewPartsFiltersForm({ updateNewPartsUrl, showClearInPane
         />
         Показать аналоги
       </label>
-      <SortFilterSection
-        options={NEW_SORT_OPTIONS}
-        value={currentSort}
-        defaultValue="price_asc"
-        onChange={setSort}
-      />
       {showClearInPanel && (
         <button
           type="button"

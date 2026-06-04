@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { PartDetailContent } from './SellerWorkspaceDetailModals';
+import OrderSourceBadge from '../../components/Orders/OrderSourceBadge';
 
 const formatCurrency = (amount) =>
     new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(amount || 0);
@@ -141,11 +142,12 @@ export default function ClientOrdersModal({
                                     >
                                         <div className="bg-gray-50 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
                                             <div>
-                                                <h3 className="text-sm font-semibold text-gray-900">
-                                                    Заказ #{order.id}
-                                                    <span className="ml-2 font-normal text-gray-500">
-                                                        {order.order_type_label}
-                                                    </span>
+                                                <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-gray-900">
+                                                    <OrderSourceBadge
+                                                        source={order.order_type === 'new' ? 'new' : 'used'}
+                                                        size="sm"
+                                                    />
+                                                    <span>Заказ #{order.id}</span>
                                                 </h3>
                                                 <p className="text-xs text-gray-500 mt-0.5">
                                                     {formatDate(order.created_at)}

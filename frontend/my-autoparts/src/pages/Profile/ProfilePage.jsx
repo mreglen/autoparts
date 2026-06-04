@@ -31,7 +31,7 @@ function ProfilePageSkeleton() {
                             <div className="h-5 w-20 rounded-full bg-gray-100" />
                         </div>
                     </div>
-                    <div className="flex shrink-0 gap-2">
+                    <div className="flex shrink-0 flex-col gap-2 max-lg:items-end lg:flex-row lg:gap-2">
                         <div className="h-10 w-10 rounded-xl bg-gray-200" />
                         <div className="h-10 w-10 rounded-xl bg-gray-200" />
                         <div className="h-10 w-10 rounded-xl bg-gray-200" />
@@ -396,7 +396,7 @@ export default function ProfilePage() {
         <div className="mt-4 sm:mt-5 space-y-6 px-4 sm:px-0">
             {/* Hero */}
             <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-                <div className="flex items-center gap-4">
+                <div className="flex items-start gap-3 sm:items-center sm:gap-4">
                     <div className="flex shrink-0 flex-col items-center sm:items-start">
                         <button
                             type="button"
@@ -469,7 +469,7 @@ export default function ProfilePage() {
                         </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2 self-center">
+                    <div className="flex shrink-0 flex-col gap-2 max-lg:items-end lg:flex-row lg:items-center lg:gap-2 lg:self-center">
                         {!isEditing && (
                             <HeroIconButton onClick={handleEdit} title="Редактировать профиль">
                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

@@ -1,5 +1,5 @@
 // src/components/AutoParts.js
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -82,6 +82,7 @@ function AutoParts() {
   );
   const [newPartsSort, setNewPartsSort] = useState(() => getNewUiSort(searchParams));
   const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const sortMenuRef = useRef(null);
 
   const updateCatalogUrl = useCallback((updates) => {
     const params = new URLSearchParams(searchParams);
@@ -181,18 +182,16 @@ function AutoParts() {
     setShowSortDropdown(false);
   }, [updateNewPartsUrl]);
   
-  // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showSortDropdown && !event.target.closest('.relative')) {
-        setShowSortDropdown(false);
-      }
+    if (!showSortDropdown) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (sortMenuRef.current?.contains(event.target)) return;
+      setShowSortDropdown(false);
     };
-    
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
   }, [showSortDropdown]);
 
   // Состояние для раскрытия карточек
@@ -214,6 +213,10 @@ function AutoParts() {
     }
     setActiveTab(isUsedTab ? 'my' : 'rossko');
   }, [isUsedTab, showNewAutoparts]);
+
+  useEffect(() => {
+    setShowSortDropdown(false);
+  }, [activeTab]);
 
   useEffect(() => {
     setUsedPartsSort(apiSortToUi(searchParams.get('sort') || 'created_at_desc'));
@@ -328,7 +331,7 @@ function AutoParts() {
   return (
     <div className="mt-0 sm:mt-5 px-0 w-full">
       <PageSeoHelmet seo={seo} />
-      <div className="max-md:sticky max-md:top-0 max-md:z-20 max-md:bg-gray-50">
+      <div className="max-lg:sticky max-lg:top-0 max-lg:z-20 max-lg:bg-gray-50">
         {activeTab === 'my' && (
           <MobileCompactSearch
             onSearch={handleUsedPartsSearch}
@@ -346,12 +349,14 @@ function AutoParts() {
         )}
 
         {/* Переключатель вкладок */}
-        <div className="mb-3 sm:mb-6 max-md:px-3 max-md:py-2">
-        <div className="flex snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mb-3 sm:mb-6 max-lg:px-3 max-lg:py-2">
+        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {showNewAutoparts && (
             <button
+              type="button"
               onClick={() => setActiveTab('rossko')}
-              className={`min-h-11 shrink-0 snap-start rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'rossko'
+              className={`min-h-11 shrink-0 snap-start touch-manipulation rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'rossko'
                   ? 'bg-indigo-500 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
@@ -360,21 +365,26 @@ function AutoParts() {
             </button>
           )}
           <button
+            type="button"
             onClick={() => setActiveTab('my')}
-            className={`min-h-11 shrink-0 snap-start rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'my'
+            className={`min-h-11 shrink-0 snap-start touch-manipulation rounded-full px-4 py-2 text-sm font-medium transition-colors sm:rounded-lg sm:px-6 sm:py-4 sm:text-base ${activeTab === 'my'
                 ? 'bg-indigo-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
           >
             Б/У
           </button>
+        </div>
 
-          {activeTab === 'rossko' && effectiveQuery && (
-            <div className="relative ml-auto shrink-0">
+          {activeTab === 'rossko' && showNewAutoparts && (
+            <div ref={sortMenuRef} className="relative shrink-0">
               <button
-                onClick={() => setShowSortDropdown(!showSortDropdown)}
-                className="flex items-center justify-center rounded-lg bg-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-300 sm:px-4 sm:py-2"
+                type="button"
+                onClick={() => setShowSortDropdown((prev) => !prev)}
+                className="flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-lg bg-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-300 active:bg-gray-300 sm:px-4 sm:py-2"
                 title="Сортировка"
+                aria-expanded={showSortDropdown}
+                aria-haspopup="menu"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
@@ -382,10 +392,11 @@ function AutoParts() {
               </button>
 
               {showSortDropdown && (
-                <div className="absolute right-0 z-30 mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+                <div className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
                   <button
+                    type="button"
                     onClick={() => applyNewPartsSort('price_asc')}
-                    className={`w-full px-4 py-2 text-left transition-colors hover:bg-gray-100 ${newPartsSort === 'price_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                    className={`min-h-11 w-full touch-manipulation px-4 py-2 text-left transition-colors hover:bg-gray-100 active:bg-gray-100 ${newPartsSort === 'price_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
                   >
                     <div className="flex items-center justify-between">
                       <span>Дешевле</span>
@@ -397,8 +408,9 @@ function AutoParts() {
                     </div>
                   </button>
                   <button
+                    type="button"
                     onClick={() => applyNewPartsSort('price_desc')}
-                    className={`w-full px-4 py-2 text-left transition-colors hover:bg-gray-100 ${newPartsSort === 'price_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                    className={`min-h-11 w-full touch-manipulation px-4 py-2 text-left transition-colors hover:bg-gray-100 active:bg-gray-100 ${newPartsSort === 'price_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
                   >
                     <div className="flex items-center justify-between">
                       <span>Дороже</span>
@@ -410,8 +422,9 @@ function AutoParts() {
                     </div>
                   </button>
                   <button
+                    type="button"
                     onClick={() => applyNewPartsSort('delivery_asc')}
-                    className={`w-full px-4 py-2 text-left transition-colors hover:bg-gray-100 ${newPartsSort === 'delivery_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                    className={`min-h-11 w-full touch-manipulation px-4 py-2 text-left transition-colors hover:bg-gray-100 active:bg-gray-100 ${newPartsSort === 'delivery_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
                   >
                     <div className="flex items-center justify-between">
                       <span>Быстрее по поставке</span>
@@ -423,8 +436,9 @@ function AutoParts() {
                     </div>
                   </button>
                   <button
+                    type="button"
                     onClick={() => applyNewPartsSort('brand')}
-                    className={`w-full px-4 py-2 text-left transition-colors hover:bg-gray-100 ${newPartsSort === 'brand' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                    className={`min-h-11 w-full touch-manipulation px-4 py-2 text-left transition-colors hover:bg-gray-100 active:bg-gray-100 ${newPartsSort === 'brand' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
                   >
                     <div className="flex items-center justify-between">
                       <span>По бренду</span>
@@ -441,12 +455,15 @@ function AutoParts() {
           )}
 
           {activeTab === 'my' && (
-            <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
-              <div className="relative">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+              <div ref={sortMenuRef} className="relative">
                 <button
-                  onClick={() => setShowSortDropdown(!showSortDropdown)}
-                  className="flex items-center justify-center rounded-lg bg-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-300 sm:px-4 sm:py-2"
+                  type="button"
+                  onClick={() => setShowSortDropdown((prev) => !prev)}
+                  className="flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-lg bg-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-300 active:bg-gray-300 sm:px-4 sm:py-2"
                   title="Сортировка"
+                  aria-expanded={showSortDropdown}
+                  aria-haspopup="menu"
                 >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
@@ -454,10 +471,11 @@ function AutoParts() {
                 </button>
 
                 {showSortDropdown && (
-                  <div className="absolute right-0 z-30 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+                  <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
                   <button
+                    type="button"
                     onClick={() => applyUsedSort('price_asc')}
-                    className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${usedPartsSort === 'price_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                    className={`min-h-11 w-full touch-manipulation text-left px-4 py-2 hover:bg-gray-100 active:bg-gray-100 transition-colors ${usedPartsSort === 'price_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
                   >
                     <div className="flex items-center justify-between">
                       <span>Дешевле</span>
@@ -469,8 +487,9 @@ function AutoParts() {
                     </div>
                   </button>
                   <button
+                    type="button"
                     onClick={() => applyUsedSort('price_desc')}
-                    className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${usedPartsSort === 'price_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                    className={`min-h-11 w-full touch-manipulation text-left px-4 py-2 hover:bg-gray-100 active:bg-gray-100 transition-colors ${usedPartsSort === 'price_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
                   >
                     <div className="flex items-center justify-between">
                       <span>Дороже</span>
@@ -482,8 +501,9 @@ function AutoParts() {
                     </div>
                   </button>
                   <button
+                    type="button"
                     onClick={() => applyUsedSort('date')}
-                    className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${usedPartsSort === 'date' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                    className={`min-h-11 w-full touch-manipulation text-left px-4 py-2 hover:bg-gray-100 active:bg-gray-100 transition-colors ${usedPartsSort === 'date' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
                   >
                     <div className="flex items-center justify-between">
                       <span>По дате</span>
@@ -499,8 +519,9 @@ function AutoParts() {
             </div>
             
             <button
+              type="button"
               onClick={() => setUsedPartsView('grid')}
-              className={`rounded-lg p-2 transition-colors sm:px-4 sm:py-2 ${usedPartsView === 'grid'
+              className={`min-h-11 min-w-11 touch-manipulation rounded-lg p-2 transition-colors sm:px-4 sm:py-2 ${usedPartsView === 'grid'
                   ? 'bg-indigo-500 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
@@ -511,8 +532,9 @@ function AutoParts() {
               </svg>
             </button>
             <button
+              type="button"
               onClick={() => setUsedPartsView('list')}
-              className={`rounded-lg p-2 transition-colors sm:px-4 sm:py-2 ${usedPartsView === 'list'
+              className={`min-h-11 min-w-11 touch-manipulation rounded-lg p-2 transition-colors sm:px-4 sm:py-2 ${usedPartsView === 'list'
                   ? 'bg-indigo-500 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}

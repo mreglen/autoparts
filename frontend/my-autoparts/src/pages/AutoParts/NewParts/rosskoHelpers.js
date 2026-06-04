@@ -16,6 +16,15 @@ export const getRosskoMinPrice = (part) => {
   }, 0);
 };
 
+/** Цена продажи из Rossko: без копеек, к ближайшему значению, кратному 5 или 10 ₽. */
+export const roundRosskoSalePrice = (rawPrice) => {
+  const rubles = Math.round(Math.max(0, Number(rawPrice) || 0));
+  if (rubles <= 0) return 0;
+  const to5 = Math.round(rubles / 5) * 5;
+  const to10 = Math.round(rubles / 10) * 10;
+  return Math.abs(rubles - to5) <= Math.abs(rubles - to10) ? to5 : to10;
+};
+
 export const getRosskoEarliestDelivery = (part) => {
   const stocks = part?.stocks?.stock;
   if (!stocks) return Number.POSITIVE_INFINITY;

@@ -36,7 +36,7 @@ export default function CookieBanner() {
   return (
     <div
       className={`fixed inset-x-0 z-[56] border-t border-gray-200 bg-white/95 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm bottom-0 ${
-        isAuthRoute ? '' : 'max-md:bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))]'
+        isAuthRoute ? '' : 'max-lg:bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))]'
       }`}
       role="dialog"
       aria-live="polite"

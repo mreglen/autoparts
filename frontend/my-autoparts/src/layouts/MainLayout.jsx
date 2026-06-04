@@ -41,8 +41,8 @@ export default function MainLayout() {
     } = useMobileMenuShell(user);
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-[4.5rem] md:pb-0">
-            <div className="hidden md:block">
+        <div className="min-h-screen bg-gray-50 pb-[4.5rem] lg:pb-0">
+            <div className="hidden lg:block">
                 <Navigation />
             </div>
 
@@ -60,10 +60,10 @@ export default function MainLayout() {
             <main
                 className={`mx-auto ${
                     isFullBleedAmbientPage
-                        ? 'max-w-none bg-[#f4f6fb] px-0 py-0 min-h-[calc(100dvh-3.75rem-4.5rem)] md:min-h-[calc(100dvh-7.5rem)]'
+                        ? 'max-w-none bg-[#f4f6fb] px-0 py-0 min-h-[calc(100dvh-3.75rem-4.5rem)] lg:min-h-[calc(100dvh-7.5rem)]'
                         : isAutopartsPage
-                        ? 'max-w-7xl max-md:px-0 max-md:py-2 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
-                        : 'max-w-7xl max-md:px-3 max-md:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
+                        ? 'max-w-7xl max-lg:px-0 max-lg:py-2 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
+                        : 'max-w-7xl max-lg:px-3 max-lg:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                 }`}
             >
                 {breadcrumbItems.length > 0 ? (

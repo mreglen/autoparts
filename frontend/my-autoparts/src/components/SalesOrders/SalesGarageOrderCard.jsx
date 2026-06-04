@@ -6,6 +6,7 @@ import { openAvitoProductFlow } from '../../utils/avitoProductFlow';
 import { getGarageDeliveryInfo } from '../../utils/garageOrderUi';
 import { navigateGarageOrderItem } from '../../utils/partRoutes';
 import UserAvatar from '../UserAvatar/UserAvatar';
+import OrderSourceBadge from '../Orders/OrderSourceBadge';
 
 const SVOYGARAGE_LOGO = '/logos/svoygarage.png';
 
@@ -51,6 +52,7 @@ function GarageCustomerStatusControl({
   orderStatusOptions,
   size = 'md',
   title = 'Статус для покупателя (Свой Гараж)',
+  showStatusIcon = true,
 }) {
   const toggleEdit = (e) => {
     e.stopPropagation();
@@ -67,12 +69,14 @@ function GarageCustomerStatusControl({
 
   return (
     <div className="inline-flex items-center gap-1" title={title}>
-      <SvoyGarageStatusIcon
-        size={size}
-        interactive={statusEditable}
-        onClick={statusEditable ? toggleEdit : undefined}
-        title={statusEditable ? 'Нажмите, чтобы изменить статус' : 'Свой Гараж'}
-      />
+      {showStatusIcon && (
+        <SvoyGarageStatusIcon
+          size={size}
+          interactive={statusEditable}
+          onClick={statusEditable ? toggleEdit : undefined}
+          title={statusEditable ? 'Нажмите, чтобы изменить статус' : 'Свой Гараж'}
+        />
+      )}
       {statusEditable && isEditing ? (
         <select
           value={statusCode}
@@ -195,12 +199,9 @@ export default function SalesGarageOrderCard({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                  isUsed ? 'bg-violet-50 text-violet-800 ring-1 ring-violet-100' : 'bg-sky-50 text-sky-800 ring-1 ring-sky-100'
-                }`}
-              >
-                {isUsed ? 'Б/У' : 'Новые'} · #{order.id}
+              <span className="inline-flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1 ring-1 ring-gray-100">
+                <OrderSourceBadge source={isUsed ? 'used' : 'new'} size="sm" />
+                <span className="text-xs font-semibold text-gray-800">#{order.id}</span>
               </span>
               {isNew && rosskoOrderId && (
                 <span className="inline-flex items-center rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-100">
@@ -255,7 +256,8 @@ export default function SalesGarageOrderCard({
                 getStatusColor={getStatusColor}
                 getStatusName={getStatusName}
                 orderStatusOptions={orderStatusOptions}
-                title="Статус заказа для покупателя (Свой Гараж)"
+                showStatusIcon={isNew}
+                title={isNew ? 'Статус заказа для покупателя (Свой Гараж)' : 'Статус заказа'}
               />
               {isNew && rosskoStatus && (
                 <span
@@ -347,7 +349,8 @@ export default function SalesGarageOrderCard({
                         getStatusName={getStatusName}
                         orderStatusOptions={orderStatusOptions}
                         size="sm"
-                        title="Статус позиции для покупателя (Свой Гараж)"
+                        showStatusIcon={isNew}
+                        title={isNew ? 'Статус позиции для покупателя (Свой Гараж)' : 'Статус позиции'}
                       />
                       {isNew && item.rossko_status && (
                         <span

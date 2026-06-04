@@ -12,6 +12,7 @@ import {
   getAvitoMobileDeliveryText,
   getAvitoOrderItems,
 } from '../pages/Sales/avitoOrderDisplay';
+import OrderSourceBadge from './Orders/OrderSourceBadge';
 
 function DeliveryIcon({ className = 'h-4 w-4' }) {
   return (
@@ -107,11 +108,11 @@ export function AvitoOrderCard({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-900 ring-1 ring-teal-100">
-                <span className="inline-flex h-4 w-4 items-center justify-center rounded bg-teal-600 text-[10px] font-bold text-white">
-                  A
+              <span className="inline-flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1 ring-1 ring-gray-100">
+                <OrderSourceBadge source="avito" size="sm" />
+                <span className="text-xs font-semibold text-gray-800">
+                  #{order.avito_order_id || order.id}
                 </span>
-                Авито · #{order.avito_order_id}
               </span>
               <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
             </div>

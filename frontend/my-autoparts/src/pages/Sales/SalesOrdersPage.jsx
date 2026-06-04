@@ -5,6 +5,8 @@ import { AvitoOrderCard } from '../../components/AvitoOrderCard';
 import SalesGarageOrderCard from '../../components/SalesOrders/SalesGarageOrderCard';
 import SalesOrdersEmptyState from '../../components/SalesOrders/SalesOrdersEmptyState';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import OrderSourceBadge from '../../components/Orders/OrderSourceBadge';
+import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
 import {
   getAvitoBuyerAndDelivery,
   getAvitoDisplayTotal,
@@ -39,10 +41,6 @@ const STATUS_FILTER_OPTIONS = [
   { id: 'rejected', label: 'Отменённые' },
 ];
 
-function sortOrdersNewestFirst(orders) {
-  return [...orders].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-}
-
 function matchesGarageStatusFilter(order, filterId, tab = 'used') {
   const code = tab === 'new'
     ? normalizeNewPartsCustomerStatus(order.status_code)
@@ -73,7 +71,6 @@ export default function SalesOrdersPage() {
   const hasPermission = user?.is_admin || user?.is_seller ||
     (user?.is_employee && permissionCodes && permissionCodes.includes('sales.orders'));
 
-  const [activeTab, setActiveTab] = useState('used'); // used | new | avito
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -83,9 +80,7 @@ export default function SalesOrdersPage() {
   const [usedOrders, setUsedOrders] = useState([]);
   const [newOrders, setNewOrders] = useState([]);
   const [avitoOrders, setAvitoOrders] = useState([]);
-  const [expandedAvitoOrderId, setExpandedAvitoOrderId] = useState(null);
-  const [expandedUsedOrderId, setExpandedUsedOrderId] = useState(null);
-  const [expandedNewOrderId, setExpandedNewOrderId] = useState(null);
+  const [expandedOrderKey, setExpandedOrderKey] = useState(null);
   const [canViewNewOrders, setCanViewNewOrders] = useState(false);
 
   const [editingStatus, setEditingStatus] = useState(null); // garage: {type, orderId, itemId?} | avito: {type, id}
@@ -216,7 +211,6 @@ export default function SalesOrdersPage() {
         setNewOrders(Array.isArray(newRes.data) ? newRes.data : []);
       } else {
         setNewOrders([]);
-        setActiveTab((t) => (t === 'new' ? 'used' : t));
       }
     } catch (e) {
       setError(e?.response?.data?.detail || e.message || 'Ошибка загрузки');
@@ -230,12 +224,6 @@ export default function SalesOrdersPage() {
     if (!hasPermission) return;
     fetchAll();
   }, [hasPermission, fetchAll]);
-
-  useEffect(() => {
-    if (!avitoProActive && activeTab === 'avito') {
-      setActiveTab('used');
-    }
-  }, [avitoProActive, activeTab]);
 
   useEffect(() => {
     if (!hasPermission) return;
@@ -688,14 +676,8 @@ export default function SalesOrdersPage() {
     }
   };
 
-  const toggleAvitoOrderExpand = (orderId) => {
-    setExpandedAvitoOrderId((prev) => (prev === orderId ? null : orderId));
-  };
-  const toggleUsedOrderExpand = (orderId) => {
-    setExpandedUsedOrderId((prev) => (prev === orderId ? null : orderId));
-  };
-  const toggleNewOrderExpand = (orderId) => {
-    setExpandedNewOrderId((prev) => (prev === orderId ? null : orderId));
+  const toggleOrderExpand = (key) => {
+    setExpandedOrderKey((prev) => (prev === key ? null : key));
   };
 
   // Wrapper for setEditingStatus that handles fetchTransitions
@@ -710,79 +692,85 @@ export default function SalesOrdersPage() {
     }
   };
 
-  const filterOrders = useCallback(
-    (orders, tab) => {
+  const allOrdersPool = useMemo(
+    () => buildUnifiedOrders(usedOrders, newOrders, avitoOrders, { canViewNewOrders, avitoProActive }),
+    [usedOrders, newOrders, avitoOrders, canViewNewOrders, avitoProActive]
+  );
+
+  const filterUnifiedEntry = useCallback(
+    (entry) => {
+      const { source, order } = entry;
+      const statusOk =
+        source === 'avito'
+          ? matchesAvitoStatusFilter(order, statusFilter)
+          : matchesGarageStatusFilter(order, statusFilter, source);
+      if (!statusOk) return false;
+
       const q = searchQuery.trim().toLowerCase();
-      return sortOrdersNewestFirst(orders).filter((order) => {
-        const statusOk =
-          tab === 'avito'
-            ? matchesAvitoStatusFilter(order, statusFilter)
-            : matchesGarageStatusFilter(order, statusFilter, tab);
-        if (!statusOk) return false;
-        if (!q) return true;
+      if (!q) return true;
 
-        if (tab === 'avito') {
-          const { buyerName, buyerPhone, delivery } = getAvitoBuyerAndDelivery(order);
-          const haystack = [
-            order.id,
-            order.avito_order_id,
-            buyerName,
-            buyerPhone,
-            getAvitoMobileDeliveryText(delivery),
-            ...getAvitoOrderItems(order).map((item) => getAvitoLineItemTitle(item)),
-          ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-          return haystack.includes(q);
-        }
-
+      if (source === 'avito') {
+        const { buyerName, buyerPhone, delivery } = getAvitoBuyerAndDelivery(order);
         const haystack = [
           order.id,
-          order.buyer_name,
-          order.buyer_phone,
-          getGarageDeliveryInfo(order),
-          ...(order.items || []).flatMap((item) => [item.name, item.brand, item.partnumber]),
+          order.avito_order_id,
+          buyerName,
+          buyerPhone,
+          getAvitoMobileDeliveryText(delivery),
+          ...getAvitoOrderItems(order).map((item) => getAvitoLineItemTitle(item)),
         ]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
         return haystack.includes(q);
-      });
+      }
+
+      const haystack = [
+        order.id,
+        order.buyer_name,
+        order.buyer_phone,
+        getGarageDeliveryInfo(order),
+        ...(order.items || []).flatMap((item) => [item.name, item.brand, item.partnumber]),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
     },
     [searchQuery, statusFilter]
   );
 
-  const filteredUsedOrders = useMemo(() => filterOrders(usedOrders, 'used'), [filterOrders, usedOrders]);
-  const filteredNewOrders = useMemo(() => filterOrders(newOrders, 'new'), [filterOrders, newOrders]);
-  const filteredAvitoOrders = useMemo(() => filterOrders(avitoOrders, 'avito'), [filterOrders, avitoOrders]);
-
-  const activeOrders =
-    activeTab === 'used' ? filteredUsedOrders : activeTab === 'new' ? filteredNewOrders : filteredAvitoOrders;
-  const totalInTab =
-    activeTab === 'used' ? usedOrders.length : activeTab === 'new' ? newOrders.length : avitoOrders.length;
+  const filteredUnifiedOrders = useMemo(
+    () => allOrdersPool.filter(filterUnifiedEntry),
+    [allOrdersPool, filterUnifiedEntry]
+  );
 
   const stats = useMemo(() => {
-    const pool = activeTab === 'used' ? usedOrders : activeTab === 'new' ? newOrders : avitoOrders;
     let activeCount = 0;
     let totalSum = 0;
-    pool.forEach((order) => {
-      if (activeTab === 'avito') {
+    allOrdersPool.forEach(({ source, order }) => {
+      if (source === 'avito') {
         if (AVITO_ACTIVE_STATUSES.has(order.avito_status_code)) activeCount += 1;
         totalSum += getAvitoDisplayTotal(order);
       } else {
-        const code = activeTab === 'new'
+        const code = source === 'new'
           ? normalizeNewPartsCustomerStatus(order.status_code)
           : (order.status_code || 'pending');
         if (GARAGE_ACTIVE_STATUSES.has(code)) activeCount += 1;
         totalSum += Number(order.total_amount || 0);
       }
     });
-    return { total: pool.length, activeCount, totalSum };
-  }, [activeTab, usedOrders, newOrders, avitoOrders]);
+    return { total: allOrdersPool.length, activeCount, totalSum };
+  }, [allOrdersPool]);
 
-  const tabLabel = activeTab === 'used' ? 'Б/У' : activeTab === 'new' ? 'Новые' : 'Авито';
-  const isAvitoTab = activeTab === 'avito';
+  const sourceCounts = useMemo(
+    () => ({
+      used: usedOrders.length,
+      new: canViewNewOrders ? newOrders.length : 0,
+      avito: avitoProActive ? avitoOrders.length : 0,
+    }),
+    [usedOrders.length, newOrders.length, avitoOrders.length, canViewNewOrders, avitoProActive]
+  );
 
   if (!hasPermission) {
     return null;
@@ -790,25 +778,11 @@ export default function SalesOrdersPage() {
 
   return (
     <div className="min-w-0 space-y-6">
-      <header
-        className={`relative overflow-hidden rounded-2xl border border-white/80 p-5 shadow-sm ring-1 ring-gray-200/60 sm:p-6 ${
-          isAvitoTab
-            ? 'bg-gradient-to-br from-white via-white to-teal-50/80'
-            : 'bg-gradient-to-br from-white via-white to-indigo-50/70'
-        }`}
-      >
-        <div
-          className={`pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full blur-2xl ${
-            isAvitoTab ? 'bg-teal-400/15' : 'bg-indigo-400/10'
-          }`}
-        />
+      <header className="relative overflow-hidden rounded-2xl border border-white/80 bg-gradient-to-br from-white via-white to-indigo-50/70 p-5 shadow-sm ring-1 ring-gray-200/60 sm:p-6">
+        <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-indigo-400/10 blur-2xl" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-md:hidden">
-            <p
-              className={`text-xs font-semibold uppercase tracking-wider ${
-                isAvitoTab ? 'text-teal-700' : 'text-indigo-600'
-              }`}
-            >
+            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
               Продажи
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">Заказы</h1>
@@ -843,16 +817,12 @@ export default function SalesOrdersPage() {
         {!loading && !error && (
           <dl className="relative mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
-              <dt className="text-xs font-medium text-gray-500">Всего · {tabLabel}</dt>
+              <dt className="text-xs font-medium text-gray-500">Всего заказов</dt>
               <dd className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{stats.total}</dd>
             </div>
             <div className="rounded-xl border border-gray-100 bg-white/80 px-4 py-3 backdrop-blur-sm">
               <dt className="text-xs font-medium text-gray-500">В работе</dt>
-              <dd
-                className={`mt-1 text-2xl font-bold tabular-nums ${
-                  isAvitoTab ? 'text-teal-700' : 'text-indigo-700'
-                }`}
-              >
+              <dd className="mt-1 text-2xl font-bold tabular-nums text-indigo-700">
                 {stats.activeCount}
               </dd>
             </div>
@@ -866,61 +836,28 @@ export default function SalesOrdersPage() {
 
       <div className="rounded-2xl border border-gray-200/80 bg-white p-1 shadow-sm">
         <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Тип заказов">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'used'}
-              onClick={() => setActiveTab('used')}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
-                activeTab === 'used' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Б/У
-              <span className={`rounded-full px-2 py-0.5 text-xs ${activeTab === 'used' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                {usedOrders.length}
+          <div className="flex flex-wrap items-center gap-3" aria-label="Источники заказов">
+            <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+              <OrderSourceBadge source="used" size="sm" />
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium tabular-nums text-gray-700">
+                {sourceCounts.used}
               </span>
-            </button>
+            </span>
             {canViewNewOrders && (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'new'}
-                onClick={() => setActiveTab('new')}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
-                  activeTab === 'new' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                Новые
-                <span className={`rounded-full px-2 py-0.5 text-xs ${activeTab === 'new' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                  {newOrders.length}
+              <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                <OrderSourceBadge source="new" size="sm" />
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium tabular-nums text-gray-700">
+                  {sourceCounts.new}
                 </span>
-              </button>
+              </span>
             )}
             {avitoProActive && (
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === 'avito'}
-                onClick={() => setActiveTab('avito')}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
-                  activeTab === 'avito'
-                    ? 'bg-teal-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-teal-50 hover:text-teal-900'
-                }`}
-              >
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-white/20 text-[10px] font-bold">
-                  <img src="/logos/avito.png" alt="Avito" className="w-5 h-5 object-contain" />
+              <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                <OrderSourceBadge source="avito" size="sm" />
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium tabular-nums text-gray-700">
+                  {sourceCounts.avito}
                 </span>
-                Авито
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${
-                    activeTab === 'avito' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
-                  }`}
-                >
-                  {avitoOrders.length}
-                </span>
-              </button>
+              </span>
             )}
           </div>
 
@@ -996,7 +933,7 @@ export default function SalesOrdersPage() {
         </div>
       )}
 
-      {!loading && !error && activeTab === 'avito' && avitoWarehouseMessage && (
+      {!loading && !error && avitoWarehouseMessage && (
         <div
           className={`rounded-xl px-4 py-3 text-sm ${
             avitoWarehouseMessage.type === 'success'
@@ -1010,81 +947,68 @@ export default function SalesOrdersPage() {
 
       {!loading && !error && (
         <>
-          {totalInTab > 0 && activeOrders.length !== totalInTab && (
+          {stats.total > 0 && filteredUnifiedOrders.length !== stats.total && (
             <p className="text-sm text-gray-500">
-              Показано {activeOrders.length} из {totalInTab} заказов
+              Показано {filteredUnifiedOrders.length} из {stats.total} заказов
             </p>
           )}
 
           <div className="space-y-4">
-            {activeTab === 'used' &&
-              filteredUsedOrders.map((o) => (
+            {filteredUnifiedOrders.map((entry) => {
+              const key = getUnifiedOrderKey(entry);
+              const isExpanded = expandedOrderKey === key;
+
+              if (entry.source === 'avito') {
+                const o = entry.order;
+                return (
+                  <AvitoOrderCard
+                    key={key}
+                    order={o}
+                    isExpanded={isExpanded}
+                    onToggle={() => toggleOrderExpand(key)}
+                    editingStatus={editingStatus}
+                    onEditStatus={handleEditStatus}
+                    onAvitoTransition={handleAvitoTransitionSelect}
+                    transitionLoadingByOrderId={transitionLoadingByOrderId}
+                    warehouseRetryLoadingByOrderId={warehouseRetryLoadingByOrderId}
+                    onRetryWarehouse={retryAvitoWarehouse}
+                    getAvitoTransitionOptions={getAvitoTransitionOptions}
+                    getAvitoTransitionLabel={getAvitoTransitionLabel}
+                    getAvitoStatusColor={getAvitoStatusColor}
+                    getAvitoStatusName={getAvitoStatusName}
+                    formatDate={formatDate}
+                    formatPrice={formatPrice}
+                    getAvitoWarehouseMismatch={getAvitoWarehouseMismatch}
+                    getAvitoWarehouseCanRetry={getAvitoWarehouseCanRetry}
+                    getAvitoSkipReasonsForDisplay={getAvitoSkipReasonsForDisplay}
+                  />
+                );
+              }
+
+              const o = entry.order;
+              const isUsed = entry.source === 'used';
+              return (
                 <SalesGarageOrderCard
-                  key={o.id}
+                  key={key}
                   order={o}
-                  orderType="used"
-                  isExpanded={expandedUsedOrderId === o.id}
-                  onToggle={toggleUsedOrderExpand}
+                  orderType={entry.source}
+                  isExpanded={isExpanded}
+                  onToggle={() => toggleOrderExpand(key)}
                   editingStatus={editingStatus}
                   onEditStatus={setEditingStatus}
-                  onUpdateStatus={updateUsedOrderStatus}
+                  onUpdateStatus={isUsed ? updateUsedOrderStatus : updateNewOrderStatus}
                   getStatusColor={getGarageStatusColor}
-                  getStatusName={(code) => getGarageStatusName(code, 'used')}
-                  orderStatusOptions={usedOrderStatusOptions}
+                  getStatusName={(code) => getGarageStatusName(code, entry.source)}
+                  orderStatusOptions={isUsed ? usedOrderStatusOptions : newOrderStatusOptions}
                   formatDate={formatDate}
                   formatPrice={formatPrice}
                 />
-              ))}
-
-            {activeTab === 'new' &&
-              canViewNewOrders &&
-              filteredNewOrders.map((o) => (
-                <SalesGarageOrderCard
-                  key={o.id}
-                  order={o}
-                  orderType="new"
-                  isExpanded={expandedNewOrderId === o.id}
-                  onToggle={toggleNewOrderExpand}
-                  editingStatus={editingStatus}
-                  onEditStatus={setEditingStatus}
-                  onUpdateStatus={updateNewOrderStatus}
-                  getStatusColor={getGarageStatusColor}
-                  getStatusName={(code) => getGarageStatusName(code, 'new')}
-                  orderStatusOptions={newOrderStatusOptions}
-                  formatDate={formatDate}
-                  formatPrice={formatPrice}
-                />
-              ))}
-
-            {activeTab === 'avito' &&
-              avitoProActive &&
-              filteredAvitoOrders.map((o) => (
-                <AvitoOrderCard
-                  key={o.id}
-                  order={o}
-                  isExpanded={expandedAvitoOrderId === o.id}
-                  onToggle={toggleAvitoOrderExpand}
-                  editingStatus={editingStatus}
-                  onEditStatus={handleEditStatus}
-                  onAvitoTransition={handleAvitoTransitionSelect}
-                  transitionLoadingByOrderId={transitionLoadingByOrderId}
-                  warehouseRetryLoadingByOrderId={warehouseRetryLoadingByOrderId}
-                  onRetryWarehouse={retryAvitoWarehouse}
-                  getAvitoTransitionOptions={getAvitoTransitionOptions}
-                  getAvitoTransitionLabel={getAvitoTransitionLabel}
-                  getAvitoStatusColor={getAvitoStatusColor}
-                  getAvitoStatusName={getAvitoStatusName}
-                  formatDate={formatDate}
-                  formatPrice={formatPrice}
-                  getAvitoWarehouseMismatch={getAvitoWarehouseMismatch}
-                  getAvitoWarehouseCanRetry={getAvitoWarehouseCanRetry}
-                  getAvitoSkipReasonsForDisplay={getAvitoSkipReasonsForDisplay}
-                />
-              ))}
+              );
+            })}
           </div>
 
-          {activeOrders.length === 0 && (
-            <SalesOrdersEmptyState tabLabel={tabLabel} variant={isAvitoTab ? 'avito' : 'default'} />
+          {filteredUnifiedOrders.length === 0 && (
+            <SalesOrdersEmptyState hasAnyOrders={stats.total > 0} />
           )}
         </>
       )}

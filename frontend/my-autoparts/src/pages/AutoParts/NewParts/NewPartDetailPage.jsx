@@ -340,14 +340,21 @@ export default function NewPartDetailPage() {
             <h2 className="text-xl font-bold text-gray-900">Б/у варианты</h2>
             <span className="text-sm text-gray-500">{usedMatches.length} шт.</span>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div
+            className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-md:touch-pan-x md:mx-0 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-3 xl:grid-cols-4"
+            aria-label="Б/у варианты — прокрутка по горизонтали"
+          >
             {usedMatches.map((used) => (
-              <ProductCard
+              <div
                 key={`used-${used.id}`}
-                part={mapUsedToProductCard(used)}
-                isTestOrganization
-                hideConditionAndQuantity
-              />
+                className="w-[78vw] max-w-[300px] shrink-0 snap-start sm:w-[260px] md:w-auto md:max-w-none md:shrink"
+              >
+                <ProductCard
+                  part={mapUsedToProductCard(used)}
+                  isTestOrganization
+                  hideConditionAndQuantity
+                />
+              </div>
             ))}
           </div>
         </section>
