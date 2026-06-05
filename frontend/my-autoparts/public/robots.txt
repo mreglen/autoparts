@@ -36,6 +36,7 @@ Disallow: /product-not-found
 
 Disallow: /api/
 Allow: /api/feeds/sitemap-products.xml
+Allow: /api/feeds/sitemap-new-parts.xml
 Allow: /api/feeds/yandex/
 Disallow: /server/
 

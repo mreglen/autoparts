@@ -41,22 +41,12 @@ ProductsSitemapSnapshot = SitemapCacheSnapshot
 NewPartsSitemapSnapshot = SitemapCacheSnapshot
 
 
-def build_organization_page_url(org_id: str, site_origin: str) -> str:
-    return f"{site_origin.rstrip('/')}/organizations/{org_id}"
-
-
 def count_working_catalog_products(db: Session) -> int:
     count = 0
     for product in _iter_catalog_products(db):
         if is_working_catalog_product(product):
             count += 1
     return count
-
-
-def count_public_organizations(db: Session) -> int:
-    from app.models.organization import Organization as OrganizationModel
-
-    return db.query(OrganizationModel).count()
 
 
 def count_active_new_part_cards(db: Session) -> int:
@@ -690,38 +680,3 @@ def generate_products_sitemap_xml(db: Session, *, preferred_host_url: str | None
 
 def generate_new_parts_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:
     return get_new_parts_sitemap_snapshot(db, preferred_host_url=preferred_host_url).xml_content
-
-
-def generate_organizations_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:
-    from app.models.organization import Organization as OrganizationModel
-
-    site_origin = _resolve_origin(db, preferred_host_url)
-    lines = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-        "  <url>",
-        f"    <loc>{site_origin.rstrip('/')}/organizations</loc>",
-        "    <changefreq>weekly</changefreq>",
-        "    <priority>0.75</priority>",
-        "  </url>",
-    ]
-
-    orgs = (
-        db.query(OrganizationModel)
-        .order_by(OrganizationModel.name.asc(), OrganizationModel.id.asc())
-        .all()
-    )
-    for org in orgs:
-        loc = build_organization_page_url(org.id, site_origin)
-        lines.extend(
-            [
-                "  <url>",
-                f"    <loc>{loc}</loc>",
-                "    <changefreq>weekly</changefreq>",
-                "    <priority>0.7</priority>",
-                "  </url>",
-            ]
-        )
-
-    lines.append("</urlset>")
-    return "\n".join(lines) + "\n"

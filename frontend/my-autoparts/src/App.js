@@ -247,22 +247,6 @@ function App() {
               </LazyRoute>
             )}
           />
-          <Route
-            path="/my-parts/add"
-            element={(
-              <LazyRoute>
-                <AddPart />
-              </LazyRoute>
-            )}
-          />
-          <Route
-            path="/my-parts/edit/:id"
-            element={(
-              <LazyRoute>
-                <EditPart />
-              </LazyRoute>
-            )}
-          />
           <Route path="/part/:productId" element={<PartDetail />} />
           <Route path="/product-not-found" element={<ProductNotFound />} />
           <Route path="*" element={<NotFound />} />
@@ -298,6 +282,22 @@ function App() {
             element={(
               <LazyRoute>
                 <MyParts />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/my-parts/add"
+            element={(
+              <LazyRoute>
+                <AddPart />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/my-parts/edit/:id"
+            element={(
+              <LazyRoute>
+                <EditPart />
               </LazyRoute>
             )}
           />

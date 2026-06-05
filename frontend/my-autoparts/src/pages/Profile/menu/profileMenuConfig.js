@@ -34,6 +34,7 @@ const PATH_TAB_MAP = Object.fromEntries(
 );
 
 export const getActiveTabFromPath = (path, user) => {
+    if (path.startsWith('/my-parts')) return 'parts';
     if (path.startsWith('/vehicles/edit')) return 'vehicles';
     if (path.startsWith('/sellers')) return 'sellers';
     if (path.startsWith('/moderation/products')) return 'product-moderation';

@@ -108,7 +108,7 @@ export default function ProfileWithMenuLayout() {
                             isChatsPage ? 'flex min-h-0 flex-col lg:h-full lg:overflow-hidden' : ''
                         }`}
                     >
-                        <Outlet />
+                        <Outlet key={location.pathname} />
                     </div>
                 </div>
             </main>

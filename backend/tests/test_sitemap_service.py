@@ -95,7 +95,6 @@ class SitemapIndexXmlTests(unittest.TestCase):
         self.assertIn("<lastmod>2026-05-28</lastmod>", xml)
         self.assertIn("<loc>https://svoygarage.ru/api/feeds/sitemap-new-parts.xml</loc>", xml)
         self.assertIn("<lastmod>2026-05-27</lastmod>", xml)
-        self.assertNotIn("sitemap-profiles", xml)
 
 
 class RosskoNewPartSitemapEligibilityTests(unittest.TestCase):

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Navigate, useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import { normalizeImageUrl, apiRequest } from '../../utils/apiClient';
@@ -38,6 +38,7 @@ const CardPart = ({
   productStorageCells = [],
   imageErrors = {},
   onImageError,
+  renderMode = 'table',
 }) => {
   const [showActions, setShowActions] = useState(false);
   const isModeration = variant === 'moderation';
@@ -190,7 +191,8 @@ const CardPart = ({
   return (
   <React.Fragment>
     {/* Desktop table row */}
-    <tr className="group hover:bg-gray-50/50 transition-all duration-200 border-b border-gray-100 hidden md:table-row">
+    {renderMode === 'table' && (
+    <tr className="group hover:bg-gray-50/50 transition-all duration-200 border-b border-gray-100">
       {!isModeration && (
         <td className="px-4 py-4 whitespace-nowrap">
           <input
@@ -336,9 +338,11 @@ const CardPart = ({
         </div>
       </td>
     </tr>
+    )}
 
     {/* Mobile card version */}
-    <div className="md:hidden bg-white rounded-lg shadow-sm border border-gray-200 mb-3">
+    {renderMode === 'card' && (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-3">
       <div className={`flex items-center p-3 border-b border-gray-100 ${isModeration ? 'justify-end' : 'justify-between'}`}>
         {!isModeration && (
           <input
@@ -593,10 +597,11 @@ const CardPart = ({
         </div>
       )}
     </div>
+    )}
 
     {/* Expandable details row for desktop */}
-    {isExpanded && (
-      <tr className="bg-gray-50/50 hidden md:table-row">
+    {renderMode === 'table' && isExpanded && (
+      <tr className="bg-gray-50/50">
         <td colSpan={expandedColSpan} className="px-6 py-6 border-t border-gray-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Photos and Videos */}
@@ -731,6 +736,7 @@ const normalizeInternalCodeForSearch = (code) => {
 
 function MyParts() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, permissionCodes } = useSelector((state) => state.auth);
@@ -750,6 +756,7 @@ function MyParts() {
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
   const [showBulkActions, setShowBulkActions] = useState(false);
   const bulkActionsPlacement = useActionsDropdownPlacement(showBulkActions, 130);
+  const mobileBulkActionsPlacement = useActionsDropdownPlacement(showBulkActions, 130);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'in-stock');
   const [inStockFilters, setInStockFilters] = useState(() => ({
     ...DEFAULT_IN_STOCK_FILTERS,
@@ -1021,6 +1028,21 @@ function MyParts() {
     });
   };
 
+  const allDisplayedSelected = displayParts.length > 0
+    && displayParts.every((part) => selectedParts.has(part.id));
+
+  const handleToggleSelectAllDisplayed = () => {
+    if (allDisplayedSelected) {
+      const newSelected = new Set(selectedParts);
+      displayParts.forEach((part) => newSelected.delete(part.id));
+      setSelectedParts(newSelected);
+      return;
+    }
+    const newSelected = new Set(selectedParts);
+    displayParts.forEach((part) => newSelected.add(part.id));
+    setSelectedParts(newSelected);
+  };
+
   // Функция для переключения мобильного меню действий
   const toggleMobileActions = (partId) => {
     setMobileActionsOpen(mobileActionsOpen === partId ? null : partId);
@@ -1112,6 +1134,31 @@ function MyParts() {
     }
   };
 
+  const renderBulkActionsMenu = (menuClassName) => (
+    <div className={menuClassName}>
+      <div className="py-1">
+        <button
+          onClick={(e) => { e.stopPropagation(); handleBulkAction(); setShowBulkActions(false); }}
+          disabled={selectedParts.size === 0}
+          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <img src="/logos/avito.png" alt="" className="w-4 h-4" />
+          Экспорт Avito
+        </button>
+        {dromIntegrationReady && (
+          <button
+            onClick={(e) => { e.stopPropagation(); handleBulkExportDrom(); setShowBulkActions(false); }}
+            disabled={selectedParts.size === 0}
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <img src="/logos/drom.png" alt="" className="w-4 h-4" />
+            Экспорт Drom
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   useEffect(() => {
     if (!avitoJob?.id || !user?.organization_id) return undefined;
     let cancelled = false;
@@ -1194,8 +1241,10 @@ function MyParts() {
   }, [modalOpen])
 
 
-  // Sync URL parameters with component state
+  // Sync URL parameters with component state (only on /my-parts, без гонки с navigate)
   useEffect(() => {
+    if (location.pathname !== '/my-parts') return;
+
     const params = new URLSearchParams();
     const filters = isModerationTab ? moderationFilters : inStockFilters;
 
@@ -1214,8 +1263,19 @@ function MyParts() {
       }
     }
 
-    setSearchParams(params);
-  }, [inStockFilters, moderationFilters, isModerationTab, setSearchParams]);
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+
+    setSearchParams(params, { replace: true });
+  }, [
+    location.pathname,
+    inStockFilters,
+    moderationFilters,
+    isModerationTab,
+    searchParams,
+    setSearchParams,
+  ]);
 
   useEffect(() => {
     const params = {};
@@ -1706,29 +1766,8 @@ function MyParts() {
                     <span className="hidden sm:inline">Действия</span>
                   </button>
 
-                  {showBulkActions && (
-                    <div className={buildActionsDropdownMenuClassName(bulkActionsPlacement.openUp, 'w-40 z-50')}>
-                      <div className="py-1">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleBulkAction(); setShowBulkActions(false); }}
-                          disabled={selectedParts.size === 0}
-                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <img src="/logos/avito.png" alt="" className="w-4 h-4" />
-                          Экспорт Avito
-                        </button>
-                        {dromIntegrationReady && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleBulkExportDrom(); setShowBulkActions(false); }}
-                            disabled={selectedParts.size === 0}
-                            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <img src="/logos/drom.png" alt="" className="w-4 h-4" />
-                            Экспорт Drom
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                  {showBulkActions && renderBulkActionsMenu(
+                    buildActionsDropdownMenuClassName(bulkActionsPlacement.openUp, 'w-40 z-50')
                   )}
                 </div>
               </div>
@@ -1739,20 +1778,8 @@ function MyParts() {
                   <th className="px-4 py-3 text-left">
                     <input
                       type="checkbox"
-                      checked={displayParts.length > 0 && selectedParts.size === displayParts.length}
-                      onChange={() => {
-                        if (selectedParts.size === displayParts.length) {
-                          // Снимаем выделение со всех отображаемых запчастей
-                          const newSelected = new Set(selectedParts);
-                          displayParts.forEach(part => newSelected.delete(part.id));
-                          setSelectedParts(newSelected);
-                        } else {
-                          // Выделяем все отображаемые запчасти
-                          const newSelected = new Set(selectedParts);
-                          displayParts.forEach(part => newSelected.add(part.id));
-                          setSelectedParts(newSelected);
-                        }
-                      }}
+                      checked={allDisplayedSelected}
+                      onChange={handleToggleSelectAllDisplayed}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                   </th>
@@ -1792,9 +1819,47 @@ function MyParts() {
 
           {/* Mobile version - card layout */}
           <div className="md:hidden">
+            <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={allDisplayedSelected}
+                    onChange={handleToggleSelectAllDisplayed}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <span>Выбрать всё</span>
+                </label>
+                <span className="text-sm text-gray-500 whitespace-nowrap">
+                  Выбрано: {selectedParts.size}
+                  {inStockFilters.search && selectedParts.size > 0 && (
+                    <span className="text-indigo-600"> / {displayParts.length}</span>
+                  )}
+                </span>
+              </div>
+              {avitoIntegrationReady && (
+                <div ref={mobileBulkActionsPlacement.anchorRef} className="relative actions-dropdown flex justify-end">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowBulkActions(!showBulkActions); }}
+                    disabled={selectedParts.size === 0}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px]"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                    </svg>
+                    <span>Действия</span>
+                  </button>
+
+                  {showBulkActions && renderBulkActionsMenu(
+                    buildActionsDropdownMenuClassName(mobileBulkActionsPlacement.openUp, 'w-44 z-50')
+                  )}
+                </div>
+              )}
+            </div>
             {sortedDisplayParts.map((part) => (
               <CardPart
                 key={part.id}
+                renderMode="card"
                 part={part}
                 getStorageAddress={getStorageAddress}
                 getCellName={getCellName}
@@ -1911,6 +1976,7 @@ function MyParts() {
               {sortedModerationParts.map((part) => (
                 <CardPart
                   key={getModerationPartKey(part)}
+                  renderMode="card"
                   variant="moderation"
                   moderationKind={part.moderationKind}
                   part={part}
