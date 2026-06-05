@@ -10,9 +10,11 @@ import {
   getAvitoLineItemTitle,
   getAvitoLineItemTotal,
   getAvitoMobileDeliveryText,
+  getAvitoOrderChatId,
   getAvitoOrderItems,
 } from '../pages/Sales/avitoOrderDisplay';
 import OrderSourceBadge from './Orders/OrderSourceBadge';
+import OrderWriteMessageButton from './OrderWriteMessageButton/OrderWriteMessageButton';
 
 function DeliveryIcon({ className = 'h-4 w-4' }) {
   return (
@@ -144,6 +146,12 @@ export function AvitoOrderCard({
                   {deliveryDateMax ? ` — ${formatDate(deliveryDateMax)}` : ''}
                 </p>
               )}
+              <div className="mt-2 pl-6">
+                <OrderWriteMessageButton
+                  label="Написать покупателю"
+                  avitoChatId={getAvitoOrderChatId(order)}
+                />
+              </div>
             </div>
           </div>
 

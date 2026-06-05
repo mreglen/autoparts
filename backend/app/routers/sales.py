@@ -157,9 +157,38 @@ def _buyer_avatar_for_order(db: Session, order) -> str | None:
     return avatar_public_url(buyer.avatar_url)
 
 
+def _buyer_user_id_for_order(db: Session, order) -> int | None:
+    user_id = getattr(order, "user_id", None)
+    if user_id:
+        return int(user_id)
+    buyer = resolve_user_by_contact(db, order.buyer_phone, order.buyer_email)
+    return buyer.id if buyer else None
+
+
+def _seller_user_id_for_org(db: Session, org_id: str | None) -> int | None:
+    if not org_id:
+        return None
+    seller = (
+        db.query(UserModel)
+        .filter(
+            UserModel.organization_id == org_id,
+            (UserModel.is_director == True) | (UserModel.is_seller == True),
+        )
+        .first()
+    )
+    if not seller:
+        seller = db.query(UserModel).filter(UserModel.organization_id == org_id).first()
+    return seller.id if seller else None
+
+
 def _used_order_response(db: Session, order: GarageUsedOrder) -> UsedPartsOrderResponse:
     base = UsedPartsOrderResponse.model_validate(order)
-    return base.model_copy(update={"buyer_avatar_url": _buyer_avatar_for_order(db, order)})
+    return base.model_copy(
+        update={
+            "buyer_avatar_url": _buyer_avatar_for_order(db, order),
+            "buyer_user_id": _buyer_user_id_for_order(db, order),
+        }
+    )
 
 
 def _can_view_new_parts_orders(db: Session, user: UserModel) -> bool:
@@ -220,7 +249,12 @@ def _new_order_response(
     rossko_sync_error: str | None = None,
 ) -> NewPartsOrderResponse:
     base = NewPartsOrderResponse.model_validate(order)
-    result = base.model_copy(update={"buyer_avatar_url": _buyer_avatar_for_order(db, order)})
+    result = base.model_copy(
+        update={
+            "buyer_avatar_url": _buyer_avatar_for_order(db, order),
+            "buyer_user_id": _buyer_user_id_for_order(db, order),
+        }
+    )
     rossko_id = order.rossko_order_id
     snapshot = (rossko_by_id or {}).get(str(rossko_id)) if rossko_id else None
     per_order_error: str | None = None
@@ -944,6 +978,7 @@ def list_purchased_used_orders(
             "id": order.id,
             "organization_id": order.organization_id,
             "organization_name": org.name if org else "Не указана",
+            "seller_user_id": _seller_user_id_for_org(db, order.organization_id),
             "buyer_name": order.buyer_name,
             "buyer_phone": order.buyer_phone,
             "buyer_email": order.buyer_email,
@@ -991,10 +1026,12 @@ def list_purchased_new_orders(
             )
             for item in order.items
         ]
+        org = db.query(Organization).filter(Organization.id == order.organization_id).first()
         order_dict = {
             "id": order.id,
             "organization_id": order.organization_id,
-            "organization_name": None,
+            "organization_name": org.name if org else None,
+            "seller_user_id": _seller_user_id_for_org(db, order.organization_id),
             "buyer_name": order.buyer_name,
             "buyer_phone": order.buyer_phone,
             "buyer_email": order.buyer_email,

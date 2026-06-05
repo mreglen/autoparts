@@ -835,33 +835,48 @@ export default function SalesOrdersPage() {
       </header>
 
       <div className="rounded-2xl border border-gray-200/80 bg-white p-1 shadow-sm">
-        <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-3" aria-label="Источники заказов">
+        <div className="flex flex-wrap items-center gap-3 px-3 pt-3" aria-label="Источники заказов">
+          <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+            <OrderSourceBadge source="used" size="sm" />
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium tabular-nums text-gray-700">
+              {sourceCounts.used}
+            </span>
+          </span>
+          {canViewNewOrders && (
             <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-              <OrderSourceBadge source="used" size="sm" />
+              <OrderSourceBadge source="new" size="sm" />
               <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium tabular-nums text-gray-700">
-                {sourceCounts.used}
+                {sourceCounts.new}
               </span>
             </span>
-            {canViewNewOrders && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-                <OrderSourceBadge source="new" size="sm" />
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium tabular-nums text-gray-700">
-                  {sourceCounts.new}
-                </span>
+          )}
+          {avitoProActive && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+              <OrderSourceBadge source="avito" size="sm" />
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium tabular-nums text-gray-700">
+                {sourceCounts.avito}
               </span>
-            )}
-            {avitoProActive && (
-              <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-                <OrderSourceBadge source="avito" size="sm" />
-                <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium tabular-nums text-gray-700">
-                  {sourceCounts.avito}
-                </span>
-              </span>
-            )}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {STATUS_FILTER_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setStatusFilter(opt.id)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  statusFilter === opt.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
 
-          <div className="relative min-w-0 flex-1 lg:max-w-sm">
+          <div className="relative min-w-0 w-full sm:max-w-xs sm:flex-1 lg:max-w-sm">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
               fill="none"
@@ -879,21 +894,6 @@ export default function SalesOrdersPage() {
               className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 border-t border-gray-100 px-3 py-3">
-          {STATUS_FILTER_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setStatusFilter(opt.id)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                statusFilter === opt.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
         </div>
       </div>
 

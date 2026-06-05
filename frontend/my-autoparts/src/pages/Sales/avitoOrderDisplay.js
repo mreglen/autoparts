@@ -8,6 +8,16 @@ export function getAvitoOrderItems(order) {
   return Array.isArray(raw) ? raw : [];
 }
 
+export function getAvitoOrderChatId(order) {
+  const items = getAvitoOrderItems(order);
+  for (const item of items) {
+    if (item?.chatId) {
+      return String(item.chatId);
+    }
+  }
+  return null;
+}
+
 export function getAvitoDisplayTotal(order) {
   const avitoData = order.avito_data || {};
   const prices = avitoData.prices || {};

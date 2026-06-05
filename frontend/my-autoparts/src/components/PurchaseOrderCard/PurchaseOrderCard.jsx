@@ -1,6 +1,17 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import OrderWriteMessageButton from '../OrderWriteMessageButton/OrderWriteMessageButton';
 import { canLinkGarageOrderItem } from '../../utils/partRoutes';
+
+function NewPartsTypeBadge({ className = '' }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-800 ring-1 ring-sky-100 ${className}`}
+    >
+      NEW
+    </span>
+  );
+}
 
 const STATUS_ICONS = {
   pending: (
@@ -81,9 +92,12 @@ export default function PurchaseOrderCard({
 }) {
   const items = order.items || [];
   const isUsed = orderType === 'used';
-  const sellerLabel = isUsed
-    ? (order.organization_name || 'Продавец не указан')
-    : `Заказ новых запчастей №${order.id}`;
+  const fallbackProductId = useMemo(() => {
+    const itemWithProduct = items.find((item) => item.product_id);
+    return itemWithProduct?.product_id ?? null;
+  }, [items]);
+  const sellerLabel = order.organization_name
+    || (isUsed ? 'Продавец не указан' : `Заказ новых запчастей №${order.id}`);
   const statusCode = order.status_code || 'pending';
   const statusIcon = STATUS_ICONS[statusCode] || STATUS_ICONS.pending;
 
@@ -103,18 +117,28 @@ export default function PurchaseOrderCard({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0 space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                    isUsed ? 'bg-violet-50 text-violet-800 ring-1 ring-violet-100' : 'bg-sky-50 text-sky-800 ring-1 ring-sky-100'
-                  }`}
-                >
-                  {isUsed ? 'Б/У' : 'Новые'} · #{order.id}
-                </span>
+                {isUsed ? (
+                  <span className="inline-flex items-center rounded-lg bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-800 ring-1 ring-gray-100">
+                    №{order.id}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1 ring-1 ring-gray-100">
+                    <NewPartsTypeBadge />
+                    <span className="text-xs font-semibold text-gray-800">№{order.id}</span>
+                  </span>
+                )}
                 <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
               </div>
               <div>
                 <h3 className="text-base font-semibold text-gray-900 truncate">{sellerLabel}</h3>
                 <p className="mt-1 text-sm text-gray-600 line-clamp-2">{getDeliveryInfo(order)}</p>
+                <div className="mt-2">
+                  <OrderWriteMessageButton
+                    label="Написать продавцу"
+                    targetUserId={order.seller_user_id}
+                    productId={fallbackProductId}
+                  />
+                </div>
               </div>
             </div>
 
@@ -228,8 +252,7 @@ export default function PurchaseOrderCard({
   );
 }
 
-export function PurchaseOrdersEmptyState({ orderType, catalogHref = '/autoparts/used' }) {
-  const isUsed = orderType === 'used';
+export function PurchaseOrdersEmptyState({ hasAnyOrders = false, catalogHref = '/autoparts/used' }) {
   return (
     <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center shadow-sm">
       <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
@@ -238,17 +261,21 @@ export function PurchaseOrdersEmptyState({ orderType, catalogHref = '/autoparts/
         </svg>
       </div>
       <h3 className="text-lg font-semibold text-gray-900">
-        {isUsed ? 'Заказов б/у пока нет' : 'Заказов новых запчастей пока нет'}
+        {hasAnyOrders ? 'Нет заказов по выбранным фильтрам' : 'Заказов пока нет'}
       </h3>
       <p className="mx-auto mt-2 max-w-sm text-sm text-gray-600">
-        После оформления покупки заказ появится здесь — со статусом, доставкой и составом.
+        {hasAnyOrders
+          ? 'Попробуйте изменить фильтр статуса или поисковый запрос.'
+          : 'После оформления покупки заказ появится здесь — со статусом, доставкой и составом.'}
       </p>
-      <Link
-        to={catalogHref}
-        className="mt-6 inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-      >
-        Перейти в каталог
-      </Link>
+      {!hasAnyOrders && (
+        <Link
+          to={catalogHref}
+          className="mt-6 inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+        >
+          Перейти в каталог
+        </Link>
+      )}
     </div>
   );
 }

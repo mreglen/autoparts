@@ -4,8 +4,8 @@ import { apiAxios } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import PurchaseOrderCard, { PurchaseOrdersEmptyState } from '../../components/PurchaseOrderCard/PurchaseOrderCard';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
 import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus } from '../../utils/garageOrderUi';
-import { navigateGarageOrderItem } from '../../utils/partRoutes';
 
 const ACTIVE_STATUSES = new Set([
   'pending',
@@ -77,8 +77,8 @@ function getGarageStatusName(statusCode) {
   return statusMap[statusCode] || statusCode || 'В ожидании';
 }
 
-function matchesStatusFilter(order, filterId, isNewOrder = false) {
-  const code = isNewOrder
+function matchesStatusFilter(order, filterId, source = 'used') {
+  const code = source === 'new'
     ? normalizeNewPartsCustomerStatus(order.status_code)
     : (order.status_code || 'pending');
   if (filterId === 'all') return true;
@@ -86,14 +86,6 @@ function matchesStatusFilter(order, filterId, isNewOrder = false) {
   if (filterId === 'completed') return COMPLETED_STATUSES.has(code);
   if (filterId === 'rejected') return code === 'rejected';
   return true;
-}
-
-function sortOrdersNewestFirst(orders) {
-  return [...orders].sort((a, b) => {
-    const ta = new Date(a.created_at || 0).getTime();
-    const tb = new Date(b.created_at || 0).getTime();
-    return tb - ta;
-  });
 }
 
 export default function PurchasesOrdersPage() {
@@ -105,11 +97,8 @@ export default function PurchasesOrdersPage() {
 
   const [usedOrders, setUsedOrders] = useState([]);
   const [newOrders, setNewOrders] = useState([]);
-  const [expandedUsedOrderId, setExpandedUsedOrderId] = useState(null);
-  const [expandedNewOrderId, setExpandedNewOrderId] = useState(null);
-  const [canViewNewOrders, setCanViewNewOrders] = useState(true);
+  const [expandedOrderKey, setExpandedOrderKey] = useState(null);
   const [newOrdersLoadFailed, setNewOrdersLoadFailed] = useState(false);
-  const [activeTab, setActiveTab] = useState('used');
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -143,11 +132,9 @@ export default function PurchasesOrdersPage() {
       }
 
       if (newRes.status === 'fulfilled') {
-        setCanViewNewOrders(true);
         setNewOrdersLoadFailed(false);
         setNewOrders(Array.isArray(newRes.value.data) ? newRes.value.data : []);
       } else {
-        setCanViewNewOrders(true);
         setNewOrders([]);
         setNewOrdersLoadFailed(true);
       }
@@ -165,56 +152,52 @@ export default function PurchasesOrdersPage() {
     }
   }, [isReady, isAuthenticated, fetchAll]);
 
-  const filterOrders = useCallback(
-    (orders, { includeOrganization = true, isNewOrder = false } = {}) => {
+  const allOrdersPool = useMemo(
+    () => buildUnifiedOrders(usedOrders, newOrders, [], { canViewNewOrders: true, avitoProActive: false }),
+    [usedOrders, newOrders],
+  );
+
+  const filterUnifiedEntry = useCallback(
+    (entry) => {
+      const { source, order } = entry;
+      if (!matchesStatusFilter(order, statusFilter, source)) return false;
+
       const q = searchQuery.trim().toLowerCase();
-      return sortOrdersNewestFirst(orders).filter((order) => {
-        if (!matchesStatusFilter(order, statusFilter, isNewOrder)) return false;
-        if (!q) return true;
-        const haystack = [
-          order.id,
-          ...(includeOrganization ? [order.organization_name, order.seller] : []),
-          order.buyer_name,
-          order.buyer_phone,
-          getGarageDeliveryInfo(order),
-          ...(order.items || []).flatMap((item) => [
-            item.name,
-            item.brand,
-            item.partnumber,
-          ]),
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        return haystack.includes(q);
-      });
+      if (!q) return true;
+
+      const haystack = [
+        order.id,
+        ...(source === 'used' ? [order.organization_name, order.seller] : [order.organization_name]),
+        order.buyer_name,
+        order.buyer_phone,
+        getGarageDeliveryInfo(order),
+        ...(order.items || []).flatMap((item) => [item.name, item.brand, item.partnumber]),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
     },
-    [searchQuery, statusFilter]
+    [searchQuery, statusFilter],
   );
 
-  const filteredUsedOrders = useMemo(
-    () => filterOrders(usedOrders, { includeOrganization: true, isNewOrder: false }),
-    [filterOrders, usedOrders]
+  const filteredUnifiedOrders = useMemo(
+    () => allOrdersPool.filter(filterUnifiedEntry),
+    [allOrdersPool, filterUnifiedEntry],
   );
-  const filteredNewOrders = useMemo(
-    () => filterOrders(newOrders, { includeOrganization: false, isNewOrder: true }),
-    [filterOrders, newOrders]
-  );
-
-  const activeOrders = activeTab === 'used' ? filteredUsedOrders : filteredNewOrders;
-  const totalInTab = activeTab === 'used' ? usedOrders.length : newOrders.length;
 
   const stats = useMemo(() => {
-    const pool = activeTab === 'used' ? usedOrders : newOrders;
-    const activeCount = pool.filter((o) => {
-      const code = activeTab === 'new'
-        ? normalizeNewPartsCustomerStatus(o.status_code)
-        : (o.status_code || 'pending');
-      return ACTIVE_STATUSES.has(code);
-    }).length;
-    const totalSum = pool.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-    return { total: pool.length, activeCount, totalSum };
-  }, [activeTab, usedOrders, newOrders]);
+    let activeCount = 0;
+    let totalSum = 0;
+    allOrdersPool.forEach(({ source, order }) => {
+      const code = source === 'new'
+        ? normalizeNewPartsCustomerStatus(order.status_code)
+        : (order.status_code || 'pending');
+      if (ACTIVE_STATUSES.has(code)) activeCount += 1;
+      totalSum += Number(order.total_amount || 0);
+    });
+    return { total: allOrdersPool.length, activeCount, totalSum };
+  }, [allOrdersPool]);
 
   const handleProductClick = (item, e) => {
     e?.stopPropagation?.();
@@ -225,7 +208,7 @@ export default function PurchasesOrdersPage() {
 
       if (brand && article) {
         navigate(
-          `/part/${productId}-${encodeURIComponent(String(brand))}-${encodeURIComponent(String(article))}`
+          `/part/${productId}-${encodeURIComponent(String(brand))}-${encodeURIComponent(String(article))}`,
         );
         return;
       }
@@ -234,19 +217,13 @@ export default function PurchasesOrdersPage() {
     }
   };
 
-  const toggleUsedOrderExpand = (orderId) => {
-    setExpandedUsedOrderId((prev) => (prev === orderId ? null : orderId));
-  };
-
-  const toggleNewOrderExpand = (orderId) => {
-    setExpandedNewOrderId((prev) => (prev === orderId ? null : orderId));
+  const toggleOrderExpand = (key) => {
+    setExpandedOrderKey((prev) => (prev === key ? null : key));
   };
 
   if (!isReady || !isAuthenticated) {
     return <AuthLoadingScreen className="min-h-[16rem]" />;
   }
-
-  const catalogHref = activeTab === 'used' ? '/autoparts/used' : '/autoparts/new';
 
   return (
     <div className="min-w-0 space-y-6">
@@ -304,52 +281,24 @@ export default function PurchasesOrdersPage() {
 
       <div className="rounded-2xl border border-gray-200/80 bg-white p-1 shadow-sm">
         <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Тип заказов">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'used'}
-              onClick={() => setActiveTab('used')}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
-                activeTab === 'used'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Б/У запчасти
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  activeTab === 'used' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                {usedOrders.length}
-              </span>
-            </button>
-            {canViewNewOrders && (
+          <div className="flex flex-wrap gap-2">
+            {STATUS_FILTER_OPTIONS.map((opt) => (
               <button
+                key={opt.id}
                 type="button"
-                role="tab"
-                aria-selected={activeTab === 'new'}
-                onClick={() => setActiveTab('new')}
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
-                  activeTab === 'new'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
+                onClick={() => setStatusFilter(opt.id)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  statusFilter === opt.id
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                Новые
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${
-                    activeTab === 'new' ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'
-                  }`}
-                >
-                  {newOrders.length}
-                </span>
+                {opt.label}
               </button>
-            )}
+            ))}
           </div>
 
-          <div className="relative min-w-0 flex-1 sm:max-w-xs">
+          <div className="relative min-w-0 w-full sm:max-w-xs sm:flex-1 lg:max-w-sm">
             <svg
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
               fill="none"
@@ -363,31 +312,10 @@ export default function PurchasesOrdersPage() {
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={
-                activeTab === 'used'
-                  ? 'Поиск по номеру, продавцу, товару…'
-                  : 'Поиск по номеру, товару…'
-              }
+              placeholder="Поиск по номеру, продавцу, товару…"
               className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
           </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2 border-t border-gray-100 px-3 py-3">
-          {STATUS_FILTER_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setStatusFilter(opt.id)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                statusFilter === opt.id
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -411,7 +339,7 @@ export default function PurchasesOrdersPage() {
         </div>
       )}
 
-      {!loading && !error && newOrdersLoadFailed && activeTab === 'new' && (
+      {!loading && !error && newOrdersLoadFailed && (
         <p className="text-sm text-amber-700">
           Не удалось загрузить заказы новых запчастей. Попробуйте обновить страницу.
         </p>
@@ -419,45 +347,44 @@ export default function PurchasesOrdersPage() {
 
       {!loading && !error && (
         <>
-          {totalInTab > 0 && activeOrders.length !== totalInTab && (
+          {stats.total > 0 && filteredUnifiedOrders.length !== stats.total && (
             <p className="text-sm text-gray-500">
-              Показано {activeOrders.length} из {totalInTab} заказов
+              Показано {filteredUnifiedOrders.length} из {stats.total} заказов
             </p>
           )}
 
           <div className="space-y-4">
-            {activeOrders.map((order) => (
-              <PurchaseOrderCard
-                key={order.id}
-                order={{
-                  ...order,
-                  delivery_method_name: getGarageDeliveryInfo(order),
-                  ...(activeTab === 'new'
-                    ? { status_code: normalizeNewPartsCustomerStatus(order.status_code) }
-                    : {}),
-                }}
-                orderType={activeTab === 'used' ? 'used' : 'new'}
-                isExpanded={
-                  activeTab === 'used'
-                    ? expandedUsedOrderId === order.id
-                    : expandedNewOrderId === order.id
-                }
-                onToggle={activeTab === 'used' ? toggleUsedOrderExpand : toggleNewOrderExpand}
-                formatDate={formatDate}
-                formatPrice={formatPrice}
-                getStatusColor={getGarageStatusColor}
-                getStatusName={getGarageStatusName}
-                getDeliveryInfo={getGarageDeliveryInfo}
-                onProductClick={handleProductClick}
-              />
-            ))}
+            {filteredUnifiedOrders.map((entry) => {
+              const key = getUnifiedOrderKey(entry);
+              const isExpanded = expandedOrderKey === key;
+              const isUsed = entry.source === 'used';
+              const order = entry.order;
+
+              return (
+                <PurchaseOrderCard
+                  key={key}
+                  order={{
+                    ...order,
+                    ...(entry.source === 'new'
+                      ? { status_code: normalizeNewPartsCustomerStatus(order.status_code) }
+                      : {}),
+                  }}
+                  orderType={entry.source}
+                  isExpanded={isExpanded}
+                  onToggle={() => toggleOrderExpand(key)}
+                  formatDate={formatDate}
+                  formatPrice={formatPrice}
+                  getStatusColor={getGarageStatusColor}
+                  getStatusName={getGarageStatusName}
+                  getDeliveryInfo={getGarageDeliveryInfo}
+                  onProductClick={handleProductClick}
+                />
+              );
+            })}
           </div>
 
-          {activeOrders.length === 0 && (
-            <PurchaseOrdersEmptyState
-              orderType={activeTab === 'used' ? 'used' : 'new'}
-              catalogHref={catalogHref}
-            />
+          {filteredUnifiedOrders.length === 0 && (
+            <PurchaseOrdersEmptyState hasAnyOrders={stats.total > 0} />
           )}
         </>
       )}

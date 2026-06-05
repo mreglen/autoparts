@@ -7,6 +7,7 @@ import { getGarageDeliveryInfo } from '../../utils/garageOrderUi';
 import { navigateGarageOrderItem } from '../../utils/partRoutes';
 import UserAvatar from '../UserAvatar/UserAvatar';
 import OrderSourceBadge from '../Orders/OrderSourceBadge';
+import OrderWriteMessageButton from '../OrderWriteMessageButton/OrderWriteMessageButton';
 
 const SVOYGARAGE_LOGO = '/logos/svoygarage.png';
 
@@ -225,6 +226,12 @@ export default function SalesGarageOrderCard({
               <div className="min-w-0">
                 <h3 className="text-base font-semibold text-gray-900">{order.buyer_name || 'Покупатель не указан'}</h3>
                 <p className="mt-1 text-sm text-gray-600 break-all">{order.buyer_phone || '—'}</p>
+                <div className="mt-2">
+                  <OrderWriteMessageButton
+                    label="Написать покупателю"
+                    targetUserId={order.buyer_user_id}
+                  />
+                </div>
               </div>
             </div>
             <p className="mt-1 text-sm text-gray-600 line-clamp-2">{deliveryText}</p>

@@ -40,6 +40,7 @@ class UsedPartsOrderResponse(BaseModel):
     buyer_phone: str
     buyer_email: str
     buyer_avatar_url: Optional[str] = None
+    buyer_user_id: Optional[int] = None
     delivery_type: str
     delivery_address: Optional[str] = None
     transport_company: Optional[str] = None
@@ -80,6 +81,7 @@ class NewPartsOrderResponse(BaseModel):
     buyer_phone: str
     buyer_email: str
     buyer_avatar_url: Optional[str] = None
+    buyer_user_id: Optional[int] = None
     delivery_type: str
     delivery_address: Optional[str] = None
     transport_company: Optional[str] = None
@@ -166,6 +168,7 @@ class PurchasedUsedOrderResponse(BaseModel):
     id: int
     organization_id: str
     organization_name: str
+    seller_user_id: Optional[int] = None
     buyer_name: str
     buyer_phone: str
     buyer_email: str
@@ -201,6 +204,7 @@ class PurchasedNewOrderResponse(BaseModel):
     id: int
     organization_id: str
     organization_name: Optional[str] = None
+    seller_user_id: Optional[int] = None
     buyer_name: str
     buyer_phone: str
     buyer_email: str
