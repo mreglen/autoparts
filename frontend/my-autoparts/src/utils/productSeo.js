@@ -4,12 +4,11 @@ import { formatProductDisplayTitle, extractProductDescription } from './productD
 import { normalizeImageUrl } from './apiClient';
 import { resolveOgImageUrl } from './seoConstants';
 import {
-  buildProductAlternateNames,
-  buildProductOfferJsonLd,
   buildProductSearchDescription,
   buildProductSearchTitle,
   resolveProductCity,
 } from './productSearchSeo';
+import { buildCatalogProductJsonLd } from './productJsonLd';
 
 const SITE_ORIGIN = 'https://svoygarage.ru';
 
@@ -58,35 +57,7 @@ export function buildProductSeo(product) {
 
   const firstPhoto = product?.photos?.[0]?.photo_url;
   const imageUrl = resolveOgImageUrl(firstPhoto ? normalizeImageUrl(firstPhoto) : null);
-  const alternateName = buildProductAlternateNames({ brand, article });
-  const priceValue =
-    product?.price != null && Number(product.price) > 0
-      ? Number(product.price).toFixed(2)
-      : null;
-
-  const offers = buildProductOfferJsonLd({
-    canonicalUrl,
-    price: priceValue,
-    inStock,
-    isNew: Boolean(product?.is_new),
-    sellerName: organization?.name,
-    sellerPhone: organization?.phone,
-    sellerAddress: organization?.address,
-    city,
-  });
-
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name,
-    sku: article || undefined,
-    mpn: article || undefined,
-    alternateName: alternateName.length > 0 ? alternateName : undefined,
-    description,
-    brand: brand ? { '@type': 'Brand', name: brand } : undefined,
-    image: imageUrl ? [imageUrl] : undefined,
-    offers,
-  };
+  const jsonLd = buildCatalogProductJsonLd(product, { canonicalUrl });
 
   return { title, description, canonicalUrl, imageUrl, jsonLd };
 }

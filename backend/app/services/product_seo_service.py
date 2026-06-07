@@ -12,9 +12,12 @@ from app.models.product import Product as ProductModel
 from app.services.spa_page_check_service import PART_PATH_RE, _normalize_path
 from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
 from app.utils.product_display_name import extract_product_description, format_product_display_title
+from app.utils.product_json_ld import (
+    build_catalog_product_json_ld,
+    dumps_json_ld,
+    product_body_description,
+)
 from app.utils.product_search_seo import (
-    build_product_alternate_names,
-    build_product_offer_json_ld,
     build_product_search_description,
     build_product_search_title,
     resolve_product_city,
@@ -41,16 +44,6 @@ def _strip_html(value: str | None) -> str:
     text = re.sub(r"<[^>]+>", " ", str(value or ""))
     return re.sub(r"\s+", " ", text).strip()
 
-
-def _body_product_description(unique_desc: str | None, meta_description: str, *, max_len: int = 500) -> str | None:
-    text = re.sub(r"\s+", " ", (unique_desc or "")).strip()
-    if not text or len(text) < 20:
-        return None
-    if text in meta_description:
-        return None
-    if len(text) <= max_len:
-        return text
-    return f"{text[: max_len - 1].strip()}…"
 
 
 def parse_part_path_product_id(path: str) -> int | None:
@@ -130,36 +123,25 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
     if not image_url:
         image_url = resolve_default_og_image_url(origin)
 
-    offer = build_product_offer_json_ld(
+    product_json_ld = build_catalog_product_json_ld(
+        product,
+        site_origin=origin,
         canonical_url=canonical_url,
-        price=price,
-        in_stock=in_stock,
-        is_new=bool(product.is_new),
-        seller_name=str(org_name) if org_name is not None else None,
-        seller_phone=str(org_phone) if org_phone is not None else None,
-        seller_address=str(org_address) if org_address is not None else None,
         city=city,
     )
-
-    alternate_names = build_product_alternate_names(brand=brand, article=article)
-    json_ld_obj = {
-        "@context": "https://schema.org",
-        "@type": "Product",
-        "name": name,
-        "sku": article or None,
-        "mpn": article or None,
-        "alternateName": alternate_names or None,
-        "description": description,
-        "brand": {"@type": "Brand", "name": brand} if brand else None,
-        "image": [image_url] if image_url else None,
-        "offers": offer,
-    }
-    json_ld_obj = {k: v for k, v in json_ld_obj.items() if v is not None}
-    json_ld = json.dumps(json_ld_obj, ensure_ascii=False)
+    json_ld = dumps_json_ld(product_json_ld)
     json_ld_graph = build_product_json_ld_graph(
         json_ld=json_ld,
         canonical_url=canonical_url,
         h1=name,
+    )
+    body_description = product_body_description(
+        brand=brand,
+        article=article,
+        name=name,
+        unique_description=unique_desc,
+        short_name=short_name,
+        is_new=bool(product.is_new),
     )
 
     return ProductSeoMeta(
@@ -172,16 +154,20 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
         in_stock=in_stock,
         json_ld=json_ld,
         json_ld_graph=json_ld_graph,
-        product_description=_body_product_description(unique_desc, description),
+        product_description=body_description,
     )
 
 
 def build_product_json_ld_graph(*, json_ld: str, canonical_url: str, h1: str) -> str:
     """Product + BreadcrumbList для JSON-LD (Яндекс.Вебмастер, Google)."""
-    try:
-        product_obj = json.loads(json_ld)
-    except Exception:
-        product_obj = None
+    product_obj = None
+    if json_ld:
+        try:
+            parsed = json.loads(json_ld)
+            if isinstance(parsed, dict) and parsed.get("@type") == "Product":
+                product_obj = parsed
+        except Exception:
+            product_obj = None
 
     site_origin = canonical_url.split("/part/")[0]
     breadcrumb_obj = {
@@ -232,15 +218,15 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
     description = html.escape(meta.description, quote=True)
     canonical = html.escape(meta.canonical_url, quote=True)
     h1 = html.escape(meta.h1)
-    body_desc = html.escape(meta.description)
-    product_desc_block = ""
-    if meta.product_description:
-        product_desc_block = f"\n    <p>{html.escape(meta.product_description)}</p>"
+    body_desc = html.escape(meta.product_description or meta.description)
     image_tag = (
         f'<meta property="og:image" content="{html.escape(meta.image_url, quote=True)}" />'
         if meta.image_url
         else ""
     )
+    image_block = ""
+    if meta.image_url:
+        image_block = f'\n    <img src="{html.escape(meta.image_url, quote=True)}" alt="{h1}" />'
     json_ld_graph = meta.json_ld_graph or build_product_json_ld_graph(
         json_ld=meta.json_ld,
         canonical_url=meta.canonical_url,
@@ -266,8 +252,8 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
 </head>
 <body>
   <article>
-    <h1>{h1}</h1>
-    <p>{body_desc}</p>{product_desc_block}
+    <h1>{h1}</h1>{image_block}
+    <p>{body_desc}</p>
   </article>
 </body>
 </html>

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
+from app.utils.product_json_ld import build_new_part_card_json_ld, dumps_json_ld, product_body_description
 from app.utils.seo_constants import resolve_default_og_image_url
 
 ROSSKO_NEW_PART_SOURCE = "rossko"
@@ -26,6 +27,7 @@ class NewPartSeoMeta:
     price: str | None
     in_stock: bool
     json_ld: str
+    product_description: str | None = None
 
 
 def _safe_text(value: object, *, default: str = "") -> str:
@@ -349,28 +351,15 @@ def build_new_part_seo_meta(card: NewPartsSeoCard, *, site_origin: str | None = 
     canonical = f"{origin}{build_new_part_card_path(card.id, card.brand, card.article)}"
     image_url = _absolute_photo_url(_safe_text(card.image_url), origin) or resolve_default_og_image_url(origin)
 
-    product_json = {
-        "@context": "https://schema.org",
-        "@type": "Product",
-        "name": display_name,
-        "sku": card.article,
-        "mpn": card.article,
-        "description": description,
-        "brand": {"@type": "Brand", "name": card.brand},
-        "image": [image_url],
-        "offers": {
-            "@type": "Offer",
-            "url": canonical,
-            "priceCurrency": card.currency or "RUB",
-            "price": price_text,
-            "availability": "https://schema.org/InStock" if in_stock else "https://schema.org/OutOfStock",
-            "itemCondition": "https://schema.org/NewCondition",
-        },
-    }
-    product_json = {k: v for k, v in product_json.items() if v is not None}
-    offers = product_json.get("offers")
-    if isinstance(offers, dict):
-        product_json["offers"] = {k: v for k, v in offers.items() if v is not None}
+    product_json_ld = build_new_part_card_json_ld(card, site_origin=origin, canonical_url=canonical)
+    json_ld = dumps_json_ld(product_json_ld)
+    body_description = product_body_description(
+        brand=str(card.brand or "").strip(),
+        article=str(card.article or "").strip(),
+        name=display_name,
+        unique_description=_safe_text(card.description),
+        is_new=True,
+    )
 
     return NewPartSeoMeta(
         title=title,
@@ -380,7 +369,8 @@ def build_new_part_seo_meta(card: NewPartsSeoCard, *, site_origin: str | None = 
         image_url=image_url,
         price=price_text,
         in_stock=in_stock,
-        json_ld=json.dumps(product_json, ensure_ascii=False),
+        json_ld=json_ld,
+        product_description=body_description,
     )
 
 
@@ -416,7 +406,14 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
     description = html.escape(meta.description, quote=True)
     canonical = html.escape(meta.canonical_url, quote=True)
     h1 = html.escape(meta.h1)
+    body_desc = html.escape(meta.product_description or meta.description)
     image_tag = f'<meta property="og:image" content="{html.escape(meta.image_url or resolve_default_og_image_url(), quote=True)}" />'
+    image_block = ""
+    if meta.image_url:
+        image_block = f'\n    <img src="{html.escape(meta.image_url, quote=True)}" alt="{h1}" />'
+    json_ld_script = ""
+    if meta.json_ld:
+        json_ld_script = f'  <script type="application/ld+json">{meta.json_ld}</script>\n'
 
     return f"""<!DOCTYPE html>
 <html lang="ru">
@@ -433,12 +430,11 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
   <meta property="og:url" content="{canonical}" />
   <meta property="og:locale" content="ru_RU" />
   {image_tag}
-  <script type="application/ld+json">{meta.json_ld}</script>
-</head>
+  {json_ld_script}</head>
 <body>
   <article>
-    <h1>{h1}</h1>
-    <p>{html.escape(meta.description)}</p>
+    <h1>{h1}</h1>{image_block}
+    <p>{body_desc}</p>
   </article>
 </body>
 </html>

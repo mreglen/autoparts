@@ -161,54 +161,37 @@ def build_product_offer_json_ld(
     seller_address: str | None,
     city: str | None,
 ) -> dict | None:
-    if not price:
+    from app.utils.product_json_ld import build_offer_json_ld, format_price_ld
+
+    price_str = format_price_ld(price)
+    if not price_str:
         return None
 
     city_name = city or DEFAULT_CITY
-    offer: dict = {
-        "@type": "Offer",
-        "url": canonical_url,
-        "priceCurrency": "RUB",
-        "price": price,
-        "availability": "https://schema.org/InStock" if in_stock else "https://schema.org/OutOfStock",
-        "itemCondition": "https://schema.org/NewCondition"
-        if is_new
-        else "https://schema.org/UsedCondition",
-        "areaServed": {"@type": "Country", "name": "RU"},
-        "shippingDetails": {
-            "@type": "OfferShippingDetails",
-            "shippingDestination": {
-                "@type": "DefinedRegion",
-                "addressCountry": "RU",
-            },
-        },
-        "availableAtOrFrom": {
-            "@type": "Place",
-            "address": {
-                "@type": "PostalAddress",
-                "addressLocality": city_name,
-                "addressCountry": "RU",
-            },
+    offer = build_offer_json_ld(
+        canonical_url=canonical_url,
+        price=price_str,
+        in_stock=in_stock,
+        is_new=is_new,
+        seller_name=seller_name,
+        seller_phone=seller_phone,
+        seller_address=seller_address,
+        city=city_name,
+    )
+    offer["areaServed"] = {"@type": "Country", "name": "RU"}
+    offer["shippingDetails"] = {
+        "@type": "OfferShippingDetails",
+        "shippingDestination": {
+            "@type": "DefinedRegion",
+            "addressCountry": "RU",
         },
     }
-
-    if seller_name or seller_phone or seller_address:
-        seller: dict = {
-            "@type": "Organization",
-            "name": str(seller_name or "").strip() or SITE_BRAND,
-        }
-        phone_str = str(seller_phone or "").strip()
-        if phone_str:
-            seller["telephone"] = phone_str
-        address_str = str(seller_address or "").strip()
-        if address_str or city_name:
-            seller["address"] = {
-                "@type": "PostalAddress",
-                "streetAddress": address_str or None,
-                "addressLocality": city_name,
-                "addressCountry": "RU",
-            }
-            seller["address"] = {k: v for k, v in seller["address"].items() if v}
-        offer["seller"] = seller
-
+    offer["availableAtOrFrom"] = {
+        "@type": "Place",
+        "address": {
+            "@type": "PostalAddress",
+            "addressLocality": city_name,
+            "addressCountry": "RU",
+        },
+    }
     return offer

@@ -6,6 +6,7 @@ import { SITE_ORIGIN } from '../../../utils/breadcrumbs';
 import { buildNewPartDetailPath, parseNewPartDetailParam } from '../../../utils/partRoutes';
 import NewPartProductCard from './NewPartProductCard';
 import ProductCard from '../ProductCard';
+import { buildNewPartCardJsonLd, parseJsonLdString } from '../../../utils/productJsonLd';
 import {
   buildRosskoLookupText,
   getRosskoParts,
@@ -99,6 +100,7 @@ export default function NewPartDetailPage() {
   const [usedMatches, setUsedMatches] = useState([]);
   const [usedMatchError, setUsedMatchError] = useState('');
   const [usedMatchLoading, setUsedMatchLoading] = useState(false);
+  const [seoJsonLd, setSeoJsonLd] = useState(null);
 
   useEffect(() => {
     if (!numericCardId || Number.isNaN(numericCardId)) {
@@ -195,6 +197,26 @@ export default function NewPartDetailPage() {
     }
   }, [card, location.pathname, navigate]);
 
+  useEffect(() => {
+    if (!card?.id) {
+      setSeoJsonLd(null);
+      return;
+    }
+    const path = buildNewPartDetailPath(card);
+    if (!path) return;
+
+    const run = async () => {
+      try {
+        const response = await apiAxiosUnauth.get('/public/new-part-meta', { params: { path } });
+        const parsed = parseJsonLdString(response?.data?.json_ld);
+        setSeoJsonLd(parsed);
+      } catch (_e) {
+        setSeoJsonLd(buildNewPartCardJsonLd(card, { canonicalUrl: `${SITE_ORIGIN}${path}` }));
+      }
+    };
+    run();
+  }, [card]);
+
   const livePart = useMemo(() => {
     if (!card) return null;
     const fromRossko = pickBestRosskoPart(rosskoData, card.article, card.brand);
@@ -273,25 +295,10 @@ export default function NewPartDetailPage() {
   const brand = safeText(card?.brand, '—');
   const article = safeText(card?.article, '—');
   const name = safeText(card?.name) || `${brand} ${article}`.trim();
-  const description = safeText(card?.description, '');
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name,
-    sku: article,
-    mpn: article,
-    description: description || name,
-    brand: { '@type': 'Brand', name: brand },
-    offers: {
-      '@type': 'Offer',
-      url: `${SITE_ORIGIN}${canonicalPath}`,
-      priceCurrency: 'RUB',
-      price: card?.price != null ? String(Number(card.price).toFixed(2)) : undefined,
-      availability: Number(card?.stock_count || 0) > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-      itemCondition: 'https://schema.org/NewCondition',
-    },
-  };
+  const jsonLd = seoJsonLd || buildNewPartCardJsonLd(card, {
+    canonicalUrl: `${SITE_ORIGIN}${canonicalPath}`,
+  });
 
   const analogsLoading = rosskoStatus === 'loading' && analogParts.length === 0;
   const hasLiveStocks = Boolean(livePart) && liveStocks.length > 0;
@@ -315,7 +322,7 @@ export default function NewPartDetailPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
       <PageSeoHelmet seo={seo} />
-      <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+      {jsonLd ? <script type="application/ld+json">{JSON.stringify(jsonLd)}</script> : null}
 
       <section className="mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-4 shadow-sm sm:p-6">
         <button

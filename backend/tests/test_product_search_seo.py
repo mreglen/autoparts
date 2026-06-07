@@ -102,7 +102,7 @@ class ProductOfferJsonLdTests(unittest.TestCase):
 
 
 class ProductSeoMetaIntegrationTests(unittest.TestCase):
-    def _make_product(self):
+    def _make_product(self, *, photos=None):
         product = MagicMock()
         product.brand = "MANN"
         product.article = "IF1009"
@@ -111,7 +111,7 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         product.is_new = True
         product.price = 1200
         product.quantity = 2
-        product.photos = []
+        product.photos = photos if photos is not None else [MagicMock(photo_url="/uploads/pictures/test.jpg")]
         product.id = 16
         product.organization = MagicMock(
             name="Авторазбор",
@@ -132,7 +132,8 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         self.assertEqual(json_ld["sku"], "IF1009")
         self.assertEqual(json_ld["mpn"], "IF1009")
         self.assertEqual(json_ld["alternateName"], ["IF1009", "MANN IF1009", "IF1009 MANN"])
-        self.assertEqual(json_ld["description"], meta.description)
+        self.assertNotEqual(json_ld["description"], meta.description)
+        self.assertIn("manufacturer", json_ld)
         self.assertIn("seller", json_ld["offers"])
         self.assertIn("shippingDetails", json_ld["offers"])
 
@@ -147,11 +148,17 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
         html = render_product_prerender_html(meta)
         self.assertIn("MANN IF1009 Масляный фильтр", html)
-        self.assertIn("в Екатеринбурге.", html)
         self.assertIn("Оригинальный фильтр в отличном состоянии.", html)
         self.assertNotIn("noindex", html)
         self.assertNotIn("Открыть карточку", html)
         self.assertNotIn("Цена:", html)
+
+    def test_prerender_html_without_photo_has_no_product_json_ld(self):
+        meta = build_product_seo_meta(self._make_product(photos=[]), site_origin="https://svoygarage.ru")
+        html = render_product_prerender_html(meta)
+        self.assertIn('type="application/ld+json"', html)
+        self.assertNotIn('"@type": "Product"', html)
+        self.assertIn('"@type": "BreadcrumbList"', html)
 
     def test_prerender_html_includes_og_image(self):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")

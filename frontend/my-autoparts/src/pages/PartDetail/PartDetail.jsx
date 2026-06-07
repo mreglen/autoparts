@@ -403,9 +403,9 @@ const PartDetail = () => {
   const seo = buildProductSeo(currentProduct);
   const breadcrumbItems = buildBreadcrumbsForPath(location.pathname, { product: currentProduct });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
-  const structuredData = breadcrumbJsonLd
+  const structuredData = seo.jsonLd && breadcrumbJsonLd
     ? { '@context': 'https://schema.org', '@graph': [seo.jsonLd, breadcrumbJsonLd] }
-    : seo.jsonLd;
+    : seo.jsonLd || breadcrumbJsonLd || null;
 
   const partBrand = (currentProduct.brand || '').trim();
   const partArticle = (currentProduct.article || '').trim();
