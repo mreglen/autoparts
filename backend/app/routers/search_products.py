@@ -12,20 +12,12 @@ from app.schemas.rossko import SearchRequest
 from app.utils.search_cache import build_cache_key, get_cached_json, set_cached_json
 from app.utils.singleflight import SingleFlight
 from app.utils.product_list_item import map_product_to_list_item
+from app.utils.partnumber import normalize_partnumber
 
 router = APIRouter(prefix="/search-products", tags=["Search-Products"])
 logger = logging.getLogger(__name__)
 _SEARCH_CACHE_TTL_SECONDS = 120
 _rossko_singleflight = SingleFlight()
-
-def normalize_partnumber(pn: str) -> str:
-    """
-    Убирает все спецсимволы и приводит к верхнему регистру.
-    Например: 'IF-1009' -> 'IF1009', 'if 1009' -> 'IF1009'
-    """
-    if not pn:
-        return ""
-    return re.sub(r'[^A-Za-z0-9А-Яа-яЁё]', '', pn).upper()
 
 def get_sql_normalize(col):
     """

@@ -1127,6 +1127,30 @@ def rebuild_sitemaps(
     return result
 
 
+@router.post("/seo/new-parts/sync-from-products")
+async def sync_new_parts_seo_from_products_endpoint(
+    limit: int = Query(100, ge=1, le=500, description="Максимум новых SEO-карточек за сутки"),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    from dataclasses import asdict
+
+    from app.services.new_parts_seo_sync_service import sync_new_parts_seo_from_products
+
+    integration = get_or_create_yandex_integration(db)
+    host = integration.host_url
+    sync_stats = await sync_new_parts_seo_from_products(db, daily_limit=limit)
+    new_parts_snapshot = rebuild_new_parts_sitemap_cache(db, preferred_host_url=host)
+    return {
+        "ok": True,
+        "sync": asdict(sync_stats),
+        "new_parts": {
+            "url_count": new_parts_snapshot.url_count,
+            "generated_at": new_parts_snapshot.generated_at.isoformat(),
+        },
+    }
+
+
 @router.get("/seo/product-card-urls")
 def download_product_card_urls(
     limit: int = Query(DEFAULT_PRODUCT_URLS_LIMIT, ge=1, le=500),

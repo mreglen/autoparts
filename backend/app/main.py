@@ -17,6 +17,7 @@ from app.db.schema_patches import (
     ensure_chat_created_by_column,
     ensure_seo_product_url_exports_table,
     ensure_seo_sitemap_cache_table,
+    ensure_new_parts_seo_sync_log_table,
     ensure_user_avatar_column,
     ensure_product_photo_thumb_url_column,
     ensure_rossko_settings_table,
@@ -59,6 +60,7 @@ import app.models.rossko_settings  # noqa: F401 — Rossko checkout settings
 import app.models.new_parts_checkout_session  # noqa: F401 — YooKassa checkout sessions
 import app.models.yookassa_payment  # noqa: F401 — YooKassa payments
 import app.models.new_parts_seo_card  # noqa: F401 — SEO cards for supplier new parts
+import app.models.new_parts_seo_sync_log  # noqa: F401 — SEO sync log for products→Rossko
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings
@@ -119,6 +121,7 @@ try:
     ensure_chat_created_by_column()
     ensure_seo_product_url_exports_table()
     ensure_seo_sitemap_cache_table()
+    ensure_new_parts_seo_sync_log_table()
     ensure_user_avatar_column()
     ensure_product_photo_thumb_url_column()
     ensure_rossko_settings_table()
@@ -314,12 +317,26 @@ async def run_cleanup_expired_guest_carts():
 
 async def run_rebuild_products_sitemap_cache():
     try:
+        from app.services.new_parts_seo_sync_service import sync_new_parts_seo_from_products
         from app.services.sitemap_service import rebuild_all_sitemaps_cache
 
         db_gen = get_db()
         db = next(db_gen)
         try:
             integration = get_or_create_yandex_integration(db)
+            sync_stats = await sync_new_parts_seo_from_products(
+                db,
+                daily_limit=settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT,
+            )
+            logger.info(
+                "New parts SEO sync from products: candidates=%s created=%s updated=%s skipped=%s not_found=%s errors=%s",
+                sync_stats.candidates,
+                sync_stats.created,
+                sync_stats.updated_existing,
+                sync_stats.skipped,
+                sync_stats.not_found,
+                sync_stats.errors,
+            )
             products_snapshot, new_parts_snapshot = rebuild_all_sitemaps_cache(
                 db,
                 preferred_host_url=integration.host_url,

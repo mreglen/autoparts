@@ -671,6 +671,83 @@ def ensure_seo_sitemap_cache_table() -> None:
     logger.info("Created seo_sitemap_cache table")
 
 
+def ensure_new_parts_seo_sync_log_table() -> None:
+    """Log of product-pair → Rossko SEO card sync attempts."""
+    inspector = inspect(engine)
+    if "new_parts_seo_sync_log" in inspector.get_table_names():
+        return
+
+    dialect = engine.dialect.name
+    with engine.begin() as conn:
+        if dialect == "postgresql":
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE new_parts_seo_sync_log (
+                        id SERIAL PRIMARY KEY,
+                        lookup_key VARCHAR(255) NOT NULL,
+                        lookup_brand VARCHAR(120) NOT NULL,
+                        lookup_article VARCHAR(120) NOT NULL,
+                        rossko_brand VARCHAR(120),
+                        rossko_article VARCHAR(120),
+                        seo_card_id INTEGER REFERENCES new_parts_seo_cards(id),
+                        status VARCHAR(32) NOT NULL,
+                        error_message TEXT,
+                        checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        next_retry_at TIMESTAMPTZ,
+                        CONSTRAINT uq_new_parts_seo_sync_log_lookup_key UNIQUE (lookup_key)
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_new_parts_seo_sync_log_status "
+                    "ON new_parts_seo_sync_log (status)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_new_parts_seo_sync_log_checked_at "
+                    "ON new_parts_seo_sync_log (checked_at)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_new_parts_seo_sync_log_next_retry_at "
+                    "ON new_parts_seo_sync_log (next_retry_at)"
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE new_parts_seo_sync_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        lookup_key VARCHAR(255) NOT NULL UNIQUE,
+                        lookup_brand VARCHAR(120) NOT NULL,
+                        lookup_article VARCHAR(120) NOT NULL,
+                        rossko_brand VARCHAR(120),
+                        rossko_article VARCHAR(120),
+                        seo_card_id INTEGER REFERENCES new_parts_seo_cards(id),
+                        status VARCHAR(32) NOT NULL,
+                        error_message TEXT,
+                        checked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        next_retry_at TIMESTAMP
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_new_parts_seo_sync_log_status "
+                    "ON new_parts_seo_sync_log (status)"
+                )
+            )
+
+    logger.info("Created new_parts_seo_sync_log table")
+
+
 def ensure_user_avatar_column() -> None:
     """Add avatar_url column to users if missing."""
     inspector = inspect(engine)

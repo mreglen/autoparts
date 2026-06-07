@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     SITEMAP_PAGES_LASTMOD: str = "2026-05-29"
     SITEMAP_REBUILD_HOUR_UTC: int = 3
 
+    NEW_PARTS_SEO_SYNC_DAILY_LIMIT: int = 100
+    NEW_PARTS_SEO_SYNC_NOT_FOUND_RETRY_DAYS: int = 7
+    NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC: float = 1.0
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
 
     @property
