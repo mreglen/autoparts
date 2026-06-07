@@ -12,9 +12,7 @@ const PERIOD_OPTIONS = [
 ];
 
 const TABS = [
-  { id: 'overview', label: 'Обзор' },
   { id: 'pages', label: 'Страницы' },
-  { id: 'product-cards', label: 'Карточки' },
   { id: 'sitemap', label: 'Sitemap' },
 ];
 
@@ -33,8 +31,6 @@ const PAGE_LABELS = {
   '/auth': 'Вход',
   '/part/:productId': 'Карточки товаров',
 };
-
-const PRODUCT_CARD_TEMPLATE = '/part/:productId';
 
 function formatDuration(seconds) {
   const total = Math.max(0, Math.round(Number(seconds) || 0));
@@ -72,6 +68,18 @@ function formatDateTime(value) {
 
 function pageLabel(path) {
   return PAGE_LABELS[path] || path;
+}
+
+function formatSyncStats(sync) {
+  if (!sync) return '';
+  const parts = [
+    sync.created != null && `создано ${sync.created}`,
+    sync.updated_existing != null && `обновлено ${sync.updated_existing}`,
+    sync.skipped != null && `пропущено ${sync.skipped}`,
+    sync.not_found != null && `не найдено ${sync.not_found}`,
+    sync.errors != null && sync.errors > 0 && `ошибок ${sync.errors}`,
+  ].filter(Boolean);
+  return parts.join(', ');
 }
 
 function Stat({ label, value }) {
@@ -150,41 +158,59 @@ function LoadingBlock() {
   return <p className="py-12 text-center text-sm text-gray-400">Загрузка…</p>;
 }
 
+const ACTIVITY_COLUMNS = [
+  { key: 'day', label: 'Дата', render: (r) => formatDay(r.day) },
+  {
+    key: 'pv',
+    label: 'Просм.',
+    align: 'right',
+    render: (r) => formatNumber(r.page_views),
+  },
+  {
+    key: 'uv',
+    label: 'Посет.',
+    align: 'right',
+    render: (r) => formatNumber(r.unique_visitors),
+  },
+];
+
 export default function AnalyticsPage() {
   const { isReady, user, isAuthenticated } = useAuthReady();
   const [days, setDays] = useState(7);
-  const [viewMode, setViewMode] = useState('overview');
+  const [viewMode, setViewMode] = useState('pages');
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [productCardsLoading, setProductCardsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [summary, setSummary] = useState(null);
   const [pages, setPages] = useState([]);
-  const [forms, setForms] = useState([]);
   const [activity, setActivity] = useState([]);
   const [selectedPath, setSelectedPath] = useState(null);
   const [pageDetail, setPageDetail] = useState(null);
-  const [productCards, setProductCards] = useState(null);
-  const [productUrlsDownloadBusy, setProductUrlsDownloadBusy] = useState(false);
-  const [productUrlsNotice, setProductUrlsNotice] = useState(null);
   const [sitemapLoading, setSitemapLoading] = useState(false);
   const [sitemapRebuildBusy, setSitemapRebuildBusy] = useState(false);
+  const [seoSyncBusy, setSeoSyncBusy] = useState(false);
+  const [seoSyncNotice, setSeoSyncNotice] = useState(null);
+  const [productUrlsDownloadBusy, setProductUrlsDownloadBusy] = useState(false);
+  const [productUrlsNotice, setProductUrlsNotice] = useState(null);
   const [sitemapData, setSitemapData] = useState(null);
 
-  const loadOverview = useCallback(async () => {
+  const loadPagesData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [summaryRes, pagesRes, formsRes, activityRes] = await Promise.all([
+      const [summaryRes, pagesRes, activityRes] = await Promise.all([
         apiRequest(`/admin/analytics/summary?days=${days}`),
         apiRequest(`/admin/analytics/pages?days=${days}`),
-        apiRequest(`/admin/analytics/forms?days=${days}`),
         apiRequest(`/admin/analytics/activity?days=${days}`),
       ]);
       setSummary(summaryRes);
-      setPages(pagesRes?.items || []);
-      setForms(formsRes?.items || []);
+      const items = pagesRes?.items || [];
+      setPages(items);
       setActivity(activityRes?.items || []);
+      setSelectedPath((prev) => {
+        if (prev && items.some((row) => row.path_template === prev)) return prev;
+        return items[0]?.path_template ?? null;
+      });
     } catch (e) {
       setError(e?.message || 'Ошибка загрузки');
     } finally {
@@ -195,13 +221,11 @@ export default function AnalyticsPage() {
   const loadPageDetail = useCallback(
     async (pathTemplate) => {
       setDetailLoading(true);
-      setError(null);
       try {
         const detail = await apiRequest(
           `/admin/analytics/page-detail?days=${days}&path_template=${encodeURIComponent(pathTemplate)}`
         );
         setPageDetail(detail);
-        setSelectedPath(pathTemplate);
       } catch (e) {
         setError(e?.message || 'Ошибка загрузки');
       } finally {
@@ -210,18 +234,6 @@ export default function AnalyticsPage() {
     },
     [days]
   );
-
-  const loadProductCards = useCallback(async () => {
-    setProductCardsLoading(true);
-    setError(null);
-    try {
-      setProductCards(await apiRequest(`/admin/analytics/product-cards?days=${days}&limit=100`));
-    } catch (e) {
-      setError(e?.message || 'Ошибка загрузки');
-    } finally {
-      setProductCardsLoading(false);
-    }
-  }, [days]);
 
   const loadSitemaps = useCallback(async () => {
     setSitemapLoading(true);
@@ -248,28 +260,21 @@ export default function AnalyticsPage() {
     }
   };
 
-  useEffect(() => {
-    if (!isReady || !user?.is_admin) return;
-    if (viewMode === 'overview') loadOverview();
-    else if (viewMode === 'pages') {
-      setLoading(true);
-      apiRequest(`/admin/analytics/pages?days=${days}`)
-        .then((res) => setPages(res?.items || []))
-        .catch((e) => setError(e?.message || 'Ошибка загрузки'))
-        .finally(() => setLoading(false));
-    } else if (viewMode === 'sitemap') {
-      loadSitemaps();
-    } else loadProductCards();
-  }, [isReady, user?.is_admin, viewMode, days, loadOverview, loadProductCards, loadSitemaps]);
-
-  useEffect(() => {
-    if (!isReady || !user?.is_admin || viewMode !== 'pages' || !selectedPath) return;
-    loadPageDetail(selectedPath);
-  }, [isReady, user?.is_admin, viewMode, selectedPath, days, loadPageDetail]);
-
-  const selectPage = (path) => {
-    setViewMode('pages');
-    setSelectedPath(path);
+  const syncSeoFromProducts = async () => {
+    setSeoSyncBusy(true);
+    setSeoSyncNotice(null);
+    setError(null);
+    try {
+      const result = await apiRequest('/admin/seo/new-parts/sync-from-products?limit=100', {
+        method: 'POST',
+      });
+      setSeoSyncNotice(formatSyncStats(result?.sync));
+      await loadSitemaps();
+    } catch (e) {
+      setError(e?.message || 'Ошибка синхронизации SEO');
+    } finally {
+      setSeoSyncBusy(false);
+    }
   };
 
   const downloadProductCardUrls = async () => {
@@ -302,39 +307,20 @@ export default function AnalyticsPage() {
     }
   };
 
+  useEffect(() => {
+    if (!isReady || !user?.is_admin) return;
+    if (viewMode === 'pages') loadPagesData();
+    else loadSitemaps();
+  }, [isReady, user?.is_admin, viewMode, loadPagesData, loadSitemaps]);
+
+  useEffect(() => {
+    if (!isReady || !user?.is_admin || viewMode !== 'pages' || !selectedPath) return;
+    loadPageDetail(selectedPath);
+  }, [isReady, user?.is_admin, viewMode, selectedPath, days, loadPageDetail]);
+
   if (!isReady) return <AuthLoadingScreen />;
   if (!isAuthenticated) return <Navigate to="/auth" replace />;
   if (!user.is_admin) return <Navigate to="/dashboard" replace />;
-
-  const pageColumns = [
-    {
-      key: 'name',
-      label: 'Страница',
-      render: (r) => (
-        <span className="font-medium" title={r.path_template}>
-          {pageLabel(r.path_template)}
-        </span>
-      ),
-    },
-    {
-      key: 'views',
-      label: 'Просм.',
-      align: 'right',
-      render: (r) => formatNumber(r.views),
-    },
-    {
-      key: 'visitors',
-      label: 'Посет.',
-      align: 'right',
-      render: (r) => formatNumber(r.unique_visitors),
-    },
-    {
-      key: 'time',
-      label: 'Время',
-      align: 'right',
-      render: (r) => formatDuration(r.avg_duration_sec),
-    },
-  ];
 
   return (
     <div className="space-y-4 max-w-6xl">
@@ -357,18 +343,20 @@ export default function AnalyticsPage() {
               </button>
             ))}
           </div>
-          <select
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
-            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700"
-            aria-label="Период"
-          >
-            {PERIOD_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          {viewMode === 'pages' && (
+            <select
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value))}
+              className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700"
+              aria-label="Период"
+            >
+              {PERIOD_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </header>
 
@@ -378,181 +366,44 @@ export default function AnalyticsPage() {
         </div>
       )}
 
-      {viewMode === 'overview' && (
+      {viewMode === 'pages' && (
         <>
           {loading ? (
             <LoadingBlock />
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <Stat label="Просмотры" value={formatNumber(summary?.page_views)} />
                 <Stat label="Посетители" value={formatNumber(summary?.unique_visitors)} />
-                <Stat label="Время / сессия" value={formatDuration(summary?.avg_session_duration_sec)} />
-                <Stat label="Сегодня" value={formatNumber(summary?.active_today)} />
-              </div>
-
-              <Panel
-                title="Страницы"
-                action={
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('pages')}
-                    className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
-                  >
-                    Все →
-                  </button>
-                }
-              >
-                <Table
-                  columns={pageColumns}
-                  rows={pages.slice(0, 10)}
-                  onRowClick={(r) => selectPage(r.path_template)}
-                  rowKey={(r) => r.path_template}
-                />
-              </Panel>
-
-              <Panel title="Формы">
-                <Table
-                  columns={[
-                    { key: 'form', label: 'Форма', render: (r) => r.form_id },
-                    { key: 'field', label: 'Поле', render: (r) => r.field_name || '—' },
-                    {
-                      key: 'fill',
-                      label: 'Зап.',
-                      align: 'right',
-                      render: (r) => formatNumber(r.fill_count),
-                    },
-                    {
-                      key: 'sub',
-                      label: 'Отпр.',
-                      align: 'right',
-                      render: (r) => formatNumber(r.submit_count),
-                    },
-                  ]}
-                  rows={forms.slice(0, 15)}
-                  rowKey={(r) => `${r.form_id}-${r.field_name || 'x'}`}
-                />
-              </Panel>
-
-              <Panel title="По дням">
-                <Table
-                  columns={[
-                    { key: 'day', label: 'Дата', render: (r) => formatDay(r.day) },
-                    {
-                      key: 'pv',
-                      label: 'Просм.',
-                      align: 'right',
-                      render: (r) => formatNumber(r.page_views),
-                    },
-                    {
-                      key: 'uv',
-                      label: 'Посет.',
-                      align: 'right',
-                      render: (r) => formatNumber(r.unique_visitors),
-                    },
-                  ]}
-                  rows={activity}
-                  rowKey={(r) => r.day}
-                />
-              </Panel>
-            </>
-          )}
-        </>
-      )}
-
-      {viewMode === 'pages' && (
-        <div className="grid gap-4 lg:grid-cols-5">
-          <Panel title="Список" className="lg:col-span-2">
-            {loading ? (
-              <LoadingBlock />
-            ) : (
-              <div className="max-h-[28rem] overflow-y-auto">
-                <Table
-                  columns={[
-                    {
-                      key: 'name',
-                      label: 'Страница',
-                      render: (r) => (
-                        <span
-                          className={
-                            selectedPath === r.path_template ? 'font-semibold text-indigo-700' : ''
-                          }
-                        >
-                          {pageLabel(r.path_template)}
-                        </span>
-                      ),
-                    },
-                    {
-                      key: 'v',
-                      label: 'Просм.',
-                      align: 'right',
-                      render: (r) => formatNumber(r.views),
-                    },
-                  ]}
-                  rows={pages}
-                  onRowClick={(r) => setSelectedPath(r.path_template)}
-                  rowKey={(r) => r.path_template}
+                <Stat
+                  label="Время / сессия"
+                  value={formatDuration(summary?.avg_session_duration_sec)}
                 />
               </div>
-            )}
-          </Panel>
 
-          <Panel
-            title={selectedPath ? pageLabel(selectedPath) : '—'}
-            className="lg:col-span-3"
-          >
-            {!selectedPath ? (
-              <p className="py-16 text-center text-sm text-gray-400">← выберите страницу</p>
-            ) : detailLoading ? (
-              <LoadingBlock />
-            ) : pageDetail ? (
-              <div className="space-y-4 p-4">
-                {selectedPath === PRODUCT_CARD_TEMPLATE && (
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('product-cards')}
-                    className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
-                  >
-                    По товарам →
-                  </button>
-                )}
-                <div className="grid grid-cols-3 gap-2">
-                  <Stat label="Просмотры" value={formatNumber(pageDetail.page_views)} />
-                  <Stat label="Посетители" value={formatNumber(pageDetail.unique_visitors)} />
-                  <Stat label="Время" value={formatDuration(pageDetail.avg_duration_sec)} />
-                </div>
-                <div>
-                  <p className="mb-2 text-xs font-medium text-gray-500">По дням</p>
-                  <Table
-                    columns={[
-                      { key: 'd', label: 'Дата', render: (r) => formatDay(r.day) },
-                      {
-                        key: 'p',
-                        label: 'Просм.',
-                        align: 'right',
-                        render: (r) => formatNumber(r.page_views),
-                      },
-                      {
-                        key: 'u',
-                        label: 'Посет.',
-                        align: 'right',
-                        render: (r) => formatNumber(r.unique_visitors),
-                      },
-                    ]}
-                    rows={pageDetail.activity || []}
-                    rowKey={(r) => r.day}
-                  />
-                </div>
-                {pageDetail.instances?.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs font-medium text-gray-500">URL</p>
+              <Panel title={`По дням · ${days} дн.`}>
+                <Table columns={ACTIVITY_COLUMNS} rows={activity} rowKey={(r) => r.day} />
+              </Panel>
+
+              <div className="grid gap-4 lg:grid-cols-5">
+                <Panel title="Страницы" className="lg:col-span-2">
+                  <div className="max-h-[28rem] overflow-y-auto">
                     <Table
                       columns={[
                         {
-                          key: 'url',
-                          label: 'Путь',
+                          key: 'name',
+                          label: 'Страница',
                           render: (r) => (
-                            <span className="font-mono text-xs text-gray-600">{r.path_raw}</span>
+                            <span
+                              className={
+                                selectedPath === r.path_template
+                                  ? 'font-semibold text-indigo-700'
+                                  : 'font-medium'
+                              }
+                              title={r.path_template}
+                            >
+                              {pageLabel(r.path_template)}
+                            </span>
                           ),
                         },
                         {
@@ -562,105 +413,113 @@ export default function AnalyticsPage() {
                           render: (r) => formatNumber(r.views),
                         },
                         {
-                          key: 't',
-                          label: 'Время',
+                          key: 'u',
+                          label: 'Посет.',
                           align: 'right',
-                          render: (r) => formatDuration(r.avg_duration_sec),
+                          render: (r) => formatNumber(r.unique_visitors),
                         },
                       ]}
-                      rows={pageDetail.instances}
-                      rowKey={(r) => r.path_raw}
+                      rows={pages}
+                      onRowClick={(r) => setSelectedPath(r.path_template)}
+                      rowKey={(r) => r.path_template}
                     />
                   </div>
-                )}
-              </div>
-            ) : null}
-          </Panel>
-        </div>
-      )}
+                </Panel>
 
-      {viewMode === 'product-cards' && (
-        <Panel
-          title={
-            productCards
-              ? `Карточки · ${formatNumber(productCards.total_views)} просм. · ${formatNumber(productCards.unique_cards)} шт.`
-              : 'Карточки'
-          }
-        >
-          {productCardsLoading ? (
-            <LoadingBlock />
-          ) : (
-            <Table
-              columns={[
-                {
-                  key: 'product',
-                  label: 'Товар',
-                  render: (r) =>
-                    r.product_id ? (
-                      <div>
-                        <p className="font-medium leading-tight">
-                          {r.name || `#${r.product_id}`}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {[r.brand, r.article].filter(Boolean).join(' · ')}
-                        </p>
+                <Panel
+                  title={selectedPath ? pageLabel(selectedPath) : '—'}
+                  className="lg:col-span-3"
+                >
+                  {!selectedPath ? (
+                    <p className="py-16 text-center text-sm text-gray-400">Нет данных</p>
+                  ) : detailLoading ? (
+                    <LoadingBlock />
+                  ) : pageDetail ? (
+                    <div className="space-y-4 p-4">
+                      <div className="grid grid-cols-3 gap-2">
+                        <Stat label="Просмотры" value={formatNumber(pageDetail.page_views)} />
+                        <Stat label="Посетители" value={formatNumber(pageDetail.unique_visitors)} />
+                        <Stat label="Время" value={formatDuration(pageDetail.avg_duration_sec)} />
                       </div>
-                    ) : (
-                      '—'
-                    ),
-                },
-                {
-                  key: 'url',
-                  label: 'URL',
-                  render: (r) => (
-                    <a
-                      href={r.path_raw}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-xs text-indigo-600 hover:underline"
-                    >
-                      {r.path_raw.replace(/^\/part\//, '…/')}
-                    </a>
-                  ),
-                },
-                {
-                  key: 'v',
-                  label: 'Просм.',
-                  align: 'right',
-                  render: (r) => formatNumber(r.views),
-                },
-                {
-                  key: 'u',
-                  label: 'Посет.',
-                  align: 'right',
-                  render: (r) => formatNumber(r.unique_visitors),
-                },
-                {
-                  key: 't',
-                  label: 'Время',
-                  align: 'right',
-                  render: (r) => formatDuration(r.avg_duration_sec),
-                },
-              ]}
-              rows={productCards?.items || []}
-              rowKey={(r) => r.path_raw}
-            />
+                      <div>
+                        <p className="mb-2 text-xs font-medium text-gray-500">
+                          По дням · {days} дн.
+                        </p>
+                        <Table
+                          columns={ACTIVITY_COLUMNS}
+                          rows={pageDetail.activity || []}
+                          rowKey={(r) => r.day}
+                        />
+                      </div>
+                      {pageDetail.instances?.length > 0 && (
+                        <div>
+                          <p className="mb-2 text-xs font-medium text-gray-500">URL</p>
+                          <Table
+                            columns={[
+                              {
+                                key: 'url',
+                                label: 'Путь',
+                                render: (r) => (
+                                  <span className="font-mono text-xs text-gray-600">
+                                    {r.path_raw}
+                                  </span>
+                                ),
+                              },
+                              {
+                                key: 'v',
+                                label: 'Просм.',
+                                align: 'right',
+                                render: (r) => formatNumber(r.views),
+                              },
+                              {
+                                key: 't',
+                                label: 'Время',
+                                align: 'right',
+                                render: (r) => formatDuration(r.avg_duration_sec),
+                              },
+                            ]}
+                            rows={pageDetail.instances}
+                            rowKey={(r) => r.path_raw}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+                </Panel>
+              </div>
+            </>
           )}
-        </Panel>
+        </>
       )}
 
       {viewMode === 'sitemap' && (
         <Panel
-          title="Файлы sitemap на сайте"
+          title="Sitemap"
           action={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={syncSeoFromProducts}
+                disabled={seoSyncBusy || sitemapLoading}
+                className="rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+              >
+                {seoSyncBusy ? '…' : 'Синхр. SEO из каталога'}
+              </button>
               <button
                 type="button"
                 onClick={rebuildProductsSitemap}
                 disabled={sitemapRebuildBusy || sitemapLoading}
                 className="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
               >
-                {sitemapRebuildBusy ? '…' : 'Пересобрать sitemap новых запчастей'}
+                {sitemapRebuildBusy ? '…' : 'Пересобрать sitemap'}
+              </button>
+              <button
+                type="button"
+                onClick={downloadProductCardUrls}
+                disabled={productUrlsDownloadBusy || sitemapLoading}
+                className="rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {productUrlsDownloadBusy ? '…' : '150 URL для SEO'}
               </button>
               <button
                 type="button"
@@ -673,6 +532,12 @@ export default function AnalyticsPage() {
             </div>
           }
         >
+          {(seoSyncNotice || productUrlsNotice) && (
+            <div className="border-b border-gray-100 bg-green-50/60 px-4 py-2 text-xs text-green-800">
+              {seoSyncNotice && <p>Синхронизация: {seoSyncNotice}</p>}
+              {productUrlsNotice && <p>Скачан файл: {productUrlsNotice}</p>}
+            </div>
+          )}
           {(sitemapData?.products_cache || sitemapData?.new_parts_cache) && (
             <div className="border-b border-gray-100 bg-indigo-50/40 px-4 py-3 text-sm text-gray-700 space-y-2">
               {sitemapData?.products_cache && (
@@ -714,7 +579,10 @@ export default function AnalyticsPage() {
           ) : (
             <div className="divide-y divide-gray-100">
               {(sitemapData?.items || []).map((item) => (
-                <div key={item.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between"
+                >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium text-gray-900">{item.title}</p>
@@ -750,8 +618,8 @@ export default function AnalyticsPage() {
           )}
           {sitemapData?.site_origin && (
             <div className="border-t border-gray-100 bg-gray-50/80 px-4 py-3 text-xs text-gray-500">
-              Базовый домен: <span className="font-mono text-gray-700">{sitemapData.site_origin}</span>.
-              Индекс:{' '}
+              Базовый домен:{' '}
+              <span className="font-mono text-gray-700">{sitemapData.site_origin}</span>. Индекс:{' '}
               <a
                 href={`${sitemapData.site_origin}/sitemap.xml`}
                 target="_blank"
@@ -764,33 +632,6 @@ export default function AnalyticsPage() {
           )}
         </Panel>
       )}
-
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
-        <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={downloadProductCardUrls}
-            disabled={productUrlsDownloadBusy}
-            className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 w-fit"
-          >
-            {productUrlsDownloadBusy ? '…' : '150 URL для SEO'}
-          </button>
-          <p className="text-xs text-gray-500 max-w-md">
-            Каждые сутки — новые 150 карточек без повторов. Повторное скачивание в тот же день вернёт тот же список.
-          </p>
-        </div>
-        {productUrlsNotice && (
-          <span className="text-xs text-green-700">{productUrlsNotice}</span>
-        )}
-        <a
-          href="https://metrika.yandex.ru/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-auto text-sm text-gray-500 hover:text-indigo-600"
-        >
-          Метрика ↗
-        </a>
-      </div>
     </div>
   );
 }
