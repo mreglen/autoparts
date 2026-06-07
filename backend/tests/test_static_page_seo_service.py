@@ -26,12 +26,15 @@ class StaticPageSeoTests(unittest.TestCase):
         meta = get_static_page_seo_for_path(None, "/autoparts/new?q=if1009")
         self.assertIsNotNone(meta)
         self.assertIn("if1009", meta.title)
-        self.assertIn("if1009", meta.canonical_url)
+        self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/new")
+        self.assertEqual(meta.robots, "noindex, follow")
 
     def test_used_parts_search_seo(self):
         meta = get_static_page_seo_for_path(None, "/autoparts/used?q=24410-3E500")
         self.assertIsNotNone(meta)
         self.assertIn("24410-3E500", meta.title)
+        self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/used")
+        self.assertEqual(meta.robots, "noindex, follow")
 
     def test_about_seo(self):
         meta = get_static_page_seo_for_path(None, "/about")

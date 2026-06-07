@@ -76,17 +76,22 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
     name = format_product_display_title(brand, article, product.name)
     short_name = extract_product_description(product.name, brand, article)
     canonical_url = build_product_page_url(product, origin)
-    title = build_product_search_title(
-        brand=brand,
-        article=article,
-        fallback_display_name=name,
-    )
 
     organization = getattr(product, "organization", None)
     org_address = getattr(organization, "address", None) if organization else None
-    org_name = getattr(organization, "name", None) if organization else None
-    org_phone = getattr(organization, "phone", None) if organization else None
+    org_name_raw = getattr(organization, "name", None) if organization else None
+    org_name = org_name_raw.strip() if isinstance(org_name_raw, str) and org_name_raw.strip() else None
+    org_phone_raw = getattr(organization, "phone", None) if organization else None
+    org_phone = org_phone_raw.strip() if isinstance(org_phone_raw, str) and org_phone_raw.strip() else None
     city = resolve_product_city(organization_address=str(org_address) if org_address is not None else None)
+
+    title = build_product_search_title(
+        brand=brand,
+        article=article,
+        product_name=product.name,
+        seller_name=org_name,
+        listing_id=int(product.id),
+    )
 
     unique_desc = _strip_html(product.description)
     in_stock = (product.quantity or 0) > 0
@@ -107,6 +112,8 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
         in_stock=in_stock,
         short_name=short_name,
         unique_description=unique_desc,
+        seller_name=org_name,
+        listing_id=int(product.id),
     )
 
     image_url = None

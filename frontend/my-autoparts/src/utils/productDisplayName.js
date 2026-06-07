@@ -81,8 +81,23 @@ export function formatProductDisplayTitle(brand, article, rawName) {
   const description =
     extractProductDescription(raw, brandStr, articleStr) || raw;
 
-  const parts = [brandStr, articleStr, description].filter(Boolean);
-  const formatted = parts.join(' ').replace(/\s+/g, ' ').trim();
+  const headline = [brandStr, articleStr].filter(Boolean).join(' ').trim();
+  const descNorm = description.replace(/\s+/g, ' ').trim().toLowerCase();
+  const headlineNorm = headline.toLowerCase();
+  const articleNorm = normalizeArticle(articleStr);
+
+  const parts = [brandStr, articleStr];
+  if (description) {
+    const descIsDuplicate =
+      descNorm === headlineNorm
+      || descNorm === articleNorm.toLowerCase()
+      || normalizeArticle(description) === articleNorm;
+    if (!descIsDuplicate) {
+      parts.push(description);
+    }
+  }
+
+  const formatted = parts.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 
   return formatted || '—';
 }

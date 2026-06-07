@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { PageSeoHelmet } from '../../../utils/pageSeo';
 import { SITE_ORIGIN } from '../../../utils/breadcrumbs';
@@ -7,6 +8,7 @@ import { buildNewPartDetailPath, parseNewPartDetailParam } from '../../../utils/
 import NewPartProductCard from './NewPartProductCard';
 import ProductCard from '../ProductCard';
 import { buildNewPartCardJsonLd, parseJsonLdString } from '../../../utils/productJsonLd';
+import { buildNewPartSearchTitle } from '../../../utils/productSearchSeo';
 import {
   buildRosskoLookupText,
   getRosskoParts,
@@ -100,6 +102,7 @@ export default function NewPartDetailPage() {
   const [usedMatches, setUsedMatches] = useState([]);
   const [usedMatchError, setUsedMatchError] = useState('');
   const [usedMatchLoading, setUsedMatchLoading] = useState(false);
+  const [seoMeta, setSeoMeta] = useState(null);
   const [seoJsonLd, setSeoJsonLd] = useState(null);
 
   useEffect(() => {
@@ -199,6 +202,7 @@ export default function NewPartDetailPage() {
 
   useEffect(() => {
     if (!card?.id) {
+      setSeoMeta(null);
       setSeoJsonLd(null);
       return;
     }
@@ -208,9 +212,20 @@ export default function NewPartDetailPage() {
     const run = async () => {
       try {
         const response = await apiAxiosUnauth.get('/public/new-part-meta', { params: { path } });
-        const parsed = parseJsonLdString(response?.data?.json_ld);
-        setSeoJsonLd(parsed);
+        const data = response?.data || null;
+        if (data?.title && data?.description && data?.canonical_url) {
+          setSeoMeta({
+            title: data.title,
+            description: data.description,
+            canonicalUrl: data.canonical_url,
+            robots: 'index, follow',
+          });
+        } else {
+          setSeoMeta(null);
+        }
+        setSeoJsonLd(parseJsonLdString(data?.json_ld));
       } catch (_e) {
+        setSeoMeta(null);
         setSeoJsonLd(buildNewPartCardJsonLd(card, { canonicalUrl: `${SITE_ORIGIN}${path}` }));
       }
     };
@@ -253,22 +268,27 @@ export default function NewPartDetailPage() {
   const canonicalPath = card ? buildNewPartDetailPath(card) : `/autoparts/new/part/${cardIdParam || ''}`;
 
   const seo = useMemo(() => {
+    if (seoMeta) return seoMeta;
+    if (!card) return null;
     const brand = safeText(card?.brand);
     const article = safeText(card?.article);
-    const name = safeText(card?.name) || `${brand} ${article}`.trim();
-    const priceText = card?.price != null ? `${Number(card.price).toFixed(2)} ₽. ` : '';
     return {
-      title: `${brand} ${article} ${name} — новая запчасть | Свой Гараж`,
-      description: `${priceText}${safeText(card?.description, name)} Доставка по России.`,
+      title: buildNewPartSearchTitle({
+        brand,
+        article,
+        rawName: card?.name,
+        cardId: card.id,
+      }),
+      description: `Купить ${brand} ${article}. Новая запчасть. Карточка №${card.id}. Доставка по России.`,
       canonicalUrl: `${SITE_ORIGIN}${canonicalPath}`,
       robots: 'index, follow',
     };
-  }, [card, canonicalPath]);
+  }, [seoMeta, card, canonicalPath]);
 
   if (loading) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10">
-        <PageSeoHelmet seo={seo} />
+        {seo ? <PageSeoHelmet seo={seo} /> : null}
         <div className="rounded-2xl border border-gray-200 bg-white px-6 py-8 text-center shadow-sm">
           <p className="text-gray-600">Загрузка карточки…</p>
         </div>
@@ -279,7 +299,10 @@ export default function NewPartDetailPage() {
   if (error) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10">
-        <PageSeoHelmet seo={seo} />
+        <Helmet>
+          <title>Карточка не найдена | Свой Гараж</title>
+          <meta name="robots" content="noindex, nofollow" />
+        </Helmet>
         <p className="text-red-600">{error}</p>
         <button
           type="button"

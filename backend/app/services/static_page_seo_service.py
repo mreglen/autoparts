@@ -78,13 +78,14 @@ def _build_new_parts_seo(site_origin: str, query: str | None) -> StaticPageSeoMe
 
     q = (query or "").strip()
     if q:
-        canonical_url = _absolute_url(site_origin, f"/autoparts/new?q={quote(q)}")
+        canonical_url = _absolute_url(site_origin, "/autoparts/new")
         title = f"{q} — новые запчасти | Свой Гараж"
         description = (
             f"Результаты поиска новых автозапчастей по запросу «{q}»: "
             "оригиналы и аналоги с доставкой по России."
         )
         h1 = f"Новые запчасти: {q}"
+        robots = "noindex, follow"
     else:
         canonical_url = _absolute_url(site_origin, "/autoparts/new")
         title = "Новые автозапчасти с доставкой | Свой Гараж"
@@ -93,11 +94,13 @@ def _build_new_parts_seo(site_origin: str, query: str | None) -> StaticPageSeoMe
             "аналоги, сроки поставки и наличие на складах."
         )
         h1 = "Новые запчасти с доставкой"
+        robots = "index, follow"
     return StaticPageSeoMeta(
         title=title,
         description=_truncate(description, 160),
         canonical_url=canonical_url,
         h1=h1,
+        robots=robots,
     )
 
 
@@ -106,13 +109,14 @@ def _build_used_parts_seo(site_origin: str, query: str | None) -> StaticPageSeoM
     if q:
         from urllib.parse import quote
 
-        canonical_url = _absolute_url(site_origin, f"/autoparts/used?q={quote(q)}")
+        canonical_url = _absolute_url(site_origin, "/autoparts/used")
         title = f"{q} — б/у запчасти | Свой Гараж"
         description = (
             f"Результаты поиска б/у автозапчастей по запросу «{q}»: "
             "фото, описание и чат с продавцом."
         )
         h1 = f"Б/у запчасти: {q}"
+        robots = "noindex, follow"
     else:
         canonical_url = _absolute_url(site_origin, "/autoparts/used")
         title = "Б/у автозапчасти — каталог продавцов | Свой Гараж"
@@ -121,11 +125,13 @@ def _build_used_parts_seo(site_origin: str, query: str | None) -> StaticPageSeoM
             "разборки и магазины, фото, описание и общение с продавцом."
         )
         h1 = "Б/у автозапчасти"
+        robots = "index, follow"
     return StaticPageSeoMeta(
         title=title,
         description=_truncate(description, 160),
         canonical_url=canonical_url,
         h1=h1,
+        robots=robots,
     )
 
 

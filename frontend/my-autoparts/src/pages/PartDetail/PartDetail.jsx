@@ -1,15 +1,15 @@
-import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
 import { fetchPublicProduct, searchAllProducts } from '../../redux/slices/ProductSlice';
 import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart } from '../../redux/slices/CartSlice';
 import { createOrGetChat } from '../../redux/slices/ChatSlice';
-import { normalizeImageUrl } from '../../utils/apiClient';
+import { normalizeImageUrl, apiAxiosUnauth } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
 import { buildPartDetailPath, parsePartDetailParam } from '../../utils/partRoutes';
 import { extractProductDescription, formatProductDisplayTitle } from '../../utils/productDisplayName';
-import { buildPreliminaryPartTitle, buildPreliminaryPartDescription, buildProductSeo } from '../../utils/productSeo';
+import { buildProductSeo, seoFromPartMetaResponse } from '../../utils/productSeo';
 import { DEFAULT_OG_IMAGE_URL } from '../../utils/seoConstants';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
@@ -82,34 +82,33 @@ const PartDetail = () => {
   const [currentMainMediaIndex, setCurrentMainMediaIndex] = useState(0);
   const [creatingChat, setCreatingChat] = useState(false);
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
+  const [apiSeo, setApiSeo] = useState(null);
 
-  const preliminaryTitle = useMemo(
-    () => buildPreliminaryPartTitle({ brand: extractedBrand, article: extractedArticle }),
-    [extractedBrand, extractedArticle]
-  );
-
-  const preliminarySeo = useMemo(() => {
-    if (!preliminaryTitle) return null;
-    const description =
-      buildPreliminaryPartDescription({
-        brand: extractedBrand,
-        article: extractedArticle,
-        organization: organization?.address ? organization : null,
-      }) ||
-      'Автозапчасть на «Свой Гараж» — каталог, доставка по России.';
-    return {
-      title: preliminaryTitle,
-      description,
-      canonicalUrl: `https://svoygarage.ru${location.pathname}`,
-      imageUrl: DEFAULT_OG_IMAGE_URL,
-    };
-  }, [preliminaryTitle, extractedBrand, extractedArticle, organization, location.pathname]);
-
-  useLayoutEffect(() => {
-    if (preliminaryTitle && loading && !currentProduct) {
-      document.title = preliminaryTitle;
+  useEffect(() => {
+    const path = location.pathname;
+    if (!path.startsWith('/part/')) {
+      setApiSeo(null);
+      return;
     }
-  }, [preliminaryTitle, loading, currentProduct]);
+
+    const run = async () => {
+      try {
+        const response = await apiAxiosUnauth.get('/public/part-meta', { params: { path } });
+        setApiSeo(seoFromPartMetaResponse(response?.data));
+      } catch (_e) {
+        setApiSeo(null);
+      }
+    };
+    run();
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!currentProduct?.id) return;
+    const canonicalPath = buildPartDetailPath(currentProduct);
+    if (canonicalPath && location.pathname !== canonicalPath) {
+      navigate(canonicalPath, { replace: true });
+    }
+  }, [currentProduct, location.pathname, navigate]);
 
   useEffect(() => {
     if (extractedProductId) {
@@ -350,7 +349,7 @@ const PartDetail = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <PartProductSeoHelmet seo={preliminarySeo} />
+        {apiSeo ? <PartProductSeoHelmet seo={apiSeo} structuredData={null} product={null} /> : null}
         <div className="text-center">
           <p className="text-lg text-gray-600">Загрузка информации о запчасти...</p>
         </div>
@@ -400,7 +399,10 @@ const PartDetail = () => {
   }
 
   const sellerOrg = currentProduct.organization || organization;
-  const seo = buildProductSeo(currentProduct);
+  const localSeo = buildProductSeo(currentProduct);
+  const seo = apiSeo
+    ? { ...localSeo, ...apiSeo, jsonLd: localSeo.jsonLd }
+    : localSeo;
   const breadcrumbItems = buildBreadcrumbsForPath(location.pathname, { product: currentProduct });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
   const structuredData = seo.jsonLd && breadcrumbJsonLd

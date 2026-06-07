@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
 from app.utils.product_json_ld import build_new_part_card_json_ld, dumps_json_ld, product_body_description
+from app.utils.product_search_seo import build_new_part_search_title
 from app.utils.seo_constants import resolve_default_og_image_url
 
 ROSSKO_NEW_PART_SOURCE = "rossko"
@@ -338,14 +339,19 @@ def find_active_new_part_card_by_brand_article(
 def build_new_part_seo_meta(card: NewPartsSeoCard, *, site_origin: str | None = None) -> NewPartSeoMeta:
     origin = _resolve_site_origin(site_origin)
     display_name = _safe_text(card.name) or f"{card.brand} {card.article}"
-    title = _truncate(f"{card.brand} {card.article} {display_name} — новая запчасть | Свой Гараж", 70)
+    title = build_new_part_search_title(
+        brand=card.brand,
+        article=card.article,
+        raw_name=_safe_text(card.name),
+        card_id=int(card.id),
+    )
     city = "Екатеринбурге"
     price_text = f"{float(card.price):.2f}" if card.price is not None else None
     in_stock = (card.stock_count or 0) > 0
     desc_core = _safe_text(card.description) or display_name
     description = _truncate(
         f"Купить {card.brand} {card.article}. Новая запчасть {'в наличии' if in_stock else 'под заказ'} в {city}. "
-        f"{(price_text + ' ₽. ') if price_text else ''}Доставка по России. {desc_core}",
+        f"{(price_text + ' ₽. ') if price_text else ''}Доставка по России. {desc_core} Карточка №{int(card.id)}.",
         160,
     )
     canonical = f"{origin}{build_new_part_card_path(card.id, card.brand, card.article)}"

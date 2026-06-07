@@ -8,6 +8,7 @@ from app.utils.product_search_seo import (
     build_product_offer_json_ld,
     build_product_search_description,
     build_product_search_title,
+    build_new_part_search_title,
 )
 
 
@@ -23,12 +24,34 @@ class ProductSearchTitleTests(unittest.TestCase):
         title = build_product_search_title(
             brand="KRAFT",
             article="KT 100529",
-            fallback_display_name="KRAFT KT 100529 Подшипник сцепления ВАЗ 2110-2115",
+            product_name="Подшипник сцепления ВАЗ 2110-2115",
         )
         self.assertEqual(
             title,
             "KRAFT KT 100529 Подшипник сцепления ВАЗ 2110-2115 | Свой Гараж",
         )
+
+    def test_title_preserves_listing_suffix_when_truncating(self):
+        title = build_product_search_title(
+            brand="KRAFT",
+            article="KT 100529",
+            product_name="Подшипник сцепления ВАЗ 2110-2115 очень длинное название которое не помещается",
+            seller_name="Авторазбор",
+            listing_id=999,
+        )
+        self.assertTrue(title.startswith("KRAFT KT 100529"))
+        self.assertIn("Авторазбор", title)
+        self.assertIn("№999", title)
+        self.assertIn("Свой Гараж", title)
+
+    def test_new_part_title_order(self):
+        title = build_new_part_search_title(
+            brand="MANN",
+            article="IF1009",
+            raw_name="MANN IF1009 Масляный фильтр",
+            card_id=42,
+        )
+        self.assertEqual(title, "MANN IF1009 Масляный фильтр — новая №42 | Свой Гараж")
 
     def test_article_only_title(self):
         title = build_product_search_title(brand="", article="24410-3E500")
@@ -113,16 +136,16 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         product.quantity = 2
         product.photos = photos if photos is not None else [MagicMock(photo_url="/uploads/pictures/test.jpg")]
         product.id = 16
-        product.organization = MagicMock(
-            name="Авторазбор",
-            phone="+79990000000",
-            address="620907, г. Екатеринбург, ул. Фруктовая, 17",
-        )
+        org = MagicMock()
+        org.name = "Авторазбор"
+        org.phone = "+79990000000"
+        org.address = "620907, г. Екатеринбург, ул. Фруктовая, 17"
+        product.organization = org
         return product
 
     def test_build_product_seo_meta_uses_search_templates(self):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
-        self.assertEqual(meta.title, "MANN IF1009 Масляный фильтр | Свой Гараж")
+        self.assertEqual(meta.title, "MANN IF1009 Масляный фильтр — Авторазбор №16 | Свой Гараж")
         self.assertIn("Купить MANN IF1009.", meta.description)
         self.assertIn("в Екатеринбурге.", meta.description)
         self.assertIn("1 200 ₽.", meta.description)

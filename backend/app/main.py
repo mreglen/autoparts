@@ -16,6 +16,7 @@ from app.db.schema_patches import (
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
     ensure_seo_product_url_exports_table,
+    ensure_seo_new_part_url_exports_table,
     ensure_seo_sitemap_cache_table,
     ensure_new_parts_seo_sync_log_table,
     ensure_user_avatar_column,
@@ -55,6 +56,7 @@ import app.models.site_quick_link  # noqa: F401 — site quick links
 import app.models.site_analytics  # noqa: F401 — site analytics
 import app.models.site_review  # noqa: F401 — site reviews
 import app.models.seo_product_url_export  # noqa: F401 — SEO URL export tracking
+import app.models.seo_new_part_url_export  # noqa: F401 — Rossko SEO URL export tracking
 import app.models.seo_sitemap_cache  # noqa: F401 — SEO sitemap cache
 import app.models.rossko_settings  # noqa: F401 — Rossko checkout settings
 import app.models.new_parts_checkout_session  # noqa: F401 — YooKassa checkout sessions
@@ -120,6 +122,7 @@ try:
     ensure_group_chat_columns()
     ensure_chat_created_by_column()
     ensure_seo_product_url_exports_table()
+    ensure_seo_new_part_url_exports_table()
     ensure_seo_sitemap_cache_table()
     ensure_new_parts_seo_sync_log_table()
     ensure_user_avatar_column()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from app.utils.organization_city import DEFAULT_CITY, extract_city_from_address, format_city_in_prepositional
+from app.utils.product_display_name import format_product_display_title
 
 SITE_BRAND = "Свой Гараж"
 _TITLE_SUFFIX = f" | {SITE_BRAND}"
@@ -54,28 +55,119 @@ def _merge_content_snippet(
     return _truncate(merged, max_len)
 
 
-def build_product_search_title(
+def _build_listing_context_suffix(
+    *,
+    seller_name: str | None = None,
+    listing_id: int | None = None,
+) -> str:
+    seller = (seller_name or "").strip()
+    parts: list[str] = []
+    if seller:
+        parts.append(seller)
+    if listing_id is not None:
+        parts.append(f"№{int(listing_id)}")
+    if not parts:
+        return ""
+    return f" — {' '.join(parts)}"
+
+
+def _append_listing_uniqueness(
+    base: str,
+    *,
+    seller_name: str | None = None,
+    listing_id: int | None = None,
+    max_len: int = 160,
+) -> str:
+    seller = (seller_name or "").strip()
+    tail_parts: list[str] = []
+    if seller:
+        tail_parts.append(f"Продавец: {seller}.")
+    if listing_id is not None:
+        tail_parts.append(f"Объявление №{int(listing_id)}.")
+    if not tail_parts:
+        return _truncate(base, max_len)
+
+    tail = " ".join(tail_parts)
+    combined = f"{base} {tail}"
+    if len(combined) <= max_len:
+        return combined
+
+    remaining = max_len - len(tail) - 1
+    if remaining > 40:
+        return f"{_truncate(base, remaining)} {tail}"
+    return _truncate(combined, max_len)
+
+
+def _build_title_core(
     *,
     brand: str | None,
     article: str | None,
+    product_name: str | None = None,
     fallback_display_name: str | None = None,
 ) -> str:
     brand_str = (brand or "").strip()
     article_str = (article or "").strip()
+    if brand_str or article_str:
+        raw = (product_name or "").strip() or None
+        return format_product_display_title(brand_str, article_str, raw)
+
     fallback = (fallback_display_name or "").strip()
-
     if fallback:
-        core = fallback
-    elif brand_str and article_str:
-        core = f"{brand_str} {article_str}"
-    elif article_str:
-        core = article_str
-    elif brand_str:
-        core = brand_str
-    else:
-        core = "Автозапчасть"
+        return fallback
+    raw = (product_name or "").strip()
+    return raw or "Автозапчасть"
 
-    title = f"{core}{_TITLE_SUFFIX}"
+
+def _fit_core_with_suffix(core: str, suffix: str, max_len: int) -> str:
+    core = re.sub(r"\s+", " ", (core or "")).strip()
+    suffix = suffix or ""
+    if not suffix:
+        return _truncate(core, max_len)
+
+    combined = f"{core}{suffix}"
+    if len(combined) <= max_len:
+        return combined
+
+    allowed_core = max_len - len(suffix)
+    if allowed_core < 1:
+        return _truncate(combined, max_len)
+    return f"{_truncate(core, allowed_core)}{suffix}"
+
+
+def build_product_search_title(
+    *,
+    brand: str | None,
+    article: str | None,
+    product_name: str | None = None,
+    fallback_display_name: str | None = None,
+    seller_name: str | None = None,
+    listing_id: int | None = None,
+) -> str:
+    core = _build_title_core(
+        brand=brand,
+        article=article,
+        product_name=product_name,
+        fallback_display_name=fallback_display_name,
+    )
+    suffix = _build_listing_context_suffix(seller_name=seller_name, listing_id=listing_id)
+    max_core_len = max(20, 70 - len(_TITLE_SUFFIX))
+    core_with_suffix = _fit_core_with_suffix(core, suffix, max_core_len)
+    title = f"{core_with_suffix}{_TITLE_SUFFIX}"
+    return re.sub(r"\s+", " ", title).strip()
+
+
+def build_new_part_search_title(
+    *,
+    brand: str | None,
+    article: str | None,
+    raw_name: str | None,
+    card_id: int,
+) -> str:
+    core = _build_title_core(brand=brand, article=article, product_name=raw_name)
+    suffix = f" — новая №{int(card_id)}"
+    max_core_len = max(20, 70 - len(_TITLE_SUFFIX))
+    core_with_suffix = _fit_core_with_suffix(core, suffix, max_core_len)
+    title = f"{core_with_suffix}{_TITLE_SUFFIX}"
     return re.sub(r"\s+", " ", title).strip()
 
 
@@ -89,6 +181,8 @@ def build_product_search_description(
     in_stock: bool = True,
     short_name: str | None = None,
     unique_description: str | None = None,
+    seller_name: str | None = None,
+    listing_id: int | None = None,
 ) -> str:
     brand_str = (brand or "").strip()
     article_str = (article or "").strip()
@@ -117,12 +211,24 @@ def build_product_search_description(
     if snippet_source:
         combined = f"{base} {snippet_source}"
         if len(combined) <= 160:
-            return combined
+            return _append_listing_uniqueness(
+                combined,
+                seller_name=seller_name,
+                listing_id=listing_id,
+            )
         remaining = 160 - len(f"{base} ") - 1
         if remaining > 20:
             snippet = _truncate(snippet_source, remaining)
-            return f"{base} {snippet}"
-    return _truncate(base, 160)
+            return _append_listing_uniqueness(
+                f"{base} {snippet}",
+                seller_name=seller_name,
+                listing_id=listing_id,
+            )
+    return _append_listing_uniqueness(
+        _truncate(base, 160),
+        seller_name=seller_name,
+        listing_id=listing_id,
+    )
 
 
 def build_product_alternate_names(*, brand: str | None, article: str | None) -> list[str]:

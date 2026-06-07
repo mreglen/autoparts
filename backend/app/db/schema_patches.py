@@ -618,6 +618,58 @@ def ensure_seo_product_url_exports_table() -> None:
     logger.info("Created seo_product_url_exports table")
 
 
+def ensure_seo_new_part_url_exports_table() -> None:
+    """Table tracking Rossko SEO card URLs in daily SEO export batches."""
+    inspector = inspect(engine)
+    if "seo_new_part_url_exports" in inspector.get_table_names():
+        return
+
+    dialect = engine.dialect.name
+    with engine.begin() as conn:
+        if dialect == "postgresql":
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_new_part_url_exports (
+                        id SERIAL PRIMARY KEY,
+                        card_id INTEGER NOT NULL REFERENCES new_parts_seo_cards(id),
+                        export_date DATE NOT NULL,
+                        exported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        CONSTRAINT uq_seo_new_part_url_exports_card_id UNIQUE (card_id)
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_seo_new_part_url_exports_export_date "
+                    "ON seo_new_part_url_exports (export_date)"
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_new_part_url_exports (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        card_id INTEGER NOT NULL REFERENCES new_parts_seo_cards(id),
+                        export_date DATE NOT NULL,
+                        exported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE (card_id)
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_seo_new_part_url_exports_export_date "
+                    "ON seo_new_part_url_exports (export_date)"
+                )
+            )
+
+    logger.info("Created seo_new_part_url_exports table")
+
+
 def ensure_seo_sitemap_cache_table() -> None:
     """Table storing cached product sitemap XML."""
     inspector = inspect(engine)

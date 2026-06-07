@@ -21,6 +21,32 @@
     document.head.appendChild(el);
   }
 
+  function setDocumentTitle(title) {
+    if (!title) return;
+    document.title = String(title);
+  }
+
+  function setMetaDescription(content) {
+    if (!content) return;
+    var el = document.querySelector('meta[name="description"]');
+    if (!el) {
+      el = document.createElement('meta');
+      el.setAttribute('name', 'description');
+      document.head.appendChild(el);
+    }
+    el.setAttribute('content', String(content));
+  }
+
+  function setCanonical(url) {
+    if (!url) return;
+    var el = document.querySelector('link[rel="canonical"]');
+    if (!el) {
+      el = document.createElement('link');
+      el.setAttribute('rel', 'canonical');
+      document.head.appendChild(el);
+    }
+    el.setAttribute('href', String(url));
+  }
   function appendJsonLd(jsonLd) {
     if (!jsonLd) return;
     var script = document.createElement('script');
@@ -76,6 +102,9 @@
   var meta = fetchProductMeta(path);
 
   if (meta) {
+    setDocumentTitle(meta.title);
+    setMetaDescription(meta.description);
+    setCanonical(meta.canonical_url || SITE_ORIGIN + path);
     appendMeta('og:type', 'product');
     appendMeta('og:site_name', 'Свой Гараж');
     appendMeta('og:title', meta.title);

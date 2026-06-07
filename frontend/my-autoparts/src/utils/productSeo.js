@@ -12,25 +12,6 @@ import { buildCatalogProductJsonLd } from './productJsonLd';
 
 const SITE_ORIGIN = 'https://svoygarage.ru';
 
-export function buildPreliminaryPartTitle({ brand, article }) {
-  const brandStr = String(brand || '').trim();
-  const articleStr = String(article || '').trim();
-  if (!brandStr && !articleStr) return null;
-  return buildProductSearchTitle({ brand: brandStr, article: articleStr });
-}
-
-export function buildPreliminaryPartDescription({ brand, article, isNew = false, organization = null }) {
-  const brandStr = String(brand || '').trim();
-  const articleStr = String(article || '').trim();
-  if (!brandStr && !articleStr) return null;
-  return buildProductSearchDescription({
-    brand: brandStr,
-    article: articleStr,
-    isNew,
-    city: resolveProductCity(organization),
-  });
-}
-
 export function buildProductSeo(product) {
   const brand = (product?.brand || '').trim();
   const article = (product?.article || '').trim();
@@ -38,8 +19,16 @@ export function buildProductSeo(product) {
   const shortName = extractProductDescription(product?.name, brand, article);
   const path = buildPartDetailPath(product);
   const canonicalUrl = `${SITE_ORIGIN}${path}`;
-  const title = buildProductSearchTitle({ brand, article, fallbackDisplayName: name });
   const organization = product?.organization || null;
+  const sellerName = organization?.name || null;
+  const listingId = product?.id != null ? Number(product.id) : null;
+  const title = buildProductSearchTitle({
+    brand,
+    article,
+    productName: product?.name,
+    sellerName,
+    listingId,
+  });
   const city = resolveProductCity(organization);
   const inStock = (product?.quantity || 0) > 0;
 
@@ -53,11 +42,24 @@ export function buildProductSeo(product) {
     inStock,
     shortName,
     uniqueDescription: uniqueDesc,
+    sellerName,
+    listingId,
   });
 
   const firstPhoto = product?.photos?.[0]?.photo_url;
   const imageUrl = resolveOgImageUrl(firstPhoto ? normalizeImageUrl(firstPhoto) : null);
   const jsonLd = buildCatalogProductJsonLd(product, { canonicalUrl });
 
-  return { title, description, canonicalUrl, imageUrl, jsonLd };
+  return { title, description, canonicalUrl, imageUrl, jsonLd, robots: 'index, follow' };
+}
+
+export function seoFromPartMetaResponse(meta) {
+  if (!meta?.title || !meta?.description || !meta?.canonical_url) return null;
+  return {
+    title: meta.title,
+    description: meta.description,
+    canonicalUrl: meta.canonical_url,
+    imageUrl: meta.image_url || resolveOgImageUrl(null),
+    robots: 'index, follow',
+  };
 }

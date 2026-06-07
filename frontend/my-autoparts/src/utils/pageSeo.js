@@ -16,6 +16,15 @@ function truncate(text, maxLen) {
   return `${value.slice(0, maxLen - 1).trim()}…`;
 }
 
+function hasListingSearchFilters(searchParams) {
+  if (!searchParams) return false;
+  if ((searchParams.get('q') || '').trim()) return true;
+  if ((searchParams.getAll('brand') || []).length > 0) return true;
+  if (searchParams.get('in_stock') === '1') return true;
+  if ((searchParams.get('sort') || '').trim()) return true;
+  return false;
+}
+
 export function buildHomeSeo() {
   return {
     title: 'Свой Гараж — автозапчасти новые и б/у',
@@ -40,29 +49,29 @@ export function buildNewPartsSeo(searchParams) {
   const q = (searchParams?.get('q') || '').trim();
   const brands = searchParams?.getAll('brand') || [];
   const inStock = searchParams?.get('in_stock') === '1';
-  const titleSuffixParts = [];
-  if (brands.length > 0) {
-    titleSuffixParts.push(`бренд: ${brands.slice(0, 2).join(', ')}`);
-  }
-  if (inStock) {
-    titleSuffixParts.push('в наличии');
-  }
-  const titleSuffix = titleSuffixParts.length ? ` (${titleSuffixParts.join('; ')})` : '';
-  if (q) {
-    const params = new URLSearchParams();
-    params.set('q', q);
-    brands.forEach((b) => params.append('brand', b));
-    if (inStock) params.set('in_stock', '1');
+  const hasFilters = hasListingSearchFilters(searchParams);
+
+  if (hasFilters) {
+    const titleSuffixParts = [];
+    if (brands.length > 0) {
+      titleSuffixParts.push(`бренд: ${brands.slice(0, 2).join(', ')}`);
+    }
+    if (inStock) {
+      titleSuffixParts.push('в наличии');
+    }
+    const titleSuffix = titleSuffixParts.length ? ` (${titleSuffixParts.join('; ')})` : '';
+    const queryLabel = q || 'фильтр';
     return {
-      title: `${q}${titleSuffix} — новые запчасти | Свой Гараж`,
+      title: `${queryLabel}${titleSuffix} — новые запчасти | Свой Гараж`,
       description: truncate(
-        `Результаты поиска новых автозапчастей по запросу «${q}»: оригиналы и аналоги с доставкой по России.`,
+        `Результаты поиска новых автозапчастей по запросу «${queryLabel}»: оригиналы и аналоги с доставкой по России.`,
         160
       ),
-      canonicalUrl: absoluteUrl(`/autoparts/new?${params.toString()}`),
-      robots: 'index, follow',
+      canonicalUrl: absoluteUrl('/autoparts/new'),
+      robots: 'noindex, follow',
     };
   }
+
   return {
     title: 'Новые автозапчасти с доставкой | Свой Гараж',
     description:
@@ -75,21 +84,22 @@ export function buildNewPartsSeo(searchParams) {
 export function buildUsedPartsSeo(searchParams) {
   const q = (searchParams?.get('q') || '').trim();
   const brands = searchParams?.getAll('brand') || [];
-  const titleSuffix = brands.length ? ` (бренд: ${brands.slice(0, 2).join(', ')})` : '';
-  if (q) {
-    const params = new URLSearchParams();
-    params.set('q', q);
-    brands.forEach((b) => params.append('brand', b));
+  const hasFilters = hasListingSearchFilters(searchParams);
+
+  if (hasFilters) {
+    const titleSuffix = brands.length ? ` (бренд: ${brands.slice(0, 2).join(', ')})` : '';
+    const queryLabel = q || 'фильтр';
     return {
-      title: `${q}${titleSuffix} — б/у запчасти | Свой Гараж`,
+      title: `${queryLabel}${titleSuffix} — б/у запчасти | Свой Гараж`,
       description: truncate(
-        `Результаты поиска б/у автозапчастей по запросу «${q}»: фото, описание и чат с продавцом.`,
+        `Результаты поиска б/у автозапчастей по запросу «${queryLabel}»: фото, описание и чат с продавцом.`,
         160
       ),
-      canonicalUrl: absoluteUrl(`/autoparts/used?${params.toString()}`),
-      robots: 'index, follow',
+      canonicalUrl: absoluteUrl('/autoparts/used'),
+      robots: 'noindex, follow',
     };
   }
+
   return {
     title: 'Б/у автозапчасти — каталог продавцов | Свой Гараж',
     description:
@@ -130,15 +140,15 @@ export function buildSellerPartCardSeo(part) {
   const name = formatProductDisplayTitle(part?.brand, part?.article, part?.name);
   const path = buildPartDetailPath(part);
   const canonical = path.startsWith('http') ? path : absoluteUrl(path);
-  const condition = part?.is_new ? 'новая' : 'б/у';
+  const listingId = part?.id != null ? Number(part.id) : null;
   return {
     title: `${name} — карточка | Свой Гараж`,
     description: truncate(
-      `${condition.charAt(0).toUpperCase() + condition.slice(1)} автозапчасть ${name}. Карточка товара на «Свой Гараж».`,
+      `${part?.is_new ? 'Новая' : 'Б/у'} автозапчасть ${name}. Карточка товара на «Свой Гараж».${listingId ? ` Объявление №${listingId}.` : ''}`,
       160
     ),
     canonicalUrl: canonical,
-    robots: 'index, follow',
+    robots: 'noindex, follow',
   };
 }
 

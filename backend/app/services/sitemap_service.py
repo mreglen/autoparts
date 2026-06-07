@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.models.product import Product as ProductModel
 from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.models.seo_product_url_export import SeoProductUrlExport
+from app.models.seo_new_part_url_export import SeoNewPartUrlExport
 from app.models.seo_sitemap_cache import SeoSitemapCache
 from app.services.new_parts_seo_card_service import (
     build_new_part_card_path,
@@ -96,15 +97,6 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
             "url_count": new_parts_count,
             "location": "backend",
         },
-        {
-            "id": "admin-analytics",
-            "title": "Админ-страница аналитики",
-            "description": "Маршрут панели администратора для SEO/аналитики",
-            "url": f"{site_origin}/admin/analytics",
-            "type": "admin",
-            "url_count": 1,
-            "location": "frontend",
-        },
     ]
 
 
@@ -186,8 +178,19 @@ def _export_date_today() -> date:
     return datetime.now(timezone.utc).date()
 
 
+def _split_seo_url_limit(limit: int) -> tuple[int, int]:
+    used_limit = limit // 2
+    rossko_limit = limit - used_limit
+    return used_limit, rossko_limit
+
+
 def _exported_product_ids(db: Session) -> set[int]:
     rows = db.query(SeoProductUrlExport.product_id).all()
+    return {int(row[0]) for row in rows}
+
+
+def _exported_new_part_card_ids(db: Session) -> set[int]:
+    rows = db.query(SeoNewPartUrlExport.card_id).all()
     return {int(row[0]) for row in rows}
 
 
@@ -227,6 +230,63 @@ def _items_from_product_ids(
     return items
 
 
+def _new_part_to_url_item(card: NewPartsSeoCard, site_origin: str) -> dict[str, str | int]:
+    return {
+        "id": int(card.id),
+        "brand": str(card.brand or "").strip(),
+        "article": str(card.article or "").strip(),
+        "name": str(card.name or "").strip(),
+        "url": f"{site_origin.rstrip('/')}{build_new_part_card_path(int(card.id), card.brand, card.article)}",
+    }
+
+
+def _items_from_new_part_card_ids(
+    db: Session,
+    card_ids: Iterable[int],
+    *,
+    preferred_host_url: str | None = None,
+) -> list[dict[str, str | int]]:
+    site_origin = _resolve_origin(db, preferred_host_url)
+    ids = list(card_ids)
+    if not ids:
+        return []
+
+    cards = (
+        db.query(NewPartsSeoCard)
+        .filter(NewPartsSeoCard.id.in_(ids))
+        .all()
+    )
+    by_id = {int(card.id): card for card in cards}
+    items: list[dict[str, str | int]] = []
+    for card_id in ids:
+        card = by_id.get(int(card_id))
+        if not card or not is_rossko_new_part_sitemap_eligible(card):
+            continue
+        items.append(_new_part_to_url_item(card, site_origin))
+    return items
+
+
+def collect_rossko_new_part_urls(
+    db: Session,
+    *,
+    limit: int,
+    preferred_host_url: str | None = None,
+    exclude_card_ids: set[int] | None = None,
+) -> list[dict[str, str | int]]:
+    site_origin = _resolve_origin(db, preferred_host_url)
+    excluded = exclude_card_ids or set()
+    items: list[dict[str, str | int]] = []
+
+    for card in iter_rossko_new_part_cards_for_sitemap(db):
+        if int(card.id) in excluded:
+            continue
+        items.append(_new_part_to_url_item(card, site_origin))
+        if len(items) >= limit:
+            break
+
+    return items
+
+
 def collect_working_product_urls(
     db: Session,
     *,
@@ -250,22 +310,13 @@ def collect_working_product_urls(
     return items
 
 
-def get_daily_product_url_batch(
+def _load_or_create_used_url_batch(
     db: Session,
     *,
-    limit: int = DEFAULT_PRODUCT_URLS_LIMIT,
-    preferred_host_url: str | None = None,
-) -> tuple[list[dict[str, str | int]], date, bool, bool]:
-    """
-    Возвращает суточную порцию URL (до limit шт.).
-
-    - В течение календарных суток (UTC) повторный запрос отдаёт тот же список.
-    - На следующий день формируется новая порция без ранее выгруженных товаров.
-    - Когда все подходящие товары уже были в выгрузках, пул сбрасывается и цикл начинается заново.
-
-    Returns: (items, export_date, created_new_batch, pool_was_reset)
-    """
-    today = _export_date_today()
+    today: date,
+    used_limit: int,
+    preferred_host_url: str | None,
+) -> tuple[list[dict[str, str | int]], bool, bool]:
     existing_rows = (
         db.query(SeoProductUrlExport)
         .filter(SeoProductUrlExport.export_date == today)
@@ -278,12 +329,12 @@ def get_daily_product_url_batch(
             [row.product_id for row in existing_rows],
             preferred_host_url=preferred_host_url,
         )
-        return items, today, False, False
+        return items, False, False
 
     excluded = _exported_product_ids(db)
     items = collect_working_product_urls(
         db,
-        limit=limit,
+        limit=used_limit,
         preferred_host_url=preferred_host_url,
         exclude_product_ids=excluded,
     )
@@ -295,13 +346,13 @@ def get_daily_product_url_batch(
         pool_reset = True
         items = collect_working_product_urls(
             db,
-            limit=limit,
+            limit=used_limit,
             preferred_host_url=preferred_host_url,
             exclude_product_ids=set(),
         )
 
     if not items:
-        return [], today, False, pool_reset
+        return [], False, pool_reset
 
     now = datetime.now(timezone.utc)
     for item in items:
@@ -312,9 +363,104 @@ def get_daily_product_url_batch(
                 exported_at=now,
             )
         )
-    db.commit()
+    db.flush()
+    return items, True, pool_reset
 
-    return items, today, True, pool_reset
+
+def _load_or_create_rossko_url_batch(
+    db: Session,
+    *,
+    today: date,
+    rossko_limit: int,
+    preferred_host_url: str | None,
+) -> tuple[list[dict[str, str | int]], bool, bool]:
+    existing_rows = (
+        db.query(SeoNewPartUrlExport)
+        .filter(SeoNewPartUrlExport.export_date == today)
+        .order_by(SeoNewPartUrlExport.id.asc())
+        .all()
+    )
+    if existing_rows:
+        items = _items_from_new_part_card_ids(
+            db,
+            [row.card_id for row in existing_rows],
+            preferred_host_url=preferred_host_url,
+        )
+        return items, False, False
+
+    excluded = _exported_new_part_card_ids(db)
+    items = collect_rossko_new_part_urls(
+        db,
+        limit=rossko_limit,
+        preferred_host_url=preferred_host_url,
+        exclude_card_ids=excluded,
+    )
+    pool_reset = False
+
+    if not items and excluded:
+        db.query(SeoNewPartUrlExport).delete(synchronize_session=False)
+        db.flush()
+        pool_reset = True
+        items = collect_rossko_new_part_urls(
+            db,
+            limit=rossko_limit,
+            preferred_host_url=preferred_host_url,
+            exclude_card_ids=set(),
+        )
+
+    if not items:
+        return [], False, pool_reset
+
+    now = datetime.now(timezone.utc)
+    for item in items:
+        db.add(
+            SeoNewPartUrlExport(
+                card_id=int(item["id"]),
+                export_date=today,
+                exported_at=now,
+            )
+        )
+    db.flush()
+    return items, True, pool_reset
+
+
+def get_daily_seo_url_batch(
+    db: Session,
+    *,
+    limit: int = DEFAULT_PRODUCT_URLS_LIMIT,
+    preferred_host_url: str | None = None,
+) -> tuple[list[dict[str, str | int]], list[dict[str, str | int]], date, bool, bool]:
+    """
+    Суточная порция URL для SEO: половина б/у карточек, половина Rossko.
+
+    Returns: (used_items, rossko_items, export_date, created_new_batch, pool_was_reset)
+    """
+    today = _export_date_today()
+    used_limit, rossko_limit = _split_seo_url_limit(limit)
+
+    used_items, used_created, used_reset = _load_or_create_used_url_batch(
+        db,
+        today=today,
+        used_limit=used_limit,
+        preferred_host_url=preferred_host_url,
+    )
+    rossko_items, rossko_created, rossko_reset = _load_or_create_rossko_url_batch(
+        db,
+        today=today,
+        rossko_limit=rossko_limit,
+        preferred_host_url=preferred_host_url,
+    )
+
+    if used_created or rossko_created:
+        db.commit()
+
+    return (
+        used_items,
+        rossko_items,
+        today,
+        used_created or rossko_created,
+        used_reset or rossko_reset,
+    )
 
 
 def generate_product_urls_text_file(
@@ -322,35 +468,53 @@ def generate_product_urls_text_file(
     *,
     limit: int = DEFAULT_PRODUCT_URLS_LIMIT,
     preferred_host_url: str | None = None,
-    items: list[dict[str, str | int]] | None = None,
+    used_items: list[dict[str, str | int]] | None = None,
+    rossko_items: list[dict[str, str | int]] | None = None,
     export_date: date | None = None,
     created_new_batch: bool = False,
     pool_was_reset: bool = False,
 ) -> str:
-    if items is None:
-        items, export_date, created_new_batch, pool_was_reset = get_daily_product_url_batch(
+    used_limit, rossko_limit = _split_seo_url_limit(limit)
+    if used_items is None and rossko_items is None:
+        used_items, rossko_items, export_date, created_new_batch, pool_was_reset = get_daily_seo_url_batch(
             db,
             limit=limit,
             preferred_host_url=preferred_host_url,
         )
 
+    used_items = used_items or []
+    rossko_items = rossko_items or []
+    total_count = len(used_items) + len(rossko_items)
+
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     batch_date = export_date or _export_date_today()
     lines = [
-        "# Карточки товаров «Свой Гараж» — рабочие URL",
-        "# Критерии: товар в наличии, есть фото, заполнены бренд, артикул и название",
+        "# Карточки «Свой Гараж» — рабочие URL",
+        "# Состав: б/у запчасти из каталога + SEO-карточки Rossko (/autoparts/new)",
+        "# Б/у: товар в наличии, есть фото, заполнены бренд, артикул и название",
+        "# Rossko: активные SEO-карточки source=rossko с данными API",
         f"# Дата суточной порции (UTC): {batch_date.isoformat()}",
         f"# Сгенерировано: {generated_at}",
-        f"# Запрошено: {limit}, в файле: {len(items)}",
+        (
+            f"# Запрошено: {limit} ({used_limit} б/у + {rossko_limit} Rossko), "
+            f"в файле: {len(used_items)} + {len(rossko_items)} = {total_count}"
+        ),
     ]
     if created_new_batch:
         lines.append("# Новая суточная порция (ранее не выгружались)")
     else:
         lines.append("# Повторная выгрузка сегодняшней порции")
     if pool_was_reset:
-        lines.append("# Все товары уже были в прошлых выгрузках — пул сброшен, список начат заново")
+        lines.append("# Один или оба пула уже были в прошлых выгрузках — сброшены, список начат заново")
     lines.append("")
-    lines.extend(item["url"] for item in items)
+    if used_items:
+        lines.append(f"# Б/у запчасти ({len(used_items)})")
+        lines.extend(item["url"] for item in used_items)
+    if rossko_items:
+        if used_items:
+            lines.append("")
+        lines.append(f"# Rossko — новые запчасти ({len(rossko_items)})")
+        lines.extend(item["url"] for item in rossko_items)
     return "\n".join(lines) + "\n"
 
 

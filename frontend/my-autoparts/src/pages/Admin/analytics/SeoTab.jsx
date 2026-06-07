@@ -1,7 +1,19 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API_BASE, apiRequest } from '../../../utils/apiClient';
 import { formatDateTime, formatNumber, formatSyncStats } from './analyticsFormatters';
-import { LoadingState, Section } from './AnalyticsUi';
+import { DataTable, LoadingState, Section } from './AnalyticsUi';
+
+const SITEMAP_TYPE_LABELS = {
+  index: 'Индекс',
+  static: 'Статический',
+  dynamic: 'Динамический',
+};
+
+function cacheForItem(item, productsCache, newPartsCache) {
+  if (item?.id === 'products') return productsCache;
+  if (item?.id === 'new-parts') return newPartsCache;
+  return null;
+}
 
 export default function SeoTab() {
   const [loading, setLoading] = useState(true);
@@ -92,8 +104,25 @@ export default function SeoTab() {
   const origin = sitemapData?.site_origin || '';
   const newParts = sitemapData?.new_parts_cache;
   const products = sitemapData?.products_cache;
-  const newPartsUrl = origin ? `${origin}/api/feeds/sitemap-new-parts.xml` : '#';
-  const indexUrl = origin ? `${origin}/sitemap.xml` : '#';
+
+  const sitemapItems = useMemo(() => {
+    const items = Array.isArray(sitemapData?.items) ? sitemapData.items : [];
+    return items.filter((item) => item?.type !== 'admin');
+  }, [sitemapData?.items]);
+
+  const sitemapRows = useMemo(
+    () =>
+      sitemapItems.map((item) => ({
+        ...item,
+        cache: cacheForItem(item, products, newParts),
+      })),
+    [sitemapItems, products, newParts],
+  );
+
+  const totalUrls = useMemo(
+    () => sitemapRows.reduce((sum, row) => sum + Number(row.url_count || 0), 0),
+    [sitemapRows],
+  );
 
   if (loading && !sitemapData) {
     return <LoadingState />;
@@ -111,12 +140,14 @@ export default function SeoTab() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Sitemap новых запчастей
+              Sitemap сайта
             </p>
             <p className="mt-1 text-4xl font-bold tabular-nums text-gray-900">
-              {formatNumber(newParts?.url_count ?? 0)}
+              {formatNumber(sitemapRows.length)}
             </p>
-            <p className="mt-1 text-sm text-gray-500">URL в индексе</p>
+            <p className="mt-1 text-sm text-gray-500">
+              файлов · {formatNumber(totalUrls)} URL суммарно
+            </p>
           </div>
           {newParts && (
             <span
@@ -126,47 +157,102 @@ export default function SeoTab() {
                   : 'bg-green-100 text-green-800'
               }`}
             >
-              {newParts.is_stale ? 'Устарел (>24 ч)' : 'Актуален'}
+              {newParts.is_stale ? 'Rossko: устарел (>24 ч)' : 'Rossko: актуален'}
             </span>
           )}
         </div>
 
-        {newParts?.generated_at && (
-          <p className="mt-3 text-sm text-gray-600">
-            Обновлено: <span className="font-medium">{formatDateTime(newParts.generated_at)}</span>
-          </p>
-        )}
-
-        {products?.url_count != null && (
-          <p className="mt-2 text-xs text-gray-400">
-            Товарный sitemap: {formatNumber(products.url_count)} URL
-          </p>
-        )}
-
         <p className="mt-3 text-xs text-gray-400">
           Авто: до 100 новых URL/сутки из каталога, cron 03:00 UTC
+          {origin ? ` · ${origin}` : ''}
         </p>
       </div>
 
-      <Section title="Ссылки">
-        <div className="flex flex-col gap-2 px-4 py-3 text-sm">
-          <a
-            href={indexUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono text-indigo-600 hover:underline"
-          >
-            {indexUrl}
-          </a>
-          <a
-            href={newPartsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono text-indigo-600 hover:underline"
-          >
-            {newPartsUrl}
-          </a>
-        </div>
+      <Section
+        title="Все sitemap"
+        subtitle="Индекс, статические страницы и динамические фиды каталога"
+      >
+        <DataTable
+          columns={[
+            {
+              key: 'title',
+              label: 'Файл',
+              render: (row) => (
+                <div>
+                  <p className="font-medium text-gray-900">{row.title}</p>
+                  {row.description ? (
+                    <p className="mt-0.5 text-xs text-gray-500">{row.description}</p>
+                  ) : null}
+                </div>
+              ),
+            },
+            {
+              key: 'url',
+              label: 'URL',
+              render: (row) => (
+                <a
+                  href={row.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="break-all font-mono text-xs text-indigo-600 hover:underline"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {row.url}
+                </a>
+              ),
+            },
+            {
+              key: 'type',
+              label: 'Тип',
+              render: (row) => (
+                <span className="text-xs text-gray-600">
+                  {SITEMAP_TYPE_LABELS[row.type] || row.type || '—'}
+                </span>
+              ),
+            },
+            {
+              key: 'url_count',
+              label: 'URL',
+              align: 'right',
+              render: (row) => formatNumber(row.url_count ?? 0),
+            },
+            {
+              key: 'generated_at',
+              label: 'Обновлён',
+              render: (row) =>
+                row.cache?.generated_at ? (
+                  <span className="text-xs text-gray-600">
+                    {formatDateTime(row.cache.generated_at)}
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-400">—</span>
+                ),
+            },
+            {
+              key: 'status',
+              label: 'Кэш',
+              render: (row) => {
+                if (!row.cache) {
+                  return <span className="text-xs text-gray-400">—</span>;
+                }
+                return (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      row.cache.is_stale
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}
+                  >
+                    {row.cache.is_stale ? 'Устарел' : 'Актуален'}
+                  </span>
+                );
+              },
+            },
+          ]}
+          rows={sitemapRows}
+          rowKey={(row) => row.id || row.url}
+          empty="Sitemap не найдены"
+        />
       </Section>
 
       <Section title="Действия">
@@ -196,7 +282,7 @@ export default function SeoTab() {
             disabled={downloadBusy}
             className="text-sm font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
           >
-            {downloadBusy ? 'Скачивание…' : 'Скачать 150 URL для SEO'}
+            {downloadBusy ? 'Скачивание…' : 'Скачать 150 URL (75 б/у + 75 Rossko)'}
           </button>
 
           {(syncChips?.length > 0 || downloadNotice) && (

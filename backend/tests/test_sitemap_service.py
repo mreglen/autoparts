@@ -7,16 +7,43 @@ from app.services.sitemap_service import (
     NEW_PARTS_SITEMAP_CACHE_KEY,
     PRODUCTS_SITEMAP_CACHE_KEY,
     _product_lastmod_date,
+    _split_seo_url_limit,
     append_new_part_card_to_sitemap_cache,
     build_fallback_sitemap_index_xml,
     build_new_parts_sitemap_xml,
     build_products_sitemap_xml,
     build_sitemap_index_xml,
+    generate_product_urls_text_file,
     get_products_sitemap_snapshot,
     is_sitemap_cache_stale,
     rebuild_new_parts_sitemap_cache,
     rebuild_products_sitemap_cache,
 )
+
+
+class SplitSeoUrlLimitTests(unittest.TestCase):
+    def test_even_limit(self):
+        self.assertEqual(_split_seo_url_limit(150), (75, 75))
+
+    def test_odd_limit(self):
+        self.assertEqual(_split_seo_url_limit(151), (75, 76))
+
+
+class GenerateProductUrlsTextFileTests(unittest.TestCase):
+    def test_file_contains_both_sections(self):
+        content = generate_product_urls_text_file(
+            MagicMock(),
+            limit=150,
+            used_items=[{"url": "https://svoygarage.ru/part/1-a-b"}],
+            rossko_items=[{"url": "https://svoygarage.ru/autoparts/new/part/2-a-b"}],
+            export_date=date(2026, 6, 5),
+            created_new_batch=True,
+        )
+        self.assertIn("# Б/у запчасти (1)", content)
+        self.assertIn("# Rossko — новые запчасти (1)", content)
+        self.assertIn("75 б/у + 75 Rossko", content)
+        self.assertIn("https://svoygarage.ru/part/1-a-b", content)
+        self.assertIn("https://svoygarage.ru/autoparts/new/part/2-a-b", content)
 
 
 class ProductLastmodTests(unittest.TestCase):

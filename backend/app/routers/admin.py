@@ -52,7 +52,7 @@ from app.services.photo_localization import (
 from app.services.sitemap_service import (
     DEFAULT_PRODUCT_URLS_LIMIT,
     generate_product_urls_text_file,
-    get_daily_product_url_batch,
+    get_daily_seo_url_batch,
     get_new_parts_sitemap_cache_meta,
     get_products_sitemap_cache_meta,
     get_site_sitemap_files,
@@ -1158,27 +1158,29 @@ def download_product_card_urls(
     db: Session = Depends(get_db),
 ):
     integration = get_or_create_yandex_integration(db)
-    items, export_date, _created, _pool_reset = get_daily_product_url_batch(
+    used_items, rossko_items, export_date, _created, _pool_reset = get_daily_seo_url_batch(
         db,
         limit=limit,
         preferred_host_url=integration.host_url,
     )
-    if not items:
+    if not used_items and not rossko_items:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Нет товаров в наличии с фото, брендом и артикулом для формирования списка URL",
+            detail="Нет карточек б/у или Rossko для формирования списка URL",
         )
 
     content = generate_product_urls_text_file(
         db,
         limit=limit,
         preferred_host_url=integration.host_url,
-        items=items,
+        used_items=used_items,
+        rossko_items=rossko_items,
         export_date=export_date,
         created_new_batch=_created,
         pool_was_reset=_pool_reset,
     )
-    filename = f"product-card-urls-{export_date.isoformat()}-{len(items)}.txt"
+    total_count = len(used_items) + len(rossko_items)
+    filename = f"seo-card-urls-{export_date.isoformat()}-{total_count}.txt"
     return Response(
         content=content,
         media_type="text/plain; charset=utf-8",

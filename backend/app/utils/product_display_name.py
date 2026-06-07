@@ -80,6 +80,20 @@ def format_product_display_title(
         return raw or "Автозапчасть"
 
     description = extract_product_description(raw, brand_str, article_str) or raw
-    parts = [brand_str, article_str, description]
+    headline = " ".join(part for part in (brand_str, article_str) if part).strip()
+    desc_norm = re.sub(r"\s+", " ", description).strip().casefold()
+    headline_norm = headline.casefold()
+    article_norm = _normalize_article(article_str)
+
+    parts = [brand_str, article_str]
+    if description:
+        desc_is_duplicate = (
+            desc_norm == headline_norm
+            or desc_norm == article_norm.casefold()
+            or _normalize_article(description) == article_norm
+        )
+        if not desc_is_duplicate:
+            parts.append(description)
+
     formatted = " ".join(part for part in parts if part).strip()
     return formatted or "Автозапчасть"

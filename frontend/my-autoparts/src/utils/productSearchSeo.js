@@ -1,4 +1,5 @@
 import { DEFAULT_CITY, extractCityFromAddress, formatCityInPrepositional } from './organizationCity';
+import { formatProductDisplayTitle } from './productDisplayName';
 
 const SITE_BRAND = 'Свой Гараж';
 const TITLE_SUFFIX = ` | ${SITE_BRAND}`;
@@ -20,25 +21,95 @@ function formatPriceRub(price) {
   return amount.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function buildProductSearchTitle({ brand, article, fallbackDisplayName }) {
+function buildListingContextSuffix({ sellerName, listingId }) {
+  const seller = String(sellerName || '').trim();
+  const parts = [];
+  if (seller) parts.push(seller);
+  if (listingId != null && listingId !== '') parts.push(`№${listingId}`);
+  if (!parts.length) return '';
+  return ` — ${parts.join(' ')}`;
+}
+
+function appendListingUniqueness(base, { sellerName, listingId, maxLen = 160 }) {
+  const seller = String(sellerName || '').trim();
+  const tailParts = [];
+  if (seller) tailParts.push(`Продавец: ${seller}.`);
+  if (listingId != null && listingId !== '') tailParts.push(`Объявление №${listingId}.`);
+  if (!tailParts.length) return truncate(base, maxLen);
+
+  const tail = tailParts.join(' ');
+  const combined = `${base} ${tail}`;
+  if (combined.length <= maxLen) return combined;
+
+  const remaining = maxLen - tail.length - 1;
+  if (remaining > 40) {
+    return `${truncate(base, remaining)} ${tail}`;
+  }
+  return truncate(combined, maxLen);
+}
+
+function mergeContentSnippet({ shortName, uniqueDescription, maxLen = 120 }) {
+  const short = String(shortName || '').replace(/\s+/g, ' ').trim();
+  const unique = String(uniqueDescription || '').replace(/\s+/g, ' ').trim();
+  const parts = [];
+  if (short) parts.push(short);
+  if (unique && !short.toLowerCase().includes(unique.toLowerCase())) {
+    parts.push(unique);
+  }
+  if (!parts.length) return '';
+  const merged = parts.join('. ');
+  if (merged.length <= maxLen) return merged;
+  return truncate(merged, maxLen);
+}
+
+function buildTitleCore({ brand, article, productName, fallbackDisplayName }) {
   const brandStr = String(brand || '').trim();
   const articleStr = String(article || '').trim();
-  const fallback = String(fallbackDisplayName || '').trim();
-
-  let core;
-  if (fallback) {
-    core = fallback;
-  } else if (brandStr && articleStr) {
-    core = `${brandStr} ${articleStr}`;
-  } else if (articleStr) {
-    core = articleStr;
-  } else if (brandStr) {
-    core = brandStr;
-  } else {
-    core = 'Автозапчасть';
+  if (brandStr || articleStr) {
+    const raw = String(productName || '').trim() || null;
+    return formatProductDisplayTitle(brandStr, articleStr, raw);
   }
 
-  return `${core}${TITLE_SUFFIX}`.replace(/\s+/g, ' ').trim();
+  const fallback = String(fallbackDisplayName || '').trim();
+  if (fallback) return fallback;
+  const raw = String(productName || '').trim();
+  return raw || 'Автозапчасть';
+}
+
+function fitCoreWithSuffix(core, suffix, maxLen) {
+  const normalizedCore = String(core || '').replace(/\s+/g, ' ').trim();
+  const normalizedSuffix = suffix || '';
+  if (!normalizedSuffix) return truncate(normalizedCore, maxLen);
+
+  const combined = `${normalizedCore}${normalizedSuffix}`;
+  if (combined.length <= maxLen) return combined;
+
+  const allowedCore = maxLen - normalizedSuffix.length;
+  if (allowedCore < 1) return truncate(combined, maxLen);
+  return `${truncate(normalizedCore, allowedCore)}${normalizedSuffix}`;
+}
+
+export function buildProductSearchTitle({
+  brand,
+  article,
+  productName,
+  fallbackDisplayName,
+  sellerName,
+  listingId,
+}) {
+  const core = buildTitleCore({ brand, article, productName, fallbackDisplayName });
+  const suffix = buildListingContextSuffix({ sellerName, listingId });
+  const maxCoreLen = Math.max(20, 70 - TITLE_SUFFIX.length);
+  const coreWithSuffix = fitCoreWithSuffix(core, suffix, maxCoreLen);
+  return `${coreWithSuffix}${TITLE_SUFFIX}`.replace(/\s+/g, ' ').trim();
+}
+
+export function buildNewPartSearchTitle({ brand, article, rawName, cardId }) {
+  const core = buildTitleCore({ brand, article, productName: rawName });
+  const suffix = ` — новая №${cardId}`;
+  const maxCoreLen = Math.max(20, 70 - TITLE_SUFFIX.length);
+  const coreWithSuffix = fitCoreWithSuffix(core, suffix, maxCoreLen);
+  return `${coreWithSuffix}${TITLE_SUFFIX}`.replace(/\s+/g, ' ').trim();
 }
 
 export function buildProductSearchDescription({
@@ -50,14 +121,14 @@ export function buildProductSearchDescription({
   inStock = true,
   shortName,
   uniqueDescription,
+  sellerName,
+  listingId,
 }) {
   const brandStr = String(brand || '').trim();
   const articleStr = String(article || '').trim();
   const condition = isNew ? 'Новая' : 'Б/у';
   const cityPrep = formatCityInPrepositional(city || DEFAULT_CITY);
-  const uniqueDesc = String(uniqueDescription || '').replace(/\s+/g, ' ').trim();
-  const short = String(shortName || '').trim();
-  const snippetSource = uniqueDesc || short;
+  const snippetSource = mergeContentSnippet({ shortName, uniqueDescription });
 
   let buyLine;
   if (brandStr && articleStr) {
@@ -79,13 +150,18 @@ export function buildProductSearchDescription({
 
   if (snippetSource) {
     const combined = `${base} ${snippetSource}`;
-    if (combined.length <= 160) return combined;
+    if (combined.length <= 160) {
+      return appendListingUniqueness(combined, { sellerName, listingId });
+    }
     const remaining = 160 - `${base} `.length - 1;
     if (remaining > 20) {
-      return `${base} ${truncate(snippetSource, remaining)}`;
+      return appendListingUniqueness(`${base} ${truncate(snippetSource, remaining)}`, {
+        sellerName,
+        listingId,
+      });
     }
   }
-  return truncate(base, 160);
+  return appendListingUniqueness(truncate(base, 160), { sellerName, listingId });
 }
 
 export function buildProductAlternateNames({ brand, article }) {
