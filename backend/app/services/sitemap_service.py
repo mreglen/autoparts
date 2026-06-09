@@ -474,7 +474,6 @@ def generate_product_urls_text_file(
     created_new_batch: bool = False,
     pool_was_reset: bool = False,
 ) -> str:
-    used_limit, rossko_limit = _split_seo_url_limit(limit)
     if used_items is None and rossko_items is None:
         used_items, rossko_items, export_date, created_new_batch, pool_was_reset = get_daily_seo_url_batch(
             db,
@@ -484,38 +483,10 @@ def generate_product_urls_text_file(
 
     used_items = used_items or []
     rossko_items = rossko_items or []
-    total_count = len(used_items) + len(rossko_items)
-
-    generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    batch_date = export_date or _export_date_today()
-    lines = [
-        "# Карточки «Свой Гараж» — рабочие URL",
-        "# Состав: б/у запчасти из каталога + SEO-карточки Rossko (/autoparts/new)",
-        "# Б/у: товар в наличии, есть фото, заполнены бренд, артикул и название",
-        "# Rossko: активные SEO-карточки source=rossko с данными API",
-        f"# Дата суточной порции (UTC): {batch_date.isoformat()}",
-        f"# Сгенерировано: {generated_at}",
-        (
-            f"# Запрошено: {limit} ({used_limit} б/у + {rossko_limit} Rossko), "
-            f"в файле: {len(used_items)} + {len(rossko_items)} = {total_count}"
-        ),
-    ]
-    if created_new_batch:
-        lines.append("# Новая суточная порция (ранее не выгружались)")
-    else:
-        lines.append("# Повторная выгрузка сегодняшней порции")
-    if pool_was_reset:
-        lines.append("# Один или оба пула уже были в прошлых выгрузках — сброшены, список начат заново")
-    lines.append("")
-    if used_items:
-        lines.append(f"# Б/у запчасти ({len(used_items)})")
-        lines.extend(item["url"] for item in used_items)
-    if rossko_items:
-        if used_items:
-            lines.append("")
-        lines.append(f"# Rossko — новые запчасти ({len(rossko_items)})")
-        lines.extend(item["url"] for item in rossko_items)
-    return "\n".join(lines) + "\n"
+    urls = [str(item["url"]) for item in used_items] + [str(item["url"]) for item in rossko_items]
+    if not urls:
+        return ""
+    return "\n".join(urls) + "\n"
 
 
 def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:

@@ -30,7 +30,7 @@ class SplitSeoUrlLimitTests(unittest.TestCase):
 
 
 class GenerateProductUrlsTextFileTests(unittest.TestCase):
-    def test_file_contains_both_sections(self):
+    def test_file_contains_only_urls_one_per_line(self):
         content = generate_product_urls_text_file(
             MagicMock(),
             limit=150,
@@ -39,11 +39,14 @@ class GenerateProductUrlsTextFileTests(unittest.TestCase):
             export_date=date(2026, 6, 5),
             created_new_batch=True,
         )
-        self.assertIn("# Б/у запчасти (1)", content)
-        self.assertIn("# Rossko — новые запчасти (1)", content)
-        self.assertIn("75 б/у + 75 Rossko", content)
-        self.assertIn("https://svoygarage.ru/part/1-a-b", content)
-        self.assertIn("https://svoygarage.ru/autoparts/new/part/2-a-b", content)
+        lines = content.strip().split("\n")
+        self.assertEqual(lines, [
+            "https://svoygarage.ru/part/1-a-b",
+            "https://svoygarage.ru/autoparts/new/part/2-a-b",
+        ])
+        for line in lines:
+            self.assertTrue(line.startswith("https://"))
+            self.assertNotIn("#", line)
 
 
 class ProductLastmodTests(unittest.TestCase):

@@ -150,7 +150,7 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
     @patch("app.services.new_parts_seo_sync_service._get_sync_log", return_value=None)
     @patch("app.services.new_parts_seo_sync_service.collect_distinct_product_candidates")
     @patch("app.services.new_parts_seo_sync_service.count_seo_cards_created_today")
-    def test_daily_limit_allows_100th_create_blocks_101st(
+    def test_daily_limit_allows_200th_create_blocks_201st(
         self,
         mock_count_today,
         mock_collect,
@@ -163,7 +163,7 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
         _upsert,
         _sleep,
     ):
-        mock_count_today.return_value = 99
+        mock_count_today.return_value = 199
         mock_collect.return_value = [
             ProductLookupCandidate(lookup_key=f"brand{i}|ART{i}", brand=f"Brand{i}", article=f"ART{i}")
             for i in range(2)
@@ -176,7 +176,7 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
         card.article = "ART0"
         mock_create.return_value = card
 
-        result = self._run(sync_new_parts_seo_from_products(MagicMock(), daily_limit=100))
+        result = self._run(sync_new_parts_seo_from_products(MagicMock(), daily_limit=200))
 
         self.assertEqual(result.created, 1)
         self.assertTrue(result.stopped_by_daily_limit)

@@ -1129,7 +1129,7 @@ def rebuild_sitemaps(
 
 @router.post("/seo/new-parts/sync-from-products")
 async def sync_new_parts_seo_from_products_endpoint(
-    limit: int = Query(100, ge=1, le=500, description="Максимум новых SEO-карточек за сутки"),
+    limit: int = Query(200, ge=1, le=500, description="Максимум новых SEO-карточек за сутки"),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):

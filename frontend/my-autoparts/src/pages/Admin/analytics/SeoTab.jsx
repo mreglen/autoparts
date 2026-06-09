@@ -59,7 +59,7 @@ export default function SeoTab() {
     setSyncChips(null);
     setError(null);
     try {
-      const result = await apiRequest('/admin/seo/new-parts/sync-from-products?limit=100', {
+      const result = await apiRequest('/admin/seo/new-parts/sync-from-products?limit=200', {
         method: 'POST',
       });
       setSyncChips(formatSyncStats(result?.sync));
@@ -163,7 +163,7 @@ export default function SeoTab() {
         </div>
 
         <p className="mt-3 text-xs text-gray-400">
-          Авто: до 100 новых URL/сутки из каталога, cron 03:00 UTC
+          Авто: до 200 новых URL/сутки из каталога, cron 03:00 UTC
           {origin ? ` · ${origin}` : ''}
         </p>
       </div>
