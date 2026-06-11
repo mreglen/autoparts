@@ -14,6 +14,7 @@ celery_app = Celery(
         'app.tasks.avito_tasks',
         'app.tasks.chat_media_tasks',
         'app.tasks.yandex_feed_tasks',
+        'app.tasks.seo_tasks',
     ]
 )
 

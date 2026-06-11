@@ -56,6 +56,7 @@ from app.services.sitemap_service import (
     get_products_sitemap_cache_meta,
     get_seo_sitemap_daily_url_limit,
     get_site_sitemap_files,
+    summarize_site_page_counts,
     rebuild_all_sitemaps_cache,
     rebuild_new_parts_sitemap_cache,
     rebuild_products_sitemap_cache,
@@ -1093,9 +1094,11 @@ def list_site_sitemaps(
 ):
     integration = get_or_create_yandex_integration(db)
     site_origin = integration.host_url or "https://svoygarage.ru"
+    items = get_site_sitemap_files(db, preferred_host_url=integration.host_url)
     return {
         "site_origin": site_origin.rstrip("/"),
-        "items": get_site_sitemap_files(db, preferred_host_url=integration.host_url),
+        "items": items,
+        "total_pages": summarize_site_page_counts(items),
         "products_cache": get_products_sitemap_cache_meta(db),
         "new_parts_cache": get_new_parts_sitemap_cache_meta(db),
     }
@@ -1172,7 +1175,11 @@ async def sync_new_parts_seo_from_products_endpoint(
 ):
     from dataclasses import asdict
 
-    from app.services.new_parts_seo_sync_service import sync_new_parts_seo_from_products
+    from app.services.new_parts_seo_sync_service import (
+        append_created_cards_to_new_parts_sitemap,
+        sync_new_parts_seo_from_products,
+    )
+    from app.services.sitemap_service import get_new_parts_sitemap_cache_meta
 
     integration = get_or_create_yandex_integration(db)
     host = integration.host_url
@@ -1180,13 +1187,18 @@ async def sync_new_parts_seo_from_products_endpoint(
         db,
         daily_limit=limit if limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT,
     )
-    new_parts_snapshot = rebuild_new_parts_sitemap_cache(db, preferred_host_url=host)
+    append_created_cards_to_new_parts_sitemap(
+        db,
+        sync_stats.created_card_ids,
+        preferred_host_url=host,
+    )
+    new_parts_cache = get_new_parts_sitemap_cache_meta(db)
     return {
         "ok": True,
         "sync": asdict(sync_stats),
         "new_parts": {
-            "url_count": new_parts_snapshot.url_count,
-            "generated_at": new_parts_snapshot.generated_at.isoformat(),
+            "url_count": int(new_parts_cache.get("url_count") or 0),
+            "generated_at": new_parts_cache.get("generated_at"),
         },
     }
 

@@ -184,6 +184,21 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
     ]
 
 
+def summarize_site_page_counts(items: Iterable[dict[str, str | int]]) -> int:
+    """Sum indexable page URLs across sitemap feeds (excludes sitemap index metadata)."""
+    return sum(
+        int(item.get("url_count") or 0)
+        for item in items
+        if item.get("type") not in {"index", "admin"}
+    )
+
+
+def count_total_site_pages(db: Session, *, preferred_host_url: str | None = None) -> int:
+    return summarize_site_page_counts(
+        get_site_sitemap_files(db, preferred_host_url=preferred_host_url)
+    )
+
+
 def _resolve_origin(db: Session, preferred_host_url: str | None = None) -> str:
     if preferred_host_url:
         return _resolve_site_origin(preferred_host_url)

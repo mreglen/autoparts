@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
@@ -21,7 +22,7 @@ from app.services.new_parts_seo_card_service import (
     is_rossko_new_part_sitemap_eligible,
 )
 from app.services.rossko_part_selection import pick_best_rossko_part, rossko_part_to_card_payload
-from app.services.sitemap_service import is_working_catalog_product
+from app.services.sitemap_service import append_new_part_card_to_sitemap_cache, is_working_catalog_product
 from app.services.yandex_feed_xml_service import _iter_catalog_products
 from app.utils.partnumber import build_product_lookup_key, normalize_partnumber
 
@@ -58,6 +59,10 @@ class SyncResult:
     not_found: int = 0
     errors: int = 0
     stopped_by_daily_limit: bool = False
+    stopped_by_batch_limit: bool = False
+    batch_size: int = 0
+    remaining_daily_quota: int = 0
+    created_card_ids: list[int] = field(default_factory=list)
     details: list[str] = field(default_factory=list)
 
 
@@ -80,6 +85,32 @@ def count_seo_cards_created_today(db: Session) -> int:
         )
         .count()
     )
+
+
+def get_seo_sync_batch_size(*, daily_limit: int | None = None) -> int:
+    configured = int(settings.NEW_PARTS_SEO_SYNC_BATCH_SIZE or 0)
+    if configured > 0:
+        return configured
+    interval_minutes = max(1, int(settings.NEW_PARTS_SEO_SYNC_BATCH_INTERVAL_MINUTES or 30))
+    ticks_per_day = max(1, (24 * 60) // interval_minutes)
+    limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
+    return max(1, math.ceil(limit / ticks_per_day))
+
+
+def get_seo_sync_runtime_settings() -> dict[str, object]:
+    daily_limit = int(settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT)
+    interval_minutes = max(1, int(settings.NEW_PARTS_SEO_SYNC_BATCH_INTERVAL_MINUTES or 30))
+    return {
+        "daily_limit": daily_limit,
+        "rossko_delay_sec": float(settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC),
+        "sitemap_daily_url_limit": int(settings.SEO_SITEMAP_DAILY_URL_LIMIT),
+        "refresh_batch_size": int(settings.NEW_PARTS_SEO_REFRESH_BATCH_SIZE),
+        "batch_interval_minutes": interval_minutes,
+        "batch_size": get_seo_sync_batch_size(daily_limit=daily_limit),
+        "batch_size_configured": int(settings.NEW_PARTS_SEO_SYNC_BATCH_SIZE or 0),
+        "use_celery": bool(settings.NEW_PARTS_SEO_SYNC_USE_CELERY),
+        "micro_batch_enabled": True,
+    }
 
 
 def collect_distinct_product_candidates(db: Session) -> list[SyncCandidate]:
@@ -416,6 +447,7 @@ async def _process_sync_candidate(
                 seo_card_id=card.id,
             )
             result.created += 1
+            result.created_card_ids.append(card.id)
             remaining_new -= 1
         else:
             _upsert_sync_log(
@@ -449,14 +481,15 @@ async def _process_sync_candidate(
     return remaining_new
 
 
-async def sync_new_parts_seo_from_products(
+async def _run_seo_sync(
     db: Session,
     *,
-    daily_limit: int | None = None,
+    max_new_cards: int,
     rossko_delay_sec: float | None = None,
     not_found_retry_days: int | None = None,
+    batch_size: int = 0,
+    remaining_daily_quota: int = 0,
 ) -> SyncResult:
-    limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
     delay = rossko_delay_sec if rossko_delay_sec is not None else settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC
     retry_days = (
         not_found_retry_days
@@ -464,10 +497,16 @@ async def sync_new_parts_seo_from_products(
         else settings.NEW_PARTS_SEO_SYNC_NOT_FOUND_RETRY_DAYS
     )
 
-    result = SyncResult()
+    result = SyncResult(
+        batch_size=batch_size,
+        remaining_daily_quota=remaining_daily_quota,
+    )
     now = _utcnow()
-    already_created_today = count_seo_cards_created_today(db)
-    remaining_new = max(0, limit - already_created_today)
+    remaining_new = max(0, max_new_cards)
+
+    if remaining_new <= 0:
+        result.stopped_by_daily_limit = True
+        return result
 
     candidates = collect_all_sync_candidates(db)
     result.candidates = len(candidates)
@@ -479,7 +518,10 @@ async def sync_new_parts_seo_from_products(
 
     for candidate in candidates:
         if remaining_new <= 0:
-            result.stopped_by_daily_limit = True
+            if batch_size > 0:
+                result.stopped_by_batch_limit = True
+            else:
+                result.stopped_by_daily_limit = True
             break
         remaining_new = await _process_sync_candidate(
             db,
@@ -500,7 +542,10 @@ async def sync_new_parts_seo_from_products(
         pending_crosses.sort(key=lambda c: _candidate_sort_key(db, c))
         for candidate in pending_crosses:
             if remaining_new <= 0:
-                result.stopped_by_daily_limit = True
+                if batch_size > 0:
+                    result.stopped_by_batch_limit = True
+                else:
+                    result.stopped_by_daily_limit = True
                 break
             remaining_new = await _process_sync_candidate(
                 db,
@@ -517,7 +562,81 @@ async def sync_new_parts_seo_from_products(
             if result.stopped_by_daily_limit:
                 break
 
+    if batch_size > 0 and remaining_new <= 0:
+        result.stopped_by_batch_limit = True
+
     return result
+
+
+async def sync_new_parts_seo_batch(
+    db: Session,
+    *,
+    max_new_cards: int | None = None,
+    daily_limit: int | None = None,
+    rossko_delay_sec: float | None = None,
+    not_found_retry_days: int | None = None,
+) -> SyncResult:
+    limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
+    already_created_today = count_seo_cards_created_today(db)
+    remaining_daily = max(0, limit - already_created_today)
+    batch_size = max_new_cards if max_new_cards is not None else get_seo_sync_batch_size(daily_limit=limit)
+    target_new = min(remaining_daily, max(1, batch_size))
+
+    return await _run_seo_sync(
+        db,
+        max_new_cards=target_new,
+        rossko_delay_sec=rossko_delay_sec,
+        not_found_retry_days=not_found_retry_days,
+        batch_size=batch_size,
+        remaining_daily_quota=remaining_daily,
+    )
+
+
+async def sync_new_parts_seo_from_products(
+    db: Session,
+    *,
+    daily_limit: int | None = None,
+    rossko_delay_sec: float | None = None,
+    not_found_retry_days: int | None = None,
+) -> SyncResult:
+    limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
+    already_created_today = count_seo_cards_created_today(db)
+    remaining_daily = max(0, limit - already_created_today)
+
+    return await _run_seo_sync(
+        db,
+        max_new_cards=remaining_daily,
+        rossko_delay_sec=rossko_delay_sec,
+        not_found_retry_days=not_found_retry_days,
+        batch_size=0,
+        remaining_daily_quota=remaining_daily,
+    )
+
+
+def append_created_cards_to_new_parts_sitemap(
+    db: Session,
+    card_ids: list[int],
+    *,
+    preferred_host_url: str | None = None,
+) -> int:
+    if not card_ids:
+        return 0
+    appended = 0
+    rows = (
+        db.query(NewPartsSeoCard)
+        .filter(NewPartsSeoCard.id.in_(card_ids))
+        .all()
+    )
+    by_id = {row.id: row for row in rows}
+    for card_id in card_ids:
+        card = by_id.get(card_id)
+        if card and append_new_part_card_to_sitemap_cache(
+            db,
+            card,
+            preferred_host_url=preferred_host_url,
+        ):
+            appended += 1
+    return appended
 
 
 def count_active_rossko_seo_cards(db: Session) -> int:
@@ -573,10 +692,5 @@ def get_new_parts_seo_dashboard_stats(db: Session, *, days: int = 14) -> dict[st
         "cards_eligible_pct": eligible_pct,
         "cards_created_today": created_today,
         "created_by_day": get_cards_created_by_day(db, days=days),
-        "settings": {
-            "daily_limit": settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT,
-            "rossko_delay_sec": settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC,
-            "sitemap_daily_url_limit": settings.SEO_SITEMAP_DAILY_URL_LIMIT,
-            "refresh_batch_size": settings.NEW_PARTS_SEO_REFRESH_BATCH_SIZE,
-        },
+        "settings": get_seo_sync_runtime_settings(),
     }

@@ -366,5 +366,18 @@ class SitemapCacheTests(unittest.TestCase):
         self.assertEqual(mock_cache_cls.call_args.kwargs["cache_key"], NEW_PARTS_SITEMAP_CACHE_KEY)
 
 
+class SummarizeSitePageCountsTests(unittest.TestCase):
+    def test_excludes_index_and_admin_entries(self):
+        items = [
+            {"id": "index", "type": "index", "url_count": 8},
+            {"id": "pages", "type": "static", "url_count": 10},
+            {"id": "products", "type": "dynamic", "url_count": 100},
+            {"id": "admin", "type": "admin", "url_count": 3},
+        ]
+        from app.services.sitemap_service import summarize_site_page_counts
+
+        self.assertEqual(summarize_site_page_counts(items), 110)
+
+
 if __name__ == "__main__":
     unittest.main()

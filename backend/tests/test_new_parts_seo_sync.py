@@ -310,5 +310,50 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
         self.assertEqual(result.processed, 0)
 
 
+class SeoSyncBatchSettingsTests(unittest.TestCase):
+    @patch("app.services.new_parts_seo_sync_service.settings")
+    def test_auto_batch_size_from_daily_limit(self, mock_settings):
+        mock_settings.NEW_PARTS_SEO_SYNC_BATCH_SIZE = 0
+        mock_settings.NEW_PARTS_SEO_SYNC_BATCH_INTERVAL_MINUTES = 30
+        mock_settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT = 1000
+
+        from app.services.new_parts_seo_sync_service import get_seo_sync_batch_size
+
+        self.assertEqual(get_seo_sync_batch_size(), 21)
+
+    @patch("app.services.new_parts_seo_sync_service.settings")
+    def test_configured_batch_size_override(self, mock_settings):
+        mock_settings.NEW_PARTS_SEO_SYNC_BATCH_SIZE = 50
+        mock_settings.NEW_PARTS_SEO_SYNC_BATCH_INTERVAL_MINUTES = 30
+        mock_settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT = 1000
+
+        from app.services.new_parts_seo_sync_service import get_seo_sync_batch_size
+
+        self.assertEqual(get_seo_sync_batch_size(), 50)
+
+
+class SeoSyncBatchRunTests(unittest.TestCase):
+    def _run(self, coro):
+        import asyncio
+
+        return asyncio.run(coro)
+
+    @patch("app.services.new_parts_seo_sync_service.count_seo_cards_created_today", return_value=0)
+    @patch("app.services.new_parts_seo_sync_service.collect_all_sync_candidates", return_value=[])
+    def test_batch_respects_zero_remaining_daily(self, _collect, _count_today):
+        from app.services.new_parts_seo_sync_service import sync_new_parts_seo_batch
+
+        with patch(
+            "app.services.new_parts_seo_sync_service.count_seo_cards_created_today",
+            return_value=1000,
+        ):
+            result = self._run(
+                sync_new_parts_seo_batch(MagicMock(), daily_limit=1000, max_new_cards=21)
+            )
+
+        self.assertTrue(result.stopped_by_daily_limit)
+        self.assertEqual(result.created, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

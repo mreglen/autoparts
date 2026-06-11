@@ -237,6 +237,13 @@ async def startup_event():
         replace_existing=True,
     )
     scheduler.add_job(
+        func=run_new_parts_seo_sync_tick,
+        trigger=IntervalTrigger(minutes=settings.NEW_PARTS_SEO_SYNC_BATCH_INTERVAL_MINUTES),
+        id="new_parts_seo_sync_batch",
+        name="Rossko SEO cards micro-batch sync",
+        replace_existing=True,
+    )
+    scheduler.add_job(
         func=run_refresh_new_parts_seo_cards,
         trigger=IntervalTrigger(hours=settings.NEW_PARTS_SEO_REFRESH_INTERVAL_HOURS),
         id="refresh_new_parts_seo_cards",
@@ -344,26 +351,12 @@ async def run_cleanup_expired_guest_carts():
 
 async def run_rebuild_products_sitemap_cache():
     try:
-        from app.services.new_parts_seo_sync_service import sync_new_parts_seo_from_products
         from app.services.sitemap_service import rebuild_all_sitemaps_cache
 
         db_gen = get_db()
         db = next(db_gen)
         try:
             integration = get_or_create_yandex_integration(db)
-            sync_stats = await sync_new_parts_seo_from_products(
-                db,
-                daily_limit=settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT,
-            )
-            logger.info(
-                "New parts SEO sync from products: candidates=%s created=%s updated=%s skipped=%s not_found=%s errors=%s",
-                sync_stats.candidates,
-                sync_stats.created,
-                sync_stats.updated_existing,
-                sync_stats.skipped,
-                sync_stats.not_found,
-                sync_stats.errors,
-            )
             products_snapshot, new_parts_snapshot, new_brands_snapshot, new_categories_snapshot = rebuild_all_sitemaps_cache(
                 db,
                 preferred_host_url=integration.host_url,
@@ -392,6 +385,38 @@ async def run_rebuild_products_sitemap_cache():
             db.close()
     except Exception as e:
         logger.error("Ошибка при пересборке кэша sitemap: %s", e)
+
+
+async def run_new_parts_seo_sync_tick():
+    try:
+        if settings.NEW_PARTS_SEO_SYNC_USE_CELERY:
+            from app.tasks.seo_tasks import run_new_parts_seo_sync_batch_task
+
+            run_new_parts_seo_sync_batch_task.delay()
+            logger.info("Rossko SEO micro-batch dispatched to Celery")
+            return
+
+        from app.services.new_parts_seo_batch_runner import execute_seo_sync_batch_job
+
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            sync_stats = await execute_seo_sync_batch_job(db)
+            logger.info(
+                "Rossko SEO micro-batch: batch_size=%s created=%s processed=%s skipped=%s "
+                "not_found=%s errors=%s remaining_daily=%s",
+                sync_stats.batch_size,
+                sync_stats.created,
+                sync_stats.processed,
+                sync_stats.skipped,
+                sync_stats.not_found,
+                sync_stats.errors,
+                sync_stats.remaining_daily_quota,
+            )
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error("Ошибка Rossko SEO micro-batch: %s", e)
 
 
 async def run_refresh_new_parts_seo_cards():

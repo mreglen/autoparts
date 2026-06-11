@@ -15,6 +15,7 @@ from app.services.seo_semantics_service import classify_query_cluster
 from app.services.sitemap_service import (
     count_active_brand_new_landings,
     count_active_new_part_cards,
+    count_total_site_pages,
     count_working_catalog_products,
     get_new_parts_sitemap_cache_meta,
     get_products_sitemap_cache_meta,
@@ -150,6 +151,7 @@ def _sitemap_indexation_summary(db: Session) -> dict[str, object]:
     products_meta = get_products_sitemap_cache_meta(db)
     new_parts_meta = get_new_parts_sitemap_cache_meta(db)
     return {
+        "total_pages": count_total_site_pages(db),
         "products_urls": int(products_meta.get("url_count") or 0),
         "new_parts_urls": int(new_parts_meta.get("url_count") or 0),
         "brand_landings": count_active_brand_new_landings(db),

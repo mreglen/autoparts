@@ -154,13 +154,24 @@ export default function SeoTab() {
     [sitemapItems, products, newParts],
   );
 
-  const totalUrls = useMemo(
-    () => sitemapRows.reduce((sum, row) => sum + Number(row.url_count || 0), 0),
-    [sitemapRows],
-  );
+  const totalUrls = useMemo(() => {
+    if (sitemapData?.total_pages != null) {
+      return Number(sitemapData.total_pages) || 0;
+    }
+    return sitemapRows.reduce(
+      (sum, row) => sum + (row.type === 'index' || row.type === 'admin' ? 0 : Number(row.url_count || 0)),
+      0,
+    );
+  }, [sitemapData?.total_pages, sitemapRows]);
 
-  const dailyLimit = seoStats?.settings?.daily_limit || 500;
-  const sitemapExportLimit = seoStats?.settings?.sitemap_daily_url_limit || 300;
+  const dailyLimit = seoStats?.settings?.daily_limit || 1000;
+  const batchSize = seoStats?.settings?.batch_size || 0;
+  const batchInterval = seoStats?.settings?.batch_interval_minutes || 30;
+  const createdToday = seoStats?.cards_created_today ?? 0;
+  const sitemapExportLimit = seoStats?.settings?.sitemap_daily_url_limit || 500;
+  const useCelery = Boolean(seoStats?.settings?.use_celery);
+  const dailyProgressPct =
+    dailyLimit > 0 ? Math.min(100, Math.round((createdToday / dailyLimit) * 100)) : 0;
 
   if (loading && !sitemapData) {
     return <LoadingState />;
@@ -178,13 +189,13 @@ export default function SeoTab() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Sitemap сайта
+              Страниц на сайте
             </p>
             <p className="mt-1 text-4xl font-bold tabular-nums text-gray-900">
-              {formatNumber(sitemapRows.length)}
+              {formatNumber(totalUrls)}
             </p>
             <p className="mt-1 text-sm text-gray-500">
-              файлов · {formatNumber(totalUrls)} URL суммарно
+              индексируемых URL в sitemap · {formatNumber(sitemapRows.length)} файлов sitemap
             </p>
           </div>
           {newParts && (
@@ -201,10 +212,43 @@ export default function SeoTab() {
         </div>
 
         <p className="mt-3 text-xs text-gray-400">
-          Авто: до {formatNumber(dailyLimit)} новых карточек/сутки (products + orders + crosses), cron 03:00 UTC
+          Micro-batch: ~{formatNumber(batchSize)} карточек каждые {batchInterval} мин
+          {useCelery ? ' (Celery worker)' : ' (APScheduler)'}
+          · лимит {formatNumber(dailyLimit)}/сутки · sitemap rebuild 03:00 UTC
           {origin ? ` · ${origin}` : ''}
         </p>
       </div>
+
+      {seoStats ? (
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 shadow-sm">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-indigo-700">
+                Rossko: создано сегодня
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-indigo-950">
+                {formatNumber(createdToday)}
+                <span className="text-base font-semibold text-indigo-600">
+                  {' '}
+                  / {formatNumber(dailyLimit)}
+                </span>
+              </p>
+            </div>
+            <p className="text-sm text-indigo-800">
+              Следующий тик через ~{batchInterval} мин · порция ~{formatNumber(batchSize)}
+            </p>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-indigo-100">
+            <div
+              className="h-full rounded-full bg-indigo-500 transition-all"
+              style={{ width: `${dailyProgressPct}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-indigo-700/80">
+            {dailyProgressPct}% дневной квоты · осталось {formatNumber(Math.max(0, dailyLimit - createdToday))}
+          </p>
+        </div>
+      ) : null}
 
       {seoStats ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

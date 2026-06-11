@@ -210,7 +210,14 @@ export default function SeoKpiDashboard() {
       </div>
 
       {data?.sitemap ? (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3 sm:col-span-2 lg:col-span-1">
+            <div className="text-xs text-indigo-700">Всего страниц на сайте</div>
+            <div className="text-2xl font-semibold text-indigo-950">
+              {formatNumber(data.sitemap.total_pages ?? 0)}
+            </div>
+            <div className="mt-1 text-xs text-indigo-600/80">URL в sitemap (без index)</div>
+          </div>
           <div className="rounded-lg border border-gray-200 bg-white p-3">
             <div className="text-xs text-gray-500">URL в sitemap (б/у)</div>
             <div className="text-lg font-semibold">{formatNumber(data.sitemap.products_urls)}</div>
@@ -224,7 +231,7 @@ export default function SeoKpiDashboard() {
             <div className="text-lg font-semibold">{formatNumber(data.sitemap.brand_landings)}</div>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-3">
-            <div className="text-xs text-gray-500">Период</div>
+            <div className="text-xs text-gray-500">Период KPI</div>
             <div className="text-sm font-semibold">
               {data.period?.start} — {data.period?.end}
             </div>
