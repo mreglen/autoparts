@@ -19,6 +19,9 @@ from app.db.schema_patches import (
     ensure_seo_new_part_url_exports_table,
     ensure_seo_sitemap_cache_table,
     ensure_new_parts_seo_sync_log_table,
+    ensure_seo_sync_pending_candidates_table,
+    ensure_seo_rossko_seed_queue_table,
+    ensure_seo_sync_daily_counters_table,
     ensure_user_avatar_column,
     ensure_product_photo_thumb_url_column,
     ensure_rossko_settings_table,
@@ -66,6 +69,9 @@ import app.models.new_parts_checkout_session  # noqa: F401 — YooKassa checkout
 import app.models.yookassa_payment  # noqa: F401 — YooKassa payments
 import app.models.new_parts_seo_card  # noqa: F401 — SEO cards for supplier new parts
 import app.models.new_parts_seo_sync_log  # noqa: F401 — SEO sync log for products→Rossko
+import app.models.seo_sync_pending_candidate  # noqa: F401 — persisted cross/sibling queue
+import app.models.seo_rossko_seed_queue  # noqa: F401 — Rossko seed pre-check queue
+import app.models.seo_sync_daily_counter  # noqa: F401 — daily API budget counters
 import app.models.seo_landing_page  # noqa: F401 — SEO landing pages registry
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
@@ -129,6 +135,9 @@ try:
     ensure_seo_new_part_url_exports_table()
     ensure_seo_sitemap_cache_table()
     ensure_new_parts_seo_sync_log_table()
+    ensure_seo_sync_pending_candidates_table()
+    ensure_seo_rossko_seed_queue_table()
+    ensure_seo_sync_daily_counters_table()
     ensure_user_avatar_column()
     ensure_product_photo_thumb_url_column()
     ensure_rossko_settings_table()
@@ -248,6 +257,20 @@ async def startup_event():
         trigger=IntervalTrigger(hours=settings.NEW_PARTS_SEO_REFRESH_INTERVAL_HOURS),
         id="refresh_new_parts_seo_cards",
         name="Refresh Rossko SEO card prices and stock",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        func=run_seo_seed_precheck_tick,
+        trigger=IntervalTrigger(minutes=settings.NEW_PARTS_SEO_SEED_PRECHECK_INTERVAL_MINUTES),
+        id="seo_rossko_seed_precheck",
+        name="Rossko SEO seed queue pre-check",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        func=run_seo_seed_populate,
+        trigger=CronTrigger(hour=2, minute=30),
+        id="seo_rossko_seed_populate",
+        name="Populate Rossko SEO seed queue nightly",
         replace_existing=True,
     )
     
@@ -438,6 +461,42 @@ async def run_refresh_new_parts_seo_cards():
             db.close()
     except Exception as e:
         logger.error("Ошибка при refresh SEO-карточек: %s", e)
+
+
+async def run_seo_seed_precheck_tick():
+    try:
+        from app.services.seo_rossko_seed_service import run_seed_precheck_batch
+
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            stats = await run_seed_precheck_batch(db)
+            logger.info(
+                "Rossko SEO seed precheck: checked=%s ready=%s not_found=%s skipped=%s",
+                stats.get("checked"),
+                stats.get("ready"),
+                stats.get("not_found"),
+                stats.get("skipped"),
+            )
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error("Ошибка Rossko SEO seed precheck: %s", e)
+
+
+async def run_seo_seed_populate():
+    try:
+        from app.services.seo_rossko_seed_service import populate_seed_queue_from_catalog
+
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            stats = populate_seed_queue_from_catalog(db)
+            logger.info("Rossko SEO seed populate: %s", stats)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error("Ошибка Rossko SEO seed populate: %s", e)
 
 
 async def run_yandex_feed_scheduler_tick():

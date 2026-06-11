@@ -800,6 +800,148 @@ def ensure_new_parts_seo_sync_log_table() -> None:
     logger.info("Created new_parts_seo_sync_log table")
 
 
+def ensure_seo_sync_pending_candidates_table() -> None:
+    inspector = inspect(engine)
+    if "seo_sync_pending_candidates" in inspector.get_table_names():
+        return
+
+    dialect = engine.dialect.name
+    with engine.begin() as conn:
+        if dialect == "postgresql":
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_sync_pending_candidates (
+                        lookup_key VARCHAR(255) PRIMARY KEY,
+                        brand VARCHAR(120) NOT NULL,
+                        article VARCHAR(120) NOT NULL,
+                        source VARCHAR(32) NOT NULL DEFAULT 'cross',
+                        priority INTEGER NOT NULL DEFAULT 100,
+                        discovered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_seo_sync_pending_candidates_source "
+                    "ON seo_sync_pending_candidates (source)"
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_sync_pending_candidates (
+                        lookup_key VARCHAR(255) PRIMARY KEY,
+                        brand VARCHAR(120) NOT NULL,
+                        article VARCHAR(120) NOT NULL,
+                        source VARCHAR(32) NOT NULL DEFAULT 'cross',
+                        priority INTEGER NOT NULL DEFAULT 100,
+                        discovered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+            )
+    logger.info("Created seo_sync_pending_candidates table")
+
+
+def ensure_seo_rossko_seed_queue_table() -> None:
+    inspector = inspect(engine)
+    if "seo_rossko_seed_queue" in inspector.get_table_names():
+        return
+
+    dialect = engine.dialect.name
+    with engine.begin() as conn:
+        if dialect == "postgresql":
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_rossko_seed_queue (
+                        lookup_key VARCHAR(255) PRIMARY KEY,
+                        brand VARCHAR(120) NOT NULL,
+                        article VARCHAR(120) NOT NULL,
+                        source VARCHAR(32) NOT NULL DEFAULT 'product',
+                        status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                        priority INTEGER NOT NULL DEFAULT 100,
+                        rossko_payload_json TEXT,
+                        rossko_checked_at TIMESTAMPTZ,
+                        next_retry_at TIMESTAMPTZ,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_seo_rossko_seed_queue_status "
+                    "ON seo_rossko_seed_queue (status)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_seo_rossko_seed_queue_source "
+                    "ON seo_rossko_seed_queue (source)"
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_rossko_seed_queue (
+                        lookup_key VARCHAR(255) PRIMARY KEY,
+                        brand VARCHAR(120) NOT NULL,
+                        article VARCHAR(120) NOT NULL,
+                        source VARCHAR(32) NOT NULL DEFAULT 'product',
+                        status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                        priority INTEGER NOT NULL DEFAULT 100,
+                        rossko_payload_json TEXT,
+                        rossko_checked_at TIMESTAMP,
+                        next_retry_at TIMESTAMP,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+            )
+    logger.info("Created seo_rossko_seed_queue table")
+
+
+def ensure_seo_sync_daily_counters_table() -> None:
+    inspector = inspect(engine)
+    if "seo_sync_daily_counters" in inspector.get_table_names():
+        return
+
+    dialect = engine.dialect.name
+    with engine.begin() as conn:
+        if dialect == "postgresql":
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_sync_daily_counters (
+                        stat_date DATE PRIMARY KEY,
+                        cross_recurse_calls INTEGER NOT NULL DEFAULT 0,
+                        precheck_calls INTEGER NOT NULL DEFAULT 0
+                    )
+                    """
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_sync_daily_counters (
+                        stat_date DATE PRIMARY KEY,
+                        cross_recurse_calls INTEGER NOT NULL DEFAULT 0,
+                        precheck_calls INTEGER NOT NULL DEFAULT 0
+                    )
+                    """
+                )
+            )
+    logger.info("Created seo_sync_daily_counters table")
+
+
 def ensure_user_avatar_column() -> None:
     """Add avatar_url column to users if missing."""
     inspector = inspect(engine)

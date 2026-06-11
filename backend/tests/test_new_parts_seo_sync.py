@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.new_parts_seo_sync_service import (
-    SOURCE_PRODUCT,
     STATUS_CREATED,
     STATUS_NOT_FOUND,
     STATUS_SKIPPED_EXISTS,
@@ -12,9 +11,12 @@ from app.services.new_parts_seo_sync_service import (
     _should_skip_before_rossko,
     collect_distinct_product_candidates,
     extract_cross_candidates_from_rossko,
+    extract_sibling_candidates_from_rossko,
     sync_new_parts_seo_from_products,
 )
-from app.services.rossko_part_selection import pick_best_rossko_part
+from app.services.rossko_part_selection import pick_best_rossko_part, pick_ranked_rossko_parts
+from app.services.seo_quota_service import get_expected_created_by_now, is_behind_quota
+from app.services.seo_sync_types import SOURCE_CROSS, SOURCE_PRODUCT, SOURCE_SIBLING
 
 
 def _part(brand: str, partnumber: str, *, count: int = 5, price: float = 100.0) -> dict:
@@ -68,7 +70,24 @@ class ExtractCrossCandidatesTests(unittest.TestCase):
         crosses = extract_cross_candidates_from_rossko(data)
         self.assertEqual(len(crosses), 2)
         self.assertEqual(crosses[0].brand, "BOSCH")
-        self.assertEqual(crosses[0].source, "cross")
+        self.assertEqual(crosses[0].source, SOURCE_CROSS)
+
+
+class ExtractSiblingCandidatesTests(unittest.TestCase):
+    def test_extracts_in_stock_siblings(self):
+        data = _rossko_response(
+            _part("MANN", "IF1009"),
+            _part("BOSCH", "IF1009"),
+            _part("ATE", "IF1009", count=0),
+        )
+        siblings = extract_sibling_candidates_from_rossko(
+            data,
+            query_brand="MANN",
+            query_article="IF1009",
+        )
+        self.assertEqual(len(siblings), 1)
+        self.assertEqual(siblings[0].brand, "BOSCH")
+        self.assertEqual(siblings[0].source, SOURCE_SIBLING)
 
 
 class PickBestRosskoPartTests(unittest.TestCase):
@@ -93,6 +112,18 @@ class PickBestRosskoPartTests(unittest.TestCase):
 
         self.assertIsNotNone(best)
         self.assertEqual(best["brand"], "BOSCH")
+
+    def test_ranked_returns_multiple_in_stock(self):
+        data = _rossko_response(
+            _part("MANN", "IF1009A"),
+            _part("MANN", "IF1009"),
+            _part("BOSCH", "IF1009"),
+            _part("MANN", "IF1009B"),
+            _part("MANN", "IF1009C"),
+            _part("MANN", "IF1009D"),
+        )
+        ranked = pick_ranked_rossko_parts(data, brand="MANN", article="IF1009", limit=5)
+        self.assertEqual(len(ranked), 5)
 
 
 class ShouldSkipBeforeRosskoTests(unittest.TestCase):
@@ -126,13 +157,14 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
         return asyncio.run(coro)
 
     @patch("app.services.new_parts_seo_sync_service.asyncio.sleep", new_callable=AsyncMock)
+    @patch("app.services.new_parts_seo_sync_service._persist_discoveries")
     @patch("app.services.new_parts_seo_sync_service._upsert_sync_log")
     @patch("app.services.new_parts_seo_sync_service.create_or_get_new_part_card")
     @patch("app.services.new_parts_seo_sync_service._fetch_rossko_search", new_callable=AsyncMock)
     @patch("app.services.new_parts_seo_sync_service.stable_key_exists", return_value=True)
     @patch("app.services.new_parts_seo_sync_service.find_active_card_for_lookup")
     @patch("app.services.new_parts_seo_sync_service._get_sync_log", return_value=None)
-    @patch("app.services.new_parts_seo_sync_service.collect_all_sync_candidates")
+    @patch("app.services.new_parts_seo_sync_service._collect_run_candidates")
     @patch("app.services.new_parts_seo_sync_service.count_seo_cards_created_today", return_value=0)
     def test_skips_existing_card_without_create(
         self,
@@ -144,6 +176,7 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
         mock_rossko,
         mock_create,
         _upsert,
+        _persist,
         _sleep,
     ):
         mock_collect.return_value = [
@@ -163,6 +196,7 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
         mock_create.assert_not_called()
 
     @patch("app.services.new_parts_seo_sync_service.asyncio.sleep", new_callable=AsyncMock)
+    @patch("app.services.new_parts_seo_sync_service._persist_discoveries")
     @patch("app.services.new_parts_seo_sync_service._upsert_sync_log")
     @patch("app.services.new_parts_seo_sync_service.is_rossko_new_part_sitemap_eligible", return_value=True)
     @patch("app.services.new_parts_seo_sync_service.create_or_get_new_part_card")
@@ -170,7 +204,7 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
     @patch("app.services.new_parts_seo_sync_service.stable_key_exists")
     @patch("app.services.new_parts_seo_sync_service.find_active_card_for_lookup", return_value=None)
     @patch("app.services.new_parts_seo_sync_service._get_sync_log", return_value=None)
-    @patch("app.services.new_parts_seo_sync_service.collect_all_sync_candidates")
+    @patch("app.services.new_parts_seo_sync_service._collect_run_candidates")
     @patch("app.services.new_parts_seo_sync_service.count_seo_cards_created_today")
     def test_daily_limit_allows_200th_create_blocks_201st(
         self,
@@ -183,6 +217,7 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
         mock_create,
         _eligible,
         _upsert,
+        _persist,
         _sleep,
     ):
         mock_count_today.return_value = 199
@@ -205,11 +240,12 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
         mock_create.assert_called_once()
 
     @patch("app.services.new_parts_seo_sync_service.asyncio.sleep", new_callable=AsyncMock)
+    @patch("app.services.new_parts_seo_sync_service._persist_discoveries")
     @patch("app.services.new_parts_seo_sync_service._upsert_sync_log")
     @patch("app.services.new_parts_seo_sync_service._fetch_rossko_search", new_callable=AsyncMock)
     @patch("app.services.new_parts_seo_sync_service.find_active_card_for_lookup", return_value=None)
     @patch("app.services.new_parts_seo_sync_service._get_sync_log", return_value=None)
-    @patch("app.services.new_parts_seo_sync_service.collect_all_sync_candidates")
+    @patch("app.services.new_parts_seo_sync_service._collect_run_candidates")
     @patch("app.services.new_parts_seo_sync_service.count_seo_cards_created_today", return_value=0)
     def test_not_found_sets_retry_in_seven_days(
         self,
@@ -219,6 +255,7 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
         _find_card,
         mock_rossko,
         mock_upsert,
+        _persist,
         _sleep,
     ):
         mock_collect.return_value = [
@@ -248,6 +285,7 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
         )
 
     @patch("app.services.new_parts_seo_sync_service.asyncio.sleep", new_callable=AsyncMock)
+    @patch("app.services.new_parts_seo_sync_service._persist_discoveries")
     @patch("app.services.new_parts_seo_sync_service._upsert_sync_log")
     @patch("app.services.new_parts_seo_sync_service.is_rossko_new_part_sitemap_eligible", return_value=True)
     @patch("app.services.new_parts_seo_sync_service.create_or_get_new_part_card")
@@ -255,9 +293,9 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
     @patch("app.services.new_parts_seo_sync_service.stable_key_exists", return_value=False)
     @patch("app.services.new_parts_seo_sync_service.find_active_card_for_lookup", return_value=None)
     @patch("app.services.new_parts_seo_sync_service._get_sync_log", return_value=None)
-    @patch("app.services.new_parts_seo_sync_service.collect_all_sync_candidates")
+    @patch("app.services.new_parts_seo_sync_service._collect_run_candidates")
     @patch("app.services.new_parts_seo_sync_service.count_seo_cards_created_today", return_value=0)
-    def test_rossko_multi_part_response_creates_single_card(
+    def test_rossko_multi_part_response_creates_up_to_five_cards(
         self,
         _count_today,
         mock_collect,
@@ -268,6 +306,7 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
         mock_create,
         _eligible,
         _upsert,
+        _persist,
         _sleep,
     ):
         mock_collect.return_value = [
@@ -279,25 +318,27 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
             _part("MANN", "IF1009B"),
             _part("BOSCH", "IF1009"),
             _part("MANN", "IF1009C"),
+            _part("MANN", "IF1009D"),
         )
-        card = MagicMock()
-        card.id = 7
-        card.brand = "MANN"
-        card.article = "IF1009"
-        mock_create.return_value = card
+
+        def _make_card(_db, payload):
+            card = MagicMock()
+            card.id = hash(payload["article"]) % 1000
+            card.brand = payload["brand"]
+            card.article = payload["article"]
+            return card
+
+        mock_create.side_effect = _make_card
 
         result = self._run(sync_new_parts_seo_from_products(MagicMock(), daily_limit=100))
 
-        self.assertEqual(result.created, 1)
-        mock_create.assert_called_once()
-        payload = mock_create.call_args.args[1]
-        self.assertEqual(payload["brand"], "MANN")
-        self.assertEqual(payload["article"], "IF1009")
+        self.assertEqual(result.created, 5)
+        self.assertEqual(mock_create.call_count, 5)
 
+    @patch("app.services.new_parts_seo_sync_service._collect_run_candidates")
     @patch("app.services.new_parts_seo_sync_service.count_seo_cards_created_today", return_value=100)
-    @patch("app.services.new_parts_seo_sync_service.collect_all_sync_candidates")
     def test_stops_immediately_when_daily_limit_already_reached(
-        self, mock_collect, _count_today
+        self, mock_count_today, mock_collect
     ):
         mock_collect.return_value = [
             SyncCandidate(lookup_key="mann|IF1009", brand="MANN", article="IF1009"),
@@ -339,7 +380,7 @@ class SeoSyncBatchRunTests(unittest.TestCase):
         return asyncio.run(coro)
 
     @patch("app.services.new_parts_seo_sync_service.count_seo_cards_created_today", return_value=0)
-    @patch("app.services.new_parts_seo_sync_service.collect_all_sync_candidates", return_value=[])
+    @patch("app.services.new_parts_seo_sync_service._collect_run_candidates", return_value=[])
     def test_batch_respects_zero_remaining_daily(self, _collect, _count_today):
         from app.services.new_parts_seo_sync_service import sync_new_parts_seo_batch
 
@@ -353,6 +394,28 @@ class SeoSyncBatchRunTests(unittest.TestCase):
 
         self.assertTrue(result.stopped_by_daily_limit)
         self.assertEqual(result.created, 0)
+
+
+class QuotaCatchupTests(unittest.TestCase):
+    @patch("app.services.seo_quota_service.settings")
+    def test_expected_created_scales_with_hour(self, mock_settings):
+        mock_settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT = 1000
+        with patch(
+            "app.services.seo_quota_service._utcnow",
+            return_value=datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc),
+        ):
+            self.assertEqual(get_expected_created_by_now(), 500)
+
+    @patch("app.services.seo_quota_service._count_created_today", return_value=100)
+    @patch("app.services.seo_quota_service.settings")
+    def test_is_behind_when_created_below_expected_minus_slack(self, mock_settings, _count):
+        mock_settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT = 1000
+        mock_settings.NEW_PARTS_SEO_CATCHUP_SLACK = 50
+        with patch(
+            "app.services.seo_quota_service._utcnow",
+            return_value=datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc),
+        ):
+            self.assertTrue(is_behind_quota(MagicMock()))
 
 
 if __name__ == "__main__":

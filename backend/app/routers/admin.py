@@ -1141,6 +1141,28 @@ def rebuild_sitemaps(
     return result
 
 
+@router.get("/seo/quota-status")
+def get_seo_quota_status(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    from app.services.seo_quota_service import get_quota_status
+
+    return get_quota_status(db)
+
+
+@router.post("/seo/seed-queue/populate")
+def populate_seo_seed_queue(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    from app.services.seo_rossko_seed_service import populate_seed_queue_from_catalog
+
+    return populate_seed_queue_from_catalog(db)
+
+
 @router.get("/seo/new-parts/stats")
 def get_new_parts_seo_stats(
     days: int = Query(14, ge=1, le=90),

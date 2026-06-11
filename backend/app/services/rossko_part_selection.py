@@ -123,6 +123,40 @@ def pick_best_rossko_part(
     return ranked[0][2]
 
 
+def pick_ranked_rossko_parts(
+    data: dict[str, Any] | None,
+    *,
+    brand: str | None,
+    article: str | None,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    parts = extract_rossko_parts(data)
+    if not parts:
+        return []
+
+    query_article_norm = _normalize_article(article)
+    query_brand_lower = _safe_text(brand).lower()
+    safe_limit = max(1, min(int(limit or 1), 20))
+
+    ranked: list[tuple[int, float, dict[str, Any]]] = []
+    seen_stable: set[str] = set()
+    for part in parts:
+        score = _score_rossko_part(part, query_article_norm, query_brand_lower)
+        if get_rossko_stock_count(part) <= 0:
+            continue
+        part_brand = _safe_text(part.get("brand"))
+        part_article = _normalize_article(part.get("partnumber"))
+        stable = f"{part_brand.casefold()}|{part_article}"
+        if stable in seen_stable:
+            continue
+        seen_stable.add(stable)
+        price = get_rossko_min_price(part)
+        ranked.append((score, price if price > 0 else float("inf"), part))
+
+    ranked.sort(key=lambda row: (-row[0], row[1]))
+    return [row[2] for row in ranked[:safe_limit]]
+
+
 def map_rossko_stocks(part: dict[str, Any]) -> list[dict[str, Any]]:
     stocks = (part.get("stocks") or {}).get("stock")
     if not stocks:

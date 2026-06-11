@@ -170,6 +170,14 @@ export default function SeoTab() {
   const createdToday = seoStats?.cards_created_today ?? 0;
   const sitemapExportLimit = seoStats?.settings?.sitemap_daily_url_limit || 500;
   const useCelery = Boolean(seoStats?.settings?.use_celery);
+  const quota = seoStats?.quota;
+  const expectedByNow = quota?.expected_by_now ?? 0;
+  const pendingQueue = quota?.pending_candidates ?? 0;
+  const seedReady = quota?.seed_ready ?? 0;
+  const recurseUsed = quota?.cross_recurse_used ?? 0;
+  const recurseLimit = quota?.cross_recurse_limit ?? 0;
+  const behindQuota = Boolean(quota?.behind_quota);
+  const guaranteedCeiling = quota?.guaranteed_ceiling ?? createdToday;
   const dailyProgressPct =
     dailyLimit > 0 ? Math.min(100, Math.round((createdToday / dailyLimit) * 100)) : 0;
 
@@ -247,6 +255,34 @@ export default function SeoTab() {
           <p className="mt-2 text-xs text-indigo-700/80">
             {dailyProgressPct}% дневной квоты · осталось {formatNumber(Math.max(0, dailyLimit - createdToday))}
           </p>
+        </div>
+      ) : null}
+
+      {seoStats?.quota ? (
+        <div
+          className={`rounded-xl border p-4 shadow-sm ${
+            behindQuota ? 'border-amber-200 bg-amber-50/60' : 'border-emerald-100 bg-emerald-50/40'
+          }`}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-600">Добор квоты</p>
+              <p className="mt-1 text-lg font-semibold text-gray-900">
+                Ожидалось к этому часу: {formatNumber(expectedByNow)} · создано: {formatNumber(createdToday)}
+              </p>
+              <p className="mt-1 text-sm text-gray-700">
+                Потолок гарантии: {formatNumber(guaranteedCeiling)} / {formatNumber(dailyLimit)}
+                {behindQuota ? ' · отстаём от плана' : ' · в графике'}
+              </p>
+            </div>
+            <div className="text-sm text-gray-700">
+              <p>Pending-очередь: {formatNumber(pendingQueue)}</p>
+              <p>Ready seed: {formatNumber(seedReady)}</p>
+              <p>
+                Recursive budget: {formatNumber(recurseUsed)}/{formatNumber(recurseLimit)}
+              </p>
+            </div>
+          </div>
         </div>
       ) : null}
 
