@@ -156,19 +156,76 @@ def build_product_search_title(
     return re.sub(r"\s+", " ", title).strip()
 
 
+def build_new_part_h1(
+    *,
+    brand: str | None,
+    article: str | None,
+    raw_name: str | None,
+) -> str:
+    brand_str = (brand or "").strip()
+    article_str = (article or "").strip()
+    raw = (raw_name or "").strip()
+    if brand_str and article_str:
+        prefix = f"{brand_str} {article_str}"
+        if raw:
+            raw_cf = raw.casefold()
+            prefix_cf = prefix.casefold()
+            if raw_cf.startswith(prefix_cf):
+                tail = raw[len(prefix) :].strip(" -—")
+                if tail:
+                    return f"{prefix} — {tail}"
+            if prefix_cf in raw_cf and raw != prefix:
+                return raw
+            return f"{prefix} — {raw}"
+        return prefix
+    if raw:
+        return raw
+    return "Автозапчасть"
+
+
 def build_new_part_search_title(
     *,
     brand: str | None,
     article: str | None,
     raw_name: str | None,
     card_id: int,
+    price: float | int | str | None = None,
 ) -> str:
     core = _build_title_core(brand=brand, article=article, product_name=raw_name)
-    suffix = f" — новая №{int(card_id)}"
+    price_text = _format_price_rub(price)
+    price_part = f" от {price_text} ₽" if price_text else ""
+    suffix = f"{price_part} — новая №{int(card_id)}"
     max_core_len = max(20, 70 - len(_TITLE_SUFFIX))
     core_with_suffix = _fit_core_with_suffix(core, suffix, max_core_len)
     title = f"{core_with_suffix}{_TITLE_SUFFIX}"
     return re.sub(r"\s+", " ", title).strip()
+
+
+def build_new_part_search_description(
+    *,
+    brand: str | None,
+    article: str | None,
+    raw_name: str | None = None,
+    card_id: int,
+    price: float | int | str | None = None,
+    in_stock: bool = True,
+    city: str | None = None,
+    unique_description: str | None = None,
+) -> str:
+    from app.utils.product_display_name import extract_product_description
+
+    short_name = extract_product_description(raw_name, brand, article)
+    return build_product_search_description(
+        brand=brand,
+        article=article,
+        is_new=True,
+        city=city or DEFAULT_CITY,
+        price=price,
+        in_stock=in_stock,
+        short_name=short_name,
+        unique_description=unique_description,
+        listing_id=card_id,
+    )
 
 
 def build_product_search_description(

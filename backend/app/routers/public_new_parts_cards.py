@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -11,6 +11,7 @@ from app.services.new_parts_seo_card_service import (
     _stocks_from_card,
     build_new_part_card_path,
     create_or_get_new_part_card,
+    find_active_new_part_card_by_brand_article,
     get_new_part_card,
 )
 from app.services.sitemap_service import try_refresh_new_parts_sitemap_for_card
@@ -50,6 +51,11 @@ class NewPartStockOut(BaseModel):
     available_count: int = 0
     delivery_start: str | None = None
     delivery_end: str | None = None
+
+
+class NewPartCardResolveOut(BaseModel):
+    card_id: int
+    canonical_url: str
 
 
 class NewPartCardOut(BaseModel):
@@ -102,6 +108,26 @@ def _card_to_out(card: NewPartsSeoCard) -> NewPartCardOut:
         else None,
         stocks=stocks,
         canonical_url=build_new_part_card_path(card.id, card.brand, card.article),
+    )
+
+
+@router.get("/public/new-parts/cards/resolve", response_model=NewPartCardResolveOut)
+def public_resolve_new_part_card(
+    brand: str = Query(..., min_length=1, max_length=120),
+    article: str = Query(..., min_length=1, max_length=120),
+    db: Session = Depends(get_db),
+):
+    card = find_active_new_part_card_by_brand_article(db, brand, article)
+    if card is None:
+        raise HTTPException(status_code=404, detail="Card not found")
+    integration = get_or_create_yandex_integration(db)
+    from app.services.yandex_feed_xml_service import _resolve_site_origin
+
+    origin = _resolve_site_origin(integration.host_url)
+    path = build_new_part_card_path(card.id, card.brand, card.article)
+    return NewPartCardResolveOut(
+        card_id=int(card.id),
+        canonical_url=f"{origin}{path}",
     )
 
 

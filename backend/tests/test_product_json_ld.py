@@ -179,19 +179,24 @@ class NewPartSeoServiceJsonLdIntegrationTests(unittest.TestCase):
         return card
 
     def test_build_new_part_seo_meta_json_ld(self):
-        meta = build_new_part_seo_meta(self._make_card(), site_origin="https://svoygarage.ru")
+        meta = build_new_part_seo_meta(self._make_card(), site_origin="https://svoygarage.ru", markup_percent=15)
         self.assertTrue(meta.json_ld)
         json_ld = json.loads(meta.json_ld)
         self.assertEqual(json_ld["@type"], "Product")
         self.assertIn("image", json_ld)
         self.assertEqual(json_ld["offers"]["priceCurrency"], "RUB")
+        self.assertEqual(json_ld["sku"], "IF1009")
+        self.assertEqual(json_ld["mpn"], "IF1009")
+        self.assertIn("alternateName", json_ld)
+        self.assertIn("shippingDetails", json_ld["offers"])
 
     def test_new_part_prerender_html_contains_product_json_ld(self):
-        meta = build_new_part_seo_meta(self._make_card(), site_origin="https://svoygarage.ru")
+        meta = build_new_part_seo_meta(self._make_card(), site_origin="https://svoygarage.ru", markup_percent=15)
         html = render_new_part_prerender_html(meta)
         self.assertIn('type="application/ld+json"', html)
         self.assertIn('"@type": "Product"', html)
         self.assertIn("<img ", html)
+        self.assertIn(meta.h1, html)
 
 
 if __name__ == "__main__":

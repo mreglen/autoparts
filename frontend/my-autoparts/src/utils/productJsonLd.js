@@ -3,6 +3,7 @@ import { buildPartDetailPath, buildNewPartDetailPath } from './partRoutes';
 import { formatProductDisplayTitle, extractProductDescription } from './productDisplayName';
 import { normalizeImageUrl } from './apiClient';
 import { resolveOgImageUrl } from './seoConstants';
+import { DEFAULT_CITY } from './organizationCity';
 import { buildProductAlternateNames, buildProductOfferJsonLd, resolveProductCity } from './productSearchSeo';
 
 const SCHEMA_ORG = 'https://schema.org';
@@ -153,7 +154,7 @@ export function isNewPartJsonLdEligible(card) {
   return Boolean(imageUrl || stockCount > 0);
 }
 
-export function buildNewPartCardJsonLd(card, { siteOrigin = SITE_ORIGIN, canonicalUrl } = {}) {
+export function buildNewPartCardJsonLd(card, { siteOrigin = SITE_ORIGIN, canonicalUrl, displayPrice } = {}) {
   if (!isNewPartJsonLdEligible(card)) return null;
 
   const brand = String(card.brand || '').trim();
@@ -177,10 +178,19 @@ export function buildNewPartCardJsonLd(card, { siteOrigin = SITE_ORIGIN, canonic
     imageUrl = resolveOgImageUrl(null);
   }
 
-  const price = formatPriceLd(card.price);
+  const priceSource = displayPrice != null ? displayPrice : card.price;
+  const price = formatPriceLd(priceSource);
   if (!price) return null;
 
   const inStock = Number(card.stock_count || 0) > 0;
+  const alternateName = buildProductAlternateNames({ brand, article });
+  const offers = buildProductOfferJsonLd({
+    canonicalUrl: url,
+    price,
+    inStock,
+    isNew: true,
+    city: DEFAULT_CITY,
+  });
   return sanitizeJsonLd({
     '@context': SCHEMA_ORG,
     '@type': 'Product',
@@ -188,17 +198,11 @@ export function buildNewPartCardJsonLd(card, { siteOrigin = SITE_ORIGIN, canonic
     description,
     sku: article,
     mpn: article,
+    alternateName: alternateName.length > 0 ? alternateName : undefined,
     brand: { '@type': 'Brand', name: brand },
     manufacturer: { '@type': 'Organization', name: brand },
     image: [imageUrl],
-    offers: {
-      '@type': 'Offer',
-      url,
-      priceCurrency: 'RUB',
-      price,
-      availability: inStock ? `${SCHEMA_ORG}/InStock` : `${SCHEMA_ORG}/OutOfStock`,
-      itemCondition: `${SCHEMA_ORG}/NewCondition`,
-    },
+    offers,
   });
 }
 

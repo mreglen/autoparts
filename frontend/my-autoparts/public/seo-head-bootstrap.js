@@ -112,6 +112,10 @@
     appendMeta('og:url', meta.canonical_url || SITE_ORIGIN + path);
     appendMeta('og:locale', 'ru_RU');
     appendMeta('og:image', meta.image_url || DEFAULT_OG_IMAGE);
+    if (meta.price) {
+      appendMeta('product:price:amount', meta.price);
+      appendMeta('product:price:currency', 'RUB');
+    }
     if (meta.json_ld) {
       appendJsonLd(meta.json_ld);
     }

@@ -12,8 +12,15 @@ from sqlalchemy.orm import Session
 from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
 from app.utils.product_json_ld import build_new_part_card_json_ld, dumps_json_ld, product_body_description
-from app.utils.product_search_seo import build_new_part_search_title
+from app.utils.product_search_seo import (
+    build_new_part_h1,
+    build_new_part_search_description,
+    build_new_part_search_title,
+)
+from app.utils.new_part_price_utils import min_stock_price_with_markup
+from app.utils.org_markup import global_markup_percent
 from app.utils.seo_constants import resolve_default_og_image_url
+from app.utils.site_settings_db import get_or_create_site_settings
 
 ROSSKO_NEW_PART_SOURCE = "rossko"
 
@@ -336,28 +343,48 @@ def find_active_new_part_card_by_brand_article(
     )
 
 
-def build_new_part_seo_meta(card: NewPartsSeoCard, *, site_origin: str | None = None) -> NewPartSeoMeta:
+def build_new_part_seo_meta(
+    card: NewPartsSeoCard,
+    *,
+    site_origin: str | None = None,
+    markup_percent: float | None = None,
+) -> NewPartSeoMeta:
     origin = _resolve_site_origin(site_origin)
     display_name = _safe_text(card.name) or f"{card.brand} {card.article}"
+    markup = float(markup_percent) if markup_percent is not None else 15.0
+    display_price = min_stock_price_with_markup(card, markup)
+    in_stock = (card.stock_count or 0) > 0
     title = build_new_part_search_title(
         brand=card.brand,
         article=card.article,
         raw_name=_safe_text(card.name),
         card_id=int(card.id),
+        price=display_price,
     )
-    city = "Екатеринбурге"
-    price_text = f"{float(card.price):.2f}" if card.price is not None else None
-    in_stock = (card.stock_count or 0) > 0
-    desc_core = _safe_text(card.description) or display_name
-    description = _truncate(
-        f"Купить {card.brand} {card.article}. Новая запчасть {'в наличии' if in_stock else 'под заказ'} в {city}. "
-        f"{(price_text + ' ₽. ') if price_text else ''}Доставка по России. {desc_core} Карточка №{int(card.id)}.",
-        160,
+    h1 = build_new_part_h1(
+        brand=card.brand,
+        article=card.article,
+        raw_name=_safe_text(card.name),
     )
+    description = build_new_part_search_description(
+        brand=card.brand,
+        article=card.article,
+        raw_name=_safe_text(card.name),
+        card_id=int(card.id),
+        price=display_price,
+        in_stock=in_stock,
+        unique_description=_safe_text(card.description),
+    )
+    price_text = f"{display_price:.2f}" if display_price is not None else None
     canonical = f"{origin}{build_new_part_card_path(card.id, card.brand, card.article)}"
     image_url = _absolute_photo_url(_safe_text(card.image_url), origin) or resolve_default_og_image_url(origin)
 
-    product_json_ld = build_new_part_card_json_ld(card, site_origin=origin, canonical_url=canonical)
+    product_json_ld = build_new_part_card_json_ld(
+        card,
+        site_origin=origin,
+        canonical_url=canonical,
+        display_price=display_price,
+    )
     json_ld = dumps_json_ld(product_json_ld)
     body_description = product_body_description(
         brand=str(card.brand or "").strip(),
@@ -371,7 +398,7 @@ def build_new_part_seo_meta(card: NewPartsSeoCard, *, site_origin: str | None = 
         title=title,
         description=description,
         canonical_url=canonical,
-        h1=display_name,
+        h1=h1,
         image_url=image_url,
         price=price_text,
         in_stock=in_stock,
@@ -404,7 +431,9 @@ def get_new_part_seo_for_path(db: Session, raw_path: str) -> NewPartSeoMeta | No
     card = get_new_part_card(db, card_id)
     if card is None:
         return None
-    return build_new_part_seo_meta(card)
+    settings_row = get_or_create_site_settings(db)
+    markup_percent = global_markup_percent(settings_row)
+    return build_new_part_seo_meta(card, markup_percent=markup_percent)
 
 
 def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:

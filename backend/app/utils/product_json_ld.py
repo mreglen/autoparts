@@ -6,7 +6,10 @@ from typing import Any
 
 from app.utils.organization_city import DEFAULT_CITY
 from app.utils.product_display_name import extract_product_description, format_product_display_title
-from app.utils.product_search_seo import build_product_alternate_names, build_product_offer_json_ld
+from app.utils.product_search_seo import (
+    build_product_alternate_names,
+    build_product_offer_json_ld,
+)
 from app.utils.seo_constants import resolve_default_og_image_url
 
 SCHEMA_ORG = "https://schema.org"
@@ -257,6 +260,7 @@ def build_new_part_card_json_ld(
     *,
     site_origin: str,
     canonical_url: str,
+    display_price: float | int | str | None = None,
 ) -> dict[str, Any] | None:
     if not is_new_part_json_ld_eligible(card):
         return None
@@ -279,11 +283,46 @@ def build_new_part_card_json_ld(
     if not image_url:
         image_url = resolve_default_og_image_url(site_origin)
 
-    price = format_price_ld(card.price)
+    price_source = display_price if display_price is not None else card.price
+    price = format_price_ld(price_source)
     if not price:
         return None
 
     in_stock = int(card.stock_count or 0) > 0
+    alternate_names = build_product_alternate_names(brand=brand, article=article)
+    offers = build_product_offer_json_ld(
+        canonical_url=canonical_url,
+        price=price,
+        in_stock=in_stock,
+        is_new=True,
+        seller_name=None,
+        seller_phone=None,
+        seller_address=None,
+        city=DEFAULT_CITY,
+    )
+    if offers is None:
+        offers = build_offer_json_ld(
+            canonical_url=canonical_url,
+            price=price,
+            in_stock=in_stock,
+            is_new=True,
+        )
+        offers["areaServed"] = {"@type": "Country", "name": "RU"}
+        offers["shippingDetails"] = {
+            "@type": "OfferShippingDetails",
+            "shippingDestination": {
+                "@type": "DefinedRegion",
+                "addressCountry": "RU",
+            },
+        }
+        offers["availableAtOrFrom"] = {
+            "@type": "Place",
+            "address": {
+                "@type": "PostalAddress",
+                "addressLocality": DEFAULT_CITY,
+                "addressCountry": "RU",
+            },
+        }
     product_json: dict[str, Any] = {
         "@context": SCHEMA_ORG,
         "@type": "Product",
@@ -291,14 +330,10 @@ def build_new_part_card_json_ld(
         "description": description,
         "sku": article,
         "mpn": article,
+        "alternateName": alternate_names or None,
         "brand": {"@type": "Brand", "name": brand},
         "manufacturer": {"@type": "Organization", "name": brand},
         "image": [image_url],
-        "offers": build_offer_json_ld(
-            canonical_url=canonical_url,
-            price=price,
-            in_stock=in_stock,
-            is_new=True,
-        ),
+        "offers": offers,
     }
     return sanitize_json_ld(product_json)

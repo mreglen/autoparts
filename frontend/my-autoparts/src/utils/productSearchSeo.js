@@ -1,5 +1,5 @@
 import { DEFAULT_CITY, extractCityFromAddress, formatCityInPrepositional } from './organizationCity';
-import { formatProductDisplayTitle } from './productDisplayName';
+import { extractProductDescription, formatProductDisplayTitle } from './productDisplayName';
 
 const SITE_BRAND = 'Свой Гараж';
 const TITLE_SUFFIX = ` | ${SITE_BRAND}`;
@@ -104,12 +104,60 @@ export function buildProductSearchTitle({
   return `${coreWithSuffix}${TITLE_SUFFIX}`.replace(/\s+/g, ' ').trim();
 }
 
-export function buildNewPartSearchTitle({ brand, article, rawName, cardId }) {
+export function buildNewPartH1({ brand, article, rawName }) {
+  const brandStr = String(brand || '').trim();
+  const articleStr = String(article || '').trim();
+  const raw = String(rawName || '').trim();
+  if (brandStr && articleStr) {
+    const prefix = `${brandStr} ${articleStr}`;
+    if (raw) {
+      const rawLower = raw.toLowerCase();
+      const prefixLower = prefix.toLowerCase();
+      if (rawLower.startsWith(prefixLower)) {
+        const tail = raw.slice(prefix.length).trim().replace(/^[-—]\s*/, '');
+        if (tail) return `${prefix} — ${tail}`;
+      }
+      if (rawLower.includes(prefixLower) && raw !== prefix) return raw;
+      return `${prefix} — ${raw}`;
+    }
+    return prefix;
+  }
+  if (raw) return raw;
+  return 'Автозапчасть';
+}
+
+export function buildNewPartSearchTitle({ brand, article, rawName, cardId, price }) {
   const core = buildTitleCore({ brand, article, productName: rawName });
-  const suffix = ` — новая №${cardId}`;
+  const priceText = formatPriceRub(price);
+  const pricePart = priceText ? ` от ${priceText} ₽` : '';
+  const suffix = `${pricePart} — новая №${cardId}`;
   const maxCoreLen = Math.max(20, 70 - TITLE_SUFFIX.length);
   const coreWithSuffix = fitCoreWithSuffix(core, suffix, maxCoreLen);
   return `${coreWithSuffix}${TITLE_SUFFIX}`.replace(/\s+/g, ' ').trim();
+}
+
+export function buildNewPartSearchDescription({
+  brand,
+  article,
+  rawName,
+  cardId,
+  price,
+  inStock = true,
+  city,
+  uniqueDescription,
+}) {
+  const shortName = extractProductDescription(rawName, brand, article);
+  return buildProductSearchDescription({
+    brand,
+    article,
+    isNew: true,
+    city,
+    price,
+    inStock,
+    shortName,
+    uniqueDescription,
+    listingId: cardId,
+  });
 }
 
 export function buildProductSearchDescription({

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 from app.services.product_seo_service import build_product_seo_meta, render_product_prerender_html
 from app.utils.product_search_seo import (
+    build_new_part_h1,
     build_product_alternate_names,
     build_product_offer_json_ld,
     build_product_search_description,
@@ -52,6 +53,25 @@ class ProductSearchTitleTests(unittest.TestCase):
             card_id=42,
         )
         self.assertEqual(title, "MANN IF1009 Масляный фильтр — новая №42 | Свой Гараж")
+
+    def test_new_part_title_with_price(self):
+        title = build_new_part_search_title(
+            brand="MANN",
+            article="IF1009",
+            raw_name="MANN IF1009 Масляный фильтр",
+            card_id=42,
+            price=1380,
+        )
+        self.assertIn("от 1 380 ₽", title)
+        self.assertIn("новая №42", title)
+
+    def test_new_part_h1_format(self):
+        h1 = build_new_part_h1(
+            brand="MANN",
+            article="IF1009",
+            raw_name="MANN IF1009 Масляный фильтр",
+        )
+        self.assertEqual(h1, "MANN IF1009 — Масляный фильтр")
 
     def test_article_only_title(self):
         title = build_product_search_title(brand="", article="24410-3E500")

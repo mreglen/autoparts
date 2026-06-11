@@ -154,19 +154,27 @@ export function buildSellerPartCardSeo(part) {
 
 export function PageSeoHelmet({ seo }) {
   if (!seo) return null;
+  const ogType = seo.ogType || 'website';
+  const ogImage = seo.ogImage || DEFAULT_OG_IMAGE_URL;
   return (
     <Helmet>
       <title>{seo.title}</title>
       <meta name="description" content={seo.description} />
       <meta name="robots" content={seo.robots || 'index, follow'} />
       <link rel="canonical" href={seo.canonicalUrl} />
-      <meta property="og:type" content="website" />
+      <meta property="og:type" content={ogType} />
       <meta property="og:site_name" content="Свой Гараж" />
       <meta property="og:title" content={seo.title} />
       <meta property="og:description" content={seo.description} />
       <meta property="og:url" content={seo.canonicalUrl} />
       <meta property="og:locale" content="ru_RU" />
-      <meta property="og:image" content={DEFAULT_OG_IMAGE_URL} />
+      <meta property="og:image" content={ogImage} />
+      {seo.price != null ? (
+        <>
+          <meta property="product:price:amount" content={String(seo.price)} />
+          <meta property="product:price:currency" content="RUB" />
+        </>
+      ) : null}
     </Helmet>
   );
 }

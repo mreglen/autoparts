@@ -1,20 +1,31 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { PageSeoHelmet } from '../../../utils/pageSeo';
 import { SITE_ORIGIN } from '../../../utils/breadcrumbs';
+import { resolveOgImageUrl } from '../../../utils/seoConstants';
 import { buildNewPartDetailPath, parseNewPartDetailParam } from '../../../utils/partRoutes';
+import { extractProductDescription, formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import NewPartProductCard from './NewPartProductCard';
-import ProductCard from '../ProductCard';
+import NewPartDeliveryStockBlock from './NewPartDeliveryStockBlock';
+import NewPartAnalogsTable from './NewPartAnalogsTable';
+import NewPartUsedMatchesBlock from './NewPartUsedMatchesBlock';
 import { buildNewPartCardJsonLd, parseJsonLdString } from '../../../utils/productJsonLd';
-import { buildNewPartSearchTitle } from '../../../utils/productSearchSeo';
+import {
+  buildNewPartH1,
+  buildNewPartSearchDescription,
+  buildNewPartSearchTitle,
+} from '../../../utils/productSearchSeo';
+import { getMinStockPrice } from './newPartStockUtils';
 import {
   buildRosskoLookupText,
   getRosskoParts,
   mapPartToStocksData,
   pickBestRosskoPart,
 } from './rosskoHelpers';
+import { extractCityFromAddress } from '../../../utils/organizationCity';
 
 const safeText = (value, fallback = '') => {
   if (typeof value === 'string') return value.trim() || fallback;
@@ -71,25 +82,32 @@ const dedupeById = (items) => {
   return unique;
 };
 
-const mapUsedToProductCard = (part) => ({
-  id: part.id,
-  title: safeText(part?.name) || `${safeText(part?.brand, '—')} ${safeText(part?.article, '—')}`.trim(),
-  price: part?.price ? `${part.price} ₽` : '—',
-  brand: safeText(part?.brand, '—'),
-  article: safeText(part?.article, '—'),
-  location: part?.storage_location?.address || '—',
-  isNew: part?.is_new,
-  quantity: part?.quantity || part?.available_count || 0,
-  photos: part?.photos || [],
-  videos: part?.videos || [],
-  sellerName: part?.organization?.name || 'Продавец',
-  phone: part?.organization?.phone || '+7 (999) 123-45-67',
-});
+function normalizeUsedMatch(item) {
+  const photo = item?.photos?.[0];
+  const photoUrl = item?.photo_url
+    || photo?.photo_url
+    || photo?.list_photo_url
+    || null;
+  const org = item?.organization || null;
+  const orgAddress = item?.organization_address || org?.address || null;
+  return {
+    id: item.id,
+    brand: item.brand,
+    article: item.article,
+    name: item.name,
+    price: item.price,
+    photo_url: photoUrl,
+    organization_name: item.organization_name || org?.name || null,
+    organization_address: orgAddress,
+    city: item.city || extractCityFromAddress(orgAddress),
+  };
+}
 
 export default function NewPartDetailPage() {
   const { cardId: cardIdParam } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const markupPercent = useSelector((state) => state.publicInfo.newPartsMarkupPercent ?? 15);
   const [rosskoData, setRosskoData] = useState(null);
   const [rosskoStatus, setRosskoStatus] = useState('idle');
 
@@ -181,7 +199,9 @@ export default function NewPartDetailPage() {
         const exactItems = Array.isArray(exactResp?.data) ? exactResp.data : [];
         const catalogItems = Array.isArray(catalogResp?.data?.items) ? catalogResp.data.items : [];
         const analogItems = Array.isArray(analogResp?.data?.analog_parts) ? analogResp.data.analog_parts : [];
-        setUsedMatches(dedupeById([...exactItems, ...catalogItems, ...analogItems]));
+        setUsedMatches(
+          dedupeById([...exactItems, ...catalogItems, ...analogItems]).map(normalizeUsedMatch)
+        );
       } catch (_e) {
         setUsedMatches([]);
         setUsedMatchError('Не удалось загрузить б/у варианты');
@@ -219,6 +239,9 @@ export default function NewPartDetailPage() {
             description: data.description,
             canonicalUrl: data.canonical_url,
             robots: 'index, follow',
+            ogType: 'product',
+            ogImage: data.image_url || resolveOgImageUrl(card?.image_url),
+            price: data.price,
           });
         } else {
           setSeoMeta(null);
@@ -226,7 +249,7 @@ export default function NewPartDetailPage() {
         setSeoJsonLd(parseJsonLdString(data?.json_ld));
       } catch (_e) {
         setSeoMeta(null);
-        setSeoJsonLd(buildNewPartCardJsonLd(card, { canonicalUrl: `${SITE_ORIGIN}${path}` }));
+        setSeoJsonLd(null);
       }
     };
     run();
@@ -244,6 +267,11 @@ export default function NewPartDetailPage() {
     if (fromRossko.length > 0) return fromRossko;
     return stocksFromCardApi(card);
   }, [livePart, card]);
+
+  const displayPrice = useMemo(
+    () => getMinStockPrice(liveStocks, markupPercent) ?? getMinStockPrice(stocksFromCardApi(card), markupPercent),
+    [liveStocks, card, markupPercent]
+  );
 
   const analogParts = useMemo(() => {
     const bestPart = livePart;
@@ -264,7 +292,6 @@ export default function NewPartDetailPage() {
   }, [livePart, rosskoData]);
 
   const backToListPath = location.state?.backTo || '/autoparts/new';
-
   const canonicalPath = card ? buildNewPartDetailPath(card) : `/autoparts/new/part/${cardIdParam || ''}`;
 
   const seo = useMemo(() => {
@@ -272,18 +299,77 @@ export default function NewPartDetailPage() {
     if (!card) return null;
     const brand = safeText(card?.brand);
     const article = safeText(card?.article);
+    const ogImageRaw = card?.image_url;
+    const ogImage = ogImageRaw
+      ? (ogImageRaw.startsWith('http') ? ogImageRaw : resolveOgImageUrl(ogImageRaw.startsWith('/') ? ogImageRaw : `/${ogImageRaw}`))
+      : resolveOgImageUrl(null);
     return {
       title: buildNewPartSearchTitle({
         brand,
         article,
         rawName: card?.name,
         cardId: card.id,
+        price: displayPrice,
       }),
-      description: `Купить ${brand} ${article}. Новая запчасть. Карточка №${card.id}. Доставка по России.`,
+      description: buildNewPartSearchDescription({
+        brand,
+        article,
+        rawName: card?.name,
+        cardId: card.id,
+        price: displayPrice,
+        inStock: (card?.stock_count || 0) > 0,
+        uniqueDescription: card?.description,
+      }),
       canonicalUrl: `${SITE_ORIGIN}${canonicalPath}`,
       robots: 'index, follow',
+      ogType: 'product',
+      ogImage,
+      price: displayPrice,
     };
-  }, [seoMeta, card, canonicalPath]);
+  }, [seoMeta, card, canonicalPath, displayPrice]);
+
+  const handleAnalogNavigateCreate = useCallback(async (part) => {
+    const brand = safeText(part?.brand);
+    const article = safeText(part?.partnumber || part?.article);
+    const stocks = mapPartToStocksData(part);
+    const mainStock = stocks[0];
+    const displayTitle = formatProductDisplayTitle(brand, article, safeText(part?.name));
+    try {
+      const payload = {
+        source: 'rossko',
+        supplier_stock_id: String(mainStock?.stock_id || ''),
+        brand,
+        article,
+        name: displayTitle,
+        description: extractProductDescription(part?.name, brand, article),
+        price: mainStock?.price ?? null,
+        currency: 'RUB',
+        stock_count: Number(mainStock?.available_count) || 0,
+        delivery_start: mainStock?.delivery_start || null,
+        delivery_end: mainStock?.delivery_end || null,
+        image_url: null,
+        guid: part?.guid ? String(part.guid) : null,
+        stocks: stocks.map((stock) => ({
+          stock_id: String(stock.stock_id),
+          price: stock.price,
+          available_count: Number(stock.available_count) || 0,
+          delivery_start: stock.delivery_start || null,
+          delivery_end: stock.delivery_end || null,
+        })),
+      };
+      const response = await apiAxiosUnauth.post('/public/new-parts/cards/create-or-get', payload);
+      const cardData = response?.data;
+      const cardId = Number(cardData?.id);
+      if (cardId > 0) {
+        navigate(
+          buildNewPartDetailPath(cardData) || cardData?.canonical_url || `/autoparts/new/part/${cardId}`,
+          { state: { backTo: backToListPath } }
+        );
+      }
+    } catch (_e) {
+      // ignore
+    }
+  }, [navigate, backToListPath]);
 
   if (loading) {
     return (
@@ -317,10 +403,11 @@ export default function NewPartDetailPage() {
 
   const brand = safeText(card?.brand, '—');
   const article = safeText(card?.article, '—');
-  const name = safeText(card?.name) || `${brand} ${article}`.trim();
+  const pageH1 = buildNewPartH1({ brand, article, rawName: card?.name });
 
   const jsonLd = seoJsonLd || buildNewPartCardJsonLd(card, {
     canonicalUrl: `${SITE_ORIGIN}${canonicalPath}`,
+    displayPrice,
   });
 
   const analogsLoading = rosskoStatus === 'loading' && analogParts.length === 0;
@@ -355,43 +442,27 @@ export default function NewPartDetailPage() {
         >
           ← К поиску новых запчастей
         </button>
-        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{name}</h1>
+        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{pageH1}</h1>
         <div className="mt-3 flex flex-wrap gap-2 text-xs sm:text-sm">
           <span className="rounded-full bg-white px-3 py-1 text-gray-700 shadow-sm">Бренд: {brand}</span>
           <span className="rounded-full bg-white px-3 py-1 text-gray-700 shadow-sm">Артикул: {article}</span>
         </div>
       </section>
 
+      <NewPartDeliveryStockBlock
+        stocks={liveStocks}
+        inStock={(card?.stock_count || 0) > 0}
+      />
+
       {mainProductBlock}
 
-      {!usedMatchLoading && usedMatches.length > 0 && (
-        <section className="mt-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">Б/у варианты</h2>
-            <span className="text-sm text-gray-500">{usedMatches.length} шт.</span>
-          </div>
-          <div
-            className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-md:touch-pan-x md:mx-0 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-3 xl:grid-cols-4"
-            aria-label="Б/у варианты — прокрутка по горизонтали"
-          >
-            {usedMatches.map((used) => (
-              <div
-                key={`used-${used.id}`}
-                className="w-[78vw] max-w-[300px] shrink-0 snap-start sm:w-[260px] md:w-auto md:max-w-none md:shrink"
-              >
-                <ProductCard
-                  part={mapUsedToProductCard(used)}
-                  isTestOrganization
-                  hideConditionAndQuantity
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-      {!usedMatchLoading && usedMatchError && (
-        <p className="mt-4 text-sm text-gray-500">{usedMatchError}</p>
-      )}
+      <NewPartUsedMatchesBlock
+        brand={brand}
+        article={article}
+        items={usedMatches}
+        loading={usedMatchLoading}
+        error={usedMatchError}
+      />
 
       <section className="mt-8">
         <div className="mb-4 flex items-center justify-between">
@@ -400,25 +471,11 @@ export default function NewPartDetailPage() {
             <span className="text-sm text-gray-500">{analogParts.length} шт.</span>
           )}
         </div>
-        {analogsLoading && <p className="text-sm text-gray-500">Загрузка аналогов…</p>}
-        {!analogsLoading && analogParts.length === 0 && (
-          <p className="text-sm text-gray-500">Аналоги не найдены.</p>
-        )}
-        <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          {analogParts.map((part, idx) => {
-            const baseKey = safeText(part?.guid) || safeText(part?.partnumber) || 'analog';
-            const uniqueId = `detail-analog-${baseKey}-${idx}`;
-            return (
-              <NewPartProductCard
-                key={uniqueId}
-                part={part}
-                stocksData={mapPartToStocksData(part)}
-                sectionType="analog"
-                uniqueId={uniqueId}
-              />
-            );
-          })}
-        </div>
+        <NewPartAnalogsTable
+          analogParts={analogParts}
+          loading={analogsLoading}
+          onNavigateCreate={handleAnalogNavigateCreate}
+        />
       </section>
     </div>
   );

@@ -31,6 +31,10 @@ class PublicUsedProductMatchOut(BaseModel):
     name: str | None = None
     price: float | None = None
     quantity: int = 0
+    photo_url: str | None = None
+    organization_name: str | None = None
+    organization_address: str | None = None
+    city: str | None = None
 
 
 
@@ -252,8 +256,16 @@ def find_public_used_product_match(
     if not brand_text or not article_text:
         return []
 
+    from app.utils.organization_city import extract_city_from_address
+
+    load_options = (
+        selectinload(ProductModel.photos),
+        selectinload(ProductModel.organization),
+    )
+
     exact_query = (
         db.query(ProductModel)
+        .options(*load_options)
         .filter(
             ProductModel.quantity > 0,
             ProductModel.is_new.is_(False),
@@ -268,6 +280,7 @@ def find_public_used_product_match(
         if normalized_article:
             products = (
                 db.query(ProductModel)
+                .options(*load_options)
                 .filter(
                     ProductModel.quantity > 0,
                     ProductModel.is_new.is_(False),
@@ -281,17 +294,34 @@ def find_public_used_product_match(
     if not products:
         return []
 
-    return [
-        PublicUsedProductMatchOut(
-            id=product.id,
-            brand=product.brand,
-            article=product.article,
-            name=product.name,
-            price=float(product.price) if product.price is not None else None,
-            quantity=int(product.quantity or 0),
+    def _photo_url(product: ProductModel) -> str | None:
+        for photo in product.photos or []:
+            url = str(getattr(photo, "photo_url", "") or "").strip()
+            if url:
+                return url
+        return None
+
+    results: list[PublicUsedProductMatchOut] = []
+    for product in products:
+        org = getattr(product, "organization", None)
+        org_address = getattr(org, "address", None) if org else None
+        org_name = getattr(org, "name", None) if org else None
+        city = extract_city_from_address(str(org_address) if org_address else None)
+        results.append(
+            PublicUsedProductMatchOut(
+                id=product.id,
+                brand=product.brand,
+                article=product.article,
+                name=product.name,
+                price=float(product.price) if product.price is not None else None,
+                quantity=int(product.quantity or 0),
+                photo_url=_photo_url(product),
+                organization_name=str(org_name).strip() if org_name else None,
+                organization_address=str(org_address).strip() if org_address else None,
+                city=city,
+            )
         )
-        for product in products
-    ]
+    return results
 
 
 @router.get("/public/{product_id}", response_model=ProductSchema)
