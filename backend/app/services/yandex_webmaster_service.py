@@ -235,3 +235,58 @@ def oauth_authorize_url(client_id: str, state: str) -> str:
         }
     )
     return f"{settings.YANDEX_OAUTH_AUTHORIZE_URL}?{q}"
+
+
+def get_popular_search_queries(
+    user_id: int,
+    host_id: str,
+    token: str,
+    *,
+    order_by: str = "TOTAL_SHOWS",
+    date_from: str | None = None,
+    date_to: str | None = None,
+    limit: int = 500,
+) -> dict:
+    from urllib.parse import urlencode
+
+    params: dict[str, str | int] = {
+        "order_by": order_by,
+        "limit": max(1, min(limit, 500)),
+    }
+    if date_from:
+        params["date_from"] = date_from
+    if date_to:
+        params["date_to"] = date_to
+    query = urlencode(params)
+    return _request_json(
+        "GET",
+        f"{_api_base()}/user/{user_id}/hosts/{host_id}/search-queries/popular?{query}",
+        token=token,
+    )
+
+
+def get_all_search_queries_history(
+    user_id: int,
+    host_id: str,
+    token: str,
+    *,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> dict:
+    from urllib.parse import urlencode
+
+    params: list[tuple[str, str]] = [
+        ("query_indicator", "TOTAL_SHOWS"),
+        ("query_indicator", "TOTAL_CLICKS"),
+        ("query_indicator", "AVG_SHOW_POSITION"),
+    ]
+    if date_from:
+        params.append(("date_from", date_from))
+    if date_to:
+        params.append(("date_to", date_to))
+    query = urlencode(params)
+    return _request_json(
+        "GET",
+        f"{_api_base()}/user/{user_id}/hosts/{host_id}/search-queries/all/history?{query}",
+        token=token,
+    )

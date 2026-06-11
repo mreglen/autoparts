@@ -16,6 +16,11 @@ from app.utils.seo_constants import resolve_default_og_image_url
 
 DEFAULT_SITE_ORIGIN = "https://svoygarage.ru"
 SELLER_PART_CARD_RE = re.compile(r"^/seller/part-card/(?P<product_id>\d+)$")
+NEW_BRAND_LANDING_RE = re.compile(r"^/autoparts/new/brand/(?P<slug>[^/]+)$")
+NEW_CATEGORY_LANDING_RE = re.compile(r"^/autoparts/new/category/(?P<slug>[^/]+)$")
+USED_BRAND_LANDING_RE = re.compile(r"^/autoparts/used/brand/(?P<slug>[^/]+)$")
+USED_CATEGORY_LANDING_RE = re.compile(r"^/autoparts/used/category/(?P<slug>[^/]+)$")
+USED_GEO_LANDING_RE = re.compile(r"^/autoparts/used/geo/(?P<slug>[^/]+)$")
 
 
 @dataclass(frozen=True)
@@ -25,6 +30,7 @@ class StaticPageSeoMeta:
     canonical_url: str
     h1: str
     robots: str = "index, follow"
+    card_links: tuple[tuple[str, str], ...] = ()
 
 
 def _truncate(text: str, max_len: int) -> str:
@@ -73,21 +79,35 @@ def _build_catalog_seo(site_origin: str) -> StaticPageSeoMeta:
     )
 
 
-def _build_new_parts_seo(site_origin: str, query: str | None) -> StaticPageSeoMeta:
-    from urllib.parse import quote
+def _build_new_parts_seo(
+    site_origin: str,
+    query: str | None,
+    *,
+    brands: list[str] | None = None,
+) -> StaticPageSeoMeta:
+    from app.services.seo_semantics_service import resolve_single_brand_landing_path
 
     q = (query or "").strip()
-    if q:
-        canonical_url = _absolute_url(site_origin, "/autoparts/new")
-        title = f"{q} — новые запчасти | Свой Гараж"
+    brand_list = [b.strip() for b in (brands or []) if b and str(b).strip()]
+    brand_landing_path = resolve_single_brand_landing_path("new", brand_list, has_text_query=bool(q))
+    has_filters = bool(q or brand_list)
+
+    if has_filters:
+        title_suffix_parts = []
+        if brand_list:
+            title_suffix_parts.append(f"бренд: {', '.join(brand_list[:2])}")
+        title_suffix = f" ({'; '.join(title_suffix_parts)})" if title_suffix_parts else ""
+        query_label = q or "фильтр"
+        canonical_path = brand_landing_path or "/autoparts/new"
+        title = f"{query_label}{title_suffix} — новые запчасти | Свой Гараж"
         description = (
-            f"Результаты поиска новых автозапчастей по запросу «{q}»: "
+            f"Результаты поиска новых автозапчастей по запросу «{query_label}»: "
             "оригиналы и аналоги с доставкой по России."
         )
-        h1 = f"Новые запчасти: {q}"
+        h1 = f"Новые запчасти: {query_label}"
         robots = "noindex, follow"
     else:
-        canonical_url = _absolute_url(site_origin, "/autoparts/new")
+        canonical_path = "/autoparts/new"
         title = "Новые автозапчасти с доставкой | Свой Гараж"
         description = (
             "Новые автозапчасти от поставщиков: поиск по артикулу и бренду, "
@@ -95,30 +115,42 @@ def _build_new_parts_seo(site_origin: str, query: str | None) -> StaticPageSeoMe
         )
         h1 = "Новые запчасти с доставкой"
         robots = "index, follow"
+
     return StaticPageSeoMeta(
         title=title,
         description=_truncate(description, 160),
-        canonical_url=canonical_url,
+        canonical_url=_absolute_url(site_origin, canonical_path),
         h1=h1,
         robots=robots,
     )
 
 
-def _build_used_parts_seo(site_origin: str, query: str | None) -> StaticPageSeoMeta:
-    q = (query or "").strip()
-    if q:
-        from urllib.parse import quote
+def _build_used_parts_seo(
+    site_origin: str,
+    query: str | None,
+    *,
+    brands: list[str] | None = None,
+) -> StaticPageSeoMeta:
+    from app.services.seo_semantics_service import resolve_single_brand_landing_path
 
-        canonical_url = _absolute_url(site_origin, "/autoparts/used")
-        title = f"{q} — б/у запчасти | Свой Гараж"
+    q = (query or "").strip()
+    brand_list = [b.strip() for b in (brands or []) if b and str(b).strip()]
+    brand_landing_path = resolve_single_brand_landing_path("used", brand_list, has_text_query=bool(q))
+    has_filters = bool(q or brand_list)
+
+    if has_filters:
+        title_suffix = f" (бренд: {', '.join(brand_list[:2])})" if brand_list else ""
+        query_label = q or "фильтр"
+        canonical_path = brand_landing_path or "/autoparts/used"
+        title = f"{query_label}{title_suffix} — б/у запчасти | Свой Гараж"
         description = (
-            f"Результаты поиска б/у автозапчастей по запросу «{q}»: "
+            f"Результаты поиска б/у автозапчастей по запросу «{query_label}»: "
             "фото, описание и чат с продавцом."
         )
-        h1 = f"Б/у запчасти: {q}"
+        h1 = f"Б/у запчасти: {query_label}"
         robots = "noindex, follow"
     else:
-        canonical_url = _absolute_url(site_origin, "/autoparts/used")
+        canonical_path = "/autoparts/used"
         title = "Б/у автозапчасти — каталог продавцов | Свой Гараж"
         description = (
             "Каталог б/у автозапчастей от продавцов на «Свой Гараж»: "
@@ -126,10 +158,11 @@ def _build_used_parts_seo(site_origin: str, query: str | None) -> StaticPageSeoM
         )
         h1 = "Б/у автозапчасти"
         robots = "index, follow"
+
     return StaticPageSeoMeta(
         title=title,
         description=_truncate(description, 160),
-        canonical_url=canonical_url,
+        canonical_url=_absolute_url(site_origin, canonical_path),
         h1=h1,
         robots=robots,
     )
@@ -166,6 +199,170 @@ def _build_seller_part_card_seo(product: ProductModel, *, site_origin: str) -> S
     )
 
 
+def _build_brand_landing_seo(db: Session, slug: str, *, site_origin: str) -> StaticPageSeoMeta | None:
+    from app.services.new_parts_seo_card_service import (
+        build_new_part_card_path,
+        count_new_part_cards_by_brand,
+        iter_new_part_cards_by_brand_for_prerender,
+    )
+    from app.services.seo_landing_page_service import resolve_brand_new_landing
+
+    provisional = resolve_brand_new_landing(db, slug)
+    if provisional is None:
+        return None
+    brand_name = provisional.brand_name or provisional.title_ru
+    total = count_new_part_cards_by_brand(db, brand_name) if brand_name else 0
+    landing = resolve_brand_new_landing(db, slug, card_count=total or None)
+    if landing is None:
+        return None
+
+    cards = iter_new_part_cards_by_brand_for_prerender(db, brand_name) if brand_name else []
+    links: list[tuple[str, str]] = []
+    for card in cards:
+        label = format_product_display_title(card.brand, card.article, card.name)
+        path = build_new_part_card_path(card.id, card.brand, card.article)
+        links.append((label, _absolute_url(site_origin, path)))
+
+    return StaticPageSeoMeta(
+        title=landing.meta_title,
+        description=_truncate(landing.meta_description, 160),
+        canonical_url=_absolute_url(site_origin, landing.canonical_path),
+        h1=f"Новые автозапчасти {brand_name}",
+        card_links=tuple(links),
+    )
+
+
+def _build_category_landing_seo(db: Session, slug: str, *, site_origin: str) -> StaticPageSeoMeta | None:
+    from app.services.new_parts_seo_card_service import (
+        build_new_part_card_path,
+        count_new_part_cards_by_category_slug,
+        iter_new_part_cards_by_category_for_prerender,
+    )
+    from app.services.seo_landing_page_service import resolve_category_new_landing
+
+    provisional = resolve_category_new_landing(db, slug)
+    if provisional is None:
+        return None
+    title_ru = provisional.title_ru
+    total = count_new_part_cards_by_category_slug(db, slug)
+    landing = resolve_category_new_landing(db, slug, card_count=total or None)
+    if landing is None:
+        return None
+
+    cards = iter_new_part_cards_by_category_for_prerender(db, slug)
+    links: list[tuple[str, str]] = []
+    for card in cards:
+        label = format_product_display_title(card.brand, card.article, card.name)
+        path = build_new_part_card_path(card.id, card.brand, card.article)
+        links.append((label, _absolute_url(site_origin, path)))
+
+    return StaticPageSeoMeta(
+        title=landing.meta_title,
+        description=_truncate(landing.meta_description, 160),
+        canonical_url=_absolute_url(site_origin, landing.canonical_path),
+        h1=f"Новые {title_ru} — каталог с доставкой",
+        card_links=tuple(links),
+    )
+
+
+def _build_used_brand_landing_seo(db: Session, slug: str, *, site_origin: str) -> StaticPageSeoMeta | None:
+    from app.services.seo_landing_page_service import resolve_brand_used_landing
+    from app.services.used_catalog_service import (
+        count_used_products_by_brand,
+        iter_used_products_by_brand_for_prerender,
+    )
+
+    provisional = resolve_brand_used_landing(db, slug)
+    if provisional is None:
+        return None
+    brand_name = provisional.brand_name or provisional.title_ru
+    total = count_used_products_by_brand(db, brand_name) if brand_name else 0
+    landing = resolve_brand_used_landing(db, slug, product_count=total or None)
+    if landing is None:
+        return None
+
+    products = iter_used_products_by_brand_for_prerender(db, brand_name) if brand_name else []
+    links: list[tuple[str, str]] = []
+    for product in products:
+        label = format_product_display_title(product.brand, product.article, product.name)
+        path = build_product_page_url(product, site_origin)
+        links.append((label, path if path.startswith("http") else _absolute_url(site_origin, path)))
+
+    return StaticPageSeoMeta(
+        title=landing.meta_title,
+        description=_truncate(landing.meta_description, 160),
+        canonical_url=_absolute_url(site_origin, landing.canonical_path),
+        h1=f"Б/у автозапчасти {brand_name}",
+        card_links=tuple(links),
+    )
+
+
+def _build_used_category_landing_seo(db: Session, slug: str, *, site_origin: str) -> StaticPageSeoMeta | None:
+    from app.services.seo_landing_page_service import resolve_category_used_landing
+    from app.services.used_catalog_service import (
+        count_used_products_by_part_type_id,
+        iter_used_products_by_part_type_for_prerender,
+    )
+
+    provisional = resolve_category_used_landing(db, slug)
+    if provisional is None:
+        return None
+    title_ru = provisional.title_ru
+    total = count_used_products_by_part_type_id(db, provisional.part_type_id)
+    landing = resolve_category_used_landing(db, slug, product_count=total or None)
+    if landing is None:
+        return None
+
+    products = iter_used_products_by_part_type_for_prerender(db, provisional.part_type_id)
+    links: list[tuple[str, str]] = []
+    for product in products:
+        label = format_product_display_title(product.brand, product.article, product.name)
+        path = build_product_page_url(product, site_origin)
+        links.append((label, path if path.startswith("http") else _absolute_url(site_origin, path)))
+
+    return StaticPageSeoMeta(
+        title=landing.meta_title,
+        description=_truncate(landing.meta_description, 160),
+        canonical_url=_absolute_url(site_origin, landing.canonical_path),
+        h1=f"Б/у {title_ru} — купить от продавцов",
+        card_links=tuple(links),
+    )
+
+
+def _build_used_geo_landing_seo(db: Session, slug: str, *, site_origin: str) -> StaticPageSeoMeta | None:
+    from app.services.seo_landing_page_service import resolve_geo_landing
+    from app.services.used_catalog_service import (
+        count_used_products_by_city,
+        iter_used_products_by_city_for_prerender,
+    )
+    from app.utils.organization_city import format_city_in_prepositional
+
+    provisional = resolve_geo_landing(db, slug)
+    if provisional is None:
+        return None
+    city = provisional.city or provisional.title_ru
+    total = count_used_products_by_city(db, city) if city else 0
+    landing = resolve_geo_landing(db, slug, product_count=total or None)
+    if landing is None:
+        return None
+
+    products = iter_used_products_by_city_for_prerender(db, city) if city else []
+    links: list[tuple[str, str]] = []
+    for product in products:
+        label = format_product_display_title(product.brand, product.article, product.name)
+        path = build_product_page_url(product, site_origin)
+        links.append((label, path if path.startswith("http") else _absolute_url(site_origin, path)))
+
+    city_prep = format_city_in_prepositional(city)
+    return StaticPageSeoMeta(
+        title=landing.meta_title,
+        description=_truncate(landing.meta_description, 160),
+        canonical_url=_absolute_url(site_origin, landing.canonical_path),
+        h1=f"Б/у автозапчасти в {city_prep}",
+        card_links=tuple(links),
+    )
+
+
 def get_static_page_seo_for_path(
     db: Session | None,
     raw_path: str,
@@ -177,17 +374,38 @@ def get_static_page_seo_for_path(
     path = _normalize_path(parsed.path or "/")
     query_params = parse_qs(parsed.query)
     search_q = (query_params.get("q") or [None])[0]
+    brand_filters = query_params.get("brand") or []
 
     if path == "/":
         return _build_home_seo(origin)
     if path == "/catalog":
         return _build_catalog_seo(origin)
     if path == "/autoparts/new":
-        return _build_new_parts_seo(origin, search_q)
+        return _build_new_parts_seo(origin, search_q, brands=brand_filters)
     if path == "/autoparts/used":
-        return _build_used_parts_seo(origin, search_q)
+        return _build_used_parts_seo(origin, search_q, brands=brand_filters)
     if path == "/about":
         return _build_about_seo(origin)
+
+    brand_match = NEW_BRAND_LANDING_RE.match(path)
+    if brand_match and db is not None:
+        return _build_brand_landing_seo(db, brand_match.group("slug"), site_origin=origin)
+
+    category_match = NEW_CATEGORY_LANDING_RE.match(path)
+    if category_match and db is not None:
+        return _build_category_landing_seo(db, category_match.group("slug"), site_origin=origin)
+
+    used_brand_match = USED_BRAND_LANDING_RE.match(path)
+    if used_brand_match and db is not None:
+        return _build_used_brand_landing_seo(db, used_brand_match.group("slug"), site_origin=origin)
+
+    used_category_match = USED_CATEGORY_LANDING_RE.match(path)
+    if used_category_match and db is not None:
+        return _build_used_category_landing_seo(db, used_category_match.group("slug"), site_origin=origin)
+
+    used_geo_match = USED_GEO_LANDING_RE.match(path)
+    if used_geo_match and db is not None:
+        return _build_used_geo_landing_seo(db, used_geo_match.group("slug"), site_origin=origin)
 
     seller_match = SELLER_PART_CARD_RE.match(path)
     if seller_match and db is not None:
@@ -232,6 +450,13 @@ def render_static_page_prerender_html(meta: StaticPageSeoMeta) -> str:
     h1 = html.escape(meta.h1)
     robots = html.escape(meta.robots, quote=True)
     body_desc = html.escape(meta.description)
+    links_html = ""
+    if meta.card_links:
+        items = "".join(
+            f'<li><a href="{html.escape(url, quote=True)}">{html.escape(label)}</a></li>'
+            for label, url in meta.card_links
+        )
+        links_html = f"<ul>{items}</ul>"
     parsed = urlsplit(meta.canonical_url or "")
     page_origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else None
     og_image = html.escape(resolve_default_og_image_url(page_origin), quote=True)
@@ -257,6 +482,7 @@ def render_static_page_prerender_html(meta: StaticPageSeoMeta) -> str:
   <main>
     <h1>{h1}</h1>
     <p>{body_desc}</p>
+    {links_html}
     <p><a href="{canonical}">Открыть на «Свой Гараж»</a></p>
   </main>
 </body>

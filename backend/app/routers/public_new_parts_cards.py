@@ -9,10 +9,14 @@ from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.services.new_parts_seo_card_service import (
     _payload_from_raw,
     _stocks_from_card,
+    aggregate_top_brands_in_category,
     build_new_part_card_path,
     create_or_get_new_part_card,
     find_active_new_part_card_by_brand_article,
     get_new_part_card,
+    list_new_part_cards_by_brand,
+    list_new_part_cards_by_category_slug,
+    resolve_category_search_query,
 )
 from app.services.sitemap_service import try_refresh_new_parts_sitemap_for_card
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
@@ -77,6 +81,20 @@ class NewPartCardOut(BaseModel):
     canonical_url: str
 
 
+class PopularBrandOut(BaseModel):
+    brand: str
+    slug: str
+    count: int
+
+
+class NewPartCardListOut(BaseModel):
+    items: list[NewPartCardOut]
+    total: int
+    page: int
+    page_size: int
+    popular_brands: list[PopularBrandOut] = Field(default_factory=list)
+
+
 def _card_to_out(card: NewPartsSeoCard) -> NewPartCardOut:
     payload = _payload_from_raw(card)
     stocks = [
@@ -108,6 +126,48 @@ def _card_to_out(card: NewPartsSeoCard) -> NewPartCardOut:
         else None,
         stocks=stocks,
         canonical_url=build_new_part_card_path(card.id, card.brand, card.article),
+    )
+
+
+@router.get("/public/new-parts/cards", response_model=NewPartCardListOut)
+def public_list_new_part_cards(
+    brand: str | None = Query(None, min_length=1, max_length=120),
+    category_slug: str | None = Query(None, min_length=1, max_length=120),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(48, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    has_brand = bool((brand or "").strip())
+    has_category = bool((category_slug or "").strip())
+    if has_brand == has_category:
+        raise HTTPException(
+            status_code=422,
+            detail="Укажите ровно один параметр: brand или category_slug",
+        )
+
+    if has_category:
+        if resolve_category_search_query(db, category_slug) is None:
+            raise HTTPException(status_code=404, detail="Категория не найдена")
+        rows, total = list_new_part_cards_by_category_slug(
+            db,
+            category_slug,
+            page=page,
+            page_size=page_size,
+        )
+        popular_brands = [
+            PopularBrandOut(**row)
+            for row in aggregate_top_brands_in_category(db, category_slug)
+        ]
+    else:
+        rows, total = list_new_part_cards_by_brand(db, brand, page=page, page_size=page_size)
+        popular_brands = []
+
+    return NewPartCardListOut(
+        items=[_card_to_out(card) for card in rows],
+        total=total,
+        page=page,
+        page_size=page_size,
+        popular_brands=popular_brands,
     )
 
 

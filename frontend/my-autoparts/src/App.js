@@ -27,6 +27,11 @@ import CookiePolicyPage from './pages/About/CookiePolicyPage';
 import UsedPartsFiltersPage from './pages/AutoParts/UsedParts/UsedPartsFiltersPage';
 import NewPartsFiltersPage from './pages/AutoParts/NewParts/NewPartsFiltersPage';
 import NewPartDetailPage from './pages/AutoParts/NewParts/NewPartDetailPage';
+import NewPartsBrandLandingPage from './pages/AutoParts/NewParts/NewPartsBrandLandingPage';
+import NewPartsCategoryLandingPage from './pages/AutoParts/NewParts/NewPartsCategoryLandingPage';
+import UsedPartsBrandLandingPage from './pages/AutoParts/UsedParts/UsedPartsBrandLandingPage';
+import UsedPartsCategoryLandingPage from './pages/AutoParts/UsedParts/UsedPartsCategoryLandingPage';
+import UsedPartsGeoLandingPage from './pages/AutoParts/UsedParts/UsedPartsGeoLandingPage';
 import Main from './pages/Main/Main';
 import CatalogPage from './pages/Catalog/CatalogPage';
 import CartPage from './pages/Cart/CartPage';
@@ -176,9 +181,14 @@ function App() {
           <Route path="/autoparts" element={<Navigate to="/autoparts/new" replace />} />
           <Route path="/autoparts/new/filters" element={<NewPartsFiltersPage />} />
           <Route path="/autoparts/new" element={<AutoParts />} />
+          <Route path="/autoparts/new/brand/:brandSlug" element={<NewPartsBrandLandingPage />} />
+          <Route path="/autoparts/new/category/:categorySlug" element={<NewPartsCategoryLandingPage />} />
           <Route path="/autoparts/new/part/:cardId" element={<NewPartDetailPage />} />
           <Route path="/autoparts/used/filters" element={<UsedPartsFiltersPage />} />
           <Route path="/autoparts/used" element={<AutoParts />} />
+          <Route path="/autoparts/used/brand/:brandSlug" element={<UsedPartsBrandLandingPage />} />
+          <Route path="/autoparts/used/category/:categorySlug" element={<UsedPartsCategoryLandingPage />} />
+          <Route path="/autoparts/used/geo/:geoSlug" element={<UsedPartsGeoLandingPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/about" element={<AboutCompany />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />

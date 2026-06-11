@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.models.new_parts_seo_sync_log import NewPartsSeoSyncLog
 from app.models.product import Product
+from app.models.garage_new_orders import GarageNewOrderItem
 from app.schemas.rossko import SearchRequest
 from app.services.new_parts_seo_card_service import (
     ROSSKO_NEW_PART_SOURCE,
@@ -32,12 +33,19 @@ STATUS_SKIPPED_EXISTS = "skipped_exists"
 STATUS_NOT_FOUND = "not_found"
 STATUS_ERROR = "error"
 
+SOURCE_ORDER = "order"
+SOURCE_PRODUCT = "product"
+SOURCE_CROSS = "cross"
+SOURCE_PRIORITY = {SOURCE_ORDER: 0, SOURCE_PRODUCT: 1, SOURCE_CROSS: 2}
+MAX_CROSSES_PER_ROSSKO_RESPONSE = 12
+
 
 @dataclass
-class ProductLookupCandidate:
+class SyncCandidate:
     lookup_key: str
     brand: str
     article: str
+    source: str = SOURCE_PRODUCT
 
 
 @dataclass
@@ -74,9 +82,9 @@ def count_seo_cards_created_today(db: Session) -> int:
     )
 
 
-def collect_distinct_product_candidates(db: Session) -> list[ProductLookupCandidate]:
+def collect_distinct_product_candidates(db: Session) -> list[SyncCandidate]:
     seen: set[str] = set()
-    candidates: list[ProductLookupCandidate] = []
+    candidates: list[SyncCandidate] = []
 
     for product in _iter_catalog_products(db):
         if not is_working_catalog_product(product):
@@ -88,13 +96,115 @@ def collect_distinct_product_candidates(db: Session) -> list[ProductLookupCandid
             continue
         seen.add(lookup_key)
         candidates.append(
-            ProductLookupCandidate(
+            SyncCandidate(
                 lookup_key=lookup_key,
                 brand=brand,
                 article=article,
+                source=SOURCE_PRODUCT,
             )
         )
     return candidates
+
+
+def collect_order_item_candidates(db: Session) -> list[SyncCandidate]:
+    seen: set[str] = set()
+    candidates: list[SyncCandidate] = []
+
+    rows = (
+        db.query(GarageNewOrderItem.brand, GarageNewOrderItem.partnumber)
+        .filter(
+            GarageNewOrderItem.brand.isnot(None),
+            GarageNewOrderItem.partnumber.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    for brand_raw, article_raw in rows:
+        brand = (brand_raw or "").strip()
+        article = (article_raw or "").strip()
+        lookup_key = build_product_lookup_key(brand, article)
+        if not lookup_key or lookup_key in seen:
+            continue
+        seen.add(lookup_key)
+        candidates.append(
+            SyncCandidate(
+                lookup_key=lookup_key,
+                brand=brand,
+                article=article,
+                source=SOURCE_ORDER,
+            )
+        )
+    return candidates
+
+
+def collect_all_sync_candidates(db: Session) -> list[SyncCandidate]:
+    seen: set[str] = set()
+    merged: list[SyncCandidate] = []
+    for collector in (collect_order_item_candidates, collect_distinct_product_candidates):
+        for candidate in collector(db):
+            if candidate.lookup_key in seen:
+                continue
+            seen.add(candidate.lookup_key)
+            merged.append(candidate)
+    return merged
+
+
+def extract_cross_candidates_from_rossko(
+    rossko_data: dict,
+    *,
+    max_crosses: int = MAX_CROSSES_PER_ROSSKO_RESPONSE,
+) -> list[SyncCandidate]:
+    results: list[SyncCandidate] = []
+    seen: set[str] = set()
+
+    def add_cross(brand: str, article: str) -> None:
+        if len(results) >= max_crosses:
+            return
+        lookup_key = build_product_lookup_key(brand, article)
+        if not lookup_key or lookup_key in seen:
+            return
+        seen.add(lookup_key)
+        results.append(
+            SyncCandidate(
+                lookup_key=lookup_key,
+                brand=brand,
+                article=article,
+                source=SOURCE_CROSS,
+            )
+        )
+
+    def walk_cross_parts(parts) -> None:
+        if not parts:
+            return
+        if not isinstance(parts, list):
+            parts = [parts]
+        for part in parts:
+            if not isinstance(part, dict):
+                continue
+            brand = (part.get("brand") or "").strip()
+            article = (part.get("partnumber") or "").strip()
+            if brand and article:
+                add_cross(brand, article)
+            if len(results) >= max_crosses:
+                return
+
+    parts_list = (rossko_data.get("PartsList") or {}).get("Part")
+    if not parts_list:
+        return results
+    if not isinstance(parts_list, list):
+        parts_list = [parts_list]
+
+    for part in parts_list:
+        if not isinstance(part, dict):
+            continue
+        crosses = part.get("crosses") or {}
+        cross_parts = crosses.get("Part") or []
+        if not isinstance(cross_parts, list):
+            cross_parts = [cross_parts] if cross_parts else []
+        walk_cross_parts(cross_parts)
+        if len(results) >= max_crosses:
+            break
+    return results
 
 
 def find_active_card_for_lookup(db: Session, brand: str, article: str) -> NewPartsSeoCard | None:
@@ -140,13 +250,14 @@ def _should_skip_before_rossko(log_row: NewPartsSeoSyncLog | None, now: datetime
     return False
 
 
-def _candidate_sort_key(db: Session, candidate: ProductLookupCandidate) -> tuple[int, datetime]:
+def _candidate_sort_key(db: Session, candidate: SyncCandidate) -> tuple[int, int, datetime]:
+    source_prio = SOURCE_PRIORITY.get(candidate.source, 9)
     log_row = _get_sync_log(db, candidate.lookup_key)
     if log_row is None:
-        return (0, datetime.min.replace(tzinfo=timezone.utc))
+        return (source_prio, 0, datetime.min.replace(tzinfo=timezone.utc))
     if log_row.status == STATUS_NOT_FOUND:
-        return (1, log_row.next_retry_at or datetime.min.replace(tzinfo=timezone.utc))
-    return (2, log_row.checked_at or datetime.min.replace(tzinfo=timezone.utc))
+        return (source_prio, 1, log_row.next_retry_at or datetime.min.replace(tzinfo=timezone.utc))
+    return (source_prio, 2, log_row.checked_at or datetime.min.replace(tzinfo=timezone.utc))
 
 
 async def _fetch_rossko_search(db: Session, search_text: str) -> dict:
@@ -169,7 +280,7 @@ async def _fetch_rossko_search(db: Session, search_text: str) -> dict:
 def _upsert_sync_log(
     db: Session,
     *,
-    candidate: ProductLookupCandidate,
+    candidate: SyncCandidate,
     status: str,
     rossko_brand: str | None = None,
     rossko_article: str | None = None,
@@ -198,6 +309,146 @@ def _upsert_sync_log(
     db.commit()
 
 
+async def _process_sync_candidate(
+    db: Session,
+    candidate: SyncCandidate,
+    *,
+    now: datetime,
+    retry_days: int,
+    delay: float,
+    session_seen_lookup: set[str],
+    session_seen_stable: set[str],
+    remaining_new: int,
+    pending_crosses: list[SyncCandidate],
+    result: SyncResult,
+) -> int:
+    if candidate.lookup_key in session_seen_lookup:
+        result.skipped += 1
+        return remaining_new
+    session_seen_lookup.add(candidate.lookup_key)
+
+    existing_card = find_active_card_for_lookup(db, candidate.brand, candidate.article)
+    if existing_card is not None:
+        _upsert_sync_log(
+            db,
+            candidate=candidate,
+            status=STATUS_SKIPPED_EXISTS,
+            rossko_brand=existing_card.brand,
+            rossko_article=existing_card.article,
+            seo_card_id=existing_card.id,
+        )
+        result.skipped += 1
+        return remaining_new
+
+    log_row = _get_sync_log(db, candidate.lookup_key)
+    if _should_skip_before_rossko(log_row, now):
+        result.skipped += 1
+        return remaining_new
+
+    result.processed += 1
+    try:
+        search_text = f"{candidate.brand} {candidate.article}".strip()
+        rossko_data = await _fetch_rossko_search(db, search_text)
+        for cross_candidate in extract_cross_candidates_from_rossko(rossko_data):
+            if cross_candidate.lookup_key not in session_seen_lookup:
+                pending_crosses.append(cross_candidate)
+
+        best_part = pick_best_rossko_part(
+            rossko_data,
+            brand=candidate.brand,
+            article=candidate.article,
+        )
+        if best_part is None:
+            _upsert_sync_log(
+                db,
+                candidate=candidate,
+                status=STATUS_NOT_FOUND,
+                next_retry_at=now + timedelta(days=retry_days),
+            )
+            result.not_found += 1
+            if delay > 0:
+                await asyncio.sleep(delay)
+            return remaining_new
+
+        payload = rossko_part_to_card_payload(best_part)
+        rossko_brand = payload.get("brand") or candidate.brand
+        rossko_article = payload.get("article") or candidate.article
+        stable_key = _stable_key(ROSSKO_NEW_PART_SOURCE, rossko_brand, rossko_article)
+
+        if stable_key in session_seen_stable:
+            _upsert_sync_log(
+                db,
+                candidate=candidate,
+                status=STATUS_SKIPPED_EXISTS,
+                rossko_brand=rossko_brand,
+                rossko_article=rossko_article,
+            )
+            result.skipped += 1
+            if delay > 0:
+                await asyncio.sleep(delay)
+            return remaining_new
+        session_seen_stable.add(stable_key)
+
+        is_new_card = not stable_key_exists(db, rossko_brand, rossko_article)
+        if is_new_card and remaining_new <= 0:
+            result.stopped_by_daily_limit = True
+            return remaining_new
+
+        card = create_or_get_new_part_card(db, payload)
+        if not is_rossko_new_part_sitemap_eligible(card):
+            _upsert_sync_log(
+                db,
+                candidate=candidate,
+                status=STATUS_NOT_FOUND,
+                rossko_brand=rossko_brand,
+                rossko_article=rossko_article,
+                seo_card_id=card.id,
+                next_retry_at=now + timedelta(days=retry_days),
+            )
+            result.not_found += 1
+        elif is_new_card:
+            _upsert_sync_log(
+                db,
+                candidate=candidate,
+                status=STATUS_CREATED,
+                rossko_brand=card.brand,
+                rossko_article=card.article,
+                seo_card_id=card.id,
+            )
+            result.created += 1
+            remaining_new -= 1
+        else:
+            _upsert_sync_log(
+                db,
+                candidate=candidate,
+                status=STATUS_UPDATED_EXISTING,
+                rossko_brand=card.brand,
+                rossko_article=card.article,
+                seo_card_id=card.id,
+            )
+            result.updated_existing += 1
+
+    except Exception as exc:
+        logger.exception(
+            "SEO sync failed for lookup_key=%s brand=%s article=%s",
+            candidate.lookup_key,
+            candidate.brand,
+            candidate.article,
+        )
+        _upsert_sync_log(
+            db,
+            candidate=candidate,
+            status=STATUS_ERROR,
+            error_message=str(exc)[:500],
+            next_retry_at=now + timedelta(days=1),
+        )
+        result.errors += 1
+
+    if delay > 0:
+        await asyncio.sleep(delay)
+    return remaining_new
+
+
 async def sync_new_parts_seo_from_products(
     db: Session,
     *,
@@ -218,137 +469,114 @@ async def sync_new_parts_seo_from_products(
     already_created_today = count_seo_cards_created_today(db)
     remaining_new = max(0, limit - already_created_today)
 
-    candidates = collect_distinct_product_candidates(db)
+    candidates = collect_all_sync_candidates(db)
     result.candidates = len(candidates)
     candidates.sort(key=lambda c: _candidate_sort_key(db, c))
 
     session_seen_lookup: set[str] = set()
     session_seen_stable: set[str] = set()
+    pending_crosses: list[SyncCandidate] = []
 
     for candidate in candidates:
         if remaining_new <= 0:
             result.stopped_by_daily_limit = True
             break
+        remaining_new = await _process_sync_candidate(
+            db,
+            candidate,
+            now=now,
+            retry_days=retry_days,
+            delay=delay,
+            session_seen_lookup=session_seen_lookup,
+            session_seen_stable=session_seen_stable,
+            remaining_new=remaining_new,
+            pending_crosses=pending_crosses,
+            result=result,
+        )
+        if result.stopped_by_daily_limit:
+            break
 
-        if candidate.lookup_key in session_seen_lookup:
-            result.skipped += 1
-            continue
-        session_seen_lookup.add(candidate.lookup_key)
-
-        existing_card = find_active_card_for_lookup(db, candidate.brand, candidate.article)
-        if existing_card is not None:
-            _upsert_sync_log(
-                db,
-                candidate=candidate,
-                status=STATUS_SKIPPED_EXISTS,
-                rossko_brand=existing_card.brand,
-                rossko_article=existing_card.article,
-                seo_card_id=existing_card.id,
-            )
-            result.skipped += 1
-            continue
-
-        log_row = _get_sync_log(db, candidate.lookup_key)
-        if _should_skip_before_rossko(log_row, now):
-            result.skipped += 1
-            continue
-
-        result.processed += 1
-        try:
-            search_text = f"{candidate.brand} {candidate.article}".strip()
-            rossko_data = await _fetch_rossko_search(db, search_text)
-            best_part = pick_best_rossko_part(
-                rossko_data,
-                brand=candidate.brand,
-                article=candidate.article,
-            )
-            if best_part is None:
-                _upsert_sync_log(
-                    db,
-                    candidate=candidate,
-                    status=STATUS_NOT_FOUND,
-                    next_retry_at=now + timedelta(days=retry_days),
-                )
-                result.not_found += 1
-                if delay > 0:
-                    await asyncio.sleep(delay)
-                continue
-
-            payload = rossko_part_to_card_payload(best_part)
-            rossko_brand = payload.get("brand") or candidate.brand
-            rossko_article = payload.get("article") or candidate.article
-            stable_key = _stable_key(ROSSKO_NEW_PART_SOURCE, rossko_brand, rossko_article)
-
-            if stable_key in session_seen_stable:
-                _upsert_sync_log(
-                    db,
-                    candidate=candidate,
-                    status=STATUS_SKIPPED_EXISTS,
-                    rossko_brand=rossko_brand,
-                    rossko_article=rossko_article,
-                )
-                result.skipped += 1
-                if delay > 0:
-                    await asyncio.sleep(delay)
-                continue
-            session_seen_stable.add(stable_key)
-
-            is_new_card = not stable_key_exists(db, rossko_brand, rossko_article)
-            if is_new_card and remaining_new <= 0:
+    if remaining_new > 0 and pending_crosses:
+        pending_crosses.sort(key=lambda c: _candidate_sort_key(db, c))
+        for candidate in pending_crosses:
+            if remaining_new <= 0:
                 result.stopped_by_daily_limit = True
                 break
-
-            card = create_or_get_new_part_card(db, payload)
-            if not is_rossko_new_part_sitemap_eligible(card):
-                _upsert_sync_log(
-                    db,
-                    candidate=candidate,
-                    status=STATUS_NOT_FOUND,
-                    rossko_brand=rossko_brand,
-                    rossko_article=rossko_article,
-                    seo_card_id=card.id,
-                    next_retry_at=now + timedelta(days=retry_days),
-                )
-                result.not_found += 1
-            elif is_new_card:
-                _upsert_sync_log(
-                    db,
-                    candidate=candidate,
-                    status=STATUS_CREATED,
-                    rossko_brand=card.brand,
-                    rossko_article=card.article,
-                    seo_card_id=card.id,
-                )
-                result.created += 1
-                remaining_new -= 1
-            else:
-                _upsert_sync_log(
-                    db,
-                    candidate=candidate,
-                    status=STATUS_UPDATED_EXISTING,
-                    rossko_brand=card.brand,
-                    rossko_article=card.article,
-                    seo_card_id=card.id,
-                )
-                result.updated_existing += 1
-
-        except Exception as exc:
-            logger.exception(
-                "SEO sync failed for lookup_key=%s brand=%s article=%s",
-                candidate.lookup_key,
-                candidate.brand,
-                candidate.article,
-            )
-            _upsert_sync_log(
+            remaining_new = await _process_sync_candidate(
                 db,
-                candidate=candidate,
-                status=STATUS_ERROR,
-                error_message=str(exc)[:500],
-                next_retry_at=now + timedelta(days=1),
+                candidate,
+                now=now,
+                retry_days=retry_days,
+                delay=delay,
+                session_seen_lookup=session_seen_lookup,
+                session_seen_stable=session_seen_stable,
+                remaining_new=remaining_new,
+                pending_crosses=pending_crosses,
+                result=result,
             )
-            result.errors += 1
-
-        if delay > 0:
-            await asyncio.sleep(delay)
+            if result.stopped_by_daily_limit:
+                break
 
     return result
+
+
+def count_active_rossko_seo_cards(db: Session) -> int:
+    return (
+        db.query(NewPartsSeoCard)
+        .filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.source) == ROSSKO_NEW_PART_SOURCE,
+        )
+        .count()
+    )
+
+
+def count_eligible_rossko_seo_cards(db: Session) -> int:
+    return sum(
+        1
+        for card in db.query(NewPartsSeoCard).filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.source) == ROSSKO_NEW_PART_SOURCE,
+        )
+        if is_rossko_new_part_sitemap_eligible(card)
+    )
+
+
+def get_cards_created_by_day(db: Session, *, days: int = 14) -> list[dict[str, object]]:
+    safe_days = max(1, min(int(days or 14), 90))
+    since = _utcnow() - timedelta(days=safe_days - 1)
+    since = since.replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = (
+        db.query(
+            func.date(NewPartsSeoSyncLog.checked_at).label("day"),
+            func.count(NewPartsSeoSyncLog.id).label("created"),
+        )
+        .filter(
+            NewPartsSeoSyncLog.status == STATUS_CREATED,
+            NewPartsSeoSyncLog.checked_at >= since,
+        )
+        .group_by(func.date(NewPartsSeoSyncLog.checked_at))
+        .order_by(func.date(NewPartsSeoSyncLog.checked_at).asc())
+        .all()
+    )
+    return [{"day": str(row.day), "created": int(row.created or 0)} for row in rows]
+
+
+def get_new_parts_seo_dashboard_stats(db: Session, *, days: int = 14) -> dict[str, object]:
+    total = count_active_rossko_seo_cards(db)
+    eligible = count_eligible_rossko_seo_cards(db)
+    created_today = count_seo_cards_created_today(db)
+    eligible_pct = round((eligible / total) * 100, 1) if total else 0.0
+    return {
+        "cards_total": total,
+        "cards_eligible": eligible,
+        "cards_eligible_pct": eligible_pct,
+        "cards_created_today": created_today,
+        "created_by_day": get_cards_created_by_day(db, days=days),
+        "settings": {
+            "daily_limit": settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT,
+            "rossko_delay_sec": settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC,
+            "sitemap_daily_url_limit": settings.SEO_SITEMAP_DAILY_URL_LIMIT,
+            "refresh_batch_size": settings.NEW_PARTS_SEO_REFRESH_BATCH_SIZE,
+        },
+    }

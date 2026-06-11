@@ -3,6 +3,7 @@ import { SITE_ORIGIN } from './breadcrumbs';
 import { DEFAULT_OG_IMAGE_URL } from './seoConstants';
 import { formatProductDisplayTitle } from './productDisplayName';
 import { buildPartDetailPath } from './partRoutes';
+import { slugifyBrand } from './slugUtils';
 
 function absoluteUrl(path) {
   if (!path || path === '/') return `${SITE_ORIGIN}/`;
@@ -23,6 +24,16 @@ function hasListingSearchFilters(searchParams) {
   if (searchParams.get('in_stock') === '1') return true;
   if ((searchParams.get('sort') || '').trim()) return true;
   return false;
+}
+
+export function resolveBrandLandingCanonical(searchParams, section) {
+  const q = (searchParams?.get('q') || '').trim();
+  if (q) return null;
+  const brands = (searchParams?.getAll('brand') || []).map((b) => b.trim()).filter(Boolean);
+  if (brands.length !== 1) return null;
+  const slug = slugifyBrand(brands[0]);
+  if (!slug) return null;
+  return absoluteUrl(`/autoparts/${section}/brand/${slug}`);
 }
 
 export function buildHomeSeo() {
@@ -61,13 +72,14 @@ export function buildNewPartsSeo(searchParams) {
     }
     const titleSuffix = titleSuffixParts.length ? ` (${titleSuffixParts.join('; ')})` : '';
     const queryLabel = q || 'фильтр';
+    const brandCanonical = resolveBrandLandingCanonical(searchParams, 'new');
     return {
       title: `${queryLabel}${titleSuffix} — новые запчасти | Свой Гараж`,
       description: truncate(
         `Результаты поиска новых автозапчастей по запросу «${queryLabel}»: оригиналы и аналоги с доставкой по России.`,
         160
       ),
-      canonicalUrl: absoluteUrl('/autoparts/new'),
+      canonicalUrl: brandCanonical || absoluteUrl('/autoparts/new'),
       robots: 'noindex, follow',
     };
   }
@@ -89,13 +101,14 @@ export function buildUsedPartsSeo(searchParams) {
   if (hasFilters) {
     const titleSuffix = brands.length ? ` (бренд: ${brands.slice(0, 2).join(', ')})` : '';
     const queryLabel = q || 'фильтр';
+    const brandCanonical = resolveBrandLandingCanonical(searchParams, 'used');
     return {
       title: `${queryLabel}${titleSuffix} — б/у запчасти | Свой Гараж`,
       description: truncate(
         `Результаты поиска б/у автозапчастей по запросу «${queryLabel}»: фото, описание и чат с продавцом.`,
         160
       ),
-      canonicalUrl: absoluteUrl('/autoparts/used'),
+      canonicalUrl: brandCanonical || absoluteUrl('/autoparts/used'),
       robots: 'noindex, follow',
     };
   }
@@ -110,6 +123,21 @@ export function buildUsedPartsSeo(searchParams) {
 }
 
 export function buildAutoPartsSeo(pathname, searchParams) {
+  if ((pathname || '').includes('/autoparts/new/brand/')) {
+    return null;
+  }
+  if ((pathname || '').includes('/autoparts/new/category/')) {
+    return null;
+  }
+  if ((pathname || '').includes('/autoparts/used/brand/')) {
+    return null;
+  }
+  if ((pathname || '').includes('/autoparts/used/category/')) {
+    return null;
+  }
+  if ((pathname || '').includes('/autoparts/used/geo/')) {
+    return null;
+  }
   if (pathname.includes('/autoparts/used')) {
     return buildUsedPartsSeo(searchParams);
   }

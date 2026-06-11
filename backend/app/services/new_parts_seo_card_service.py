@@ -10,6 +10,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.new_parts_seo_card import NewPartsSeoCard
+from app.models.seo_landing_page import SeoLandingPage
+from app.utils.slug_utils import slugify_brand
 from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
 from app.utils.product_json_ld import build_new_part_card_json_ld, dumps_json_ld, product_body_description
 from app.utils.product_search_seo import (
@@ -329,7 +331,6 @@ def find_active_new_part_card_by_brand_article(
     article_text = _safe_text(article)
     if not brand_text or not article_text:
         return None
-    from sqlalchemy import func
 
     return (
         db.query(NewPartsSeoCard)
@@ -341,6 +342,162 @@ def find_active_new_part_card_by_brand_article(
         .order_by(NewPartsSeoCard.id.desc())
         .first()
     )
+
+
+def _brand_cards_base_query(db: Session, brand: str):
+    brand_text = _safe_text(brand)
+    return (
+        db.query(NewPartsSeoCard)
+        .filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.source) == ROSSKO_NEW_PART_SOURCE,
+            func.lower(NewPartsSeoCard.brand) == brand_text.lower(),
+        )
+        .order_by(
+            NewPartsSeoCard.stock_count.desc().nullslast(),
+            NewPartsSeoCard.updated_at.desc().nullslast(),
+            NewPartsSeoCard.id.desc(),
+        )
+    )
+
+
+def count_new_part_cards_by_brand(db: Session, brand: str) -> int:
+    return _brand_cards_base_query(db, brand).count()
+
+
+def list_new_part_cards_by_brand(
+    db: Session,
+    brand: str,
+    *,
+    page: int = 1,
+    page_size: int = 48,
+) -> tuple[list[NewPartsSeoCard], int]:
+    page = max(1, int(page or 1))
+    page_size = max(1, min(int(page_size or 48), 100))
+    query = _brand_cards_base_query(db, brand)
+    total = query.count()
+    offset = (page - 1) * page_size
+    rows = query.offset(offset).limit(page_size).all()
+    return rows, total
+
+
+def iter_new_part_cards_by_brand_for_prerender(
+    db: Session,
+    brand: str,
+    *,
+    limit: int = 48,
+) -> list[NewPartsSeoCard]:
+    return _brand_cards_base_query(db, brand).limit(max(1, min(limit, 100))).all()
+
+
+def resolve_category_search_query(db: Session, category_slug: str) -> str | None:
+    slug_text = (category_slug or "").strip()
+    if not slug_text:
+        return None
+    row = (
+        db.query(SeoLandingPage)
+        .filter(
+            SeoLandingPage.kind == "category_new",
+            SeoLandingPage.slug == slug_text,
+            SeoLandingPage.is_active.is_(True),
+        )
+        .first()
+    )
+    if not row:
+        return None
+    search_query = _safe_text(row.search_query)
+    return search_query or None
+
+
+def _category_cards_base_query(db: Session, search_query: str):
+    query_text = _safe_text(search_query).lower()
+    return (
+        db.query(NewPartsSeoCard)
+        .filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.source) == ROSSKO_NEW_PART_SOURCE,
+            func.lower(NewPartsSeoCard.name).like(f"%{query_text}%"),
+        )
+        .order_by(
+            NewPartsSeoCard.stock_count.desc().nullslast(),
+            NewPartsSeoCard.updated_at.desc().nullslast(),
+            NewPartsSeoCard.id.desc(),
+        )
+    )
+
+
+def count_new_part_cards_by_category_slug(db: Session, category_slug: str) -> int:
+    search_query = resolve_category_search_query(db, category_slug)
+    if not search_query:
+        return 0
+    return _category_cards_base_query(db, search_query).count()
+
+
+def list_new_part_cards_by_category_slug(
+    db: Session,
+    category_slug: str,
+    *,
+    page: int = 1,
+    page_size: int = 48,
+) -> tuple[list[NewPartsSeoCard], int]:
+    search_query = resolve_category_search_query(db, category_slug)
+    if not search_query:
+        return [], 0
+    page = max(1, int(page or 1))
+    page_size = max(1, min(int(page_size or 48), 100))
+    query = _category_cards_base_query(db, search_query)
+    total = query.count()
+    offset = (page - 1) * page_size
+    rows = query.offset(offset).limit(page_size).all()
+    return rows, total
+
+
+def iter_new_part_cards_by_category_for_prerender(
+    db: Session,
+    category_slug: str,
+    *,
+    limit: int = 48,
+) -> list[NewPartsSeoCard]:
+    search_query = resolve_category_search_query(db, category_slug)
+    if not search_query:
+        return []
+    return _category_cards_base_query(db, search_query).limit(max(1, min(limit, 100))).all()
+
+
+def aggregate_top_brands_in_category(
+    db: Session,
+    category_slug: str,
+    *,
+    limit: int = 12,
+) -> list[dict[str, object]]:
+    search_query = resolve_category_search_query(db, category_slug)
+    if not search_query:
+        return []
+    rows = (
+        db.query(
+            func.max(NewPartsSeoCard.brand).label("brand"),
+            func.count(NewPartsSeoCard.id).label("count"),
+        )
+        .filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.source) == ROSSKO_NEW_PART_SOURCE,
+            func.lower(NewPartsSeoCard.name).like(f"%{search_query.lower()}%"),
+        )
+        .group_by(func.lower(NewPartsSeoCard.brand))
+        .order_by(func.count(NewPartsSeoCard.id).desc())
+        .limit(max(1, min(int(limit or 12), 24)))
+        .all()
+    )
+    result: list[dict[str, object]] = []
+    for row in rows:
+        brand = _safe_text(row.brand)
+        if not brand:
+            continue
+        slug = slugify_brand(brand)
+        if not slug:
+            continue
+        result.append({"brand": brand, "slug": slug, "count": int(row.count or 0)})
+    return result
 
 
 def build_new_part_seo_meta(

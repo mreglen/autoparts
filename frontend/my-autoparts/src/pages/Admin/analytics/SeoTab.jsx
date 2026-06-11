@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API_BASE, apiRequest } from '../../../utils/apiClient';
 import { formatDateTime, formatNumber, formatSyncStats } from './analyticsFormatters';
 import { DataTable, LoadingState, Section } from './AnalyticsUi';
+import CardsCreatedTrend from './CardsCreatedTrend';
 import LandingPagesSection from './LandingPagesSection';
+import SeoKpiDashboard from './SeoKpiDashboard';
 
 const SITEMAP_TYPE_LABELS = {
   index: 'Индекс',
@@ -20,17 +22,25 @@ export default function SeoTab() {
   const [loading, setLoading] = useState(true);
   const [rebuildBusy, setRebuildBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
+  const [refreshBusy, setRefreshBusy] = useState(false);
   const [downloadBusy, setDownloadBusy] = useState(false);
   const [error, setError] = useState(null);
   const [syncChips, setSyncChips] = useState(null);
+  const [refreshChips, setRefreshChips] = useState(null);
   const [downloadNotice, setDownloadNotice] = useState(null);
   const [sitemapData, setSitemapData] = useState(null);
+  const [seoStats, setSeoStats] = useState(null);
 
   const loadSitemaps = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setSitemapData(await apiRequest('/admin/seo/sitemaps'));
+      const [sitemaps, stats] = await Promise.all([
+        apiRequest('/admin/seo/sitemaps'),
+        apiRequest('/admin/seo/new-parts/stats'),
+      ]);
+      setSitemapData(sitemaps);
+      setSeoStats(stats);
     } catch (e) {
       setError(e?.message || 'Ошибка загрузки');
     } finally {
@@ -60,9 +70,11 @@ export default function SeoTab() {
     setSyncChips(null);
     setError(null);
     try {
-      const result = await apiRequest('/admin/seo/new-parts/sync-from-products?limit=200', {
-        method: 'POST',
-      });
+      const dailyLimit = seoStats?.settings?.daily_limit;
+      const url = dailyLimit
+        ? `/admin/seo/new-parts/sync-from-products?limit=${dailyLimit}`
+        : '/admin/seo/new-parts/sync-from-products';
+      const result = await apiRequest(url, { method: 'POST' });
       setSyncChips(formatSyncStats(result?.sync));
       await loadSitemaps();
     } catch (e) {
@@ -72,13 +84,35 @@ export default function SeoTab() {
     }
   };
 
+  const refreshCards = async () => {
+    setRefreshBusy(true);
+    setRefreshChips(null);
+    setError(null);
+    try {
+      const result = await apiRequest('/admin/seo/new-parts/refresh', { method: 'POST' });
+      const refresh = result?.refresh;
+      if (refresh) {
+        setRefreshChips([
+          { key: 'updated', label: 'обновлено', value: refresh.updated },
+          { key: 'not_found', label: 'не найдено', value: refresh.not_found },
+          { key: 'errors', label: 'ошибок', value: refresh.errors },
+        ].filter((item) => item.value != null && (item.key !== 'errors' || item.value > 0)));
+      }
+      await loadSitemaps();
+    } catch (e) {
+      setError(e?.message || 'Ошибка обновления карточек');
+    } finally {
+      setRefreshBusy(false);
+    }
+  };
+
   const downloadUrls = async () => {
     setDownloadBusy(true);
     setDownloadNotice(null);
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/admin/seo/product-card-urls?limit=150`, {
+      const response = await fetch(`${API_BASE}/admin/seo/product-card-urls`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!response.ok) {
@@ -125,6 +159,9 @@ export default function SeoTab() {
     [sitemapRows],
   );
 
+  const dailyLimit = seoStats?.settings?.daily_limit || 500;
+  const sitemapExportLimit = seoStats?.settings?.sitemap_daily_url_limit || 300;
+
   if (loading && !sitemapData) {
     return <LoadingState />;
   }
@@ -164,10 +201,53 @@ export default function SeoTab() {
         </div>
 
         <p className="mt-3 text-xs text-gray-400">
-          Авто: до 200 новых URL/сутки из каталога, cron 03:00 UTC
+          Авто: до {formatNumber(dailyLimit)} новых карточек/сутки (products + orders + crosses), cron 03:00 UTC
           {origin ? ` · ${origin}` : ''}
         </p>
       </div>
+
+      {seoStats ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">SEO-карточки Rossko</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">
+              {formatNumber(seoStats.cards_total)}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              eligible: {formatNumber(seoStats.cards_eligible)} ({seoStats.cards_eligible_pct}%)
+            </p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Создано сегодня</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">
+              {formatNumber(seoStats.cards_created_today)}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">лимит {formatNumber(dailyLimit)}/сутки</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Sitemap new-parts</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">
+              {formatNumber(seoStats.sitemap?.url_count || 0)}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">URL в кэше</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Экспорт URL/день</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">
+              {formatNumber(sitemapExportLimit)}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              refresh batch: {formatNumber(seoStats.settings?.refresh_batch_size || 100)}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {seoStats?.created_by_day?.length ? (
+        <Section title="Прирост SEO-карточек" subtitle="Созданные карточки по дням (sync log)">
+          <CardsCreatedTrend activity={seoStats.created_by_day} />
+        </Section>
+      ) : null}
 
       <Section
         title="Все sitemap"
@@ -256,6 +336,7 @@ export default function SeoTab() {
         />
       </Section>
 
+      <SeoKpiDashboard />
       <LandingPagesSection />
 
       <Section title="Действия">
@@ -268,6 +349,14 @@ export default function SeoTab() {
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
             >
               {syncBusy ? 'Синхронизация…' : 'Синхронизировать из каталога'}
+            </button>
+            <button
+              type="button"
+              onClick={refreshCards}
+              disabled={refreshBusy || loading}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {refreshBusy ? 'Обновление…' : 'Обновить цены/наличие'}
             </button>
             <button
               type="button"
@@ -285,10 +374,12 @@ export default function SeoTab() {
             disabled={downloadBusy}
             className="text-sm font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
           >
-            {downloadBusy ? 'Скачивание…' : 'Скачать 150 URL (75 б/у + 75 Rossko)'}
+            {downloadBusy
+              ? 'Скачивание…'
+              : `Скачать ${formatNumber(sitemapExportLimit)} URL (${formatNumber(Math.floor(sitemapExportLimit / 2))} б/у + ${formatNumber(Math.ceil(sitemapExportLimit / 2))} Rossko)`}
           </button>
 
-          {(syncChips?.length > 0 || downloadNotice) && (
+          {(syncChips?.length > 0 || refreshChips?.length > 0 || downloadNotice) && (
             <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
               {syncChips?.length > 0 && (
                 <div className="flex flex-wrap gap-2">
@@ -302,8 +393,22 @@ export default function SeoTab() {
                   ))}
                 </div>
               )}
+              {refreshChips?.length > 0 && (
+                <div className={`flex flex-wrap gap-2${syncChips?.length ? ' mt-2' : ''}`}>
+                  {refreshChips.map((chip) => (
+                    <span
+                      key={chip.key}
+                      className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-green-800"
+                    >
+                      {chip.label}: {chip.value}
+                    </span>
+                  ))}
+                </div>
+              )}
               {downloadNotice && (
-                <p className={syncChips?.length ? 'mt-2 text-xs' : ''}>Файл: {downloadNotice}</p>
+                <p className={syncChips?.length || refreshChips?.length ? 'mt-2 text-xs' : ''}>
+                  Файл: {downloadNotice}
+                </p>
               )}
             </div>
           )}

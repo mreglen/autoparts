@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
@@ -26,6 +26,7 @@ import {
   pickBestRosskoPart,
 } from './rosskoHelpers';
 import { extractCityFromAddress } from '../../../utils/organizationCity';
+import { slugifyBrand } from '../../../utils/slugUtils';
 
 const safeText = (value, fallback = '') => {
   if (typeof value === 'string') return value.trim() || fallback;
@@ -446,6 +447,14 @@ export default function NewPartDetailPage() {
         <div className="mt-3 flex flex-wrap gap-2 text-xs sm:text-sm">
           <span className="rounded-full bg-white px-3 py-1 text-gray-700 shadow-sm">Бренд: {brand}</span>
           <span className="rounded-full bg-white px-3 py-1 text-gray-700 shadow-sm">Артикул: {article}</span>
+          {slugifyBrand(brand) ? (
+            <Link
+              to={`/autoparts/new/brand/${encodeURIComponent(slugifyBrand(brand))}`}
+              className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 font-medium text-indigo-700 shadow-sm hover:bg-indigo-100"
+            >
+              Все новые {brand}
+            </Link>
+          ) : null}
         </div>
       </section>
 

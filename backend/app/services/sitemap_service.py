@@ -8,11 +8,13 @@ from typing import Iterable
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.config import settings
 from app.models.product import Product as ProductModel
 from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.models.seo_product_url_export import SeoProductUrlExport
 from app.models.seo_new_part_url_export import SeoNewPartUrlExport
 from app.models.seo_sitemap_cache import SeoSitemapCache
+from app.models.seo_landing_page import SeoLandingPage
 from app.services.new_parts_seo_card_service import (
     build_new_part_card_path,
     count_rossko_new_part_cards_for_sitemap,
@@ -24,8 +26,17 @@ from app.utils.product_urls import build_product_page_url
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
 
 DEFAULT_PRODUCT_URLS_LIMIT = 150
+
+
+def get_seo_sitemap_daily_url_limit() -> int:
+    return max(1, int(settings.SEO_SITEMAP_DAILY_URL_LIMIT or DEFAULT_PRODUCT_URLS_LIMIT))
 PRODUCTS_SITEMAP_CACHE_KEY = "products"
 NEW_PARTS_SITEMAP_CACHE_KEY = "new_parts"
+NEW_BRANDS_SITEMAP_CACHE_KEY = "new_brands"
+NEW_CATEGORIES_SITEMAP_CACHE_KEY = "new_categories"
+USED_BRANDS_SITEMAP_CACHE_KEY = "used_brands"
+USED_CATEGORIES_SITEMAP_CACHE_KEY = "used_categories"
+USED_GEO_SITEMAP_CACHE_KEY = "used_geo"
 SITEMAP_CACHE_MAX_AGE_SECONDS = 86400
 
 logger = logging.getLogger(__name__)
@@ -54,11 +65,39 @@ def count_active_new_part_cards(db: Session) -> int:
     return count_rossko_new_part_cards_for_sitemap(db)
 
 
+def count_active_brand_new_landings(db: Session) -> int:
+    return (
+        db.query(SeoLandingPage)
+        .filter(
+            SeoLandingPage.kind == "brand_new",
+            SeoLandingPage.is_active.is_(True),
+        )
+        .count()
+    )
+
+
+def _count_active_landings(db: Session, kind: str) -> int:
+    return (
+        db.query(SeoLandingPage)
+        .filter(
+            SeoLandingPage.kind == kind,
+            SeoLandingPage.is_active.is_(True),
+        )
+        .count()
+    )
+
+
 def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None) -> list[dict[str, str | int]]:
     site_origin = _resolve_origin(db, preferred_host_url)
     product_count = count_working_catalog_products(db)
     new_parts_count = count_active_new_part_cards(db)
+    brand_landings_count = count_active_brand_new_landings(db)
+    category_landings_count = _count_active_landings(db, "category_new")
+    used_brand_count = _count_active_landings(db, "brand_used")
+    used_category_count = _count_active_landings(db, "category_used")
+    used_geo_count = _count_active_landings(db, "geo")
     static_pages_count = 10
+    index_children = 8
 
     return [
         {
@@ -67,7 +106,7 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
             "description": "Корневой файл со списком всех sitemap сайта",
             "url": f"{site_origin}/sitemap.xml",
             "type": "index",
-            "url_count": 3,
+            "url_count": index_children,
             "location": "backend",
         },
         {
@@ -95,6 +134,51 @@ def get_site_sitemap_files(db: Session, *, preferred_host_url: str | None = None
             "url": f"{site_origin}/api/feeds/sitemap-new-parts.xml",
             "type": "dynamic",
             "url_count": new_parts_count,
+            "location": "backend",
+        },
+        {
+            "id": "new-brands",
+            "title": "Посадочные брендов (new)",
+            "description": "SEO-страницы /autoparts/new/brand/{slug} из справочника seo_landing_pages",
+            "url": f"{site_origin}/api/feeds/sitemap-new-brands.xml",
+            "type": "dynamic",
+            "url_count": brand_landings_count,
+            "location": "backend",
+        },
+        {
+            "id": "new-categories",
+            "title": "Посадочные категорий (new)",
+            "description": "SEO-страницы /autoparts/new/category/{slug}",
+            "url": f"{site_origin}/api/feeds/sitemap-new-categories.xml",
+            "type": "dynamic",
+            "url_count": category_landings_count,
+            "location": "backend",
+        },
+        {
+            "id": "used-brands",
+            "title": "Посадочные брендов (used)",
+            "description": "SEO-страницы /autoparts/used/brand/{slug}",
+            "url": f"{site_origin}/api/feeds/sitemap-used-brands.xml",
+            "type": "dynamic",
+            "url_count": used_brand_count,
+            "location": "backend",
+        },
+        {
+            "id": "used-categories",
+            "title": "Посадочные категорий (used)",
+            "description": "SEO-страницы /autoparts/used/category/{slug}",
+            "url": f"{site_origin}/api/feeds/sitemap-used-categories.xml",
+            "type": "dynamic",
+            "url_count": used_category_count,
+            "location": "backend",
+        },
+        {
+            "id": "used-geo",
+            "title": "Гео-посадочные (used)",
+            "description": "SEO-страницы /autoparts/used/geo/{slug}",
+            "url": f"{site_origin}/api/feeds/sitemap-used-geo.xml",
+            "type": "dynamic",
+            "url_count": used_geo_count,
             "location": "backend",
         },
     ]
@@ -427,7 +511,7 @@ def _load_or_create_rossko_url_batch(
 def get_daily_seo_url_batch(
     db: Session,
     *,
-    limit: int = DEFAULT_PRODUCT_URLS_LIMIT,
+    limit: int | None = None,
     preferred_host_url: str | None = None,
 ) -> tuple[list[dict[str, str | int]], list[dict[str, str | int]], date, bool, bool]:
     """
@@ -435,8 +519,9 @@ def get_daily_seo_url_batch(
 
     Returns: (used_items, rossko_items, export_date, created_new_batch, pool_was_reset)
     """
+    effective_limit = limit if limit is not None else get_seo_sitemap_daily_url_limit()
     today = _export_date_today()
-    used_limit, rossko_limit = _split_seo_url_limit(limit)
+    used_limit, rossko_limit = _split_seo_url_limit(effective_limit)
 
     used_items, used_created, used_reset = _load_or_create_used_url_batch(
         db,
@@ -612,6 +697,123 @@ def build_new_parts_sitemap_xml(db: Session, *, preferred_host_url: str | None =
     return "\n".join(lines) + "\n", url_count
 
 
+def build_new_brands_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
+    site_origin = _resolve_origin(db, preferred_host_url)
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    url_count = 0
+    rows = (
+        db.query(SeoLandingPage)
+        .filter(
+            SeoLandingPage.kind == "brand_new",
+            SeoLandingPage.is_active.is_(True),
+        )
+        .order_by(SeoLandingPage.priority.desc(), SeoLandingPage.slug.asc())
+        .all()
+    )
+    for row in rows:
+        loc = f"{site_origin}/autoparts/new/brand/{row.slug}"
+        lines.append("  <url>")
+        lines.append(f"    <loc>{loc}</loc>")
+        lines.append("    <changefreq>weekly</changefreq>")
+        lines.append("    <priority>0.8</priority>")
+        lines.append("  </url>")
+        url_count += 1
+    lines.append("</urlset>")
+    return "\n".join(lines) + "\n", url_count
+
+
+def build_new_categories_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
+    site_origin = _resolve_origin(db, preferred_host_url)
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    url_count = 0
+    rows = (
+        db.query(SeoLandingPage)
+        .filter(
+            SeoLandingPage.kind == "category_new",
+            SeoLandingPage.is_active.is_(True),
+        )
+        .order_by(SeoLandingPage.priority.desc(), SeoLandingPage.slug.asc())
+        .all()
+    )
+    for row in rows:
+        loc = f"{site_origin}/autoparts/new/category/{row.slug}"
+        lines.append("  <url>")
+        lines.append(f"    <loc>{loc}</loc>")
+        lines.append("    <changefreq>weekly</changefreq>")
+        lines.append("    <priority>0.8</priority>")
+        lines.append("  </url>")
+        url_count += 1
+    lines.append("</urlset>")
+    return "\n".join(lines) + "\n", url_count
+
+
+def _build_landing_kind_sitemap_xml(
+    db: Session,
+    *,
+    kind: str,
+    path_prefix: str,
+    preferred_host_url: str | None = None,
+) -> tuple[str, int]:
+    site_origin = _resolve_origin(db, preferred_host_url)
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    url_count = 0
+    rows = (
+        db.query(SeoLandingPage)
+        .filter(
+            SeoLandingPage.kind == kind,
+            SeoLandingPage.is_active.is_(True),
+        )
+        .order_by(SeoLandingPage.priority.desc(), SeoLandingPage.slug.asc())
+        .all()
+    )
+    for row in rows:
+        loc = f"{site_origin}{path_prefix}/{row.slug}"
+        lines.append("  <url>")
+        lines.append(f"    <loc>{loc}</loc>")
+        lines.append("    <changefreq>weekly</changefreq>")
+        lines.append("    <priority>0.8</priority>")
+        lines.append("  </url>")
+        url_count += 1
+    lines.append("</urlset>")
+    return "\n".join(lines) + "\n", url_count
+
+
+def build_used_brands_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
+    return _build_landing_kind_sitemap_xml(
+        db,
+        kind="brand_used",
+        path_prefix="/autoparts/used/brand",
+        preferred_host_url=preferred_host_url,
+    )
+
+
+def build_used_categories_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
+    return _build_landing_kind_sitemap_xml(
+        db,
+        kind="category_used",
+        path_prefix="/autoparts/used/category",
+        preferred_host_url=preferred_host_url,
+    )
+
+
+def build_used_geo_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
+    return _build_landing_kind_sitemap_xml(
+        db,
+        kind="geo",
+        path_prefix="/autoparts/used/geo",
+        preferred_host_url=preferred_host_url,
+    )
+
+
 def _get_sitemap_cache_row(db: Session, cache_key: str) -> SeoSitemapCache | None:
     return (
         db.query(SeoSitemapCache)
@@ -683,14 +885,89 @@ def rebuild_new_parts_sitemap_cache(
     )
 
 
+def rebuild_new_brands_sitemap_cache(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> SitemapCacheSnapshot:
+    xml_content, url_count = build_new_brands_sitemap_xml(db, preferred_host_url=preferred_host_url)
+    return _persist_sitemap_cache(
+        db,
+        cache_key=NEW_BRANDS_SITEMAP_CACHE_KEY,
+        xml_content=xml_content,
+        url_count=url_count,
+    )
+
+
+def rebuild_new_categories_sitemap_cache(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> SitemapCacheSnapshot:
+    xml_content, url_count = build_new_categories_sitemap_xml(db, preferred_host_url=preferred_host_url)
+    return _persist_sitemap_cache(
+        db,
+        cache_key=NEW_CATEGORIES_SITEMAP_CACHE_KEY,
+        xml_content=xml_content,
+        url_count=url_count,
+    )
+
+
+def rebuild_used_brands_sitemap_cache(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> SitemapCacheSnapshot:
+    xml_content, url_count = build_used_brands_sitemap_xml(db, preferred_host_url=preferred_host_url)
+    return _persist_sitemap_cache(
+        db,
+        cache_key=USED_BRANDS_SITEMAP_CACHE_KEY,
+        xml_content=xml_content,
+        url_count=url_count,
+    )
+
+
+def rebuild_used_categories_sitemap_cache(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> SitemapCacheSnapshot:
+    xml_content, url_count = build_used_categories_sitemap_xml(db, preferred_host_url=preferred_host_url)
+    return _persist_sitemap_cache(
+        db,
+        cache_key=USED_CATEGORIES_SITEMAP_CACHE_KEY,
+        xml_content=xml_content,
+        url_count=url_count,
+    )
+
+
+def rebuild_used_geo_sitemap_cache(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> SitemapCacheSnapshot:
+    xml_content, url_count = build_used_geo_sitemap_xml(db, preferred_host_url=preferred_host_url)
+    return _persist_sitemap_cache(
+        db,
+        cache_key=USED_GEO_SITEMAP_CACHE_KEY,
+        xml_content=xml_content,
+        url_count=url_count,
+    )
+
+
 def rebuild_all_sitemaps_cache(
     db: Session,
     *,
     preferred_host_url: str | None = None,
-) -> tuple[ProductsSitemapSnapshot, NewPartsSitemapSnapshot]:
+) -> tuple[ProductsSitemapSnapshot, NewPartsSitemapSnapshot, SitemapCacheSnapshot, SitemapCacheSnapshot]:
     products = rebuild_products_sitemap_cache(db, preferred_host_url=preferred_host_url)
     new_parts = rebuild_new_parts_sitemap_cache(db, preferred_host_url=preferred_host_url)
-    return products, new_parts
+    new_brands = rebuild_new_brands_sitemap_cache(db, preferred_host_url=preferred_host_url)
+    new_categories = rebuild_new_categories_sitemap_cache(db, preferred_host_url=preferred_host_url)
+    rebuild_used_brands_sitemap_cache(db, preferred_host_url=preferred_host_url)
+    rebuild_used_categories_sitemap_cache(db, preferred_host_url=preferred_host_url)
+    rebuild_used_geo_sitemap_cache(db, preferred_host_url=preferred_host_url)
+    return products, new_parts, new_brands, new_categories
 
 
 def get_products_sitemap_cache_row(db: Session) -> SeoSitemapCache | None:
@@ -699,6 +976,26 @@ def get_products_sitemap_cache_row(db: Session) -> SeoSitemapCache | None:
 
 def get_new_parts_sitemap_cache_row(db: Session) -> SeoSitemapCache | None:
     return _get_sitemap_cache_row(db, NEW_PARTS_SITEMAP_CACHE_KEY)
+
+
+def get_new_brands_sitemap_cache_row(db: Session) -> SeoSitemapCache | None:
+    return _get_sitemap_cache_row(db, NEW_BRANDS_SITEMAP_CACHE_KEY)
+
+
+def get_new_categories_sitemap_cache_row(db: Session) -> SeoSitemapCache | None:
+    return _get_sitemap_cache_row(db, NEW_CATEGORIES_SITEMAP_CACHE_KEY)
+
+
+def get_used_brands_sitemap_cache_row(db: Session) -> SeoSitemapCache | None:
+    return _get_sitemap_cache_row(db, USED_BRANDS_SITEMAP_CACHE_KEY)
+
+
+def get_used_categories_sitemap_cache_row(db: Session) -> SeoSitemapCache | None:
+    return _get_sitemap_cache_row(db, USED_CATEGORIES_SITEMAP_CACHE_KEY)
+
+
+def get_used_geo_sitemap_cache_row(db: Session) -> SeoSitemapCache | None:
+    return _get_sitemap_cache_row(db, USED_GEO_SITEMAP_CACHE_KEY)
 
 
 def get_products_sitemap_snapshot(
@@ -723,6 +1020,61 @@ def get_new_parts_sitemap_snapshot(
     return rebuild_new_parts_sitemap_cache(db, preferred_host_url=preferred_host_url)
 
 
+def get_new_brands_sitemap_snapshot(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> SitemapCacheSnapshot:
+    row = get_new_brands_sitemap_cache_row(db)
+    if row is not None and row.xml_content:
+        return _snapshot_from_cache_row(row)
+    return rebuild_new_brands_sitemap_cache(db, preferred_host_url=preferred_host_url)
+
+
+def get_new_categories_sitemap_snapshot(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> SitemapCacheSnapshot:
+    row = get_new_categories_sitemap_cache_row(db)
+    if row is not None and row.xml_content:
+        return _snapshot_from_cache_row(row)
+    return rebuild_new_categories_sitemap_cache(db, preferred_host_url=preferred_host_url)
+
+
+def get_used_brands_sitemap_snapshot(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> SitemapCacheSnapshot:
+    row = get_used_brands_sitemap_cache_row(db)
+    if row is not None and row.xml_content:
+        return _snapshot_from_cache_row(row)
+    return rebuild_used_brands_sitemap_cache(db, preferred_host_url=preferred_host_url)
+
+
+def get_used_categories_sitemap_snapshot(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> SitemapCacheSnapshot:
+    row = get_used_categories_sitemap_cache_row(db)
+    if row is not None and row.xml_content:
+        return _snapshot_from_cache_row(row)
+    return rebuild_used_categories_sitemap_cache(db, preferred_host_url=preferred_host_url)
+
+
+def get_used_geo_sitemap_snapshot(
+    db: Session,
+    *,
+    preferred_host_url: str | None = None,
+) -> SitemapCacheSnapshot:
+    row = get_used_geo_sitemap_cache_row(db)
+    if row is not None and row.xml_content:
+        return _snapshot_from_cache_row(row)
+    return rebuild_used_geo_sitemap_cache(db, preferred_host_url=preferred_host_url)
+
+
 def _sitemap_cache_meta(row: SeoSitemapCache | None) -> dict[str, object]:
     generated_at = _as_utc_datetime(row.generated_at) if row else None
     return {
@@ -738,6 +1090,14 @@ def get_products_sitemap_cache_meta(db: Session) -> dict[str, object]:
 
 def get_new_parts_sitemap_cache_meta(db: Session) -> dict[str, object]:
     return _sitemap_cache_meta(get_new_parts_sitemap_cache_row(db))
+
+
+def get_new_brands_sitemap_cache_meta(db: Session) -> dict[str, object]:
+    return _sitemap_cache_meta(get_new_brands_sitemap_cache_row(db))
+
+
+def get_new_categories_sitemap_cache_meta(db: Session) -> dict[str, object]:
+    return _sitemap_cache_meta(get_new_categories_sitemap_cache_row(db))
 
 
 def latest_sitemap_generated_at(*values: datetime | None) -> datetime | None:
@@ -782,12 +1142,22 @@ def build_sitemap_index_xml(
     *,
     products_generated_at: datetime | None,
     new_parts_generated_at: datetime | None = None,
+    new_brands_generated_at: datetime | None = None,
+    new_categories_generated_at: datetime | None = None,
+    used_brands_generated_at: datetime | None = None,
+    used_categories_generated_at: datetime | None = None,
+    used_geo_generated_at: datetime | None = None,
     pages_lastmod: str | None = None,
 ) -> str:
     origin = site_origin.rstrip("/")
     pages_mod = (pages_lastmod or settings.SITEMAP_PAGES_LASTMOD).strip()
     products_mod = _sitemap_index_lastmod_line(products_generated_at)
     new_parts_mod = _sitemap_index_lastmod_line(new_parts_generated_at)
+    new_brands_mod = _sitemap_index_lastmod_line(new_brands_generated_at)
+    new_categories_mod = _sitemap_index_lastmod_line(new_categories_generated_at)
+    used_brands_mod = _sitemap_index_lastmod_line(used_brands_generated_at)
+    used_categories_mod = _sitemap_index_lastmod_line(used_categories_generated_at)
+    used_geo_mod = _sitemap_index_lastmod_line(used_geo_generated_at)
 
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -804,6 +1174,26 @@ def build_sitemap_index_xml(
         f"    <loc>{origin}/api/feeds/sitemap-new-parts.xml</loc>\n"
         f"{new_parts_mod}"
         "  </sitemap>\n"
+        "  <sitemap>\n"
+        f"    <loc>{origin}/api/feeds/sitemap-new-brands.xml</loc>\n"
+        f"{new_brands_mod}"
+        "  </sitemap>\n"
+        "  <sitemap>\n"
+        f"    <loc>{origin}/api/feeds/sitemap-new-categories.xml</loc>\n"
+        f"{new_categories_mod}"
+        "  </sitemap>\n"
+        "  <sitemap>\n"
+        f"    <loc>{origin}/api/feeds/sitemap-used-brands.xml</loc>\n"
+        f"{used_brands_mod}"
+        "  </sitemap>\n"
+        "  <sitemap>\n"
+        f"    <loc>{origin}/api/feeds/sitemap-used-categories.xml</loc>\n"
+        f"{used_categories_mod}"
+        "  </sitemap>\n"
+        "  <sitemap>\n"
+        f"    <loc>{origin}/api/feeds/sitemap-used-geo.xml</loc>\n"
+        f"{used_geo_mod}"
+        "  </sitemap>\n"
         "</sitemapindex>\n"
     )
 
@@ -815,3 +1205,11 @@ def generate_products_sitemap_xml(db: Session, *, preferred_host_url: str | None
 
 def generate_new_parts_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:
     return get_new_parts_sitemap_snapshot(db, preferred_host_url=preferred_host_url).xml_content
+
+
+def generate_new_brands_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:
+    return get_new_brands_sitemap_snapshot(db, preferred_host_url=preferred_host_url).xml_content
+
+
+def generate_new_categories_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> str:
+    return get_new_categories_sitemap_snapshot(db, preferred_host_url=preferred_host_url).xml_content

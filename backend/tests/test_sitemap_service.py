@@ -125,6 +125,102 @@ class SitemapIndexXmlTests(unittest.TestCase):
         self.assertIn("<lastmod>2026-05-28</lastmod>", xml)
         self.assertIn("<loc>https://svoygarage.ru/api/feeds/sitemap-new-parts.xml</loc>", xml)
         self.assertIn("<lastmod>2026-05-27</lastmod>", xml)
+        self.assertIn("<loc>https://svoygarage.ru/api/feeds/sitemap-new-brands.xml</loc>", xml)
+
+
+class NewCategoriesSitemapTests(unittest.TestCase):
+    def test_build_new_categories_sitemap_xml(self):
+        from app.models.seo_landing_page import SeoLandingPage
+        from app.services.sitemap_service import build_new_categories_sitemap_xml
+
+        db = MagicMock()
+        row = SeoLandingPage(
+            kind="category_new",
+            slug="tormoznye-kolodki",
+            title_ru="Тормозные колодки",
+            search_query="тормозные колодки",
+            is_active=True,
+            priority=1,
+        )
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [row]
+        xml, count = build_new_categories_sitemap_xml(db, preferred_host_url="https://svoygarage.ru")
+        self.assertEqual(count, 1)
+        self.assertIn("/autoparts/new/category/tormoznye-kolodki", xml)
+
+    def test_index_includes_categories_sitemap(self):
+        products_at = datetime(2026, 5, 28, 3, 0, tzinfo=timezone.utc)
+        new_parts_at = datetime(2026, 5, 27, 12, 0, tzinfo=timezone.utc)
+        new_brands_at = datetime(2026, 5, 26, 12, 0, tzinfo=timezone.utc)
+        new_categories_at = datetime(2026, 5, 25, 12, 0, tzinfo=timezone.utc)
+        with patch("app.services.sitemap_service.settings") as mock_settings:
+            mock_settings.SITEMAP_PAGES_LASTMOD = "2026-05-23"
+            xml = build_sitemap_index_xml(
+                "https://svoygarage.ru",
+                products_generated_at=products_at,
+                new_parts_generated_at=new_parts_at,
+                new_brands_generated_at=new_brands_at,
+                new_categories_generated_at=new_categories_at,
+            )
+
+        self.assertIn("<loc>https://svoygarage.ru/api/feeds/sitemap-new-categories.xml</loc>", xml)
+        self.assertIn("<lastmod>2026-05-25</lastmod>", xml)
+
+
+class UsedLandingsSitemapTests(unittest.TestCase):
+    def test_build_used_brands_sitemap_xml(self):
+        from app.models.seo_landing_page import SeoLandingPage
+        from app.services.sitemap_service import build_used_brands_sitemap_xml
+
+        db = MagicMock()
+        row = SeoLandingPage(
+            kind="brand_used",
+            slug="bosch",
+            title_ru="BOSCH",
+            brand_name="BOSCH",
+            is_active=True,
+            priority=1,
+        )
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [row]
+        xml, count = build_used_brands_sitemap_xml(db, preferred_host_url="https://svoygarage.ru")
+        self.assertEqual(count, 1)
+        self.assertIn("/autoparts/used/brand/bosch", xml)
+
+    def test_index_includes_used_sitemaps(self):
+        products_at = datetime(2026, 5, 28, 3, 0, tzinfo=timezone.utc)
+        used_at = datetime(2026, 5, 24, 12, 0, tzinfo=timezone.utc)
+        with patch("app.services.sitemap_service.settings") as mock_settings:
+            mock_settings.SITEMAP_PAGES_LASTMOD = "2026-05-23"
+            xml = build_sitemap_index_xml(
+                "https://svoygarage.ru",
+                products_generated_at=products_at,
+                used_brands_generated_at=used_at,
+                used_categories_generated_at=used_at,
+                used_geo_generated_at=used_at,
+            )
+
+        self.assertIn("<loc>https://svoygarage.ru/api/feeds/sitemap-used-brands.xml</loc>", xml)
+        self.assertIn("<loc>https://svoygarage.ru/api/feeds/sitemap-used-categories.xml</loc>", xml)
+        self.assertIn("<loc>https://svoygarage.ru/api/feeds/sitemap-used-geo.xml</loc>", xml)
+
+
+class NewBrandsSitemapTests(unittest.TestCase):
+    def test_build_new_brands_sitemap_xml(self):
+        from app.models.seo_landing_page import SeoLandingPage
+        from app.services.sitemap_service import build_new_brands_sitemap_xml
+
+        db = MagicMock()
+        row = SeoLandingPage(
+            kind="brand_new",
+            slug="bosch",
+            title_ru="BOSCH",
+            brand_name="BOSCH",
+            is_active=True,
+            priority=1,
+        )
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [row]
+        xml, count = build_new_brands_sitemap_xml(db, preferred_host_url="https://svoygarage.ru")
+        self.assertEqual(count, 1)
+        self.assertIn("/autoparts/new/brand/bosch", xml)
 
 
 class RosskoNewPartSitemapEligibilityTests(unittest.TestCase):

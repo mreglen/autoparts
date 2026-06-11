@@ -6,6 +6,7 @@ from sqlalchemy import exists, func, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.database import get_db
+from app.models.organization import Organization
 from app.models.product import Product as ProductModel, ProductPhoto
 from app.models.vehicle import Vehicle as VehicleModel
 from app.routers.search_products import search_local_products_query
@@ -59,6 +60,7 @@ def _apply_catalog_filters(
     vehicle_brand: Optional[List[str]],
     vehicle_model: Optional[List[str]],
     vehicle_id: Optional[int],
+    city: Optional[str] = None,
 ):
     if is_new is not None:
         query = query.filter(ProductModel.is_new == is_new)
@@ -78,6 +80,10 @@ def _apply_catalog_filters(
         query = query.filter(ProductModel.storage_location_id == storage_location_id)
     if organization_id is not None:
         query = query.filter(ProductModel.organization_id == organization_id)
+    city_text = (city or "").strip()
+    if len(city_text) >= 2:
+        query = query.join(Organization, ProductModel.organization_id == Organization.id)
+        query = query.filter(Organization.address.ilike(f"%{city_text}%"))
     if has_photos:
         query = query.filter(
             exists().where(ProductPhoto.product_id == ProductModel.id)
@@ -126,6 +132,7 @@ def list_catalog_products(
     vehicle_brand: Optional[List[str]] = Query(None),
     vehicle_model: Optional[List[str]] = Query(None),
     vehicle_id: Optional[int] = None,
+    city: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     if sort not in SORT_OPTIONS:
@@ -160,6 +167,7 @@ def list_catalog_products(
         vehicle_brand=vehicle_brand,
         vehicle_model=vehicle_model,
         vehicle_id=vehicle_id,
+        city=city,
     )
 
     id_subq = query.with_entities(ProductModel.id).distinct().subquery()
@@ -181,6 +189,7 @@ def get_catalog_facets(
     is_new: Optional[bool] = None,
     limit: int = Query(30, ge=1, le=100),
     vehicle_brand: Optional[str] = None,
+    city: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     brand_q = db.query(ProductModel.brand, func.count(ProductModel.id)).filter(
@@ -190,6 +199,10 @@ def get_catalog_facets(
     )
     if is_new is not None:
         brand_q = brand_q.filter(ProductModel.is_new == is_new)
+    city_text = (city or "").strip()
+    if len(city_text) >= 2:
+        brand_q = brand_q.join(Organization, ProductModel.organization_id == Organization.id)
+        brand_q = brand_q.filter(Organization.address.ilike(f"%{city_text}%"))
     brand_rows = (
         brand_q
         .group_by(ProductModel.brand)

@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     YANDEX_OAUTH_AUTHORIZE_URL: str = "https://oauth.yandex.ru/authorize"
     YANDEX_OAUTH_TOKEN_URL: str = "https://oauth.yandex.ru/token"
     YANDEX_WEBMASTER_API_BASE: str = "https://api.webmaster.yandex.net/v4"
+
+    GOOGLE_OAUTH_AUTHORIZE_URL: str = "https://accounts.google.com/o/oauth2/v2/auth"
+    GOOGLE_OAUTH_TOKEN_URL: str = "https://oauth2.googleapis.com/token"
+    GOOGLE_OAUTH_REDIRECT_URI: Optional[str] = None
+    GOOGLE_CREDENTIALS_SECRET: Optional[str] = None
     
     # Пути к FFmpeg для обработки видео
     FFPROBE_PATH: Optional[str] = r"C:\ffmpeg\bin\ffprobe.exe"
@@ -69,9 +74,13 @@ class Settings(BaseSettings):
     SITEMAP_PAGES_LASTMOD: str = "2026-05-29"
     SITEMAP_REBUILD_HOUR_UTC: int = 3
 
-    NEW_PARTS_SEO_SYNC_DAILY_LIMIT: int = 200
+    # SEO new parts: Rossko sync (создание карточек) и sitemap export
+    NEW_PARTS_SEO_SYNC_DAILY_LIMIT: int = 500
     NEW_PARTS_SEO_SYNC_NOT_FOUND_RETRY_DAYS: int = 7
-    NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC: float = 1.0
+    NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC: float = 0.5
+    SEO_SITEMAP_DAILY_URL_LIMIT: int = 300
+    NEW_PARTS_SEO_REFRESH_BATCH_SIZE: int = 100
+    NEW_PARTS_SEO_REFRESH_INTERVAL_HOURS: int = 6
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
 

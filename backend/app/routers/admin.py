@@ -50,16 +50,17 @@ from app.services.photo_localization import (
     migrate_external_product_photos,
 )
 from app.services.sitemap_service import (
-    DEFAULT_PRODUCT_URLS_LIMIT,
     generate_product_urls_text_file,
     get_daily_seo_url_batch,
     get_new_parts_sitemap_cache_meta,
     get_products_sitemap_cache_meta,
+    get_seo_sitemap_daily_url_limit,
     get_site_sitemap_files,
     rebuild_all_sitemaps_cache,
     rebuild_new_parts_sitemap_cache,
     rebuild_products_sitemap_cache,
 )
+from app.core.config import settings
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
 from app.schemas.client import ClientBuyerOrdersResponse, ClientListItemResponse
 from app.utils.event_logger import log_event
@@ -1127,9 +1128,35 @@ def rebuild_sitemaps(
     return result
 
 
+@router.get("/seo/new-parts/stats")
+def get_new_parts_seo_stats(
+    days: int = Query(14, ge=1, le=90),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    from app.services.new_parts_seo_sync_service import get_new_parts_seo_dashboard_stats
+
+    integration = get_or_create_yandex_integration(db)
+    stats = get_new_parts_seo_dashboard_stats(db, days=days)
+    new_parts_cache = get_new_parts_sitemap_cache_meta(db)
+    stats["sitemap"] = {
+        "url_count": int(new_parts_cache.get("url_count") or 0),
+        "generated_at": new_parts_cache.get("generated_at"),
+        "is_stale": bool(new_parts_cache.get("is_stale")),
+    }
+    stats["site_origin"] = (integration.host_url or "https://svoygarage.ru").rstrip("/")
+    return stats
+
+
 @router.post("/seo/new-parts/sync-from-products")
 async def sync_new_parts_seo_from_products_endpoint(
-    limit: int = Query(200, ge=1, le=500, description="Максимум новых SEO-карточек за сутки"),
+    limit: int | None = Query(
+        None,
+        ge=1,
+        le=1000,
+        description="Максимум новых SEO-карточек за сутки (по умолчанию из .env)",
+    ),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
@@ -1139,7 +1166,10 @@ async def sync_new_parts_seo_from_products_endpoint(
 
     integration = get_or_create_yandex_integration(db)
     host = integration.host_url
-    sync_stats = await sync_new_parts_seo_from_products(db, daily_limit=limit)
+    sync_stats = await sync_new_parts_seo_from_products(
+        db,
+        daily_limit=limit if limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT,
+    )
     new_parts_snapshot = rebuild_new_parts_sitemap_cache(db, preferred_host_url=host)
     return {
         "ok": True,
@@ -1151,16 +1181,35 @@ async def sync_new_parts_seo_from_products_endpoint(
     }
 
 
+@router.post("/seo/new-parts/refresh")
+async def refresh_new_parts_seo_cards_endpoint(
+    batch_size: int | None = Query(None, ge=1, le=500),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    from dataclasses import asdict
+
+    from app.services.new_parts_seo_refresh_service import refresh_new_parts_seo_cards
+
+    del current_user
+    refresh_stats = await refresh_new_parts_seo_cards(
+        db,
+        batch_size=batch_size,
+    )
+    return {"ok": True, "refresh": asdict(refresh_stats)}
+
+
 @router.get("/seo/product-card-urls")
 def download_product_card_urls(
-    limit: int = Query(DEFAULT_PRODUCT_URLS_LIMIT, ge=1, le=500),
+    limit: int = Query(None, ge=1, le=500),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
     integration = get_or_create_yandex_integration(db)
+    effective_limit = limit if limit is not None else get_seo_sitemap_daily_url_limit()
     used_items, rossko_items, export_date, _created, _pool_reset = get_daily_seo_url_batch(
         db,
-        limit=limit,
+        limit=effective_limit,
         preferred_host_url=integration.host_url,
     )
     if not used_items and not rossko_items:
@@ -1171,7 +1220,7 @@ def download_product_card_urls(
 
     content = generate_product_urls_text_file(
         db,
-        limit=limit,
+        limit=effective_limit,
         preferred_host_url=integration.host_url,
         used_items=used_items,
         rossko_items=rossko_items,
@@ -1186,3 +1235,15 @@ def download_product_card_urls(
         media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/seo/kpi/dashboard")
+def get_seo_kpi_dashboard(
+    days: int = Query(14, ge=1, le=90),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    from app.services.seo_kpi_service import build_seo_kpi_dashboard
+
+    return build_seo_kpi_dashboard(db, days=days)

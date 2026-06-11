@@ -390,7 +390,7 @@ export default function LandingPagesSection() {
         method: 'POST',
       });
       setSeedNotice(
-        `Создано: brand_new=${result.created_brand_new}, category_new=${result.created_category_new}, пропущено=${result.skipped}, всего=${result.total_rows}`,
+        `Создано: brand_new=${result.created_brand_new}, category_new=${result.created_category_new}, brand_used=${result.created_brand_used}, category_used=${result.created_category_used}, geo=${result.created_geo}, пропущено=${result.skipped}, всего=${result.total_rows}`,
       );
       await loadRows();
     } catch (e) {

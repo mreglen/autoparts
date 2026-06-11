@@ -31,7 +31,6 @@ class SpaRouteMatchingTests(unittest.TestCase):
         db = MagicMock()
         for path in (
             "/catalog/missing",
-            "/autoparts/new/extra",
             "/about/foo",
             "/settings",
             "/admin",
@@ -41,6 +40,52 @@ class SpaRouteMatchingTests(unittest.TestCase):
             "/missing-page",
         ):
             self.assertFalse(is_spa_page_available(db, path), path)
+
+    def test_unknown_brand_landing_rejected(self):
+        db = MagicMock()
+        with patch(
+            "app.services.seo_landing_page_service.resolve_brand_new_landing",
+            return_value=None,
+        ):
+            self.assertFalse(is_spa_page_available(db, "/autoparts/new/brand/missing"))
+
+    @patch("app.services.seo_landing_page_service.resolve_brand_new_landing")
+    def test_valid_brand_landing(self, mock_resolve):
+        mock_resolve.return_value = object()
+        db = MagicMock()
+        self.assertTrue(is_spa_page_available(db, "/autoparts/new/brand/bosch"))
+
+    def test_unknown_category_landing_rejected(self):
+        db = MagicMock()
+        with patch(
+            "app.services.seo_landing_page_service.resolve_category_new_landing",
+            return_value=None,
+        ):
+            self.assertFalse(is_spa_page_available(db, "/autoparts/new/category/missing"))
+
+    @patch("app.services.seo_landing_page_service.resolve_category_new_landing")
+    def test_valid_category_landing(self, mock_resolve):
+        mock_resolve.return_value = object()
+        db = MagicMock()
+        self.assertTrue(is_spa_page_available(db, "/autoparts/new/category/tormoznye-kolodki"))
+
+    @patch("app.services.seo_landing_page_service.resolve_brand_used_landing")
+    def test_valid_used_brand_landing(self, mock_resolve):
+        mock_resolve.return_value = object()
+        db = MagicMock()
+        self.assertTrue(is_spa_page_available(db, "/autoparts/used/brand/bosch"))
+
+    @patch("app.services.seo_landing_page_service.resolve_category_used_landing")
+    def test_valid_used_category_landing(self, mock_resolve):
+        mock_resolve.return_value = object()
+        db = MagicMock()
+        self.assertTrue(is_spa_page_available(db, "/autoparts/used/category/tormoznye-kolodki"))
+
+    @patch("app.services.seo_landing_page_service.resolve_geo_landing")
+    def test_valid_geo_landing(self, mock_resolve):
+        mock_resolve.return_value = object()
+        db = MagicMock()
+        self.assertTrue(is_spa_page_available(db, "/autoparts/used/geo/ekaterinburg"))
 
     @patch("app.services.spa_page_check_service._product_exists", return_value=False)
     def test_missing_product_returns_false(self, _exists):

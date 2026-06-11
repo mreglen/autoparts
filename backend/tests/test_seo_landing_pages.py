@@ -12,6 +12,10 @@ from app.services.seo_landing_page_service import (
     build_meta_description,
     build_meta_title,
     create_landing_page,
+    resolve_brand_used_landing,
+    resolve_category_new_landing,
+    resolve_category_used_landing,
+    resolve_geo_landing,
     resolve_landing_page,
     seed_landing_pages_from_catalog,
     update_landing_page,
@@ -44,10 +48,24 @@ class SeoLandingPageServiceTests(unittest.TestCase):
             conn.execute(
                 text(
                     """
+                    CREATE TABLE organizations (
+                        id VARCHAR(10) PRIMARY KEY,
+                        name VARCHAR(255),
+                        address TEXT
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
                     CREATE TABLE products (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         part_type_id INTEGER NOT NULL,
-                        quantity INTEGER DEFAULT 0
+                        quantity INTEGER DEFAULT 0,
+                        brand VARCHAR(120),
+                        is_new INTEGER NOT NULL DEFAULT 0,
+                        organization_id VARCHAR(10)
                     )
                     """
                 )
@@ -110,7 +128,15 @@ class SeoLandingPageServiceTests(unittest.TestCase):
             conn.execute(text("INSERT INTO part_types (name) VALUES ('Масляный фильтр')"))
             conn.execute(
                 text(
-                    "INSERT INTO products (part_type_id, quantity) VALUES (1, 10), (1, 5), (2, 2)"
+                    "INSERT INTO products (part_type_id, quantity, brand, is_new, organization_id) "
+                    "VALUES (1, 10, 'BOSCH', 0, 'org1'), (1, 5, 'BOSCH', 0, 'org1'), (2, 2, 'NGK', 0, 'org2')"
+                )
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO organizations (id, name, address) "
+                    "VALUES ('org1', 'Org 1', 'г. Екатеринбург, ул. Test'), "
+                    "('org2', 'Org 2', 'г. Москва, ул. Other')"
                 )
             )
 
@@ -169,6 +195,26 @@ class SeoLandingPageServiceTests(unittest.TestCase):
         self.assertIsNotNone(resolved)
         self.assertEqual(resolved.filters["search_query"], "тормозные колодки")
         self.assertEqual(resolved.filters["category_slug"], "tormoznye-kolodki")
+
+    def test_resolve_category_new_landing_with_count(self):
+        create_landing_page(
+            self.db,
+            SeoLandingPageCreate(
+                kind="category_new",
+                title_ru="Тормозные колодки",
+                search_query="тормозные колодки",
+            ),
+        )
+        resolved = resolve_category_new_landing(self.db, "tormoznye-kolodki", card_count=12)
+        self.assertIsNotNone(resolved)
+        self.assertIn("12 позиций", resolved.meta_description)
+        self.assertEqual(
+            resolved.canonical_path,
+            "/autoparts/new/category/tormoznye-kolodki",
+        )
+
+    def test_resolve_category_new_landing_missing_returns_none(self):
+        self.assertIsNone(resolve_category_new_landing(self.db, "missing"))
 
     def test_resolve_inactive_returns_none(self):
         create_landing_page(
@@ -232,6 +278,56 @@ class SeoLandingPageServiceTests(unittest.TestCase):
         self.db.commit()
         result = seed_landing_pages_from_catalog(self.db, force=True)
         self.assertGreaterEqual(result.created_brand_new, 1)
+
+
+    def test_resolve_brand_used_registry(self):
+        create_landing_page(
+            self.db,
+            SeoLandingPageCreate(kind="brand_used", title_ru="BOSCH", brand_name="BOSCH"),
+        )
+        resolved = resolve_brand_used_landing(self.db, "bosch", product_count=3)
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved.canonical_path, "/autoparts/used/brand/bosch")
+        self.assertIn("3 б/у", resolved.meta_description)
+
+    def test_resolve_brand_used_fallback_from_catalog(self):
+        self._seed_catalog_data()
+        resolved = resolve_brand_used_landing(self.db, "bosch", product_count=2)
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved.brand_name, "BOSCH")
+
+    def test_resolve_category_used_registry_only(self):
+        create_landing_page(
+            self.db,
+            SeoLandingPageCreate(
+                kind="category_used",
+                title_ru="Тормозные колодки",
+                search_query="тормозные колодки",
+            ),
+        )
+        resolved = resolve_category_used_landing(self.db, "tormoznye-kolodki", product_count=5)
+        self.assertIsNotNone(resolved)
+        self.assertIn("5 объявлений", resolved.meta_description)
+
+    def test_resolve_category_used_missing_returns_none(self):
+        self.assertIsNone(resolve_category_used_landing(self.db, "missing"))
+
+    def test_resolve_geo_landing(self):
+        create_landing_page(
+            self.db,
+            SeoLandingPageCreate(kind="geo", title_ru="Екатеринбург", city="Екатеринбург"),
+        )
+        resolved = resolve_geo_landing(self.db, "ekaterinburg", product_count=7)
+        self.assertIsNotNone(resolved)
+        self.assertEqual(resolved.canonical_path, "/autoparts/used/geo/ekaterinburg")
+        self.assertIn("Екатеринбурге", resolved.meta_title)
+
+    def test_seed_creates_used_landings(self):
+        self._seed_catalog_data()
+        result = seed_landing_pages_from_catalog(self.db, force=True)
+        self.assertGreaterEqual(result.created_brand_used, 1)
+        self.assertGreaterEqual(result.created_category_used, 1)
+        self.assertGreaterEqual(result.created_geo, 1)
 
 
 if __name__ == "__main__":

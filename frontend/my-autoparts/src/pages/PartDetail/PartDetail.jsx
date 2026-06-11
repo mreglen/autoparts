@@ -13,6 +13,7 @@ import { buildProductSeo, seoFromPartMetaResponse } from '../../utils/productSeo
 import { DEFAULT_OG_IMAGE_URL } from '../../utils/seoConstants';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
+import PartDetailSeoCrossLinks from './PartDetailSeoCrossLinks';
 
 const formatErrorText = (value) => {
   if (!value) return 'Ошибка загрузки товара';
@@ -480,6 +481,13 @@ const PartDetail = () => {
                     </div>
                   )}
                 </div>
+                <PartDetailSeoCrossLinks
+                  brand={partBrand}
+                  article={partArticle}
+                  isNew={Boolean(currentProduct.is_new)}
+                  organizationId={sellerOrg?.id}
+                  organizationName={sellerOrg?.name}
+                />
               </div>
               <div className="text-left sm:text-right">
                 <div className="text-3xl sm:text-4xl font-bold text-gray-900">

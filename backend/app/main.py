@@ -50,6 +50,8 @@ import app.models.organization_avito_integration  # noqa: F401 — avito integra
 import app.models.organization_avito_autoload_cache  # noqa: F401 — avito autoload cache
 import app.models.transmission  # noqa: F401 — transmissions, vehicle_transmissions в metadata
 import app.models.site_yandex_integration  # noqa: F401 — yandex integration
+import app.models.site_google_integration  # noqa: F401 — google search console integration
+import app.models.google_oauth_state  # noqa: F401 — google oauth state
 import app.models.yandex_feed_sync_state  # noqa: F401 — yandex feed sync state
 import app.models.yandex_oauth_state  # noqa: F401 — yandex oauth state
 import app.models.site_delivery_option  # noqa: F401 — site delivery matrix
@@ -234,6 +236,13 @@ async def startup_event():
         name="Rebuild cached products sitemap daily",
         replace_existing=True,
     )
+    scheduler.add_job(
+        func=run_refresh_new_parts_seo_cards,
+        trigger=IntervalTrigger(hours=settings.NEW_PARTS_SEO_REFRESH_INTERVAL_HOURS),
+        id="refresh_new_parts_seo_cards",
+        name="Refresh Rossko SEO card prices and stock",
+        replace_existing=True,
+    )
     
     scheduler.start()
     logger.info("Scheduler started. Expired session cleanup job scheduled.")
@@ -355,7 +364,7 @@ async def run_rebuild_products_sitemap_cache():
                 sync_stats.not_found,
                 sync_stats.errors,
             )
-            products_snapshot, new_parts_snapshot = rebuild_all_sitemaps_cache(
+            products_snapshot, new_parts_snapshot, new_brands_snapshot, new_categories_snapshot = rebuild_all_sitemaps_cache(
                 db,
                 preferred_host_url=integration.host_url,
             )
@@ -369,10 +378,41 @@ async def run_rebuild_products_sitemap_cache():
                 new_parts_snapshot.url_count,
                 new_parts_snapshot.generated_at.isoformat(),
             )
+            logger.info(
+                "New brands sitemap cache rebuilt: url_count=%s generated_at=%s",
+                new_brands_snapshot.url_count,
+                new_brands_snapshot.generated_at.isoformat(),
+            )
+            logger.info(
+                "New categories sitemap cache rebuilt: url_count=%s generated_at=%s",
+                new_categories_snapshot.url_count,
+                new_categories_snapshot.generated_at.isoformat(),
+            )
         finally:
             db.close()
     except Exception as e:
         logger.error("Ошибка при пересборке кэша sitemap: %s", e)
+
+
+async def run_refresh_new_parts_seo_cards():
+    try:
+        from app.services.new_parts_seo_refresh_service import refresh_new_parts_seo_cards
+
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            refresh_stats = await refresh_new_parts_seo_cards(db)
+            logger.info(
+                "New parts SEO refresh: candidates=%s updated=%s not_found=%s errors=%s",
+                refresh_stats.candidates,
+                refresh_stats.updated,
+                refresh_stats.not_found,
+                refresh_stats.errors,
+            )
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error("Ошибка при refresh SEO-карточек: %s", e)
 
 
 async def run_yandex_feed_scheduler_tick():

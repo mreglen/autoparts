@@ -39,6 +39,11 @@ _SPA_ROUTE_RULES: tuple[_RouteRule, ...] = (
     _RouteRule(re.compile(r"^/autoparts$")),
     _RouteRule(re.compile(r"^/autoparts/new/filters$")),
     _RouteRule(re.compile(r"^/autoparts/new$")),
+    _RouteRule(re.compile(r"^/autoparts/new/brand/(?P<slug>[^/]+)$"), "brand_new_landing"),
+    _RouteRule(re.compile(r"^/autoparts/new/category/(?P<slug>[^/]+)$"), "category_new_landing"),
+    _RouteRule(re.compile(r"^/autoparts/used/brand/(?P<slug>[^/]+)$"), "brand_used_landing"),
+    _RouteRule(re.compile(r"^/autoparts/used/category/(?P<slug>[^/]+)$"), "category_used_landing"),
+    _RouteRule(re.compile(r"^/autoparts/used/geo/(?P<slug>[^/]+)$"), "geo_landing"),
     _RouteRule(re.compile(rf"^/autoparts/new/part/(?P<card_id>{_NUM})(?:[-/][^/]*)?$"), "new_part_card"),
     _RouteRule(re.compile(r"^/autoparts/used/filters$")),
     _RouteRule(re.compile(r"^/autoparts/used$")),
@@ -167,6 +172,26 @@ def _validate_route(db: Session, rule: _RouteRule, match: re.Match[str]) -> bool
         return get_public_user_profile(db, match.group("public_code")) is not None
     if rule.validator == "new_part_card":
         return _new_part_card_exists(db, int(match.group("card_id")))
+    if rule.validator == "brand_new_landing":
+        from app.services.seo_landing_page_service import resolve_brand_new_landing
+
+        return resolve_brand_new_landing(db, match.group("slug")) is not None
+    if rule.validator == "category_new_landing":
+        from app.services.seo_landing_page_service import resolve_category_new_landing
+
+        return resolve_category_new_landing(db, match.group("slug")) is not None
+    if rule.validator == "brand_used_landing":
+        from app.services.seo_landing_page_service import resolve_brand_used_landing
+
+        return resolve_brand_used_landing(db, match.group("slug")) is not None
+    if rule.validator == "category_used_landing":
+        from app.services.seo_landing_page_service import resolve_category_used_landing
+
+        return resolve_category_used_landing(db, match.group("slug")) is not None
+    if rule.validator == "geo_landing":
+        from app.services.seo_landing_page_service import resolve_geo_landing
+
+        return resolve_geo_landing(db, match.group("slug")) is not None
 
     return False
 

@@ -8,6 +8,7 @@ import { buildPartDetailPath } from '../../utils/partRoutes';
 
 import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 import ReviewsSection from '../../components/Reviews/ReviewsSection';
+import FeaturedLandingsSection from '../../components/Seo/FeaturedLandingsSection';
 import PageAmbientBackground from '../../components/PageAmbientBackground/PageAmbientBackground';
 import { buildHomeSeo, PageSeoHelmet } from '../../utils/pageSeo';
 
@@ -324,6 +325,8 @@ function Main() {
           </div>
         </div>
       </section>
+
+      <FeaturedLandingsSection />
 
       {showSiteReviews && <ReviewsSection />}
 

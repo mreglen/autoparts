@@ -81,6 +81,18 @@ export function buildBreadcrumbsForPath(pathname, context = {}) {
     return items;
   }
 
+  if (path.startsWith('/autoparts/new/brand/')) {
+    items.push({ label: 'Новые запчасти', href: '/autoparts/new' });
+    items.push({ label: context.brandName || 'Бренд' });
+    return items;
+  }
+
+  if (path.startsWith('/autoparts/new/category/')) {
+    items.push({ label: 'Новые запчасти', href: '/autoparts/new' });
+    items.push({ label: context.categoryName || 'Категория' });
+    return items;
+  }
+
   if (path === '/autoparts/used') {
     items.push({ label: 'Б/у запчасти' });
     return items;
@@ -89,6 +101,24 @@ export function buildBreadcrumbsForPath(pathname, context = {}) {
   if (path === '/autoparts/used/filters') {
     items.push({ label: 'Б/у запчасти', href: '/autoparts/used' });
     items.push({ label: 'Фильтры' });
+    return items;
+  }
+
+  if (path.startsWith('/autoparts/used/brand/')) {
+    items.push({ label: 'Б/у запчасти', href: '/autoparts/used' });
+    items.push({ label: context.brandName || 'Бренд' });
+    return items;
+  }
+
+  if (path.startsWith('/autoparts/used/category/')) {
+    items.push({ label: 'Б/у запчасти', href: '/autoparts/used' });
+    items.push({ label: context.categoryName || 'Категория' });
+    return items;
+  }
+
+  if (path.startsWith('/autoparts/used/geo/')) {
+    items.push({ label: 'Б/у запчасти', href: '/autoparts/used' });
+    items.push({ label: context.cityName || 'Город' });
     return items;
   }
 

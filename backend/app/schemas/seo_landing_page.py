@@ -70,5 +70,8 @@ class SeoLandingResolveOut(BaseModel):
 class SeoLandingSeedResult(BaseModel):
     created_brand_new: int = 0
     created_category_new: int = 0
+    created_brand_used: int = 0
+    created_category_used: int = 0
+    created_geo: int = 0
     skipped: int = 0
     total_rows: int = 0

@@ -16,6 +16,8 @@ from app.schemas.seo_landing_page import (
     SeoLandingSeedResult,
 )
 from app.services.new_parts_seo_card_service import ROSSKO_NEW_PART_SOURCE
+from app.services.used_catalog_service import find_used_brand_name_by_slug
+from app.utils.organization_city import format_city_in_prepositional
 from app.utils.slug_utils import is_valid_slug, slugify, slugify_brand
 
 BRAND_KINDS = {"brand_new", "brand_used"}
@@ -57,16 +59,16 @@ def _build_filters(row: SeoLandingPage) -> dict[str, Any]:
 def build_meta_title(row: SeoLandingPage) -> str:
     if row.meta_title:
         return row.meta_title.strip()
-    if row.kind in BRAND_KINDS:
+    if row.kind == "brand_new":
         brand = row.brand_name or row.title_ru
         return f"Новые запчасти {brand} — каталог с доставкой | Свой Гараж"
     if row.kind == "brand_used":
         brand = row.brand_name or row.title_ru
-        return f"Б/у запчасти {brand} — каталог | Свой Гараж"
-    if row.kind in CATEGORY_KINDS:
+        return f"Б/у запчасти {brand} — каталог продавцов | Свой Гараж"
+    if row.kind == "category_new":
         return f"Новые {row.title_ru} — купить с доставкой | Свой Гараж"
     if row.kind == "category_used":
-        return f"Б/у {row.title_ru} — купить | Свой Гараж"
+        return f"Б/у {row.title_ru} — купить от продавцов | Свой Гараж"
     if row.kind == "geo":
         city = row.city or row.title_ru
         return f"Б/у автозапчасти в {city} | Свой Гараж"
@@ -76,7 +78,7 @@ def build_meta_title(row: SeoLandingPage) -> str:
 def build_meta_description(row: SeoLandingPage) -> str:
     if row.meta_description:
         return row.meta_description.strip()
-    if row.kind in BRAND_KINDS:
+    if row.kind == "brand_new":
         brand = row.brand_name or row.title_ru
         return (
             f"Купить новые автозапчасти {brand}: каталог артикулов, цены, "
@@ -85,7 +87,7 @@ def build_meta_description(row: SeoLandingPage) -> str:
     if row.kind == "brand_used":
         brand = row.brand_name or row.title_ru
         return f"Купить б/у автозапчасти {brand}: объявления продавцов, цены, доставка."
-    if row.kind in CATEGORY_KINDS:
+    if row.kind == "category_new":
         return (
             f"Каталог новых {row.title_ru.lower()}: цены, артикулы, аналоги. "
             f"Доставка по России. Свой Гараж."
@@ -282,6 +284,306 @@ def resolve_landing_page(db: Session, kind: str, slug: str) -> Optional[SeoLandi
     )
 
 
+def find_brand_name_by_slug(db: Session, slug: str) -> Optional[str]:
+    slug_text = (slug or "").strip().lower()
+    if not slug_text:
+        return None
+    rows = (
+        db.query(NewPartsSeoCard.brand)
+        .filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.source) == ROSSKO_NEW_PART_SOURCE,
+        )
+        .distinct()
+        .all()
+    )
+    for (brand,) in rows:
+        if brand and slugify_brand(brand) == slug_text:
+            return brand
+    return None
+
+
+def _build_brand_new_meta_description(brand_name: str, *, total: int | None = None) -> str:
+    if total is not None and total > 0:
+        return (
+            f"Купить новые автозапчасти {brand_name}: {total} позиций в каталоге, "
+            f"артикулы, цены, доставка по России."
+        )
+    return (
+        f"Купить новые автозапчасти {brand_name}: каталог артикулов, цены, "
+        f"доставка по России. Маркетплейс Свой Гараж."
+    )
+
+
+def resolve_brand_new_landing(
+    db: Session,
+    slug: str,
+    *,
+    card_count: int | None = None,
+) -> Optional[SeoLandingResolveOut]:
+    resolved = resolve_landing_page(db, "brand_new", slug)
+    from_registry = resolved is not None
+
+    if resolved:
+        brand_name = resolved.brand_name or resolved.title_ru
+    else:
+        brand_name = find_brand_name_by_slug(db, slug)
+        if not brand_name:
+            return None
+        resolved = SeoLandingResolveOut(
+            kind="brand_new",
+            slug=slug,
+            title_ru=brand_name,
+            search_query=None,
+            brand_name=brand_name,
+            part_type_id=None,
+            city=None,
+            meta_title=f"Новые запчасти {brand_name} — каталог с доставкой | Свой Гараж",
+            meta_description=_build_brand_new_meta_description(brand_name, total=card_count),
+            intro_html=None,
+            filters={"brand": brand_name},
+            canonical_path=f"/autoparts/new/brand/{slug}",
+        )
+
+    if card_count is not None and card_count > 0 and brand_name:
+        registry_row = None
+        if from_registry:
+            registry_row = (
+                db.query(SeoLandingPage)
+                .filter(
+                    SeoLandingPage.kind == "brand_new",
+                    SeoLandingPage.slug == slug,
+                    SeoLandingPage.is_active.is_(True),
+                )
+                .first()
+            )
+        has_custom_description = bool(
+            registry_row and (registry_row.meta_description or "").strip()
+        )
+        if not has_custom_description:
+            resolved = resolved.model_copy(
+                update={
+                    "meta_description": _build_brand_new_meta_description(
+                        brand_name,
+                        total=card_count,
+                    )
+                }
+            )
+    return resolved
+
+
+def _build_category_new_meta_description(title_ru: str, *, total: int | None = None) -> str:
+    if total is not None and total > 0:
+        return (
+            f"Каталог новых {title_ru.lower()}: {total} позиций, цены, артикулы, аналоги. "
+            f"Доставка по России."
+        )
+    return (
+        f"Каталог новых {title_ru.lower()}: цены, артикулы, аналоги. "
+        f"Доставка по России. Маркетплейс Свой Гараж."
+    )
+
+
+def resolve_category_new_landing(
+    db: Session,
+    slug: str,
+    *,
+    card_count: int | None = None,
+) -> Optional[SeoLandingResolveOut]:
+    resolved = resolve_landing_page(db, "category_new", slug)
+    if not resolved:
+        return None
+
+    title_ru = resolved.title_ru
+    if card_count is not None and card_count > 0 and title_ru:
+        registry_row = (
+            db.query(SeoLandingPage)
+            .filter(
+                SeoLandingPage.kind == "category_new",
+                SeoLandingPage.slug == slug,
+                SeoLandingPage.is_active.is_(True),
+            )
+            .first()
+        )
+        has_custom_description = bool(
+            registry_row and (registry_row.meta_description or "").strip()
+        )
+        if not has_custom_description:
+            resolved = resolved.model_copy(
+                update={
+                    "meta_description": _build_category_new_meta_description(
+                        title_ru,
+                        total=card_count,
+                    )
+                }
+            )
+    return resolved
+
+
+def _build_brand_used_meta_description(brand_name: str, *, total: int | None = None) -> str:
+    if total is not None and total > 0:
+        return (
+            f"{total} б/у автозапчастей {brand_name} от продавцов на «Свой Гараж»: "
+            f"фото, цены, чат с продавцом. Екатеринбург и доставка по России."
+        )
+    return (
+        f"Купить б/у автозапчасти {brand_name}: объявления продавцов, цены, доставка."
+    )
+
+
+def resolve_brand_used_landing(
+    db: Session,
+    slug: str,
+    *,
+    product_count: int | None = None,
+) -> Optional[SeoLandingResolveOut]:
+    resolved = resolve_landing_page(db, "brand_used", slug)
+    from_registry = resolved is not None
+
+    if resolved:
+        brand_name = resolved.brand_name or resolved.title_ru
+    else:
+        brand_name = find_used_brand_name_by_slug(db, slug)
+        if not brand_name:
+            return None
+        resolved = SeoLandingResolveOut(
+            kind="brand_used",
+            slug=slug,
+            title_ru=brand_name,
+            search_query=None,
+            brand_name=brand_name,
+            part_type_id=None,
+            city=None,
+            meta_title=f"Б/у запчасти {brand_name} — каталог продавцов | Свой Гараж",
+            meta_description=_build_brand_used_meta_description(brand_name, total=product_count),
+            intro_html=None,
+            filters={"brand": brand_name},
+            canonical_path=f"/autoparts/used/brand/{slug}",
+        )
+
+    if product_count is not None and product_count > 0 and brand_name:
+        registry_row = None
+        if from_registry:
+            registry_row = (
+                db.query(SeoLandingPage)
+                .filter(
+                    SeoLandingPage.kind == "brand_used",
+                    SeoLandingPage.slug == slug,
+                    SeoLandingPage.is_active.is_(True),
+                )
+                .first()
+            )
+        has_custom_description = bool(
+            registry_row and (registry_row.meta_description or "").strip()
+        )
+        if not has_custom_description:
+            resolved = resolved.model_copy(
+                update={
+                    "meta_description": _build_brand_used_meta_description(
+                        brand_name,
+                        total=product_count,
+                    )
+                }
+            )
+    return resolved
+
+
+def _build_category_used_meta_description(title_ru: str, *, total: int | None = None) -> str:
+    if total is not None and total > 0:
+        return (
+            f"Каталог б/у {title_ru.lower()}: {total} объявлений, цены, доставка."
+        )
+    return f"Каталог б/у {title_ru.lower()}: объявления, цены, доставка."
+
+
+def resolve_category_used_landing(
+    db: Session,
+    slug: str,
+    *,
+    product_count: int | None = None,
+) -> Optional[SeoLandingResolveOut]:
+    resolved = resolve_landing_page(db, "category_used", slug)
+    if not resolved:
+        return None
+
+    title_ru = resolved.title_ru
+    if product_count is not None and product_count > 0 and title_ru:
+        registry_row = (
+            db.query(SeoLandingPage)
+            .filter(
+                SeoLandingPage.kind == "category_used",
+                SeoLandingPage.slug == slug,
+                SeoLandingPage.is_active.is_(True),
+            )
+            .first()
+        )
+        has_custom_description = bool(
+            registry_row and (registry_row.meta_description or "").strip()
+        )
+        if not has_custom_description:
+            resolved = resolved.model_copy(
+                update={
+                    "meta_description": _build_category_used_meta_description(
+                        title_ru,
+                        total=product_count,
+                    )
+                }
+            )
+    return resolved
+
+
+def _build_geo_meta_title(city: str) -> str:
+    city_prep = format_city_in_prepositional(city)
+    return f"Б/у автозапчасти в {city_prep} — каталог | Свой Гараж"
+
+
+def _build_geo_meta_description(city: str, *, total: int | None = None) -> str:
+    city_prep = format_city_in_prepositional(city)
+    if total is not None and total > 0:
+        return (
+            f"Б/у автозапчасти в {city_prep}: {total} объявлений продавцов, цены, доставка."
+        )
+    return f"Б/у автозапчасти в {city_prep}: объявления продавцов, цены, доставка."
+
+
+def resolve_geo_landing(
+    db: Session,
+    slug: str,
+    *,
+    product_count: int | None = None,
+) -> Optional[SeoLandingResolveOut]:
+    resolved = resolve_landing_page(db, "geo", slug)
+    if not resolved:
+        return None
+
+    city = resolved.city or resolved.title_ru
+    if city:
+        registry_row = (
+            db.query(SeoLandingPage)
+            .filter(
+                SeoLandingPage.kind == "geo",
+                SeoLandingPage.slug == slug,
+                SeoLandingPage.is_active.is_(True),
+            )
+            .first()
+        )
+        has_custom_title = bool(registry_row and (registry_row.meta_title or "").strip())
+        has_custom_description = bool(
+            registry_row and (registry_row.meta_description or "").strip()
+        )
+        updates: dict[str, Any] = {}
+        if not has_custom_title:
+            updates["meta_title"] = _build_geo_meta_title(city)
+        if not has_custom_description:
+            updates["meta_description"] = _build_geo_meta_description(
+                city,
+                total=product_count,
+            )
+        if updates:
+            resolved = resolved.model_copy(update=updates)
+    return resolved
+
+
 def _top_brands_from_catalog(db: Session, limit: int = 10) -> list[tuple[str, str]]:
     rows = (
         db.query(
@@ -318,6 +620,47 @@ def _top_categories_from_catalog(db: Session, limit: int = 10) -> list[tuple[int
     return [(row.id, row.name) for row in rows if row.name]
 
 
+def _top_brands_from_used_catalog(db: Session, limit: int = 10) -> list[tuple[str, str]]:
+    rows = (
+        db.query(
+            func.lower(Product.brand).label("brand_key"),
+            func.max(Product.brand).label("display_brand"),
+            func.count(Product.id).label("product_count"),
+        )
+        .filter(
+            Product.is_new.is_(False),
+            func.coalesce(Product.quantity, 0) > 0,
+            Product.brand.isnot(None),
+            Product.brand != "",
+        )
+        .group_by(func.lower(Product.brand))
+        .order_by(func.count(Product.id).desc())
+        .limit(limit)
+        .all()
+    )
+    return [(row.display_brand, row.display_brand) for row in rows if row.display_brand]
+
+
+def _top_categories_from_used_catalog(db: Session, limit: int = 10) -> list[tuple[int, str]]:
+    rows = (
+        db.query(
+            PartType.id,
+            PartType.name,
+            func.count(Product.id).label("product_count"),
+        )
+        .join(Product, Product.part_type_id == PartType.id)
+        .filter(
+            Product.is_new.is_(False),
+            func.coalesce(Product.quantity, 0) > 0,
+        )
+        .group_by(PartType.id, PartType.name)
+        .order_by(func.count(Product.id).desc())
+        .limit(limit)
+        .all()
+    )
+    return [(row.id, row.name) for row in rows if row.name]
+
+
 def seed_landing_pages_from_catalog(db: Session, *, force: bool = False) -> SeoLandingSeedResult:
     result = SeoLandingSeedResult()
     existing_count = db.query(SeoLandingPage).count()
@@ -328,6 +671,9 @@ def seed_landing_pages_from_catalog(db: Session, *, force: bool = False) -> SeoL
 
     created_brand = 0
     created_category = 0
+    created_brand_used = 0
+    created_category_used = 0
+    created_geo = 0
     skipped = 0
 
     for display_brand, brand_name in _top_brands_from_catalog(db):
@@ -379,9 +725,82 @@ def seed_landing_pages_from_catalog(db: Session, *, force: bool = False) -> SeoL
         db.add(row)
         created_category += 1
 
+    for display_brand, brand_name in _top_brands_from_used_catalog(db):
+        slug = slugify_brand(brand_name)
+        if not slug:
+            skipped += 1
+            continue
+        exists = (
+            db.query(SeoLandingPage)
+            .filter(SeoLandingPage.kind == "brand_used", SeoLandingPage.slug == slug)
+            .first()
+        )
+        if exists:
+            skipped += 1
+            continue
+        row = SeoLandingPage(
+            kind="brand_used",
+            slug=slug,
+            title_ru=display_brand,
+            brand_name=brand_name,
+            is_active=True,
+            priority=90,
+        )
+        db.add(row)
+        created_brand_used += 1
+
+    for part_type_id, name in _top_categories_from_used_catalog(db):
+        slug = slugify(name)
+        if not slug:
+            skipped += 1
+            continue
+        exists = (
+            db.query(SeoLandingPage)
+            .filter(SeoLandingPage.kind == "category_used", SeoLandingPage.slug == slug)
+            .first()
+        )
+        if exists:
+            skipped += 1
+            continue
+        row = SeoLandingPage(
+            kind="category_used",
+            slug=slug,
+            title_ru=name,
+            search_query=name.lower(),
+            part_type_id=part_type_id,
+            is_active=True,
+            priority=45,
+        )
+        db.add(row)
+        created_category_used += 1
+
+    geo_slug = slugify("Екатеринбург")
+    if geo_slug:
+        exists = (
+            db.query(SeoLandingPage)
+            .filter(SeoLandingPage.kind == "geo", SeoLandingPage.slug == geo_slug)
+            .first()
+        )
+        if not exists:
+            row = SeoLandingPage(
+                kind="geo",
+                slug=geo_slug,
+                title_ru="Екатеринбург",
+                city="Екатеринбург",
+                is_active=True,
+                priority=40,
+            )
+            db.add(row)
+            created_geo += 1
+        else:
+            skipped += 1
+
     db.commit()
     result.created_brand_new = created_brand
     result.created_category_new = created_category
+    result.created_brand_used = created_brand_used
+    result.created_category_used = created_category_used
+    result.created_geo = created_geo
     result.skipped = skipped
     result.total_rows = db.query(SeoLandingPage).count()
     return result

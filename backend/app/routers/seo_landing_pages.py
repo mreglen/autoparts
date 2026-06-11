@@ -22,16 +22,100 @@ from app.services.seo_landing_page_service import (
     delete_landing_page,
     get_landing_page_by_id,
     list_landing_pages,
+    resolve_brand_new_landing,
+    resolve_brand_used_landing,
+    resolve_category_new_landing,
+    resolve_category_used_landing,
+    resolve_geo_landing,
     resolve_landing_page,
     seed_landing_pages_from_catalog,
     update_landing_page,
+)
+from app.services.seo_crosslinks_service import get_featured_landings, get_landing_crosslinks
+from app.services.new_parts_seo_card_service import (
+    count_new_part_cards_by_brand,
+    count_new_part_cards_by_category_slug,
+)
+from app.services.used_catalog_service import (
+    count_used_products_by_brand,
+    count_used_products_by_city,
+    count_used_products_by_part_type_id,
 )
 
 router = APIRouter(tags=["SEO landing pages"])
 
 
+@router.get("/public/seo/featured-landings")
+def get_public_featured_landings(
+    limit: int = Query(8, ge=2, le=12),
+    db: Session = Depends(get_db),
+):
+    return get_featured_landings(db, limit=limit)
+
+
+@router.get("/public/seo/landings/{kind}/{slug}/crosslinks")
+def get_public_landing_crosslinks(
+    kind: str,
+    slug: str,
+    limit: int = Query(8, ge=2, le=12),
+    db: Session = Depends(get_db),
+):
+    return get_landing_crosslinks(db, kind, slug, limit=limit)
+
+
 @router.get("/public/seo/landings/{kind}/{slug}", response_model=SeoLandingResolveOut)
 def get_public_landing_resolve(kind: str, slug: str, db: Session = Depends(get_db)):
+    if kind == "brand_new":
+        resolved = resolve_brand_new_landing(db, slug)
+        if not resolved:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Посадочная не найдена")
+        brand_name = resolved.brand_name or resolved.title_ru
+        if brand_name:
+            total = count_new_part_cards_by_brand(db, brand_name)
+            if total > 0:
+                resolved = resolve_brand_new_landing(db, slug, card_count=total)
+        return resolved
+
+    if kind == "category_new":
+        resolved = resolve_category_new_landing(db, slug)
+        if not resolved:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Посадочная не найдена")
+        total = count_new_part_cards_by_category_slug(db, slug)
+        if total > 0:
+            resolved = resolve_category_new_landing(db, slug, card_count=total)
+        return resolved
+
+    if kind == "brand_used":
+        resolved = resolve_brand_used_landing(db, slug)
+        if not resolved:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Посадочная не найдена")
+        brand_name = resolved.brand_name or resolved.title_ru
+        if brand_name:
+            total = count_used_products_by_brand(db, brand_name)
+            if total > 0:
+                resolved = resolve_brand_used_landing(db, slug, product_count=total)
+        return resolved
+
+    if kind == "category_used":
+        resolved = resolve_category_used_landing(db, slug)
+        if not resolved:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Посадочная не найдена")
+        total = count_used_products_by_part_type_id(db, resolved.part_type_id)
+        if total > 0:
+            resolved = resolve_category_used_landing(db, slug, product_count=total)
+        return resolved
+
+    if kind == "geo":
+        resolved = resolve_geo_landing(db, slug)
+        if not resolved:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Посадочная не найдена")
+        city = resolved.city or resolved.title_ru
+        if city:
+            total = count_used_products_by_city(db, city)
+            if total > 0:
+                resolved = resolve_geo_landing(db, slug, product_count=total)
+        return resolved
+
     result = resolve_landing_page(db, kind, slug)
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Посадочная не найдена")
@@ -63,7 +147,10 @@ def seed_admin_landing_pages_from_catalog(
         category="seo",
         summary=(
             f"Seed посадочных: brand_new={result.created_brand_new}, "
-            f"category_new={result.created_category_new}, skipped={result.skipped}"
+            f"category_new={result.created_category_new}, "
+            f"brand_used={result.created_brand_used}, "
+            f"category_used={result.created_category_used}, "
+            f"geo={result.created_geo}, skipped={result.skipped}"
         ),
         user=current_user,
     )
