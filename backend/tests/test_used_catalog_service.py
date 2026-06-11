@@ -62,7 +62,7 @@ class UsedCatalogServiceTests(unittest.TestCase):
         self.assertIsNone(find_used_brand_name_by_slug(self.db, "missing"))
 
     def test_count_used_products_by_brand(self):
-        self.assertEqual(count_used_products_by_brand(self.db, "BOSCH"), 2)
+        self.assertEqual(count_used_products_by_brand(self.db, "BOSCH"), 3)
 
     def test_count_used_products_by_city(self):
         self.assertEqual(count_used_products_by_city(self.db, "Екатеринбург"), 2)

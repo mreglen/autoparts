@@ -124,9 +124,7 @@ export function buildBreadcrumbsForPath(pathname, context = {}) {
 
   if (path.startsWith('/part/')) {
     const product = context.product;
-    const sectionLabel = product?.is_new ? 'Новые запчасти' : 'Б/у запчасти';
-    const sectionHref = product?.is_new ? '/autoparts/new' : '/autoparts/used';
-    items.push({ label: sectionLabel, href: sectionHref });
+    items.push({ label: 'Б/у запчасти', href: '/autoparts/used' });
 
     const brand = (product?.brand || '').trim();
     const article = (product?.article || '').trim();

@@ -628,7 +628,6 @@ def _top_brands_from_used_catalog(db: Session, limit: int = 10) -> list[tuple[st
             func.count(Product.id).label("product_count"),
         )
         .filter(
-            Product.is_new.is_(False),
             func.coalesce(Product.quantity, 0) > 0,
             Product.brand.isnot(None),
             Product.brand != "",
@@ -650,7 +649,6 @@ def _top_categories_from_used_catalog(db: Session, limit: int = 10) -> list[tupl
         )
         .join(Product, Product.part_type_id == PartType.id)
         .filter(
-            Product.is_new.is_(False),
             func.coalesce(Product.quantity, 0) > 0,
         )
         .group_by(PartType.id, PartType.name)

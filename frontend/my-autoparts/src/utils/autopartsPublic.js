@@ -70,7 +70,6 @@ export function getNewUiSort(searchParams) {
 
 export function buildUsedCatalogFilterParams(searchParams) {
   const params = {
-    is_new: false,
     page_size: CATALOG_PAGE_SIZE,
     sort: searchParams.get('sort') || 'created_at_desc',
   };

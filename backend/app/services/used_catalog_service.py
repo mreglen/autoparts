@@ -13,10 +13,7 @@ def _in_stock_filter():
 
 
 def _used_filters():
-    return (
-        Product.is_new.is_(False),
-        _in_stock_filter(),
-    )
+    return (_in_stock_filter(),)
 
 
 def _brand_used_query(db: Session, brand_name: str):

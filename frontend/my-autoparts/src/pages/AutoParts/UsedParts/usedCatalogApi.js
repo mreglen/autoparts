@@ -19,7 +19,6 @@ function buildCatalogQuery(params) {
 
 export async function fetchUsedCatalogProducts(params) {
   const query = buildCatalogQuery({
-    is_new: false,
     has_photos: true,
     sort: 'created_at_desc',
     ...params,
