@@ -53,6 +53,7 @@ from app.routers.site_analytics_public import router as site_analytics_public_ro
 from app.routers.admin_analytics import router as admin_analytics_router
 from app.routers.dadata import router as dadata_router
 from app.routers.public_new_parts_cards import router as public_new_parts_cards_router
+from app.routers.seo_landing_pages import router as seo_landing_pages_router
 
 
 
@@ -108,6 +109,7 @@ api_router.include_router(site_quick_links_router)
 api_router.include_router(site_reviews_router)
 api_router.include_router(public_pages_router)
 api_router.include_router(public_new_parts_cards_router)
+api_router.include_router(seo_landing_pages_router)
 api_router.include_router(public_pages_seo_router)
 api_router.include_router(public_product_seo_router)
 api_router.include_router(public_organizations_router)

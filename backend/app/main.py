@@ -30,6 +30,7 @@ from app.db.schema_patches import (
     ensure_yookassa_payment_tables,
     ensure_yookassa_refund_columns,
     ensure_garage_new_order_yookassa_columns,
+    ensure_seo_landing_pages_table,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import api_router
@@ -63,6 +64,7 @@ import app.models.new_parts_checkout_session  # noqa: F401 — YooKassa checkout
 import app.models.yookassa_payment  # noqa: F401 — YooKassa payments
 import app.models.new_parts_seo_card  # noqa: F401 — SEO cards for supplier new parts
 import app.models.new_parts_seo_sync_log  # noqa: F401 — SEO sync log for products→Rossko
+import app.models.seo_landing_page  # noqa: F401 — SEO landing pages registry
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings
@@ -136,9 +138,22 @@ try:
     ensure_yookassa_payment_tables()
     ensure_yookassa_refund_columns()
     ensure_garage_new_order_yookassa_columns()
+    ensure_seo_landing_pages_table()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise
+
+try:
+    from app.db.database import SessionLocal
+    from app.services.seo_landing_page_service import seed_landing_pages_from_catalog
+
+    _seed_db = SessionLocal()
+    try:
+        seed_landing_pages_from_catalog(_seed_db, force=False)
+    finally:
+        _seed_db.close()
+except Exception as e:
+    logger.warning("SEO landing pages seed skipped: %s", e)
 
 app = FastAPI(title="Автозапчасти")
 

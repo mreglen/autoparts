@@ -1244,3 +1244,60 @@ def ensure_garage_new_order_yookassa_columns() -> None:
             conn.execute(text(stmt))
     logger.info("Applied garage_new_orders YooKassa column patches: %s", statements)
 
+
+def ensure_seo_landing_pages_table() -> None:
+    """Create seo_landing_pages table for brand/category/geo SEO landings."""
+    inspector = inspect(engine)
+    if "seo_landing_pages" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE seo_landing_pages (
+            id SERIAL PRIMARY KEY,
+            kind VARCHAR(32) NOT NULL,
+            slug VARCHAR(120) NOT NULL,
+            title_ru VARCHAR(255) NOT NULL,
+            search_query VARCHAR(255),
+            brand_name VARCHAR(120),
+            part_type_id INTEGER REFERENCES part_types(id),
+            city VARCHAR(120),
+            meta_title VARCHAR(255),
+            meta_description VARCHAR(512),
+            intro_html TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            priority INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_seo_landing_pages_kind_slug UNIQUE (kind, slug)
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE seo_landing_pages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind VARCHAR(32) NOT NULL,
+            slug VARCHAR(120) NOT NULL,
+            title_ru VARCHAR(255) NOT NULL,
+            search_query VARCHAR(255),
+            brand_name VARCHAR(120),
+            part_type_id INTEGER REFERENCES part_types(id),
+            city VARCHAR(120),
+            meta_title VARCHAR(255),
+            meta_description VARCHAR(512),
+            intro_html TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT 1,
+            priority INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (kind, slug)
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_seo_landing_pages_kind ON seo_landing_pages (kind)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_seo_landing_pages_slug ON seo_landing_pages (slug)"))
+
+    logger.info("Applied seo_landing_pages table patch")
+

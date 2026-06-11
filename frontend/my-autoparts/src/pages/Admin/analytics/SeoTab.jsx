@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API_BASE, apiRequest } from '../../../utils/apiClient';
 import { formatDateTime, formatNumber, formatSyncStats } from './analyticsFormatters';
 import { DataTable, LoadingState, Section } from './AnalyticsUi';
+import LandingPagesSection from './LandingPagesSection';
 
 const SITEMAP_TYPE_LABELS = {
   index: 'Индекс',
@@ -254,6 +255,8 @@ export default function SeoTab() {
           empty="Sitemap не найдены"
         />
       </Section>
+
+      <LandingPagesSection />
 
       <Section title="Действия">
         <div className="space-y-3 px-4 py-4">
