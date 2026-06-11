@@ -72,6 +72,8 @@ from app.services.audit_service import (
     require_audit_access,
 )
 from app.utils.email import send_verification_email, send_welcome_email
+from app.schemas.server_stats import ServerStatsOut
+from app.services.server_stats_service import collect_server_stats
 import math
 import secrets
 import string
@@ -134,6 +136,14 @@ class PhotoLocalizationAdminResponse(BaseModel):
     failed: int
     skipped: int
     failures: List[PhotoLocalizationFailure]
+
+
+@router.get("/server-stats", response_model=ServerStatsOut)
+def get_server_stats(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    return collect_server_stats(db)
 
 
 @router.get("/site-settings", response_model=SiteSettingsResponse)

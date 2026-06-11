@@ -10,6 +10,7 @@ import {
   setShowSiteReviews,
   setNewPartsMarkupPercent,
 } from '../../redux/slices/PublicInfoSlice';
+import ServerStatsPanel from './ServerStatsPanel';
 
 function AdminPanelPage() {
   const dispatch = useDispatch();
@@ -265,6 +266,8 @@ function AdminPanelPage() {
           {notice}
         </div>
       )}
+
+      <ServerStatsPanel />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <label className="flex items-start gap-3 cursor-pointer select-none">
