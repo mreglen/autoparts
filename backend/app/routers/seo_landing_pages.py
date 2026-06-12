@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -41,6 +42,8 @@ from app.services.used_catalog_service import (
     count_used_products_by_city,
     count_used_products_by_part_type_id,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["SEO landing pages"])
 
@@ -140,20 +143,32 @@ def seed_admin_landing_pages_from_catalog(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
-    result = seed_landing_pages_from_catalog(db, force=force)
-    log_audit(
-        db,
-        event_type="seo_landing_pages_seeded",
-        category="seo",
-        summary=(
-            f"Seed посадочных: brand_new={result.created_brand_new}, "
-            f"category_new={result.created_category_new}, "
-            f"brand_used={result.created_brand_used}, "
-            f"category_used={result.created_category_used}, "
-            f"geo={result.created_geo}, skipped={result.skipped}"
-        ),
-        user=current_user,
-    )
+    try:
+        result = seed_landing_pages_from_catalog(db, force=force)
+    except SeoLandingPageValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("seed_landing_pages_from_catalog failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Не удалось создать посадочные из каталога",
+        ) from exc
+    try:
+        log_audit(
+            db,
+            event_type="seo_landing_pages_seeded",
+            category="seo",
+            summary=(
+                f"Seed посадочных: brand_new={result.created_brand_new}, "
+                f"category_new={result.created_category_new}, "
+                f"brand_used={result.created_brand_used}, "
+                f"category_used={result.created_category_used}, "
+                f"geo={result.created_geo}, skipped={result.skipped}"
+            ),
+            user=current_user,
+        )
+    except Exception:
+        logger.exception("Failed to audit seo landing pages seed")
     return result
 
 

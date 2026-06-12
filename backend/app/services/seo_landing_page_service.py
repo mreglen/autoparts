@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.new_parts_seo_card import NewPartsSeoCard
@@ -659,6 +660,31 @@ def _top_categories_from_used_catalog(db: Session, limit: int = 10) -> list[tupl
     return [(row.id, row.name) for row in rows if row.name]
 
 
+def _load_seen_slugs(db: Session) -> dict[str, set[str]]:
+    seen: dict[str, set[str]] = {}
+    for kind, slug in db.query(SeoLandingPage.kind, SeoLandingPage.slug).all():
+        seen.setdefault(kind, set()).add(slug)
+    return seen
+
+
+def _try_add_landing_row(
+    db: Session,
+    seen: dict[str, set[str]],
+    *,
+    kind: str,
+    slug: str,
+    row: SeoLandingPage,
+) -> bool:
+    if not slug:
+        return False
+    kind_seen = seen.setdefault(kind, set())
+    if slug in kind_seen:
+        return False
+    db.add(row)
+    kind_seen.add(slug)
+    return True
+
+
 def seed_landing_pages_from_catalog(db: Session, *, force: bool = False) -> SeoLandingSeedResult:
     result = SeoLandingSeedResult()
     existing_count = db.query(SeoLandingPage).count()
@@ -673,18 +699,11 @@ def seed_landing_pages_from_catalog(db: Session, *, force: bool = False) -> SeoL
     created_category_used = 0
     created_geo = 0
     skipped = 0
+    seen_slugs = _load_seen_slugs(db)
 
     for display_brand, brand_name in _top_brands_from_catalog(db):
         slug = slugify_brand(brand_name)
         if not slug:
-            skipped += 1
-            continue
-        exists = (
-            db.query(SeoLandingPage)
-            .filter(SeoLandingPage.kind == "brand_new", SeoLandingPage.slug == slug)
-            .first()
-        )
-        if exists:
             skipped += 1
             continue
         row = SeoLandingPage(
@@ -695,20 +714,14 @@ def seed_landing_pages_from_catalog(db: Session, *, force: bool = False) -> SeoL
             is_active=True,
             priority=100,
         )
-        db.add(row)
-        created_brand += 1
+        if _try_add_landing_row(db, seen_slugs, kind="brand_new", slug=slug, row=row):
+            created_brand += 1
+        else:
+            skipped += 1
 
     for part_type_id, name in _top_categories_from_catalog(db):
         slug = slugify(name)
         if not slug:
-            skipped += 1
-            continue
-        exists = (
-            db.query(SeoLandingPage)
-            .filter(SeoLandingPage.kind == "category_new", SeoLandingPage.slug == slug)
-            .first()
-        )
-        if exists:
             skipped += 1
             continue
         row = SeoLandingPage(
@@ -720,20 +733,14 @@ def seed_landing_pages_from_catalog(db: Session, *, force: bool = False) -> SeoL
             is_active=True,
             priority=50,
         )
-        db.add(row)
-        created_category += 1
+        if _try_add_landing_row(db, seen_slugs, kind="category_new", slug=slug, row=row):
+            created_category += 1
+        else:
+            skipped += 1
 
     for display_brand, brand_name in _top_brands_from_used_catalog(db):
         slug = slugify_brand(brand_name)
         if not slug:
-            skipped += 1
-            continue
-        exists = (
-            db.query(SeoLandingPage)
-            .filter(SeoLandingPage.kind == "brand_used", SeoLandingPage.slug == slug)
-            .first()
-        )
-        if exists:
             skipped += 1
             continue
         row = SeoLandingPage(
@@ -744,20 +751,14 @@ def seed_landing_pages_from_catalog(db: Session, *, force: bool = False) -> SeoL
             is_active=True,
             priority=90,
         )
-        db.add(row)
-        created_brand_used += 1
+        if _try_add_landing_row(db, seen_slugs, kind="brand_used", slug=slug, row=row):
+            created_brand_used += 1
+        else:
+            skipped += 1
 
     for part_type_id, name in _top_categories_from_used_catalog(db):
         slug = slugify(name)
         if not slug:
-            skipped += 1
-            continue
-        exists = (
-            db.query(SeoLandingPage)
-            .filter(SeoLandingPage.kind == "category_used", SeoLandingPage.slug == slug)
-            .first()
-        )
-        if exists:
             skipped += 1
             continue
         row = SeoLandingPage(
@@ -769,31 +770,33 @@ def seed_landing_pages_from_catalog(db: Session, *, force: bool = False) -> SeoL
             is_active=True,
             priority=45,
         )
-        db.add(row)
-        created_category_used += 1
+        if _try_add_landing_row(db, seen_slugs, kind="category_used", slug=slug, row=row):
+            created_category_used += 1
+        else:
+            skipped += 1
 
     geo_slug = slugify("Екатеринбург")
     if geo_slug:
-        exists = (
-            db.query(SeoLandingPage)
-            .filter(SeoLandingPage.kind == "geo", SeoLandingPage.slug == geo_slug)
-            .first()
+        row = SeoLandingPage(
+            kind="geo",
+            slug=geo_slug,
+            title_ru="Екатеринбург",
+            city="Екатеринбург",
+            is_active=True,
+            priority=40,
         )
-        if not exists:
-            row = SeoLandingPage(
-                kind="geo",
-                slug=geo_slug,
-                title_ru="Екатеринбург",
-                city="Екатеринбург",
-                is_active=True,
-                priority=40,
-            )
-            db.add(row)
+        if _try_add_landing_row(db, seen_slugs, kind="geo", slug=geo_slug, row=row):
             created_geo += 1
         else:
             skipped += 1
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise SeoLandingPageValidationError(
+            "Конфликт уникальности при создании посадочных (дубликат slug). Повторите попытку."
+        ) from exc
     result.created_brand_new = created_brand
     result.created_category_new = created_category
     result.created_brand_used = created_brand_used

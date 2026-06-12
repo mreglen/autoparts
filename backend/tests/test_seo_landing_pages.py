@@ -329,6 +329,43 @@ class SeoLandingPageServiceTests(unittest.TestCase):
         self.assertGreaterEqual(result.created_category_used, 1)
         self.assertGreaterEqual(result.created_geo, 1)
 
+    def test_seed_skips_duplicate_slug_brands_in_one_batch(self):
+        with self.engine.begin() as conn:
+            conn.execute(text("INSERT INTO part_types (id, name) VALUES (1, 'Фильтр')"))
+            for brand in ("AC Delco", "AC-Delco"):
+                for idx in range(4):
+                    conn.execute(
+                        text(
+                            """
+                            INSERT INTO new_parts_seo_cards (source, stable_key, brand, article, is_active)
+                            VALUES ('rossko', :key, :brand, :article, 1)
+                            """
+                        ),
+                        {"key": f"{brand}-{idx}", "brand": brand, "article": f"A{idx}"},
+                    )
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO products (part_type_id, quantity, brand, is_new)
+                    VALUES (1, 2, 'AC Delco', 0), (1, 2, 'AC-Delco', 0)
+                    """
+                )
+            )
+        result = seed_landing_pages_from_catalog(self.db, force=True)
+        brand_new = (
+            self.db.query(SeoLandingPage)
+            .filter(SeoLandingPage.kind == "brand_new")
+            .all()
+        )
+        brand_used = (
+            self.db.query(SeoLandingPage)
+            .filter(SeoLandingPage.kind == "brand_used")
+            .all()
+        )
+        self.assertEqual(len(brand_new), 1)
+        self.assertEqual(len(brand_used), 1)
+        self.assertGreaterEqual(result.skipped, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

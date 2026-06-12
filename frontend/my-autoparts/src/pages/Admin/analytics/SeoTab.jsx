@@ -9,12 +9,116 @@ const SOURCE_LABELS = {
   tecdoc: 'TecDoc',
   product: 'Каталог б/у',
   order: 'Заказы',
+  orders: 'Заказы',
+  products: 'Каталог б/у',
   semantic: 'Семантика',
   landing: 'Посадочные',
   card_cross: 'Кроссы',
   cross: 'Кроссы Rossko',
   sibling: 'Аналоги',
+  unknown: 'Прочее',
 };
+
+function aggregateSeedQueue(quota) {
+  const bySource = quota?.seed_conversion_by_source ?? {};
+  const totals = { pending: 0, ready: 0, not_found: 0, created: 0 };
+  for (const counts of Object.values(bySource)) {
+    totals.pending += Number(counts.pending ?? 0);
+    totals.ready += Number(counts.ready ?? 0);
+    totals.not_found += Number(counts.not_found ?? 0);
+    totals.created += Number(counts.created ?? 0);
+  }
+  if (!Object.keys(bySource).length && quota) {
+    totals.pending = Number(quota.seed_pending ?? 0);
+    totals.ready = Number(quota.seed_ready ?? 0);
+  }
+  totals.total = totals.pending + totals.ready + totals.not_found + totals.created;
+  return { totals, bySource };
+}
+
+function formatQueueDelta(before, after, field) {
+  const prev = Number(before?.[field] ?? 0);
+  const next = Number(after?.[field] ?? 0);
+  const delta = next - prev;
+  if (delta === 0) return `${formatNumber(next)}`;
+  const sign = delta > 0 ? '+' : '';
+  return `${formatNumber(prev)} → ${formatNumber(next)} (${sign}${formatNumber(delta)})`;
+}
+
+function SeedQueuePanel({ quota }) {
+  const { totals, bySource } = aggregateSeedQueue(quota);
+  const rows = Object.entries(bySource).sort(([, a], [, b]) => {
+    const score = (c) => Number(c.pending ?? 0) + Number(c.ready ?? 0);
+    return score(b) - score(a);
+  });
+
+  return (
+    <div className="rounded border border-gray-200 bg-white p-4">
+      <h2 className="text-base font-semibold text-gray-900">Очередь проверки Rossko</h2>
+      <p className="mt-1 text-sm text-gray-600">
+        Кандидаты перед созданием карточек: сначала «Наполнить», затем «Проверить».
+      </p>
+
+      <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div>
+          <dt className="text-sm text-gray-500">Ожидают проверки</dt>
+          <dd className="text-xl font-semibold tabular-nums text-amber-800">{formatNumber(totals.pending)}</dd>
+        </div>
+        <div>
+          <dt className="text-sm text-gray-500">В наличии (готовы)</dt>
+          <dd className="text-xl font-semibold tabular-nums text-green-800">{formatNumber(totals.ready)}</dd>
+        </div>
+        <div>
+          <dt className="text-sm text-gray-500">Не найдено</dt>
+          <dd className="text-xl font-semibold tabular-nums">{formatNumber(totals.not_found)}</dd>
+        </div>
+        <div>
+          <dt className="text-sm text-gray-500">Уже созданы</dt>
+          <dd className="text-xl font-semibold tabular-nums">{formatNumber(totals.created)}</dd>
+        </div>
+        <div>
+          <dt className="text-sm text-gray-500">Всего в очереди</dt>
+          <dd className="text-xl font-semibold tabular-nums">{formatNumber(totals.total)}</dd>
+        </div>
+      </dl>
+
+      {quota?.precheck_limit ? (
+        <p className="mt-2 text-sm text-gray-500">
+          Проверок Rossko сегодня: {formatNumber(quota.precheck_used ?? 0)} / {formatNumber(quota.precheck_limit)}
+        </p>
+      ) : null}
+
+      {rows.length ? (
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b text-left text-gray-500">
+                <th className="py-2 pr-4 font-medium">Источник</th>
+                <th className="py-2 pr-4 font-medium">Ожидают</th>
+                <th className="py-2 pr-4 font-medium">Готовы</th>
+                <th className="py-2 pr-4 font-medium">Нет в Rossko</th>
+                <th className="py-2 font-medium">Созданы</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(([source, counts]) => (
+                <tr key={source} className="border-b border-gray-100">
+                  <td className="py-2 pr-4">{SOURCE_LABELS[source] || source}</td>
+                  <td className="py-2 pr-4 tabular-nums">{formatNumber(counts.pending ?? 0)}</td>
+                  <td className="py-2 pr-4 tabular-nums">{formatNumber(counts.ready ?? 0)}</td>
+                  <td className="py-2 pr-4 tabular-nums">{formatNumber(counts.not_found ?? 0)}</td>
+                  <td className="py-2 tabular-nums">{formatNumber(counts.created ?? 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-gray-500">Очередь пуста — нажмите «Наполнить».</p>
+      )}
+    </div>
+  );
+}
 
 function ActionButton({ children, onClick, disabled, primary }) {
   return (
@@ -51,8 +155,10 @@ export default function SeoTab() {
       ]);
       setSitemapData(sitemaps);
       setSeoStats(stats);
+      return { sitemaps, stats };
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить данные');
+      return null;
     } finally {
       setLoading(false);
     }
@@ -66,10 +172,13 @@ export default function SeoTab() {
     setBusy(key);
     setError(null);
     setLastResult(null);
+    const queueBefore =
+      key === 'populate' || key === 'precheck' ? aggregateSeedQueue(seoStats?.quota) : null;
     try {
       const result = await fn();
-      setLastResult({ key, result });
-      await load();
+      const loaded = await load();
+      const queueAfter = aggregateSeedQueue(loaded?.stats?.quota);
+      setLastResult({ key, result, queueBefore, queueAfter });
     } catch (e) {
       setError(e?.message || 'Ошибка операции');
     } finally {
@@ -148,13 +257,15 @@ export default function SeoTab() {
 
         {seedLow ? (
           <p className="mt-3 text-sm text-amber-800">
-            В очереди мало проверенных позиций ({formatNumber(seedReady)}). Сначала наполните очередь и запустите проверку Rossko.
+            Мало готовых позиций в очереди ({formatNumber(seedReady)}). Сначала наполните и проверьте очередь.
           </p>
         ) : null}
         {sitemapStale ? (
           <p className="mt-2 text-sm text-amber-800">Кэш sitemap устарел — пересоберите вручную или дождитесь ночной пересборки.</p>
         ) : null}
       </div>
+
+      <SeedQueuePanel quota={seoStats?.quota} />
 
       {/* Действия */}
       <div className="rounded border border-gray-200 bg-white p-4">
@@ -246,28 +357,65 @@ export default function SeoTab() {
         </div>
 
         {lastResult ? (
-          <p className="mt-3 text-sm text-gray-600">
+          <div className="mt-3 space-y-1 text-sm text-gray-600">
             {(() => {
-              const { key, result } = lastResult;
+              const { key, result, queueBefore, queueAfter } = lastResult;
               if (key === 'sync' && result?.sync) {
-                return formatSyncStats(result.sync)
-                  .map((c) => `${c.label}: ${c.value}`)
-                  .join(', ');
+                return (
+                  <p>
+                    {formatSyncStats(result.sync)
+                      .map((c) => `${c.label}: ${c.value}`)
+                      .join(', ')}
+                  </p>
+                );
               }
               if (key === 'populate' && result) {
-                return `Добавлено в очередь: ${formatNumber(result.total ?? 0)}`;
+                const parts = [
+                  `Добавлено новых: ${formatNumber(result.total ?? 0)}`,
+                  result.orders ? `заказы ${result.orders}` : null,
+                  result.products ? `каталог ${result.products}` : null,
+                  result.tecdoc ? `TecDoc ${result.tecdoc}` : null,
+                  result.semantic ? `семантика ${result.semantic}` : null,
+                  result.landing ? `посадочные ${result.landing}` : null,
+                  result.card_cross ? `кроссы ${result.card_cross}` : null,
+                ].filter(Boolean);
+                return (
+                  <>
+                    <p>{parts.join(' · ')}</p>
+                    {queueBefore && queueAfter ? (
+                      <p>
+                        Очередь — ожидают: {formatQueueDelta(queueBefore.totals, queueAfter.totals, 'pending')},
+                        готовы: {formatQueueDelta(queueBefore.totals, queueAfter.totals, 'ready')},
+                        всего: {formatQueueDelta(queueBefore.totals, queueAfter.totals, 'total')}
+                      </p>
+                    ) : null}
+                  </>
+                );
               }
               if (key === 'precheck' && result) {
-                return `Проверено: ${result.checked ?? 0}, в наличии: ${result.ready ?? 0}, нет: ${result.not_found ?? 0}`;
+                return (
+                  <>
+                    <p>
+                      Проверено: {result.checked ?? 0}, в наличии: {result.ready ?? 0}, нет:{' '}
+                      {result.not_found ?? 0}
+                    </p>
+                    {queueBefore && queueAfter ? (
+                      <p>
+                        Очередь — ожидают: {formatQueueDelta(queueBefore.totals, queueAfter.totals, 'pending')},
+                        готовы: {formatQueueDelta(queueBefore.totals, queueAfter.totals, 'ready')}
+                      </p>
+                    ) : null}
+                  </>
+                );
               }
               if (key === 'refresh' && result?.refresh) {
-                return `Обновлено: ${result.refresh.updated ?? 0}`;
+                return <p>Обновлено: {result.refresh.updated ?? 0}</p>;
               }
-              if (key === 'sitemap') return 'Sitemap пересобран';
-              if (key === 'download' && result?.filename) return `Скачан файл ${result.filename}`;
+              if (key === 'sitemap') return <p>Sitemap пересобран</p>;
+              if (key === 'download' && result?.filename) return <p>Скачан файл {result.filename}</p>;
               return null;
             })()}
-          </p>
+          </div>
         ) : null}
       </div>
 
