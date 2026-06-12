@@ -5,11 +5,11 @@ import { DataTable, Section } from './AnalyticsUi';
 
 const KIND_OPTIONS = [
   { value: '', label: 'Все' },
-  { value: 'brand_new', label: 'Бренд (new)' },
-  { value: 'category_new', label: 'Категория (new)' },
-  { value: 'brand_used', label: 'Бренд (б/у)' },
-  { value: 'category_used', label: 'Категория (б/у)' },
-  { value: 'geo', label: 'Город (geo)' },
+  { value: 'brand_new', label: 'Бренд · новые' },
+  { value: 'category_new', label: 'Категория · новые' },
+  { value: 'brand_used', label: 'Бренд · б/у' },
+  { value: 'category_used', label: 'Категория · б/у' },
+  { value: 'geo', label: 'Город' },
 ];
 
 const KIND_LABELS = Object.fromEntries(
@@ -382,19 +382,31 @@ export default function LandingPagesSection() {
   };
 
   const seedFromCatalog = async () => {
+    const force = rows.length > 0
+      ? window.confirm('Добавить недостающие посадочные из каталога? Существующие не трогаем.')
+      : false;
+    const url = force
+      ? '/admin/seo/landing-pages/seed-from-catalog?force=true'
+      : '/admin/seo/landing-pages/seed-from-catalog';
     setSeedBusy(true);
     setSeedNotice(null);
     setError(null);
     try {
-      const result = await apiRequest('/admin/seo/landing-pages/seed-from-catalog?force=true', {
-        method: 'POST',
-      });
+      const result = await apiRequest(url, { method: 'POST' });
+      const added =
+        (result.created_brand_new || 0) +
+        (result.created_category_new || 0) +
+        (result.created_brand_used || 0) +
+        (result.created_category_used || 0) +
+        (result.created_geo || 0);
       setSeedNotice(
-        `Создано: brand_new=${result.created_brand_new}, category_new=${result.created_category_new}, brand_used=${result.created_brand_used}, category_used=${result.created_category_used}, geo=${result.created_geo}, пропущено=${result.skipped}, всего=${result.total_rows}`,
+        added > 0
+          ? `Добавлено ${added} посадочных (всего в справочнике: ${result.total_rows ?? rows.length})`
+          : `Новых посадочных нет — всего ${result.total_rows ?? rows.length}`,
       );
       await loadRows();
     } catch (e) {
-      setError(e?.message || 'Ошибка генерации из каталога');
+      setError(e?.message || 'Не удалось сгенерировать из каталога');
     } finally {
       setSeedBusy(false);
     }
@@ -404,24 +416,30 @@ export default function LandingPagesSection() {
 
   return (
     <>
+      {error && (
+        <div className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {error}
+        </div>
+      )}
+
       <Section
         title="Посадочные страницы"
-        subtitle="Справочник slug для brand/category/geo — meta, фильтры, sitemap (этапы 3–6)"
+        subtitle="Страницы брендов, категорий и городов для поисковиков"
         action={
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={seedFromCatalog}
               disabled={seedBusy || saving}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-40"
             >
-              {seedBusy ? 'Генерация…' : 'Сгенерировать из каталога'}
+              {seedBusy ? '…' : 'Из каталога'}
             </button>
             <button
               type="button"
               onClick={openCreate}
               disabled={saving}
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              className="rounded border border-gray-900 bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800 disabled:opacity-40"
             >
               Добавить
             </button>
@@ -435,10 +453,10 @@ export default function LandingPagesSection() {
                 key={option.value || 'all'}
                 type="button"
                 onClick={() => setKindFilter(option.value)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                className={`rounded px-3 py-1.5 text-sm transition ${
                   kindFilter === option.value
-                    ? 'bg-indigo-100 text-indigo-800'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {option.label}
@@ -536,12 +554,6 @@ export default function LandingPagesSection() {
           />
         )}
       </Section>
-
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
 
       <LandingPageModal
         open={modalOpen}

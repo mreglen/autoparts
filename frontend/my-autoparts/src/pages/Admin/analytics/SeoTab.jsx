@@ -1,65 +1,47 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API_BASE, apiRequest } from '../../../utils/apiClient';
-import { formatDateTime, formatNumber, formatSyncStats } from './analyticsFormatters';
-import { DataTable, LoadingState, Section } from './AnalyticsUi';
+import { formatNumber, formatSyncStats } from './analyticsFormatters';
+import { LoadingState } from './AnalyticsUi';
 import CardsCreatedTrend from './CardsCreatedTrend';
 import LandingPagesSection from './LandingPagesSection';
-import SeoKpiDashboard from './SeoKpiDashboard';
 
-const SITEMAP_TYPE_LABELS = {
-  index: 'Индекс',
-  static: 'Статический',
-  dynamic: 'Динамический',
-};
-
-const SEO_SOURCE_LABELS = {
+const SOURCE_LABELS = {
   tecdoc: 'TecDoc',
   product: 'Каталог б/у',
   order: 'Заказы',
   semantic: 'Семантика',
   landing: 'Посадочные',
-  card_cross: 'Кроссы карточек',
+  card_cross: 'Кроссы',
   cross: 'Кроссы Rossko',
-  sibling: 'Аналоги Rossko',
-  unknown: 'Прочее',
+  sibling: 'Аналоги',
 };
 
-const SEO_SOURCE_DISPLAY_ORDER = [
-  'tecdoc',
-  'product',
-  'order',
-  'semantic',
-  'landing',
-  'card_cross',
-  'cross',
-  'sibling',
-  'unknown',
-];
-
-function cacheForItem(item, productsCache, newPartsCache) {
-  if (item?.id === 'products') return productsCache;
-  if (item?.id === 'new-parts') return newPartsCache;
-  return null;
+function ActionButton({ children, onClick, disabled, primary }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={
+        primary
+          ? 'rounded border border-gray-900 bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-800 disabled:opacity-40'
+          : 'rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-40'
+      }
+    >
+      {children}
+    </button>
+  );
 }
 
 export default function SeoTab() {
   const [loading, setLoading] = useState(true);
-  const [rebuildBusy, setRebuildBusy] = useState(false);
-  const [syncBusy, setSyncBusy] = useState(false);
-  const [refreshBusy, setRefreshBusy] = useState(false);
-  const [downloadBusy, setDownloadBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [syncChips, setSyncChips] = useState(null);
-  const [refreshChips, setRefreshChips] = useState(null);
-  const [downloadNotice, setDownloadNotice] = useState(null);
-  const [sitemapData, setSitemapData] = useState(null);
   const [seoStats, setSeoStats] = useState(null);
-  const [populateBusy, setPopulateBusy] = useState(false);
-  const [populateStats, setPopulateStats] = useState(null);
-  const [precheckBusy, setPrecheckBusy] = useState(false);
-  const [precheckStats, setPrecheckStats] = useState(null);
+  const [sitemapData, setSitemapData] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const [lastResult, setLastResult] = useState(null);
 
-  const loadSitemaps = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -70,595 +52,235 @@ export default function SeoTab() {
       setSitemapData(sitemaps);
       setSeoStats(stats);
     } catch (e) {
-      setError(e?.message || 'Ошибка загрузки');
+      setError(e?.message || 'Не удалось загрузить данные');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadSitemaps();
-  }, [loadSitemaps]);
+    load();
+  }, [load]);
 
-  const rebuildSitemap = async () => {
-    setRebuildBusy(true);
+  const run = async (key, fn) => {
+    setBusy(key);
     setError(null);
+    setLastResult(null);
     try {
-      await apiRequest('/admin/seo/sitemaps/rebuild?scope=new_parts', { method: 'POST' });
-      await loadSitemaps();
+      const result = await fn();
+      setLastResult({ key, result });
+      await load();
     } catch (e) {
-      setError(e?.message || 'Ошибка пересборки sitemap');
+      setError(e?.message || 'Ошибка операции');
     } finally {
-      setRebuildBusy(false);
+      setBusy(null);
     }
   };
-
-  const syncFromCatalog = async () => {
-    setSyncBusy(true);
-    setSyncChips(null);
-    setError(null);
-    try {
-      const dailyLimit = seoStats?.settings?.daily_limit;
-      const url = dailyLimit
-        ? `/admin/seo/new-parts/sync-from-products?limit=${dailyLimit}`
-        : '/admin/seo/new-parts/sync-from-products';
-      const result = await apiRequest(url, { method: 'POST' });
-      setSyncChips(formatSyncStats(result?.sync));
-      await loadSitemaps();
-    } catch (e) {
-      setError(e?.message || 'Ошибка синхронизации');
-    } finally {
-      setSyncBusy(false);
-    }
-  };
-
-  const refreshCards = async () => {
-    setRefreshBusy(true);
-    setRefreshChips(null);
-    setError(null);
-    try {
-      const result = await apiRequest('/admin/seo/new-parts/refresh', { method: 'POST' });
-      const refresh = result?.refresh;
-      if (refresh) {
-        setRefreshChips([
-          { key: 'updated', label: 'обновлено', value: refresh.updated },
-          { key: 'not_found', label: 'не найдено', value: refresh.not_found },
-          { key: 'errors', label: 'ошибок', value: refresh.errors },
-        ].filter((item) => item.value != null && (item.key !== 'errors' || item.value > 0)));
-      }
-      await loadSitemaps();
-    } catch (e) {
-      setError(e?.message || 'Ошибка обновления карточек');
-    } finally {
-      setRefreshBusy(false);
-    }
-  };
-
-  const populateSeedQueue = async () => {
-    setPopulateBusy(true);
-    setPopulateStats(null);
-    setError(null);
-    try {
-      const result = await apiRequest('/admin/seo/seed-queue/populate', { method: 'POST' });
-      setPopulateStats(result);
-      await loadSitemaps();
-    } catch (e) {
-      setError(e?.message || 'Ошибка populate seed queue');
-    } finally {
-      setPopulateBusy(false);
-    }
-  };
-
-  const runSeedPrecheck = async () => {
-    setPrecheckBusy(true);
-    setPrecheckStats(null);
-    setError(null);
-    try {
-      const result = await apiRequest('/admin/seo/seed-queue/precheck', { method: 'POST' });
-      setPrecheckStats(result);
-      await loadSitemaps();
-    } catch (e) {
-      setError(e?.message || 'Ошибка precheck seed queue');
-    } finally {
-      setPrecheckBusy(false);
-    }
-  };
-
-  const downloadUrls = async () => {
-    setDownloadBusy(true);
-    setDownloadNotice(null);
-    setError(null);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/admin/seo/product-card-urls`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || 'Ошибка скачивания');
-      }
-      const blob = await response.blob();
-      const match = (response.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
-      const filename = match?.[1] || 'urls.txt';
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.click();
-      window.URL.revokeObjectURL(url);
-      setDownloadNotice(filename);
-    } catch (e) {
-      setError(e?.message || 'Ошибка скачивания');
-    } finally {
-      setDownloadBusy(false);
-    }
-  };
-
-  const origin = sitemapData?.site_origin || '';
-  const newParts = sitemapData?.new_parts_cache;
-  const products = sitemapData?.products_cache;
-
-  const sitemapItems = useMemo(() => {
-    const items = Array.isArray(sitemapData?.items) ? sitemapData.items : [];
-    return items.filter((item) => item?.type !== 'admin');
-  }, [sitemapData?.items]);
-
-  const sitemapRows = useMemo(
-    () =>
-      sitemapItems.map((item) => ({
-        ...item,
-        cache: cacheForItem(item, products, newParts),
-      })),
-    [sitemapItems, products, newParts],
-  );
-
-  const totalUrls = useMemo(() => {
-    if (sitemapData?.total_pages != null) {
-      return Number(sitemapData.total_pages) || 0;
-    }
-    return sitemapRows.reduce(
-      (sum, row) => sum + (row.type === 'index' || row.type === 'admin' ? 0 : Number(row.url_count || 0)),
-      0,
-    );
-  }, [sitemapData?.total_pages, sitemapRows]);
 
   const dailyLimit = seoStats?.settings?.daily_limit || 1000;
-  const batchSize = seoStats?.settings?.batch_size || 0;
-  const batchInterval = seoStats?.settings?.batch_interval_minutes || 30;
   const createdToday = seoStats?.cards_created_today ?? 0;
-  const sitemapExportLimit = seoStats?.settings?.sitemap_daily_url_limit || 500;
-  const useCelery = Boolean(seoStats?.settings?.use_celery);
+  const remaining = Math.max(0, dailyLimit - createdToday);
   const quota = seoStats?.quota;
-  const expectedByNow = quota?.expected_by_now ?? 0;
-  const pendingQueue = quota?.pending_candidates ?? 0;
   const seedReady = quota?.seed_ready ?? 0;
-  const seedDeficit = quota?.deficit ?? Math.max(0, dailyLimit - createdToday);
-  const poolDaysEstimate = quota?.pool_days_estimate ?? 0;
-  const seedReadyTarget = quota?.seed_ready_target ?? 1500;
-  const seedBySource = quota?.seed_by_source ?? {};
-  const seedConversionBySource = quota?.seed_conversion_by_source ?? {};
-  const tecdocConversion = seedConversionBySource.tecdoc;
+  const seedLow = seedReady < (quota?.deficit ?? remaining);
   const createdBySource = quota?.cards_created_today_by_source ?? {};
-  const createdBySourceEntries = useMemo(() => {
-    const keys = new Set([
-      ...SEO_SOURCE_DISPLAY_ORDER,
-      ...Object.keys(createdBySource),
-    ]);
-    return [...keys]
-      .map((source) => ({
-        source,
-        count: Number(createdBySource[source] || 0),
-        label: SEO_SOURCE_LABELS[source] || source,
-      }))
-      .filter((item) => item.count > 0)
-      .sort(
-        (a, b) =>
-          SEO_SOURCE_DISPLAY_ORDER.indexOf(a.source) - SEO_SOURCE_DISPLAY_ORDER.indexOf(b.source),
-      );
-  }, [createdBySource]);
-  const seedLow = seedReady < seedDeficit;
-  const recurseUsed = quota?.cross_recurse_used ?? 0;
-  const recurseLimit = quota?.cross_recurse_limit ?? 0;
-  const behindQuota = Boolean(quota?.behind_quota);
-  const guaranteedCeiling = quota?.guaranteed_ceiling ?? createdToday;
-  const dailyProgressPct =
-    dailyLimit > 0 ? Math.min(100, Math.round((createdToday / dailyLimit) * 100)) : 0;
+  const sourceLine = useMemo(
+    () =>
+      Object.entries(createdBySource)
+        .filter(([, n]) => Number(n) > 0)
+        .map(([k, n]) => `${SOURCE_LABELS[k] || k}: ${n}`)
+        .join(', '),
+    [createdBySource],
+  );
 
-  if (loading && !sitemapData) {
-    return <LoadingState />;
+  const totalUrls = sitemapData?.total_pages ?? 0;
+  const sitemapStale = sitemapData?.new_parts_cache?.is_stale;
+
+  if (loading && !seoStats) {
+    return <LoadingState label="Загрузка SEO…" />;
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </div>
       )}
 
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      {/* Сводка */}
+      <div className="rounded border border-gray-200 bg-white p-4">
+        <h2 className="text-base font-semibold text-gray-900">Новые запчасти (Rossko)</h2>
+        <dl className="mt-3 grid gap-3 sm:grid-cols-3">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-              Страниц на сайте
-            </p>
-            <p className="mt-1 text-4xl font-bold tabular-nums text-gray-900">
-              {formatNumber(totalUrls)}
-            </p>
-            <p className="mt-1 text-sm text-gray-500">
-              индексируемых URL в sitemap · {formatNumber(sitemapRows.length)} файлов sitemap
-            </p>
+            <dt className="text-sm text-gray-500">Карточек всего</dt>
+            <dd className="text-2xl font-semibold tabular-nums">{formatNumber(seoStats?.cards_total ?? 0)}</dd>
           </div>
-          {newParts && (
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                newParts.is_stale
-                  ? 'bg-amber-100 text-amber-800'
-                  : 'bg-green-100 text-green-800'
-              }`}
-            >
-              {newParts.is_stale ? 'Rossko: устарел (>24 ч)' : 'Rossko: актуален'}
-            </span>
-          )}
-        </div>
-
-        <p className="mt-3 text-xs text-gray-400">
-          Micro-batch: ~{formatNumber(batchSize)} карточек каждые {batchInterval} мин
-          {useCelery ? ' (Celery worker)' : ' (APScheduler)'}
-          · лимит {formatNumber(dailyLimit)}/сутки · sitemap rebuild 03:00 UTC
-          {origin ? ` · ${origin}` : ''}
-        </p>
-      </div>
-
-      {seoStats ? (
-        <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 shadow-sm">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-indigo-700">
-                Rossko: создано сегодня
-              </p>
-              <p className="mt-1 text-2xl font-bold tabular-nums text-indigo-950">
-                {formatNumber(createdToday)}
-                <span className="text-base font-semibold text-indigo-600">
-                  {' '}
-                  / {formatNumber(dailyLimit)}
-                </span>
-              </p>
-            </div>
-            <p className="text-sm text-indigo-800">
-              Следующий тик через ~{batchInterval} мин · порция ~{formatNumber(batchSize)}
-            </p>
+          <div>
+            <dt className="text-sm text-gray-500">Создано сегодня</dt>
+            <dd className="text-2xl font-semibold tabular-nums">
+              {formatNumber(createdToday)}
+              <span className="text-base font-normal text-gray-500"> / {formatNumber(dailyLimit)}</span>
+            </dd>
           </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-indigo-100">
+          <div>
+            <dt className="text-sm text-gray-500">Страниц в sitemap</dt>
+            <dd className="text-2xl font-semibold tabular-nums">{formatNumber(totalUrls)}</dd>
+          </div>
+        </dl>
+
+        <div className="mt-4">
+          <div className="h-2 rounded bg-gray-100">
             <div
-              className="h-full rounded-full bg-indigo-500 transition-all"
-              style={{ width: `${dailyProgressPct}%` }}
+              className="h-2 rounded bg-gray-800 transition-all"
+              style={{
+                width: `${dailyLimit > 0 ? Math.min(100, Math.round((createdToday / dailyLimit) * 100)) : 0}%`,
+              }}
             />
           </div>
-          <p className="mt-2 text-xs text-indigo-700/80">
-            {dailyProgressPct}% дневной квоты · осталось {formatNumber(Math.max(0, dailyLimit - createdToday))}
+          <p className="mt-1 text-sm text-gray-600">
+            Осталось сегодня: {formatNumber(remaining)}. Автоматически ~{formatNumber(seoStats?.settings?.batch_size || 0)} карточек каждые {seoStats?.settings?.batch_interval_minutes || 30} мин.
           </p>
-          {createdBySourceEntries.length > 0 ? (
-            <div className="mt-3 rounded-lg border border-indigo-100 bg-white/70 px-3 py-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-indigo-700">
-                Сегодня по источникам
-              </p>
-              <p className="mt-1 text-sm text-indigo-950">
-                {createdBySourceEntries
-                  .map((item) => `${item.label} ${formatNumber(item.count)}`)
-                  .join(' · ')}
-              </p>
-            </div>
+          {sourceLine ? (
+            <p className="mt-1 text-sm text-gray-500">Источники сегодня: {sourceLine}</p>
           ) : null}
         </div>
-      ) : null}
 
-      {seoStats?.quota ? (
-        <div
-          className={`rounded-xl border p-4 shadow-sm ${
-            behindQuota ? 'border-amber-200 bg-amber-50/60' : 'border-emerald-100 bg-emerald-50/40'
-          }`}
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-600">Добор квоты</p>
-              <p className="mt-1 text-lg font-semibold text-gray-900">
-                Ожидалось к этому часу: {formatNumber(expectedByNow)} · создано: {formatNumber(createdToday)}
-              </p>
-              <p className="mt-1 text-sm text-gray-700">
-                Потолок гарантии: {formatNumber(guaranteedCeiling)} / {formatNumber(dailyLimit)}
-                {behindQuota ? ' · отстаём от плана' : ' · в графике'}
-              </p>
-            </div>
-            <div className="text-sm text-gray-700">
-              <p>Pending-очередь: {formatNumber(pendingQueue)}</p>
-              <p>
-                Ready seed: {formatNumber(seedReady)}
-                {seedReadyTarget ? ` (цель ${formatNumber(seedReadyTarget)})` : ''}
-              </p>
-              <p>Запас пула: ~{poolDaysEstimate} дн.</p>
-              <p>
-                Recursive budget: {formatNumber(recurseUsed)}/{formatNumber(recurseLimit)}
-              </p>
-            </div>
-          </div>
-          {seedLow ? (
-            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-100/80 px-3 py-2 text-sm text-amber-900">
-              Ready seed ({formatNumber(seedReady)}) ниже дефицита ({formatNumber(seedDeficit)}).
-              Запустите populate или дождитесь precheck.
-            </p>
-          ) : null}
-          {Object.keys(seedBySource).length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {Object.entries(seedBySource).map(([source, counts]) => {
-                const conversion = seedConversionBySource[source];
-                const pct = conversion?.conversion_pct;
-                return (
-                  <span
-                    key={source}
-                    className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-gray-200"
-                  >
-                    {source}: ready {formatNumber(counts.ready ?? 0)} · pending{' '}
-                    {formatNumber(counts.pending ?? 0)}
-                    {pct != null ? ` · ${pct}% precheck` : ''}
-                  </span>
-                );
-              })}
-            </div>
-          ) : null}
-          {tecdocConversion?.checked > 0 ? (
-            <p className="mt-2 text-xs text-gray-600">
-              TecDoc pipeline: {formatNumber(tecdocConversion.ready ?? 0)} ready из{' '}
-              {formatNumber(tecdocConversion.checked)} проверенных (
-              {tecdocConversion.conversion_pct ?? 0}% hit-rate)
-              {tecdocConversion.pending > 0
-                ? ` · ${formatNumber(tecdocConversion.pending)} в очереди precheck`
-                : ''}
-            </p>
-          ) : null}
-          {precheckStats ? (
-            <p className="mt-2 text-xs text-gray-600">
-              Precheck: checked {formatNumber(precheckStats.checked ?? 0)} · ready{' '}
-              {formatNumber(precheckStats.ready ?? 0)} · not_found{' '}
-              {formatNumber(precheckStats.not_found ?? 0)}
-            </p>
-          ) : null}
-          {populateStats ? (
-            <p className="mt-2 text-xs text-gray-600">
-              Populate: +{formatNumber(populateStats.total ?? 0)} всего
-              {['semantic', 'tecdoc', 'landing', 'card_cross', 'orders', 'products']
-                .filter((key) => populateStats[key] > 0)
-                .map((key) => ` · ${key} ${formatNumber(populateStats[key])}`)
-                .join('')}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
+        {seedLow ? (
+          <p className="mt-3 text-sm text-amber-800">
+            В очереди мало проверенных позиций ({formatNumber(seedReady)}). Сначала наполните очередь и запустите проверку Rossko.
+          </p>
+        ) : null}
+        {sitemapStale ? (
+          <p className="mt-2 text-sm text-amber-800">Кэш sitemap устарел — пересоберите вручную или дождитесь ночной пересборки.</p>
+        ) : null}
+      </div>
 
-      {seoStats ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">SEO-карточки Rossko</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">
-              {formatNumber(seoStats.cards_total)}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              eligible: {formatNumber(seoStats.cards_eligible)} ({seoStats.cards_eligible_pct}%)
-            </p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Создано сегодня</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">
-              {formatNumber(seoStats.cards_created_today)}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">лимит {formatNumber(dailyLimit)}/сутки</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Sitemap new-parts</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">
-              {formatNumber(seoStats.sitemap?.url_count || 0)}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">URL в кэше</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Экспорт URL/день</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">
-              {formatNumber(sitemapExportLimit)}
-            </p>
-            <p className="mt-1 text-xs text-gray-500">
-              refresh batch: {formatNumber(seoStats.settings?.refresh_batch_size || 100)}
-            </p>
-          </div>
-        </div>
-      ) : null}
+      {/* Действия */}
+      <div className="rounded border border-gray-200 bg-white p-4">
+        <h2 className="text-base font-semibold text-gray-900">Ручной запуск</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          Обычно всё идёт по расписанию. Эти кнопки — если нужно ускорить.
+        </p>
 
-      {seoStats?.created_by_day?.length ? (
-        <Section title="Прирост SEO-карточек" subtitle="Созданные карточки по дням (new_parts_seo_cards)">
-          <CardsCreatedTrend activity={seoStats.created_by_day} />
-        </Section>
-      ) : null}
-
-      <Section
-        title="Все sitemap"
-        subtitle="Индекс, статические страницы и динамические фиды каталога"
-      >
-        <DataTable
-          columns={[
-            {
-              key: 'title',
-              label: 'Файл',
-              render: (row) => (
-                <div>
-                  <p className="font-medium text-gray-900">{row.title}</p>
-                  {row.description ? (
-                    <p className="mt-0.5 text-xs text-gray-500">{row.description}</p>
-                  ) : null}
-                </div>
-              ),
-            },
-            {
-              key: 'url',
-              label: 'URL',
-              render: (row) => (
-                <a
-                  href={row.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="break-all font-mono text-xs text-indigo-600 hover:underline"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  {row.url}
-                </a>
-              ),
-            },
-            {
-              key: 'type',
-              label: 'Тип',
-              render: (row) => (
-                <span className="text-xs text-gray-600">
-                  {SITEMAP_TYPE_LABELS[row.type] || row.type || '—'}
-                </span>
-              ),
-            },
-            {
-              key: 'url_count',
-              label: 'URL',
-              align: 'right',
-              render: (row) => formatNumber(row.url_count ?? 0),
-            },
-            {
-              key: 'generated_at',
-              label: 'Обновлён',
-              render: (row) =>
-                row.cache?.generated_at ? (
-                  <span className="text-xs text-gray-600">
-                    {formatDateTime(row.cache.generated_at)}
-                  </span>
-                ) : (
-                  <span className="text-xs text-gray-400">—</span>
-                ),
-            },
-            {
-              key: 'status',
-              label: 'Кэш',
-              render: (row) => {
-                if (!row.cache) {
-                  return <span className="text-xs text-gray-400">—</span>;
-                }
-                return (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      row.cache.is_stale
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-green-100 text-green-800'
-                    }`}
-                  >
-                    {row.cache.is_stale ? 'Устарел' : 'Актуален'}
-                  </span>
-                );
-              },
-            },
-          ]}
-          rows={sitemapRows}
-          rowKey={(row) => row.id || row.url}
-          empty="Sitemap не найдены"
-        />
-      </Section>
-
-      <SeoKpiDashboard />
-      <LandingPagesSection />
-
-      <Section title="Действия">
-        <div className="space-y-3 px-4 py-4">
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={syncFromCatalog}
-              disabled={syncBusy || loading}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+        <ol className="mt-4 space-y-3 text-sm text-gray-700">
+          <li className="flex flex-wrap items-center gap-2">
+            <span className="w-6 shrink-0 font-medium text-gray-400">1</span>
+            <span className="min-w-[12rem]">Собрать кандидатов в очередь</span>
+            <ActionButton
+              disabled={Boolean(busy)}
+              onClick={() => run('populate', () => apiRequest('/admin/seo/seed-queue/populate', { method: 'POST' }))}
             >
-              {syncBusy ? 'Синхронизация…' : 'Синхронизировать из каталога'}
-            </button>
-            <button
-              type="button"
-              onClick={refreshCards}
-              disabled={refreshBusy || loading}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              {busy === 'populate' ? '…' : 'Наполнить'}
+            </ActionButton>
+          </li>
+          <li className="flex flex-wrap items-center gap-2">
+            <span className="w-6 shrink-0 font-medium text-gray-400">2</span>
+            <span className="min-w-[12rem]">Проверить наличие в Rossko</span>
+            <ActionButton
+              disabled={Boolean(busy)}
+              onClick={() => run('precheck', () => apiRequest('/admin/seo/seed-queue/precheck', { method: 'POST' }))}
             >
-              {refreshBusy ? 'Обновление…' : 'Обновить цены/наличие'}
-            </button>
-            <button
-              type="button"
-              onClick={rebuildSitemap}
-              disabled={rebuildBusy || loading}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              {busy === 'precheck' ? '…' : 'Проверить'}
+            </ActionButton>
+          </li>
+          <li className="flex flex-wrap items-center gap-2">
+            <span className="w-6 shrink-0 font-medium text-gray-400">3</span>
+            <span className="min-w-[12rem]">Создать карточки на сайте</span>
+            <ActionButton
+              primary
+              disabled={Boolean(busy)}
+              onClick={() =>
+                run('sync', () =>
+                  apiRequest(`/admin/seo/new-parts/sync-from-products?limit=${dailyLimit}`, { method: 'POST' }),
+                )
+              }
             >
-              {rebuildBusy ? 'Пересборка…' : 'Пересобрать sitemap'}
-            </button>
-            <button
-              type="button"
-              onClick={populateSeedQueue}
-              disabled={populateBusy || precheckBusy || loading}
-              className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
-            >
-              {populateBusy ? 'Populate…' : 'Populate seed queue'}
-            </button>
-            <button
-              type="button"
-              onClick={runSeedPrecheck}
-              disabled={precheckBusy || populateBusy || loading}
-              className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100 disabled:opacity-50"
-            >
-              {precheckBusy ? 'Precheck…' : 'Precheck seed queue'}
-            </button>
-          </div>
+              {busy === 'sync' ? '…' : 'Создать карточки'}
+            </ActionButton>
+          </li>
+        </ol>
 
-          <button
-            type="button"
-            onClick={downloadUrls}
-            disabled={downloadBusy}
-            className="text-sm font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-4">
+          <ActionButton
+            disabled={Boolean(busy)}
+            onClick={() => run('refresh', () => apiRequest('/admin/seo/new-parts/refresh', { method: 'POST' }))}
           >
-            {downloadBusy
-              ? 'Скачивание…'
-              : `Скачать ${formatNumber(sitemapExportLimit)} URL (${formatNumber(Math.floor(sitemapExportLimit / 2))} б/у + ${formatNumber(Math.ceil(sitemapExportLimit / 2))} Rossko)`}
-          </button>
-
-          {(syncChips?.length > 0 || refreshChips?.length > 0 || downloadNotice) && (
-            <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
-              {syncChips?.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {syncChips.map((chip) => (
-                    <span
-                      key={chip.key}
-                      className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-green-800"
-                    >
-                      {chip.label}: {chip.value}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {refreshChips?.length > 0 && (
-                <div className={`flex flex-wrap gap-2${syncChips?.length ? ' mt-2' : ''}`}>
-                  {refreshChips.map((chip) => (
-                    <span
-                      key={chip.key}
-                      className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-green-800"
-                    >
-                      {chip.label}: {chip.value}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {downloadNotice && (
-                <p className={syncChips?.length || refreshChips?.length ? 'mt-2 text-xs' : ''}>
-                  Файл: {downloadNotice}
-                </p>
-              )}
-            </div>
-          )}
+            {busy === 'refresh' ? '…' : 'Обновить цены'}
+          </ActionButton>
+          <ActionButton
+            disabled={Boolean(busy)}
+            onClick={() =>
+              run('sitemap', () => apiRequest('/admin/seo/sitemaps/rebuild?scope=new_parts', { method: 'POST' }))
+            }
+          >
+            {busy === 'sitemap' ? '…' : 'Пересобрать sitemap'}
+          </ActionButton>
+          <ActionButton
+            disabled={Boolean(busy)}
+            onClick={() =>
+              run('download', async () => {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${API_BASE}/admin/seo/product-card-urls`, {
+                  headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                if (!response.ok) {
+                  const err = await response.json().catch(() => ({}));
+                  throw new Error(err.detail || 'Ошибка скачивания');
+                }
+                const blob = await response.blob();
+                const match = (response.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
+                const filename = match?.[1] || 'urls.txt';
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                link.click();
+                window.URL.revokeObjectURL(url);
+                return { filename };
+              })
+            }
+          >
+            {busy === 'download' ? '…' : 'Скачать URL'}
+          </ActionButton>
         </div>
-      </Section>
+
+        {lastResult ? (
+          <p className="mt-3 text-sm text-gray-600">
+            {(() => {
+              const { key, result } = lastResult;
+              if (key === 'sync' && result?.sync) {
+                return formatSyncStats(result.sync)
+                  .map((c) => `${c.label}: ${c.value}`)
+                  .join(', ');
+              }
+              if (key === 'populate' && result) {
+                return `Добавлено в очередь: ${formatNumber(result.total ?? 0)}`;
+              }
+              if (key === 'precheck' && result) {
+                return `Проверено: ${result.checked ?? 0}, в наличии: ${result.ready ?? 0}, нет: ${result.not_found ?? 0}`;
+              }
+              if (key === 'refresh' && result?.refresh) {
+                return `Обновлено: ${result.refresh.updated ?? 0}`;
+              }
+              if (key === 'sitemap') return 'Sitemap пересобран';
+              if (key === 'download' && result?.filename) return `Скачан файл ${result.filename}`;
+              return null;
+            })()}
+          </p>
+        ) : null}
+      </div>
+
+      {seoStats?.created_by_day?.length > 0 ? (
+        <div className="rounded border border-gray-200 bg-white p-4">
+          <h2 className="text-base font-semibold text-gray-900">Прирост по дням</h2>
+          <div className="mt-3">
+            <CardsCreatedTrend activity={seoStats.created_by_day} />
+          </div>
+        </div>
+      ) : null}
+
+      <LandingPagesSection />
     </div>
   );
 }
