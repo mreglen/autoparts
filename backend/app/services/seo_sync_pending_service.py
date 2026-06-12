@@ -64,6 +64,7 @@ def list_pending_candidates(db: Session, *, limit: int = 500) -> list[SyncCandid
             brand=row.brand,
             article=row.article,
             source=row.source,
+            origin_source=row.source,
         )
         for row in rows
     ]

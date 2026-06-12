@@ -12,6 +12,30 @@ const SITEMAP_TYPE_LABELS = {
   dynamic: 'Динамический',
 };
 
+const SEO_SOURCE_LABELS = {
+  tecdoc: 'TecDoc',
+  product: 'Каталог б/у',
+  order: 'Заказы',
+  semantic: 'Семантика',
+  landing: 'Посадочные',
+  card_cross: 'Кроссы карточек',
+  cross: 'Кроссы Rossko',
+  sibling: 'Аналоги Rossko',
+  unknown: 'Прочее',
+};
+
+const SEO_SOURCE_DISPLAY_ORDER = [
+  'tecdoc',
+  'product',
+  'order',
+  'semantic',
+  'landing',
+  'card_cross',
+  'cross',
+  'sibling',
+  'unknown',
+];
+
 function cacheForItem(item, productsCache, newPartsCache) {
   if (item?.id === 'products') return productsCache;
   if (item?.id === 'new-parts') return newPartsCache;
@@ -32,6 +56,8 @@ export default function SeoTab() {
   const [seoStats, setSeoStats] = useState(null);
   const [populateBusy, setPopulateBusy] = useState(false);
   const [populateStats, setPopulateStats] = useState(null);
+  const [precheckBusy, setPrecheckBusy] = useState(false);
+  const [precheckStats, setPrecheckStats] = useState(null);
 
   const loadSitemaps = useCallback(async () => {
     setLoading(true);
@@ -123,6 +149,21 @@ export default function SeoTab() {
     }
   };
 
+  const runSeedPrecheck = async () => {
+    setPrecheckBusy(true);
+    setPrecheckStats(null);
+    setError(null);
+    try {
+      const result = await apiRequest('/admin/seo/seed-queue/precheck', { method: 'POST' });
+      setPrecheckStats(result);
+      await loadSitemaps();
+    } catch (e) {
+      setError(e?.message || 'Ошибка precheck seed queue');
+    } finally {
+      setPrecheckBusy(false);
+    }
+  };
+
   const downloadUrls = async () => {
     setDownloadBusy(true);
     setDownloadNotice(null);
@@ -195,6 +236,26 @@ export default function SeoTab() {
   const poolDaysEstimate = quota?.pool_days_estimate ?? 0;
   const seedReadyTarget = quota?.seed_ready_target ?? 1500;
   const seedBySource = quota?.seed_by_source ?? {};
+  const seedConversionBySource = quota?.seed_conversion_by_source ?? {};
+  const tecdocConversion = seedConversionBySource.tecdoc;
+  const createdBySource = quota?.cards_created_today_by_source ?? {};
+  const createdBySourceEntries = useMemo(() => {
+    const keys = new Set([
+      ...SEO_SOURCE_DISPLAY_ORDER,
+      ...Object.keys(createdBySource),
+    ]);
+    return [...keys]
+      .map((source) => ({
+        source,
+        count: Number(createdBySource[source] || 0),
+        label: SEO_SOURCE_LABELS[source] || source,
+      }))
+      .filter((item) => item.count > 0)
+      .sort(
+        (a, b) =>
+          SEO_SOURCE_DISPLAY_ORDER.indexOf(a.source) - SEO_SOURCE_DISPLAY_ORDER.indexOf(b.source),
+      );
+  }, [createdBySource]);
   const seedLow = seedReady < seedDeficit;
   const recurseUsed = quota?.cross_recurse_used ?? 0;
   const recurseLimit = quota?.cross_recurse_limit ?? 0;
@@ -277,6 +338,18 @@ export default function SeoTab() {
           <p className="mt-2 text-xs text-indigo-700/80">
             {dailyProgressPct}% дневной квоты · осталось {formatNumber(Math.max(0, dailyLimit - createdToday))}
           </p>
+          {createdBySourceEntries.length > 0 ? (
+            <div className="mt-3 rounded-lg border border-indigo-100 bg-white/70 px-3 py-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-indigo-700">
+                Сегодня по источникам
+              </p>
+              <p className="mt-1 text-sm text-indigo-950">
+                {createdBySourceEntries
+                  .map((item) => `${item.label} ${formatNumber(item.count)}`)
+                  .join(' · ')}
+              </p>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -317,16 +390,38 @@ export default function SeoTab() {
           ) : null}
           {Object.keys(seedBySource).length > 0 ? (
             <div className="mt-3 flex flex-wrap gap-2">
-              {Object.entries(seedBySource).map(([source, counts]) => (
-                <span
-                  key={source}
-                  className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-gray-200"
-                >
-                  {source}: ready {formatNumber(counts.ready ?? 0)} · pending{' '}
-                  {formatNumber(counts.pending ?? 0)}
-                </span>
-              ))}
+              {Object.entries(seedBySource).map(([source, counts]) => {
+                const conversion = seedConversionBySource[source];
+                const pct = conversion?.conversion_pct;
+                return (
+                  <span
+                    key={source}
+                    className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-gray-200"
+                  >
+                    {source}: ready {formatNumber(counts.ready ?? 0)} · pending{' '}
+                    {formatNumber(counts.pending ?? 0)}
+                    {pct != null ? ` · ${pct}% precheck` : ''}
+                  </span>
+                );
+              })}
             </div>
+          ) : null}
+          {tecdocConversion?.checked > 0 ? (
+            <p className="mt-2 text-xs text-gray-600">
+              TecDoc pipeline: {formatNumber(tecdocConversion.ready ?? 0)} ready из{' '}
+              {formatNumber(tecdocConversion.checked)} проверенных (
+              {tecdocConversion.conversion_pct ?? 0}% hit-rate)
+              {tecdocConversion.pending > 0
+                ? ` · ${formatNumber(tecdocConversion.pending)} в очереди precheck`
+                : ''}
+            </p>
+          ) : null}
+          {precheckStats ? (
+            <p className="mt-2 text-xs text-gray-600">
+              Precheck: checked {formatNumber(precheckStats.checked ?? 0)} · ready{' '}
+              {formatNumber(precheckStats.ready ?? 0)} · not_found{' '}
+              {formatNumber(precheckStats.not_found ?? 0)}
+            </p>
           ) : null}
           {populateStats ? (
             <p className="mt-2 text-xs text-gray-600">
@@ -503,10 +598,18 @@ export default function SeoTab() {
             <button
               type="button"
               onClick={populateSeedQueue}
-              disabled={populateBusy || loading}
+              disabled={populateBusy || precheckBusy || loading}
               className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
             >
               {populateBusy ? 'Populate…' : 'Populate seed queue'}
+            </button>
+            <button
+              type="button"
+              onClick={runSeedPrecheck}
+              disabled={precheckBusy || populateBusy || loading}
+              className="rounded-lg border border-sky-300 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100 disabled:opacity-50"
+            >
+              {precheckBusy ? 'Precheck…' : 'Precheck seed queue'}
             </button>
           </div>
 

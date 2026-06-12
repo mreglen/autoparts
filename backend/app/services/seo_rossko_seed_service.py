@@ -26,6 +26,7 @@ from app.services.seo_quota_service import (
     precheck_budget_remaining,
 )
 from app.services.seo_semantic_seed_service import load_semantic_seed_pairs
+from app.services.seo_tecdoc_brand_service import map_tecdoc_brand_to_rossko
 from app.services.seo_sync_types import SOURCE_SEED_READY, SyncCandidate
 from app.services.sitemap_service import is_working_catalog_product
 from app.services.yandex_feed_xml_service import _iter_catalog_products
@@ -167,7 +168,12 @@ def _populate_semantic(db: Session, *, seen: set[str], stats: dict[str, int], li
 
 
 def _populate_tecdoc(db: Session, *, seen: set[str], stats: dict[str, int], limit: int) -> None:
-    tecdoc_limit = int(settings.NEW_PARTS_SEO_SEED_TECDOC_LIMIT or 10000)
+    from app.services.tecdoc_pair_harvest_service import (
+        harvest_tecdoc_cross_pairs,
+        harvest_tecdoc_direct_pairs,
+    )
+
+    tecdoc_limit = int(settings.NEW_PARTS_SEO_SEED_TECDOC_LIMIT or 100000)
     normalized_articles: set[str] = set()
     for product in _iter_catalog_products(db):
         if not is_working_catalog_product(product):
@@ -176,52 +182,76 @@ def _populate_tecdoc(db: Session, *, seen: set[str], stats: dict[str, int], limi
         norm = normalize_partnumber(article)
         if norm:
             normalized_articles.add(norm)
-        if len(normalized_articles) >= 5000:
+        if len(normalized_articles) >= 10000:
             break
 
-    if not normalized_articles:
-        return
-
-    article_list = list(normalized_articles)
-    inserted_tecdoc = 0
-    try:
-        for offset in range(0, len(article_list), 200):
-            if inserted_tecdoc >= tecdoc_limit or stats["total"] >= limit:
-                break
-            batch = article_list[offset : offset + 200]
-            cross_rows = (
-                db.query(TecdocArticleCrossList.Article, TecdocSupplier.Description)
-                .join(
-                    TecdocArticle,
-                    TecdocArticle.id == TecdocArticleCrossList.article_id,
-                )
-                .join(
-                    TecdocSupplier,
-                    TecdocSupplier.id == TecdocArticleCrossList.supplier,
-                )
-                .filter(TecdocArticleCrossList.Article.in_(batch))
-                .limit(min(500, tecdoc_limit - inserted_tecdoc))
-                .all()
-            )
-            for cross_article, supplier_name in cross_rows:
+    inserted_tecdoc = int(stats.get("tecdoc", 0))
+    if normalized_articles:
+        article_list = list(normalized_articles)
+        try:
+            for offset in range(0, len(article_list), 200):
                 if inserted_tecdoc >= tecdoc_limit or stats["total"] >= limit:
                     break
-                brand = (supplier_name or "").strip()
-                article = (cross_article or "").strip()
-                if _try_add_pair(
-                    db,
-                    brand=brand,
-                    article=article,
-                    source=SOURCE_TECDOC,
-                    priority=70,
-                    seen=seen,
-                    stats=stats,
-                    stat_key="tecdoc",
-                    total_limit=limit,
-                ):
-                    inserted_tecdoc += 1
+                batch = article_list[offset : offset + 200]
+                cross_rows = (
+                    db.query(TecdocArticleCrossList.Article, TecdocSupplier.Description)
+                    .join(
+                        TecdocArticle,
+                        TecdocArticle.id == TecdocArticleCrossList.article_id,
+                    )
+                    .join(
+                        TecdocSupplier,
+                        TecdocSupplier.id == TecdocArticleCrossList.supplier,
+                    )
+                    .filter(TecdocArticleCrossList.Article.in_(batch))
+                    .limit(min(500, tecdoc_limit - inserted_tecdoc))
+                    .all()
+                )
+                for cross_article, supplier_name in cross_rows:
+                    if inserted_tecdoc >= tecdoc_limit or stats["total"] >= limit:
+                        break
+                    brand = map_tecdoc_brand_to_rossko((supplier_name or "").strip())
+                    article = (cross_article or "").strip()
+                    if _try_add_pair(
+                        db,
+                        brand=brand,
+                        article=article,
+                        source=SOURCE_TECDOC,
+                        priority=70,
+                        seen=seen,
+                        stats=stats,
+                        stat_key="tecdoc",
+                        total_limit=limit,
+                    ):
+                        inserted_tecdoc += 1
+        except Exception:
+            logger.exception("TecDoc catalog cross populate failed")
+
+    if stats["total"] >= limit or inserted_tecdoc >= tecdoc_limit:
+        return
+
+    try:
+        harvest_tecdoc_direct_pairs(
+            db,
+            seen=seen,
+            stats=stats,
+            total_limit=min(limit, tecdoc_limit),
+        )
     except Exception:
-        logger.exception("TecDoc seed populate failed")
+        logger.exception("TecDoc direct harvest during populate failed")
+
+    if stats["total"] >= limit or stats.get("tecdoc", 0) >= tecdoc_limit:
+        return
+
+    try:
+        harvest_tecdoc_cross_pairs(
+            db,
+            seen=seen,
+            stats=stats,
+            total_limit=min(limit, tecdoc_limit),
+        )
+    except Exception:
+        logger.exception("TecDoc cross harvest during populate failed")
 
 
 def _populate_landing(db: Session, *, seen: set[str], stats: dict[str, int], limit: int) -> None:
@@ -477,6 +507,7 @@ def list_ready_seed_candidates(db: Session, *, limit: int = 100) -> list[SyncCan
             brand=row.brand,
             article=row.article,
             source=SOURCE_SEED_READY,
+            origin_source=row.source,
         )
         for row in rows
     ]
@@ -602,6 +633,84 @@ def _resolve_precheck_batch_size(db: Session, requested: int | None) -> int:
     return max(0, min(budget, batch))
 
 
+PRECHECK_SOURCE_ORDER: tuple[str, ...] = (
+    "tecdoc",
+    "semantic",
+    "order",
+    "product",
+    "landing",
+    "card_cross",
+)
+
+
+def _select_pending_seed_rows_fair(db: Session, *, limit: int) -> list[SeoRosskoSeedQueue]:
+    now = _utcnow()
+    base_query = db.query(SeoRosskoSeedQueue).filter(
+        SeoRosskoSeedQueue.status == "pending",
+        (SeoRosskoSeedQueue.next_retry_at.is_(None)) | (SeoRosskoSeedQueue.next_retry_at <= now),
+    )
+    source_rows = (
+        base_query.with_entities(SeoRosskoSeedQueue.source)
+        .distinct()
+        .all()
+    )
+    active_sources = [str(row[0]) for row in source_rows if row and row[0]]
+    if not active_sources:
+        return []
+
+    ordered_sources = [src for src in PRECHECK_SOURCE_ORDER if src in active_sources]
+    ordered_sources.extend(src for src in active_sources if src not in ordered_sources)
+    per_source = max(1, limit // max(1, len(ordered_sources)))
+
+    buckets: dict[str, list[SeoRosskoSeedQueue]] = {}
+    for src in ordered_sources:
+        buckets[src] = (
+            base_query.filter(SeoRosskoSeedQueue.source == src)
+            .order_by(SeoRosskoSeedQueue.priority.asc(), SeoRosskoSeedQueue.created_at.asc())
+            .limit(per_source)
+            .all()
+        )
+
+    selected: list[SeoRosskoSeedQueue] = []
+    while len(selected) < limit:
+        added = False
+        for src in ordered_sources:
+            queue = buckets.get(src) or []
+            if not queue:
+                continue
+            selected.append(queue.pop(0))
+            added = True
+            if len(selected) >= limit:
+                break
+        if not added:
+            break
+    return selected
+
+
+async def _precheck_seed_row(db: Session, row: SeoRosskoSeedQueue) -> bool:
+    search_brand = (
+        map_tecdoc_brand_to_rossko(row.brand)
+        if row.source == SOURCE_TECDOC
+        else row.brand
+    )
+    search_text = f"{search_brand} {row.article}".strip()
+    data = await _fetch_rossko_search(db, search_text)
+    if _rossko_has_in_stock(data):
+        mark_seed_ready(db, row.lookup_key, data)
+        return True
+
+    if row.source == SOURCE_TECDOC:
+        article_only = (row.article or "").strip()
+        if article_only and article_only.casefold() != search_text.casefold():
+            data = await _fetch_rossko_search(db, article_only)
+            if _rossko_has_in_stock(data):
+                mark_seed_ready(db, row.lookup_key, data)
+                return True
+
+    mark_seed_not_found(db, row.lookup_key)
+    return False
+
+
 async def run_seed_precheck_batch(db: Session, *, max_checks: int | None = None) -> dict[str, int]:
     ready_count = count_seed_queue_by_status(db, "ready")
     target = int(settings.NEW_PARTS_SEO_SEED_READY_TARGET or 1500)
@@ -612,17 +721,7 @@ async def run_seed_precheck_batch(db: Session, *, max_checks: int | None = None)
     if limit <= 0:
         return {"checked": 0, "ready": 0, "not_found": 0, "skipped": 0, "reactivated": 0}
 
-    now = _utcnow()
-    rows = (
-        db.query(SeoRosskoSeedQueue)
-        .filter(
-            SeoRosskoSeedQueue.status == "pending",
-            (SeoRosskoSeedQueue.next_retry_at.is_(None)) | (SeoRosskoSeedQueue.next_retry_at <= now),
-        )
-        .order_by(SeoRosskoSeedQueue.priority.asc(), SeoRosskoSeedQueue.created_at.asc())
-        .limit(limit)
-        .all()
-    )
+    rows = _select_pending_seed_rows_fair(db, limit=limit)
 
     stats = {"checked": 0, "ready": 0, "not_found": 0, "skipped": 0, "reactivated": 0}
     delay = float(settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC or 0)
@@ -635,13 +734,9 @@ async def run_seed_precheck_batch(db: Session, *, max_checks: int | None = None)
         stats["checked"] += 1
         increment_precheck_calls(db)
         try:
-            search_text = f"{row.brand} {row.article}".strip()
-            data = await _fetch_rossko_search(db, search_text)
-            if _rossko_has_in_stock(data):
-                mark_seed_ready(db, row.lookup_key, data)
+            if await _precheck_seed_row(db, row):
                 stats["ready"] += 1
             else:
-                mark_seed_not_found(db, row.lookup_key)
                 stats["not_found"] += 1
         except Exception:
             logger.exception("Seed precheck failed for %s", row.lookup_key)

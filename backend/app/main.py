@@ -22,6 +22,8 @@ from app.db.schema_patches import (
     ensure_seo_sync_pending_candidates_table,
     ensure_seo_rossko_seed_queue_table,
     ensure_seo_sync_daily_counters_table,
+    ensure_seo_sync_daily_counters_created_by_source_column,
+    ensure_seo_pipeline_state_table,
     ensure_user_avatar_column,
     ensure_product_photo_thumb_url_column,
     ensure_rossko_settings_table,
@@ -72,6 +74,7 @@ import app.models.new_parts_seo_sync_log  # noqa: F401 — SEO sync log for prod
 import app.models.seo_sync_pending_candidate  # noqa: F401 — persisted cross/sibling queue
 import app.models.seo_rossko_seed_queue  # noqa: F401 — Rossko seed pre-check queue
 import app.models.seo_sync_daily_counter  # noqa: F401 — daily API budget counters
+import app.models.seo_pipeline_state  # noqa: F401 — TecDoc harvest cursors
 import app.models.seo_landing_page  # noqa: F401 — SEO landing pages registry
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
@@ -138,6 +141,8 @@ try:
     ensure_seo_sync_pending_candidates_table()
     ensure_seo_rossko_seed_queue_table()
     ensure_seo_sync_daily_counters_table()
+    ensure_seo_sync_daily_counters_created_by_source_column()
+    ensure_seo_pipeline_state_table()
     ensure_user_avatar_column()
     ensure_product_photo_thumb_url_column()
     ensure_rossko_settings_table()
@@ -264,6 +269,13 @@ async def startup_event():
         trigger=IntervalTrigger(minutes=settings.NEW_PARTS_SEO_SEED_PRECHECK_INTERVAL_MINUTES),
         id="seo_rossko_seed_precheck",
         name="Rossko SEO seed queue pre-check",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        func=run_seo_tecdoc_harvest,
+        trigger=CronTrigger(hour=2, minute=0),
+        id="seo_tecdoc_harvest",
+        name="Harvest TecDoc brand/article pairs for Rossko seed queue",
         replace_existing=True,
     )
     scheduler.add_job(
@@ -489,6 +501,29 @@ async def run_seo_seed_precheck_tick():
             db.close()
     except Exception as e:
         logger.error("Ошибка Rossko SEO seed precheck: %s", e)
+
+
+async def run_seo_tecdoc_harvest():
+    try:
+        from app.services.tecdoc_pair_harvest_service import (
+            harvest_tecdoc_cross_pairs,
+            harvest_tecdoc_direct_pairs,
+        )
+
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            direct_stats = harvest_tecdoc_direct_pairs(db)
+            cross_stats = harvest_tecdoc_cross_pairs(db)
+            logger.info(
+                "TecDoc harvest: direct=%s cross=%s",
+                direct_stats,
+                cross_stats,
+            )
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error("Ошибка TecDoc harvest: %s", e)
 
 
 async def run_seo_seed_populate():

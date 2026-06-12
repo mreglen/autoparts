@@ -1,6 +1,6 @@
 import { Helmet } from 'react-helmet-async';
 import { SITE_ORIGIN } from './breadcrumbs';
-import { DEFAULT_OG_IMAGE_URL } from './seoConstants';
+import { DEFAULT_OG_IMAGE_URL, FAVICON_SVG_PATH } from './seoConstants';
 import { formatProductDisplayTitle } from './productDisplayName';
 import { buildPartDetailPath } from './partRoutes';
 import { slugifyBrand } from './slugUtils';
@@ -43,6 +43,7 @@ export function buildHomeSeo() {
       'Маркетплейс автозапчастей «Свой Гараж»: поиск по артикулу и бренду, новые и б/у детали, доставка по России.',
     canonicalUrl: absoluteUrl('/'),
     robots: 'index, follow',
+    faviconSvg: FAVICON_SVG_PATH,
   };
 }
 
@@ -190,6 +191,9 @@ export function PageSeoHelmet({ seo }) {
       <meta name="description" content={seo.description} />
       <meta name="robots" content={seo.robots || 'index, follow'} />
       <link rel="canonical" href={seo.canonicalUrl} />
+      {seo.faviconSvg ? (
+        <link rel="icon" type="image/svg+xml" href={seo.faviconSvg} sizes="120x120" />
+      ) : null}
       <meta property="og:type" content={ogType} />
       <meta property="og:site_name" content="Свой Гараж" />
       <meta property="og:title" content={seo.title} />

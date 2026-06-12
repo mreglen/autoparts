@@ -9,6 +9,12 @@
   "background_color": "#ffffff",
   "icons": [
     {
+      "src": "favicons/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "120x120",
+      "purpose": "any"
+    },
+    {
       "src": "favicons/favicon.ico",
       "sizes": "48x48",
       "type": "image/x-icon"

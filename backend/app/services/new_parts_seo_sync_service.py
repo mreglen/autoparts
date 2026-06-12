@@ -26,9 +26,13 @@ from app.services.rossko_part_selection import (
     rossko_part_to_card_payload,
 )
 from app.services.seo_quota_service import (
+    count_cards_created_today_by_source,
     cross_recurse_budget_remaining,
+    get_source_daily_shares,
+    increment_created_by_source,
     increment_cross_recurse_calls,
     is_behind_quota,
+    source_quota_cap,
 )
 from app.services.seo_rossko_seed_service import (
     enqueue_seed_candidates,
@@ -172,6 +176,7 @@ def collect_distinct_product_candidates(db: Session) -> list[SyncCandidate]:
                 brand=brand,
                 article=article,
                 source=SOURCE_PRODUCT,
+                origin_source=SOURCE_PRODUCT,
             )
         )
     return candidates
@@ -203,6 +208,7 @@ def collect_order_item_candidates(db: Session) -> list[SyncCandidate]:
                 brand=brand,
                 article=article,
                 source=SOURCE_ORDER,
+                origin_source=SOURCE_ORDER,
             )
         )
     return candidates
@@ -242,6 +248,7 @@ def extract_cross_candidates_from_rossko(
                 brand=brand,
                 article=article,
                 source=SOURCE_CROSS,
+                origin_source=SOURCE_CROSS,
             )
         )
 
@@ -314,6 +321,7 @@ def extract_sibling_candidates_from_rossko(
                 brand=brand,
                 article=article,
                 source=SOURCE_SIBLING,
+                origin_source=SOURCE_SIBLING,
             )
         )
         if len(results) >= limit:
@@ -505,6 +513,7 @@ async def _create_cards_from_parts(
             result.created_card_ids.append(card.id)
             remaining_new -= 1
             created_any = True
+            increment_created_by_source(db, candidate.get_origin_source())
             if candidate.source == SOURCE_SEED_READY:
                 mark_seed_created(db, candidate.lookup_key)
         else:
@@ -740,6 +749,55 @@ async def _process_sync_candidate(
     return remaining_new
 
 
+def _quota_bucket_for_origin(origin: str) -> str:
+    if origin == SOURCE_SIBLING:
+        return SOURCE_CROSS
+    return origin or "unknown"
+
+
+def _apply_fair_quota_order(db: Session, candidates: list[SyncCandidate]) -> list[SyncCandidate]:
+    if not candidates:
+        return []
+
+    daily_limit = int(settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT or 1000)
+    shares = get_source_daily_shares()
+    created_by_source = count_cards_created_today_by_source(db)
+
+    def bucket_has_quota(bucket: str) -> bool:
+        cap = source_quota_cap(bucket, daily_limit=daily_limit)
+        if cap <= 0:
+            return False
+        return int(created_by_source.get(bucket, 0)) < cap
+
+    buckets: dict[str, list[SyncCandidate]] = {}
+    for candidate in candidates:
+        bucket = _quota_bucket_for_origin(candidate.get_origin_source())
+        buckets.setdefault(bucket, []).append(candidate)
+
+    for bucket_candidates in buckets.values():
+        bucket_candidates.sort(key=lambda c: _candidate_sort_key(db, c))
+
+    source_order = sorted(
+        shares.keys(),
+        key=lambda src: (-shares.get(src, 0.0), src),
+    )
+    ordered: list[SyncCandidate] = []
+    while True:
+        added = False
+        any_with_quota = any(bucket_has_quota(src) for src in buckets if buckets.get(src))
+        for src in source_order:
+            queue = buckets.get(src) or []
+            if not queue:
+                continue
+            if any_with_quota and not bucket_has_quota(src):
+                continue
+            ordered.append(queue.pop(0))
+            added = True
+        if not added:
+            break
+    return ordered
+
+
 def _collect_run_candidates(db: Session) -> list[SyncCandidate]:
     seen: set[str] = set()
     merged: list[SyncCandidate] = []
@@ -762,8 +820,7 @@ def _collect_run_candidates(db: Session) -> list[SyncCandidate]:
         seen.add(candidate.lookup_key)
         merged.append(candidate)
 
-    merged.sort(key=lambda c: _candidate_sort_key(db, c))
-    return merged
+    return _apply_fair_quota_order(db, merged)
 
 
 async def _run_seo_sync(

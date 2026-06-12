@@ -1163,6 +1163,17 @@ def populate_seo_seed_queue(
     return populate_seed_queue_from_catalog(db)
 
 
+@router.post("/seo/seed-queue/precheck")
+async def precheck_seo_seed_queue(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    from app.services.seo_rossko_seed_service import run_seed_precheck_batch
+
+    return await run_seed_precheck_batch(db)
+
+
 @router.get("/seo/new-parts/stats")
 def get_new_parts_seo_stats(
     days: int = Query(14, ge=1, le=90),

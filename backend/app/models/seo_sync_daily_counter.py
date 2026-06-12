@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Date, Integer
+from sqlalchemy import Column, Date, Integer, Text
 
 from app.db.database import Base
 
@@ -9,3 +9,4 @@ class SeoSyncDailyCounter(Base):
     stat_date = Column(Date, primary_key=True)
     cross_recurse_calls = Column(Integer, nullable=False, default=0)
     precheck_calls = Column(Integer, nullable=False, default=0)
+    created_by_source_json = Column(Text, nullable=True)

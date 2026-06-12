@@ -23,3 +23,11 @@ class SyncCandidate:
     brand: str
     article: str
     source: str = SOURCE_PRODUCT
+    origin_source: str | None = None
+
+    def get_origin_source(self) -> str:
+        if self.origin_source:
+            return self.origin_source
+        if self.source == SOURCE_SEED_READY:
+            return "unknown"
+        return self.source

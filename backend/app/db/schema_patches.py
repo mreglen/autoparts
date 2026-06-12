@@ -942,6 +942,79 @@ def ensure_seo_sync_daily_counters_table() -> None:
     logger.info("Created seo_sync_daily_counters table")
 
 
+def ensure_seo_sync_daily_counters_created_by_source_column() -> None:
+    inspector = inspect(engine)
+    if "seo_sync_daily_counters" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("seo_sync_daily_counters")}
+    if "created_by_source_json" in columns:
+        return
+
+    dialect = engine.dialect.name
+    with engine.begin() as conn:
+        if dialect == "postgresql":
+            conn.execute(
+                text("ALTER TABLE seo_sync_daily_counters ADD COLUMN created_by_source_json TEXT")
+            )
+        else:
+            conn.execute(
+                text("ALTER TABLE seo_sync_daily_counters ADD COLUMN created_by_source_json TEXT")
+            )
+    logger.info("Applied seo_sync_daily_counters.created_by_source_json column patch")
+
+
+def ensure_seo_pipeline_state_table() -> None:
+    inspector = inspect(engine)
+    if "seo_pipeline_state" in inspector.get_table_names():
+        return
+
+    dialect = engine.dialect.name
+    with engine.begin() as conn:
+        if dialect == "postgresql":
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_pipeline_state (
+                        id INTEGER PRIMARY KEY DEFAULT 1,
+                        tecdoc_direct_cursor INTEGER NOT NULL DEFAULT 0,
+                        tecdoc_cross_cursor INTEGER NOT NULL DEFAULT 0
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO seo_pipeline_state (id, tecdoc_direct_cursor, tecdoc_cross_cursor)
+                    VALUES (1, 0, 0)
+                    ON CONFLICT (id) DO NOTHING
+                    """
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE seo_pipeline_state (
+                        id INTEGER PRIMARY KEY,
+                        tecdoc_direct_cursor INTEGER NOT NULL DEFAULT 0,
+                        tecdoc_cross_cursor INTEGER NOT NULL DEFAULT 0
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    INSERT OR IGNORE INTO seo_pipeline_state (id, tecdoc_direct_cursor, tecdoc_cross_cursor)
+                    VALUES (1, 0, 0)
+                    """
+                )
+            )
+    logger.info("Created seo_pipeline_state table")
+
+
 def ensure_user_avatar_column() -> None:
     """Add avatar_url column to users if missing."""
     inspector = inspect(engine)
