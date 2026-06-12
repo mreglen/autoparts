@@ -30,6 +30,14 @@ async def execute_seo_sync_batch_job(db: Session) -> SyncResult:
             len(sync_stats.created_card_ids),
             appended,
         )
+    try:
+        from app.services.seo_rossko_seed_service import maybe_run_precheck_boost
+
+        boost_stats = await maybe_run_precheck_boost(db)
+        if boost_stats:
+            logger.info("Rossko SEO precheck boost: %s", boost_stats)
+    except Exception:
+        logger.exception("Rossko SEO precheck boost failed")
     return sync_stats
 
 

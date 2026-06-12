@@ -100,6 +100,17 @@ def _today_start_utc() -> datetime:
 
 def count_seo_cards_created_today(db: Session) -> int:
     today_start = _today_start_utc()
+    card_count = (
+        db.query(NewPartsSeoCard)
+        .filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.source) == ROSSKO_NEW_PART_SOURCE,
+            NewPartsSeoCard.created_at >= today_start,
+        )
+        .count()
+    )
+    if card_count > 0:
+        return int(card_count)
     return (
         db.query(NewPartsSeoSyncLog)
         .filter(
@@ -916,6 +927,22 @@ def get_cards_created_by_day(db: Session, *, days: int = 14) -> list[dict[str, o
     safe_days = max(1, min(int(days or 14), 90))
     since = _utcnow() - timedelta(days=safe_days - 1)
     since = since.replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = (
+        db.query(
+            func.date(NewPartsSeoCard.created_at).label("day"),
+            func.count(NewPartsSeoCard.id).label("created"),
+        )
+        .filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.source) == ROSSKO_NEW_PART_SOURCE,
+            NewPartsSeoCard.created_at >= since,
+        )
+        .group_by(func.date(NewPartsSeoCard.created_at))
+        .order_by(func.date(NewPartsSeoCard.created_at).asc())
+        .all()
+    )
+    if rows:
+        return [{"day": str(row.day), "created": int(row.created or 0)} for row in rows]
     rows = (
         db.query(
             func.date(NewPartsSeoSyncLog.checked_at).label("day"),

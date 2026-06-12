@@ -273,6 +273,13 @@ async def startup_event():
         name="Populate Rossko SEO seed queue nightly",
         replace_existing=True,
     )
+    scheduler.add_job(
+        func=run_seo_seed_populate,
+        trigger=CronTrigger(hour=14, minute=0),
+        id="seo_rossko_seed_populate_afternoon",
+        name="Populate Rossko SEO seed queue afternoon",
+        replace_existing=True,
+    )
     
     scheduler.start()
     logger.info("Scheduler started. Expired session cleanup job scheduled.")

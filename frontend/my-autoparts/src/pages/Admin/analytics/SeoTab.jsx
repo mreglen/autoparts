@@ -30,6 +30,8 @@ export default function SeoTab() {
   const [downloadNotice, setDownloadNotice] = useState(null);
   const [sitemapData, setSitemapData] = useState(null);
   const [seoStats, setSeoStats] = useState(null);
+  const [populateBusy, setPopulateBusy] = useState(false);
+  const [populateStats, setPopulateStats] = useState(null);
 
   const loadSitemaps = useCallback(async () => {
     setLoading(true);
@@ -106,6 +108,21 @@ export default function SeoTab() {
     }
   };
 
+  const populateSeedQueue = async () => {
+    setPopulateBusy(true);
+    setPopulateStats(null);
+    setError(null);
+    try {
+      const result = await apiRequest('/admin/seo/seed-queue/populate', { method: 'POST' });
+      setPopulateStats(result);
+      await loadSitemaps();
+    } catch (e) {
+      setError(e?.message || 'Ошибка populate seed queue');
+    } finally {
+      setPopulateBusy(false);
+    }
+  };
+
   const downloadUrls = async () => {
     setDownloadBusy(true);
     setDownloadNotice(null);
@@ -174,6 +191,11 @@ export default function SeoTab() {
   const expectedByNow = quota?.expected_by_now ?? 0;
   const pendingQueue = quota?.pending_candidates ?? 0;
   const seedReady = quota?.seed_ready ?? 0;
+  const seedDeficit = quota?.deficit ?? Math.max(0, dailyLimit - createdToday);
+  const poolDaysEstimate = quota?.pool_days_estimate ?? 0;
+  const seedReadyTarget = quota?.seed_ready_target ?? 1500;
+  const seedBySource = quota?.seed_by_source ?? {};
+  const seedLow = seedReady < seedDeficit;
   const recurseUsed = quota?.cross_recurse_used ?? 0;
   const recurseLimit = quota?.cross_recurse_limit ?? 0;
   const behindQuota = Boolean(quota?.behind_quota);
@@ -277,12 +299,44 @@ export default function SeoTab() {
             </div>
             <div className="text-sm text-gray-700">
               <p>Pending-очередь: {formatNumber(pendingQueue)}</p>
-              <p>Ready seed: {formatNumber(seedReady)}</p>
+              <p>
+                Ready seed: {formatNumber(seedReady)}
+                {seedReadyTarget ? ` (цель ${formatNumber(seedReadyTarget)})` : ''}
+              </p>
+              <p>Запас пула: ~{poolDaysEstimate} дн.</p>
               <p>
                 Recursive budget: {formatNumber(recurseUsed)}/{formatNumber(recurseLimit)}
               </p>
             </div>
           </div>
+          {seedLow ? (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-100/80 px-3 py-2 text-sm text-amber-900">
+              Ready seed ({formatNumber(seedReady)}) ниже дефицита ({formatNumber(seedDeficit)}).
+              Запустите populate или дождитесь precheck.
+            </p>
+          ) : null}
+          {Object.keys(seedBySource).length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {Object.entries(seedBySource).map(([source, counts]) => (
+                <span
+                  key={source}
+                  className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-gray-200"
+                >
+                  {source}: ready {formatNumber(counts.ready ?? 0)} · pending{' '}
+                  {formatNumber(counts.pending ?? 0)}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {populateStats ? (
+            <p className="mt-2 text-xs text-gray-600">
+              Populate: +{formatNumber(populateStats.total ?? 0)} всего
+              {['semantic', 'tecdoc', 'landing', 'card_cross', 'orders', 'products']
+                .filter((key) => populateStats[key] > 0)
+                .map((key) => ` · ${key} ${formatNumber(populateStats[key])}`)
+                .join('')}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -324,7 +378,7 @@ export default function SeoTab() {
       ) : null}
 
       {seoStats?.created_by_day?.length ? (
-        <Section title="Прирост SEO-карточек" subtitle="Созданные карточки по дням (sync log)">
+        <Section title="Прирост SEO-карточек" subtitle="Созданные карточки по дням (new_parts_seo_cards)">
           <CardsCreatedTrend activity={seoStats.created_by_day} />
         </Section>
       ) : null}
@@ -445,6 +499,14 @@ export default function SeoTab() {
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               {rebuildBusy ? 'Пересборка…' : 'Пересобрать sitemap'}
+            </button>
+            <button
+              type="button"
+              onClick={populateSeedQueue}
+              disabled={populateBusy || loading}
+              className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+            >
+              {populateBusy ? 'Populate…' : 'Populate seed queue'}
             </button>
           </div>
 

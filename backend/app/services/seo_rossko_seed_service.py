@@ -9,35 +9,34 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.database import engine
-from app.models.garage_new_orders import GarageNewOrderItem
 from app.models.new_parts_seo_card import NewPartsSeoCard
+from app.models.seo_landing_page import SeoLandingPage
 from app.models.seo_rossko_seed_queue import SeoRosskoSeedQueue
 from app.models.tecdoc import TecdocArticle, TecdocArticleCrossList, TecdocSupplier
 from app.schemas.rossko import SearchRequest
-from app.services.new_parts_seo_card_service import ROSSKO_NEW_PART_SOURCE, _stable_key
+from app.services.new_parts_seo_card_service import (
+    ROSSKO_NEW_PART_SOURCE,
+    _stable_key,
+    list_new_part_cards_by_category_slug,
+)
 from app.services.rossko_part_selection import get_rossko_stock_count
-from app.services.seo_quota_service import increment_precheck_calls, precheck_budget_remaining
+from app.services.seo_quota_service import (
+    count_seed_queue_by_status,
+    increment_precheck_calls,
+    precheck_budget_remaining,
+)
+from app.services.seo_semantic_seed_service import load_semantic_seed_pairs
 from app.services.seo_sync_types import SOURCE_SEED_READY, SyncCandidate
 from app.services.sitemap_service import is_working_catalog_product
 from app.services.yandex_feed_xml_service import _iter_catalog_products
-from app.utils.partnumber import build_product_lookup_key
+from app.utils.partnumber import build_product_lookup_key, normalize_partnumber
 
 logger = logging.getLogger(__name__)
 
 SOURCE_TECDOC = "tecdoc"
 SOURCE_SEMANTIC = "semantic"
-
-SEMANTIC_SEED_PAIRS: list[tuple[str, str]] = [
-    ("BOSCH", "0986424590"),
-    ("MANN", "W712/75"),
-    ("NGK", "96535"),
-    ("FEBI", "37424"),
-    ("KNECHT", "OX188"),
-    ("SAKURA", "FC1101"),
-    ("KAYABA", "334001"),
-    ("HYUNDAI", "2630035504"),
-    ("GRAF", "PA1234"),
-]
+SOURCE_LANDING = "landing"
+SOURCE_CARD_CROSS = "card_cross"
 
 
 def _utcnow() -> datetime:
@@ -104,6 +103,38 @@ def _upsert_seed_row(
     return True
 
 
+def _try_add_pair(
+    db: Session,
+    *,
+    brand: str,
+    article: str,
+    source: str,
+    priority: int,
+    seen: set[str],
+    stats: dict[str, int],
+    stat_key: str,
+    total_limit: int,
+) -> bool:
+    if stats["total"] >= total_limit:
+        return False
+    lookup_key = build_product_lookup_key(brand, article)
+    if not lookup_key or lookup_key in seen:
+        return False
+    seen.add(lookup_key)
+    if _upsert_seed_row(
+        db,
+        lookup_key=lookup_key,
+        brand=brand,
+        article=article,
+        source=source,
+        priority=priority,
+    ):
+        stats[stat_key] = stats.get(stat_key, 0) + 1
+        stats["total"] += 1
+        return True
+    return False
+
+
 def enqueue_seed_candidates(db: Session, candidates: list[SyncCandidate]) -> int:
     inserted = 0
     for candidate in candidates:
@@ -118,65 +149,46 @@ def enqueue_seed_candidates(db: Session, candidates: list[SyncCandidate]) -> int
     return inserted
 
 
-def populate_seed_queue_from_catalog(db: Session, *, limit: int = 5000) -> dict[str, int]:
-    from app.services.new_parts_seo_sync_service import (
-        collect_distinct_product_candidates,
-        collect_order_item_candidates,
-    )
-
-    stats = {"orders": 0, "products": 0, "tecdoc": 0, "semantic": 0, "total": 0}
-    seen: set[str] = set()
-
-    for collector, key in (
-        (collect_order_item_candidates, "orders"),
-        (collect_distinct_product_candidates, "products"),
-    ):
-        for candidate in collector(db):
-            if candidate.lookup_key in seen:
-                continue
-            seen.add(candidate.lookup_key)
-            if _upsert_seed_row(
-                db,
-                lookup_key=candidate.lookup_key,
-                brand=candidate.brand,
-                article=candidate.article,
-                source=candidate.source,
-            ):
-                stats[key] += 1
-                stats["total"] += 1
-            if stats["total"] >= limit:
-                return stats
-
-    for brand, article in SEMANTIC_SEED_PAIRS:
-        lookup_key = build_product_lookup_key(brand, article)
-        if not lookup_key or lookup_key in seen:
-            continue
-        seen.add(lookup_key)
-        if _upsert_seed_row(
+def _populate_semantic(db: Session, *, seen: set[str], stats: dict[str, int], limit: int) -> None:
+    for brand, article in load_semantic_seed_pairs():
+        _try_add_pair(
             db,
-            lookup_key=lookup_key,
             brand=brand,
             article=article,
             source=SOURCE_SEMANTIC,
-            priority=50,
-        ):
-            stats["semantic"] += 1
-            stats["total"] += 1
+            priority=30,
+            seen=seen,
+            stats=stats,
+            stat_key="semantic",
+            total_limit=limit,
+        )
+        if stats["total"] >= limit:
+            return
 
-    catalog_articles: list[tuple[str, str]] = []
+
+def _populate_tecdoc(db: Session, *, seen: set[str], stats: dict[str, int], limit: int) -> None:
+    tecdoc_limit = int(settings.NEW_PARTS_SEO_SEED_TECDOC_LIMIT or 10000)
+    normalized_articles: set[str] = set()
     for product in _iter_catalog_products(db):
         if not is_working_catalog_product(product):
             continue
-        brand = (product.brand or "").strip()
         article = (product.article or "").strip()
-        if brand and article:
-            catalog_articles.append((brand, article))
-        if len(catalog_articles) >= 500:
+        norm = normalize_partnumber(article)
+        if norm:
+            normalized_articles.add(norm)
+        if len(normalized_articles) >= 5000:
             break
 
+    if not normalized_articles:
+        return
+
+    article_list = list(normalized_articles)
+    inserted_tecdoc = 0
     try:
-        article_numbers = [article for _, article in catalog_articles[:200]]
-        if article_numbers:
+        for offset in range(0, len(article_list), 200):
+            if inserted_tecdoc >= tecdoc_limit or stats["total"] >= limit:
+                break
+            batch = article_list[offset : offset + 200]
             cross_rows = (
                 db.query(TecdocArticleCrossList.Article, TecdocSupplier.Description)
                 .join(
@@ -187,30 +199,267 @@ def populate_seed_queue_from_catalog(db: Session, *, limit: int = 5000) -> dict[
                     TecdocSupplier,
                     TecdocSupplier.id == TecdocArticleCrossList.supplier,
                 )
-                .filter(TecdocArticleCrossList.Article.in_(article_numbers))
-                .limit(1000)
+                .filter(TecdocArticleCrossList.Article.in_(batch))
+                .limit(min(500, tecdoc_limit - inserted_tecdoc))
                 .all()
             )
             for cross_article, supplier_name in cross_rows:
+                if inserted_tecdoc >= tecdoc_limit or stats["total"] >= limit:
+                    break
                 brand = (supplier_name or "").strip()
                 article = (cross_article or "").strip()
-                lookup_key = build_product_lookup_key(brand, article)
-                if not lookup_key or lookup_key in seen:
-                    continue
-                seen.add(lookup_key)
-                if _upsert_seed_row(
+                if _try_add_pair(
                     db,
-                    lookup_key=lookup_key,
                     brand=brand,
                     article=article,
                     source=SOURCE_TECDOC,
-                    priority=80,
+                    priority=70,
+                    seen=seen,
+                    stats=stats,
+                    stat_key="tecdoc",
+                    total_limit=limit,
                 ):
-                    stats["tecdoc"] += 1
-                    stats["total"] += 1
+                    inserted_tecdoc += 1
     except Exception:
         logger.exception("TecDoc seed populate failed")
 
+
+def _populate_landing(db: Session, *, seen: set[str], stats: dict[str, int], limit: int) -> None:
+    landing_limit = min(3000, limit - stats["total"])
+    if landing_limit <= 0:
+        return
+
+    rows = (
+        db.query(SeoLandingPage)
+        .filter(SeoLandingPage.is_active.is_(True))
+        .order_by(SeoLandingPage.priority.asc(), SeoLandingPage.id.asc())
+        .all()
+    )
+    landing_added = 0
+
+    for row in rows:
+        if landing_added >= landing_limit or stats["total"] >= limit:
+            break
+
+        if row.kind == "brand_new" and row.brand_name:
+            brand_name = row.brand_name.strip()
+            card_rows = (
+                db.query(NewPartsSeoCard.brand, NewPartsSeoCard.article)
+                .filter(
+                    NewPartsSeoCard.is_active.is_(True),
+                    func.lower(NewPartsSeoCard.source) == ROSSKO_NEW_PART_SOURCE,
+                    func.lower(NewPartsSeoCard.brand) == brand_name.casefold(),
+                )
+                .order_by(NewPartsSeoCard.id.desc())
+                .limit(20)
+                .all()
+            )
+            if card_rows:
+                for card_brand, card_article in card_rows:
+                    if _try_add_pair(
+                        db,
+                        brand=card_brand,
+                        article=card_article,
+                        source=SOURCE_LANDING,
+                        priority=45,
+                        seen=seen,
+                        stats=stats,
+                        stat_key="landing",
+                        total_limit=limit,
+                    ):
+                        landing_added += 1
+            else:
+                for brand, article in load_semantic_seed_pairs():
+                    if brand.casefold() != brand_name.casefold():
+                        continue
+                    if _try_add_pair(
+                        db,
+                        brand=brand,
+                        article=article,
+                        source=SOURCE_LANDING,
+                        priority=45,
+                        seen=seen,
+                        stats=stats,
+                        stat_key="landing",
+                        total_limit=limit,
+                    ):
+                        landing_added += 1
+
+        elif row.kind == "category_new" and row.slug:
+            cards, _total = list_new_part_cards_by_category_slug(db, row.slug, page=1, page_size=15)
+            for card in cards:
+                if _try_add_pair(
+                    db,
+                    brand=card.brand,
+                    article=card.article,
+                    source=SOURCE_LANDING,
+                    priority=50,
+                    seen=seen,
+                    stats=stats,
+                    stat_key="landing",
+                    total_limit=limit,
+                ):
+                    landing_added += 1
+
+        elif row.kind in {"brand_used", "category_used"}:
+            for product in _iter_catalog_products(db):
+                if stats["total"] >= limit or landing_added >= landing_limit:
+                    break
+                if not is_working_catalog_product(product):
+                    continue
+                brand = (product.brand or "").strip()
+                article = (product.article or "").strip()
+                if row.kind == "brand_used" and row.brand_name:
+                    if brand.casefold() != row.brand_name.strip().casefold():
+                        continue
+                elif row.part_type_id:
+                    if product.part_type_id != row.part_type_id:
+                        continue
+                else:
+                    continue
+                if _try_add_pair(
+                    db,
+                    brand=brand,
+                    article=article,
+                    source=SOURCE_LANDING,
+                    priority=55,
+                    seen=seen,
+                    stats=stats,
+                    stat_key="landing",
+                    total_limit=limit,
+                ):
+                    landing_added += 1
+                    if landing_added >= landing_limit:
+                        break
+
+
+def _populate_card_cross_mining(db: Session, *, seen: set[str], stats: dict[str, int], limit: int) -> None:
+    from app.services.new_parts_seo_sync_service import extract_discovery_candidates_from_rossko
+
+    mining_limit = min(500, limit - stats["total"])
+    if mining_limit <= 0:
+        return
+
+    since = _utcnow() - timedelta(days=7)
+    payload_rows = (
+        db.query(SeoRosskoSeedQueue)
+        .filter(
+            SeoRosskoSeedQueue.rossko_payload_json.isnot(None),
+            SeoRosskoSeedQueue.status.in_(["ready", "created"]),
+        )
+        .order_by(SeoRosskoSeedQueue.updated_at.desc())
+        .limit(200)
+        .all()
+    )
+    mined = 0
+    for row in payload_rows:
+        if mined >= mining_limit or stats["total"] >= limit:
+            break
+        try:
+            data = json.loads(row.rossko_payload_json or "{}")
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        discoveries = extract_discovery_candidates_from_rossko(
+            data,
+            query_brand=row.brand,
+            query_article=row.article,
+        )
+        for candidate in discoveries:
+            if _try_add_pair(
+                db,
+                brand=candidate.brand,
+                article=candidate.article,
+                source=SOURCE_CARD_CROSS,
+                priority=55,
+                seen=seen,
+                stats=stats,
+                stat_key="card_cross",
+                total_limit=limit,
+            ):
+                mined += 1
+
+    card_rows = (
+        db.query(NewPartsSeoCard)
+        .filter(
+            NewPartsSeoCard.is_active.is_(True),
+            func.lower(NewPartsSeoCard.source) == ROSSKO_NEW_PART_SOURCE,
+            NewPartsSeoCard.created_at >= since,
+        )
+        .order_by(NewPartsSeoCard.created_at.desc())
+        .limit(300)
+        .all()
+    )
+    for card in card_rows:
+        if mined >= mining_limit or stats["total"] >= limit:
+            break
+        seed_row = (
+            db.query(SeoRosskoSeedQueue)
+            .filter(SeoRosskoSeedQueue.lookup_key == build_product_lookup_key(card.brand, card.article))
+            .first()
+        )
+        if seed_row and seed_row.rossko_payload_json:
+            continue
+        if _try_add_pair(
+            db,
+            brand=card.brand,
+            article=card.article,
+            source=SOURCE_CARD_CROSS,
+            priority=60,
+            seen=seen,
+            stats=stats,
+            stat_key="card_cross",
+            total_limit=limit,
+        ):
+            mined += 1
+
+
+def populate_seed_queue_from_catalog(
+    db: Session,
+    *,
+    limit: int | None = None,
+) -> dict[str, int]:
+    from app.services.new_parts_seo_sync_service import (
+        collect_distinct_product_candidates,
+        collect_order_item_candidates,
+    )
+
+    total_limit = limit if limit is not None else int(settings.NEW_PARTS_SEO_SEED_POPULATE_LIMIT or 20000)
+    stats: dict[str, int] = {
+        "orders": 0,
+        "products": 0,
+        "tecdoc": 0,
+        "semantic": 0,
+        "landing": 0,
+        "card_cross": 0,
+        "total": 0,
+    }
+    seen: set[str] = set()
+
+    for collector, key in (
+        (collect_order_item_candidates, "orders"),
+        (collect_distinct_product_candidates, "products"),
+    ):
+        for candidate in collector(db):
+            _try_add_pair(
+                db,
+                brand=candidate.brand,
+                article=candidate.article,
+                source=candidate.source,
+                priority=10 if key == "orders" else 20,
+                seen=seen,
+                stats=stats,
+                stat_key=key,
+                total_limit=total_limit,
+            )
+            if stats["total"] >= total_limit:
+                return stats
+
+    _populate_semantic(db, seen=seen, stats=stats, limit=total_limit)
+    _populate_landing(db, seen=seen, stats=stats, limit=total_limit)
+    _populate_tecdoc(db, seen=seen, stats=stats, limit=total_limit)
+    _populate_card_cross_mining(db, seen=seen, stats=stats, limit=total_limit)
     return stats
 
 
@@ -286,6 +535,27 @@ def load_seed_payload(row: SeoRosskoSeedQueue) -> dict | None:
         return None
 
 
+def _reactivate_due_not_found(db: Session, *, limit: int = 500) -> int:
+    now = _utcnow()
+    rows = (
+        db.query(SeoRosskoSeedQueue)
+        .filter(
+            SeoRosskoSeedQueue.status == "not_found",
+            SeoRosskoSeedQueue.next_retry_at.isnot(None),
+            SeoRosskoSeedQueue.next_retry_at <= now,
+        )
+        .order_by(SeoRosskoSeedQueue.next_retry_at.asc())
+        .limit(max(1, limit))
+        .all()
+    )
+    for row in rows:
+        row.status = "pending"
+        row.next_retry_at = None
+    if rows:
+        db.commit()
+    return len(rows)
+
+
 async def _fetch_rossko_search(db: Session, search_text: str) -> dict:
     from app.routers.rossko_api.rossko_api import (
         rossko_address_id,
@@ -314,12 +584,34 @@ def _rossko_has_in_stock(data: dict | None) -> bool:
     return False
 
 
-async def run_seed_precheck_batch(db: Session, *, max_checks: int | None = None) -> dict[str, int]:
+def _resolve_precheck_batch_size(db: Session, requested: int | None) -> int:
     budget = precheck_budget_remaining(db)
     if budget <= 0:
-        return {"checked": 0, "ready": 0, "not_found": 0, "skipped": 0}
+        return 0
+    ready_count = count_seed_queue_by_status(db, "ready")
+    target = int(settings.NEW_PARTS_SEO_SEED_READY_TARGET or 1500)
+    from app.services.new_parts_seo_sync_service import count_seo_cards_created_today
 
-    limit = min(budget, max_checks or budget)
+    daily_limit = int(settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT or 1000)
+    created_today = count_seo_cards_created_today(db)
+    deficit = max(0, daily_limit - created_today)
+
+    batch = requested if requested is not None else budget
+    if ready_count < deficit or ready_count < target:
+        batch = min(budget, max(batch, budget // 2))
+    return max(0, min(budget, batch))
+
+
+async def run_seed_precheck_batch(db: Session, *, max_checks: int | None = None) -> dict[str, int]:
+    ready_count = count_seed_queue_by_status(db, "ready")
+    target = int(settings.NEW_PARTS_SEO_SEED_READY_TARGET or 1500)
+    if ready_count < min(200, target):
+        _reactivate_due_not_found(db, limit=500)
+
+    limit = _resolve_precheck_batch_size(db, max_checks)
+    if limit <= 0:
+        return {"checked": 0, "ready": 0, "not_found": 0, "skipped": 0, "reactivated": 0}
+
     now = _utcnow()
     rows = (
         db.query(SeoRosskoSeedQueue)
@@ -332,7 +624,7 @@ async def run_seed_precheck_batch(db: Session, *, max_checks: int | None = None)
         .all()
     )
 
-    stats = {"checked": 0, "ready": 0, "not_found": 0, "skipped": 0}
+    stats = {"checked": 0, "ready": 0, "not_found": 0, "skipped": 0, "reactivated": 0}
     delay = float(settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC or 0)
 
     import asyncio
@@ -358,3 +650,15 @@ async def run_seed_precheck_batch(db: Session, *, max_checks: int | None = None)
             await asyncio.sleep(delay)
 
     return stats
+
+
+async def maybe_run_precheck_boost(db: Session) -> dict[str, int] | None:
+    ready_count = count_seed_queue_by_status(db, "ready")
+    from app.services.new_parts_seo_sync_service import count_seo_cards_created_today
+
+    daily_limit = int(settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT or 1000)
+    created_today = count_seo_cards_created_today(db)
+    deficit = max(0, daily_limit - created_today)
+    if ready_count >= deficit or precheck_budget_remaining(db) <= 0:
+        return None
+    return await run_seed_precheck_batch(db)

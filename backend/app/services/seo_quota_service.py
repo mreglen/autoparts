@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from datetime import date, datetime, timezone
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -105,6 +106,26 @@ def count_seed_queue_by_status(db: Session, status: str) -> int:
     )
 
 
+def count_seed_by_source(db: Session) -> dict[str, dict[str, int]]:
+    rows = (
+        db.query(
+            SeoRosskoSeedQueue.source,
+            SeoRosskoSeedQueue.status,
+            func.count(SeoRosskoSeedQueue.lookup_key),
+        )
+        .group_by(SeoRosskoSeedQueue.source, SeoRosskoSeedQueue.status)
+        .all()
+    )
+    result: dict[str, dict[str, int]] = {}
+    for source, status, count in rows:
+        bucket = result.setdefault(str(source or "unknown"), {"pending": 0, "ready": 0, "other": 0})
+        if status in bucket:
+            bucket[status] = int(count or 0)
+        else:
+            bucket["other"] = bucket.get("other", 0) + int(count or 0)
+    return result
+
+
 def get_quota_status(db: Session, *, daily_limit: int | None = None) -> dict[str, object]:
     limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
     created_today = _count_created_today(db)
@@ -118,6 +139,8 @@ def get_quota_status(db: Session, *, daily_limit: int | None = None) -> dict[str
     precheck_limit = int(settings.NEW_PARTS_SEO_SEED_PRECHECK_DAILY or 0)
     precheck_used = count_precheck_calls_today(db)
     guaranteed_ceiling = min(limit, ready_count + created_today) if ready_count else created_today
+    pool_days_estimate = round(ready_count / limit, 1) if limit > 0 and ready_count else 0.0
+    seed_by_source = count_seed_by_source(db)
 
     return {
         "daily_limit": limit,
@@ -129,6 +152,9 @@ def get_quota_status(db: Session, *, daily_limit: int | None = None) -> dict[str
         "seed_pending": pending_seed,
         "seed_ready": ready_count,
         "guaranteed_ceiling": guaranteed_ceiling,
+        "pool_days_estimate": pool_days_estimate,
+        "seed_ready_target": int(settings.NEW_PARTS_SEO_SEED_READY_TARGET or 1500),
+        "seed_by_source": seed_by_source,
         "cross_recurse_used": recurse_used,
         "cross_recurse_limit": recurse_limit,
         "precheck_used": precheck_used,

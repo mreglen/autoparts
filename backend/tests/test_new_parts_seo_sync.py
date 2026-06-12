@@ -396,6 +396,35 @@ class SeoSyncBatchRunTests(unittest.TestCase):
         self.assertEqual(result.created, 0)
 
 
+class CountSeoCardsCreatedTodayTests(unittest.TestCase):
+    def test_counts_cards_not_sync_log_rows(self):
+        from app.services.new_parts_seo_sync_service import count_seo_cards_created_today
+
+        db = MagicMock()
+        card_query = MagicMock()
+        log_query = MagicMock()
+        db.query.side_effect = [card_query, log_query]
+        card_query.filter.return_value = card_query
+        card_query.count.return_value = 5
+
+        self.assertEqual(count_seo_cards_created_today(db), 5)
+        log_query.count.assert_not_called()
+
+    def test_falls_back_to_sync_log_when_no_cards(self):
+        from app.services.new_parts_seo_sync_service import count_seo_cards_created_today
+
+        db = MagicMock()
+        card_query = MagicMock()
+        log_query = MagicMock()
+        db.query.side_effect = [card_query, log_query]
+        card_query.filter.return_value = card_query
+        log_query.filter.return_value = log_query
+        card_query.count.return_value = 0
+        log_query.count.return_value = 2
+
+        self.assertEqual(count_seo_cards_created_today(db), 2)
+
+
 class QuotaCatchupTests(unittest.TestCase):
     @patch("app.services.seo_quota_service.settings")
     def test_expected_created_scales_with_hour(self, mock_settings):
