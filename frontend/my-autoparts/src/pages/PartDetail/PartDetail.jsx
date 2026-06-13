@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
@@ -72,8 +72,7 @@ const PartDetail = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
-  const { currentProduct, loading, error } = useSelector((state) => state.products);
-  const { organization } = useSelector((state) => state.organization);
+  const { currentProduct, error } = useSelector((state) => state.products);
   const { user } = useSelector((state) => state.auth);
   const cart = useSelector(selectCart);
   const [addingToCartId, setAddingToCartId] = useState(null);
@@ -84,6 +83,37 @@ const PartDetail = () => {
   const [creatingChat, setCreatingChat] = useState(false);
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [apiSeo, setApiSeo] = useState(null);
+  const fetchedProductIdRef = useRef(null);
+  const searchedBrandArticleRef = useRef(null);
+
+  const productMatchesRoute = useMemo(() => {
+    if (!currentProduct?.id) return false;
+
+    if (extractedProductId) {
+      const numericId = parseInt(extractedProductId, 10);
+      if (!Number.isNaN(numericId) && numericId > 0) {
+        return currentProduct.id === numericId;
+      }
+    }
+
+    if (extractedBrand && extractedArticle) {
+      const decodedBrand = decodeURIComponent(extractedBrand).toLowerCase();
+      const decodedArticle = decodeURIComponent(extractedArticle).toLowerCase();
+      return (
+        (currentProduct.brand || '').toLowerCase() === decodedBrand &&
+        (currentProduct.article || '').toLowerCase() === decodedArticle
+      );
+    }
+
+    return true;
+  }, [currentProduct, extractedProductId, extractedBrand, extractedArticle]);
+
+  const showProduct = Boolean(productMatchesRoute && currentProduct);
+
+  useEffect(() => {
+    fetchedProductIdRef.current = null;
+    searchedBrandArticleRef.current = null;
+  }, [combinedParam]);
 
   useEffect(() => {
     const path = location.pathname;
@@ -115,13 +145,22 @@ const PartDetail = () => {
     if (extractedProductId) {
       const numericId = parseInt(extractedProductId, 10);
       if (!Number.isNaN(numericId) && numericId > 0) {
-      // Use the extracted product ID to fetch directly
+        if (fetchedProductIdRef.current === numericId) {
+          return;
+        }
+        fetchedProductIdRef.current = numericId;
         dispatch(fetchPublicProduct(numericId));
         return;
       }
     }
 
     if (extractedBrand && extractedArticle) {
+      const searchKey = `${extractedBrand}|${extractedArticle}`;
+      if (searchedBrandArticleRef.current === searchKey) {
+        return;
+      }
+      searchedBrandArticleRef.current = searchKey;
+
       const fetchByBrandAndArticle = async () => {
         try {
           // Decode brand and article in case they contain encoded characters
@@ -137,12 +176,14 @@ const PartDetail = () => {
           );
           
           if (matchedProduct) {
+            fetchedProductIdRef.current = matchedProduct.id;
             dispatch(fetchPublicProduct(matchedProduct.id));
           } else {
             const articleMatch = data.find(p => 
               p.article?.toLowerCase() === decodedArticle.toLowerCase()
             );
             if (articleMatch) {
+              fetchedProductIdRef.current = articleMatch.id;
               dispatch(fetchPublicProduct(articleMatch.id));
             }
           }
@@ -347,18 +388,7 @@ const PartDetail = () => {
     setIsMediaModalOpen(true);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        {apiSeo ? <PartProductSeoHelmet seo={apiSeo} structuredData={null} product={null} /> : null}
-        <div className="text-center">
-          <p className="text-lg text-gray-600">Загрузка информации о запчасти...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
+  if (!showProduct && error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Helmet>
@@ -379,27 +409,20 @@ const PartDetail = () => {
     );
   }
 
-  if (!currentProduct) {
+  if (!showProduct) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Helmet>
-          <title>Запчасть не найдена | Свой Гараж</title>
-          <meta name="robots" content="noindex, nofollow" />
-        </Helmet>
-        <div className="text-center">
-          <p className="text-lg text-gray-600">Запчасть не найдена</p>
-          <button 
-            onClick={() => navigate(-1)}
-            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-          >
-            Назад
-          </button>
+      <div className="min-h-screen bg-gray-50 max-md:pb-28">
+        {apiSeo ? <PartProductSeoHelmet seo={apiSeo} structuredData={null} product={null} /> : null}
+        <div className="max-w-6xl mx-auto px-4 py-16">
+          <div className="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center shadow-sm">
+            <p className="text-lg text-gray-600">Загрузка информации о запчасти...</p>
+          </div>
         </div>
       </div>
     );
   }
 
-  const sellerOrg = currentProduct.organization || organization;
+  const sellerOrg = currentProduct.organization;
   const localSeo = buildProductSeo(currentProduct);
   const seo = apiSeo
     ? { ...localSeo, ...apiSeo, jsonLd: localSeo.jsonLd }

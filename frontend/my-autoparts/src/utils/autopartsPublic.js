@@ -31,6 +31,14 @@ export function getUsedPartsUrlQuery(searchParams) {
   return (searchParams.get('q') || '').trim();
 }
 
+/** Страница /autoparts/used только с параметром ?q= (без других фильтров). */
+export function isUsedCatalogQueryOnlyPage(searchParams) {
+  if (!searchParams) return false;
+  if (!getUsedPartsUrlQuery(searchParams)) return false;
+  const allowedKeys = new Set(['q']);
+  return [...searchParams.keys()].every((key) => allowedKeys.has(key));
+}
+
 /** Основной список б/у всегда из быстрого каталога (в т.ч. при ?q=). */
 export function isUsedCatalogBrowseMode() {
   return true;

@@ -1207,9 +1207,13 @@ const productSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
             })
-            .addCase(fetchPublicProduct.pending, (state) => {
+            .addCase(fetchPublicProduct.pending, (state, action) => {
                 state.loading = true;
                 state.error = null;
+                const nextId = action.meta.arg;
+                if (state.currentProduct?.id !== nextId) {
+                    state.currentProduct = null;
+                }
             })
             .addCase(fetchPublicProduct.fulfilled, (state, action) => {
                 state.loading = false;

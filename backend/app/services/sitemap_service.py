@@ -5,9 +5,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Iterable
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
-from app.core.config import settings
 from app.core.config import settings
 from app.models.product import Product as ProductModel
 from app.models.new_parts_seo_card import NewPartsSeoCard
@@ -22,10 +21,11 @@ from app.services.new_parts_seo_card_service import (
     iter_rossko_new_part_cards_for_sitemap,
 )
 from app.services.yandex_feed_xml_service import _iter_catalog_products, _resolve_site_origin
-from app.utils.product_urls import build_product_page_url
+from app.utils.product_urls import build_product_page_url, build_product_used_catalog_url
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
 
 DEFAULT_PRODUCT_URLS_LIMIT = 150
+PRODUCT_URL_DOWNLOAD_LIMIT = DEFAULT_PRODUCT_URLS_LIMIT
 
 
 def get_seo_sitemap_daily_url_limit() -> int:
@@ -409,6 +409,57 @@ def collect_working_product_urls(
     return items
 
 
+def _iter_catalog_products_by_created_desc(db: Session) -> list[ProductModel]:
+    return (
+        db.query(ProductModel)
+        .options(selectinload(ProductModel.photos))
+        .filter(ProductModel.quantity > 0)
+        .order_by(ProductModel.created_at.desc(), ProductModel.id.desc())
+        .all()
+    )
+
+
+def collect_latest_working_product_urls(
+    db: Session,
+    *,
+    limit: int = PRODUCT_URL_DOWNLOAD_LIMIT,
+    preferred_host_url: str | None = None,
+) -> list[dict[str, str | int]]:
+    """
+    Последние добавленные рабочие карточки б/у из таблицы products для SEO-выгрузки.
+    Сортировка: created_at DESC, id DESC.
+    """
+    site_origin = _resolve_origin(db, preferred_host_url)
+    items: list[dict[str, str | int]] = []
+
+    for product in _iter_catalog_products_by_created_desc(db):
+        if not is_working_catalog_product(product):
+            continue
+        items.append(_product_to_url_item(product, site_origin))
+        if len(items) >= limit:
+            break
+
+    return items
+
+
+def generate_latest_product_urls_download(
+    db: Session,
+    *,
+    limit: int = PRODUCT_URL_DOWNLOAD_LIMIT,
+    preferred_host_url: str | None = None,
+) -> tuple[str, list[dict[str, str | int]], date]:
+    items = collect_latest_working_product_urls(
+        db,
+        limit=limit,
+        preferred_host_url=preferred_host_url,
+    )
+    if not items:
+        return "", [], _export_date_today()
+    urls = [str(item["url"]) for item in items]
+    content = "\n".join(urls) + "\n"
+    return content, items, _export_date_today()
+
+
 def _load_or_create_used_url_batch(
     db: Session,
     *,
@@ -589,6 +640,28 @@ def generate_product_urls_text_file(
     return "\n".join(urls) + "\n"
 
 
+def _product_sitemap_url_block(
+    loc: str,
+    *,
+    lastmod: date | None,
+    priority: str,
+) -> str:
+    url_lines = [
+        "  <url>",
+        f"    <loc>{loc}</loc>",
+    ]
+    if lastmod is not None:
+        url_lines.append(f"    <lastmod>{lastmod.isoformat()}</lastmod>")
+    url_lines.extend(
+        [
+            "    <changefreq>weekly</changefreq>",
+            f"    <priority>{priority}</priority>",
+            "  </url>",
+        ]
+    )
+    return "\n".join(url_lines)
+
+
 def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
     site_origin = _resolve_origin(db, preferred_host_url)
     lines = [
@@ -600,23 +673,19 @@ def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = 
     for product in _iter_catalog_products(db):
         if not is_working_catalog_product(product):
             continue
-        loc = build_product_page_url(product, site_origin)
-        priority = "0.8" if product.is_new else "0.85"
         lastmod = _product_lastmod_date(product)
-        url_lines = [
-            "  <url>",
-            f"    <loc>{loc}</loc>",
-        ]
-        if lastmod is not None:
-            url_lines.append(f"    <lastmod>{lastmod.isoformat()}</lastmod>")
-        url_lines.extend(
-            [
-                "    <changefreq>weekly</changefreq>",
-                f"    <priority>{priority}</priority>",
-                "  </url>",
-            ]
-        )
-        lines.extend(url_lines)
+        part_priority = "0.8" if product.is_new else "0.85"
+        lines.append(_product_sitemap_url_block(
+            build_product_page_url(product, site_origin),
+            lastmod=lastmod,
+            priority=part_priority,
+        ))
+        url_count += 1
+        lines.append(_product_sitemap_url_block(
+            build_product_used_catalog_url(product, site_origin),
+            lastmod=lastmod,
+            priority="0.75",
+        ))
         url_count += 1
 
     lines.append("</urlset>")

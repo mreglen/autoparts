@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from app.services.sitemap_service import (
     NEW_PARTS_SITEMAP_CACHE_KEY,
     PRODUCTS_SITEMAP_CACHE_KEY,
+    PRODUCT_URL_DOWNLOAD_LIMIT,
     _product_lastmod_date,
     _split_seo_url_limit,
     append_new_part_card_to_sitemap_cache,
@@ -13,6 +14,8 @@ from app.services.sitemap_service import (
     build_new_parts_sitemap_xml,
     build_products_sitemap_xml,
     build_sitemap_index_xml,
+    collect_latest_working_product_urls,
+    generate_latest_product_urls_download,
     generate_product_urls_text_file,
     get_products_sitemap_snapshot,
     is_sitemap_cache_stale,
@@ -49,6 +52,67 @@ class GenerateProductUrlsTextFileTests(unittest.TestCase):
             self.assertNotIn("#", line)
 
 
+class LatestWorkingProductUrlsTests(unittest.TestCase):
+    def _working_product(self, *, pid: int, created_at: datetime):
+        photo = MagicMock()
+        photo.photo_url = "https://cdn.example/photo.jpg"
+        product = MagicMock()
+        product.id = pid
+        product.quantity = 1
+        product.brand = "BOSCH"
+        product.article = f"A{pid}"
+        product.name = f"Part {pid}"
+        product.photos = [photo]
+        product.created_at = created_at
+        return product
+
+    @patch("app.services.sitemap_service._resolve_origin", return_value="https://svoygarage.ru")
+    @patch("app.services.sitemap_service.build_product_page_url")
+    @patch("app.services.sitemap_service.is_working_catalog_product", return_value=True)
+    @patch("app.services.sitemap_service._iter_catalog_products_by_created_desc")
+    def test_collect_latest_returns_newest_first_up_to_limit(
+        self,
+        mock_iter,
+        _is_working,
+        mock_build_url,
+        _origin,
+    ):
+        mock_build_url.side_effect = lambda product, origin: f"{origin}/part/{product.id}"
+
+        older = self._working_product(pid=1, created_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+        newer = self._working_product(pid=2, created_at=datetime(2026, 6, 1, tzinfo=timezone.utc))
+        newest = self._working_product(pid=3, created_at=datetime(2026, 6, 10, tzinfo=timezone.utc))
+        mock_iter.return_value = [newest, newer, older]
+
+        items = collect_latest_working_product_urls(MagicMock(), limit=2)
+
+        self.assertEqual([item["id"] for item in items], [3, 2])
+        self.assertTrue(all("/part/" in item["url"] for item in items))
+        self.assertTrue(all("/autoparts/new/" not in item["url"] for item in items))
+
+    @patch("app.services.sitemap_service._export_date_today", return_value=date(2026, 6, 13))
+    @patch("app.services.sitemap_service.collect_latest_working_product_urls")
+    def test_generate_latest_download_uses_only_product_urls(self, mock_collect, _export_date):
+        mock_collect.return_value = [
+            {"id": 10, "url": "https://svoygarage.ru/part/10-bosch-a10"},
+            {"id": 9, "url": "https://svoygarage.ru/part/9-bosch-a9"},
+        ]
+
+        content, items, export_date = generate_latest_product_urls_download(MagicMock(), limit=PRODUCT_URL_DOWNLOAD_LIMIT)
+
+        self.assertEqual(export_date, date(2026, 6, 13))
+        self.assertEqual(len(items), 2)
+        self.assertEqual(
+            content.strip().split("\n"),
+            [
+                "https://svoygarage.ru/part/10-bosch-a10",
+                "https://svoygarage.ru/part/9-bosch-a9",
+            ],
+        )
+        mock_collect.assert_called_once()
+        self.assertEqual(mock_collect.call_args.kwargs["limit"], PRODUCT_URL_DOWNLOAD_LIMIT)
+
+
 class ProductLastmodTests(unittest.TestCase):
     def test_uses_updated_at_in_utc(self):
         product = MagicMock()
@@ -73,15 +137,20 @@ class BuildProductsSitemapXmlTests(unittest.TestCase):
     @patch("app.services.sitemap_service._iter_catalog_products")
     @patch("app.services.sitemap_service._resolve_origin")
     @patch("app.services.sitemap_service.is_working_catalog_product", return_value=True)
+    @patch("app.services.sitemap_service.build_product_used_catalog_url")
     @patch("app.services.sitemap_service.build_product_page_url", return_value="https://svoygarage.ru/part/1-a-b")
     def test_lastmod_differs_by_product_dates(
         self,
         _build_url,
+        mock_used_url,
         _is_working,
         mock_origin,
         mock_iter,
     ):
         mock_origin.return_value = "https://svoygarage.ru"
+        mock_used_url.side_effect = (
+            lambda product, origin: f"{origin}/autoparts/used?q={product.id}"
+        )
         older = MagicMock()
         older.id = 1
         older.is_new = True
@@ -96,9 +165,11 @@ class BuildProductsSitemapXmlTests(unittest.TestCase):
 
         xml, url_count = build_products_sitemap_xml(MagicMock())
 
-        self.assertEqual(url_count, 2)
+        self.assertEqual(url_count, 4)
         self.assertIn("<lastmod>2026-01-01</lastmod>", xml)
         self.assertIn("<lastmod>2026-05-20</lastmod>", xml)
+        self.assertIn("/autoparts/used?q=1", xml)
+        self.assertIn("/autoparts/used?q=2", xml)
         self.assertNotIn("<lastmod>2026-05-29</lastmod>", xml)
 
 

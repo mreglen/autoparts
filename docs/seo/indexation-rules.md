@@ -22,6 +22,7 @@
 | `/autoparts/new/part/{id}-…` | index, follow | self | `NewPartDetailPage` / prerender |
 | `/autoparts/used` | index, follow | `/autoparts/used` | `buildUsedPartsSeo` |
 | `/autoparts/used?q=…` | noindex, follow | `/autoparts/used` | `buildUsedPartsSeo` |
+| `/autoparts/used?q={brand} {article}` (канонический запрос рабочей карточки) | index, follow | self (`/autoparts/used?q=…`) | `_build_used_parts_seo` + resolver |
 | `/autoparts/used?brand=…` | noindex, follow | `/autoparts/used/brand/{slug}` если один бренд | `buildUsedPartsSeo` + `resolveBrandLandingCanonical` |
 | `/autoparts/used/brand/{slug}` | index, follow | self | `usedPartsBrandSeo` |
 | `/autoparts/used/category/{slug}` | index, follow | self | `usedPartsCategorySeo` |

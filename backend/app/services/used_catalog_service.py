@@ -5,7 +5,40 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.organization import Organization
 from app.models.product import Product, ProductPhoto
+from app.utils.product_urls import build_product_used_catalog_search_query
 from app.utils.slug_utils import slugify_brand
+
+
+def _normalize_used_catalog_query(q: str) -> str:
+    return (q or "").strip().casefold()
+
+
+def find_working_product_by_used_catalog_query(db: Session, q: str) -> Product | None:
+    """
+    Находит единственную рабочую карточку, если q совпадает с каноническим запросом каталога.
+    """
+    from app.services.sitemap_service import is_working_catalog_product
+
+    normalized_q = _normalize_used_catalog_query(q)
+    if not normalized_q:
+        return None
+
+    products = (
+        db.query(Product)
+        .options(selectinload(Product.photos))
+        .filter(_in_stock_filter())
+        .all()
+    )
+
+    matches = [
+        product
+        for product in products
+        if _normalize_used_catalog_query(build_product_used_catalog_search_query(product)) == normalized_q
+        and is_working_catalog_product(product)
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    return None
 
 
 def _in_stock_filter():

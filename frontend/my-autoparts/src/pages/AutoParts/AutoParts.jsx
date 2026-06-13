@@ -26,11 +26,13 @@ import {
   buildUsedCatalogParams,
   buildUsedCatalogFilterParams,
   getUsedPartsUrlQuery,
+  isUsedCatalogQueryOnlyPage,
   apiSortToUi,
   uiSortToApi,
   getNewUiSort,
 } from '../../utils/autopartsPublic';
 import { buildAutoPartsSeo, PageSeoHelmet } from '../../utils/pageSeo';
+import { apiAxiosUnauth } from '../../utils/apiClient';
 
 const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs'];
 
@@ -304,10 +306,45 @@ function AutoParts() {
     dispatch(fetchCart());
   }, [dispatch]);
 
-  const seo = useMemo(
+  const fallbackSeo = useMemo(
     () => buildAutoPartsSeo(location.pathname, searchParams),
     [location.pathname, searchParams]
   );
+
+  const usedQueryOnlyPage = location.pathname === '/autoparts/used'
+    && isUsedCatalogQueryOnlyPage(searchParams);
+  const [usedQueryPageSeo, setUsedQueryPageSeo] = useState(null);
+
+  useEffect(() => {
+    if (!usedQueryOnlyPage) {
+      setUsedQueryPageSeo(null);
+      return undefined;
+    }
+
+    const path = `${location.pathname}${location.search}`;
+    let cancelled = false;
+
+    apiAxiosUnauth
+      .get('/public/page-meta', { params: { path } })
+      .then((response) => {
+        if (cancelled) return;
+        setUsedQueryPageSeo({
+          title: response.data.title,
+          description: response.data.description,
+          canonicalUrl: response.data.canonical_url,
+          robots: response.data.robots,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setUsedQueryPageSeo(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [usedQueryOnlyPage, location.pathname, location.search]);
+
+  const seo = usedQueryPageSeo || fallbackSeo;
 
   if (status === 'loading' && activeTab === 'rossko' && effectiveQuery) {
     return (

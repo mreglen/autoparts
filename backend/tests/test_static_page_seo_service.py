@@ -29,12 +29,42 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/new")
         self.assertEqual(meta.robots, "noindex, follow")
 
-    def test_used_parts_search_seo(self):
+    def test_used_parts_search_seo_without_db_stays_noindex(self):
         meta = get_static_page_seo_for_path(None, "/autoparts/used?q=24410-3E500")
         self.assertIsNotNone(meta)
         self.assertIn("24410-3E500", meta.title)
         self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/used")
         self.assertEqual(meta.robots, "noindex, follow")
+
+    @patch("app.services.static_page_seo_service.build_product_page_url")
+    @patch("app.services.static_page_seo_service.build_product_used_catalog_url")
+    @patch("app.services.used_catalog_service.find_working_product_by_used_catalog_query")
+    def test_used_parts_canonical_product_query_is_indexable(
+        self,
+        mock_find_product,
+        mock_used_url,
+        mock_part_url,
+    ):
+        product = MagicMock(
+            id=42,
+            brand="BOSCH",
+            article="A123",
+            name="Filter",
+            is_new=False,
+        )
+        mock_find_product.return_value = product
+        mock_used_url.return_value = "https://svoygarage.ru/autoparts/used?q=BOSCH%20A123"
+        mock_part_url.return_value = "https://svoygarage.ru/part/42-BOSCH-A123"
+
+        db = MagicMock()
+        meta = get_static_page_seo_for_path(db, "/autoparts/used?q=BOSCH%20A123")
+
+        self.assertIsNotNone(meta)
+        self.assertEqual(meta.robots, "index, follow")
+        self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/used?q=BOSCH%20A123")
+        self.assertIn("BOSCH", meta.title)
+        html = render_static_page_prerender_html(meta)
+        self.assertIn("BOSCH", html)
 
     def test_used_parts_single_brand_canonical_to_landing(self):
         meta = get_static_page_seo_for_path(None, "/autoparts/used?brand=BOSCH")

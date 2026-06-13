@@ -48,7 +48,7 @@ function SourceOverview({ overview, loading }) {
     return <LoadingState label="Загрузка очереди…" />;
   }
   if (!sources.length) {
-    return <p className="mt-4 text-sm text-gray-500">Очередь пуста — сначала нажмите «Наполнить» в разделе SEO.</p>;
+    return <p className="mt-4 text-sm text-gray-500">Очередь пуста — пополнение идёт автоматически по расписанию.</p>;
   }
 
   return (

@@ -11,7 +11,7 @@ from app.models.product import Product as ProductModel
 from app.services.spa_page_check_service import PART_PATH_RE, _normalize_path
 from app.services.yandex_feed_xml_service import _resolve_site_origin
 from app.utils.product_display_name import format_product_display_title
-from app.utils.product_urls import build_product_page_url
+from app.utils.product_urls import build_product_page_url, build_product_used_catalog_url
 from app.utils.seo_constants import resolve_default_og_image_url
 
 DEFAULT_SITE_ORIGIN = "https://svoygarage.ru"
@@ -125,16 +125,49 @@ def _build_new_parts_seo(
     )
 
 
+def _used_parts_query_is_q_only(query_params: dict) -> bool:
+    allowed = {"q"}
+    if set(query_params.keys()) - allowed:
+        return False
+    q = (query_params.get("q") or [None])[0]
+    return bool((q or "").strip())
+
+
 def _build_used_parts_seo(
     site_origin: str,
     query: str | None,
     *,
     brands: list[str] | None = None,
+    db: Session | None = None,
 ) -> StaticPageSeoMeta:
     from app.services.seo_semantics_service import resolve_single_brand_landing_path
+    from app.services.used_catalog_service import find_working_product_by_used_catalog_query
 
     q = (query or "").strip()
     brand_list = [b.strip() for b in (brands or []) if b and str(b).strip()]
+
+    if q and not brand_list and db is not None:
+        product = find_working_product_by_used_catalog_query(db, q)
+        if product is not None:
+            brand = (product.brand or "").strip()
+            article = (product.article or "").strip()
+            name = format_product_display_title(brand, article, product.name)
+            canonical_url = build_product_used_catalog_url(product, site_origin)
+            part_url = build_product_page_url(product, site_origin)
+            condition = "новая" if product.is_new else "б/у"
+            return StaticPageSeoMeta(
+                title=f"{name} — б/у запчасти | Свой Гараж",
+                description=_truncate(
+                    f"{condition.capitalize()} автозапчасть {name}. "
+                    "Фото, описание и чат с продавцом на «Свой Гараж».",
+                    160,
+                ),
+                canonical_url=canonical_url,
+                h1=name,
+                robots="index, follow",
+                card_links=((name, part_url),),
+            )
+
     brand_landing_path = resolve_single_brand_landing_path("used", brand_list, has_text_query=bool(q))
     has_filters = bool(q or brand_list)
 
@@ -383,7 +416,12 @@ def get_static_page_seo_for_path(
     if path == "/autoparts/new":
         return _build_new_parts_seo(origin, search_q, brands=brand_filters)
     if path == "/autoparts/used":
-        return _build_used_parts_seo(origin, search_q, brands=brand_filters)
+        return _build_used_parts_seo(
+            origin,
+            search_q,
+            brands=brand_filters,
+            db=db if _used_parts_query_is_q_only(query_params) else None,
+        )
     if path == "/about":
         return _build_about_seo(origin)
 

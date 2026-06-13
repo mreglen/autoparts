@@ -50,11 +50,10 @@ from app.services.photo_localization import (
     migrate_external_product_photos,
 )
 from app.services.sitemap_service import (
-    generate_product_urls_text_file,
-    get_daily_seo_url_batch,
+    DEFAULT_PRODUCT_URLS_LIMIT,
+    generate_latest_product_urls_download,
     get_new_parts_sitemap_cache_meta,
     get_products_sitemap_cache_meta,
-    get_seo_sitemap_daily_url_limit,
     get_site_sitemap_files,
     summarize_site_page_counts,
     rebuild_all_sitemaps_cache,
@@ -1298,30 +1297,20 @@ def download_product_card_urls(
     db: Session = Depends(get_db),
 ):
     integration = get_or_create_yandex_integration(db)
-    effective_limit = limit if limit is not None else get_seo_sitemap_daily_url_limit()
-    used_items, rossko_items, export_date, _created, _pool_reset = get_daily_seo_url_batch(
+    effective_limit = limit if limit is not None else DEFAULT_PRODUCT_URLS_LIMIT
+    content, items, export_date = generate_latest_product_urls_download(
         db,
         limit=effective_limit,
         preferred_host_url=integration.host_url,
     )
-    if not used_items and not rossko_items:
+    if not items:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Нет карточек б/у или Rossko для формирования списка URL",
+            detail="Нет рабочих карточек б/у в таблице products для формирования списка URL",
         )
 
-    content = generate_product_urls_text_file(
-        db,
-        limit=effective_limit,
-        preferred_host_url=integration.host_url,
-        used_items=used_items,
-        rossko_items=rossko_items,
-        export_date=export_date,
-        created_new_batch=_created,
-        pool_was_reset=_pool_reset,
-    )
-    total_count = len(used_items) + len(rossko_items)
-    filename = f"seo-card-urls-{export_date.isoformat()}-{total_count}.txt"
+    total_count = len(items)
+    filename = f"seo-product-urls-{export_date.isoformat()}-{total_count}.txt"
     return Response(
         content=content,
         media_type="text/plain; charset=utf-8",
