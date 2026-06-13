@@ -59,10 +59,19 @@ export function buildHomeStructuredData() {
       '@type': 'SearchAction',
       target: {
         '@type': 'EntryPoint',
-        urlTemplate: `${SITE_ORIGIN}/autoparts/used?q={search_term_string}`,
+        urlTemplate: `${SITE_ORIGIN}/find?q={search_term_string}`,
       },
       'query-input': 'required name=search_term_string',
     },
+  };
+}
+
+export function buildFindSeo() {
+  return {
+    title: 'Поиск запчастей | Свой Гараж',
+    description: 'Поиск автозапчастей на «Свой Гараж».',
+    canonicalUrl: absoluteUrl('/find'),
+    robots: 'noindex, follow',
   };
 }
 

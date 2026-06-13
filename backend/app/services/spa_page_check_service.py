@@ -34,6 +34,7 @@ class _RouteRule:
 # Маршруты синхронизированы с frontend/my-autoparts/src/App.js
 _SPA_ROUTE_RULES: tuple[_RouteRule, ...] = (
     _RouteRule(re.compile(r"^/$")),
+    _RouteRule(re.compile(r"^/find$")),
     _RouteRule(re.compile(r"^/auth$")),
     _RouteRule(re.compile(r"^/auth/password-reset$")),
     _RouteRule(re.compile(r"^/autoparts$")),

@@ -1,11 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchSearchResults, setSearchQuery as setGlobalSearchQuery } from '../../redux/slices/RosskoSlice';
-import { searchUsedParts } from '../../redux/slices/ProductSlice';
-import { apiAxiosUnauth } from '../../utils/apiClient';
-import { buildPartDetailPath } from '../../utils/partRoutes';
-
+import { useSelector } from 'react-redux';
 import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 import ReviewsSection from '../../components/Reviews/ReviewsSection';
 import FeaturedLandingsSection from '../../components/Seo/FeaturedLandingsSection';
@@ -40,7 +35,6 @@ const featureItems = [
 ];
 
 function Main() {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
   const showSiteReviews = useShowSiteReviews();
@@ -52,33 +46,13 @@ function Main() {
   const seo = buildHomeSeo();
   const homeStructuredData = buildHomeStructuredData();
 
-  const runSearch = async (e) => {
+  const runSearch = (e) => {
     e?.preventDefault();
     const trimmed = query.trim();
     if (!trimmed || busy) return;
     setBusy(true);
-
-    try {
-      const { data } = await apiAxiosUnauth.get('/search-products/resolve', {
-        params: { q: trimmed },
-      });
-
-      if (data.status === 'found' && data.product) {
-        navigate(buildPartDetailPath(data.product));
-        return;
-      }
-
-      dispatch(setGlobalSearchQuery(trimmed));
-      await Promise.all([
-        dispatch(searchUsedParts(trimmed)),
-        dispatch(fetchSearchResults({ text: trimmed })),
-      ]);
-      navigate(`${autopartsPath}?q=${encodeURIComponent(trimmed)}`);
-    } catch {
-      navigate(`${autopartsPath}?q=${encodeURIComponent(trimmed)}`);
-    } finally {
-      setBusy(false);
-    }
+    navigate(`/find?q=${encodeURIComponent(trimmed)}`);
+    setBusy(false);
   };
 
   return (

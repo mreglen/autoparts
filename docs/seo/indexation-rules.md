@@ -13,6 +13,7 @@
 | URL-паттерн | robots | canonical | keywords | Где задаётся |
 |-------------|--------|-----------|----------|--------------|
 | `/` | index, follow | `/` | — | `buildHomeSeo` / `_build_home_seo` |
+| `/find?q=…` | noindex, follow | `/find` | — | `buildFindSeo` + `resolve-all` redirect |
 | `/catalog` | index, follow | `/catalog` | — | `buildCatalogSeo` |
 | `/autoparts/new` | index, follow | `/autoparts/new` | — | `buildNewPartsSeo` |
 | `/autoparts/new?q=…` | noindex, follow | `/autoparts/new` | — | `buildNewPartsSeo` |
@@ -22,7 +23,9 @@
 | `/autoparts/new/part/{id}-…` | index, follow | self | авто, `buildPageKeywords` | `NewPartDetailPage` / prerender |
 | `/autoparts/used` | index, follow | `/autoparts/used` | — | `buildUsedPartsSeo` |
 | `/autoparts/used?q=…` (произвольный) | noindex, follow | `/autoparts/used` | — | `buildUsedPartsSeo` |
-| `/autoparts/used?q={brand} {article}` (канонический запрос рабочей карточки) | index, follow | self (`/autoparts/used?q=…`) | авто, `buildPageKeywords` | `_build_used_parts_seo` + resolver |
+| `/autoparts/used?q={brand} {article}` (канонический запрос рабочей карточки) | index, follow | `build_product_used_catalog_url` (обычно `бренд артикул`) | авто, `buildPageKeywords` | `_build_used_parts_seo` + resolver |
+| `/autoparts/used?q={article}` (уникальный нормализованный артикул) | index, follow | `build_product_used_catalog_url` | авто, `buildPageKeywords` | `_build_used_parts_seo` + resolver |
+| `/autoparts/used?q={name}` (уникальное точное название) | index, follow | `build_product_used_catalog_url` | авто, `buildPageKeywords` | `_build_used_parts_seo` + resolver |
 | `/autoparts/used?brand=…` | noindex, follow | `/autoparts/used/brand/{slug}` если один бренд | — | `buildUsedPartsSeo` + `resolveBrandLandingCanonical` |
 | `/autoparts/used/brand/{slug}` | index, follow | self | авто, `buildPageKeywords` | `usedPartsBrandSeo` |
 | `/autoparts/used/category/{slug}` | index, follow | self | авто, `buildPageKeywords` | `usedPartsCategorySeo` |
@@ -37,7 +40,7 @@
 
 Файл: [`frontend/my-autoparts/public/robots.txt`](../../frontend/my-autoparts/public/robots.txt).
 
-Дублирует meta robots для **crawl budget**: закрывает кабинеты (`/auth`, `/my-parts`, `/seller/`, `/admin/`), зеркала карточек (`/seller/part-card/`), страницы фильтров (`/autoparts/*/filters`), корзину и служебные URL. Индексируемые разделы (`/part/`, `/autoparts/`, `/organizations`, `/delivery`) явно разрешены. `Clean-param` убирает UTM и рекламные метки из индекса Яндекса.
+Дублирует meta robots для **crawl budget**: закрывает кабинеты (`/auth`, `/my-parts`, `/seller/`, `/admin/`), служебный редирект поиска (`/find`), зеркала карточек (`/seller/part-card/`), страницы фильтров (`/autoparts/*/filters`), корзину и служебные URL. Индексируемые разделы (`/part/`, `/autoparts/`, `/organizations`, `/delivery`) явно разрешены. `Clean-param` убирает UTM и рекламные метки из индекса Яндекса.
 
 ## Фильтр `?brand=` → canonical на посадочную
 

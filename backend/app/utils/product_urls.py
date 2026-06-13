@@ -22,7 +22,12 @@ def build_product_used_catalog_search_query(product) -> str:
 
 def build_product_used_catalog_url(product, site_origin: str) -> str:
     query = build_product_used_catalog_search_query(product)
+    return build_used_catalog_url_for_query(site_origin, query)
+
+
+def build_used_catalog_url_for_query(site_origin: str, q: str) -> str:
     origin = site_origin.rstrip("/")
+    query = (q or "").strip()
     if not query:
         return f"{origin}/autoparts/used"
     return f"{origin}/autoparts/used?q={quote(query, safe='')}"

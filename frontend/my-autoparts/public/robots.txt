@@ -38,6 +38,7 @@ Disallow: /users/
 Disallow: /autoparts/new/filters
 Disallow: /autoparts/used/filters
 
+Disallow: /find
 Disallow: /api/
 Allow: /api/feeds/sitemap-products.xml
 Allow: /api/feeds/sitemap-new-parts.xml

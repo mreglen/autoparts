@@ -19,6 +19,7 @@ class SpaRouteMatchingTests(unittest.TestCase):
         db = MagicMock()
         for path in (
             "/",
+            "/find",
             "/catalog",
             "/autoparts/new",
             "/about",

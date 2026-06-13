@@ -68,7 +68,7 @@ def _build_home_json_ld(site_origin: str) -> str:
                 "@type": "SearchAction",
                 "target": {
                     "@type": "EntryPoint",
-                    "urlTemplate": f"{site_origin}/autoparts/used?q={{search_term_string}}",
+                    "urlTemplate": f"{site_origin}/find?q={{search_term_string}}",
                 },
                 "query-input": "required name=search_term_string",
             },
@@ -170,14 +170,15 @@ def _build_used_parts_seo(
     db: Session | None = None,
 ) -> StaticPageSeoMeta:
     from app.services.seo_semantics_service import resolve_single_brand_landing_path
-    from app.services.used_catalog_service import find_working_product_by_used_catalog_query
+    from app.services.used_catalog_service import find_indexable_used_catalog_product
 
     q = (query or "").strip()
     brand_list = [b.strip() for b in (brands or []) if b and str(b).strip()]
 
     if q and not brand_list and db is not None:
-        product = find_working_product_by_used_catalog_query(db, q)
-        if product is not None:
+        indexable = find_indexable_used_catalog_product(db, q)
+        if indexable is not None:
+            product, _match_type = indexable
             brand = (product.brand or "").strip()
             article = (product.article or "").strip()
             name = format_product_display_title(brand, article, product.name)

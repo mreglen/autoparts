@@ -21,7 +21,8 @@ from app.services.new_parts_seo_card_service import (
     iter_rossko_new_part_cards_for_sitemap,
 )
 from app.services.yandex_feed_xml_service import _iter_catalog_products, _resolve_site_origin
-from app.utils.product_urls import build_product_page_url, build_product_used_catalog_url
+from app.utils.product_urls import build_product_page_url, build_product_used_catalog_url, build_used_catalog_url_for_query
+from app.utils.partnumber import normalize_partnumber
 from app.utils.yandex_integration_db import get_or_create_yandex_integration
 
 DEFAULT_PRODUCT_URLS_LIMIT = 150
@@ -663,6 +664,19 @@ def _product_sitemap_url_block(
     return "\n".join(url_lines)
 
 
+def _used_catalog_uniqueness_maps(products: list) -> tuple[dict[str, int], dict[str, int]]:
+    article_counts: dict[str, int] = {}
+    name_counts: dict[str, int] = {}
+    for product in products:
+        article_key = normalize_partnumber(getattr(product, "article", None))
+        if article_key:
+            article_counts[article_key] = article_counts.get(article_key, 0) + 1
+        name_key = str(getattr(product, "name", "") or "").strip().casefold()
+        if name_key:
+            name_counts[name_key] = name_counts.get(name_key, 0) + 1
+    return article_counts, name_counts
+
+
 def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
     site_origin = _resolve_origin(db, preferred_host_url)
     lines = [
@@ -671,9 +685,15 @@ def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = 
     ]
     url_count = 0
 
-    for product in _iter_catalog_products(db):
-        if not is_working_catalog_product(product):
-            continue
+    working_products = [
+        product
+        for product in _iter_catalog_products(db)
+        if is_working_catalog_product(product)
+    ]
+    article_counts, name_counts = _used_catalog_uniqueness_maps(working_products)
+    seen_urls: set[str] = set()
+
+    for product in working_products:
         lastmod = _product_lastmod_date(product)
         part_priority = "0.8" if product.is_new else "0.85"
         lines.append(_product_sitemap_url_block(
@@ -682,12 +702,38 @@ def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = 
             priority=part_priority,
         ))
         url_count += 1
+        canonical_used_url = build_product_used_catalog_url(product, site_origin)
+        seen_urls.add(canonical_used_url)
         lines.append(_product_sitemap_url_block(
-            build_product_used_catalog_url(product, site_origin),
+            canonical_used_url,
             lastmod=lastmod,
             priority="0.75",
         ))
         url_count += 1
+
+        article_key = normalize_partnumber(product.article)
+        if article_key and article_counts.get(article_key) == 1:
+            article_url = build_used_catalog_url_for_query(site_origin, article_key)
+            if article_url not in seen_urls:
+                seen_urls.add(article_url)
+                lines.append(_product_sitemap_url_block(
+                    article_url,
+                    lastmod=lastmod,
+                    priority="0.7",
+                ))
+                url_count += 1
+
+        name_key = str(product.name or "").strip().casefold()
+        if name_key and name_counts.get(name_key) == 1:
+            name_url = build_used_catalog_url_for_query(site_origin, str(product.name or "").strip())
+            if name_url not in seen_urls:
+                seen_urls.add(name_url)
+                lines.append(_product_sitemap_url_block(
+                    name_url,
+                    lastmod=lastmod,
+                    priority="0.7",
+                ))
+                url_count += 1
 
     lines.append("</urlset>")
     return "\n".join(lines) + "\n", url_count

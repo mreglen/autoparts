@@ -33,6 +33,7 @@ import UsedPartsBrandLandingPage from './pages/AutoParts/UsedParts/UsedPartsBran
 import UsedPartsCategoryLandingPage from './pages/AutoParts/UsedParts/UsedPartsCategoryLandingPage';
 import UsedPartsGeoLandingPage from './pages/AutoParts/UsedParts/UsedPartsGeoLandingPage';
 import Main from './pages/Main/Main';
+import FindRedirectPage from './pages/Find/FindRedirectPage';
 import CatalogPage from './pages/Catalog/CatalogPage';
 import CartPage from './pages/Cart/CartPage';
 import PartDetail from './pages/PartDetail/PartDetail';
@@ -179,6 +180,7 @@ function App() {
 
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Main />} />
+          <Route path="/find" element={<FindRedirectPage />} />
           <Route path="/autoparts" element={<Navigate to="/autoparts/new" replace />} />
           <Route path="/autoparts/new/filters" element={<NewPartsFiltersPage />} />
           <Route path="/autoparts/new" element={<AutoParts />} />

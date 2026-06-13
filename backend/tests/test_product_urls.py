@@ -5,6 +5,7 @@ from app.utils.product_urls import (
     build_product_page_url,
     build_product_used_catalog_search_query,
     build_product_used_catalog_url,
+    build_used_catalog_url_for_query,
 )
 
 
@@ -31,6 +32,19 @@ class ProductUrlsTests(unittest.TestCase):
         self.assertEqual(
             url,
             "https://svoygarage.ru/autoparts/used?q=Hyundai%2FKia%2021020-26425",
+        )
+
+    def test_build_used_catalog_url_for_query_encodes_value(self):
+        url = build_used_catalog_url_for_query("https://svoygarage.ru", "Hyundai/Kia 21020-26425")
+        self.assertEqual(
+            url,
+            "https://svoygarage.ru/autoparts/used?q=Hyundai%2FKia%2021020-26425",
+        )
+
+    def test_build_used_catalog_url_for_query_empty_returns_catalog(self):
+        self.assertEqual(
+            build_used_catalog_url_for_query("https://svoygarage.ru", "  "),
+            "https://svoygarage.ru/autoparts/used",
         )
 
     def test_build_product_page_url_unchanged(self):

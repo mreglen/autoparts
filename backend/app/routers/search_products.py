@@ -143,6 +143,27 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
         "products": [],
     })
 
+
+@router.get("/resolve-all")
+def resolve_search_all(q: str, db: Session = Depends(get_db)):
+    from app.services.search_resolve_service import resolve_search_query
+    from app.services.yandex_feed_xml_service import _resolve_site_origin
+    from app.utils.yandex_integration_db import get_or_create_yandex_integration
+
+    row = get_or_create_yandex_integration(db)
+    site_origin = _resolve_site_origin(row.host_url)
+    result = resolve_search_query(db, q, site_origin=site_origin)
+    return jsonable_encoder(
+        {
+            "status": result.status,
+            "redirect_path": result.redirect_path,
+            "redirect_url": result.redirect_url,
+            "match_type": result.match_type,
+            "query": (q or "").strip(),
+        }
+    )
+
+
 @router.get("/search-combined")
 async def search_combined(q: str, db: Session = Depends(get_db)):
     """
