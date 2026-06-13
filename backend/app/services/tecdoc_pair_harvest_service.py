@@ -120,8 +120,11 @@ def harvest_tecdoc_cross_pairs(
 
     try:
         rows = (
-            db.query(TecdocArticleCrossList.Article, TecdocSupplier.Description, TecdocArticleCrossList.article_id)
-            .join(TecdocArticle, TecdocArticle.id == TecdocArticleCrossList.article_id)
+            db.query(
+                TecdocArticleCrossList.Article,
+                TecdocSupplier.Description,
+                TecdocArticleCrossList.article_id,
+            )
             .join(TecdocSupplier, TecdocSupplier.id == TecdocArticleCrossList.supplier)
             .filter(TecdocArticleCrossList.article_id > cursor)
             .order_by(TecdocArticleCrossList.article_id.asc())

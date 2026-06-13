@@ -12,7 +12,7 @@ from app.db.database import engine
 from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.models.seo_landing_page import SeoLandingPage
 from app.models.seo_rossko_seed_queue import SeoRosskoSeedQueue
-from app.models.tecdoc import TecdocArticle, TecdocArticleCrossList, TecdocSupplier
+from app.models.tecdoc import TecdocArticleCrossList, TecdocSupplier
 from app.schemas.rossko import SearchRequest
 from app.services.new_parts_seo_card_service import (
     ROSSKO_NEW_PART_SOURCE,
@@ -205,10 +205,6 @@ def _populate_tecdoc(
                 batch = article_list[offset : offset + 200]
                 cross_rows = (
                     db.query(TecdocArticleCrossList.Article, TecdocSupplier.Description)
-                    .join(
-                        TecdocArticle,
-                        TecdocArticle.id == TecdocArticleCrossList.article_id,
-                    )
                     .join(
                         TecdocSupplier,
                         TecdocSupplier.id == TecdocArticleCrossList.supplier,

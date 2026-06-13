@@ -301,6 +301,17 @@ class PopulateTecdocFirstTests(unittest.TestCase):
         self.assertEqual(kwargs["total_limit"], 20000)
 
 
+class CrossHarvestWithoutArticlesTests(unittest.TestCase):
+    def test_cross_harvest_query_uses_supplier_join_only(self):
+        import inspect
+        from app.services import tecdoc_pair_harvest_service as svc
+
+        source = inspect.getsource(svc.harvest_tecdoc_cross_pairs)
+        self.assertNotIn("join(TecdocArticle", source.replace(" ", ""))
+        self.assertIn("TecdocArticleCrossList", source)
+        self.assertIn("TecdocSupplier", source)
+
+
 class CreatedBySourceCounterTests(unittest.TestCase):
     def test_increment_created_by_source_accumulates(self):
         from app.services.seo_quota_service import (
