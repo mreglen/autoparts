@@ -125,6 +125,68 @@ class PickBestRosskoPartTests(unittest.TestCase):
         ranked = pick_ranked_rossko_parts(data, brand="MANN", article="IF1009", limit=5)
         self.assertEqual(len(ranked), 5)
 
+    def test_includes_cross_analogs_when_enabled(self):
+        data = _rossko_response(
+            {
+                "brand": "Blue Print",
+                "partnumber": "ADM53084",
+                "name": "Комплект сцепления",
+                "stocks": None,
+                "crosses": {
+                    "Part": [
+                        _part("Sachs", "3000 990 214"),
+                        _part("LUK", "624335909", count=0),
+                    ]
+                },
+            }
+        )
+        ranked = pick_ranked_rossko_parts(
+            data,
+            brand="Blue Print",
+            article="ADM53084",
+            limit=5,
+            include_crosses=True,
+        )
+        self.assertEqual(len(ranked), 1)
+        self.assertEqual(ranked[0]["brand"], "Sachs")
+
+        without_crosses = pick_ranked_rossko_parts(
+            data,
+            brand="Blue Print",
+            article="ADM53084",
+            limit=5,
+            include_crosses=False,
+        )
+        self.assertEqual(without_crosses, [])
+
+    def test_tecdoc_unrelated_in_stock_part_is_accepted(self):
+        data = _rossko_response(_part("OTHERBRAND", "ZZ-999"))
+        ranked = pick_ranked_rossko_parts(
+            data,
+            brand="MANN-FILTER",
+            article="IF1009",
+            limit=5,
+            include_crosses=True,
+        )
+        self.assertEqual(len(ranked), 1)
+        self.assertEqual(ranked[0]["brand"], "OTHERBRAND")
+
+
+class RosskoHasInStockCrossesTests(unittest.TestCase):
+    def test_tecdoc_cross_stock_counts_as_in_stock(self):
+        from app.services.seo_rossko_seed_service import _rossko_has_in_stock
+
+        data = _rossko_response(
+            {
+                "brand": "Blue Print",
+                "partnumber": "ADM53084",
+                "stocks": None,
+                "crosses": {"Part": [_part("Sachs", "3000 990 214")]},
+            }
+        )
+        self.assertFalse(_rossko_has_in_stock(data, include_crosses=False))
+        self.assertTrue(_rossko_has_in_stock(data, include_crosses=True))
+
 
 class ShouldSkipBeforeRosskoTests(unittest.TestCase):
     def test_skips_not_found_until_retry(self):

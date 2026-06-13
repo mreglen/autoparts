@@ -72,6 +72,36 @@ def _max_crosses_per_response() -> int:
     return max(1, int(settings.NEW_PARTS_SEO_MAX_CROSSES_PER_RESPONSE or 50))
 
 
+SOURCE_TECDOC_ORIGIN = "tecdoc"
+
+
+def _is_tecdoc_origin(candidate: SyncCandidate, *, seed_source: str | None = None) -> bool:
+    if seed_source == SOURCE_TECDOC_ORIGIN:
+        return True
+    return candidate.get_origin_source() == SOURCE_TECDOC_ORIGIN
+
+
+def _build_rossko_search_text(
+    candidate: SyncCandidate,
+    *,
+    seed_source: str | None = None,
+) -> str:
+    brand = candidate.brand
+    if _is_tecdoc_origin(candidate, seed_source=seed_source):
+        from app.services.seo_tecdoc_brand_service import map_tecdoc_brand_to_rossko
+
+        brand = map_tecdoc_brand_to_rossko(brand)
+    return f"{brand} {candidate.article}".strip()
+
+
+def _rossko_pick_options(
+    candidate: SyncCandidate,
+    *,
+    seed_source: str | None = None,
+) -> dict[str, bool]:
+    return {"include_crosses": _is_tecdoc_origin(candidate, seed_source=seed_source)}
+
+
 def _max_cards_per_response() -> int:
     return max(1, int(settings.NEW_PARTS_SEO_MAX_CARDS_PER_RESPONSE or 5))
 
@@ -591,14 +621,36 @@ async def _process_ready_seed_candidate(
         if is_seed_payload_fresh(seed_row):
             rossko_data = load_seed_payload(seed_row)
         if rossko_data is None:
-            search_text = f"{candidate.brand} {candidate.article}".strip()
+            search_text = _build_rossko_search_text(
+                candidate,
+                seed_source=seed_row.source if seed_row else None,
+            )
             rossko_data = await _fetch_rossko_search(db, search_text)
+            if (
+                seed_row
+                and seed_row.source == SOURCE_TECDOC_ORIGIN
+                and not pick_ranked_rossko_parts(
+                    rossko_data,
+                    brand=candidate.brand,
+                    article=candidate.article,
+                    limit=1,
+                    include_crosses=True,
+                )
+            ):
+                article_only = (candidate.article or "").strip()
+                if article_only and article_only.casefold() != search_text.casefold():
+                    rossko_data = await _fetch_rossko_search(db, article_only)
 
+        pick_opts = _rossko_pick_options(
+            candidate,
+            seed_source=seed_row.source if seed_row else None,
+        )
         parts = pick_ranked_rossko_parts(
             rossko_data,
             brand=candidate.brand,
             article=candidate.article,
             limit=_max_cards_per_response(),
+            **pick_opts,
         )
         if not parts:
             _upsert_sync_log(
@@ -693,8 +745,18 @@ async def _process_sync_candidate(
         increment_cross_recurse_calls(db)
 
     try:
-        search_text = f"{candidate.brand} {candidate.article}".strip()
+        search_text = _build_rossko_search_text(candidate)
         rossko_data = await _fetch_rossko_search(db, search_text)
+        if _is_tecdoc_origin(candidate) and not pick_ranked_rossko_parts(
+            rossko_data,
+            brand=candidate.brand,
+            article=candidate.article,
+            limit=1,
+            include_crosses=True,
+        ):
+            article_only = (candidate.article or "").strip()
+            if article_only and article_only.casefold() != search_text.casefold():
+                rossko_data = await _fetch_rossko_search(db, article_only)
         discoveries = extract_discovery_candidates_from_rossko(
             rossko_data,
             query_brand=candidate.brand,
@@ -707,6 +769,7 @@ async def _process_sync_candidate(
             brand=candidate.brand,
             article=candidate.article,
             limit=_max_cards_per_response(),
+            **_rossko_pick_options(candidate),
         )
         if not parts:
             _upsert_sync_log(

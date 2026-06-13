@@ -13,17 +13,60 @@ def _safe_text(value: object, default: str = "") -> str:
     return default
 
 
-def extract_rossko_parts(data: dict[str, Any] | None) -> list[dict[str, Any]]:
+def extract_rossko_parts(
+    data: dict[str, Any] | None,
+    *,
+    include_crosses: bool = False,
+    max_parts: int = 200,
+) -> list[dict[str, Any]]:
     if not data:
         return []
     parts_list = (data.get("PartsList") or {}).get("Part")
     if not parts_list:
         return []
-    if isinstance(parts_list, list):
-        return [p for p in parts_list if isinstance(p, dict)]
     if isinstance(parts_list, dict):
-        return [parts_list]
-    return []
+        top_level = [parts_list]
+    elif isinstance(parts_list, list):
+        top_level = [p for p in parts_list if isinstance(p, dict)]
+    else:
+        return []
+
+    results: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add_part(part: dict[str, Any]) -> None:
+        if len(results) >= max_parts:
+            return
+        brand = _safe_text(part.get("brand"))
+        article = _normalize_article(part.get("partnumber"))
+        if not brand and not article:
+            return
+        stable = f"{brand.casefold()}|{article}"
+        if stable in seen:
+            return
+        seen.add(stable)
+        results.append(part)
+
+    def walk_crosses(part: dict[str, Any], *, depth: int = 0) -> None:
+        if depth > 2 or len(results) >= max_parts:
+            return
+        crosses = part.get("crosses") or {}
+        cross_parts = crosses.get("Part") or []
+        if not isinstance(cross_parts, list):
+            cross_parts = [cross_parts] if cross_parts else []
+        for cross in cross_parts:
+            if not isinstance(cross, dict):
+                continue
+            add_part(cross)
+            if include_crosses:
+                walk_crosses(cross, depth=depth + 1)
+
+    for part in top_level:
+        add_part(part)
+        if include_crosses:
+            walk_crosses(part)
+
+    return results
 
 
 def _normalize_article(value: object) -> str:
@@ -100,8 +143,9 @@ def pick_best_rossko_part(
     *,
     brand: str | None,
     article: str | None,
+    include_crosses: bool = False,
 ) -> dict[str, Any] | None:
-    parts = extract_rossko_parts(data)
+    parts = extract_rossko_parts(data, include_crosses=include_crosses)
     if not parts:
         return None
 
@@ -129,8 +173,9 @@ def pick_ranked_rossko_parts(
     brand: str | None,
     article: str | None,
     limit: int = 5,
+    include_crosses: bool = False,
 ) -> list[dict[str, Any]]:
-    parts = extract_rossko_parts(data)
+    parts = extract_rossko_parts(data, include_crosses=include_crosses)
     if not parts:
         return []
 

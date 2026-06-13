@@ -662,12 +662,12 @@ async def _fetch_rossko_search(db: Session, search_text: str) -> dict:
     )
 
 
-def _rossko_has_in_stock(data: dict | None) -> bool:
+def _rossko_has_in_stock(data: dict | None, *, include_crosses: bool = False) -> bool:
     from app.services.rossko_part_selection import extract_rossko_parts
 
     if not data:
         return False
-    for part in extract_rossko_parts(data):
+    for part in extract_rossko_parts(data, include_crosses=include_crosses):
         if get_rossko_stock_count(part) > 0:
             return True
     return False
@@ -746,6 +746,7 @@ def _select_pending_seed_rows_fair(db: Session, *, limit: int) -> list[SeoRossko
 
 
 async def _precheck_seed_row(db: Session, row: SeoRosskoSeedQueue) -> bool:
+    include_crosses = row.source == SOURCE_TECDOC
     search_brand = (
         map_tecdoc_brand_to_rossko(row.brand)
         if row.source == SOURCE_TECDOC
@@ -753,7 +754,7 @@ async def _precheck_seed_row(db: Session, row: SeoRosskoSeedQueue) -> bool:
     )
     search_text = f"{search_brand} {row.article}".strip()
     data = await _fetch_rossko_search(db, search_text)
-    if _rossko_has_in_stock(data):
+    if _rossko_has_in_stock(data, include_crosses=include_crosses):
         mark_seed_ready(db, row.lookup_key, data)
         return True
 
@@ -761,7 +762,7 @@ async def _precheck_seed_row(db: Session, row: SeoRosskoSeedQueue) -> bool:
         article_only = (row.article or "").strip()
         if article_only and article_only.casefold() != search_text.casefold():
             data = await _fetch_rossko_search(db, article_only)
-            if _rossko_has_in_stock(data):
+            if _rossko_has_in_stock(data, include_crosses=include_crosses):
                 mark_seed_ready(db, row.lookup_key, data)
                 return True
 
