@@ -171,6 +171,31 @@ class PickBestRosskoPartTests(unittest.TestCase):
         self.assertEqual(len(ranked), 1)
         self.assertEqual(ranked[0]["brand"], "OTHERBRAND")
 
+    def test_seed_limit_zero_returns_all_in_stock_parts(self):
+        parts = [_part("FENOX", f"RC{i:05d}") for i in range(23)]
+        data = _rossko_response(*parts)
+        ranked = pick_ranked_rossko_parts(
+            data,
+            brand="FENOX",
+            article="RC00047",
+            limit=0,
+            include_crosses=True,
+            max_extract_parts=500,
+        )
+        self.assertEqual(len(ranked), 23)
+
+    def test_seed_limit_100_allows_more_than_default_five(self):
+        parts = [_part("FENOX", f"P{i:03d}") for i in range(30)]
+        data = _rossko_response(*parts)
+        ranked = pick_ranked_rossko_parts(
+            data,
+            brand="FENOX",
+            article="RC00047",
+            limit=100,
+            include_crosses=True,
+        )
+        self.assertEqual(len(ranked), 30)
+
 
 class RosskoHasInStockCrossesTests(unittest.TestCase):
     def test_tecdoc_cross_stock_counts_as_in_stock(self):

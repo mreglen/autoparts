@@ -746,7 +746,7 @@ def _select_pending_seed_rows_fair(db: Session, *, limit: int) -> list[SeoRossko
 
 
 async def _precheck_seed_row(db: Session, row: SeoRosskoSeedQueue) -> bool:
-    include_crosses = row.source == SOURCE_TECDOC
+    include_crosses = True
     search_brand = (
         map_tecdoc_brand_to_rossko(row.brand)
         if row.source == SOURCE_TECDOC

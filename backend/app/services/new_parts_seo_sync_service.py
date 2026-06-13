@@ -98,12 +98,35 @@ def _rossko_pick_options(
     candidate: SyncCandidate,
     *,
     seed_source: str | None = None,
-) -> dict[str, bool]:
-    return {"include_crosses": _is_tecdoc_origin(candidate, seed_source=seed_source)}
+    from_seed_queue: bool = False,
+) -> dict[str, object]:
+    if from_seed_queue:
+        return {
+            "include_crosses": True,
+            "max_extract_parts": _seed_extract_max_parts(),
+        }
+    return {
+        "include_crosses": _is_tecdoc_origin(candidate, seed_source=seed_source),
+        "max_extract_parts": 200,
+    }
 
 
 def _max_cards_per_response() -> int:
     return max(1, int(settings.NEW_PARTS_SEO_MAX_CARDS_PER_RESPONSE or 5))
+
+
+def _max_cards_per_seed_response() -> int:
+    return int(settings.NEW_PARTS_SEO_MAX_CARDS_PER_SEED_RESPONSE or 100)
+
+
+def _seed_extract_max_parts() -> int:
+    return max(50, int(settings.NEW_PARTS_SEO_SEED_EXTRACT_MAX_PARTS or 500))
+
+
+def _seed_cards_limit() -> int:
+    """0 in settings means all in-stock parts from Rossko response."""
+    configured = _max_cards_per_seed_response()
+    return configured if configured > 0 else 0
 
 
 @dataclass
@@ -179,6 +202,8 @@ def get_seo_sync_runtime_settings() -> dict[str, object]:
         "use_celery": bool(settings.NEW_PARTS_SEO_SYNC_USE_CELERY),
         "micro_batch_enabled": True,
         "max_cards_per_response": _max_cards_per_response(),
+        "max_cards_per_seed_response": _max_cards_per_seed_response(),
+        "seed_extract_max_parts": _seed_extract_max_parts(),
         "max_crosses_per_response": _max_crosses_per_response(),
         "cross_recurse_daily": int(settings.NEW_PARTS_SEO_CROSS_RECURSE_DAILY or 0),
         "catchup_enabled": bool(settings.NEW_PARTS_SEO_CATCHUP_ENABLED),
@@ -544,10 +569,15 @@ async def _create_cards_from_parts(
             remaining_new -= 1
             created_any = True
             increment_created_by_source(db, candidate.get_origin_source())
-            if candidate.source == SOURCE_SEED_READY:
-                mark_seed_created(db, candidate.lookup_key)
         else:
             updated_any = True
+
+    if (
+        candidate.source == SOURCE_SEED_READY
+        and not result.stopped_by_daily_limit
+        and (created_any or updated_any)
+    ):
+        mark_seed_created(db, candidate.lookup_key)
 
     if created_any:
         _upsert_sync_log(
@@ -644,12 +674,13 @@ async def _process_ready_seed_candidate(
         pick_opts = _rossko_pick_options(
             candidate,
             seed_source=seed_row.source if seed_row else None,
+            from_seed_queue=True,
         )
         parts = pick_ranked_rossko_parts(
             rossko_data,
             brand=candidate.brand,
             article=candidate.article,
-            limit=_max_cards_per_response(),
+            limit=_seed_cards_limit(),
             **pick_opts,
         )
         if not parts:

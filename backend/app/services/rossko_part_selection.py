@@ -174,14 +174,19 @@ def pick_ranked_rossko_parts(
     article: str | None,
     limit: int = 5,
     include_crosses: bool = False,
+    max_extract_parts: int = 200,
 ) -> list[dict[str, Any]]:
-    parts = extract_rossko_parts(data, include_crosses=include_crosses)
+    extract_cap = max(1, int(max_extract_parts or 200))
+    parts = extract_rossko_parts(
+        data,
+        include_crosses=include_crosses,
+        max_parts=extract_cap,
+    )
     if not parts:
         return []
 
     query_article_norm = _normalize_article(article)
     query_brand_lower = _safe_text(brand).lower()
-    safe_limit = max(1, min(int(limit or 1), 20))
 
     ranked: list[tuple[int, float, dict[str, Any]]] = []
     seen_stable: set[str] = set()
@@ -199,7 +204,11 @@ def pick_ranked_rossko_parts(
         ranked.append((score, price if price > 0 else float("inf"), part))
 
     ranked.sort(key=lambda row: (-row[0], row[1]))
-    return [row[2] for row in ranked[:safe_limit]]
+    picked = [row[2] for row in ranked]
+    card_limit = int(limit or 0)
+    if card_limit <= 0:
+        return picked
+    return picked[: max(1, min(card_limit, extract_cap))]
 
 
 def map_rossko_stocks(part: dict[str, Any]) -> list[dict[str, Any]]:
