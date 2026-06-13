@@ -346,6 +346,8 @@ def build_new_part_card_json_ld(
     product_json: dict[str, Any] = {
         "@context": SCHEMA_ORG,
         "@type": "Product",
+        "@id": f"{canonical_url}#product",
+        "url": canonical_url,
         "name": display_name,
         "description": description,
         "sku": article,

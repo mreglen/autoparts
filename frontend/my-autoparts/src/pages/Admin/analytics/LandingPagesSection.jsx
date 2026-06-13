@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../../../utils/apiClient';
 import { slugify, slugifyBrand } from '../../../utils/slugUtils';
+import { SITE_ORIGIN } from '../../../utils/breadcrumbs';
 import { DataTable, Section } from './AnalyticsUi';
 
 const KIND_OPTIONS = [
@@ -37,6 +38,17 @@ function isBrandKind(kind) {
 
 function isCategoryKind(kind) {
   return kind === 'category_new' || kind === 'category_used';
+}
+
+function landingCanonicalPath(kind, slug) {
+  const safeSlug = (slug || '').trim();
+  if (!safeSlug) return null;
+  if (kind === 'brand_new') return `/autoparts/new/brand/${safeSlug}`;
+  if (kind === 'category_new') return `/autoparts/new/category/${safeSlug}`;
+  if (kind === 'brand_used') return `/autoparts/used/brand/${safeSlug}`;
+  if (kind === 'category_used') return `/autoparts/used/category/${safeSlug}`;
+  if (kind === 'geo') return `/autoparts/used/geo/${safeSlug}`;
+  return `/seo/${kind}/${safeSlug}`;
 }
 
 function autoSlugForForm(form) {
@@ -483,9 +495,56 @@ export default function LandingPagesSection() {
               {
                 key: 'slug',
                 label: 'Slug',
-                render: (row) => (
-                  <span className="font-mono text-xs text-gray-800">{row.slug}</span>
-                ),
+                render: (row) => {
+                  const path = landingCanonicalPath(row.kind, row.slug);
+                  if (!path) {
+                    return <span className="font-mono text-xs text-gray-800">{row.slug}</span>;
+                  }
+                  const href = `${SITE_ORIGIN}${path}`;
+                  if (row.is_active) {
+                    return (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-xs text-indigo-600 hover:underline"
+                      >
+                        {row.slug}
+                      </a>
+                    );
+                  }
+                  return (
+                    <span className="font-mono text-xs text-gray-500" title="Посадочная выключена">
+                      {row.slug}
+                    </span>
+                  );
+                },
+              },
+              {
+                key: 'page_url',
+                label: 'Страница',
+                render: (row) => {
+                  const path = landingCanonicalPath(row.kind, row.slug);
+                  if (!path) return '—';
+                  const href = `${SITE_ORIGIN}${path}`;
+                  if (row.is_active) {
+                    return (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-indigo-600 hover:underline"
+                      >
+                        Открыть
+                      </a>
+                    );
+                  }
+                  return (
+                    <span className="text-xs text-gray-400" title={path}>
+                      выкл.
+                    </span>
+                  );
+                },
               },
               {
                 key: 'title_ru',

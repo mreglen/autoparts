@@ -93,6 +93,15 @@ export function buildBreadcrumbsForPath(pathname, context = {}) {
     return items;
   }
 
+  if (path.startsWith('/autoparts/new/part/')) {
+    items.push({ label: 'Новые запчасти', href: '/autoparts/new' });
+    const brand = (context.brand || '').trim();
+    const article = (context.article || '').trim();
+    const leafLabel = brand && article ? `${brand} ${article}` : context.cardName || 'Карточка';
+    items.push({ label: leafLabel });
+    return items;
+  }
+
   if (path === '/autoparts/used') {
     items.push({ label: 'Б/у запчасти' });
     return items;

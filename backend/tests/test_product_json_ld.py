@@ -183,6 +183,8 @@ class NewPartSeoServiceJsonLdIntegrationTests(unittest.TestCase):
         self.assertTrue(meta.json_ld)
         json_ld = json.loads(meta.json_ld)
         self.assertEqual(json_ld["@type"], "Product")
+        self.assertEqual(json_ld["url"], meta.canonical_url)
+        self.assertEqual(json_ld["@id"], f"{meta.canonical_url}#product")
         self.assertIn("image", json_ld)
         self.assertEqual(json_ld["offers"]["priceCurrency"], "RUB")
         self.assertEqual(json_ld["sku"], "IF1009")
@@ -190,11 +192,23 @@ class NewPartSeoServiceJsonLdIntegrationTests(unittest.TestCase):
         self.assertIn("alternateName", json_ld)
         self.assertIn("shippingDetails", json_ld["offers"])
 
+    def test_build_new_part_seo_meta_json_ld_graph(self):
+        meta = build_new_part_seo_meta(self._make_card(), site_origin="https://svoygarage.ru", markup_percent=15)
+        self.assertTrue(meta.json_ld_graph)
+        graph = json.loads(meta.json_ld_graph)
+        self.assertIn("@graph", graph)
+        types = {node["@type"] for node in graph["@graph"]}
+        self.assertIn("Product", types)
+        self.assertIn("BreadcrumbList", types)
+        self.assertIn("WebPage", types)
+
     def test_new_part_prerender_html_contains_product_json_ld(self):
         meta = build_new_part_seo_meta(self._make_card(), site_origin="https://svoygarage.ru", markup_percent=15)
         html = render_new_part_prerender_html(meta)
         self.assertIn('type="application/ld+json"', html)
+        self.assertIn('"@graph"', html)
         self.assertIn('"@type": "Product"', html)
+        self.assertIn('aria-label="Хлебные крошки"', html)
         self.assertIn("<img ", html)
         self.assertIn(meta.h1, html)
 

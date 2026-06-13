@@ -3,7 +3,7 @@ import { buildPartDetailPath } from './partRoutes';
 import { formatProductDisplayTitle, extractProductDescription } from './productDisplayName';
 import { normalizeImageUrl } from './apiClient';
 import { resolveOgImageUrl } from './seoConstants';
-import { SITE_ORIGIN } from './breadcrumbs';
+import { SITE_ORIGIN, buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from './breadcrumbs';
 import {
   buildProductSearchDescription,
   buildProductSearchTitle,
@@ -99,6 +99,27 @@ export function buildProductStructuredDataGraph({
   }
   if (!graph.length) return null;
   return { '@context': 'https://schema.org', '@graph': graph };
+}
+
+export function buildNewPartStructuredDataGraph({
+  productJsonLd,
+  canonicalUrl,
+  title,
+  description,
+  brand,
+  article,
+  cardName,
+} = {}) {
+  const path = canonicalUrl ? canonicalUrl.replace(SITE_ORIGIN, '') : '';
+  const breadcrumbItems = buildBreadcrumbsForPath(path, { brand, article, cardName });
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
+  return buildProductStructuredDataGraph({
+    productJsonLd,
+    breadcrumbJsonLd,
+    canonicalUrl,
+    title,
+    description,
+  });
 }
 
 export function buildProductSeo(product) {

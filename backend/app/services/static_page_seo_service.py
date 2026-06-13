@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import json
 import re
 from dataclasses import dataclass
 from urllib.parse import parse_qs, unquote, urlsplit, urlparse
@@ -33,6 +34,7 @@ class StaticPageSeoMeta:
     robots: str = "index, follow"
     keywords: str = ""
     card_links: tuple[tuple[str, str], ...] = ()
+    json_ld: str = ""
 
 
 def _truncate(text: str, max_len: int) -> str:
@@ -51,6 +53,30 @@ def _absolute_url(site_origin: str, path: str) -> str:
     return f"{origin}{path if path.startswith('/') else f'/{path}'}"
 
 
+def _build_home_json_ld(site_origin: str) -> str:
+    return json.dumps(
+        {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "Свой Гараж",
+            "url": site_origin,
+            "description": (
+                "Маркетплейс автозапчастей «Свой Гараж»: поиск по артикулу и бренду, "
+                "новые и б/у детали, доставка по России."
+            ),
+            "potentialAction": {
+                "@type": "SearchAction",
+                "target": {
+                    "@type": "EntryPoint",
+                    "urlTemplate": f"{site_origin}/autoparts/used?q={{search_term_string}}",
+                },
+                "query-input": "required name=search_term_string",
+            },
+        },
+        ensure_ascii=False,
+    )
+
+
 def _build_home_seo(site_origin: str) -> StaticPageSeoMeta:
     canonical_url = _absolute_url(site_origin, "/")
     title = "Свой Гараж — автозапчасти новые и б/у"
@@ -63,6 +89,7 @@ def _build_home_seo(site_origin: str) -> StaticPageSeoMeta:
         description=description,
         canonical_url=canonical_url,
         h1="Найдите любую автозапчасть",
+        json_ld=_build_home_json_ld(site_origin.rstrip("/")),
     )
 
 
@@ -216,6 +243,52 @@ def _build_about_seo(site_origin: str) -> StaticPageSeoMeta:
         description=description,
         canonical_url=canonical_url,
         h1="О компании",
+    )
+
+
+def _build_delivery_seo(site_origin: str) -> StaticPageSeoMeta:
+    canonical_url = _absolute_url(site_origin, "/delivery")
+    title = "Доставка автозапчастей — условия и регионы | Свой Гараж"
+    description = (
+        "Условия доставки «Свой Гараж»: самовывоз и ПВЗ, регионы доставки, "
+        "минимальная сумма и службы доставки."
+    )
+    return StaticPageSeoMeta(
+        title=title,
+        description=description,
+        canonical_url=canonical_url,
+        h1="Доставка",
+    )
+
+
+def _build_organizations_seo(site_origin: str) -> StaticPageSeoMeta:
+    canonical_url = _absolute_url(site_origin, "/organizations")
+    title = "Организации — автозапчасти на «Свой Гараж»"
+    description = (
+        "Каталог организаций-партнёров «Свой Гараж»: контакты, адреса и информация "
+        "о продавцах автозапчастей."
+    )
+    json_ld = json.dumps(
+        {
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            "name": "Организации — Свой Гараж",
+            "description": description,
+            "url": canonical_url,
+            "isPartOf": {
+                "@type": "WebSite",
+                "name": "Свой Гараж",
+                "url": site_origin.rstrip("/"),
+            },
+        },
+        ensure_ascii=False,
+    )
+    return StaticPageSeoMeta(
+        title=title,
+        description=description,
+        canonical_url=canonical_url,
+        h1="Организации",
+        json_ld=json_ld,
     )
 
 
@@ -440,6 +513,10 @@ def get_static_page_seo_for_path(
         )
     if path == "/about":
         return _build_about_seo(origin)
+    if path == "/delivery":
+        return _build_delivery_seo(origin)
+    if path == "/organizations":
+        return _build_organizations_seo(origin)
 
     brand_match = NEW_BRAND_LANDING_RE.match(path)
     if brand_match and db is not None:
@@ -519,6 +596,9 @@ def render_static_page_prerender_html(meta: StaticPageSeoMeta) -> str:
         keywords_tag = (
             f'  <meta name="keywords" content="{html.escape(meta.keywords, quote=True)}" />\n'
         )
+    json_ld_script = ""
+    if meta.json_ld:
+        json_ld_script = f'  <script type="application/ld+json">{meta.json_ld}</script>\n'
 
     return f"""<!DOCTYPE html>
 <html lang="ru">
@@ -537,7 +617,7 @@ def render_static_page_prerender_html(meta: StaticPageSeoMeta) -> str:
   <meta property="og:url" content="{canonical}" />
   <meta property="og:locale" content="ru_RU" />
   <meta property="og:image" content="{og_image}" />
-</head>
+{json_ld_script}</head>
 <body>
   <main>
     <h1>{h1}</h1>

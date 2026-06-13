@@ -91,6 +91,11 @@ export default function ClientsPage() {
 
     const clientRowKey = (client) => client.id ?? `${client.email}-${client.phone}`;
 
+    const lastClientRowKey = useMemo(() => {
+        if (filteredClients.length === 0) return null;
+        return clientRowKey(filteredClients[filteredClients.length - 1]);
+    }, [filteredClients]);
+
     const handleOpenOrders = (client) => {
         setOpenActionsId(null);
         setOrdersClient(client);
@@ -209,8 +214,12 @@ export default function ClientsPage() {
                 </div>
             ) : (
                 <>
-                    <div className={`hidden md:block w-full ${openActionsId ? 'overflow-visible' : 'overflow-x-auto'}`}>
-                        <table className="min-w-full divide-y divide-gray-200 bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <div
+                        className={`hidden md:block w-full rounded-xl border border-gray-200 bg-white ${
+                            openActionsId ? 'overflow-visible' : 'overflow-x-auto overflow-hidden'
+                        }`}
+                    >
+                        <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Клиент</th>
@@ -246,6 +255,7 @@ export default function ClientsPage() {
                                                     onOpenChange={(next) => setOpenActionsId(next ? rowKey : null)}
                                                     menuClassName="w-56 z-50"
                                                     estimatedMenuHeight={client.id ? 120 : 56}
+                                                    preferOpenUp={rowKey === lastClientRowKey}
                                                 >
                                                     <ActionsDropdownItem onClick={() => handleOpenOrders(client)}>
                                                         Просмотреть заказы

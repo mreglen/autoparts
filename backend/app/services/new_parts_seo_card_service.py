@@ -38,8 +38,11 @@ class NewPartSeoMeta:
     price: str | None
     in_stock: bool
     json_ld: str
+    json_ld_graph: str = ""
     keywords: str = ""
     product_description: str | None = None
+    brand: str = ""
+    article: str = ""
 
 
 def _safe_text(value: object, *, default: str = "") -> str:
@@ -502,6 +505,82 @@ def aggregate_top_brands_in_category(
     return result
 
 
+def build_new_part_json_ld_graph(
+    *,
+    json_ld: str,
+    canonical_url: str,
+    h1: str,
+    title: str | None = None,
+    description: str | None = None,
+) -> str:
+    """Product + BreadcrumbList + WebPage для JSON-LD Rossko-карточек."""
+    product_obj = None
+    if json_ld:
+        try:
+            parsed = json.loads(json_ld)
+            if isinstance(parsed, dict) and parsed.get("@type") == "Product":
+                product_obj = dict(parsed)
+                product_obj.pop("@context", None)
+                product_obj.setdefault("@id", f"{canonical_url}#product")
+        except Exception:
+            product_obj = None
+
+    site_origin = canonical_url.split("/autoparts/new/part/")[0]
+    breadcrumb_obj = {
+        "@type": "BreadcrumbList",
+        "@id": f"{canonical_url}#breadcrumb",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Свой Гараж",
+                "item": site_origin,
+            },
+            {
+                "@type": "ListItem",
+                "position": 2,
+                "name": "Новые запчасти",
+                "item": f"{site_origin}/autoparts/new",
+            },
+            {
+                "@type": "ListItem",
+                "position": 3,
+                "name": h1,
+                "item": canonical_url,
+            },
+        ],
+    }
+
+    graph: list[dict] = []
+    if product_obj:
+        graph.append(product_obj)
+    graph.append(breadcrumb_obj)
+    if product_obj:
+        graph.append(
+            {
+                "@type": "WebPage",
+                "@id": f"{canonical_url}#webpage",
+                "url": canonical_url,
+                "name": title or h1,
+                "description": description,
+                "isPartOf": {
+                    "@type": "WebSite",
+                    "name": "Свой Гараж",
+                    "url": site_origin,
+                },
+                "breadcrumb": {"@id": f"{canonical_url}#breadcrumb"},
+                "mainEntity": {"@id": f"{canonical_url}#product"},
+            }
+        )
+
+    if len(graph) == 1:
+        graph_obj = {"@context": "https://schema.org", **graph[0]}
+    else:
+        graph_obj = {"@context": "https://schema.org", "@graph": graph}
+
+    return json.dumps(graph_obj, ensure_ascii=False)
+
+
 def build_new_part_seo_meta(
     card: NewPartsSeoCard,
     *,
@@ -545,6 +624,13 @@ def build_new_part_seo_meta(
         display_price=display_price,
     )
     json_ld = dumps_json_ld(product_json_ld)
+    json_ld_graph = build_new_part_json_ld_graph(
+        json_ld=json_ld,
+        canonical_url=canonical,
+        h1=h1,
+        title=title,
+        description=description,
+    )
     body_description = product_body_description(
         brand=str(card.brand or "").strip(),
         article=str(card.article or "").strip(),
@@ -562,12 +648,15 @@ def build_new_part_seo_meta(
         price=price_text,
         in_stock=in_stock,
         json_ld=json_ld,
+        json_ld_graph=json_ld_graph,
         keywords=build_page_keywords(
             "new_part_card",
             brand=card.brand,
             article=card.article,
         ),
         product_description=body_description,
+        brand=str(card.brand or "").strip(),
+        article=str(card.article or "").strip(),
     )
 
 
@@ -610,24 +699,55 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
     image_block = ""
     if meta.image_url:
         image_block = f'\n    <img src="{html.escape(meta.image_url, quote=True)}" alt="{h1}" />'
-    json_ld_script = ""
-    if meta.json_ld:
-        json_ld_script = f'  <script type="application/ld+json">{meta.json_ld}</script>\n'
+    json_ld_graph = meta.json_ld_graph or build_new_part_json_ld_graph(
+        json_ld=meta.json_ld,
+        canonical_url=meta.canonical_url,
+        h1=meta.h1,
+        title=meta.title,
+        description=meta.description,
+    )
     keywords_tag = ""
     if meta.keywords:
         keywords_tag = (
             f'  <meta name="keywords" content="{html.escape(meta.keywords, quote=True)}" />\n'
         )
+    robots = html.escape("index, follow", quote=True)
+    site_origin = meta.canonical_url.split("/autoparts/new/part/")[0]
+    details_html = ""
+    if meta.brand or meta.article or meta.price:
+        brand_row = (
+            f"<dt>Бренд</dt><dd>{html.escape(meta.brand)}</dd>"
+            if meta.brand
+            else ""
+        )
+        article_row = (
+            f"<dt>Артикул</dt><dd>{html.escape(meta.article)}</dd>"
+            if meta.article
+            else ""
+        )
+        price_row = (
+            f"<dt>Цена</dt><dd>{html.escape(meta.price)} ₽</dd>"
+            if meta.price
+            else ""
+        )
+        details_html = f"    <dl>{brand_row}{article_row}{price_row}</dl>\n"
+    breadcrumb_html = (
+        "  <nav aria-label=\"Хлебные крошки\">\n"
+        f'    <a href="{html.escape(site_origin, quote=True)}">Главная</a> ›\n'
+        f'    <a href="{html.escape(site_origin, quote=True)}/autoparts/new">Новые запчасти</a> ›\n'
+        f"    <span>{h1}</span>\n"
+        "  </nav>\n"
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="{robots}" />
   <title>{title}</title>
   <meta name="description" content="{description}" />
-{keywords_tag}
-  <link rel="canonical" href="{canonical}" />
+{keywords_tag}  <link rel="canonical" href="{canonical}" />
   <meta property="og:type" content="product" />
   <meta property="og:site_name" content="Свой Гараж" />
   <meta property="og:title" content="{title}" />
@@ -635,12 +755,13 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
   <meta property="og:url" content="{canonical}" />
   <meta property="og:locale" content="ru_RU" />
   {image_tag}
-  {json_ld_script}</head>
+  <script type="application/ld+json">{json_ld_graph}</script>
+</head>
 <body>
-  <article>
+{breadcrumb_html}  <article>
     <h1>{h1}</h1>{image_block}
     <p>{body_desc}</p>
-  </article>
+{details_html}  </article>
 </body>
 </html>
 """

@@ -211,6 +211,8 @@ export function buildNewPartCardJsonLd(card, { siteOrigin = SITE_ORIGIN, canonic
   return sanitizeJsonLd({
     '@context': SCHEMA_ORG,
     '@type': 'Product',
+    '@id': `${url}#product`,
+    url,
     name: displayName,
     description,
     sku: article,

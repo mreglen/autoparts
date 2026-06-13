@@ -109,7 +109,7 @@ def public_new_part_meta(
         image_url=meta.image_url,
         price=meta.price,
         in_stock=meta.in_stock,
-        json_ld=meta.json_ld,
+        json_ld=meta.json_ld_graph or meta.json_ld,
         keywords=meta.keywords,
     )
 

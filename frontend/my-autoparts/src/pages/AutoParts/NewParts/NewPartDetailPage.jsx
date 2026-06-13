@@ -13,6 +13,7 @@ import NewPartDeliveryStockBlock from './NewPartDeliveryStockBlock';
 import NewPartAnalogsTable from './NewPartAnalogsTable';
 import NewPartUsedMatchesBlock from './NewPartUsedMatchesBlock';
 import { buildNewPartCardJsonLd, parseJsonLdString } from '../../../utils/productJsonLd';
+import { buildNewPartStructuredDataGraph } from '../../../utils/productSeo';
 import { buildNewPartCardKeywords } from '../../../utils/pageKeywords';
 import {
   buildNewPartH1,
@@ -410,11 +411,26 @@ export default function NewPartDetailPage() {
   const brand = safeText(card?.brand, '—');
   const article = safeText(card?.article, '—');
   const pageH1 = buildNewPartH1({ brand, article, rawName: card?.name });
+  const canonicalUrl = `${SITE_ORIGIN}${canonicalPath}`;
 
-  const jsonLd = seoJsonLd || buildNewPartCardJsonLd(card, {
-    canonicalUrl: `${SITE_ORIGIN}${canonicalPath}`,
-    displayPrice,
-  });
+  const parsedApiJsonLd = seoJsonLd;
+  const productJsonLd = parsedApiJsonLd?.['@graph']
+    ? parsedApiJsonLd['@graph'].find((node) => node?.['@type'] === 'Product')
+    : parsedApiJsonLd?.['@type'] === 'Product'
+      ? parsedApiJsonLd
+      : buildNewPartCardJsonLd(card, { canonicalUrl, displayPrice });
+
+  const structuredData = parsedApiJsonLd?.['@graph']
+    ? parsedApiJsonLd
+    : buildNewPartStructuredDataGraph({
+        productJsonLd,
+        canonicalUrl,
+        title: seo?.title,
+        description: seo?.description,
+        brand,
+        article,
+        cardName: card?.name,
+      });
 
   const analogsLoading = rosskoStatus === 'loading' && analogParts.length === 0;
   const hasLiveStocks = Boolean(livePart) && liveStocks.length > 0;
@@ -438,7 +454,7 @@ export default function NewPartDetailPage() {
   return (
     <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6 md:py-8">
       <PageSeoHelmet seo={seo} />
-      {jsonLd ? <script type="application/ld+json">{JSON.stringify(jsonLd)}</script> : null}
+      {structuredData ? <script type="application/ld+json">{JSON.stringify(structuredData)}</script> : null}
 
       <section className="mb-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-4 shadow-sm sm:mb-6 sm:p-6">
         <button

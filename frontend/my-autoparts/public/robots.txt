@@ -7,9 +7,6 @@ Allow: /delivery
 Allow: /payment
 Allow: /part/
 Allow: /organizations
-Allow: /seller/
-Allow: /buyer/
-Allow: /users/
 
 Disallow: /auth
 Disallow: /dashboard
@@ -33,6 +30,13 @@ Disallow: /stock-out
 Disallow: /warehouse-sales
 Disallow: /chats
 Disallow: /product-not-found
+
+Disallow: /seller/
+Disallow: /seller/part-card/
+Disallow: /buyer/
+Disallow: /users/
+Disallow: /autoparts/new/filters
+Disallow: /autoparts/used/filters
 
 Disallow: /api/
 Allow: /api/feeds/sitemap-products.xml

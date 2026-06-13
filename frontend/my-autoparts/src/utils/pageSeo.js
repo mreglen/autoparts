@@ -47,6 +47,25 @@ export function buildHomeSeo() {
   };
 }
 
+export function buildHomeStructuredData() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Свой Гараж',
+    url: SITE_ORIGIN,
+    description:
+      'Маркетплейс автозапчастей «Свой Гараж»: поиск по артикулу и бренду, новые и б/у детали, доставка по России.',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${SITE_ORIGIN}/autoparts/used?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  };
+}
+
 export function buildCatalogSeo() {
   return {
     title: 'Каталог автозапчастей — новые и б/у | Свой Гараж',

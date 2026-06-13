@@ -33,6 +33,12 @@
 
 **keywords:** автогенерация через [`page_keywords.py`](../../backend/app/utils/page_keywords.py) / [`pageKeywords.js`](../../frontend/my-autoparts/src/utils/pageKeywords.js). На **noindex**-страницах тег `<meta name="keywords">` **не выводится**.
 
+## robots.txt
+
+Файл: [`frontend/my-autoparts/public/robots.txt`](../../frontend/my-autoparts/public/robots.txt).
+
+Дублирует meta robots для **crawl budget**: закрывает кабинеты (`/auth`, `/my-parts`, `/seller/`, `/admin/`), зеркала карточек (`/seller/part-card/`), страницы фильтров (`/autoparts/*/filters`), корзину и служебные URL. Индексируемые разделы (`/part/`, `/autoparts/`, `/organizations`, `/delivery`) явно разрешены. `Clean-param` убирает UTM и рекламные метки из индекса Яндекса.
+
 ## Фильтр `?brand=` → canonical на посадочную
 
 Единственный бренд в query (`brand=BOSCH`) → canonical `/autoparts/{new|used}/brand/bosch`.  

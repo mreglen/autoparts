@@ -10,7 +10,7 @@ import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 import ReviewsSection from '../../components/Reviews/ReviewsSection';
 import FeaturedLandingsSection from '../../components/Seo/FeaturedLandingsSection';
 import PageAmbientBackground from '../../components/PageAmbientBackground/PageAmbientBackground';
-import { buildHomeSeo, PageSeoHelmet } from '../../utils/pageSeo';
+import { buildHomeSeo, buildHomeStructuredData, PageSeoHelmet } from '../../utils/pageSeo';
 
 const featureItems = [
   {
@@ -50,6 +50,7 @@ function Main() {
 
   const autopartsPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
   const seo = buildHomeSeo();
+  const homeStructuredData = buildHomeStructuredData();
 
   const runSearch = async (e) => {
     e?.preventDefault();
@@ -83,6 +84,7 @@ function Main() {
   return (
     <div className="relative w-full text-gray-900">
       <PageSeoHelmet seo={seo} />
+      <script type="application/ld+json">{JSON.stringify(homeStructuredData)}</script>
       <PageAmbientBackground />
 
       {/* Герой */}
