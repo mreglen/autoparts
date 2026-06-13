@@ -167,13 +167,23 @@ def _populate_semantic(db: Session, *, seen: set[str], stats: dict[str, int], li
             return
 
 
-def _populate_tecdoc(db: Session, *, seen: set[str], stats: dict[str, int], limit: int) -> None:
+def _populate_tecdoc(
+    db: Session,
+    *,
+    seen: set[str],
+    stats: dict[str, int],
+    total_limit: int,
+    tecdoc_budget: int,
+    loop_harvest: bool = False,
+) -> None:
     from app.services.tecdoc_pair_harvest_service import (
         harvest_tecdoc_cross_pairs,
         harvest_tecdoc_direct_pairs,
     )
 
-    tecdoc_limit = int(settings.NEW_PARTS_SEO_SEED_TECDOC_LIMIT or 100000)
+    stats.setdefault("tecdoc_scanned", 0)
+    stats.setdefault("tecdoc_harvest_rounds", 0)
+
     normalized_articles: set[str] = set()
     for product in _iter_catalog_products(db):
         if not is_working_catalog_product(product):
@@ -190,7 +200,7 @@ def _populate_tecdoc(db: Session, *, seen: set[str], stats: dict[str, int], limi
         article_list = list(normalized_articles)
         try:
             for offset in range(0, len(article_list), 200):
-                if inserted_tecdoc >= tecdoc_limit or stats["total"] >= limit:
+                if inserted_tecdoc >= tecdoc_budget or stats["total"] >= total_limit:
                     break
                 batch = article_list[offset : offset + 200]
                 cross_rows = (
@@ -204,11 +214,12 @@ def _populate_tecdoc(db: Session, *, seen: set[str], stats: dict[str, int], limi
                         TecdocSupplier.id == TecdocArticleCrossList.supplier,
                     )
                     .filter(TecdocArticleCrossList.Article.in_(batch))
-                    .limit(min(500, tecdoc_limit - inserted_tecdoc))
+                    .limit(min(500, tecdoc_budget - inserted_tecdoc))
                     .all()
                 )
+                stats["tecdoc_scanned"] = int(stats.get("tecdoc_scanned", 0)) + len(cross_rows)
                 for cross_article, supplier_name in cross_rows:
-                    if inserted_tecdoc >= tecdoc_limit or stats["total"] >= limit:
+                    if inserted_tecdoc >= tecdoc_budget or stats["total"] >= total_limit:
                         break
                     brand = map_tecdoc_brand_to_rossko((supplier_name or "").strip())
                     article = (cross_article or "").strip()
@@ -221,37 +232,59 @@ def _populate_tecdoc(db: Session, *, seen: set[str], stats: dict[str, int], limi
                         seen=seen,
                         stats=stats,
                         stat_key="tecdoc",
-                        total_limit=limit,
+                        total_limit=total_limit,
                     ):
                         inserted_tecdoc += 1
         except Exception:
             logger.exception("TecDoc catalog cross populate failed")
 
-    if stats["total"] >= limit or inserted_tecdoc >= tecdoc_limit:
+    if stats["total"] >= total_limit or inserted_tecdoc >= tecdoc_budget:
         return
 
-    try:
-        harvest_tecdoc_direct_pairs(
-            db,
-            seen=seen,
-            stats=stats,
-            total_limit=min(limit, tecdoc_limit),
-        )
-    except Exception:
-        logger.exception("TecDoc direct harvest during populate failed")
+    max_rounds = 20 if loop_harvest else 1
+    for _round in range(max_rounds):
+        if stats.get("tecdoc", 0) >= tecdoc_budget or stats["total"] >= total_limit:
+            break
 
-    if stats["total"] >= limit or stats.get("tecdoc", 0) >= tecdoc_limit:
-        return
+        direct_inserted = 0
+        cross_inserted = 0
+        direct_scanned = 0
+        cross_scanned = 0
 
-    try:
-        harvest_tecdoc_cross_pairs(
-            db,
-            seen=seen,
-            stats=stats,
-            total_limit=min(limit, tecdoc_limit),
-        )
-    except Exception:
-        logger.exception("TecDoc cross harvest during populate failed")
+        try:
+            direct_result = harvest_tecdoc_direct_pairs(
+                db,
+                seen=seen,
+                stats=stats,
+                total_limit=tecdoc_budget,
+            )
+            direct_inserted = int(direct_result.get("inserted", 0))
+            direct_scanned = int(direct_result.get("scanned", 0))
+        except Exception:
+            logger.exception("TecDoc direct harvest during populate failed")
+
+        if stats.get("tecdoc", 0) >= tecdoc_budget or stats["total"] >= total_limit:
+            stats["tecdoc_harvest_rounds"] = int(stats.get("tecdoc_harvest_rounds", 0)) + 1
+            stats["tecdoc_scanned"] = int(stats.get("tecdoc_scanned", 0)) + direct_scanned
+            break
+
+        try:
+            cross_result = harvest_tecdoc_cross_pairs(
+                db,
+                seen=seen,
+                stats=stats,
+                total_limit=tecdoc_budget,
+            )
+            cross_inserted = int(cross_result.get("inserted", 0))
+            cross_scanned = int(cross_result.get("scanned", 0))
+        except Exception:
+            logger.exception("TecDoc cross harvest during populate failed")
+
+        stats["tecdoc_harvest_rounds"] = int(stats.get("tecdoc_harvest_rounds", 0)) + 1
+        stats["tecdoc_scanned"] = int(stats.get("tecdoc_scanned", 0)) + direct_scanned + cross_scanned
+
+        if direct_inserted == 0 and cross_inserted == 0:
+            break
 
 
 def _populate_landing(db: Session, *, seen: set[str], stats: dict[str, int], limit: int) -> None:
@@ -449,6 +482,7 @@ def populate_seed_queue_from_catalog(
     db: Session,
     *,
     limit: int | None = None,
+    loop_tecdoc_harvest: bool = False,
 ) -> dict[str, int]:
     from app.services.new_parts_seo_sync_service import (
         collect_distinct_product_candidates,
@@ -456,6 +490,8 @@ def populate_seed_queue_from_catalog(
     )
 
     total_limit = limit if limit is not None else int(settings.NEW_PARTS_SEO_SEED_POPULATE_LIMIT or 20000)
+    tecdoc_limit = int(settings.NEW_PARTS_SEO_SEED_TECDOC_LIMIT or 100000)
+    tecdoc_budget = min(tecdoc_limit, total_limit)
     stats: dict[str, int] = {
         "orders": 0,
         "products": 0,
@@ -464,32 +500,46 @@ def populate_seed_queue_from_catalog(
         "landing": 0,
         "card_cross": 0,
         "total": 0,
+        "tecdoc_scanned": 0,
+        "tecdoc_harvest_rounds": 0,
     }
     seen: set[str] = set()
 
-    for collector, key in (
-        (collect_order_item_candidates, "orders"),
-        (collect_distinct_product_candidates, "products"),
-    ):
-        for candidate in collector(db):
-            _try_add_pair(
-                db,
-                brand=candidate.brand,
-                article=candidate.article,
-                source=candidate.source,
-                priority=10 if key == "orders" else 20,
-                seen=seen,
-                stats=stats,
-                stat_key=key,
-                total_limit=total_limit,
-            )
-            if stats["total"] >= total_limit:
-                return stats
+    _populate_tecdoc(
+        db,
+        seen=seen,
+        stats=stats,
+        total_limit=total_limit,
+        tecdoc_budget=tecdoc_budget,
+        loop_harvest=loop_tecdoc_harvest,
+    )
 
-    _populate_semantic(db, seen=seen, stats=stats, limit=total_limit)
-    _populate_landing(db, seen=seen, stats=stats, limit=total_limit)
-    _populate_tecdoc(db, seen=seen, stats=stats, limit=total_limit)
-    _populate_card_cross_mining(db, seen=seen, stats=stats, limit=total_limit)
+    if stats["total"] < total_limit:
+        for collector, key in (
+            (collect_order_item_candidates, "orders"),
+            (collect_distinct_product_candidates, "products"),
+        ):
+            for candidate in collector(db):
+                _try_add_pair(
+                    db,
+                    brand=candidate.brand,
+                    article=candidate.article,
+                    source=candidate.source,
+                    priority=10 if key == "orders" else 20,
+                    seen=seen,
+                    stats=stats,
+                    stat_key=key,
+                    total_limit=total_limit,
+                )
+                if stats["total"] >= total_limit:
+                    return stats
+
+    if stats["total"] < total_limit:
+        _populate_semantic(db, seen=seen, stats=stats, limit=total_limit)
+    if stats["total"] < total_limit:
+        _populate_landing(db, seen=seen, stats=stats, limit=total_limit)
+    if stats["total"] < total_limit:
+        _populate_card_cross_mining(db, seen=seen, stats=stats, limit=total_limit)
     return stats
 
 

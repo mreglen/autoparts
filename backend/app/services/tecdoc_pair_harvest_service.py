@@ -75,7 +75,7 @@ def harvest_tecdoc_direct_pairs(
     for article_id, article_raw, supplier_name in rows:
         scanned += 1
         last_id = max(last_id, int(article_id or 0))
-        if inserted >= batch or local_stats["total"] >= limit:
+        if inserted >= batch or local_stats.get("tecdoc", 0) >= limit or local_stats["total"] >= limit:
             break
         supplier_text = (supplier_name or "").strip()
         if not is_tecdoc_brand_whitelisted(supplier_text, extra_brands=card_brands):
@@ -136,7 +136,7 @@ def harvest_tecdoc_cross_pairs(
     scanned = 0
     for cross_article, supplier_name, article_id in rows:
         scanned += 1
-        if inserted >= batch or local_stats["total"] >= limit:
+        if inserted >= batch or local_stats.get("tecdoc", 0) >= limit or local_stats["total"] >= limit:
             break
         last_id = max(last_id, int(article_id or 0))
         supplier_text = (supplier_name or "").strip()

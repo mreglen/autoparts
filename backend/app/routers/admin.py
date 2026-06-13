@@ -1160,7 +1160,7 @@ def populate_seo_seed_queue(
     del current_user
     from app.services.seo_rossko_seed_service import populate_seed_queue_from_catalog
 
-    return populate_seed_queue_from_catalog(db)
+    return populate_seed_queue_from_catalog(db, loop_tecdoc_harvest=True)
 
 
 @router.post("/seo/seed-queue/precheck")

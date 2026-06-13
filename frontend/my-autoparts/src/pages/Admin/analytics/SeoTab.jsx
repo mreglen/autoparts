@@ -372,16 +372,30 @@ export default function SeoTab() {
               if (key === 'populate' && result) {
                 const parts = [
                   `Добавлено новых: ${formatNumber(result.total ?? 0)}`,
+                  result.tecdoc ? `TecDoc ${result.tecdoc}` : null,
                   result.orders ? `заказы ${result.orders}` : null,
                   result.products ? `каталог ${result.products}` : null,
-                  result.tecdoc ? `TecDoc ${result.tecdoc}` : null,
                   result.semantic ? `семантика ${result.semantic}` : null,
                   result.landing ? `посадочные ${result.landing}` : null,
                   result.card_cross ? `кроссы ${result.card_cross}` : null,
                 ].filter(Boolean);
+                const tecdocMeta =
+                  result.tecdoc_harvest_rounds || result.tecdoc_scanned
+                    ? ` (раундов harvest: ${result.tecdoc_harvest_rounds ?? 0}, просмотрено: ${formatNumber(result.tecdoc_scanned ?? 0)})`
+                    : '';
                 return (
                   <>
                     <p>{parts.join(' · ')}</p>
+                    {!result.tecdoc ? (
+                      <p className="text-amber-800">
+                        TecDoc: новых позиций не добавлено — возможно, кандидаты уже в очереди или не
+                        прошли whitelist брендов{tecdocMeta}.
+                      </p>
+                    ) : result.tecdoc_harvest_rounds || result.tecdoc_scanned ? (
+                      <p className="text-gray-500">
+                        TecDoc{tecdocMeta}.
+                      </p>
+                    ) : null}
                     {queueBefore && queueAfter ? (
                       <p>
                         Очередь — ожидают: {formatQueueDelta(queueBefore.totals, queueAfter.totals, 'pending')},
