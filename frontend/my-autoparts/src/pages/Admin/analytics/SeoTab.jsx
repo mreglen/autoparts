@@ -1,23 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { API_BASE, apiRequest } from '../../../utils/apiClient';
 import { formatNumber, formatSyncStats } from './analyticsFormatters';
 import { LoadingState } from './AnalyticsUi';
 import CardsCreatedTrend from './CardsCreatedTrend';
 import LandingPagesSection from './LandingPagesSection';
-
-const SOURCE_LABELS = {
-  tecdoc: 'TecDoc',
-  product: 'Каталог б/у',
-  order: 'Заказы',
-  orders: 'Заказы',
-  products: 'Каталог б/у',
-  semantic: 'Семантика',
-  landing: 'Посадочные',
-  card_cross: 'Кроссы',
-  cross: 'Кроссы Rossko',
-  sibling: 'Аналоги',
-  unknown: 'Прочее',
-};
+import { SOURCE_LABELS, sourceLabel } from './seoSourceLabels';
 
 function aggregateSeedQueue(quota) {
   const bySource = quota?.seed_conversion_by_source ?? {};
@@ -54,10 +42,20 @@ function SeedQueuePanel({ quota }) {
 
   return (
     <div className="rounded border border-gray-200 bg-white p-4">
-      <h2 className="text-base font-semibold text-gray-900">Очередь проверки Rossko</h2>
-      <p className="mt-1 text-sm text-gray-600">
-        Кандидаты перед созданием карточек: сначала «Наполнить», затем «Проверить».
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">Очередь проверки Rossko</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Кандидаты перед созданием карточек: сначала «Наполнить», затем «Проверить».
+          </p>
+        </div>
+        <Link
+          to="/admin/analytics/seo/queue"
+          className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
+        >
+          Смотреть очередь
+        </Link>
+      </div>
 
       <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div>
@@ -103,7 +101,14 @@ function SeedQueuePanel({ quota }) {
             <tbody>
               {rows.map(([source, counts]) => (
                 <tr key={source} className="border-b border-gray-100">
-                  <td className="py-2 pr-4">{SOURCE_LABELS[source] || source}</td>
+                  <td className="py-2 pr-4">
+                    <Link
+                      to={`/admin/analytics/seo/queue/${encodeURIComponent(source)}`}
+                      className="text-gray-900 hover:underline"
+                    >
+                      {sourceLabel(source)}
+                    </Link>
+                  </td>
                   <td className="py-2 pr-4 tabular-nums">{formatNumber(counts.pending ?? 0)}</td>
                   <td className="py-2 pr-4 tabular-nums">{formatNumber(counts.ready ?? 0)}</td>
                   <td className="py-2 pr-4 tabular-nums">{formatNumber(counts.not_found ?? 0)}</td>

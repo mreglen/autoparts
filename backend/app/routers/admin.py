@@ -1180,6 +1180,37 @@ async def precheck_seo_seed_queue(
     return await run_seed_precheck_batch(db, max_checks=limit)
 
 
+@router.get("/seo/seed-queue")
+def get_seo_seed_queue_overview(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    from app.services.seo_rossko_seed_service import get_seed_queue_overview
+
+    return get_seed_queue_overview(db)
+
+
+@router.get("/seo/seed-queue/items")
+def list_seo_seed_queue_items(
+    source: str = Query(..., min_length=1, max_length=32),
+    status: str | None = Query(
+        None,
+        description="Фильтр: pending, ready, not_found, created",
+    ),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    from app.services.seo_rossko_seed_service import SEED_QUEUE_STATUSES, list_seed_queue_items
+
+    if status and status not in SEED_QUEUE_STATUSES:
+        raise HTTPException(status_code=400, detail=f"status must be one of: {', '.join(SEED_QUEUE_STATUSES)}")
+    return list_seed_queue_items(db, source=source, status=status, page=page, page_size=page_size)
+
+
 @router.get("/seo/new-parts/stats")
 def get_new_parts_seo_stats(
     days: int = Query(14, ge=1, le=90),

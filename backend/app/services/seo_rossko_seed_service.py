@@ -815,3 +815,126 @@ async def maybe_run_precheck_boost(db: Session) -> dict[str, int] | None:
     if ready_count >= deficit or precheck_budget_remaining(db) <= 0:
         return None
     return await run_seed_precheck_batch(db)
+
+
+SEED_QUEUE_SOURCE_ORDER: tuple[str, ...] = (
+    "tecdoc",
+    "product",
+    "order",
+    "semantic",
+    "landing",
+    "card_cross",
+)
+
+SEED_QUEUE_STATUSES: tuple[str, ...] = ("pending", "ready", "not_found", "created")
+
+
+def _seed_row_to_dict(row: SeoRosskoSeedQueue) -> dict[str, object]:
+    return {
+        "lookup_key": row.lookup_key,
+        "brand": row.brand,
+        "article": row.article,
+        "source": row.source,
+        "status": row.status,
+        "priority": int(row.priority or 0),
+        "has_rossko_payload": bool(row.rossko_payload_json),
+        "rossko_checked_at": row.rossko_checked_at.isoformat() if row.rossko_checked_at else None,
+        "next_retry_at": row.next_retry_at.isoformat() if row.next_retry_at else None,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
+def get_seed_queue_overview(db: Session) -> dict[str, object]:
+    rows = (
+        db.query(
+            SeoRosskoSeedQueue.source,
+            SeoRosskoSeedQueue.status,
+            func.count(SeoRosskoSeedQueue.lookup_key),
+        )
+        .group_by(SeoRosskoSeedQueue.source, SeoRosskoSeedQueue.status)
+        .all()
+    )
+    by_source: dict[str, dict[str, int]] = {}
+    totals = {status: 0 for status in SEED_QUEUE_STATUSES}
+    for source_raw, status_raw, count in rows:
+        source = str(source_raw or "unknown")
+        status = str(status_raw or "unknown")
+        bucket = by_source.setdefault(source, {s: 0 for s in SEED_QUEUE_STATUSES})
+        value = int(count or 0)
+        if status in bucket:
+            bucket[status] = value
+            totals[status] += value
+
+    sources: list[dict[str, object]] = []
+    known = set(by_source.keys())
+    ordered_keys = [src for src in SEED_QUEUE_SOURCE_ORDER if src in known]
+    ordered_keys.extend(sorted(src for src in known if src not in SEED_QUEUE_SOURCE_ORDER))
+    for source in ordered_keys:
+        counts = by_source[source]
+        active = sum(int(counts.get(s, 0)) for s in SEED_QUEUE_STATUSES)
+        sources.append(
+            {
+                "source": source,
+                "pending": counts.get("pending", 0),
+                "ready": counts.get("ready", 0),
+                "not_found": counts.get("not_found", 0),
+                "created": counts.get("created", 0),
+                "total": active,
+            }
+        )
+
+    grand_total = sum(totals.values())
+    return {
+        "sources": sources,
+        "totals": {**totals, "total": grand_total},
+    }
+
+
+def list_seed_queue_items(
+    db: Session,
+    *,
+    source: str,
+    status: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> dict[str, object]:
+    safe_page = max(1, int(page or 1))
+    safe_size = max(1, min(int(page_size or 50), 200))
+    source_key = (source or "").strip() or "unknown"
+
+    query = db.query(SeoRosskoSeedQueue).filter(SeoRosskoSeedQueue.source == source_key)
+    if status:
+        status_key = status.strip()
+        if status_key in SEED_QUEUE_STATUSES:
+            query = query.filter(SeoRosskoSeedQueue.status == status_key)
+
+    total = query.count()
+    rows = (
+        query.order_by(
+            SeoRosskoSeedQueue.priority.asc(),
+            SeoRosskoSeedQueue.created_at.asc(),
+            SeoRosskoSeedQueue.lookup_key.asc(),
+        )
+        .offset((safe_page - 1) * safe_size)
+        .limit(safe_size)
+        .all()
+    )
+
+    status_counts_rows = (
+        db.query(SeoRosskoSeedQueue.status, func.count(SeoRosskoSeedQueue.lookup_key))
+        .filter(SeoRosskoSeedQueue.source == source_key)
+        .group_by(SeoRosskoSeedQueue.status)
+        .all()
+    )
+    status_counts = {str(s or "unknown"): int(c or 0) for s, c in status_counts_rows}
+
+    return {
+        "source": source_key,
+        "status": status.strip() if status else None,
+        "page": safe_page,
+        "page_size": safe_size,
+        "total": total,
+        "status_counts": status_counts,
+        "items": [_seed_row_to_dict(row) for row in rows],
+    }

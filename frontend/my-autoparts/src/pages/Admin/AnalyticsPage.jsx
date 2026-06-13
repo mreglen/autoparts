@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiRequest } from '../../utils/apiClient';
@@ -14,7 +14,8 @@ const TABS = [
 
 export default function AnalyticsPage() {
   const { isReady, user, isAuthenticated } = useAuthReady();
-  const [viewMode, setViewMode] = useState('traffic');
+  const [searchParams] = useSearchParams();
+  const [viewMode, setViewMode] = useState(() => (searchParams.get('tab') === 'seo' ? 'seo' : 'traffic'));
   const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -24,6 +25,10 @@ export default function AnalyticsPage() {
   const [activity, setActivity] = useState([]);
   const [selectedPath, setSelectedPath] = useState(null);
   const [pageDetail, setPageDetail] = useState(null);
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'seo') setViewMode('seo');
+  }, [searchParams]);
 
   const loadPagesData = useCallback(async () => {
     setLoading(true);

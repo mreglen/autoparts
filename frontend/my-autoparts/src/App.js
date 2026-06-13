@@ -93,6 +93,7 @@ const AuditLogPage = lazy(() => import('./pages/Admin/AuditLogPage'));
 const AdminUsersPage = lazy(() => import('./pages/Admin/AdminUsersPage'));
 const RosskoSettingsPage = lazy(() => import('./pages/Admin/RosskoSettingsPage'));
 const AnalyticsPage = lazy(() => import('./pages/Admin/AnalyticsPage'));
+const SeoSeedQueuePage = lazy(() => import('./pages/Admin/analytics/SeoSeedQueuePage'));
 
 function LazyRoute({ children }) {
   return <Suspense fallback={<RouteFallback />}>{children}</Suspense>;
@@ -560,6 +561,22 @@ function App() {
             element={(
               <LazyRoute>
                 <AnalyticsPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/admin/analytics/seo/queue/:source"
+            element={(
+              <LazyRoute>
+                <SeoSeedQueuePage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/admin/analytics/seo/queue"
+            element={(
+              <LazyRoute>
+                <SeoSeedQueuePage />
               </LazyRoute>
             )}
           />
