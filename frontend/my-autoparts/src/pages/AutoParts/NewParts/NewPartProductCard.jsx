@@ -310,8 +310,8 @@ export default function NewPartProductCard({
   const mainAvailableCount = toSafeInt(mainStock?.available_count, 0);
 
   return (
-    <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5" data-card-id={uniqueId}>
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <article className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5" data-card-id={uniqueId}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
             <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{brand}</span>
@@ -325,32 +325,32 @@ export default function NewPartProductCard({
           >
             {displayTitle}
           </h3>
-          <p className="mt-2 line-clamp-2 text-sm text-gray-600">{title}</p>
+          <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-gray-600 sm:line-clamp-2">{title}</p>
         </div>
 
-        <div className="w-full rounded-lg bg-gray-50 p-3 md:w-[280px] md:flex-shrink-0">
-          <div className="mb-2 flex items-start justify-between">
+        <div className="w-full rounded-lg bg-gray-50 p-3 sm:p-4 lg:w-[280px] lg:flex-shrink-0">
+          <div className="mb-2 flex items-start justify-between gap-3">
             <div>
               <p className="text-xs text-gray-500">Цена</p>
-              <p className="text-xl font-bold text-gray-900">{price} ₽</p>
+              <p className="text-2xl font-bold text-gray-900 sm:text-xl">{price} ₽</p>
             </div>
             <div className="text-right">
               <p className="text-xs text-gray-500">Остаток</p>
               <p className="text-sm font-semibold text-gray-900">{mainAvailableCount} шт.</p>
             </div>
           </div>
-          <p className="mb-3 text-xs text-gray-600">{formatDeliveryTimeText(mainStock.delivery_start, mainStock.delivery_end)}</p>
-          <div className="flex items-center justify-between">
+          <p className="mb-3 text-xs leading-relaxed text-gray-600">{formatDeliveryTimeText(mainStock.delivery_start, mainStock.delivery_end)}</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <QuantityControl
               quantity={mainQuantity}
               onAdd={() => handleAddToCart(mainStock)}
               onRemove={() => handleRemoveFromCart(mainStock)}
               disabled={disabledControl}
               noStock={mainStockInfo.noStock}
-              compact={false}
+              compact
             />
             {(mainStockInfo.noStock || mainStockInfo.limitedStock) && (
-              <span className="ml-2 text-xs text-orange-600">
+              <span className="text-xs text-orange-600 sm:ml-2">
                 {mainStockInfo.noStock ? 'Нет на складах' : 'Есть на др. складах'}
               </span>
             )}
@@ -364,7 +364,7 @@ export default function NewPartProductCard({
           <button
             type="button"
             onClick={() => setShowDetails((prev) => !prev)}
-            className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+            className="min-h-[44px] text-sm font-medium text-indigo-600 hover:text-indigo-800"
           >
             {showDetails ? 'Скрыть другие склады' : `Другие склады (${otherStocks.length})`}
           </button>

@@ -27,6 +27,7 @@ import {
 } from './rosskoHelpers';
 import { extractCityFromAddress } from '../../../utils/organizationCity';
 import { slugifyBrand } from '../../../utils/slugUtils';
+import NewPartHorizontalScroll from './NewPartHorizontalScroll';
 
 const safeText = (value, fallback = '') => {
   if (typeof value === 'string') return value.trim() || fallback;
@@ -101,6 +102,7 @@ function normalizeUsedMatch(item) {
     organization_name: item.organization_name || org?.name || null,
     organization_address: orgAddress,
     city: item.city || extractCityFromAddress(orgAddress),
+    compatible_vehicles: Array.isArray(item.compatible_vehicles) ? item.compatible_vehicles : [],
   };
 }
 
@@ -431,31 +433,33 @@ export default function NewPartDetailPage() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+    <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6 md:py-8">
       <PageSeoHelmet seo={seo} />
       {jsonLd ? <script type="application/ld+json">{JSON.stringify(jsonLd)}</script> : null}
 
-      <section className="mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-4 shadow-sm sm:p-6">
+      <section className="mb-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-4 shadow-sm sm:mb-6 sm:p-6">
         <button
           type="button"
           onClick={() => navigate(backToListPath)}
-          className="mb-3 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+          className="mb-3 min-h-[44px] text-sm font-medium text-indigo-600 hover:text-indigo-800"
         >
           ← К поиску новых запчастей
         </button>
-        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{pageH1}</h1>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs sm:text-sm">
-          <span className="rounded-full bg-white px-3 py-1 text-gray-700 shadow-sm">Бренд: {brand}</span>
-          <span className="rounded-full bg-white px-3 py-1 text-gray-700 shadow-sm">Артикул: {article}</span>
-          {slugifyBrand(brand) ? (
-            <Link
-              to={`/autoparts/new/brand/${encodeURIComponent(slugifyBrand(brand))}`}
-              className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 font-medium text-indigo-700 shadow-sm hover:bg-indigo-100"
-            >
-              Все новые {brand}
-            </Link>
-          ) : null}
-        </div>
+        <h1 className="text-lg font-bold leading-snug text-gray-900 sm:text-2xl">{pageH1}</h1>
+        <NewPartHorizontalScroll className="mt-3" hint="Листайте теги →" showHint={false}>
+          <div className="flex flex-nowrap gap-2 pb-0.5 text-xs sm:flex-wrap sm:text-sm">
+            <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-gray-700 shadow-sm">Бренд: {brand}</span>
+            <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-gray-700 shadow-sm">Артикул: {article}</span>
+            {slugifyBrand(brand) ? (
+              <Link
+                to={`/autoparts/new/brand/${encodeURIComponent(slugifyBrand(brand))}`}
+                className="shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 font-medium text-indigo-700 shadow-sm hover:bg-indigo-100"
+              >
+                Все новые {brand}
+              </Link>
+            ) : null}
+          </div>
+        </NewPartHorizontalScroll>
       </section>
 
       <NewPartDeliveryStockBlock

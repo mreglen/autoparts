@@ -7,7 +7,16 @@ from pydantic import BaseModel
 from app.models.product import ProductPhoto, ProductVideo, Product as ProductModel
 from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
 from app.models.product_vehicle import ProductVehicleAssociation
-from app.schemas.product import Product as ProductSchema, ProductCreate, ProductUpdate, ProductQuantityUpdate, Vehicle, DeletePhotosRequest, DeleteVideosRequest, QrPartCardResponse
+from app.schemas.product import (
+    Product as ProductSchema,
+    ProductCreate,
+    ProductUpdate,
+    ProductQuantityUpdate,
+    DeletePhotosRequest,
+    DeleteVideosRequest,
+    QrPartCardResponse,
+)
+from app.schemas.vehicle import Vehicle as VehicleSchema
 from app.models.vehicle import Vehicle as VehicleModel
 from app.db.database import get_db
 from app.core.auth import get_current_user
@@ -35,6 +44,7 @@ class PublicUsedProductMatchOut(BaseModel):
     organization_name: str | None = None
     organization_address: str | None = None
     city: str | None = None
+    compatible_vehicles: list[VehicleSchema] = []
 
 
 
@@ -261,6 +271,7 @@ def find_public_used_product_match(
     load_options = (
         selectinload(ProductModel.photos),
         selectinload(ProductModel.organization),
+        selectinload(ProductModel.compatible_vehicles),
     )
 
     exact_query = (
@@ -319,6 +330,7 @@ def find_public_used_product_match(
                 organization_name=str(org_name).strip() if org_name else None,
                 organization_address=str(org_address).strip() if org_address else None,
                 city=city,
+                compatible_vehicles=list(product.compatible_vehicles or []),
             )
         )
     return results
