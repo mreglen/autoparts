@@ -410,11 +410,12 @@ def collect_working_product_urls(
 
 
 def _iter_catalog_products_by_created_desc(db: Session) -> list[ProductModel]:
+    """Последние товары в каталоге: у Product нет created_at, сортируем по id DESC."""
     return (
         db.query(ProductModel)
         .options(selectinload(ProductModel.photos))
         .filter(ProductModel.quantity > 0)
-        .order_by(ProductModel.created_at.desc(), ProductModel.id.desc())
+        .order_by(ProductModel.id.desc())
         .all()
     )
 
@@ -427,7 +428,7 @@ def collect_latest_working_product_urls(
 ) -> list[dict[str, str | int]]:
     """
     Последние добавленные рабочие карточки б/у из таблицы products для SEO-выгрузки.
-    Сортировка: created_at DESC, id DESC.
+    Сортировка: id DESC (новые записи имеют больший id).
     """
     site_origin = _resolve_origin(db, preferred_host_url)
     items: list[dict[str, str | int]] = []

@@ -9,6 +9,7 @@ import {
   resolveProductCity,
 } from './productSearchSeo';
 import { buildCatalogProductJsonLd } from './productJsonLd';
+import { buildProductUsedKeywords } from './pageKeywords';
 
 const SITE_ORIGIN = 'https://svoygarage.ru';
 
@@ -50,7 +51,15 @@ export function buildProductSeo(product) {
   const imageUrl = resolveOgImageUrl(firstPhoto ? normalizeImageUrl(firstPhoto) : null);
   const jsonLd = buildCatalogProductJsonLd(product, { canonicalUrl });
 
-  return { title, description, canonicalUrl, imageUrl, jsonLd, robots: 'index, follow' };
+  return {
+    title,
+    description,
+    canonicalUrl,
+    imageUrl,
+    jsonLd,
+    robots: 'index, follow',
+    keywords: buildProductUsedKeywords({ brand, article, city }),
+  };
 }
 
 export function seoFromPartMetaResponse(meta) {
@@ -61,5 +70,6 @@ export function seoFromPartMetaResponse(meta) {
     canonicalUrl: meta.canonical_url,
     imageUrl: meta.image_url || resolveOgImageUrl(null),
     robots: 'index, follow',
+    keywords: meta.keywords || '',
   };
 }

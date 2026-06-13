@@ -189,6 +189,7 @@ export function PageSeoHelmet({ seo }) {
     <Helmet>
       <title>{seo.title}</title>
       <meta name="description" content={seo.description} />
+      {seo.keywords ? <meta name="keywords" content={seo.keywords} /> : null}
       <meta name="robots" content={seo.robots || 'index, follow'} />
       <link rel="canonical" href={seo.canonicalUrl} />
       {seo.faviconSvg ? (

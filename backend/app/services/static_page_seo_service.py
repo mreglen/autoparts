@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.product import Product as ProductModel
 from app.services.spa_page_check_service import PART_PATH_RE, _normalize_path
 from app.services.yandex_feed_xml_service import _resolve_site_origin
+from app.utils.page_keywords import build_page_keywords
 from app.utils.product_display_name import format_product_display_title
 from app.utils.product_urls import build_product_page_url, build_product_used_catalog_url
 from app.utils.seo_constants import resolve_default_og_image_url
@@ -30,6 +31,7 @@ class StaticPageSeoMeta:
     canonical_url: str
     h1: str
     robots: str = "index, follow"
+    keywords: str = ""
     card_links: tuple[tuple[str, str], ...] = ()
 
 
@@ -165,6 +167,7 @@ def _build_used_parts_seo(
                 canonical_url=canonical_url,
                 h1=name,
                 robots="index, follow",
+                keywords=build_page_keywords("used_catalog_q", brand=brand, article=article),
                 card_links=((name, part_url),),
             )
 
@@ -261,6 +264,7 @@ def _build_brand_landing_seo(db: Session, slug: str, *, site_origin: str) -> Sta
         description=_truncate(landing.meta_description, 160),
         canonical_url=_absolute_url(site_origin, landing.canonical_path),
         h1=f"Новые автозапчасти {brand_name}",
+        keywords=build_page_keywords("brand_new", brand_name=brand_name),
         card_links=tuple(links),
     )
 
@@ -294,6 +298,11 @@ def _build_category_landing_seo(db: Session, slug: str, *, site_origin: str) -> 
         description=_truncate(landing.meta_description, 160),
         canonical_url=_absolute_url(site_origin, landing.canonical_path),
         h1=f"Новые {title_ru} — каталог с доставкой",
+        keywords=build_page_keywords(
+            "category_new",
+            title_ru=title_ru,
+            search_query=landing.search_query,
+        ),
         card_links=tuple(links),
     )
 
@@ -326,6 +335,7 @@ def _build_used_brand_landing_seo(db: Session, slug: str, *, site_origin: str) -
         description=_truncate(landing.meta_description, 160),
         canonical_url=_absolute_url(site_origin, landing.canonical_path),
         h1=f"Б/у автозапчасти {brand_name}",
+        keywords=build_page_keywords("brand_used", brand_name=brand_name),
         card_links=tuple(links),
     )
 
@@ -358,6 +368,11 @@ def _build_used_category_landing_seo(db: Session, slug: str, *, site_origin: str
         description=_truncate(landing.meta_description, 160),
         canonical_url=_absolute_url(site_origin, landing.canonical_path),
         h1=f"Б/у {title_ru} — купить от продавцов",
+        keywords=build_page_keywords(
+            "category_used",
+            title_ru=title_ru,
+            search_query=landing.search_query,
+        ),
         card_links=tuple(links),
     )
 
@@ -392,6 +407,7 @@ def _build_used_geo_landing_seo(db: Session, slug: str, *, site_origin: str) -> 
         description=_truncate(landing.meta_description, 160),
         canonical_url=_absolute_url(site_origin, landing.canonical_path),
         h1=f"Б/у автозапчасти в {city_prep}",
+        keywords=build_page_keywords("geo_used", city=city),
         card_links=tuple(links),
     )
 
@@ -498,6 +514,11 @@ def render_static_page_prerender_html(meta: StaticPageSeoMeta) -> str:
     parsed = urlsplit(meta.canonical_url or "")
     page_origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else None
     og_image = html.escape(resolve_default_og_image_url(page_origin), quote=True)
+    keywords_tag = ""
+    if meta.keywords:
+        keywords_tag = (
+            f'  <meta name="keywords" content="{html.escape(meta.keywords, quote=True)}" />\n'
+        )
 
     return f"""<!DOCTYPE html>
 <html lang="ru">
@@ -507,6 +528,7 @@ def render_static_page_prerender_html(meta: StaticPageSeoMeta) -> str:
   <meta name="robots" content="{robots}" />
   <title>{title}</title>
   <meta name="description" content="{description}" />
+{keywords_tag}
   <link rel="canonical" href="{canonical}" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Свой Гараж" />

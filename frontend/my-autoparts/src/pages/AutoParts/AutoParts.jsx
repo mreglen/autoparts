@@ -333,6 +333,7 @@ function AutoParts() {
           description: response.data.description,
           canonicalUrl: response.data.canonical_url,
           robots: response.data.robots,
+          keywords: response.data.keywords || '',
         });
       })
       .catch(() => {

@@ -10,26 +10,28 @@
 
 ## Таблица URL-паттернов
 
-| URL-паттерн | robots | canonical | Где задаётся |
-|-------------|--------|-----------|--------------|
-| `/` | index, follow | `/` | `buildHomeSeo` / `_build_home_seo` |
-| `/catalog` | index, follow | `/catalog` | `buildCatalogSeo` |
-| `/autoparts/new` | index, follow | `/autoparts/new` | `buildNewPartsSeo` |
-| `/autoparts/new?q=…` | noindex, follow | `/autoparts/new` | `buildNewPartsSeo` |
-| `/autoparts/new?brand=…` | noindex, follow | `/autoparts/new/brand/{slug}` если один бренд | `buildNewPartsSeo` + `resolveBrandLandingCanonical` |
-| `/autoparts/new/brand/{slug}` | index, follow | self | landing page SEO helpers |
-| `/autoparts/new/category/{slug}` | index, follow | self | landing page SEO helpers |
-| `/autoparts/new/part/{id}-…` | index, follow | self | `NewPartDetailPage` / prerender |
-| `/autoparts/used` | index, follow | `/autoparts/used` | `buildUsedPartsSeo` |
-| `/autoparts/used?q=…` | noindex, follow | `/autoparts/used` | `buildUsedPartsSeo` |
-| `/autoparts/used?q={brand} {article}` (канонический запрос рабочей карточки) | index, follow | self (`/autoparts/used?q=…`) | `_build_used_parts_seo` + resolver |
-| `/autoparts/used?brand=…` | noindex, follow | `/autoparts/used/brand/{slug}` если один бренд | `buildUsedPartsSeo` + `resolveBrandLandingCanonical` |
-| `/autoparts/used/brand/{slug}` | index, follow | self | `usedPartsBrandSeo` |
-| `/autoparts/used/category/{slug}` | index, follow | self | `usedPartsCategorySeo` |
-| `/autoparts/used/geo/{slug}` | index, follow | self | `usedPartsGeoSeo` |
-| `/part/{id}-…` | index, follow | self | `buildProductSeo` / part prerender |
-| `/seller/part-card/{id}` | noindex, follow | `/part/…` | `buildSellerPartCardSeo` |
-| `/about`, `/delivery`, `/organizations` | index, follow | self | static SEO builders |
+| URL-паттерн | robots | canonical | keywords | Где задаётся |
+|-------------|--------|-----------|----------|--------------|
+| `/` | index, follow | `/` | — | `buildHomeSeo` / `_build_home_seo` |
+| `/catalog` | index, follow | `/catalog` | — | `buildCatalogSeo` |
+| `/autoparts/new` | index, follow | `/autoparts/new` | — | `buildNewPartsSeo` |
+| `/autoparts/new?q=…` | noindex, follow | `/autoparts/new` | — | `buildNewPartsSeo` |
+| `/autoparts/new?brand=…` | noindex, follow | `/autoparts/new/brand/{slug}` если один бренд | — | `buildNewPartsSeo` + `resolveBrandLandingCanonical` |
+| `/autoparts/new/brand/{slug}` | index, follow | self | авто, `buildPageKeywords` | landing page SEO helpers |
+| `/autoparts/new/category/{slug}` | index, follow | self | авто, `buildPageKeywords` | landing page SEO helpers |
+| `/autoparts/new/part/{id}-…` | index, follow | self | авто, `buildPageKeywords` | `NewPartDetailPage` / prerender |
+| `/autoparts/used` | index, follow | `/autoparts/used` | — | `buildUsedPartsSeo` |
+| `/autoparts/used?q=…` (произвольный) | noindex, follow | `/autoparts/used` | — | `buildUsedPartsSeo` |
+| `/autoparts/used?q={brand} {article}` (канонический запрос рабочей карточки) | index, follow | self (`/autoparts/used?q=…`) | авто, `buildPageKeywords` | `_build_used_parts_seo` + resolver |
+| `/autoparts/used?brand=…` | noindex, follow | `/autoparts/used/brand/{slug}` если один бренд | — | `buildUsedPartsSeo` + `resolveBrandLandingCanonical` |
+| `/autoparts/used/brand/{slug}` | index, follow | self | авто, `buildPageKeywords` | `usedPartsBrandSeo` |
+| `/autoparts/used/category/{slug}` | index, follow | self | авто, `buildPageKeywords` | `usedPartsCategorySeo` |
+| `/autoparts/used/geo/{slug}` | index, follow | self | авто, `buildPageKeywords` | `usedPartsGeoSeo` |
+| `/part/{id}-…` | index, follow | self | авто, `buildPageKeywords` | `buildProductSeo` / part prerender |
+| `/seller/part-card/{id}` | noindex, follow | `/part/…` | — | `buildSellerPartCardSeo` |
+| `/about`, `/delivery`, `/organizations` | index, follow | self | — | static SEO builders |
+
+**keywords:** автогенерация через [`page_keywords.py`](../../backend/app/utils/page_keywords.py) / [`pageKeywords.js`](../../frontend/my-autoparts/src/utils/pageKeywords.js). На **noindex**-страницах тег `<meta name="keywords">` **не выводится**.
 
 ## Фильтр `?brand=` → canonical на посадочную
 

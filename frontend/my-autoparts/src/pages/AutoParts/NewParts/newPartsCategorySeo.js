@@ -1,3 +1,4 @@
+import { buildCategoryNewKeywords } from '../../../utils/pageKeywords';
 import { SITE_ORIGIN } from '../../../utils/breadcrumbs';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 
@@ -73,6 +74,10 @@ export function buildNewPartsCategorySeo({ landing, total = 0, items = [] }) {
     canonicalUrl,
     robots: 'index, follow',
     h1: `Новые ${category} — каталог с доставкой`,
+    keywords: buildCategoryNewKeywords({
+      titleRu: category,
+      searchQuery: landing?.search_query,
+    }),
     jsonLd,
   };
 }

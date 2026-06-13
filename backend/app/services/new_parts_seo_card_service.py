@@ -22,6 +22,7 @@ from app.utils.product_search_seo import (
 from app.utils.new_part_price_utils import min_stock_price_with_markup
 from app.utils.org_markup import global_markup_percent
 from app.utils.seo_constants import resolve_default_og_image_url
+from app.utils.page_keywords import build_page_keywords
 from app.utils.site_settings_db import get_or_create_site_settings
 
 ROSSKO_NEW_PART_SOURCE = "rossko"
@@ -37,6 +38,7 @@ class NewPartSeoMeta:
     price: str | None
     in_stock: bool
     json_ld: str
+    keywords: str = ""
     product_description: str | None = None
 
 
@@ -560,6 +562,11 @@ def build_new_part_seo_meta(
         price=price_text,
         in_stock=in_stock,
         json_ld=json_ld,
+        keywords=build_page_keywords(
+            "new_part_card",
+            brand=card.brand,
+            article=card.article,
+        ),
         product_description=body_description,
     )
 
@@ -606,6 +613,11 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
     json_ld_script = ""
     if meta.json_ld:
         json_ld_script = f'  <script type="application/ld+json">{meta.json_ld}</script>\n'
+    keywords_tag = ""
+    if meta.keywords:
+        keywords_tag = (
+            f'  <meta name="keywords" content="{html.escape(meta.keywords, quote=True)}" />\n'
+        )
 
     return f"""<!DOCTYPE html>
 <html lang="ru">
@@ -614,6 +626,7 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{title}</title>
   <meta name="description" content="{description}" />
+{keywords_tag}
   <link rel="canonical" href="{canonical}" />
   <meta property="og:type" content="product" />
   <meta property="og:site_name" content="Свой Гараж" />

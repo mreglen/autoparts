@@ -41,6 +41,7 @@ function PartProductSeoHelmet({ seo, structuredData, product }) {
     <Helmet>
       <title>{seo.title}</title>
       <meta name="description" content={seo.description} />
+      {seo.keywords ? <meta name="keywords" content={seo.keywords} /> : null}
       <link rel="canonical" href={seo.canonicalUrl} />
       <meta property="og:type" content="product" />
       <meta property="og:site_name" content="Свой Гараж" />

@@ -28,6 +28,9 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertIn("if1009", meta.title)
         self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/new")
         self.assertEqual(meta.robots, "noindex, follow")
+        self.assertEqual(meta.keywords, "")
+        html = render_static_page_prerender_html(meta)
+        self.assertNotIn('name="keywords"', html)
 
     def test_used_parts_search_seo_without_db_stays_noindex(self):
         meta = get_static_page_seo_for_path(None, "/autoparts/used?q=24410-3E500")
@@ -35,6 +38,9 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertIn("24410-3E500", meta.title)
         self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/used")
         self.assertEqual(meta.robots, "noindex, follow")
+        self.assertEqual(meta.keywords, "")
+        html = render_static_page_prerender_html(meta)
+        self.assertNotIn('name="keywords"', html)
 
     @patch("app.services.static_page_seo_service.build_product_page_url")
     @patch("app.services.static_page_seo_service.build_product_used_catalog_url")
@@ -63,8 +69,10 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertEqual(meta.robots, "index, follow")
         self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/used?q=BOSCH%20A123")
         self.assertIn("BOSCH", meta.title)
+        self.assertTrue(meta.keywords)
         html = render_static_page_prerender_html(meta)
         self.assertIn("BOSCH", html)
+        self.assertIn('name="keywords"', html)
 
     def test_used_parts_single_brand_canonical_to_landing(self):
         meta = get_static_page_seo_for_path(None, "/autoparts/used?brand=BOSCH")
@@ -123,9 +131,11 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertIsNotNone(meta)
         self.assertEqual(meta.h1, "Новые автозапчасти BOSCH")
         self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/new/brand/bosch")
+        self.assertTrue(meta.keywords)
         html = render_static_page_prerender_html(meta)
         self.assertIn("BOSCH A1", html)
         self.assertIn("<ul>", html)
+        self.assertIn('name="keywords"', html)
 
     @patch("app.services.new_parts_seo_card_service.iter_new_part_cards_by_category_for_prerender")
     @patch("app.services.new_parts_seo_card_service.count_new_part_cards_by_category_slug")
@@ -207,6 +217,9 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertIsNotNone(meta)
         self.assertEqual(meta.h1, "Б/у автозапчасти BOSCH")
         self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/used/brand/bosch")
+        self.assertTrue(meta.keywords)
+        html = render_static_page_prerender_html(meta)
+        self.assertIn('name="keywords"', html)
 
     def test_prerender_html_has_no_noindex(self):
         meta = get_static_page_seo_for_path(None, "/catalog")
@@ -214,6 +227,13 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertIn("index, follow", html)
         self.assertNotIn("noindex", html)
         self.assertIn(meta.title.replace("&", "&amp;") if "&" in meta.title else meta.title, html)
+
+    def test_home_and_catalog_have_no_keywords(self):
+        for path in ("/", "/catalog"):
+            meta = get_static_page_seo_for_path(None, path)
+            self.assertEqual(meta.keywords, "")
+            html = render_static_page_prerender_html(meta)
+            self.assertNotIn('name="keywords"', html)
 
     @patch("app.services.static_page_seo_service.build_product_page_url")
     def test_seller_part_card_redirect(self, mock_build_url):

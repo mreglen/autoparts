@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.product import Product as ProductModel
 from app.services.spa_page_check_service import PART_PATH_RE, _normalize_path
 from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
+from app.utils.page_keywords import build_page_keywords
 from app.utils.product_display_name import extract_product_description, format_product_display_title
 from app.utils.product_json_ld import (
     build_catalog_product_json_ld,
@@ -37,6 +38,7 @@ class ProductSeoMeta:
     in_stock: bool
     json_ld: str
     json_ld_graph: str
+    keywords: str = ""
     product_description: str | None = None
 
 
@@ -161,6 +163,12 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
         in_stock=in_stock,
         json_ld=json_ld,
         json_ld_graph=json_ld_graph,
+        keywords=build_page_keywords(
+            "product_used",
+            brand=brand,
+            article=article,
+            city=city,
+        ),
         product_description=body_description,
     )
 
@@ -239,6 +247,11 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
         canonical_url=meta.canonical_url,
         h1=meta.h1,
     )
+    keywords_tag = ""
+    if meta.keywords:
+        keywords_tag = (
+            f'  <meta name="keywords" content="{html.escape(meta.keywords, quote=True)}" />\n'
+        )
 
     return f"""<!DOCTYPE html>
 <html lang="ru">
@@ -247,6 +260,7 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{title}</title>
   <meta name="description" content="{description}" />
+{keywords_tag}
   <link rel="canonical" href="{canonical}" />
   <meta property="og:type" content="product" />
   <meta property="og:site_name" content="Свой Гараж" />

@@ -1,3 +1,4 @@
+import { buildCategoryUsedKeywords } from '../../../utils/pageKeywords';
 import { SITE_ORIGIN } from '../../../utils/breadcrumbs';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import { buildPartDetailPath } from '../../../utils/partRoutes';
@@ -73,6 +74,10 @@ export function buildUsedPartsCategorySeo({ landing, total = 0, items = [] }) {
     canonicalUrl,
     robots: 'index, follow',
     h1: `Б/у ${category} — купить от продавцов`,
+    keywords: buildCategoryUsedKeywords({
+      titleRu: category,
+      searchQuery: landing?.search_query,
+    }),
     jsonLd,
   };
 }

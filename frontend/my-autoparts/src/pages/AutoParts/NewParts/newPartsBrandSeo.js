@@ -1,3 +1,4 @@
+import { buildBrandNewKeywords } from '../../../utils/pageKeywords';
 import { SITE_ORIGIN } from '../../../utils/breadcrumbs';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 
@@ -73,6 +74,7 @@ export function buildNewPartsBrandSeo({ landing, total = 0, items = [] }) {
     canonicalUrl,
     robots: 'index, follow',
     h1: `Новые автозапчасти ${brand}`,
+    keywords: buildBrandNewKeywords(brand),
     jsonLd,
   };
 }

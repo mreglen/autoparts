@@ -24,6 +24,7 @@ class StaticPageSeoMetaResponse(BaseModel):
     canonical_url: str
     h1: str
     robots: str = "index, follow"
+    keywords: str = ""
 
 
 @router.get("/public/page-meta", response_model=StaticPageSeoMetaResponse)
@@ -42,6 +43,7 @@ def public_page_meta(
         canonical_url=meta.canonical_url,
         h1=meta.h1,
         robots=meta.robots,
+        keywords=meta.keywords,
     )
 
 

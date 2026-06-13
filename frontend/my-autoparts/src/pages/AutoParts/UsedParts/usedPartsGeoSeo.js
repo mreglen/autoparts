@@ -1,3 +1,4 @@
+import { buildGeoUsedKeywords } from '../../../utils/pageKeywords';
 import { SITE_ORIGIN } from '../../../utils/breadcrumbs';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import { buildPartDetailPath } from '../../../utils/partRoutes';
@@ -73,6 +74,7 @@ export function buildUsedPartsGeoSeo({ landing, total = 0, items = [] }) {
     canonicalUrl,
     robots: 'index, follow',
     h1: `Б/у автозапчасти в ${city}`,
+    keywords: buildGeoUsedKeywords(city),
     jsonLd,
   };
 }

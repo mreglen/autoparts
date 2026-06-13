@@ -13,6 +13,7 @@ import NewPartDeliveryStockBlock from './NewPartDeliveryStockBlock';
 import NewPartAnalogsTable from './NewPartAnalogsTable';
 import NewPartUsedMatchesBlock from './NewPartUsedMatchesBlock';
 import { buildNewPartCardJsonLd, parseJsonLdString } from '../../../utils/productJsonLd';
+import { buildNewPartCardKeywords } from '../../../utils/pageKeywords';
 import {
   buildNewPartH1,
   buildNewPartSearchDescription,
@@ -245,6 +246,7 @@ export default function NewPartDetailPage() {
             ogType: 'product',
             ogImage: data.image_url || resolveOgImageUrl(card?.image_url),
             price: data.price,
+            keywords: data.keywords || '',
           });
         } else {
           setSeoMeta(null);
@@ -328,6 +330,7 @@ export default function NewPartDetailPage() {
       ogType: 'product',
       ogImage,
       price: displayPrice,
+      keywords: buildNewPartCardKeywords({ brand, article }),
     };
   }, [seoMeta, card, canonicalPath, displayPrice]);
 

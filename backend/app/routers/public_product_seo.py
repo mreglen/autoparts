@@ -28,6 +28,7 @@ class ProductSeoMetaResponse(BaseModel):
     price: str | None = None
     in_stock: bool = True
     json_ld: str | None = None
+    keywords: str = ""
 
 
 class NewPartSeoMetaResponse(BaseModel):
@@ -39,6 +40,7 @@ class NewPartSeoMetaResponse(BaseModel):
     price: str | None = None
     in_stock: bool = True
     json_ld: str | None = None
+    keywords: str = ""
 
 
 @router.get("/public/part-meta", response_model=ProductSeoMetaResponse)
@@ -59,6 +61,7 @@ def public_part_meta(
         price=meta.price,
         in_stock=meta.in_stock,
         json_ld=meta.json_ld_graph,
+        keywords=meta.keywords,
     )
 
 
@@ -101,6 +104,7 @@ def public_new_part_meta(
         price=meta.price,
         in_stock=meta.in_stock,
         json_ld=meta.json_ld,
+        keywords=meta.keywords,
     )
 
 
