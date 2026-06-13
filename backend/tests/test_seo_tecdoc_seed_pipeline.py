@@ -301,6 +301,29 @@ class PopulateTecdocFirstTests(unittest.TestCase):
         self.assertEqual(kwargs["total_limit"], 20000)
 
 
+class RosskoPayloadSerializationTests(unittest.TestCase):
+    def test_serializes_datetime_in_rossko_payload(self):
+        from datetime import datetime
+
+        from app.services.seo_rossko_seed_service import _serialize_rossko_payload
+
+        payload = {
+            "PartsList": {
+                "Part": {
+                    "stocks": {
+                        "stock": {
+                            "deliveryStart": datetime(2026, 6, 15, 15, 15),
+                            "deliveryEnd": datetime(2026, 6, 15, 20, 0),
+                        }
+                    }
+                }
+            }
+        }
+        raw = _serialize_rossko_payload(payload)
+        self.assertIn("2026-06-15 15:15:00", raw)
+        self.assertIn("2026-06-15 20:00:00", raw)
+
+
 class CrossHarvestWithoutArticlesTests(unittest.TestCase):
     def test_cross_harvest_query_uses_supplier_join_only(self):
         import inspect

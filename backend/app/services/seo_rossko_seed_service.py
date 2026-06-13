@@ -585,11 +585,23 @@ def mark_seed_not_found(db: Session, lookup_key: str, *, retry_days: int | None 
         db.commit()
 
 
+def _serialize_rossko_payload(data: object) -> str:
+    """Rossko SOAP payloads may contain datetime/Decimal — make them JSON-safe."""
+    try:
+        from zeep.helpers import serialize_object
+
+        if not isinstance(data, (dict, list)):
+            data = serialize_object(data)
+    except Exception:
+        pass
+    return json.dumps(data, ensure_ascii=False, default=str)
+
+
 def mark_seed_ready(db: Session, lookup_key: str, rossko_data: dict) -> None:
     row = get_seed_queue_row(db, lookup_key)
     if row:
         row.status = "ready"
-        row.rossko_payload_json = json.dumps(rossko_data, ensure_ascii=False)
+        row.rossko_payload_json = _serialize_rossko_payload(rossko_data)
         row.rossko_checked_at = _utcnow()
         row.next_retry_at = None
         row.updated_at = _utcnow()
