@@ -7,6 +7,7 @@ from datetime import datetime
 from zeep import Client
 from zeep.helpers import serialize_object
 from zeep.transports import Transport
+import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
@@ -113,6 +114,10 @@ async def rossko_checkout(checkout_data):
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Ошибка при выполнении запроса GetCheckout: {str(error)}")
 
+def _blocking_get_search(params: dict) -> object:
+    return get_search_client().service.GetSearch(**params)
+
+
 async def rossko_search(request: SearchRequest, db: Session = Depends(get_db)):
     try:
         params = {
@@ -124,15 +129,8 @@ async def rossko_search(request: SearchRequest, db: Session = Depends(get_db)):
         if request.address_id is not None:
             params["address_id"] = request.address_id
 
-        result = get_search_client().service.GetSearch(**params)
-
+        result = await asyncio.to_thread(_blocking_get_search, params)
         serialized_result = serialize_object(result)
-
-        # Debug: log the response structure
-        print(f"ROSSKO API response structure: {serialized_result}")
-        print(f"PartsList exists: {'PartsList' in serialized_result}")
-        if 'PartsList' in serialized_result:
-            print(f"PartsList content: {serialized_result['PartsList']}")
 
         # Сохраняем данные о складах в базу данных
         await save_stock_data_to_db(serialized_result, db)
@@ -140,8 +138,7 @@ async def rossko_search(request: SearchRequest, db: Session = Depends(get_db)):
         return serialized_result
 
     except Exception as error:
-        print(f"ROSSKO API Error: {str(error)}")
-        print(f"Error type: {type(error)}")
+        logger.exception("ROSSKO GetSearch failed for text=%r", request.text)
         raise HTTPException(status_code=500, detail=f"Ошибка при выполнении запроса: {str(error)}")
 
 
