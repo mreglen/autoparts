@@ -9,7 +9,7 @@ import { normalizeImageUrl, apiAxiosUnauth } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
 import { buildPartDetailPath, parsePartDetailParam } from '../../utils/partRoutes';
 import { extractProductDescription, formatProductDisplayTitle } from '../../utils/productDisplayName';
-import { buildProductSeo, seoFromPartMetaResponse } from '../../utils/productSeo';
+import { buildProductSeo, seoFromPartMetaResponse, buildProductStructuredDataGraph, buildProductPhotoAlt } from '../../utils/productSeo';
 import { DEFAULT_OG_IMAGE_URL } from '../../utils/seoConstants';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
@@ -37,11 +37,15 @@ const formatErrorText = (value) => {
 
 function PartProductSeoHelmet({ seo, structuredData, product }) {
   if (!seo) return null;
+  const ogImage = seo.imageUrl || DEFAULT_OG_IMAGE_URL;
+  const ogImageAlt = seo.ogImageAlt || seo.title;
+  const inStock = (product?.quantity || 0) > 0;
   return (
     <Helmet>
       <title>{seo.title}</title>
       <meta name="description" content={seo.description} />
       {seo.keywords ? <meta name="keywords" content={seo.keywords} /> : null}
+      <meta name="robots" content={seo.robots || 'index, follow'} />
       <link rel="canonical" href={seo.canonicalUrl} />
       <meta property="og:type" content="product" />
       <meta property="og:site_name" content="Свой Гараж" />
@@ -49,13 +53,23 @@ function PartProductSeoHelmet({ seo, structuredData, product }) {
       <meta property="og:description" content={seo.description} />
       <meta property="og:url" content={seo.canonicalUrl} />
       <meta property="og:locale" content="ru_RU" />
-      <meta property="og:image" content={seo.imageUrl || DEFAULT_OG_IMAGE_URL} />
+      <meta property="og:image" content={ogImage} />
+      <meta property="og:image:alt" content={ogImageAlt} />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={seo.title} />
+      <meta name="twitter:description" content={seo.description} />
+      <meta name="twitter:image" content={ogImage} />
+      <meta name="twitter:image:alt" content={ogImageAlt} />
       {product?.price ? (
         <>
           <meta property="product:price:amount" content={String(product.price)} />
           <meta property="product:price:currency" content="RUB" />
         </>
       ) : null}
+      <meta
+        property="product:availability"
+        content={inStock ? 'in stock' : 'out of stock'}
+      />
       {structuredData ? (
         <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
       ) : null}
@@ -430,12 +444,22 @@ const PartDetail = () => {
     : localSeo;
   const breadcrumbItems = buildBreadcrumbsForPath(location.pathname, { product: currentProduct });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
-  const structuredData = seo.jsonLd && breadcrumbJsonLd
-    ? { '@context': 'https://schema.org', '@graph': [seo.jsonLd, breadcrumbJsonLd] }
-    : seo.jsonLd || breadcrumbJsonLd || null;
+  const structuredData = buildProductStructuredDataGraph({
+    productJsonLd: seo.jsonLd,
+    breadcrumbJsonLd,
+    canonicalUrl: seo.canonicalUrl,
+    title: seo.title,
+    description: seo.description,
+  });
 
   const partBrand = (currentProduct.brand || '').trim();
   const partArticle = (currentProduct.article || '').trim();
+  const photoAltMain = buildProductPhotoAlt({
+    brand: partBrand,
+    article: partArticle,
+    name: currentProduct.name,
+    isMain: true,
+  });
   const h1Primary =
     [partBrand, partArticle].filter(Boolean).join(' ') ||
     formatProductDisplayTitle(partBrand, partArticle, currentProduct.name);
@@ -476,6 +500,9 @@ const PartDetail = () => {
                     </span>
                   ) : null}
                 </h1>
+                {seo.seoSummary ? (
+                  <p className="sr-only">{seo.seoSummary}</p>
+                ) : null}
                 <div className="flex flex-wrap gap-2 items-center">
                   <div className="flex items-center bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium">
                     <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -511,6 +538,7 @@ const PartDetail = () => {
                   isNew={Boolean(currentProduct.is_new)}
                   organizationId={sellerOrg?.id}
                   organizationName={sellerOrg?.name}
+                  usedCatalogPath={seo.usedCatalogPath}
                 />
               </div>
               <div className="text-left sm:text-right">
@@ -572,7 +600,7 @@ const PartDetail = () => {
                           ) : (
                             <img
                               src={mediaUrl}
-                              alt="Основное фото"
+                              alt={photoAltMain}
                               className="w-full h-full object-contain"
                               loading="eager"
                             />
@@ -654,7 +682,12 @@ const PartDetail = () => {
                           ) : (
                             <img
                               src={mediaUrl}
-                              alt={`Фото ${index + 1}`}
+                              alt={buildProductPhotoAlt({
+                                brand: partBrand,
+                                article: partArticle,
+                                name: currentProduct.name,
+                                index,
+                              })}
                               className="w-full h-full object-cover"
                               loading="lazy"
                             />

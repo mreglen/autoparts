@@ -288,6 +288,31 @@ def build_product_search_description(
     )
 
 
+def build_product_seo_summary(
+    *,
+    brand: str | None,
+    article: str | None,
+    name: str | None = None,
+    is_new: bool = False,
+    city: str | None = None,
+    price: float | int | str | None = None,
+    in_stock: bool = True,
+    short_name: str | None = None,
+    unique_description: str | None = None,
+) -> str:
+    brand_str = (brand or "").strip()
+    article_str = (article or "").strip()
+    condition = "Новая" if is_new else "Б/у"
+    city_prep = format_city_in_prepositional(city or DEFAULT_CITY)
+    label = f"{brand_str} {article_str}".strip() or (name or "").strip() or "автозапчасть"
+    stock_phrase = "в наличии" if in_stock else "доступна"
+    price_text = _format_price_rub(price)
+    price_part = f" Цена {price_text} ₽." if price_text else ""
+    snippet = _merge_content_snippet(short_name=short_name, unique_description=unique_description, max_len=120)
+    detail = f" {snippet}." if snippet else ""
+    return f"{condition} автозапчасть {label} {stock_phrase} в {city_prep}.{price_part}{detail}".replace("  ", " ").strip()
+
+
 def build_product_alternate_names(*, brand: str | None, article: str | None) -> list[str]:
     brand_str = (brand or "").strip()
     article_str = (article or "").strip()

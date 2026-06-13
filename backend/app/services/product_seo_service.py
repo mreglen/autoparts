@@ -4,7 +4,7 @@ import html
 import json
 import re
 from dataclasses import dataclass
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 from sqlalchemy.orm import Session, selectinload
 
@@ -21,9 +21,10 @@ from app.utils.product_json_ld import (
 from app.utils.product_search_seo import (
     build_product_search_description,
     build_product_search_title,
+    build_product_seo_summary,
     resolve_product_city,
 )
-from app.utils.product_urls import build_product_page_url
+from app.utils.product_urls import build_product_page_url, build_product_used_catalog_url
 from app.utils.seo_constants import resolve_default_og_image_url
 
 
@@ -39,7 +40,14 @@ class ProductSeoMeta:
     json_ld: str
     json_ld_graph: str
     keywords: str = ""
-    product_description: str | None = None
+    seo_summary: str = ""
+    body_description: str | None = None
+    used_catalog_url: str = ""
+    used_catalog_path: str = ""
+    brand: str = ""
+    article: str = ""
+    city: str = ""
+    condition_label: str = ""
 
 
 def _strip_html(value: str | None) -> str:
@@ -65,6 +73,7 @@ def _load_product(db: Session, product_id: int) -> ProductModel | None:
         .options(
             selectinload(ProductModel.photos),
             selectinload(ProductModel.organization),
+            selectinload(ProductModel.part_type),
         )
         .filter(ProductModel.id == product_id, ProductModel.quantity > 0)
         .first()
@@ -143,6 +152,8 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
         json_ld=json_ld,
         canonical_url=canonical_url,
         h1=name,
+        title=title,
+        description=description,
     )
     body_description = product_body_description(
         brand=brand,
@@ -152,6 +163,23 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
         short_name=short_name,
         is_new=bool(product.is_new),
     )
+    seo_summary = build_product_seo_summary(
+        brand=brand,
+        article=article,
+        name=name,
+        is_new=bool(product.is_new),
+        city=city,
+        price=product.price,
+        in_stock=in_stock,
+        short_name=short_name,
+        unique_description=unique_desc,
+    )
+    used_catalog_url = build_product_used_catalog_url(product, origin)
+    parsed_catalog = urlparse(used_catalog_url)
+    used_catalog_path = parsed_catalog.path
+    if parsed_catalog.query:
+        used_catalog_path = f"{used_catalog_path}?{parsed_catalog.query}"
+    condition_label = "Новая" if product.is_new else "Б/у"
 
     return ProductSeoMeta(
         title=title,
@@ -169,25 +197,41 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
             article=article,
             city=city,
         ),
-        product_description=body_description,
+        seo_summary=seo_summary,
+        body_description=body_description,
+        used_catalog_url=used_catalog_url,
+        used_catalog_path=used_catalog_path,
+        brand=brand,
+        article=article,
+        city=city,
+        condition_label=condition_label,
     )
 
 
-def build_product_json_ld_graph(*, json_ld: str, canonical_url: str, h1: str) -> str:
-    """Product + BreadcrumbList для JSON-LD (Яндекс.Вебмастер, Google)."""
+def build_product_json_ld_graph(
+    *,
+    json_ld: str,
+    canonical_url: str,
+    h1: str,
+    title: str | None = None,
+    description: str | None = None,
+) -> str:
+    """Product + BreadcrumbList + WebPage для JSON-LD (Яндекс.Вебмастер, Google)."""
     product_obj = None
     if json_ld:
         try:
             parsed = json.loads(json_ld)
             if isinstance(parsed, dict) and parsed.get("@type") == "Product":
-                product_obj = parsed
+                product_obj = dict(parsed)
+                product_obj.pop("@context", None)
+                product_obj.setdefault("@id", f"{canonical_url}#product")
         except Exception:
             product_obj = None
 
     site_origin = canonical_url.split("/part/")[0]
     breadcrumb_obj = {
-        "@context": "https://schema.org",
         "@type": "BreadcrumbList",
+        "@id": f"{canonical_url}#breadcrumb",
         "itemListElement": [
             {
                 "@type": "ListItem",
@@ -198,8 +242,8 @@ def build_product_json_ld_graph(*, json_ld: str, canonical_url: str, h1: str) ->
             {
                 "@type": "ListItem",
                 "position": 2,
-                "name": "Каталог",
-                "item": f"{site_origin}/catalog",
+                "name": "Б/у запчасти",
+                "item": f"{site_origin}/autoparts/used",
             },
             {
                 "@type": "ListItem",
@@ -210,10 +254,32 @@ def build_product_json_ld_graph(*, json_ld: str, canonical_url: str, h1: str) ->
         ],
     }
 
+    graph: list[dict] = []
     if product_obj:
-        graph_obj = {"@context": "https://schema.org", "@graph": [product_obj, breadcrumb_obj]}
+        graph.append(product_obj)
+    graph.append(breadcrumb_obj)
+    if product_obj:
+        graph.append(
+            {
+                "@type": "WebPage",
+                "@id": f"{canonical_url}#webpage",
+                "url": canonical_url,
+                "name": title or h1,
+                "description": description,
+                "isPartOf": {
+                    "@type": "WebSite",
+                    "name": "Свой Гараж",
+                    "url": site_origin,
+                },
+                "breadcrumb": {"@id": f"{canonical_url}#breadcrumb"},
+                "mainEntity": {"@id": f"{canonical_url}#product"},
+            }
+        )
+
+    if len(graph) == 1:
+        graph_obj = {"@context": "https://schema.org", **graph[0]}
     else:
-        graph_obj = breadcrumb_obj
+        graph_obj = {"@context": "https://schema.org", "@graph": graph}
 
     return json.dumps(graph_obj, ensure_ascii=False)
 
@@ -233,7 +299,7 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
     description = html.escape(meta.description, quote=True)
     canonical = html.escape(meta.canonical_url, quote=True)
     h1 = html.escape(meta.h1)
-    body_desc = html.escape(meta.product_description or meta.description)
+    body_desc = html.escape(meta.seo_summary or meta.body_description or meta.description)
     image_tag = (
         f'<meta property="og:image" content="{html.escape(meta.image_url, quote=True)}" />'
         if meta.image_url
@@ -246,22 +312,69 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
         json_ld=meta.json_ld,
         canonical_url=meta.canonical_url,
         h1=meta.h1,
+        title=meta.title,
+        description=meta.description,
     )
     keywords_tag = ""
     if meta.keywords:
         keywords_tag = (
             f'  <meta name="keywords" content="{html.escape(meta.keywords, quote=True)}" />\n'
         )
+    robots = html.escape("index, follow", quote=True)
+    site_origin = meta.canonical_url.split("/part/")[0]
+    used_catalog_link = ""
+    if meta.used_catalog_url:
+        used_catalog_link = (
+            f'    <p><a href="{html.escape(meta.used_catalog_url, quote=True)}">'
+            f"Каталог по артикулу {html.escape(meta.brand)} {html.escape(meta.article)}</a></p>\n"
+        )
+    details_html = ""
+    if meta.brand or meta.article or meta.price:
+        brand_row = (
+            f"<dt>Бренд</dt><dd>{html.escape(meta.brand)}</dd>"
+            if meta.brand
+            else ""
+        )
+        article_row = (
+            f"<dt>Артикул</dt><dd>{html.escape(meta.article)}</dd>"
+            if meta.article
+            else ""
+        )
+        price_row = (
+            f"<dt>Цена</dt><dd>{html.escape(meta.price)} ₽</dd>"
+            if meta.price
+            else ""
+        )
+        city_row = (
+            f"<dt>Город</dt><dd>{html.escape(meta.city)}</dd>"
+            if meta.city
+            else ""
+        )
+        condition_row = (
+            f"<dt>Состояние</dt><dd>{html.escape(meta.condition_label)}</dd>"
+            if meta.condition_label
+            else ""
+        )
+        details_html = (
+            f"    <dl>{brand_row}{article_row}{price_row}{city_row}{condition_row}</dl>\n"
+        )
+    breadcrumb_html = (
+        "  <nav aria-label=\"Хлебные крошки\">\n"
+        f'    <a href="{html.escape(site_origin, quote=True)}">Главная</a> ›\n'
+        f'    <a href="{html.escape(site_origin, quote=True)}/autoparts/used">Б/у запчасти</a> ›\n'
+        f"    <span>{h1}</span>\n"
+        "  </nav>\n"
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="{robots}" />
   <title>{title}</title>
   <meta name="description" content="{description}" />
-{keywords_tag}
-  <link rel="canonical" href="{canonical}" />
+{keywords_tag}  <link rel="canonical" href="{canonical}" />
   <meta property="og:type" content="product" />
   <meta property="og:site_name" content="Свой Гараж" />
   <meta property="og:title" content="{title}" />
@@ -272,10 +385,10 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
   <script type="application/ld+json">{json_ld_graph}</script>
 </head>
 <body>
-  <article>
+{breadcrumb_html}  <article>
     <h1>{h1}</h1>{image_block}
     <p>{body_desc}</p>
-  </article>
+{details_html}{used_catalog_link}  </article>
 </body>
 </html>
 """

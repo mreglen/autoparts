@@ -146,9 +146,11 @@ def _product_has_working_photo(product) -> bool:
     return False
 
 
-def _catalog_product_image_url(product, site_origin: str) -> str | None:
+def _catalog_product_image_urls(product, site_origin: str, *, max_count: int = 5) -> list[str]:
     from app.services.yandex_feed_xml_service import _absolute_photo_url
 
+    urls: list[str] = []
+    seen: set[str] = set()
     for photo in product.photos or []:
         raw_url = getattr(photo, "photo_url", None)
         if not raw_url:
@@ -157,9 +159,18 @@ def _catalog_product_image_url(product, site_origin: str) -> str | None:
         if not str(raw_url).startswith(("http://", "https://")):
             path = photo.full_url if hasattr(photo, "full_url") else raw_url
         image_url = _absolute_photo_url(path, site_origin)
-        if image_url:
-            return image_url
-    return None
+        if not image_url or image_url in seen:
+            continue
+        seen.add(image_url)
+        urls.append(image_url)
+        if len(urls) >= max_count:
+            break
+    return urls
+
+
+def _catalog_product_image_url(product, site_origin: str) -> str | None:
+    urls = _catalog_product_image_urls(product, site_origin, max_count=1)
+    return urls[0] if urls else None
 
 
 def is_catalog_product_json_ld_eligible(product) -> bool:
@@ -192,8 +203,8 @@ def build_catalog_product_json_ld(
     name = format_product_display_title(brand, article, product.name)
     short_name = extract_product_description(product.name, brand, article)
     unique_desc = _strip_html(product.description)
-    image_url = _catalog_product_image_url(product, site_origin)
-    if not image_url:
+    image_urls = _catalog_product_image_urls(product, site_origin)
+    if not image_urls:
         return None
 
     price = format_price_ld(product.price)
@@ -205,6 +216,12 @@ def build_catalog_product_json_ld(
     org_name = getattr(organization, "name", None) if organization else None
     org_phone = getattr(organization, "phone", None) if organization else None
     org_address = getattr(organization, "address", None) if organization else None
+    part_type = getattr(product, "part_type", None)
+    category_name = ""
+    if part_type is not None:
+        raw_category = getattr(part_type, "name", None)
+        if isinstance(raw_category, str):
+            category_name = raw_category.strip()
 
     description = product_body_description(
         brand=brand,
@@ -218,6 +235,8 @@ def build_catalog_product_json_ld(
     product_json: dict[str, Any] = {
         "@context": SCHEMA_ORG,
         "@type": "Product",
+        "@id": f"{canonical_url}#product",
+        "url": canonical_url,
         "name": name,
         "description": description,
         "sku": article,
@@ -225,7 +244,8 @@ def build_catalog_product_json_ld(
         "alternateName": build_product_alternate_names(brand=brand, article=article) or None,
         "brand": {"@type": "Brand", "name": brand},
         "manufacturer": {"@type": "Organization", "name": brand},
-        "image": [image_url],
+        "category": category_name or None,
+        "image": image_urls,
         "offers": build_product_offer_json_ld(
             canonical_url=canonical_url,
             price=price,

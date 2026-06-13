@@ -4,11 +4,22 @@ import { apiAxiosUnauth } from '../../utils/apiClient';
 import { buildNewPartDetailPath } from '../../utils/partRoutes';
 import { slugifyBrand } from '../../utils/slugUtils';
 
-export default function PartDetailSeoCrossLinks({ brand, article, isNew, organizationId, organizationName }) {
+export default function PartDetailSeoCrossLinks({
+  brand,
+  article,
+  isNew,
+  organizationId,
+  organizationName,
+  usedCatalogPath,
+}) {
   const [newPartHref, setNewPartHref] = useState(null);
   const brandText = (brand || '').trim();
   const articleText = (article || '').trim();
   const brandSlug = brandText ? slugifyBrand(brandText) : '';
+  const catalogHref = usedCatalogPath
+    || (brandText && articleText
+      ? `/autoparts/used?q=${encodeURIComponent(`${brandText} ${articleText}`)}`
+      : null);
 
   useEffect(() => {
     if (isNew || !brandText || !articleText) {
@@ -46,6 +57,14 @@ export default function PartDetailSeoCrossLinks({ brand, article, isNew, organiz
 
   return (
     <div className="mt-4 flex flex-wrap gap-3">
+      {catalogHref ? (
+        <Link
+          to={catalogHref}
+          className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+        >
+          Каталог по артикулу
+        </Link>
+      ) : null}
       {brandSlug ? (
         <Link
           to={`/autoparts/used/brand/${encodeURIComponent(brandSlug)}`}

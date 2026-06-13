@@ -68,15 +68,27 @@ export function sanitizeJsonLd(value) {
   return value;
 }
 
-function catalogProductImageUrl(product, siteOrigin = SITE_ORIGIN) {
-  const firstPhoto = product?.photos?.[0]?.photo_url;
-  if (!firstPhoto) return null;
-  const normalized = normalizeImageUrl(firstPhoto);
-  if (!normalized) return null;
-  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
-    return normalized;
+function catalogProductImageUrls(product, siteOrigin = SITE_ORIGIN, maxCount = 5) {
+  const urls = [];
+  const seen = new Set();
+  for (const photo of product?.photos || []) {
+    const firstPhoto = photo?.photo_url;
+    if (!firstPhoto) continue;
+    const normalized = normalizeImageUrl(firstPhoto);
+    if (!normalized) continue;
+    const absolute = normalized.startsWith('http://') || normalized.startsWith('https://')
+      ? normalized
+      : resolveOgImageUrl(normalized.startsWith('/') ? normalized : `/${normalized}`);
+    if (!absolute || seen.has(absolute)) continue;
+    seen.add(absolute);
+    urls.push(absolute);
+    if (urls.length >= maxCount) break;
   }
-  return resolveOgImageUrl(normalized.startsWith('/') ? normalized : `/${normalized}`);
+  return urls;
+}
+
+function catalogProductImageUrl(product, siteOrigin = SITE_ORIGIN) {
+  return catalogProductImageUrls(product, siteOrigin, 1)[0] || null;
 }
 
 export function isCatalogProductJsonLdEligible(product) {
@@ -98,8 +110,8 @@ export function buildCatalogProductJsonLd(product, { siteOrigin = SITE_ORIGIN, c
   const shortName = extractProductDescription(product.name, brand, article);
   const path = buildPartDetailPath(product);
   const url = canonicalUrl || `${siteOrigin}${path}`;
-  const imageUrl = catalogProductImageUrl(product, siteOrigin);
-  if (!imageUrl) return null;
+  const imageUrls = catalogProductImageUrls(product, siteOrigin);
+  if (!imageUrls.length) return null;
 
   const price = formatPriceLd(product.price);
   if (!price) return null;
@@ -116,6 +128,8 @@ export function buildCatalogProductJsonLd(product, { siteOrigin = SITE_ORIGIN, c
     isNew: Boolean(product.is_new),
   });
   const alternateName = buildProductAlternateNames({ brand, article });
+  const categoryRaw = product?.part_type?.name ?? product?.part_type_name;
+  const categoryName = typeof categoryRaw === 'string' ? categoryRaw.trim() : '';
   const offers = buildProductOfferJsonLd({
     canonicalUrl: url,
     price,
@@ -130,6 +144,8 @@ export function buildCatalogProductJsonLd(product, { siteOrigin = SITE_ORIGIN, c
   return sanitizeJsonLd({
     '@context': SCHEMA_ORG,
     '@type': 'Product',
+    '@id': `${url}#product`,
+    url,
     name,
     description,
     sku: article,
@@ -137,7 +153,8 @@ export function buildCatalogProductJsonLd(product, { siteOrigin = SITE_ORIGIN, c
     alternateName: alternateName.length > 0 ? alternateName : undefined,
     brand: { '@type': 'Brand', name: brand },
     manufacturer: { '@type': 'Organization', name: brand },
-    image: [imageUrl],
+    category: categoryName || undefined,
+    image: imageUrls,
     offers,
   });
 }

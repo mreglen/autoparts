@@ -29,6 +29,9 @@ class ProductSeoMetaResponse(BaseModel):
     in_stock: bool = True
     json_ld: str | None = None
     keywords: str = ""
+    seo_summary: str = ""
+    body_description: str | None = None
+    used_catalog_path: str = ""
 
 
 class NewPartSeoMetaResponse(BaseModel):
@@ -62,6 +65,9 @@ def public_part_meta(
         in_stock=meta.in_stock,
         json_ld=meta.json_ld_graph,
         keywords=meta.keywords,
+        seo_summary=meta.seo_summary,
+        body_description=meta.body_description,
+        used_catalog_path=meta.used_catalog_path,
     )
 
 
