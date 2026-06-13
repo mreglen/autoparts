@@ -1241,7 +1241,7 @@ function MyParts() {
   }, [modalOpen])
 
 
-  // Sync URL parameters with component state (only on /my-parts, без гонки с navigate)
+  // Sync URL parameters with component state (only on /my-parts)
   useEffect(() => {
     if (location.pathname !== '/my-parts') return;
 
@@ -1264,16 +1264,18 @@ function MyParts() {
     }
 
     const next = params.toString();
-    const current = searchParams.toString();
-    if (next === current) return;
+    const currentSearch = location.search.startsWith('?')
+      ? location.search.slice(1)
+      : location.search;
+    if (next === currentSearch) return;
 
     setSearchParams(params, { replace: true });
   }, [
     location.pathname,
+    location.search,
     inStockFilters,
     moderationFilters,
     isModerationTab,
-    searchParams,
     setSearchParams,
   ]);
 

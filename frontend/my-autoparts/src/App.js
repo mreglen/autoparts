@@ -263,7 +263,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Route>
 
-        <Route path="/" element={<ProfileWithMenuLayout />}>
+        <Route element={<ProfileWithMenuLayout />}>
           <Route
             path="/dashboard"
             element={(

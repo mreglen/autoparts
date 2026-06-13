@@ -72,7 +72,7 @@ export default function MainLayout() {
                     </div>
                 ) : null}
                 <AvitoProExpiredBanner status={avitoAccountStatus} />
-                <Outlet />
+                <Outlet key={location.pathname} />
             </main>
 
             <InstallPwaPrompt />
