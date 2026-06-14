@@ -11,6 +11,7 @@ from app.services.new_parts_seo_card_service import (
 )
 from app.services.used_catalog_service import find_indexable_used_catalog_product
 from app.utils.product_urls import build_used_catalog_url_for_query
+from app.utils.search_query import parse_brand_article_from_query
 
 
 @dataclass(frozen=True)
@@ -19,17 +20,6 @@ class ResolveSearchResult:
     redirect_path: str
     redirect_url: str
     match_type: str | None = None
-
-
-def _parse_brand_article_tokens(q: str) -> tuple[str, str] | None:
-    tokens = (q or "").strip().split()
-    if len(tokens) < 2:
-        return None
-    brand = tokens[0].strip()
-    article = " ".join(tokens[1:]).strip()
-    if not brand or not article:
-        return None
-    return brand, article
 
 
 def resolve_search_query(db: Session, q: str, *, site_origin: str) -> ResolveSearchResult:
@@ -54,7 +44,7 @@ def resolve_search_query(db: Session, q: str, *, site_origin: str) -> ResolveSea
             match_type=indexable[1],
         )
 
-    parsed = _parse_brand_article_tokens(trimmed)
+    parsed = parse_brand_article_from_query(trimmed)
     if parsed is not None:
         brand, article = parsed
         card = find_active_new_part_card_by_brand_article(db, brand, article)

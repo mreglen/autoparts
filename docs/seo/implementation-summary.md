@@ -209,3 +209,4 @@ flowchart TB
 - [semantic-map.md](semantic-map.md)
 - [indexation-rules.md](indexation-rules.md)
 - [webmaster-setup.md](webmaster-setup.md)
+- [verification-checklist.md](verification-checklist.md)

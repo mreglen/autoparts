@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import or_, func
+from sqlalchemy import and_, or_, func
 from sqlalchemy.orm import Session, selectinload
-import re
 import logging
 from app.models.product import Product as ProductModel
 from app.schemas.product import Product as ProductSchema
@@ -13,6 +12,7 @@ from app.utils.search_cache import build_cache_key, get_cached_json, set_cached_
 from app.utils.singleflight import SingleFlight
 from app.utils.product_list_item import map_product_to_list_item
 from app.utils.partnumber import normalize_partnumber
+from app.utils.search_query import parse_brand_article_from_query
 
 router = APIRouter(prefix="/search-products", tags=["Search-Products"])
 logger = logging.getLogger(__name__)
@@ -27,22 +27,92 @@ def get_sql_normalize(col):
     return func.replace(func.replace(func.replace(func.replace(func.replace(func.replace(func.replace(func.upper(col), 
         '-', ''), ' ', ''), '.', ''), '/', ''), '(', ''), ')', ''), '_', '')
 
+
+def get_sql_normalize_brand(col):
+    """Нормализация бренда для нечёткого сравнения (MANN-FILTER == MANN FILTER)."""
+    return func.replace(
+        func.replace(func.replace(func.upper(col), '-', ''), ' ', ''),
+        '/',
+        '',
+    )
+
+
+def _brand_match_conditions(brand_text: str):
+    brand_trim = brand_text.strip()
+    conditions = [
+        ProductModel.brand.ilike(brand_trim),
+        func.lower(func.trim(ProductModel.brand)) == brand_trim.casefold(),
+    ]
+    brand_norm = normalize_partnumber(brand_trim)
+    if brand_norm:
+        conditions.append(get_sql_normalize_brand(ProductModel.brand) == brand_norm)
+    return or_(*conditions)
+
+
+def _article_match_conditions(article_text: str):
+    article_trim = article_text.strip()
+    conditions = [
+        ProductModel.article.ilike(article_trim),
+        ProductModel.article.ilike(f"%{article_trim}%"),
+    ]
+    article_norm = normalize_partnumber(article_trim)
+    if article_norm:
+        conditions.extend([
+            get_sql_normalize(ProductModel.article) == article_norm,
+            get_sql_normalize(ProductModel.article).ilike(f"%{article_norm}%"),
+        ])
+    return or_(*conditions)
+
+
 def search_local_products_query(db: Session, q: str, is_new: bool = None):
     """
-    Базовая логика поиска в локальной БД по артикулу (нормализованному) или названию.
+    Поиск в локальной БД: артикул, название, бренд и комбинация «бренд + артикул».
     """
-    trimmed_q = q.strip()
+    trimmed_q = (q or "").strip()
+    if not trimmed_q:
+        return (
+            db.query(ProductModel)
+            .options(
+                selectinload(ProductModel.photos),
+                selectinload(ProductModel.storage_location),
+                selectinload(ProductModel.organization),
+            )
+            .filter(ProductModel.id == -1)
+        )
+
     normalized_q = normalize_partnumber(trimmed_q)
-    
     conditions = [
         ProductModel.article.ilike(f"%{trimmed_q}%"),
-        ProductModel.name.ilike(f"%{trimmed_q}%")
+        ProductModel.name.ilike(f"%{trimmed_q}%"),
+        ProductModel.brand.ilike(f"%{trimmed_q}%"),
     ]
-    
+
+    parsed = parse_brand_article_from_query(trimmed_q)
+    if parsed:
+        brand_text, article_text = parsed
+        conditions.append(
+            and_(
+                _brand_match_conditions(brand_text),
+                _article_match_conditions(article_text),
+            )
+        )
+        canonical_q = f"{brand_text} {article_text}".strip().casefold()
+        conditions.append(
+            func.lower(
+                func.trim(
+                    func.concat(
+                        func.trim(ProductModel.brand),
+                        " ",
+                        func.trim(ProductModel.article),
+                    )
+                )
+            )
+            == canonical_q
+        )
+
     if normalized_q:
-        # Поиск по нормализованному артикулу в БД
         conditions.append(get_sql_normalize(ProductModel.article).ilike(f"%{normalized_q}%"))
-        # Поиск по нормализованному названию (только пробелы)
+        conditions.append(get_sql_normalize_brand(ProductModel.brand).ilike(f"%{normalized_q}%"))
         conditions.append(func.replace(ProductModel.name, ' ', '').ilike(f"%{normalized_q}%"))
 
     query = db.query(ProductModel).options(
@@ -50,10 +120,10 @@ def search_local_products_query(db: Session, q: str, is_new: bool = None):
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
     ).filter(or_(*conditions), func.coalesce(ProductModel.quantity, 0) > 0)
-    
+
     if is_new is not None:
         query = query.filter(ProductModel.is_new == is_new)
-        
+
     return query
 
 @router.get("/search", response_model=list[ProductSchema])
@@ -286,7 +356,7 @@ async def search_used_parts(
 
     # --- ШАГ 1: Быстрый поиск в наличии (всё локальное наличие считаем "в наличии" для этой вкладки) ---
     # Получаем прямые соответствия запросу для отображения или для исключения из аналогов
-    direct_matches = search_local_products_query(db, trimmed_query).all()
+    direct_matches = search_local_products_query(db, trimmed_query, is_new=False).all()
     
     if not only_analogs:
         available_parts = direct_matches
@@ -332,6 +402,7 @@ async def search_used_parts(
                 ).filter(
                     get_sql_normalize(ProductModel.article).in_(list(analog_pns)),
                     func.coalesce(ProductModel.quantity, 0) > 0,
+                    ProductModel.is_new.is_(False),
                 ).all()
                 
                 # Исключаем те, что уже найдены как прямые соответствия

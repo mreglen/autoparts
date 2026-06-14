@@ -80,6 +80,7 @@ export function buildUsedCatalogFilterParams(searchParams) {
   const params = {
     page_size: CATALOG_PAGE_SIZE,
     sort: searchParams.get('sort') || 'created_at_desc',
+    is_new: false,
   };
   const partTypes = searchParams.getAll('part_type').map((value) => parseInt(value, 10)).filter(Number.isFinite);
   if (partTypes.length) params.part_type_id = partTypes;

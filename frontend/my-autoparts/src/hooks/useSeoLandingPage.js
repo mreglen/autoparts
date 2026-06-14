@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { apiRequest } from '../../utils/apiClient';
-import { buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
+import { apiRequest } from '../utils/apiClient';
+import { buildBreadcrumbsForPath } from '../utils/breadcrumbs';
 
 const PAGE_SIZE = 48;
 
