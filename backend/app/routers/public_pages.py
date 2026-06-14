@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.core.internal_access import require_internal_prerender
 from app.services.spa_page_check_service import is_spa_page_available
 from app.services.site_analytics_service import get_popular_new_part_queries
 
@@ -22,6 +23,7 @@ class PopularNewPartQueriesResponse(BaseModel):
 def public_page_check(
     path: str = Query(..., min_length=1, max_length=2048),
     db: Session = Depends(get_db),
+    _: None = Depends(require_internal_prerender),
 ):
     """
     Проверка существования SPA-страницы для nginx auth_request.

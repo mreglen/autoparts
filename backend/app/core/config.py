@@ -101,6 +101,12 @@ class Settings(BaseSettings):
     NEW_PARTS_SEO_REFRESH_BATCH_SIZE: int = 100
     NEW_PARTS_SEO_REFRESH_INTERVAL_HOURS: int = 6
 
+    # DDoS / rate limiting
+    RATE_LIMIT_ENABLED: bool = True
+    PRERENDER_INTERNAL_TOKEN: Optional[str] = None
+    PRODUCTS_PUBLIC_CACHE_TTL_SECONDS: int = 45
+    WEBSOCKET_MAX_CONNECTIONS_PER_USER: int = 5
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
 
     @property

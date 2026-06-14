@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -28,6 +29,8 @@ from app.services.yandex_feed_sync_service import (
 )
 from sqlalchemy.orm import selectinload
 from app.routers.search_products import normalize_partnumber, get_sql_normalize
+from app.core.config import settings
+from app.utils.json_cache_sync import get_cached_json_sync, set_cached_json_sync
 
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -1044,7 +1047,11 @@ def get_public_products(
     storage_location_id: int = None,
     db: Session = Depends(get_db)
 ):
-    # Базовый запрос - получить все товары, которые есть в наличии
+    cache_key = f"products:public:storage_location:{storage_location_id if storage_location_id is not None else 'all'}"
+    cached = get_cached_json_sync(cache_key)
+    if cached is not None:
+        return cached
+
     query = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
         selectinload(ProductModel.videos),
@@ -1055,12 +1062,16 @@ def get_public_products(
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization)
     ).filter(
-        ProductModel.quantity > 0  # Только товары, которые есть в наличии
+        ProductModel.quantity > 0
     )
-    
-    # Фильтрация по складу, если указан
+
     if storage_location_id is not None:
         query = query.filter(ProductModel.storage_location_id == storage_location_id)
-    
+
     products = query.all()
-    return products
+    for product in products:
+        product.is_on_avito = len(product.avito_listing_links) > 0
+        product.is_on_drom = len(product.drom_listing_links) > 0
+    payload = jsonable_encoder(products)
+    set_cached_json_sync(cache_key, payload, settings.PRODUCTS_PUBLIC_CACHE_TTL_SECONDS)
+    return payload

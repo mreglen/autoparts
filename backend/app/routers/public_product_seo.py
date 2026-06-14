@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.core.internal_access import require_internal_prerender
 from app.services.product_seo_service import (
     get_product_seo_for_path,
     render_product_prerender_html,
@@ -75,6 +76,7 @@ def public_part_meta(
 def public_part_prerender(
     path: str = Query(..., min_length=1, max_length=2048),
     db: Session = Depends(get_db),
+    _: None = Depends(require_internal_prerender),
 ):
     """
     HTML с корректным &lt;title&gt; для поисковых роботов (Яндекс, Google).
@@ -118,6 +120,7 @@ def public_new_part_meta(
 def public_new_part_prerender(
     path: str = Query(..., min_length=1, max_length=2048),
     db: Session = Depends(get_db),
+    _: None = Depends(require_internal_prerender),
 ):
     meta = get_new_part_seo_for_path(db, path)
     if meta is None:

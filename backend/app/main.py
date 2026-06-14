@@ -38,6 +38,7 @@ from app.db.schema_patches import (
     ensure_seo_landing_pages_table,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from app.middleware.rate_limit_middleware import RateLimitMiddleware
 from app.routers import api_router
 from app.routers import chats as chats_router
 from app.routers import websocket as websocket_router
@@ -200,6 +201,7 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["X-Guest-Cart-Token"],
 )
+app.add_middleware(RateLimitMiddleware)
 
 
 @app.middleware("http")

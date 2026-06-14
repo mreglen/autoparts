@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.core.internal_access import require_internal_prerender
 from app.services.static_page_seo_service import (
     get_seller_part_card_redirect_url,
     get_static_page_seo_for_path,
@@ -72,6 +73,7 @@ def public_page_meta(
 def public_page_prerender(
     path: str = Query(..., min_length=1, max_length=2048),
     db: Session = Depends(get_db),
+    _: None = Depends(require_internal_prerender),
 ):
     row = get_or_create_yandex_integration(db)
     site_origin = _resolve_site_origin(row.host_url)
@@ -110,6 +112,7 @@ def public_find_redirect(
 def public_find_prerender(
     path: str = Query(..., min_length=1, max_length=2048),
     db: Session = Depends(get_db),
+    _: None = Depends(require_internal_prerender),
 ):
     row = get_or_create_yandex_integration(db)
     site_origin = _resolve_site_origin(row.host_url)

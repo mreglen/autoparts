@@ -12,16 +12,25 @@ from app.utils.chat_access import get_accessible_chat, is_group_chat, get_chat_p
 
 router = APIRouter()
 settings = Settings()
+MAX_WS_CONNECTIONS_PER_USER = settings.WEBSOCKET_MAX_CONNECTIONS_PER_USER
+
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[int, Set[WebSocket]] = {}
 
-    async def connect(self, websocket: WebSocket, user_id: int):
+    def connection_count(self, user_id: int) -> int:
+        return len(self.active_connections.get(user_id, set()))
+
+    async def connect(self, websocket: WebSocket, user_id: int) -> bool:
+        current = self.connection_count(user_id)
+        if current >= MAX_WS_CONNECTIONS_PER_USER:
+            return False
         await websocket.accept()
         if user_id not in self.active_connections:
             self.active_connections[user_id] = set()
         self.active_connections[user_id].add(websocket)
+        return True
 
     def disconnect(self, user_id: int, websocket: WebSocket):
         if user_id not in self.active_connections:
@@ -155,7 +164,10 @@ async def chat_websocket_endpoint(websocket: WebSocket, user_id: int):
         db.close()
 
     try:
-        await manager.connect(websocket, user_id)
+        connected = await manager.connect(websocket, user_id)
+        if not connected:
+            await websocket.close(code=1008, reason="Too many connections")
+            return
         print(f"[WS] Successfully connected user_id={user_id}")
     except Exception as e:
         print(f"[WS] Error accepting connection for user_id={user_id}: {e}")
