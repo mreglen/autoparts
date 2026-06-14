@@ -35,6 +35,10 @@ class StaticPageSeoMeta:
     keywords: str = ""
     card_links: tuple[tuple[str, str], ...] = ()
     json_ld: str = ""
+    content_sections_html: str = ""
+    faq_html: str = ""
+    popular_queries_html: str = ""
+    crosslinks_html: str = ""
 
 
 def _truncate(text: str, max_len: int) -> str:
@@ -309,6 +313,29 @@ def _build_seller_part_card_seo(product: ProductModel, *, site_origin: str) -> S
     )
 
 
+def _landing_prerender_supplements(
+    db: Session,
+    *,
+    kind: str,
+    slug: str,
+    landing,
+    total_count: int,
+    top_items: list,
+    site_origin: str,
+) -> dict[str, str]:
+    from app.services.landing_prerender_service import build_landing_prerender_supplements
+
+    return build_landing_prerender_supplements(
+        db,
+        kind=kind,
+        slug=slug,
+        landing=landing,
+        total_count=total_count,
+        top_items=top_items,
+        site_origin=site_origin,
+    )
+
+
 def _build_brand_landing_seo(db: Session, slug: str, *, site_origin: str) -> StaticPageSeoMeta | None:
     from app.services.new_parts_seo_card_service import (
         build_new_part_card_path,
@@ -333,6 +360,16 @@ def _build_brand_landing_seo(db: Session, slug: str, *, site_origin: str) -> Sta
         path = build_new_part_card_path(card.id, card.brand, card.article)
         links.append((label, _absolute_url(site_origin, path)))
 
+    supplements = _landing_prerender_supplements(
+        db,
+        kind="brand_new",
+        slug=slug,
+        landing=landing,
+        total_count=total,
+        top_items=cards[:12],
+        site_origin=site_origin,
+    )
+
     return StaticPageSeoMeta(
         title=landing.meta_title,
         description=_truncate(landing.meta_description, 160),
@@ -340,6 +377,11 @@ def _build_brand_landing_seo(db: Session, slug: str, *, site_origin: str) -> Sta
         h1=f"Новые автозапчасти {brand_name}",
         keywords=build_page_keywords("brand_new", brand_name=brand_name),
         card_links=tuple(links),
+        content_sections_html=supplements["content_sections_html"],
+        faq_html=supplements["faq_html"],
+        popular_queries_html=supplements["popular_queries_html"],
+        crosslinks_html=supplements["crosslinks_html"],
+        json_ld=supplements["json_ld"],
     )
 
 
@@ -367,6 +409,16 @@ def _build_category_landing_seo(db: Session, slug: str, *, site_origin: str) -> 
         path = build_new_part_card_path(card.id, card.brand, card.article)
         links.append((label, _absolute_url(site_origin, path)))
 
+    supplements = _landing_prerender_supplements(
+        db,
+        kind="category_new",
+        slug=slug,
+        landing=landing,
+        total_count=total,
+        top_items=cards[:12],
+        site_origin=site_origin,
+    )
+
     return StaticPageSeoMeta(
         title=landing.meta_title,
         description=_truncate(landing.meta_description, 160),
@@ -378,6 +430,11 @@ def _build_category_landing_seo(db: Session, slug: str, *, site_origin: str) -> 
             search_query=landing.search_query,
         ),
         card_links=tuple(links),
+        content_sections_html=supplements["content_sections_html"],
+        faq_html=supplements["faq_html"],
+        popular_queries_html=supplements["popular_queries_html"],
+        crosslinks_html=supplements["crosslinks_html"],
+        json_ld=supplements["json_ld"],
     )
 
 
@@ -404,6 +461,16 @@ def _build_used_brand_landing_seo(db: Session, slug: str, *, site_origin: str) -
         path = build_product_page_url(product, site_origin)
         links.append((label, path if path.startswith("http") else _absolute_url(site_origin, path)))
 
+    supplements = _landing_prerender_supplements(
+        db,
+        kind="brand_used",
+        slug=slug,
+        landing=landing,
+        total_count=total,
+        top_items=products[:12],
+        site_origin=site_origin,
+    )
+
     return StaticPageSeoMeta(
         title=landing.meta_title,
         description=_truncate(landing.meta_description, 160),
@@ -411,6 +478,11 @@ def _build_used_brand_landing_seo(db: Session, slug: str, *, site_origin: str) -
         h1=f"Б/у автозапчасти {brand_name}",
         keywords=build_page_keywords("brand_used", brand_name=brand_name),
         card_links=tuple(links),
+        content_sections_html=supplements["content_sections_html"],
+        faq_html=supplements["faq_html"],
+        popular_queries_html=supplements["popular_queries_html"],
+        crosslinks_html=supplements["crosslinks_html"],
+        json_ld=supplements["json_ld"],
     )
 
 
@@ -437,6 +509,16 @@ def _build_used_category_landing_seo(db: Session, slug: str, *, site_origin: str
         path = build_product_page_url(product, site_origin)
         links.append((label, path if path.startswith("http") else _absolute_url(site_origin, path)))
 
+    supplements = _landing_prerender_supplements(
+        db,
+        kind="category_used",
+        slug=slug,
+        landing=landing,
+        total_count=total,
+        top_items=products[:12],
+        site_origin=site_origin,
+    )
+
     return StaticPageSeoMeta(
         title=landing.meta_title,
         description=_truncate(landing.meta_description, 160),
@@ -448,6 +530,11 @@ def _build_used_category_landing_seo(db: Session, slug: str, *, site_origin: str
             search_query=landing.search_query,
         ),
         card_links=tuple(links),
+        content_sections_html=supplements["content_sections_html"],
+        faq_html=supplements["faq_html"],
+        popular_queries_html=supplements["popular_queries_html"],
+        crosslinks_html=supplements["crosslinks_html"],
+        json_ld=supplements["json_ld"],
     )
 
 
@@ -476,6 +563,16 @@ def _build_used_geo_landing_seo(db: Session, slug: str, *, site_origin: str) -> 
         links.append((label, path if path.startswith("http") else _absolute_url(site_origin, path)))
 
     city_prep = format_city_in_prepositional(city)
+    supplements = _landing_prerender_supplements(
+        db,
+        kind="geo",
+        slug=slug,
+        landing=landing,
+        total_count=total,
+        top_items=products[:12],
+        site_origin=site_origin,
+    )
+
     return StaticPageSeoMeta(
         title=landing.meta_title,
         description=_truncate(landing.meta_description, 160),
@@ -483,6 +580,11 @@ def _build_used_geo_landing_seo(db: Session, slug: str, *, site_origin: str) -> 
         h1=f"Б/у автозапчасти в {city_prep}",
         keywords=build_page_keywords("geo_used", city=city),
         card_links=tuple(links),
+        content_sections_html=supplements["content_sections_html"],
+        faq_html=supplements["faq_html"],
+        popular_queries_html=supplements["popular_queries_html"],
+        crosslinks_html=supplements["crosslinks_html"],
+        json_ld=supplements["json_ld"],
     )
 
 
@@ -588,7 +690,7 @@ def render_static_page_prerender_html(meta: StaticPageSeoMeta) -> str:
             f'<li><a href="{html.escape(url, quote=True)}">{html.escape(label)}</a></li>'
             for label, url in meta.card_links
         )
-        links_html = f"<ul>{items}</ul>"
+        links_html = f"<section><h2>Каталог</h2><ul>{items}</ul></section>"
     parsed = urlsplit(meta.canonical_url or "")
     page_origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else None
     og_image = html.escape(resolve_default_og_image_url(page_origin), quote=True)
@@ -623,6 +725,10 @@ def render_static_page_prerender_html(meta: StaticPageSeoMeta) -> str:
   <main>
     <h1>{h1}</h1>
     <p>{body_desc}</p>
+    {meta.content_sections_html}
+    {meta.faq_html}
+    {meta.popular_queries_html}
+    {meta.crosslinks_html}
     {links_html}
     <p><a href="{canonical}">Открыть на «Свой Гараж»</a></p>
   </main>

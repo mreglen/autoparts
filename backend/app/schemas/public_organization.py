@@ -17,3 +17,14 @@ class PublicOrganizationListItem(BaseModel):
 
 class PublicOrganizationDetail(PublicOrganizationListItem):
     pass
+
+
+class PublicOrganizationBrandSummary(BaseModel):
+    name: str
+    slug: str
+    count: int
+
+
+class PublicOrganizationCatalogSummary(BaseModel):
+    total_count: int
+    brands: list[PublicOrganizationBrandSummary]

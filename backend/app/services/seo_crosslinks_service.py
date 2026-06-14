@@ -35,14 +35,28 @@ def _landing_link(row: SeoLandingPage) -> dict[str, str]:
     }
 
 
-def _query_landings(db: Session, kind: str, *, limit: int) -> list[SeoLandingPage]:
+def _query_landings_excluding(
+    db: Session,
+    kind: str,
+    *,
+    exclude_slug: str | None = None,
+    limit: int,
+) -> list[SeoLandingPage]:
+    query = db.query(SeoLandingPage).filter(
+        SeoLandingPage.kind == kind,
+        SeoLandingPage.is_active.is_(True),
+    )
+    if exclude_slug:
+        query = query.filter(SeoLandingPage.slug != exclude_slug)
     return (
-        db.query(SeoLandingPage)
-        .filter(SeoLandingPage.kind == kind, SeoLandingPage.is_active.is_(True))
-        .order_by(SeoLandingPage.priority.desc(), SeoLandingPage.slug.asc())
+        query.order_by(SeoLandingPage.priority.desc(), SeoLandingPage.slug.asc())
         .limit(max(1, min(limit, 24)))
         .all()
     )
+
+
+def _query_landings(db: Session, kind: str, *, limit: int) -> list[SeoLandingPage]:
+    return _query_landings_excluding(db, kind, limit=limit)
 
 
 def get_featured_landings(db: Session, *, limit: int = 8) -> dict[str, list[dict[str, str]]]:
@@ -66,6 +80,7 @@ def get_landing_crosslinks(db: Session, kind: str, slug: str, *, limit: int = 8)
         "categories": [],
         "brands": [],
         "geo": [],
+        "related_categories": [],
     }
 
     if kind == "brand_new":
@@ -78,10 +93,18 @@ def get_landing_crosslinks(db: Session, kind: str, slug: str, *, limit: int = 8)
     elif kind == "category_new":
         result["counterpart"] = _find_landing(db, "category_used", slug_text)
         result["brands"] = [_landing_link(r) for r in _query_landings(db, "brand_new", limit=per_kind)]
+        result["related_categories"] = [
+            _landing_link(r)
+            for r in _query_landings_excluding(db, "category_new", exclude_slug=slug_text, limit=per_kind)
+        ]
     elif kind == "category_used":
         result["counterpart"] = _find_landing(db, "category_new", slug_text)
         result["brands"] = [_landing_link(r) for r in _query_landings(db, "brand_used", limit=per_kind)]
         result["geo"] = [_landing_link(r) for r in _query_landings(db, "geo", limit=2)]
+        result["related_categories"] = [
+            _landing_link(r)
+            for r in _query_landings_excluding(db, "category_used", exclude_slug=slug_text, limit=per_kind)
+        ]
     elif kind == "geo":
         result["brands"] = [_landing_link(r) for r in _query_landings(db, "brand_used", limit=per_kind)]
         result["categories"] = [_landing_link(r) for r in _query_landings(db, "category_used", limit=per_kind)]

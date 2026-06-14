@@ -32,6 +32,7 @@ from app.services.seo_landing_page_service import (
     seed_landing_pages_from_catalog,
     update_landing_page,
 )
+from app.services.landing_page_resolve_service import attach_landing_content
 from app.services.seo_crosslinks_service import get_featured_landings, get_landing_crosslinks
 from app.services.new_parts_seo_card_service import (
     count_new_part_cards_by_brand,
@@ -73,11 +74,12 @@ def get_public_landing_resolve(kind: str, slug: str, db: Session = Depends(get_d
         if not resolved:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Посадочная не найдена")
         brand_name = resolved.brand_name or resolved.title_ru
+        total = 0
         if brand_name:
             total = count_new_part_cards_by_brand(db, brand_name)
             if total > 0:
                 resolved = resolve_brand_new_landing(db, slug, card_count=total)
-        return resolved
+        return attach_landing_content(db, resolved, kind=kind, total_count=total)
 
     if kind == "category_new":
         resolved = resolve_category_new_landing(db, slug)
@@ -86,18 +88,19 @@ def get_public_landing_resolve(kind: str, slug: str, db: Session = Depends(get_d
         total = count_new_part_cards_by_category_slug(db, slug)
         if total > 0:
             resolved = resolve_category_new_landing(db, slug, card_count=total)
-        return resolved
+        return attach_landing_content(db, resolved, kind=kind, total_count=total)
 
     if kind == "brand_used":
         resolved = resolve_brand_used_landing(db, slug)
         if not resolved:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Посадочная не найдена")
         brand_name = resolved.brand_name or resolved.title_ru
+        total = 0
         if brand_name:
             total = count_used_products_by_brand(db, brand_name)
             if total > 0:
                 resolved = resolve_brand_used_landing(db, slug, product_count=total)
-        return resolved
+        return attach_landing_content(db, resolved, kind=kind, total_count=total)
 
     if kind == "category_used":
         resolved = resolve_category_used_landing(db, slug)
@@ -106,23 +109,24 @@ def get_public_landing_resolve(kind: str, slug: str, db: Session = Depends(get_d
         total = count_used_products_by_part_type_id(db, resolved.part_type_id)
         if total > 0:
             resolved = resolve_category_used_landing(db, slug, product_count=total)
-        return resolved
+        return attach_landing_content(db, resolved, kind=kind, total_count=total)
 
     if kind == "geo":
         resolved = resolve_geo_landing(db, slug)
         if not resolved:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Посадочная не найдена")
         city = resolved.city or resolved.title_ru
+        total = 0
         if city:
             total = count_used_products_by_city(db, city)
             if total > 0:
                 resolved = resolve_geo_landing(db, slug, product_count=total)
-        return resolved
+        return attach_landing_content(db, resolved, kind=kind, total_count=total)
 
     result = resolve_landing_page(db, kind, slug)
     if not result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Посадочная не найдена")
-    return result
+    return attach_landing_content(db, result, kind=kind, total_count=0)
 
 
 @router.get("/admin/seo/landing-pages", response_model=list[SeoLandingPageView])

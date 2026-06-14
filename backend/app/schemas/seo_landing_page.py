@@ -52,6 +52,24 @@ class SeoLandingPageView(SeoLandingPageBase):
         from_attributes = True
 
 
+class LandingFaqItemOut(BaseModel):
+    question: str
+    answer: str
+
+
+class LandingPopularQueryOut(BaseModel):
+    label: str
+    path: str
+
+
+class LandingContentOut(BaseModel):
+    about_html: str
+    order_delivery_html: str
+    faq_items: list[LandingFaqItemOut]
+    popular_queries: list[LandingPopularQueryOut]
+    faq_json_ld: str = ""
+
+
 class SeoLandingResolveOut(BaseModel):
     kind: SeoLandingKind
     slug: str
@@ -65,6 +83,7 @@ class SeoLandingResolveOut(BaseModel):
     intro_html: Optional[str] = None
     filters: dict[str, Any]
     canonical_path: str
+    content: Optional[LandingContentOut] = None
 
 
 class SeoLandingSeedResult(BaseModel):

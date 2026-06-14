@@ -54,3 +54,33 @@ class SeoCrosslinksServiceTests(unittest.TestCase):
         self.assertEqual(result["kind"], "brand_new")
         self.assertEqual(result["counterpart"]["path"], "/autoparts/used/brand/bosch")
         self.assertEqual(len(result["categories"]), 1)
+        self.assertEqual(result["related_categories"], [])
+
+    def test_category_new_related_categories_excludes_self(self):
+        db = MagicMock()
+        current = self._landing(kind="category_new", slug="filters", title_ru="Фильтры")
+        other = self._landing(kind="category_new", slug="brakes", title_ru="Тормоза")
+        counterpart = self._landing(kind="category_used", slug="filters", title_ru="Фильтры used")
+        call_count = {"n": 0}
+
+        def query_side_effect(*_args, **_kwargs):
+            chain = MagicMock()
+            chain.filter.return_value = chain
+            chain.order_by.return_value = chain
+            chain.limit.return_value = chain
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                chain.first.return_value = counterpart
+                chain.all.return_value = []
+            elif call_count["n"] == 2:
+                chain.first.return_value = None
+                chain.all.return_value = [self._landing(kind="brand_new", slug="bosch")]
+            else:
+                chain.first.return_value = None
+                chain.all.return_value = [other]
+            return chain
+
+        db.query.side_effect = query_side_effect
+        result = get_landing_crosslinks(db, "category_new", "filters", limit=4)
+        self.assertEqual(len(result["related_categories"]), 1)
+        self.assertEqual(result["related_categories"][0]["slug"], "brakes")

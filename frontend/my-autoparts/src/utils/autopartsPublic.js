@@ -98,6 +98,8 @@ export function buildUsedCatalogFilterParams(searchParams) {
   if (searchParams.get('has_photos') === '1') params.has_photos = true;
   const urlQ = getUsedPartsUrlQuery(searchParams);
   if (urlQ) params.q = urlQ;
+  const organizationId = (searchParams.get('organization_id') || '').trim();
+  if (organizationId) params.organization_id = organizationId;
   return params;
 }
 

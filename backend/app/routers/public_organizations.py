@@ -7,7 +7,13 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.organization import Organization as OrganizationModel
 from app.models.product import Product as ProductModel
-from app.schemas.public_organization import PublicOrganizationDetail, PublicOrganizationListItem
+from app.schemas.public_organization import (
+    PublicOrganizationCatalogSummary,
+    PublicOrganizationDetail,
+    PublicOrganizationListItem,
+    PublicOrganizationBrandSummary,
+)
+from app.utils.slug_utils import slugify_brand
 
 logger = logging.getLogger(__name__)
 
@@ -105,3 +111,52 @@ def get_public_organization(org_id: str, db: Session = Depends(get_db)):
     except Exception:
         logger.exception("get_public_organization failed org_id=%s", org_id)
         raise HTTPException(status_code=500, detail="Не удалось загрузить организацию")
+
+
+@router.get(
+    "/public/organizations/{org_id}/catalog-summary",
+    response_model=PublicOrganizationCatalogSummary,
+)
+def get_public_organization_catalog_summary(org_id: str, db: Session = Depends(get_db)):
+    try:
+        org = (
+            _public_org_filter(db.query(OrganizationModel))
+            .filter(OrganizationModel.id == org_id)
+            .first()
+        )
+        if not org:
+            raise HTTPException(status_code=404, detail="Организация не найдена")
+
+        rows = (
+            _catalog_product_filter(
+                db.query(ProductModel.brand, func.count(ProductModel.id))
+                .filter(ProductModel.organization_id == org_id)
+            )
+            .group_by(ProductModel.brand)
+            .order_by(func.count(ProductModel.id).desc(), ProductModel.brand.asc())
+            .limit(20)
+            .all()
+        )
+
+        total_count = (
+            _catalog_product_filter(
+                db.query(func.count(ProductModel.id)).filter(ProductModel.organization_id == org_id)
+            ).scalar()
+            or 0
+        )
+
+        brands: list[PublicOrganizationBrandSummary] = []
+        for brand_name, count in rows:
+            name = (brand_name or "").strip()
+            if not name:
+                continue
+            qty = int(count or 0)
+            slug = slugify_brand(name) or name.lower().replace(" ", "-")
+            brands.append(PublicOrganizationBrandSummary(name=name, slug=slug, count=qty))
+
+        return PublicOrganizationCatalogSummary(total_count=int(total_count), brands=brands)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("get_public_organization_catalog_summary failed org_id=%s", org_id)
+        raise HTTPException(status_code=500, detail="Не удалось загрузить каталог организации")

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { apiAxiosUnauth } from '../../../utils/apiClient';
 import ProductCard from '../ProductCard';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import UsedPartsFiltersForm from './UsedPartsFiltersForm';
@@ -67,6 +68,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const catalogTotal = useSelector(selectCatalogTotal);
   const catalogPage = useSelector(selectCatalogPage);
   const urlQ = getUsedPartsUrlQuery(searchParams);
+  const organizationFilterId = (searchParams.get('organization_id') || '').trim();
   const isCatalogMode = isUsedCatalogBrowseMode();
   const catalogLoading = useSelector(selectCatalogLoading);
   const catalogLoadingMore = useSelector(selectCatalogLoadingMore);
@@ -76,6 +78,32 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const catalogHasMore = isCatalogMode && catalogHasMoreFromStore;
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
+  const [organizationFilterName, setOrganizationFilterName] = useState('');
+
+  useEffect(() => {
+    if (!organizationFilterId) {
+      setOrganizationFilterName('');
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiAxiosUnauth.get(`/public/organizations/${organizationFilterId}`);
+        if (!cancelled) {
+          setOrganizationFilterName((res.data?.name || '').trim());
+          const name = (res.data?.name || '').trim();
+          if (name) {
+            sessionStorage.setItem(`org-bc-name:${organizationFilterId}`, name);
+          }
+        }
+      } catch (_e) {
+        if (!cancelled) setOrganizationFilterName('');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationFilterId]);
 
   const availableParts = useMemo(() => catalogItems, [catalogItems]);
 
@@ -455,6 +483,18 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
       <h1 className="sr-only">
         {urlQ ? `Б/у запчасти: ${urlQ}` : 'Б/у автозапчасти'}
       </h1>
+      {organizationFilterId ? (
+        <div className="mb-3 mx-3 sm:mx-0 rounded-2xl border border-indigo-100 bg-indigo-50/80 px-4 py-3 text-sm text-indigo-900">
+          <span>
+            Показаны запчасти продавца
+            {organizationFilterName ? ` «${organizationFilterName}»` : ''}
+          </span>
+          {' '}
+          <Link to="/autoparts/used" className="font-semibold underline hover:text-indigo-700">
+            Весь каталог
+          </Link>
+        </div>
+      ) : null}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0">
         <p className="text-sm text-gray-600">Найдено: <span className="font-semibold text-gray-900">{visibleTotal}</span></p>
         <Link
@@ -509,6 +549,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   vm: null,
                   vehicle_id: null,
                   has_photos: null,
+                  organization_id: null,
                 });
                 navigate('/autoparts/used');
               }}

@@ -241,6 +241,9 @@ function LandingPageModal({ open, title, form, partTypes, saving, onClose, onCha
 
           <label className="text-sm sm:col-span-2">
             <span className="mb-1 block text-gray-600">Intro HTML</span>
+            <p className="mb-2 text-xs text-gray-500">
+              Если задан — заменяет автоматический блок «О разделе» на посадочной. FAQ и блок доставки генерируются автоматически.
+            </p>
             <textarea
               rows={4}
               className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs"

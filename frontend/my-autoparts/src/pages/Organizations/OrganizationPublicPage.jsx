@@ -26,6 +26,7 @@ function DetailSkeleton() {
 export default function OrganizationPublicPage() {
   const { orgId } = useParams();
   const [organization, setOrganization] = useState(null);
+  const [catalogSummary, setCatalogSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -42,6 +43,18 @@ export default function OrganizationPublicPage() {
           if (name && orgId) {
             sessionStorage.setItem(`org-bc-name:${orgId}`, name);
           }
+        }
+        if (res.data?.has_catalog_items) {
+          try {
+            const summaryRes = await apiAxiosUnauth.get(
+              `/public/organizations/${orgId}/catalog-summary`,
+            );
+            if (!cancelled) setCatalogSummary(summaryRes.data);
+          } catch (_summaryError) {
+            if (!cancelled) setCatalogSummary(null);
+          }
+        } else if (!cancelled) {
+          setCatalogSummary(null);
         }
       } catch (e) {
         if (!cancelled) {
@@ -172,7 +185,7 @@ export default function OrganizationPublicPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Каталог запчастей</p>
               {organization.has_catalog_items ? (
                 <Link
-                  to="/autoparts/used"
+                  to={`/autoparts/used?organization_id=${encodeURIComponent(orgId)}`}
                   className="mt-2 inline-flex items-center gap-1 text-lg font-semibold text-indigo-600 hover:text-indigo-800"
                 >
                   Перейти к поиску
@@ -183,6 +196,29 @@ export default function OrganizationPublicPage() {
               )}
             </div>
           </div>
+
+          {catalogSummary?.brands?.length ? (
+            <section className="border-t border-slate-100 px-6 py-8 sm:px-8">
+              <h2 className="text-xl font-bold text-slate-900">Бренды в каталоге</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                {catalogSummary.total_count
+                  ? `${catalogSummary.total_count} позиций от ${name}`
+                  : 'Популярные бренды продавца'}
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                {catalogSummary.brands.map((brand) => (
+                  <Link
+                    key={brand.slug || brand.name}
+                    to={`/autoparts/used?organization_id=${encodeURIComponent(orgId)}&brand=${encodeURIComponent(brand.name)}`}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 min-h-[44px] flex items-center justify-center text-center"
+                  >
+                    {brand.name}
+                    {brand.count ? ` (${brand.count})` : ''}
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {description && (
             <section className="border-t border-slate-100 px-6 py-8 sm:px-8">
