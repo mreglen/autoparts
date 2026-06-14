@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPublicSiteConfig } from '../../redux/slices/PublicInfoSlice';
 import { buildAboutSeo, PageSeoHelmet } from '../../utils/pageSeo';
+import YandexWebmasterCounter from '../../components/Seo/YandexWebmasterCounter';
 
 const LEGAL = {
     fullName: 'Общество с ограниченной ответственностью «Кроан»',
@@ -128,7 +129,7 @@ export default function AboutCompany() {
                
             </section>
 
-           
+            <YandexWebmasterCounter />
         </div>
     );
 }

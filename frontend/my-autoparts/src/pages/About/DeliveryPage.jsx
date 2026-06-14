@@ -10,6 +10,7 @@ import {
   findPvzDeliveryOption,
 } from '../../utils/newPartsCheckoutDelivery';
 import { buildDeliverySeo, PageSeoHelmet } from '../../utils/pageSeo';
+import YandexWebmasterCounter from '../../components/Seo/YandexWebmasterCounter';
 
 function formatMoney(value) {
   const num = Number(value);
@@ -197,6 +198,7 @@ export default function DeliveryPage() {
           </section>
         </div>
       )}
+      <YandexWebmasterCounter />
     </div>
   );
 }

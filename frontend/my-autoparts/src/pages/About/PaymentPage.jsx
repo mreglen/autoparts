@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiAxiosUnauth } from '../../utils/apiClient';
+import YandexWebmasterCounter from '../../components/Seo/YandexWebmasterCounter';
 
 export default function PaymentPage() {
   const [info, setInfo] = useState(null);
@@ -57,6 +58,7 @@ export default function PaymentPage() {
           {info.notes && <p className="mt-4 text-sm text-gray-600">{info.notes}</p>}
         </section>
       )}
+      <YandexWebmasterCounter />
     </div>
   );
 }

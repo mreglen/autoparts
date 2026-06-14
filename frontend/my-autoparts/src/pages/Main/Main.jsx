@@ -5,6 +5,7 @@ import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 import ReviewsSection from '../../components/Reviews/ReviewsSection';
 import FeaturedLandingsSection from '../../components/Seo/FeaturedLandingsSection';
 import PageAmbientBackground from '../../components/PageAmbientBackground/PageAmbientBackground';
+import YandexWebmasterCounter from '../../components/Seo/YandexWebmasterCounter';
 import { buildHomeSeo, buildHomeStructuredData, PageSeoHelmet } from '../../utils/pageSeo';
 
 const featureItems = [
@@ -336,24 +337,7 @@ function Main() {
         </div>
       </section>
 
-      <section className="border-t border-gray-200/80 bg-white/90 py-6">
-        <div className="mx-auto flex max-w-7xl justify-center px-4 sm:px-6 lg:px-8">
-          <a
-            href="https://webmaster.yandex.ru/siteinfo/?site=https://svoygarage.ru"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block overflow-hidden rounded-lg opacity-90 transition hover:opacity-100"
-          >
-            <img
-              width={88}
-              height={31}
-              alt="Статистика сайта в Яндекс Вебмастере"
-              src="https://yandex.ru/cycounter?https://svoygarage.ru&theme=dark&lang=ru"
-              className="block rounded-lg"
-            />
-          </a>
-        </div>
-      </section>
+      <YandexWebmasterCounter />
     </div>
   );
 }
