@@ -25,6 +25,7 @@ class FindIndexableUsedCatalogProductTests(unittest.TestCase):
 
         def filter_side_effect(*_args, **_kwargs):
             match_query = MagicMock()
+            match_query.limit.return_value = match_query
             if pending:
                 match_query.all.return_value = pending.pop(0)
             else:
@@ -39,8 +40,7 @@ class FindIndexableUsedCatalogProductTests(unittest.TestCase):
         return db
 
     @patch("app.services.used_catalog_service.selectinload")
-    @patch("app.services.sitemap_service.is_working_catalog_product", return_value=True)
-    def test_canonical_match_case_insensitive(self, _is_working, _selectinload):
+    def test_canonical_match_case_insensitive(self, _selectinload):
         product = self._working_product(pid=1, brand="BOSCH", article="A123")
         db = self._mock_db([[product]])
 
@@ -51,17 +51,15 @@ class FindIndexableUsedCatalogProductTests(unittest.TestCase):
         self.assertIs(find_working_product_by_used_catalog_query(db2, "bosch a123"), product)
 
     @patch("app.services.used_catalog_service.selectinload")
-    @patch("app.services.sitemap_service.is_working_catalog_product", return_value=True)
-    def test_canonical_returns_none_when_multiple_matches(self, _is_working, _selectinload):
+    def test_canonical_returns_none_when_multiple_matches(self, _selectinload):
         first = self._working_product(pid=1, brand="BOSCH", article="A123")
         second = self._working_product(pid=2, brand="BOSCH", article="A123")
-        db = self._mock_db([[first, second], [], []])
+        db = self._mock_db([[first, second]])
 
         self.assertIsNone(find_indexable_used_catalog_product(db, "BOSCH A123"))
 
     @patch("app.services.used_catalog_service.selectinload")
-    @patch("app.services.sitemap_service.is_working_catalog_product", return_value=True)
-    def test_article_unique_match(self, _is_working, _selectinload):
+    def test_article_unique_match(self, _selectinload):
         product = self._working_product(pid=3, brand="MANN", article="IF-1009")
         db = self._mock_db([[], [product]])
 
@@ -70,17 +68,15 @@ class FindIndexableUsedCatalogProductTests(unittest.TestCase):
         self.assertEqual(result, (product, "article"))
 
     @patch("app.services.used_catalog_service.selectinload")
-    @patch("app.services.sitemap_service.is_working_catalog_product", return_value=True)
-    def test_article_duplicate_returns_none(self, _is_working, _selectinload):
+    def test_article_duplicate_returns_none(self, _selectinload):
         first = self._working_product(pid=1, brand="MANN", article="IF1009")
         second = self._working_product(pid=2, brand="BOSCH", article="IF1009")
-        db = self._mock_db([[], [first, second], []])
+        db = self._mock_db([[], [first, second]])
 
         self.assertIsNone(find_indexable_used_catalog_product(db, "IF1009"))
 
     @patch("app.services.used_catalog_service.selectinload")
-    @patch("app.services.sitemap_service.is_working_catalog_product", return_value=True)
-    def test_name_unique_match(self, _is_working, _selectinload):
+    def test_name_unique_match(self, _selectinload):
         product = self._working_product(
             pid=4,
             brand="MANN",
@@ -94,8 +90,7 @@ class FindIndexableUsedCatalogProductTests(unittest.TestCase):
         self.assertEqual(result, (product, "name"))
 
     @patch("app.services.used_catalog_service.selectinload")
-    @patch("app.services.sitemap_service.is_working_catalog_product", return_value=True)
-    def test_name_duplicate_returns_none(self, _is_working, _selectinload):
+    def test_name_duplicate_returns_none(self, _selectinload):
         first = self._working_product(pid=1, brand="A", article="X1", name="Одинаковое название")
         second = self._working_product(pid=2, brand="B", article="X2", name="Одинаковое название")
         db = self._mock_db([[], [], [first, second]])

@@ -664,19 +664,6 @@ def _product_sitemap_url_block(
     return "\n".join(url_lines)
 
 
-def _used_catalog_uniqueness_maps(products: list) -> tuple[dict[str, int], dict[str, int]]:
-    article_counts: dict[str, int] = {}
-    name_counts: dict[str, int] = {}
-    for product in products:
-        article_key = normalize_partnumber(getattr(product, "article", None))
-        if article_key:
-            article_counts[article_key] = article_counts.get(article_key, 0) + 1
-        name_key = str(getattr(product, "name", "") or "").strip().casefold()
-        if name_key:
-            name_counts[name_key] = name_counts.get(name_key, 0) + 1
-    return article_counts, name_counts
-
-
 def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = None) -> tuple[str, int]:
     site_origin = _resolve_origin(db, preferred_host_url)
     lines = [
@@ -684,13 +671,21 @@ def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = 
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
     ]
     url_count = 0
+    working_products: list = []
+    article_counts: dict[str, int] = {}
+    name_counts: dict[str, int] = {}
 
-    working_products = [
-        product
-        for product in _iter_catalog_products(db)
-        if is_working_catalog_product(product)
-    ]
-    article_counts, name_counts = _used_catalog_uniqueness_maps(working_products)
+    for product in _iter_catalog_products(db):
+        if not is_working_catalog_product(product):
+            continue
+        working_products.append(product)
+        article_key = normalize_partnumber(getattr(product, "article", None))
+        if article_key:
+            article_counts[article_key] = article_counts.get(article_key, 0) + 1
+        name_key = str(getattr(product, "name", "") or "").strip().casefold()
+        if name_key:
+            name_counts[name_key] = name_counts.get(name_key, 0) + 1
+
     seen_urls: set[str] = set()
 
     for product in working_products:

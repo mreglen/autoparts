@@ -67,13 +67,17 @@ def _working_products_query(db: Session):
     )
 
 
-def _single_working_match(matches: list[Product]) -> Product | None:
-    from app.services.sitemap_service import is_working_catalog_product
-
-    working = [product for product in matches if is_working_catalog_product(product)]
-    if len(working) == 1:
-        return working[0]
-    return None
+def _unique_working_product(db: Session, *filters) -> Product | None:
+    """Возвращает карточку только при ровно одном совпадении (limit 2, без полного скана)."""
+    matches = (
+        _working_products_query(db)
+        .filter(*filters)
+        .limit(2)
+        .all()
+    )
+    if len(matches) != 1:
+        return None
+    return matches[0]
 
 
 def find_indexable_used_catalog_product(db: Session, q: str) -> tuple[Product, str] | None:
@@ -85,8 +89,6 @@ def find_indexable_used_catalog_product(db: Session, q: str) -> tuple[Product, s
     if not normalized_q:
         return None
 
-    base = _working_products_query(db)
-
     canonical_expr = func.lower(
         func.trim(
             func.concat(
@@ -96,22 +98,22 @@ def find_indexable_used_catalog_product(db: Session, q: str) -> tuple[Product, s
             )
         )
     )
-    canonical_match = _single_working_match(
-        base.filter(canonical_expr == normalized_q).all()
-    )
+    canonical_match = _unique_working_product(db, canonical_expr == normalized_q)
     if canonical_match is not None:
         return canonical_match, "canonical"
 
     article_norm = normalize_partnumber(q)
     if article_norm:
-        article_match = _single_working_match(
-            base.filter(_sql_normalize_article(Product.article) == article_norm).all()
+        article_match = _unique_working_product(
+            db,
+            _sql_normalize_article(Product.article) == article_norm,
         )
         if article_match is not None:
             return article_match, "article"
 
-    name_match = _single_working_match(
-        base.filter(func.lower(func.trim(Product.name)) == normalized_q).all()
+    name_match = _unique_working_product(
+        db,
+        func.lower(func.trim(Product.name)) == normalized_q,
     )
     if name_match is not None:
         return name_match, "name"
