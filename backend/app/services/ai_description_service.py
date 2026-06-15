@@ -79,6 +79,33 @@ def count_org_requests_today(db: Session, organization_id: str) -> int:
     )
 
 
+def can_use_ai_description_ui(user: User) -> bool:
+    if not user.organization_id:
+        return False
+    return bool(user.is_seller or user.is_director or user.is_employee)
+
+
+def can_generate_ai_description(user: User) -> bool:
+    return can_use_ai_description_ui(user)
+
+
+def _resolve_block_reason(
+    *,
+    user: User,
+    integration: SiteOpenRouterIntegration,
+    org_enabled: bool,
+) -> str | None:
+    if not can_use_ai_description_ui(user):
+        return "Доступно только продавцам и сотрудникам организации"
+    if not integration.api_key_encrypted:
+        return "Администратор ещё не сохранил API-ключ OpenRouter"
+    if not integration.is_enabled:
+        return "Генерация отключена в /admin-settings → OpenRouter"
+    if not org_enabled:
+        return "Для вашей организации доступ не включён в /admin-settings"
+    return None
+
+
 def is_org_ai_description_enabled(db: Session, organization_id: str | None) -> bool:
     if not organization_id:
         return False
@@ -103,18 +130,21 @@ def get_seller_access_info(db: Session, user: User) -> dict:
     org_used = count_org_requests_today(db, org_id) if org_id else 0
     org_limit = int(integration.per_org_daily_limit or 10)
 
-    enabled = bool(
-        integration.is_enabled
-        and integration.api_key_encrypted
-        and org_enabled
-        and user.is_seller
+    show_ui = can_use_ai_description_ui(user)
+    block_reason = _resolve_block_reason(
+        user=user,
+        integration=integration,
+        org_enabled=org_enabled,
     )
+    enabled = show_ui and block_reason is None
     remaining_global = max(0, global_limit - global_used)
     remaining_org = max(0, org_limit - org_used)
     remaining_today = min(remaining_global, remaining_org) if enabled else 0
 
     return {
+        "show_ui": show_ui,
         "enabled": enabled,
+        "reason": block_reason,
         "remaining_today": remaining_today,
         "org_limit": org_limit,
         "global_limit": global_limit,
@@ -157,8 +187,8 @@ def _assert_can_generate(
     user: User,
     integration: SiteOpenRouterIntegration,
 ) -> None:
-    if not user.is_seller or not user.organization_id:
-        raise HTTPException(status_code=403, detail="Доступно только продавцам")
+    if not can_generate_ai_description(user):
+        raise HTTPException(status_code=403, detail="Доступно только продавцам и сотрудникам организации")
 
     if not integration.is_enabled:
         raise HTTPException(status_code=503, detail="Генерация описаний отключена администратором")

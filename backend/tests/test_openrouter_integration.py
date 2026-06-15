@@ -108,6 +108,8 @@ class AiDescriptionServiceTests(unittest.TestCase):
 
         user = MagicMock()
         user.is_seller = False
+        user.is_director = False
+        user.is_employee = False
         user.organization_id = "org1"
 
         with patch(
@@ -121,6 +123,7 @@ class AiDescriptionServiceTests(unittest.TestCase):
             return_value=0,
         ):
             info = get_seller_access_info(db, user)
+        self.assertFalse(info["show_ui"])
         self.assertFalse(info["enabled"])
 
 

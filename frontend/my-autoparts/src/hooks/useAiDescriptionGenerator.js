@@ -1,28 +1,52 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiRequest } from '../utils/apiClient';
 
-export function useAiDescriptionGenerator({ brand, article, name, isNew, partTypeId, productId }) {
+export function useAiDescriptionGenerator({
+  brand,
+  article,
+  name,
+  isNew,
+  partTypeId,
+  productId,
+  authReady = true,
+}) {
   const [access, setAccess] = useState(null);
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
 
+  const loadAccess = useCallback(async () => {
+    if (!authReady) return;
+    setLoadingAccess(true);
+    try {
+      const data = await apiRequest('/products/ai-description/access');
+      setAccess(data);
+    } catch (e) {
+      setAccess({
+        show_ui: false,
+        enabled: false,
+        reason: e?.message || 'Не удалось проверить доступ к AI-описаниям',
+        remaining_today: 0,
+      });
+    } finally {
+      setLoadingAccess(false);
+    }
+  }, [authReady]);
+
   useEffect(() => {
+    if (!authReady) {
+      setLoadingAccess(false);
+      return undefined;
+    }
     let cancelled = false;
     (async () => {
-      try {
-        const data = await apiRequest('/products/ai-description/access');
-        if (!cancelled) setAccess(data);
-      } catch (_e) {
-        if (!cancelled) setAccess({ enabled: false, remaining_today: 0 });
-      } finally {
-        if (!cancelled) setLoadingAccess(false);
-      }
+      await loadAccess();
+      if (cancelled) return;
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authReady, loadAccess]);
 
   const canGenerate =
     Boolean(access?.enabled) &&
@@ -73,5 +97,6 @@ export function useAiDescriptionGenerator({ brand, article, name, isNew, partTyp
     canGenerate,
     generate,
     clearError: () => setError(null),
+    reloadAccess: loadAccess,
   };
 }

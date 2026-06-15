@@ -21,6 +21,7 @@ const EditPart = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
   const { isReady, user } = useAuthReady();
+  const canAccess = Boolean(user?.is_seller || user?.is_employee || user?.is_admin);
   const productStatus = useSelector((state) => state.products.loading);
   const productError = useSelector((state) => state.products.error);
   const currentProduct = useSelector((state) => state.products.currentProduct);
@@ -91,6 +92,7 @@ const EditPart = () => {
     isNew: formData.condition === 'новый',
     partTypeId: formData.part_type_id,
     productId: id,
+    authReady: isReady && canAccess,
   });
 
   const handleGenerateDescription = async () => {
@@ -991,8 +993,6 @@ const EditPart = () => {
     }
   };
 
-  const canAccess = Boolean(user?.is_seller || user?.is_employee || user?.is_admin);
-
   useEffect(() => {
     if (!isReady) return;
     if (!canAccess) {
@@ -1130,20 +1130,26 @@ const EditPart = () => {
             className="mt-1 block w-full px-3 py-2 border rounded-md"
             placeholder="Введите описание запчасти..."
           />
-          {!aiDescriptionLoading && aiDescriptionAccess?.enabled && (
+          {!aiDescriptionLoading && (aiDescriptionAccess?.show_ui || aiDescriptionAccess?.enabled) && (
             <div className="mt-2 space-y-1">
               <button
                 type="button"
                 onClick={handleGenerateDescription}
                 disabled={!canGenerateAiDescription}
-                className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+                className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {aiDescriptionGenerating ? 'Генерация…' : 'Сгенерировать описание'}
               </button>
+              {!aiDescriptionAccess?.enabled && aiDescriptionAccess?.reason && (
+                <p className="text-xs text-amber-700">{aiDescriptionAccess.reason}</p>
+              )}
               {aiDescriptionError && (
                 <p className="text-xs text-red-600">{aiDescriptionError}</p>
               )}
             </div>
+          )}
+          {aiDescriptionLoading && (
+            <p className="mt-2 text-xs text-gray-500">Проверка доступа к AI…</p>
           )}
         </div>
         </MobilePageSection>

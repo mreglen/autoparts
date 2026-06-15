@@ -37,7 +37,9 @@ router = APIRouter(prefix="/products", tags=["Products"])
 
 
 class AiDescriptionAccessOut(BaseModel):
+    show_ui: bool = False
     enabled: bool
+    reason: str | None = None
     remaining_today: int
     org_limit: int
     global_limit: int
