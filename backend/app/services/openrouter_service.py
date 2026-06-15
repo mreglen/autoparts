@@ -75,7 +75,7 @@ def chat_completion(
 ) -> OpenRouterCompletionResult:
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
+        "Content-Type": "application/json; charset=utf-8",
         "HTTP-Referer": "https://svoygarage.ru",
         "X-Title": "Svoy Garage",
     }
@@ -88,13 +88,15 @@ def chat_completion(
         "max_tokens": max_tokens,
         "temperature": temperature,
     }
+    # Явный UTF-8: на серверах с LANG=C httpx/json=payload может падать на кириллице.
+    body_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
     try:
         with httpx.Client(timeout=DEFAULT_TIMEOUT_SEC) as client:
-            response = client.post(OPENROUTER_API_URL, headers=headers, json=payload)
-    except httpx.RequestError as exc:
+            response = client.post(OPENROUTER_API_URL, headers=headers, content=body_bytes)
+    except (httpx.RequestError, UnicodeEncodeError) as exc:
         logger.exception("OpenRouter request failed")
-        raise OpenRouterApiError(f"Не удалось связаться с OpenRouter: {exc}") from exc
+        raise OpenRouterApiError(f"Не удалось отправить запрос в OpenRouter: {exc}") from exc
 
     if response.status_code >= 400:
         detail = _parse_error_detail(response)

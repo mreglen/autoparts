@@ -60,6 +60,36 @@ class OpenRouterServiceTests(unittest.TestCase):
         self.assertIsInstance(result, OpenRouterCompletionResult)
         self.assertIn("описание", result.content)
         self.assertEqual(result.tokens_used, 42)
+        call_kwargs = mock_client.post.call_args.kwargs
+        self.assertIn("content", call_kwargs)
+        self.assertIsInstance(call_kwargs["content"], bytes)
+        headers = mock_client.post.call_args.kwargs.get("headers") or mock_client.post.call_args[1].get("headers")
+        if headers:
+            self.assertIn("charset=utf-8", headers.get("Content-Type", ""))
+
+    @patch("app.services.openrouter_service.httpx.Client")
+    def test_chat_completion_sends_utf8_body_for_cyrillic_prompt(self, mock_client_cls):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "model": "meta-llama/llama-3.3-70b-instruct:free",
+            "choices": [{"message": {"content": "Описание."}}],
+            "usage": {"total_tokens": 10},
+        }
+        mock_client = MagicMock()
+        mock_client.__enter__.return_value = mock_client
+        mock_client.__exit__.return_value = False
+        mock_client.post.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        chat_completion(
+            api_key="sk-test",
+            model="meta-llama/llama-3.3-70b-instruct:free",
+            system_prompt="Пиши только на русском языке.",
+            user_prompt="Бренд: Koyo\nАртикул: 608ZZ\nНазвание: Подшипник",
+        )
+        body = mock_client.post.call_args.kwargs["content"]
+        self.assertIn("Подшипник".encode("utf-8"), body)
 
     @patch("app.services.openrouter_service.httpx.Client")
     def test_chat_completion_api_error(self, mock_client_cls):
