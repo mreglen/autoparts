@@ -18,6 +18,7 @@ from app.services.ai_description_service import (
     get_plain_api_key,
     test_openrouter_connection,
 )
+from app.services.openrouter_service import OpenRouterApiError, normalize_openrouter_api_key
 from app.services.audit_service import log_audit
 from app.utils.openrouter_crypto import encrypt_openrouter_secret
 from app.utils.openrouter_integration_db import get_or_create_openrouter_integration
@@ -100,7 +101,11 @@ def save_openrouter_credentials(
     db: Session = Depends(get_db),
 ):
     row = get_or_create_openrouter_integration(db)
-    row.api_key_encrypted = encrypt_openrouter_secret(payload.api_key.strip())
+    try:
+        api_key = normalize_openrouter_api_key(payload.api_key)
+    except OpenRouterApiError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    row.api_key_encrypted = encrypt_openrouter_secret(api_key)
     db.add(row)
     db.commit()
     db.refresh(row)

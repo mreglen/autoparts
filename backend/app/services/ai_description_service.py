@@ -318,7 +318,14 @@ def generate_product_description(
             db.rollback()
             logger.exception("Failed to persist OpenRouter error log")
         status = 429 if exc.status_code == 429 else 502
-        raise HTTPException(status_code=status, detail=str(exc)) from exc
+        if status == 429:
+            detail = (
+                "OpenRouter вернул ошибку 429: исчерпан лимит бесплатной модели. "
+                "Попробуйте другую модель :free или повторите позже."
+            )
+        else:
+            detail = str(exc)
+        raise HTTPException(status_code=status, detail=detail) from exc
     except HTTPException:
         db.rollback()
         raise
@@ -353,19 +360,31 @@ def test_openrouter_connection(db: Session) -> dict:
         raise HTTPException(status_code=400, detail="API-ключ не настроен")
 
     model_id = (integration.model_id or "").strip() or RECOMMENDED_FREE_MODELS[0]
-    result = chat_completion(
-        api_key=api_key,
-        model=model_id,
-        system_prompt=SYSTEM_PROMPT,
-        user_prompt=_build_user_prompt(
-            brand="Koyo",
-            article="608ZZ",
-            name="Подшипник",
-            is_new=True,
-            part_type_name="Подшипник",
-        ),
-        max_tokens=200,
-    )
+    try:
+        result = chat_completion(
+            api_key=api_key,
+            model=model_id,
+            system_prompt=SYSTEM_PROMPT,
+            user_prompt=_build_user_prompt(
+                brand="Koyo",
+                article="608ZZ",
+                name="Подшипник",
+                is_new=True,
+                part_type_name="Подшипник",
+            ),
+            max_tokens=200,
+        )
+    except OpenRouterApiError as exc:
+        status = exc.status_code if exc.status_code else 502
+        if status == 429:
+            detail = (
+                "OpenRouter вернул ошибку 429: исчерпан лимит бесплатной модели. "
+                "Выберите другую модель с суффиксом :free (например google/gemma-3-12b-it:free) "
+                "или повторите через несколько минут."
+            )
+        else:
+            detail = str(exc)
+        raise HTTPException(status_code=status, detail=detail) from exc
     return {
         "ok": True,
         "model": result.model,

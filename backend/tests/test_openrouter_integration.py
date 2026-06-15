@@ -13,16 +13,33 @@ from app.services.openrouter_service import (
     OpenRouterCompletionResult,
     _extract_message_content,
     chat_completion,
+    normalize_openrouter_api_key,
 )
 from app.utils.openrouter_crypto import decrypt_openrouter_secret, encrypt_openrouter_secret
+
+VALID_API_KEY = "sk-or-v1-test-key-1234567890"
 
 
 class OpenRouterCryptoTests(unittest.TestCase):
     def test_encrypt_decrypt_roundtrip(self):
-        plain = "sk-or-v1-test-key-12345"
+        plain = VALID_API_KEY
         token = encrypt_openrouter_secret(plain)
         self.assertNotEqual(token, plain)
         self.assertEqual(decrypt_openrouter_secret(token), plain)
+
+
+class OpenRouterApiKeyValidationTests(unittest.TestCase):
+    def test_normalize_rejects_cyrillic_api_key(self):
+        with self.assertRaises(OpenRouterApiError) as ctx:
+            normalize_openrouter_api_key("sk-or-v1-" + "a" * 64 + "Создавай")
+        self.assertIn("недопустимые символы", str(ctx.exception))
+
+    def test_normalize_rejects_invalid_prefix(self):
+        with self.assertRaises(OpenRouterApiError):
+            normalize_openrouter_api_key("sk-test-key-1234567890")
+
+    def test_normalize_accepts_valid_key(self):
+        self.assertEqual(normalize_openrouter_api_key(f"  {VALID_API_KEY}  "), VALID_API_KEY)
 
 
 class OpenRouterServiceTests(unittest.TestCase):
@@ -36,19 +53,22 @@ class OpenRouterServiceTests(unittest.TestCase):
         content = _extract_message_content({"content": "  Текст  "})
         self.assertEqual(content, "Текст")
 
-    @patch("app.services.openrouter_service.requests.post")
+    @patch("app.services.openrouter_service._post_openrouter")
     def test_chat_completion_success(self, mock_post):
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "model": "meta-llama/llama-3.3-70b-instruct:free",
-            "choices": [{"message": {"content": "Тестовое описание подшипника."}}],
-            "usage": {"total_tokens": 42},
-        }
-        mock_post.return_value = mock_response
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=MagicMock(
+                return_value={
+                    "model": "meta-llama/llama-3.3-70b-instruct:free",
+                    "choices": [{"message": {"content": "Тестовое описание подшипника."}}],
+                    "usage": {"total_tokens": 42},
+                }
+            ),
+            text="",
+        )
 
         result = chat_completion(
-            api_key="sk-test",
+            api_key=VALID_API_KEY,
             model="meta-llama/llama-3.3-70b-instruct:free",
             system_prompt="sys",
             user_prompt="user",
@@ -57,46 +77,59 @@ class OpenRouterServiceTests(unittest.TestCase):
         self.assertIn("описание", result.content)
         self.assertEqual(result.tokens_used, 42)
         call_kwargs = mock_post.call_args.kwargs
-        self.assertIn("data", call_kwargs)
-        self.assertIsInstance(call_kwargs["data"], bytes)
+        self.assertIsInstance(call_kwargs["body"], bytes)
         headers = call_kwargs.get("headers") or {}
         self.assertIn("charset=utf-8", headers.get("Content-Type", ""))
+        mock_post.assert_called_once()
 
-    @patch("app.services.openrouter_service.requests.post")
+    @patch("app.services.openrouter_service._post_openrouter")
     def test_chat_completion_sends_utf8_body_for_cyrillic_prompt(self, mock_post):
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "model": "meta-llama/llama-3.3-70b-instruct:free",
-            "choices": [{"message": {"content": "Описание."}}],
-            "usage": {"total_tokens": 10},
-        }
-        mock_post.return_value = mock_response
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=MagicMock(
+                return_value={
+                    "model": "meta-llama/llama-3.3-70b-instruct:free",
+                    "choices": [{"message": {"content": "Описание."}}],
+                    "usage": {"total_tokens": 10},
+                }
+            ),
+            text="",
+        )
 
         chat_completion(
-            api_key="sk-test",
+            api_key=VALID_API_KEY,
             model="meta-llama/llama-3.3-70b-instruct:free",
             system_prompt="Пиши только на русском языке.",
             user_prompt="Бренд: Koyo\nАртикул: 608ZZ\nНазвание: Подшипник",
         )
-        body = mock_post.call_args.kwargs["data"]
+        body = mock_post.call_args.kwargs["body"]
         self.assertIn("Подшипник".encode("utf-8"), body)
 
-    @patch("app.services.openrouter_service.requests.post")
+    @patch("app.services.openrouter_service._post_openrouter")
     def test_chat_completion_api_error(self, mock_post):
-        mock_response = MagicMock()
-        mock_response.status_code = 429
-        mock_response.text = "rate limited"
-        mock_post.return_value = mock_response
+        mock_post.return_value = MagicMock(status_code=429, text="rate limited")
 
         with self.assertRaises(OpenRouterApiError) as ctx:
             chat_completion(
-                api_key="sk-test",
+                api_key=VALID_API_KEY,
                 model="meta-llama/llama-3.3-70b-instruct:free",
                 system_prompt="sys",
                 user_prompt="user",
             )
         self.assertEqual(ctx.exception.status_code, 429)
+
+    @patch("app.services.openrouter_service._post_openrouter")
+    def test_chat_completion_rejects_cyrillic_api_key_before_http(self, mock_post):
+        contaminated_key = "sk-or-v1-" + "a" * 64 + "Создавай"
+        with self.assertRaises(OpenRouterApiError) as ctx:
+            chat_completion(
+                api_key=contaminated_key,
+                model="meta-llama/llama-3.3-70b-instruct:free",
+                system_prompt="sys",
+                user_prompt="user",
+            )
+        self.assertIn("недопустимые символы", str(ctx.exception))
+        mock_post.assert_not_called()
 
 
 class AiDescriptionServiceTests(unittest.TestCase):
