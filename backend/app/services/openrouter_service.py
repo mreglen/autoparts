@@ -75,27 +75,34 @@ def _assert_latin1_header(value: str, header_name: str) -> None:
         ) from exc
 
 
-def _extract_message_content(message: dict[str, Any]) -> str:
+def _extract_message_content(message: dict[str, Any], *, include_reasoning: bool = False) -> str:
     content = message.get("content")
     if isinstance(content, str):
-        return content.strip()
+        text = content.strip()
+        if text and text not in {"[]", "{}"}:
+            return text
     if isinstance(content, list):
         parts: list[str] = []
         for item in content:
             if isinstance(item, dict):
+                item_type = str(item.get("type") or "").lower()
+                if item_type in {"reasoning", "thinking", "reasoning_content"}:
+                    continue
                 text = item.get("text") or item.get("content")
                 if text:
                     parts.append(str(text).strip())
             elif isinstance(item, str) and item.strip():
                 parts.append(item.strip())
-        return " ".join(parts).strip()
+        if parts:
+            return "\n\n".join(parts).strip()
     if content is not None:
         text = str(content).strip()
         if text and text not in {"[]", "{}"}:
             return text
-    reasoning = message.get("reasoning")
-    if isinstance(reasoning, str) and reasoning.strip():
-        return reasoning.strip()
+    if include_reasoning:
+        reasoning = message.get("reasoning")
+        if isinstance(reasoning, str) and reasoning.strip():
+            return reasoning.strip()
     return ""
 
 

@@ -45,7 +45,12 @@ class OpenRouterApiKeyValidationTests(unittest.TestCase):
 class OpenRouterServiceTests(unittest.TestCase):
     def test_extract_message_content_from_list(self):
         content = _extract_message_content(
-            {"content": [{"type": "text", "text": "Описание подшипника."}]}
+            {
+                "content": [
+                    {"type": "reasoning", "text": "Okay, let me think"},
+                    {"type": "text", "text": "Описание подшипника."},
+                ]
+            }
         )
         self.assertEqual(content, "Описание подшипника.")
 
@@ -144,7 +149,7 @@ class AiDescriptionServiceTests(unittest.TestCase):
         self.assertIn("Koyo", prompt)
         self.assertIn("608ZZ", prompt)
         self.assertIn("новая", prompt)
-        self.assertIn("400", prompt)
+        self.assertIn("220", prompt)
 
     def test_build_user_prompt_includes_existing_draft(self):
         prompt = _build_user_prompt(
@@ -157,7 +162,7 @@ class AiDescriptionServiceTests(unittest.TestCase):
         )
         self.assertIn("Текущий черновик описания", prompt)
         self.assertIn("Старый текст про подшипник.", prompt)
-        self.assertIn("Доработай и расширь", prompt)
+        self.assertIn("лаконичное описание", prompt)
         self.assertIn("без вступлений", prompt)
 
     def test_build_user_prompt_preserves_compat_hint_from_draft(self):
@@ -178,10 +183,23 @@ class AiDescriptionServiceTests(unittest.TestCase):
         self.assertFalse(normalized.lower().startswith("хорошо"))
         self.assertIn("Подшипник Koyo", normalized)
 
+    def test_normalize_description_drops_english_reasoning(self):
+        raw = (
+            "Okay, let me tackle this. The user wants a description. "
+            "Блок управления A761E, разъём на 15 контактов, без пробега по России. "
+            "Для автомобилей Lexus GS430 и Toyota Crown."
+        )
+        normalized = _normalize_description(raw)
+        self.assertNotIn("Okay", normalized)
+        self.assertNotIn("The user", normalized)
+        self.assertIn("A761E", normalized)
+        self.assertIn("Lexus", normalized)
+        self.assertLessEqual(len(normalized), 550)
+
     def test_normalize_description_truncates(self):
         long_text = "а" * 3000
         normalized = _normalize_description(long_text)
-        self.assertLessEqual(len(normalized), 2000)
+        self.assertLessEqual(len(normalized), 550)
 
     def test_recommended_models_include_free_suffix(self):
         for model in RECOMMENDED_FREE_MODELS:

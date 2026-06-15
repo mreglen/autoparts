@@ -19,36 +19,43 @@ from app.utils.openrouter_integration_db import get_or_create_openrouter_integra
 
 logger = logging.getLogger(__name__)
 
-# Ориентир для SEO-карточки: развёрнутый уникальный текст (Яндекс / Google).
-DESCRIPTION_TARGET_MIN_CHARS = 400
-DESCRIPTION_TARGET_MAX_CHARS = 900
+# Лаконичное описание товара: факты о детали, без «воды».
+DESCRIPTION_TARGET_MIN_CHARS = 220
+DESCRIPTION_TARGET_MAX_CHARS = 550
+DESCRIPTION_ABSOLUTE_MAX_CHARS = 550
 EXISTING_DESCRIPTION_MAX_INPUT = 1500
-DESCRIPTION_GENERATION_MAX_TOKENS = 1000
+DESCRIPTION_GENERATION_MAX_TOKENS = 450
+DESCRIPTION_GENERATION_TEMPERATURE = 0.2
 
 SYSTEM_PROMPT = (
-    "Ты помощник маркетплейса автозапчастей «Свой Гараж». "
-    "Пиши только на русском языке. "
-    f"Создавай развёрнутое описание товара для карточки на сайте: 6–10 предложений, "
-    f"примерно {DESCRIPTION_TARGET_MIN_CHARS}–{DESCRIPTION_TARGET_MAX_CHARS} символов. "
-    "Можно два коротких абзаца (раздели пустой строкой). "
-    "Используй только факты из запроса пользователя и черновика. "
-    "Если есть черновик — доработай и расширь его, сохрани верные факты, не отбрасывай полезные детали. "
-    "Если в черновике указаны совместимость с автомобилями, применяемость, марки/модели, OEM-номера "
-    "или технические характеристики — обязательно сохрани и включи их в итоговый текст. "
-    "НЕ выдумывай совместимость, OEM, характеристики, размеры и материалы, если их нет в запросе или черновике. "
-    "Не используй маркетинговые клише и восклицательные знаки. "
-    "Запрещено писать от себя: «хорошо», «конечно», «пользователь просит», «вот описание», "
-    "«ниже текст» и любые пояснения задания. "
-    "Ответ — только готовый текст описания товара для публикации на сайте, без заголовков и списков."
+    "Ты составляешь описание автозапчасти для карточки на маркетплейсе «Свой Гараж». "
+    "КРИТИЧНО: только русский язык, без английского и без рассуждений. "
+    f"Длина: {DESCRIPTION_TARGET_MIN_CHARS}–{DESCRIPTION_TARGET_MAX_CHARS} символов, 4–6 коротких предложений. "
+    "Один абзац или два коротких через пустую строку. "
+    "Пиши по делу о самой детали: что это за запчасть, бренд, артикул, состояние, "
+    "ключевые параметры и применяемость — только если они есть в запросе или черновике. "
+    "Начни с сути товара (название и назначение детали), без вступлений про маркетплейс и покупку. "
+    "Если есть черновик — упорядочи факты из него, не раздувай текст и не добавляй лишнего. "
+    "Сохрани списки совместимых автомобилей и характеристики из черновика, если они указаны. "
+    "НЕ выдумывай факты. Без клише («идеальный выбор», «высокое качество»), восклицаний и списков с маркерами. "
+    "Запрещено: «хорошо», «пользователь просит», «Okay», «Let me» и любые пояснения задания."
 )
 
+_CYRILLIC_RE = re.compile(r"[а-яА-ЯёЁ]")
 _DRAFT_HAS_VEHICLE_COMPAT_RE = re.compile(
     r"совместим|подходит\s+(?:для|к)|применяем|"
-    r"для\s+(?:авто|машин|легков|грузов)|"
+    r"для\s+автомобил|для\s+(?:авто|машин|легков|грузов)|"
     r"\b(?:OEM|oem)\b|оригинал(?:ьный)?\s+номер|"
     r"марки?\s+авто|модел(?:и|ей)\s+авто|"
-    r"кузов\w*|двигател\w*|",
+    r"кузов\w*|двигател\w*|"
+    r"Lexus|Toyota|Hyundai|KIA|BMW|Mercedes|Volkswagen|Audi|Nissan|Honda|Mazda|"
+    r"Lada|ВАЗ|ГАЗ|УАЗ|Ford|Chevrolet|Opel|Renault|Skoda",
     re.IGNORECASE,
+)
+
+_ENGLISH_REASONING_RE = re.compile(
+    r"(?is)\b(?:okay|ok[,!]?|sure|let me|the user|user wants|wait[,!]?|"
+    r"i need to|i'll|i will|hmm|they specified|the task is|my job is)\b"
 )
 
 _META_LEAD_PATTERNS = [
@@ -68,7 +75,17 @@ _META_LEAD_PATTERNS = [
         r"^(?:описание\s+товара|текст\s+для\s+карточки)\s*[:—-]\s*",
         re.IGNORECASE,
     ),
+    re.compile(
+        r"^(?:okay|ok|sure|let me|the user|wait|i need to|i'll)\b[^.!?]*[.!?]\s*",
+        re.IGNORECASE,
+    ),
 ]
+
+REPAIR_USER_SUFFIX = (
+    "\n\nВАЖНО: верни ТОЛЬКО итоговое описание на русском языке. "
+    f"Строго {DESCRIPTION_TARGET_MIN_CHARS}–{DESCRIPTION_TARGET_MAX_CHARS} символов. "
+    "Без английского языка и без рассуждений."
+)
 
 RECOMMENDED_FREE_MODELS = [
     "meta-llama/llama-3.3-70b-instruct:free",
@@ -225,22 +242,68 @@ def _build_user_prompt(
                 "обязательно сохрани и включи их в итоговое описание."
             )
         lines.append(
-            "Доработай и расширь описание для карточки товара на основе фактов и черновика. "
-            f"Итоговый текст — не короче {DESCRIPTION_TARGET_MIN_CHARS} символов. "
-            "Верни только готовый текст описания, без вступлений вроде «хорошо» или «пользователь просит»."
+            "Составь лаконичное описание товара: только факты о детали, без воды и рекламы. "
+            f"Длина {DESCRIPTION_TARGET_MIN_CHARS}–{DESCRIPTION_TARGET_MAX_CHARS} символов. "
+            "Верни только готовый текст, без вступлений."
         )
     else:
         lines.append(
-            f"Напиши развёрнутое описание для карточки товара "
-            f"(не короче {DESCRIPTION_TARGET_MIN_CHARS} символов). "
-            "Верни только готовый текст описания, без вступлений вроде «хорошо» или «пользователь просит»."
+            f"Составь лаконичное описание товара по фактам выше "
+            f"({DESCRIPTION_TARGET_MIN_CHARS}–{DESCRIPTION_TARGET_MAX_CHARS} символов). "
+            "Начни с того, что это за деталь. Верни только готовый текст, без вступлений."
         )
     return "\n".join(lines)
 
 
+def _cyrillic_letter_ratio(text: str) -> float:
+    letters = [char for char in text if char.isalpha()]
+    if not letters:
+        return 0.0
+    cyrillic_count = sum(1 for char in letters if _CYRILLIC_RE.match(char))
+    return cyrillic_count / len(letters)
+
+
+def _sentence_is_usable(sentence: str) -> bool:
+    sentence = sentence.strip()
+    if not sentence or not _CYRILLIC_RE.search(sentence):
+        return False
+    if _ENGLISH_REASONING_RE.search(sentence):
+        return False
+    return _cyrillic_letter_ratio(sentence) >= 0.15
+
+
+def _extract_russian_description(text: str) -> str:
+    raw = (text or "").strip()
+    if not raw:
+        return ""
+
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n", raw) if part.strip()]
+    if not paragraphs:
+        paragraphs = [raw]
+
+    russian_blocks: list[str] = []
+    for paragraph in paragraphs:
+        if _ENGLISH_REASONING_RE.search(paragraph) and _cyrillic_letter_ratio(paragraph) < 0.35:
+            sentences = re.split(r"(?<=[.!?])\s+", paragraph)
+            good_sentences = [s.strip() for s in sentences if _sentence_is_usable(s)]
+            if good_sentences:
+                russian_blocks.append(" ".join(good_sentences))
+            continue
+        if _cyrillic_letter_ratio(paragraph) < 0.15 and not _CYRILLIC_RE.search(paragraph):
+            continue
+        russian_blocks.append(paragraph)
+
+    if russian_blocks:
+        return "\n\n".join(russian_blocks)
+
+    sentences = re.split(r"(?<=[.!?])\s+", raw)
+    good = [sentence.strip() for sentence in sentences if _sentence_is_usable(sentence)]
+    return " ".join(good) if good else raw
+
+
 def _strip_meta_lead(text: str) -> str:
     cleaned = (text or "").strip()
-    for _ in range(3):
+    for _ in range(5):
         before = cleaned
         for pattern in _META_LEAD_PATTERNS:
             cleaned = pattern.sub("", cleaned, count=1).strip()
@@ -249,13 +312,45 @@ def _strip_meta_lead(text: str) -> str:
     return cleaned
 
 
+def _truncate_to_max_chars(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    soft_limit = max_chars - 1 if max_chars > 1 else max_chars
+    chunk = text[:soft_limit]
+    for sep in (". ", ".\n", "! ", "? "):
+        pos = chunk.rfind(sep)
+        if pos >= int(soft_limit * 0.55):
+            return chunk[: pos + 1].rstrip()
+    return chunk.rstrip()
+
+
+def _is_valid_product_description(text: str) -> bool:
+    cleaned = (text or "").strip()
+    if len(cleaned) < 50:
+        return False
+    if _cyrillic_letter_ratio(cleaned) < 0.55:
+        return False
+    if _ENGLISH_REASONING_RE.search(cleaned[:300]):
+        return False
+    if len(_CYRILLIC_RE.findall(cleaned)) < 35:
+        return False
+    return True
+
+
 def _normalize_description(text: str) -> str:
-    cleaned = _strip_meta_lead(text)
+    cleaned = _extract_russian_description(text)
+    cleaned = _strip_meta_lead(cleaned)
     cleaned = re.sub(r"[ \t]+", " ", cleaned).strip()
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
-    if len(cleaned) > 2000:
-        cleaned = f"{cleaned[:1999].rstrip()}…"
+    cleaned = _truncate_to_max_chars(cleaned, DESCRIPTION_ABSOLUTE_MAX_CHARS)
     return cleaned
+
+
+def _finalize_product_description(raw: str) -> str:
+    description = _normalize_description(raw)
+    if not _is_valid_product_description(description):
+        raise ValueError("Модель вернула некорректное описание")
+    return description
 
 
 def _assert_can_generate(
@@ -361,8 +456,31 @@ def generate_product_description(
             system_prompt=SYSTEM_PROMPT,
             user_prompt=user_prompt,
             max_tokens=DESCRIPTION_GENERATION_MAX_TOKENS,
+            temperature=DESCRIPTION_GENERATION_TEMPERATURE,
         )
-        description = _normalize_description(result.content)
+        try:
+            description = _finalize_product_description(result.content)
+        except ValueError:
+            logger.warning("AI description invalid on first attempt, retrying with repair prompt")
+            repair_result = chat_completion(
+                api_key=api_key,
+                model=model_id,
+                system_prompt=SYSTEM_PROMPT,
+                user_prompt=user_prompt + REPAIR_USER_SUFFIX,
+                max_tokens=DESCRIPTION_GENERATION_MAX_TOKENS,
+                temperature=0.1,
+            )
+            try:
+                description = _finalize_product_description(repair_result.content)
+                result = repair_result
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail=(
+                        "Модель вернула некорректный текст (рассуждения или не русский язык). "
+                        "Попробуйте другую модель :free в /admin-settings → OpenRouter."
+                    ),
+                ) from exc
         _append_generation_log(
             db,
             user=user,
