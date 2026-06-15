@@ -158,6 +158,25 @@ class AiDescriptionServiceTests(unittest.TestCase):
         self.assertIn("Текущий черновик описания", prompt)
         self.assertIn("Старый текст про подшипник.", prompt)
         self.assertIn("Доработай и расширь", prompt)
+        self.assertIn("без вступлений", prompt)
+
+    def test_build_user_prompt_preserves_compat_hint_from_draft(self):
+        prompt = _build_user_prompt(
+            brand="Hyundai",
+            article="29215-3E100",
+            name="Фильтр",
+            is_new=True,
+            part_type_name=None,
+            existing_description="Подходит для Hyundai Solaris 2010-2017.",
+        )
+        self.assertIn("совместимости", prompt)
+        self.assertIn("обязательно сохрани", prompt)
+
+    def test_normalize_description_strips_meta_lead(self):
+        raw = "Хорошо, пользователь просит описание товара. Подшипник Koyo 608ZZ в отличном состоянии."
+        normalized = _normalize_description(raw)
+        self.assertFalse(normalized.lower().startswith("хорошо"))
+        self.assertIn("Подшипник Koyo", normalized)
 
     def test_normalize_description_truncates(self):
         long_text = "а" * 3000
