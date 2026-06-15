@@ -11,6 +11,7 @@ import MediaModal from '../../../components/MediaModal/MediaModal';
 import PrintReceiptModal from '../PrintReceiptModal/PrintReceiptModal';
 import { normalizeImageUrl, apiRequest, apiRequestFormData } from '../../../utils/apiClient';
 import { useAuthReady } from '../../../hooks/useAuthReady';
+import { useAiDescriptionGenerator } from '../../../hooks/useAiDescriptionGenerator';
 import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
 import MobilePageSection from '../../../components/MobilePageSection/MobilePageSection';
 import MobileStickyFooter from '../../../components/MobileStickyFooter/MobileStickyFooter';
@@ -75,6 +76,29 @@ const EditPart = () => {
     storage_location_id: '',
     part_type_id: '',
   });
+
+  const {
+    access: aiDescriptionAccess,
+    loadingAccess: aiDescriptionLoading,
+    generating: aiDescriptionGenerating,
+    error: aiDescriptionError,
+    canGenerate: canGenerateAiDescription,
+    generate: generateAiDescription,
+  } = useAiDescriptionGenerator({
+    brand: formData.brand,
+    article: formData.article,
+    name: formData.name,
+    isNew: formData.condition === 'новый',
+    partTypeId: formData.part_type_id,
+    productId: id,
+  });
+
+  const handleGenerateDescription = async () => {
+    const description = await generateAiDescription();
+    if (description) {
+      setFormData((prev) => ({ ...prev, description }));
+    }
+  };
 
   const [photos, setPhotos] = useState([]);
   const [videos, setVideos] = useState([]);
@@ -1090,7 +1114,14 @@ const EditPart = () => {
 
         {/* Описание */}
         <div>
-          <label className="block text-sm font-medium">Описание</label>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <label className="block text-sm font-medium">Описание</label>
+            {!aiDescriptionLoading && aiDescriptionAccess?.enabled && (
+              <span className="text-xs text-gray-500">
+                Осталось сегодня: {aiDescriptionAccess.remaining_today ?? 0}
+              </span>
+            )}
+          </div>
           <textarea
             name="description"
             value={formData.description}
@@ -1099,6 +1130,21 @@ const EditPart = () => {
             className="mt-1 block w-full px-3 py-2 border rounded-md"
             placeholder="Введите описание запчасти..."
           />
+          {!aiDescriptionLoading && aiDescriptionAccess?.enabled && (
+            <div className="mt-2 space-y-1">
+              <button
+                type="button"
+                onClick={handleGenerateDescription}
+                disabled={!canGenerateAiDescription}
+                className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+              >
+                {aiDescriptionGenerating ? 'Генерация…' : 'Сгенерировать описание'}
+              </button>
+              {aiDescriptionError && (
+                <p className="text-xs text-red-600">{aiDescriptionError}</p>
+              )}
+            </div>
+          )}
         </div>
         </MobilePageSection>
 

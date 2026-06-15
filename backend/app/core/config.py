@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     GOOGLE_OAUTH_TOKEN_URL: str = "https://oauth2.googleapis.com/token"
     GOOGLE_OAUTH_REDIRECT_URI: Optional[str] = None
     GOOGLE_CREDENTIALS_SECRET: Optional[str] = None
+    # Ключ для шифрования API-ключа OpenRouter в БД. Если не задан — SECRET_KEY.
+    OPENROUTER_CREDENTIALS_SECRET: Optional[str] = None
     
     # Пути к FFmpeg для обработки видео
     FFPROBE_PATH: Optional[str] = r"C:\ffmpeg\bin\ffprobe.exe"

@@ -1516,3 +1516,121 @@ def ensure_seo_landing_pages_table() -> None:
 
     logger.info("Applied seo_landing_pages table patch")
 
+
+def ensure_openrouter_tables() -> None:
+    """Create OpenRouter integration, org allowlist, and generation log tables."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+
+    if "site_openrouter_integration" not in table_names:
+        if engine.dialect.name == "postgresql":
+            ddl = """
+            CREATE TABLE site_openrouter_integration (
+                id INTEGER PRIMARY KEY,
+                api_key_encrypted TEXT,
+                model_id VARCHAR(128) NOT NULL DEFAULT 'meta-llama/llama-3.3-70b-instruct:free',
+                is_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                daily_limit INTEGER NOT NULL DEFAULT 50,
+                requests_today INTEGER NOT NULL DEFAULT 0,
+                requests_today_date DATE,
+                per_org_daily_limit INTEGER NOT NULL DEFAULT 10,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        else:
+            ddl = """
+            CREATE TABLE site_openrouter_integration (
+                id INTEGER PRIMARY KEY,
+                api_key_encrypted TEXT,
+                model_id VARCHAR(128) NOT NULL DEFAULT 'meta-llama/llama-3.3-70b-instruct:free',
+                is_enabled BOOLEAN NOT NULL DEFAULT 0,
+                daily_limit INTEGER NOT NULL DEFAULT 50,
+                requests_today INTEGER NOT NULL DEFAULT 0,
+                requests_today_date DATE,
+                per_org_daily_limit INTEGER NOT NULL DEFAULT 10,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    "INSERT INTO site_openrouter_integration (id, is_enabled, daily_limit, per_org_daily_limit) "
+                    "VALUES (1, FALSE, 50, 10)"
+                    if engine.dialect.name == "postgresql"
+                    else "INSERT INTO site_openrouter_integration (id, is_enabled, daily_limit, per_org_daily_limit) "
+                    "VALUES (1, 0, 50, 10)"
+                )
+            )
+        logger.info("Applied site_openrouter_integration table patch")
+
+    if "organization_ai_description_access" not in table_names:
+        if engine.dialect.name == "postgresql":
+            ddl = """
+            CREATE TABLE organization_ai_description_access (
+                organization_id VARCHAR(10) PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+                is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                enabled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                enabled_by_user_id INTEGER REFERENCES users(id),
+                notes VARCHAR(255)
+            )
+            """
+        else:
+            ddl = """
+            CREATE TABLE organization_ai_description_access (
+                organization_id VARCHAR(10) PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+                is_enabled BOOLEAN NOT NULL DEFAULT 1,
+                enabled_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                enabled_by_user_id INTEGER REFERENCES users(id),
+                notes VARCHAR(255)
+            )
+            """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+        logger.info("Applied organization_ai_description_access table patch")
+
+    if "ai_description_generation_log" not in table_names:
+        if engine.dialect.name == "postgresql":
+            ddl = """
+            CREATE TABLE ai_description_generation_log (
+                id SERIAL PRIMARY KEY,
+                organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                product_id INTEGER REFERENCES products(id),
+                brand VARCHAR(120),
+                article VARCHAR(120),
+                model_id VARCHAR(128),
+                tokens_used INTEGER,
+                status VARCHAR(32) NOT NULL DEFAULT 'success',
+                error_message TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        else:
+            ddl = """
+            CREATE TABLE ai_description_generation_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                product_id INTEGER REFERENCES products(id),
+                brand VARCHAR(120),
+                article VARCHAR(120),
+                model_id VARCHAR(128),
+                tokens_used INTEGER,
+                status VARCHAR(32) NOT NULL DEFAULT 'success',
+                error_message TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_ai_desc_log_org_created "
+                    "ON ai_description_generation_log (organization_id, created_at)"
+                )
+            )
+        logger.info("Applied ai_description_generation_log table patch")
+

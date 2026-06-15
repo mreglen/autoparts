@@ -11,6 +11,7 @@ import {
   setNewPartsMarkupPercent,
 } from '../../redux/slices/PublicInfoSlice';
 import ServerStatsPanel from './ServerStatsPanel';
+import OpenRouterSection from './OpenRouterSection';
 
 function AdminPanelPage() {
   const dispatch = useDispatch();
@@ -338,6 +339,8 @@ function AdminPanelPage() {
           </button>
         </div>
       </div>
+
+      <OpenRouterSection />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-1">
