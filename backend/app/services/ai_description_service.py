@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date, datetime, timezone
 
@@ -15,6 +16,8 @@ from app.models.user import User
 from app.services.openrouter_service import OpenRouterApiError, chat_completion
 from app.utils.openrouter_crypto import decrypt_openrouter_secret
 from app.utils.openrouter_integration_db import get_or_create_openrouter_integration
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "Ты помощник маркетплейса автозапчастей «Свой Гараж». "
@@ -209,6 +212,33 @@ def _assert_can_generate(
         raise HTTPException(status_code=429, detail="Исчерпан дневной лимит вашей организации")
 
 
+def _append_generation_log(
+    db: Session,
+    *,
+    user: User,
+    brand: str,
+    article: str,
+    model_id: str,
+    product_id: int | None,
+    status: str,
+    tokens_used: int | None = None,
+    error_message: str | None = None,
+) -> None:
+    db.add(
+        AiDescriptionGenerationLog(
+            organization_id=user.organization_id,
+            user_id=user.id,
+            product_id=product_id,
+            brand=brand,
+            article=article,
+            model_id=model_id,
+            tokens_used=tokens_used,
+            status=status,
+            error_message=(error_message or "")[:1000] or None,
+        )
+    )
+
+
 def generate_product_description(
     db: Session,
     *,
@@ -248,18 +278,6 @@ def generate_product_description(
     )
     model_id = (integration.model_id or "").strip() or RECOMMENDED_FREE_MODELS[0]
 
-    log_row = AiDescriptionGenerationLog(
-        organization_id=user.organization_id,
-        user_id=user.id,
-        product_id=product_id,
-        brand=brand_text,
-        article=article_text,
-        model_id=model_id,
-        status="error",
-    )
-    db.add(log_row)
-    db.flush()
-
     try:
         result = chat_completion(
             api_key=api_key,
@@ -268,25 +286,64 @@ def generate_product_description(
             user_prompt=user_prompt,
         )
         description = _normalize_description(result.content)
-        log_row.status = "success"
-        log_row.tokens_used = result.tokens_used
-        log_row.model_id = result.model
+        _append_generation_log(
+            db,
+            user=user,
+            brand=brand_text,
+            article=article_text,
+            model_id=result.model,
+            product_id=product_id,
+            status="success",
+            tokens_used=result.tokens_used,
+        )
         integration.requests_today = int(integration.requests_today or 0) + 1
         integration.requests_today_date = _utc_today()
         db.commit()
         return {"description": description, "tokens_used": result.tokens_used}
     except OpenRouterApiError as exc:
-        log_row.error_message = str(exc)[:1000]
-        db.commit()
+        db.rollback()
+        try:
+            _append_generation_log(
+                db,
+                user=user,
+                brand=brand_text,
+                article=article_text,
+                model_id=model_id,
+                product_id=product_id,
+                status="error",
+                error_message=str(exc),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to persist OpenRouter error log")
         status = 429 if exc.status_code == 429 else 502
         raise HTTPException(status_code=status, detail=str(exc)) from exc
     except HTTPException:
-        db.commit()
+        db.rollback()
         raise
     except Exception as exc:
-        log_row.error_message = str(exc)[:1000]
-        db.commit()
-        raise HTTPException(status_code=500, detail="Ошибка генерации описания") from exc
+        db.rollback()
+        logger.exception("AI description generation failed")
+        try:
+            _append_generation_log(
+                db,
+                user=user,
+                brand=brand_text,
+                article=article_text,
+                model_id=model_id,
+                product_id=product_id,
+                status="error",
+                error_message=str(exc),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("Failed to persist AI generation error log")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка генерации описания: {exc}",
+        ) from exc
 
 
 def test_openrouter_connection(db: Session) -> dict:

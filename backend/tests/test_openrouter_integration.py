@@ -8,7 +8,12 @@ from app.services.ai_description_service import (
     get_seller_access_info,
     is_org_ai_description_enabled,
 )
-from app.services.openrouter_service import OpenRouterApiError, OpenRouterCompletionResult, chat_completion
+from app.services.openrouter_service import (
+    OpenRouterApiError,
+    OpenRouterCompletionResult,
+    _extract_message_content,
+    chat_completion,
+)
 from app.utils.openrouter_crypto import decrypt_openrouter_secret, encrypt_openrouter_secret
 
 
@@ -21,6 +26,16 @@ class OpenRouterCryptoTests(unittest.TestCase):
 
 
 class OpenRouterServiceTests(unittest.TestCase):
+    def test_extract_message_content_from_list(self):
+        content = _extract_message_content(
+            {"content": [{"type": "text", "text": "Описание подшипника."}]}
+        )
+        self.assertEqual(content, "Описание подшипника.")
+
+    def test_extract_message_content_from_string(self):
+        content = _extract_message_content({"content": "  Текст  "})
+        self.assertEqual(content, "Текст")
+
     @patch("app.services.openrouter_service.httpx.Client")
     def test_chat_completion_success(self, mock_client_cls):
         mock_response = MagicMock()
