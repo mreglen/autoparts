@@ -19,15 +19,25 @@ from app.utils.openrouter_integration_db import get_or_create_openrouter_integra
 
 logger = logging.getLogger(__name__)
 
+# Ориентир для SEO-карточки: развёрнутый уникальный текст (Яндекс / Google).
+DESCRIPTION_TARGET_MIN_CHARS = 400
+DESCRIPTION_TARGET_MAX_CHARS = 900
+EXISTING_DESCRIPTION_MAX_INPUT = 1500
+DESCRIPTION_GENERATION_MAX_TOKENS = 1000
+
 SYSTEM_PROMPT = (
     "Ты помощник маркетплейса автозапчастей «Свой Гараж». "
     "Пиши только на русском языке. "
-    "Создавай краткое описание товара для карточки на сайте (2–4 предложения). "
+    f"Создавай развёрнутое описание товара для карточки на сайте: 6–10 предложений, "
+    f"примерно {DESCRIPTION_TARGET_MIN_CHARS}–{DESCRIPTION_TARGET_MAX_CHARS} символов. "
+    "Можно два коротких абзаца (раздели пустой строкой). "
     "Используй только факты из запроса пользователя. "
+    "Если есть черновик описания — доработай и расширь его, сохрани верные факты из черновика, "
+    "не отбрасывай полезные детали. "
     "НЕ выдумывай совместимость с автомобилями, OEM-номера, технические характеристики, "
     "размеры и материалы, если они не указаны явно. "
     "Не используй маркетинговые клише и восклицательные знаки. "
-    "Ответ — только текст описания, без заголовков и списков."
+    "Ответ — только текст описания, без заголовков и маркированных списков."
 )
 
 RECOMMENDED_FREE_MODELS = [
@@ -163,6 +173,7 @@ def _build_user_prompt(
     name: str,
     is_new: bool,
     part_type_name: str | None,
+    existing_description: str | None = None,
 ) -> str:
     condition = "новая" if is_new else "б/у"
     lines = [
@@ -173,12 +184,26 @@ def _build_user_prompt(
     ]
     if part_type_name:
         lines.append(f"Тип детали: {part_type_name}")
-    lines.append("Напиши описание для карточки товара.")
+    draft = (existing_description or "").strip()
+    if draft:
+        if len(draft) > EXISTING_DESCRIPTION_MAX_INPUT:
+            draft = f"{draft[: EXISTING_DESCRIPTION_MAX_INPUT - 1].rstrip()}…"
+        lines.append(f"Текущий черновик описания:\n{draft}")
+        lines.append(
+            "Доработай и расширь описание для карточки товара на основе фактов и черновика. "
+            f"Итоговый текст — не короче {DESCRIPTION_TARGET_MIN_CHARS} символов."
+        )
+    else:
+        lines.append(
+            f"Напиши развёрнутое описание для карточки товара "
+            f"(не короче {DESCRIPTION_TARGET_MIN_CHARS} символов)."
+        )
     return "\n".join(lines)
 
 
 def _normalize_description(text: str) -> str:
-    cleaned = re.sub(r"\s+", " ", (text or "")).strip()
+    cleaned = re.sub(r"[ \t]+", " ", (text or "")).strip()
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     if len(cleaned) > 2000:
         cleaned = f"{cleaned[:1999].rstrip()}…"
     return cleaned
@@ -249,6 +274,7 @@ def generate_product_description(
     is_new: bool = False,
     part_type_id: int | None = None,
     product_id: int | None = None,
+    existing_description: str | None = None,
 ) -> dict:
     brand_text = (brand or "").strip()
     article_text = (article or "").strip()
@@ -275,6 +301,7 @@ def generate_product_description(
         name=name_text,
         is_new=is_new,
         part_type_name=part_type_name,
+        existing_description=existing_description,
     )
     model_id = (integration.model_id or "").strip() or RECOMMENDED_FREE_MODELS[0]
 
@@ -284,6 +311,7 @@ def generate_product_description(
             model=model_id,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=user_prompt,
+            max_tokens=DESCRIPTION_GENERATION_MAX_TOKENS,
         )
         description = _normalize_description(result.content)
         _append_generation_log(

@@ -144,6 +144,20 @@ class AiDescriptionServiceTests(unittest.TestCase):
         self.assertIn("Koyo", prompt)
         self.assertIn("608ZZ", prompt)
         self.assertIn("новая", prompt)
+        self.assertIn("400", prompt)
+
+    def test_build_user_prompt_includes_existing_draft(self):
+        prompt = _build_user_prompt(
+            brand="Koyo",
+            article="608ZZ",
+            name="Подшипник",
+            is_new=False,
+            part_type_name=None,
+            existing_description="Старый текст про подшипник.",
+        )
+        self.assertIn("Текущий черновик описания", prompt)
+        self.assertIn("Старый текст про подшипник.", prompt)
+        self.assertIn("Доработай и расширь", prompt)
 
     def test_normalize_description_truncates(self):
         long_text = "а" * 3000

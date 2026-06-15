@@ -89,6 +89,7 @@ const EditPart = () => {
     brand: formData.brand,
     article: formData.article,
     name: formData.name,
+    description: formData.description,
     isNew: formData.condition === 'новый',
     partTypeId: formData.part_type_id,
     productId: id,

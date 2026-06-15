@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.models.product import ProductPhoto, ProductVideo, Product as ProductModel
 from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
 from app.models.product_vehicle import ProductVehicleAssociation
@@ -54,6 +54,7 @@ class GenerateDescriptionIn(BaseModel):
     is_new: bool = False
     part_type_id: int | None = None
     product_id: int | None = None
+    existing_description: str | None = Field(None, max_length=2000)
 
 
 class GenerateDescriptionOut(BaseModel):
@@ -88,6 +89,7 @@ def generate_product_description_endpoint(
         is_new=payload.is_new,
         part_type_id=payload.part_type_id,
         product_id=payload.product_id,
+        existing_description=payload.existing_description,
     )
     return GenerateDescriptionOut(**result)
 

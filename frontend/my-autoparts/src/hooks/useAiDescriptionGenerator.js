@@ -5,6 +5,7 @@ export function useAiDescriptionGenerator({
   brand,
   article,
   name,
+  description,
   isNew,
   partTypeId,
   productId,
@@ -68,6 +69,7 @@ export function useAiDescriptionGenerator({
           is_new: Boolean(isNew),
           part_type_id: partTypeId ? parseInt(partTypeId, 10) : null,
           product_id: productId ? parseInt(productId, 10) : null,
+          existing_description: (description || '').trim() || null,
         }),
       });
       setAccess((prev) =>
@@ -87,7 +89,7 @@ export function useAiDescriptionGenerator({
     } finally {
       setGenerating(false);
     }
-  }, [brand, article, name, isNew, partTypeId, productId]);
+  }, [brand, article, name, description, isNew, partTypeId, productId]);
 
   return {
     access,
