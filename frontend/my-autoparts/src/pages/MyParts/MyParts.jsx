@@ -8,7 +8,7 @@ import { stripHtmlTags } from '../../utils/text';
 import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
-import { fetchProductStorageCells, fetchStorageCells, invalidateProductStorageCells } from '../../redux/slices/StorageCellsSlice';
+import { fetchProductStorageCellsBatch, fetchStorageCells, invalidateProductStorageCells } from '../../redux/slices/StorageCellsSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
 import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
 import { useActionsDropdownPlacement } from '../../hooks/useActionsDropdownPlacement';
@@ -1426,26 +1426,12 @@ function MyParts() {
       ));
   }, [displayParts, loading, productStorageCells]);
 
-  // Fetch product storage cells in batches to avoid flooding the API
+  // Fetch product storage cells in one batched request to avoid rate limits
   useEffect(() => {
     if (productIdsNeedingData.length === 0) return undefined;
 
-    let cancelled = false;
-    const batchSize = 8;
-
-    (async () => {
-      for (let i = 0; i < productIdsNeedingData.length; i += batchSize) {
-        if (cancelled) break;
-        const batch = productIdsNeedingData.slice(i, i + batchSize);
-        await Promise.allSettled(
-          batch.map((productId) => dispatch(fetchProductStorageCells(productId)))
-        );
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    dispatch(fetchProductStorageCellsBatch(productIdsNeedingData));
+    return undefined;
   }, [dispatch, productIdsNeedingData]);
   
   // Refresh product storage cell data when storage cells are modified
@@ -1455,9 +1441,7 @@ function MyParts() {
     const productIds = displayParts.map((part) => part.id).filter(Boolean);
     if (productIds.length > 0) {
       dispatch(invalidateProductStorageCells(productIds));
-      productIds.forEach((productId) => {
-        dispatch(fetchProductStorageCells(productId));
-      });
+      dispatch(fetchProductStorageCellsBatch(productIds));
     }
 
     dispatch(fetchStorageCells());

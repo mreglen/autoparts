@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from datetime import datetime
 
 # Storage Cell Schemas
@@ -40,6 +40,9 @@ class ProductStorageCell(ProductStorageCellBase):
     
     class Config:
         from_attributes = True
+
+class ProductStorageCellsByProductsRequest(BaseModel):
+    product_ids: List[int] = Field(..., min_length=1, max_length=200)
 
 # Response schemas with relationships
 class StorageCellWithLocation(StorageCell):

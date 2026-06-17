@@ -8,6 +8,7 @@ from app.models.product_storage_cell import ProductStorageCell as ProductStorage
 from app.schemas.storage_cell import (
     StorageCell, StorageCellCreate, StorageCellUpdate,
     ProductStorageCell, ProductStorageCellCreate, ProductStorageCellUpdate,
+    ProductStorageCellsByProductsRequest,
     StorageCellWithLocation, StorageCellWithProducts
 )
 from app.db.database import get_db
@@ -127,6 +128,19 @@ def create_product_storage_cell_link(
     db.commit()
     db.refresh(db_link)
     return db_link
+
+@router.post("/product-links/by-products", response_model=List[ProductStorageCell])
+def read_product_storage_cell_links_by_products(
+    payload: ProductStorageCellsByProductsRequest,
+    db: Session = Depends(get_db),
+):
+    """Get product-storage cell links for many products in one request."""
+    unique_ids = list(dict.fromkeys(payload.product_ids))
+    return (
+        db.query(ProductStorageCellModel)
+        .filter(ProductStorageCellModel.product_id.in_(unique_ids))
+        .all()
+    )
 
 @router.get("/product-links/", response_model=List[ProductStorageCell])
 def read_product_storage_cell_links(
