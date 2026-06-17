@@ -213,9 +213,14 @@ def chat_completion(
     if not choices:
         raise OpenRouterApiError("OpenRouter вернул пустой ответ")
 
-    first = choices[0] if isinstance(choices[0], dict) else {}
-    message = first.get("message") if isinstance(first.get("message"), dict) else {}
-    content = _extract_message_content(message)
+    content = ""
+    for choice in choices:
+        if not isinstance(choice, dict):
+            continue
+        message = choice.get("message") if isinstance(choice.get("message"), dict) else {}
+        content = _extract_message_content(message)
+        if content:
+            break
     if not content:
         raise OpenRouterApiError("OpenRouter вернул пустое описание")
 

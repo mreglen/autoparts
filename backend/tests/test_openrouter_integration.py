@@ -124,6 +124,31 @@ class OpenRouterServiceTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 429)
 
     @patch("app.services.openrouter_service._post_openrouter")
+    def test_chat_completion_uses_first_non_empty_choice(self, mock_post):
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=MagicMock(
+                return_value={
+                    "model": "meta-llama/llama-3.3-70b-instruct:free",
+                    "choices": [
+                        {"message": {"content": ""}},
+                        {"message": {"content": "Рабочее описание детали."}},
+                    ],
+                    "usage": {"total_tokens": 30},
+                }
+            ),
+            text="",
+        )
+
+        result = chat_completion(
+            api_key=VALID_API_KEY,
+            model="meta-llama/llama-3.3-70b-instruct:free",
+            system_prompt="sys",
+            user_prompt="user",
+        )
+        self.assertEqual(result.content, "Рабочее описание детали.")
+
+    @patch("app.services.openrouter_service._post_openrouter")
     def test_chat_completion_rejects_cyrillic_api_key_before_http(self, mock_post):
         contaminated_key = "sk-or-v1-" + "a" * 64 + "Создавай"
         with self.assertRaises(OpenRouterApiError) as ctx:
