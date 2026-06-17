@@ -6,6 +6,9 @@ venv/
 
 uploads/
 
+# Backups (DB dumps and uploads archives)
+backend/backups/
+
 # Frontend
 node_modules/
 build/

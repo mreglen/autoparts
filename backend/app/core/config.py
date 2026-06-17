@@ -109,6 +109,11 @@ class Settings(BaseSettings):
     PRODUCTS_PUBLIC_CACHE_TTL_SECONDS: int = 45
     WEBSOCKET_MAX_CONNECTIONS_PER_USER: int = 5
 
+    # Резервные копии (БД и uploads)
+    BACKUP_DIR: Optional[str] = None
+    BACKUP_RETENTION_COUNT: int = 8
+    BACKUP_WEEKLY_HOUR_UTC: int = 4
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
 
     @property

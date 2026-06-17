@@ -160,10 +160,10 @@ class AiDescriptionServiceTests(unittest.TestCase):
             part_type_name=None,
             existing_description="Старый текст про подшипник.",
         )
-        self.assertIn("Текущий черновик описания", prompt)
+        self.assertIn("Дополнительные сведения о товаре", prompt)
         self.assertIn("Старый текст про подшипник.", prompt)
-        self.assertIn("лаконичное описание", prompt)
-        self.assertIn("без вступлений", prompt)
+        self.assertIn("как продавец в объявлении", prompt)
+        self.assertIn("Не упоминай черновик", prompt)
 
     def test_build_user_prompt_preserves_compat_hint_from_draft(self):
         prompt = _build_user_prompt(
@@ -174,8 +174,30 @@ class AiDescriptionServiceTests(unittest.TestCase):
             part_type_name=None,
             existing_description="Подходит для Hyundai Solaris 2010-2017.",
         )
-        self.assertIn("совместимости", prompt)
-        self.assertIn("обязательно сохрани", prompt)
+        self.assertIn("совместимость", prompt)
+        self.assertIn("марки, модели", prompt)
+
+    def test_normalize_description_strips_draft_meta_sentence(self):
+        raw = (
+            "Комплект подшипников для коленвала, артикул 21020-26425. "
+            "Включает вкладыши двигателя, состояние — новая. "
+            "Доступно в черновике, с указанными характеристиками."
+        )
+        normalized = _normalize_description(raw)
+        self.assertNotIn("черновик", normalized.lower())
+        self.assertNotIn("указанными характеристиками", normalized.lower())
+        self.assertIn("21020-26425", normalized)
+
+    def test_normalize_description_strips_vague_compat(self):
+        raw = (
+            "Комплект подшипников для коленвала 21020-26425. "
+            "Совместимый с двигателями. Подходит для автомобилей. "
+            "Состояние новая, в комплекте вкладыши."
+        )
+        normalized = _normalize_description(raw)
+        self.assertNotIn("совместимый с двигателями", normalized.lower())
+        self.assertNotIn("подходит для автомобилей", normalized.lower())
+        self.assertIn("21020-26425", normalized)
 
     def test_normalize_description_strips_meta_lead(self):
         raw = "Хорошо, пользователь просит описание товара. Подшипник Koyo 608ZZ в отличном состоянии."

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
@@ -8,7 +8,7 @@ import { stripHtmlTags } from '../../utils/text';
 import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
-import { fetchProductStorageCells, fetchStorageCells } from '../../redux/slices/StorageCellsSlice';
+import { fetchProductStorageCells, fetchStorageCells, invalidateProductStorageCells } from '../../redux/slices/StorageCellsSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
 import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
 import { useActionsDropdownPlacement } from '../../hooks/useActionsDropdownPlacement';
@@ -723,6 +723,7 @@ const CardPart = ({
 
 const DEFAULT_IN_STOCK_FILTERS = { search: '', storage: '', sort: 'date_desc' };
 const DEFAULT_MODERATION_FILTERS = { search: '', storage: '', sort: 'date_desc', hideRejected: false };
+const URL_SEARCH_DEBOUNCE_MS = 400;
 
 const getModerationPartKey = (part) => `${part.moderationKind || 'pending'}-${part.id}`;
 
@@ -779,6 +780,16 @@ function MyParts() {
 
   const isModerationTab = activeTab === 'pending';
   const activeFilters = isModerationTab ? moderationFilters : inStockFilters;
+  const activeSearchQuery = activeFilters.search;
+  const [debouncedUrlSearch, setDebouncedUrlSearch] = useState(activeSearchQuery);
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedUrlSearch(activeSearchQuery);
+    }, URL_SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [activeSearchQuery]);
   const updateActiveFilters = (patch) => {
     if (isModerationTab) {
       setModerationFilters((prev) => ({ ...prev, ...patch }));
@@ -1241,19 +1252,19 @@ function MyParts() {
   }, [modalOpen])
 
 
-  // Sync URL parameters with component state (only on /my-parts)
+  // Sync URL parameters with component state (debounced search — avoids mobile keyboard dismiss)
   useEffect(() => {
     if (location.pathname !== '/my-parts') return;
 
     const params = new URLSearchParams();
-    const filters = isModerationTab ? moderationFilters : inStockFilters;
+    const storage = isModerationTab ? moderationFilters.storage : inStockFilters.storage;
 
-    if (filters.search) {
-      params.set('q', filters.search);
+    if (debouncedUrlSearch) {
+      params.set('q', debouncedUrlSearch);
     }
 
-    if (filters.storage) {
-      params.set('storage', filters.storage);
+    if (storage) {
+      params.set('storage', storage);
     }
 
     if (isModerationTab) {
@@ -1270,11 +1281,20 @@ function MyParts() {
     if (next === currentSearch) return;
 
     setSearchParams(params, { replace: true });
+    // Restore focus after URL update (mobile browsers may blur the input)
+    const input = searchInputRef.current;
+    if (input && document.activeElement !== input) {
+      requestAnimationFrame(() => {
+        input.focus({ preventScroll: true });
+      });
+    }
   }, [
     location.pathname,
     location.search,
-    inStockFilters,
-    moderationFilters,
+    debouncedUrlSearch,
+    inStockFilters.storage,
+    moderationFilters.storage,
+    moderationFilters.hideRejected,
     isModerationTab,
     setSearchParams,
   ]);
@@ -1397,37 +1417,51 @@ function MyParts() {
   // Create memoized product IDs that need storage cell data
   const productIdsNeedingData = React.useMemo(() => {
     if (displayParts.length === 0 || loading) return [];
-    
-    const productIds = displayParts.map(part => part.id);
-    return productIds.filter(productId => 
-      !productStorageCells[productId] || productStorageCells[productId].length === 0
-    );
-  }, [displayParts.length, loading, JSON.stringify(Object.keys(productStorageCells || {}))]);
 
-  // Fetch product storage cells for all displayed products - optimized to avoid continuous requests
+    return displayParts
+      .map((part) => part.id)
+      .filter((productId) => (
+        productId != null
+        && !Object.prototype.hasOwnProperty.call(productStorageCells || {}, productId)
+      ));
+  }, [displayParts, loading, productStorageCells]);
+
+  // Fetch product storage cells in batches to avoid flooding the API
   useEffect(() => {
-    if (productIdsNeedingData.length > 0) {
-      productIdsNeedingData.forEach(productId => {
-        dispatch(fetchProductStorageCells(productId));
-      });
-    }
+    if (productIdsNeedingData.length === 0) return undefined;
+
+    let cancelled = false;
+    const batchSize = 8;
+
+    (async () => {
+      for (let i = 0; i < productIdsNeedingData.length; i += batchSize) {
+        if (cancelled) break;
+        const batch = productIdsNeedingData.slice(i, i + batchSize);
+        await Promise.allSettled(
+          batch.map((productId) => dispatch(fetchProductStorageCells(productId)))
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [dispatch, productIdsNeedingData]);
   
   // Refresh product storage cell data when storage cells are modified
-  // This ensures we get updated data after additions/deletions
   useEffect(() => {
-    // Force refresh of all currently displayed product storage cell data
-    if (lastModified) {
-      displayParts.forEach(part => {
-        if (part.id) {
-          dispatch(fetchProductStorageCells(part.id));
-        }
+    if (!lastModified) return;
+
+    const productIds = displayParts.map((part) => part.id).filter(Boolean);
+    if (productIds.length > 0) {
+      dispatch(invalidateProductStorageCells(productIds));
+      productIds.forEach((productId) => {
+        dispatch(fetchProductStorageCells(productId));
       });
-      
-      // Also refresh storage cells data
-      dispatch(fetchStorageCells());
     }
-  }, [lastModified]); // Trigger when storage cells are modified
+
+    dispatch(fetchStorageCells());
+  }, [dispatch, lastModified, displayParts]);
 
   // Check if user has permission to view this page
   // Admin and sellers always have access
@@ -1526,24 +1560,29 @@ function MyParts() {
               </svg>
             </div>
             <input
+              ref={searchInputRef}
               type="text"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
               placeholder="Поиск по номеру, внутр. коду или названию..."
               value={activeFilters.search}
               onChange={(e) => updateActiveFilters({ search: e.target.value })}
               className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
-            {activeFilters.search && (
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                <button
-                  onClick={() => updateActiveFilters({ search: '' })}
-                  className="text-gray-400 hover:text-gray-600 focus:outline-none"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            )}
+            <div className={`absolute inset-y-0 right-0 pr-3 flex items-center ${activeFilters.search ? '' : 'invisible pointer-events-none'}`}>
+              <button
+                type="button"
+                onClick={() => updateActiveFilters({ search: '' })}
+                className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                tabIndex={activeFilters.search ? 0 : -1}
+                aria-hidden={!activeFilters.search}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1709,7 +1748,13 @@ function MyParts() {
           <h2 className="text-xl font-medium text-gray-900 mb-2">Ошибка загрузки запчастей</h2>
           <p className="text-gray-500 mb-6 text-base">{error}</p>
           <button
-            onClick={() => dispatch(fetchMyProducts())}
+            onClick={() => {
+              const params = {};
+              if (inStockFilters.storage) {
+                params.storage_location_id = inStockFilters.storage;
+              }
+              dispatch(fetchMyProducts(params));
+            }}
             className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
           >
             Попробовать снова

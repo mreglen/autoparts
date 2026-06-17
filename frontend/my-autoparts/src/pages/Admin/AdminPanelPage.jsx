@@ -12,6 +12,7 @@ import {
 } from '../../redux/slices/PublicInfoSlice';
 import ServerStatsPanel from './ServerStatsPanel';
 import OpenRouterSection from './OpenRouterSection';
+import BackupSection from './BackupSection';
 
 function AdminPanelPage() {
   const dispatch = useDispatch();
@@ -269,6 +270,8 @@ function AdminPanelPage() {
       )}
 
       <ServerStatsPanel />
+
+      <BackupSection />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <label className="flex items-start gap-3 cursor-pointer select-none">

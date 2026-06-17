@@ -28,17 +28,19 @@ DESCRIPTION_GENERATION_MAX_TOKENS = 450
 DESCRIPTION_GENERATION_TEMPERATURE = 0.2
 
 SYSTEM_PROMPT = (
-    "Ты составляешь описание автозапчасти для карточки на маркетплейсе «Свой Гараж». "
+    "Ты продавец автозапчастей и пишешь описание для карточки товара на маркетплейсе «Свой Гараж». "
     "КРИТИЧНО: только русский язык, без английского и без рассуждений. "
     f"Длина: {DESCRIPTION_TARGET_MIN_CHARS}–{DESCRIPTION_TARGET_MAX_CHARS} символов, 4–6 коротких предложений. "
     "Один абзац или два коротких через пустую строку. "
-    "Пиши по делу о самой детали: что это за запчасть, бренд, артикул, состояние, "
-    "ключевые параметры и применяемость — только если они есть в запросе или черновике. "
-    "Начни с сути товара (название и назначение детали), без вступлений про маркетплейс и покупку. "
-    "Если есть черновик — упорядочи факты из него, не раздувай текст и не добавляй лишнего. "
-    "Сохрани списки совместимых автомобилей и характеристики из черновика, если они указаны. "
-    "НЕ выдумывай факты. Без клише («идеальный выбор», «высокое качество»), восклицаний и списков с маркерами. "
-    "Запрещено: «хорошо», «пользователь просит», «Okay», «Let me» и любые пояснения задания."
+    "Стиль — как у живого объявления: простые фразы, без канцелярита и рекламных штампов. "
+    "Начни с сути: что за деталь и для чего. Затем бренд, артикул, состояние, важные параметры. "
+    "Совместимость и применяемость указывай только конкретно (марка, модель, двигатель, год) — "
+    "если в данных нет конкретики, не пиши общие фразы вроде «подходит для автомобилей» или «совместим с двигателями». "
+    "Используй факты из дополнительных сведений о товаре, но в тексте НИКОГДА не упоминай "
+    "черновик, запрос, исходные данные, «указанные характеристики» и подобное — читатель видит только готовое описание. "
+    "НЕ выдумывай факты. Без клише («идеальный выбор», «высокое качество», «для установки и поддержки»), "
+    "восклицаний и списков с маркерами. "
+    "Запрещено: «хорошо», «пользователь просит», «доступно в черновике», «Okay», «Let me» и любые пояснения задания."
 )
 
 _CYRILLIC_RE = re.compile(r"[а-яА-ЯёЁ]")
@@ -81,9 +83,44 @@ _META_LEAD_PATTERNS = [
     ),
 ]
 
+_META_SENTENCE_RE = re.compile(
+    r"(?i)(?:"
+    r"черн(?:овик|овика|овике|овику)|"
+    r"в\s+запросе|"
+    r"по\s+запросу|"
+    r"исходн(?:ые|ых|ом|ого)\s+(?:данн|сведен)|"
+    r"указанн(?:ые|ых|ой|ая)\s+характеристик|"
+    r"доступно\s+в\s+|"
+    r"предоставленн(?:ые|ая)\s+(?:сведения|данные)|"
+    r"согласно\s+(?:запросу|данным|исходным)|"
+    r"ниже\s+перечислен|"
+    r"в\s+тексте\s+выше|"
+    r"для\s+установки\s+и\s+поддержки"
+    r")"
+)
+
+_VAGUE_COMPAT_RE = re.compile(
+    r"(?i)\b(?:"
+    r"совместим(?:ый|ая|ые)?\s+с\s+двигателями\b|"
+    r"подходит\s+для\s+автомобилей\b|"
+    r"для\s+легковых\s+и\s+грузовых\s+автомобилей\b|"
+    r"универсальн(?:ая|ый|ое)\s+запчасть"
+    r")"
+)
+
+_SPECIFIC_COMPAT_RE = re.compile(
+    r"(?i)(?:"
+    r"Lexus|Toyota|Hyundai|KIA|Kia|BMW|Mercedes|Volkswagen|Audi|Nissan|Honda|Mazda|"
+    r"Lada|ВАЗ|ГАЗ|УАЗ|Ford|Chevrolet|Opel|Renault|Skoda|"
+    r"Solaris|Camry|Corolla|RAV4|Land\s+Cruiser|"
+    r"\b\d{4}\s*[-–]\s*\d{4}\b"
+    r")"
+)
+
 REPAIR_USER_SUFFIX = (
     "\n\nВАЖНО: верни ТОЛЬКО итоговое описание на русском языке. "
     f"Строго {DESCRIPTION_TARGET_MIN_CHARS}–{DESCRIPTION_TARGET_MAX_CHARS} символов. "
+    "Пиши как продавец в объявлении. Без упоминания черновика, запроса и исходных данных. "
     "Без английского языка и без рассуждений."
 )
 
@@ -235,22 +272,22 @@ def _build_user_prompt(
     if draft:
         if len(draft) > EXISTING_DESCRIPTION_MAX_INPUT:
             draft = f"{draft[: EXISTING_DESCRIPTION_MAX_INPUT - 1].rstrip()}…"
-        lines.append(f"Текущий черновик описания:\n{draft}")
+        lines.append(f"Дополнительные сведения о товаре:\n{draft}")
         if _DRAFT_HAS_VEHICLE_COMPAT_RE.search(draft):
             lines.append(
-                "В черновике есть сведения о совместимости, применяемости или характеристиках — "
-                "обязательно сохрани и включи их в итоговое описание."
+                "В сведениях указана совместимость или применяемость — "
+                "обязательно впиши конкретные марки, модели или двигатели в текст описания."
             )
         lines.append(
-            "Составь лаконичное описание товара: только факты о детали, без воды и рекламы. "
+            "Напиши описание простым языком, как продавец в объявлении: только факты о детали. "
             f"Длина {DESCRIPTION_TARGET_MIN_CHARS}–{DESCRIPTION_TARGET_MAX_CHARS} символов. "
-            "Верни только готовый текст, без вступлений."
+            "Не упоминай черновик, запрос и исходные данные — только готовый текст для покупателя."
         )
     else:
         lines.append(
-            f"Составь лаконичное описание товара по фактам выше "
+            f"Напиши описание простым языком, как продавец в объявлении, по фактам выше "
             f"({DESCRIPTION_TARGET_MIN_CHARS}–{DESCRIPTION_TARGET_MAX_CHARS} символов). "
-            "Начни с того, что это за деталь. Верни только готовый текст, без вступлений."
+            "Начни с того, что это за деталь. Верни только готовый текст для покупателя."
         )
     return "\n".join(lines)
 
@@ -312,6 +349,29 @@ def _strip_meta_lead(text: str) -> str:
     return cleaned
 
 
+def _is_vague_compat_sentence(sentence: str) -> bool:
+    if not _VAGUE_COMPAT_RE.search(sentence):
+        return False
+    return not _SPECIFIC_COMPAT_RE.search(sentence)
+
+
+def _strip_meta_sentences(text: str) -> str:
+    sentences = re.split(r"(?<=[.!?])\s+", (text or "").strip())
+    kept: list[str] = []
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        if _META_SENTENCE_RE.search(sentence):
+            continue
+        if _is_vague_compat_sentence(sentence):
+            continue
+        kept.append(sentence)
+    if not kept:
+        return (text or "").strip()
+    return " ".join(kept)
+
+
 def _truncate_to_max_chars(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
@@ -340,6 +400,7 @@ def _is_valid_product_description(text: str) -> bool:
 def _normalize_description(text: str) -> str:
     cleaned = _extract_russian_description(text)
     cleaned = _strip_meta_lead(cleaned)
+    cleaned = _strip_meta_sentences(cleaned)
     cleaned = re.sub(r"[ \t]+", " ", cleaned).strip()
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     cleaned = _truncate_to_max_chars(cleaned, DESCRIPTION_ABSOLUTE_MAX_CHARS)

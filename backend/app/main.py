@@ -299,6 +299,13 @@ async def startup_event():
         name="Populate Rossko SEO seed queue afternoon",
         replace_existing=True,
     )
+    scheduler.add_job(
+        func=run_weekly_backups,
+        trigger=CronTrigger(day_of_week="sun", hour=settings.BACKUP_WEEKLY_HOUR_UTC, minute=0),
+        id="weekly_backups",
+        name="Weekly database and uploads backups",
+        replace_existing=True,
+    )
     
     scheduler.start()
     logger.info("Scheduler started. Expired session cleanup job scheduled.")
@@ -546,6 +553,16 @@ async def run_seo_seed_populate():
             db.close()
     except Exception as e:
         logger.error("Ошибка Rossko SEO seed populate: %s", e)
+
+
+async def run_weekly_backups():
+    try:
+        from app.services.backup_service import run_scheduled_backups
+
+        result = run_scheduled_backups()
+        logger.info("Weekly backups completed: %s", result)
+    except Exception as e:
+        logger.error("Ошибка еженедельного резервного копирования: %s", e)
 
 
 async def run_yandex_feed_scheduler_tick():
