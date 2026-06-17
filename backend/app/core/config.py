@@ -111,6 +111,7 @@ class Settings(BaseSettings):
 
     # Резервные копии (БД и uploads)
     BACKUP_DIR: Optional[str] = None
+    PG_DUMP_PATH: Optional[str] = None
     BACKUP_RETENTION_COUNT: int = 8
     BACKUP_WEEKLY_HOUR_UTC: int = 4
 

@@ -120,12 +120,34 @@ def resolve_backup_path(backup_id: str) -> Path:
 
 
 def _ensure_pg_dump_available() -> str:
+    configured = (settings.PG_DUMP_PATH or "").strip()
+    if configured:
+        candidate = Path(configured).expanduser()
+        if candidate.is_file():
+            return str(candidate)
+        raise RuntimeError(f"PG_DUMP_PATH указывает на несуществующий файл: {candidate}")
+
     pg_dump = shutil.which("pg_dump")
-    if not pg_dump:
-        raise RuntimeError(
-            "Утилита pg_dump не найдена. Установите PostgreSQL client tools и добавьте pg_dump в PATH."
-        )
-    return pg_dump
+    if pg_dump:
+        return pg_dump
+
+    common_candidates = [
+        Path(r"C:\Program Files\PostgreSQL\17\bin\pg_dump.exe"),
+        Path(r"C:\Program Files\PostgreSQL\16\bin\pg_dump.exe"),
+        Path(r"C:\Program Files\PostgreSQL\15\bin\pg_dump.exe"),
+        Path(r"C:\Program Files\PostgreSQL\14\bin\pg_dump.exe"),
+        Path(r"C:\Program Files\PostgreSQL\13\bin\pg_dump.exe"),
+        Path("/usr/bin/pg_dump"),
+        Path("/usr/local/bin/pg_dump"),
+    ]
+    for candidate in common_candidates:
+        if candidate.is_file():
+            return str(candidate)
+
+    raise RuntimeError(
+        "Утилита pg_dump не найдена. Установите PostgreSQL client tools и добавьте pg_dump в PATH "
+        "или задайте полный путь в переменной PG_DUMP_PATH."
+    )
 
 
 def _database_url_supports_backup() -> bool:
