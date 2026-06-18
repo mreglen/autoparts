@@ -169,7 +169,7 @@ export const pickListImageUrlNormalized = (photo) => normalizeImageUrl(pickListI
 export const pickFullImageUrlNormalized = (photo) => normalizeImageUrl(pickFullImageUrl(photo));
 
 
-function formatApiDetail(detail) {
+export function formatApiDetail(detail) {
     if (detail == null) return null;
     if (typeof detail === 'string') return detail;
     if (Array.isArray(detail)) {

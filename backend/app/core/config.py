@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     GOOGLE_OAUTH_TOKEN_URL: str = "https://oauth2.googleapis.com/token"
     GOOGLE_OAUTH_REDIRECT_URI: Optional[str] = None
     GOOGLE_CREDENTIALS_SECRET: Optional[str] = None
+    # Ключ для шифрования API-ключа OpenRouter в БД. Если не задан — SECRET_KEY.
+    OPENROUTER_CREDENTIALS_SECRET: Optional[str] = None
     
     # Пути к FFmpeg для обработки видео
     FFPROBE_PATH: Optional[str] = r"C:\ffmpeg\bin\ffprobe.exe"
@@ -106,6 +108,12 @@ class Settings(BaseSettings):
     PRERENDER_INTERNAL_TOKEN: Optional[str] = None
     PRODUCTS_PUBLIC_CACHE_TTL_SECONDS: int = 45
     WEBSOCKET_MAX_CONNECTIONS_PER_USER: int = 5
+
+    # Резервные копии (БД и uploads)
+    BACKUP_DIR: Optional[str] = None
+    PG_DUMP_PATH: Optional[str] = None
+    BACKUP_RETENTION_COUNT: int = 8
+    BACKUP_WEEKLY_HOUR_UTC: int = 4
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra='ignore')
 

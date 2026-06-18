@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from app.models.product import ProductPhoto, ProductVideo, Product as ProductModel
 from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
 from app.models.product_vehicle import ProductVehicleAssociation
@@ -34,6 +34,64 @@ from app.utils.json_cache_sync import get_cached_json_sync, set_cached_json_sync
 
 
 router = APIRouter(prefix="/products", tags=["Products"])
+
+
+class AiDescriptionAccessOut(BaseModel):
+    show_ui: bool = False
+    enabled: bool
+    reason: str | None = None
+    remaining_today: int
+    org_limit: int
+    global_limit: int
+    global_used: int
+    org_used: int
+
+
+class GenerateDescriptionIn(BaseModel):
+    brand: str
+    article: str
+    name: str
+    is_new: bool = False
+    part_type_id: int | None = None
+    product_id: int | None = None
+    existing_description: str | None = Field(None, max_length=2000)
+
+
+class GenerateDescriptionOut(BaseModel):
+    description: str
+    tokens_used: int | None = None
+
+
+@router.get("/ai-description/access", response_model=AiDescriptionAccessOut)
+def get_ai_description_access(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.ai_description_service import get_seller_access_info
+
+    return get_seller_access_info(db, current_user)
+
+
+@router.post("/generate-description", response_model=GenerateDescriptionOut)
+def generate_product_description_endpoint(
+    payload: GenerateDescriptionIn,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.ai_description_service import generate_product_description
+
+    result = generate_product_description(
+        db,
+        user=current_user,
+        brand=payload.brand,
+        article=payload.article,
+        name=payload.name,
+        is_new=payload.is_new,
+        part_type_id=payload.part_type_id,
+        product_id=payload.product_id,
+        existing_description=payload.existing_description,
+    )
+    return GenerateDescriptionOut(**result)
 
 
 class PublicUsedProductMatchOut(BaseModel):

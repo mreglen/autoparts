@@ -36,6 +36,7 @@ from app.db.schema_patches import (
     ensure_yookassa_refund_columns,
     ensure_garage_new_order_yookassa_columns,
     ensure_seo_landing_pages_table,
+    ensure_openrouter_tables,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
@@ -77,6 +78,9 @@ import app.models.seo_rossko_seed_queue  # noqa: F401 — Rossko seed pre-check 
 import app.models.seo_sync_daily_counter  # noqa: F401 — daily API budget counters
 import app.models.seo_pipeline_state  # noqa: F401 — TecDoc harvest cursors
 import app.models.seo_landing_page  # noqa: F401 — SEO landing pages registry
+import app.models.site_openrouter_integration  # noqa: F401 — OpenRouter integration
+import app.models.organization_ai_description_access  # noqa: F401 — AI description org allowlist
+import app.models.ai_description_generation_log  # noqa: F401 — AI description generation log
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings
@@ -156,6 +160,7 @@ try:
     ensure_yookassa_refund_columns()
     ensure_garage_new_order_yookassa_columns()
     ensure_seo_landing_pages_table()
+    ensure_openrouter_tables()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise
@@ -292,6 +297,13 @@ async def startup_event():
         trigger=CronTrigger(hour=14, minute=0),
         id="seo_rossko_seed_populate_afternoon",
         name="Populate Rossko SEO seed queue afternoon",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        func=run_weekly_backups,
+        trigger=CronTrigger(day_of_week="sun", hour=settings.BACKUP_WEEKLY_HOUR_UTC, minute=0),
+        id="weekly_backups",
+        name="Weekly database and uploads backups",
         replace_existing=True,
     )
     
@@ -541,6 +553,16 @@ async def run_seo_seed_populate():
             db.close()
     except Exception as e:
         logger.error("Ошибка Rossko SEO seed populate: %s", e)
+
+
+async def run_weekly_backups():
+    try:
+        from app.services.backup_service import run_scheduled_backups
+
+        result = run_scheduled_backups()
+        logger.info("Weekly backups completed: %s", result)
+    except Exception as e:
+        logger.error("Ошибка еженедельного резервного копирования: %s", e)
 
 
 async def run_yandex_feed_scheduler_tick():

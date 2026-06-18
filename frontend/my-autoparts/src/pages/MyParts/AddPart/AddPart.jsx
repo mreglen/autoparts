@@ -22,6 +22,7 @@ import {
 import { fetchPartTypes } from '../../../redux/slices/PartTypeSlice';
 import { normalizeImageUrl, apiRequest, apiRequestFormData, apiAxios } from '../../../utils/apiClient';
 import { useAuthReady } from '../../../hooks/useAuthReady';
+import { useAiDescriptionGenerator } from '../../../hooks/useAiDescriptionGenerator';
 import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
 import {
   buildRosskoLookupText,
@@ -45,7 +46,9 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
   const resubmitId = resubmitMode ? routeId : null;
   const editPendingId = editPendingMode ? routeId : null;
   const dispatch = useDispatch();
+  const { isReady } = useAuthReady();
   const user = useSelector((state) => state.auth.user);
+  const canAccess = Boolean(user?.is_seller || user?.is_employee || user?.is_admin);
   const productStatus = useSelector((state) => state.products.loading);
   const productError = useSelector((state) => state.products.error);
   const { storageLocations } = useSelector((state) => state.organization);
@@ -67,6 +70,31 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
     storage_location_id: '',
     part_type_id: '',
   });
+
+  const {
+    access: aiDescriptionAccess,
+    loadingAccess: aiDescriptionLoading,
+    generating: aiDescriptionGenerating,
+    error: aiDescriptionError,
+    canGenerate: canGenerateAiDescription,
+    generate: generateAiDescription,
+  } = useAiDescriptionGenerator({
+    brand: formData.brand,
+    article: formData.article,
+    name: formData.name,
+    description: formData.description,
+    isNew: formData.condition === 'новый',
+    partTypeId: formData.part_type_id,
+    productId: null,
+    authReady: isReady && canAccess,
+  });
+
+  const handleGenerateDescription = async () => {
+    const description = await generateAiDescription();
+    if (description) {
+      setFormData((prev) => ({ ...prev, description }));
+    }
+  };
 
   const [articleOptions, setArticleOptions] = useState([]);
   const [brandOptions, setBrandOptions] = useState([]);
@@ -1000,9 +1028,6 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
     }
   };
 
-  const { isReady } = useAuthReady();
-  const canAccess = Boolean(user?.is_seller || user?.is_employee || user?.is_admin);
-
   useEffect(() => {
     if (!isReady) return;
     if (!canAccess) {
@@ -1183,7 +1208,14 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
         
         {/* Описание */}
         <div>
-          <label className="block text-sm font-medium">Описание</label>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+            <label className="block text-sm font-medium">Описание</label>
+            {!aiDescriptionLoading && aiDescriptionAccess?.enabled && (
+              <span className="text-xs text-gray-500">
+                Осталось сегодня: {aiDescriptionAccess.remaining_today ?? 0}
+              </span>
+            )}
+          </div>
           <textarea
             name="description"
             value={formData.description}
@@ -1192,6 +1224,27 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
             className="mt-1 block w-full px-3 py-2 border rounded-md"
             placeholder="Введите описание запчасти..."
           />
+          {!aiDescriptionLoading && (aiDescriptionAccess?.show_ui || aiDescriptionAccess?.enabled) && (
+            <div className="mt-2 space-y-1">
+              <button
+                type="button"
+                onClick={handleGenerateDescription}
+                disabled={!canGenerateAiDescription}
+                className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {aiDescriptionGenerating ? 'Генерация…' : 'Сгенерировать описание'}
+              </button>
+              {!aiDescriptionAccess?.enabled && aiDescriptionAccess?.reason && (
+                <p className="text-xs text-amber-700">{aiDescriptionAccess.reason}</p>
+              )}
+              {aiDescriptionError && (
+                <p className="text-xs text-red-600">{aiDescriptionError}</p>
+              )}
+            </div>
+          )}
+          {aiDescriptionLoading && (
+            <p className="mt-2 text-xs text-gray-500">Проверка доступа к AI…</p>
+          )}
         </div>
         </MobilePageSection>
 

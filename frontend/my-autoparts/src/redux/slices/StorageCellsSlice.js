@@ -117,36 +117,104 @@ export const fetchProductCellLinks = createAsyncThunk(
     }
 );
 
-// Track ongoing requests to prevent duplicates
-const ongoingRequests = new Set();
+// Track in-flight product storage cell requests (condition + pending lifecycle)
+const ongoingProductStorageCellRequests = new Set();
+const ongoingBatchProductIds = new Set();
+
+const isRateLimitError = (payloadOrError) => {
+    if (!payloadOrError) return false;
+    if (typeof payloadOrError === 'object' && payloadOrError.message) {
+        return isRateLimitError(payloadOrError.message);
+    }
+    const message = payloadOrError?.message || String(payloadOrError || '');
+    return message.includes('429') || message.includes('Too many requests');
+};
+
+const groupLinksByProductId = (links, productIds) => {
+    const grouped = {};
+    productIds.forEach((productId) => {
+        grouped[productId] = [];
+    });
+    (Array.isArray(links) ? links : []).forEach((link) => {
+        const productId = link?.product_id;
+        if (productId == null) return;
+        if (!grouped[productId]) grouped[productId] = [];
+        grouped[productId].push(link);
+    });
+    return grouped;
+};
+
+export const fetchProductStorageCellsBatch = createAsyncThunk(
+    'storageCells/fetchProductStorageCellsBatch',
+    async (productIds, { rejectWithValue, getState }) => {
+        try {
+            const cached = getState().storageCells.productStorageCells;
+            const uniqueIds = [...new Set(productIds.filter((id) => (
+                id != null
+                && !Object.prototype.hasOwnProperty.call(cached, id)
+                && !ongoingBatchProductIds.has(id)
+            )))];
+            if (uniqueIds.length === 0) {
+                return { grouped: {} };
+            }
+
+            uniqueIds.forEach((id) => ongoingBatchProductIds.add(id));
+            const grouped = {};
+            const chunkSize = 100;
+
+            try {
+                for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+                    const chunk = uniqueIds.slice(i, i + chunkSize);
+                    const result = await apiRequest('/storage-cells/product-links/by-products', {
+                        method: 'POST',
+                        body: JSON.stringify({ product_ids: chunk }),
+                    });
+                    Object.assign(grouped, groupLinksByProductId(result, chunk));
+                }
+            } finally {
+                uniqueIds.forEach((id) => ongoingBatchProductIds.delete(id));
+            }
+
+            return { grouped };
+        } catch (error) {
+            const message = error?.message || 'Ошибка загрузки ячеек товаров';
+            return rejectWithValue({ message, productIds });
+        }
+    },
+    {
+        condition: (productIds, { getState }) => {
+            const cached = getState().storageCells.productStorageCells;
+            return productIds.some((id) => (
+                id != null
+                && !Object.prototype.hasOwnProperty.call(cached, id)
+                && !ongoingBatchProductIds.has(id)
+            ));
+        },
+    }
+);
 
 // Get product-cell links for a specific product
 export const fetchProductStorageCells = createAsyncThunk(
     'storageCells/fetchProductStorageCells',
-    async (productId, { getState }) => {
-        // Check if request is already in progress
-        if (ongoingRequests.has(productId)) {
-            return Promise.reject('Request already in progress');
-        }
-        
+    async (productId, { rejectWithValue }) => {
         try {
-            ongoingRequests.add(productId);
-            
-            let url = '/storage-cells/product-links/?';
-            const params = [];
-            if (productId) params.push(`product_id=${productId}`);
-            
-            if (params.length > 0) {
-                url += params.join('&');
-            }
-            
+            const url = `/storage-cells/product-links/?product_id=${productId}`;
             const result = await apiRequest(url);
-            return { productId, links: result.data || result };
+            const links = Array.isArray(result) ? result : [];
+            return { productId, links };
         } catch (error) {
-            throw error;
-        } finally {
-            ongoingRequests.delete(productId);
+            const message = error?.message || 'Ошибка загрузки ячеек товара';
+            return rejectWithValue(message);
         }
+    },
+    {
+        condition: (productId, { getState }) => {
+            if (ongoingProductStorageCellRequests.has(productId)) {
+                return false;
+            }
+            const cached = getState().storageCells.productStorageCells;
+            return !Object.prototype.hasOwnProperty.call(cached, productId);
+        },
     }
 );
 
@@ -202,6 +270,16 @@ const storageCellsSlice = createSlice({
         clearProductCellLinks: (state) => {
             state.productCellLinks = [];
             state.linksError = null;
+        },
+        invalidateProductStorageCells: (state, action) => {
+            const productIds = action.payload;
+            if (!Array.isArray(productIds) || productIds.length === 0) {
+                state.productStorageCells = {};
+                return;
+            }
+            productIds.forEach((id) => {
+                delete state.productStorageCells[id];
+            });
         },
     },
     extraReducers: (builder) => {
@@ -331,14 +409,41 @@ const storageCellsSlice = createSlice({
                     ];
                 }
             })
+            .addCase(fetchProductStorageCells.pending, (state, action) => {
+                ongoingProductStorageCellRequests.add(action.meta.arg);
+            })
             .addCase(fetchProductStorageCells.fulfilled, (state, action) => {
+                ongoingProductStorageCellRequests.delete(action.meta.arg);
                 const { productId, links } = action.payload;
                 state.productStorageCells[productId] = links;
             })
             .addCase(fetchProductStorageCells.rejected, (state, action) => {
-                console.error('Failed to fetch product storage cells:', action.error);
+                ongoingProductStorageCellRequests.delete(action.meta.arg);
+                if (action.meta.aborted) return;
+                if (isRateLimitError(action.payload || action.error)) return;
+                const productId = action.meta.arg;
+                if (!Object.prototype.hasOwnProperty.call(state.productStorageCells, productId)) {
+                    state.productStorageCells[productId] = [];
+                }
+            })
+            .addCase(fetchProductStorageCellsBatch.fulfilled, (state, action) => {
+                const grouped = action.payload?.grouped || {};
+                Object.entries(grouped).forEach(([productId, links]) => {
+                    state.productStorageCells[Number(productId)] = links;
+                });
+            })
+            .addCase(fetchProductStorageCellsBatch.rejected, (state, action) => {
+                if (action.meta.aborted) return;
+                if (isRateLimitError(action.payload || action.error)) return;
+                const productIds = action.payload?.productIds || action.meta.arg || [];
+                productIds.forEach((productId) => {
+                    if (!Object.prototype.hasOwnProperty.call(state.productStorageCells, productId)) {
+                        state.productStorageCells[productId] = [];
+                    }
+                });
             });
     },
 });
 
+export const { clearStorageCells, clearProductCellLinks, invalidateProductStorageCells } = storageCellsSlice.actions;
 export default storageCellsSlice.reducer;

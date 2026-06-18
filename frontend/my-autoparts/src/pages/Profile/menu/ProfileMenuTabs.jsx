@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PublicSiteMenuLinks from '../../../components/MobileSideMenu/PublicSiteMenuLinks';
+import { getPathForTab } from './profileMenuConfig';
 
 // Icon mapping for menu items
 const getMenuIcon = (menuId) => {
@@ -235,6 +236,24 @@ export default function ProfileMenuTabs({
         }
     };
 
+    const handleSidebarItemClick = (event, tabId) => {
+        const isPlainLeftClick = event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+
+        if (isDrawer) {
+            // For drawer anchors we want SPA navigation on plain left click,
+            // but keep default browser context-menu / "open in new tab" behavior.
+            if (!isPlainLeftClick) return;
+            event.preventDefault();
+            handleTabChange(tabId);
+            return;
+        }
+
+        // Keep native browser behavior for context menu / open in new tab.
+        if (!isPlainLeftClick) return;
+        event.preventDefault();
+        handleTabChange(tabId);
+    };
+
     const itemBase = isDrawer
         ? 'min-h-[44px] w-full rounded-xl px-3 py-3 text-left text-sm font-medium transition-colors flex items-center gap-3 active:scale-[0.99]'
         : 'w-full px-4 py-3 text-left text-sm font-medium border-l-4 transition-colors flex items-center gap-3';
@@ -288,16 +307,20 @@ export default function ProfileMenuTabs({
                     {isExpanded && (
                         <div className={isDrawer ? 'mt-1 space-y-0.5 pl-2' : 'ml-4 border-l border-gray-200'}>
                             {tab.submenu.map((subTab) => (
-                                <button
+                                <a
                                     key={subTab.id}
-                                    type="button"
-                                    onClick={() => handleTabChange(subTab.id)}
+                                    href={getPathForTab(subTab.id) || '#'}
+                                    onClick={(event) => handleSidebarItemClick(event, subTab.id)}
                                     className={`${submenuItemBase} ${
                                         activeTab === subTab.id ? itemActive : itemInactive
                                     }`}
                                 >
                                     <div className="flex-shrink-0">{getMenuIcon(subTab.id)}</div>
-                                    <span className={`flex flex-grow items-center gap-2 ${isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'}`}>
+                                    <span
+                                        className={`flex flex-grow items-center gap-2 ${
+                                            isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
+                                        }`}
+                                    >
                                         {subTab.label}
                                         {badgeCounts[subTab.id] !== undefined && badgeCounts[subTab.id] > 0 && (
                                             <span className="inline-flex shrink-0 items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
@@ -305,7 +328,7 @@ export default function ProfileMenuTabs({
                                             </span>
                                         )}
                                     </span>
-                                </button>
+                                </a>
                             ))}
                         </div>
                     )}
@@ -314,16 +337,20 @@ export default function ProfileMenuTabs({
         }
 
         return (
-            <button
+            <a
                 key={tab.id}
-                type="button"
-                onClick={() => handleTabChange(tab.id)}
+                href={getPathForTab(tab.id) || '#'}
+                onClick={(event) => handleSidebarItemClick(event, tab.id)}
                 className={`${itemBase} ${activeTab === tab.id ? itemActive : itemInactive} ${
                     isDrawer ? 'mb-1' : ''
                 }`}
             >
                 <div className="flex-shrink-0">{getMenuIcon(tab.id)}</div>
-                <span className={`flex flex-grow items-center gap-2 ${isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'}`}>
+                <span
+                    className={`flex flex-grow items-center gap-2 ${
+                        isDrawer ? 'break-words whitespace-normal' : 'whitespace-normal leading-snug'
+                    }`}
+                >
                     {tab.label}
                     {badgeCounts[tab.id] !== undefined && badgeCounts[tab.id] > 0 && (
                         <span className="inline-flex shrink-0 items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
@@ -331,7 +358,7 @@ export default function ProfileMenuTabs({
                         </span>
                     )}
                 </span>
-            </button>
+            </a>
         );
     };
 

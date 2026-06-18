@@ -1,6 +1,6 @@
 // src/store/slices/ProductSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { apiAxios, apiAxiosUnauth, apiRequestFormData } from '../../utils/apiClient';
+import { apiAxios, apiAxiosUnauth, apiRequestFormData, formatApiDetail } from '../../utils/apiClient';
 
 
 
@@ -324,18 +324,30 @@ export const fetchProducts = createAsyncThunk(
 );
 
 // New action for fetching user's own products
+let fetchMyProductsAbortController = null;
+
 export const fetchMyProducts = createAsyncThunk(
     'products/fetchMyProducts',
     async (params = {}, { rejectWithValue }) => {
+        if (fetchMyProductsAbortController) {
+            fetchMyProductsAbortController.abort();
+        }
+        fetchMyProductsAbortController = new AbortController();
+        const { signal } = fetchMyProductsAbortController;
+
         try {
             const response = await apiAxios.get(
                 '/products/',
-                { params }
+                { params, signal }
             );
             return response.data;
         } catch (error) {
+            if (signal.aborted || error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
+                throw error;
+            }
+            const detail = error.response?.data?.detail;
             return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка загрузки моих товаров'
+                formatApiDetail(detail) || error.message || 'Ошибка загрузки моих товаров'
             );
         }
     }
@@ -1192,6 +1204,7 @@ const productSlice = createSlice({
                 state.items = action.payload;
             })
             .addCase(fetchMyProducts.rejected, (state, action) => {
+                if (action.meta.aborted) return;
                 state.loading = false;
                 state.error = action.payload;
             })
