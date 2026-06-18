@@ -544,6 +544,9 @@ const PartDetail = () => {
   }
 
   const sellerOrg = currentProduct.organization;
+  const sellerLogoUrl = sellerOrg?.logo_organization
+    ? normalizeImageUrl(sellerOrg.logo_organization)
+    : null;
   const localSeo = buildProductSeo(currentProduct);
   const seo = apiSeo
     ? { ...localSeo, ...apiSeo, jsonLd: localSeo.jsonLd }
@@ -909,8 +912,18 @@ const PartDetail = () => {
                 <h2 className="mb-3 text-sm font-semibold text-gray-900">Продавец</h2>
 
                 <div className="mb-3 flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
-                    {(sellerOrg?.name || 'П').substring(0, 2).toUpperCase()}
+                  <div className="flex h-9 w-9 shrink-0 overflow-hidden rounded-full bg-indigo-600">
+                    {sellerLogoUrl ? (
+                      <img
+                        src={sellerLogoUrl}
+                        alt={sellerOrg?.name || 'Логотип продавца'}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
+                        {(sellerOrg?.name || 'П').substring(0, 2).toUpperCase()}
+                      </span>
+                    )}
                   </div>
                   <div className="min-w-0">
                     {sellerOrg?.name ? (
