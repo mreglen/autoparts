@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import or_
@@ -34,6 +35,23 @@ from app.utils.json_cache_sync import get_cached_json_sync, set_cached_json_sync
 
 
 router = APIRouter(prefix="/products", tags=["Products"])
+
+
+class PublicProductsResponse(BaseModel):
+    items: List[ProductSchema]
+    total: int
+    page: int
+    page_size: int
+
+
+def _public_list_load_options():
+    return [
+        selectinload(ProductModel.photos),
+        selectinload(ProductModel.videos),
+        selectinload(ProductModel.storage_location),
+        selectinload(ProductModel.organization),
+        selectinload(ProductModel.compatible_vehicles),
+    ]
 
 
 class AiDescriptionAccessOut(BaseModel):
@@ -1100,25 +1118,21 @@ def get_products(
     return products
 
 
-@router.get("/public/", response_model=list[ProductSchema])
+@router.get("/public/", response_model=PublicProductsResponse)
 def get_public_products(
-    storage_location_id: int = None,
-    db: Session = Depends(get_db)
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    storage_location_id: Optional[int] = None,
+    db: Session = Depends(get_db),
 ):
-    cache_key = f"products:public:storage_location:{storage_location_id if storage_location_id is not None else 'all'}"
+    loc_key = storage_location_id if storage_location_id is not None else "all"
+    cache_key = f"products:public:p{page}:s{page_size}:loc:{loc_key}"
     cached = get_cached_json_sync(cache_key)
     if cached is not None:
         return cached
 
     query = db.query(ProductModel).options(
-        selectinload(ProductModel.photos),
-        selectinload(ProductModel.videos),
-        selectinload(ProductModel.compatible_vehicles).options(
-            selectinload(VehicleModel.vin_row),
-            selectinload(VehicleModel.mileage_row),
-        ),
-        selectinload(ProductModel.storage_location),
-        selectinload(ProductModel.organization)
+        *_public_list_load_options()
     ).filter(
         ProductModel.quantity > 0
     )
@@ -1126,10 +1140,22 @@ def get_public_products(
     if storage_location_id is not None:
         query = query.filter(ProductModel.storage_location_id == storage_location_id)
 
-    products = query.all()
+    total = query.order_by(None).count()
+    products = (
+        query.order_by(ProductModel.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
     for product in products:
         product.is_on_avito = len(product.avito_listing_links) > 0
         product.is_on_drom = len(product.drom_listing_links) > 0
-    payload = jsonable_encoder(products)
+
+    payload = {
+        "items": jsonable_encoder(products),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
     set_cached_json_sync(cache_key, payload, settings.PRODUCTS_PUBLIC_CACHE_TTL_SECONDS)
     return payload

@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { fetchStockOuts, createReturn } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
-import { fetchProducts } from '../../redux/slices/ProductSlice';
+import { fetchMyProducts } from '../../redux/slices/ProductSlice';
 import { fetchStockIns } from '../../redux/slices/StockInSlice';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import StockOutCard from '../../components/StockOut/StockOutCard';
@@ -143,7 +143,7 @@ export const StockOutList = () => {
     try {
       await dispatch(createReturn({ items: returnData })).unwrap();
       dispatch(fetchStockOuts());
-      dispatch(fetchProducts());
+      dispatch(fetchMyProducts());
       dispatch(fetchStockIns());
       setReturnModalOpen(false);
       setItemsToReturn([]);

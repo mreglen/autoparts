@@ -5,6 +5,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { store } from './redux/store';
 import './index.css';
 import App from './App';
+import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -43,6 +44,11 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Optional: Web vitals reporting
-// import reportWebVitals from './reportWebVitals';
-// reportWebVitals();
+if (typeof window !== 'undefined') {
+  const initWebVitals = () => reportWebVitals();
+  if (document.readyState === 'complete') {
+    initWebVitals();
+  } else {
+    window.addEventListener('load', initWebVitals, { once: true });
+  }
+}

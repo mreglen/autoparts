@@ -10,7 +10,7 @@ import {
   fetchProductStorageCells
 } from '../../redux/slices/StorageCellsSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
-import { fetchProducts } from '../../redux/slices/ProductSlice';
+import { fetchMyProducts } from '../../redux/slices/ProductSlice';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 
 const StorageAddressesPage = () => {
@@ -82,7 +82,7 @@ const StorageAddressesPage = () => {
   useEffect(() => {
     // This will trigger re-fetching of all storage-related data
     if (user?.organization_id && lastModified) {
-      dispatch(fetchProducts());
+      dispatch(fetchMyProducts());
       // Also refresh storage cell data
       dispatch(fetchLocationsWithCells());
       dispatch(fetchStorageCells());

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
@@ -25,6 +26,24 @@ import {
 import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
+
+const VIRTUALIZE_THRESHOLD = 48;
+const GRID_ROW_ESTIMATE_PX = 380;
+const LIST_ROW_ESTIMATE_PX = 220;
+
+function getGridColumnCount(width) {
+  if (width >= 1280) return 4;
+  if (width >= 1024) return 3;
+  return 2;
+}
+
+function chunkIntoRows(items, columns) {
+  const rows = [];
+  for (let i = 0; i < items.length; i += columns) {
+    rows.push(items.slice(i, i + columns));
+  }
+  return rows;
+}
 
 // Функция форматирования телефона
 const formatPhoneNumber = (phone) => {
@@ -247,6 +266,61 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     
     return sorted;
   }, [analogParts, sortBy, isCatalogMode, matchesActiveFilters]);
+
+  const [gridColumns, setGridColumns] = useState(() => getGridColumnCount(
+    typeof window !== 'undefined' ? window.innerWidth : 1024
+  ));
+
+  useEffect(() => {
+    const onResize = () => setGridColumns(getGridColumnCount(window.innerWidth));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const shouldVirtualize = sortedAvailableParts.length > VIRTUALIZE_THRESHOLD;
+  const gridRows = useMemo(
+    () => chunkIntoRows(sortedAvailableParts, gridColumns),
+    [sortedAvailableParts, gridColumns]
+  );
+
+  const gridRowVirtualizer = useWindowVirtualizer({
+    count: shouldVirtualize && viewMode === 'grid' ? gridRows.length : 0,
+    estimateSize: () => GRID_ROW_ESTIMATE_PX,
+    overscan: 2,
+  });
+
+  const listRowVirtualizer = useWindowVirtualizer({
+    count: shouldVirtualize && viewMode === 'list' ? sortedAvailableParts.length : 0,
+    estimateSize: () => LIST_ROW_ESTIMATE_PX,
+    overscan: 3,
+  });
+
+  const buildProductCardPart = useCallback((part) => ({
+    id: part.id,
+    title: formatProductDisplayTitle(part.brand, part.article, part.name),
+    price: part.price ? `${part.price} ₽` : '—',
+    originalPrice: null,
+    discount: null,
+    brand: part.brand || '—',
+    article: part.article || '—',
+    location: part.storage_location?.address || '—',
+    description: part.description || '',
+    sellerName: organization?.name || part.organization?.name || 'Продавец',
+    rating: 4.7,
+    reviewCount: 152,
+    isDiscount: false,
+    isNew: part.is_new,
+    quantity: part.quantity || part.available_count || 0,
+    sellerReliable: true,
+    sellerVerified: true,
+    photos: part.photos || [],
+    videos: part.videos || [],
+    image: (part.photos && part.photos.length > 0)
+      ? (part.photos[0].full_url || part.photos[0].photo_url || part.photos[0])
+      : '/api/placeholder/200/200',
+    sellerLogo: organization?.name?.substring(0, 4).toUpperCase() || 'SELL',
+    phone: organization?.phone || part.organization?.phone || '+7 (999) 123-45-67',
+  }), [organization]);
   
   useEffect(() => {
     // Загружаем информацию об организации только для авторизованных продавцов и сотрудников
@@ -365,6 +439,8 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             src={resolvedUrl || currentMedia.url}
             alt={part.name || part.article}
             className="w-full h-full object-cover rounded-lg"
+            loading="lazy"
+            decoding="async"
             onError={() => {
               const chain = currentMedia.urlChain || [];
               const nextIndex = urlFallbackIndex + 1;
@@ -566,47 +642,75 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
         <>
 
           {/* Grid view - карточки */}
-          {viewMode === 'grid' && (
+          {viewMode === 'grid' && !shouldVirtualize && (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {sortedAvailableParts.map((part, index) => (
                 <ProductCard
                   key={part.id}
                   listPriority={index < 2}
-                  part={{
-                    id: part.id,
-                    title: formatProductDisplayTitle(part.brand, part.article, part.name),
-                    price: part.price ? `${part.price} ₽` : '—',
-                    originalPrice: null, // No original price in current data
-                    discount: null, // No discount info in current data
-                    brand: part.brand || '—',
-                    article: part.article || '—',
-                    location: part.storage_location?.address || '—',
-                    description: part.description || '',
-                    sellerName: organization?.name || part.organization?.name || 'Продавец',
-                    rating: 4.7, // Default rating since not in data
-                    reviewCount: 152, // Default review count
-                    isDiscount: false, // No discount info in current data
-                    isNew: part.is_new,
-                    quantity: part.quantity || part.available_count || 0,
-                    sellerReliable: true, // Default value
-                    sellerVerified: true, // Default value
-                    photos: part.photos || [],
-                    videos: part.videos || [], // Add videos from backend
-                    image: (part.photos && part.photos.length > 0) ? (part.photos[0].full_url || part.photos[0].photo_url || part.photos[0]) : '/api/placeholder/200/200',
-                    sellerLogo: organization?.name?.substring(0, 4).toUpperCase() || 'SELL',
-                    phone: organization?.phone || part.organization?.phone || '+7 (999) 123-45-67' // Use phone from organization if available
-                  }}
+                  part={buildProductCardPart(part)}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
                 />
               ))}
             </div>
           )}
+          {viewMode === 'grid' && shouldVirtualize && (
+            <div
+              className="relative w-full"
+              style={{ height: `${gridRowVirtualizer.getTotalSize()}px` }}
+            >
+              {gridRowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const rowParts = gridRows[virtualRow.index] || [];
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={gridRowVirtualizer.measureElement}
+                    className="absolute left-0 top-0 w-full grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
+                    style={{ transform: `translateY(${virtualRow.start}px)` }}
+                  >
+                    {rowParts.map((part, colIndex) => (
+                      <ProductCard
+                        key={part.id}
+                        listPriority={virtualRow.index === 0 && colIndex < 2}
+                        part={buildProductCardPart(part)}
+                        isTestOrganization={true}
+                        hideConditionAndQuantity={true}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* List view — компактная строка: превью + данные, продавец снизу */}
-          {viewMode === 'list' && (
+          {viewMode === 'list' && !shouldVirtualize && (
             <div className="space-y-3">
               {sortedAvailableParts.map((part) => renderPartListCard(part, part.id))}
+            </div>
+          )}
+          {viewMode === 'list' && shouldVirtualize && (
+            <div
+              className="relative w-full"
+              style={{ height: `${listRowVirtualizer.getTotalSize()}px` }}
+            >
+              {listRowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const part = sortedAvailableParts[virtualRow.index];
+                if (!part) return null;
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={listRowVirtualizer.measureElement}
+                    className="absolute left-0 top-0 w-full pb-3"
+                    style={{ transform: `translateY(${virtualRow.start}px)` }}
+                  >
+                    {renderPartListCard(part, part.id)}
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -639,30 +743,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                 <ProductCard
                   key={`analog-${part.id}`}
                   listPriority={index < 2}
-                  part={{
-                    id: part.id,
-                    title: formatProductDisplayTitle(part.brand, part.article, part.name),
-                    price: part.price ? `${part.price} ₽` : '—',
-                    originalPrice: null, // No original price in current data
-                    discount: null, // No discount info in current data
-                    brand: part.brand || '—',
-                    article: part.article || '—',
-                    location: part.storage_location?.address || '—',
-                    description: part.description || '',
-                    sellerName: organization?.name || part.organization?.name || 'Продавец',
-                    rating: 4.7, // Default rating since not in data
-                    reviewCount: 152, // Default review count
-                    isDiscount: false, // No discount info in current data
-                    isNew: part.is_new,
-                    quantity: part.quantity || part.available_count || 0,
-                    sellerReliable: true, // Default value
-                    sellerVerified: true, // Default value
-                    photos: part.photos || [],
-                    videos: part.videos || [], // Add videos from backend
-                    image: (part.photos && part.photos.length > 0) ? (part.photos[0].full_url || part.photos[0].photo_url || part.photos[0]) : '/api/placeholder/200/200',
-                    sellerLogo: organization?.name?.substring(0, 4).toUpperCase() || 'SELL',
-                    phone: organization?.phone || part.organization?.phone || '+7 (999) 123-45-67' // Use phone from organization if available
-                  }}
+                  part={buildProductCardPart(part)}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
                 />

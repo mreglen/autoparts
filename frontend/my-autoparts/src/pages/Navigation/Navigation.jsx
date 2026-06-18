@@ -185,7 +185,14 @@ export default function Navigation() {
       <div className="mx-auto max-w-7xl px-4 lg:px-6">
         <div className="flex h-[4.25rem] items-center gap-4 lg:gap-5">
           <NavLink to="/" className="flex shrink-0 items-center gap-2.5">
-            <img src="/img/LogoWithoutBg.png" alt="Свой Гараж" className="h-9 w-auto" />
+            <img
+              src="/img/LogoWithoutBg.png"
+              alt="Свой Гараж"
+              className="h-9 w-auto"
+              width={144}
+              height={36}
+              fetchPriority="high"
+            />
             <div className="hidden leading-tight text-blue-900 xl:block">
               <span className="block text-sm font-bold">Свой</span>
               <span className="block text-sm font-bold">Гараж</span>

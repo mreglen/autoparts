@@ -17,28 +17,30 @@ import useSiteAnalytics from './hooks/useSiteAnalytics';
 import Authorization from './pages/Autorization/Authorization';
 import PasswordReset from './pages/Autorization/PasswordReset/PasswordReset';
 import AutoParts from './pages/AutoParts/AutoParts';
-import AboutCompany from './pages/About/AboutCompany';
-import DeliveryPage from './pages/About/DeliveryPage';
-import PaymentPage from './pages/About/PaymentPage';
-import PrivacyPolicyPage from './pages/About/PrivacyPolicyPage';
-import PersonalDataConsentPage from './pages/About/PersonalDataConsentPage';
-import PublicOfferPage from './pages/About/PublicOfferPage';
-import CookiePolicyPage from './pages/About/CookiePolicyPage';
-import UsedPartsFiltersPage from './pages/AutoParts/UsedParts/UsedPartsFiltersPage';
-import NewPartsFiltersPage from './pages/AutoParts/NewParts/NewPartsFiltersPage';
-import NewPartDetailPage from './pages/AutoParts/NewParts/NewPartDetailPage';
-import NewPartsBrandLandingPage from './pages/AutoParts/NewParts/NewPartsBrandLandingPage';
-import NewPartsCategoryLandingPage from './pages/AutoParts/NewParts/NewPartsCategoryLandingPage';
-import UsedPartsBrandLandingPage from './pages/AutoParts/UsedParts/UsedPartsBrandLandingPage';
-import UsedPartsCategoryLandingPage from './pages/AutoParts/UsedParts/UsedPartsCategoryLandingPage';
-import UsedPartsGeoLandingPage from './pages/AutoParts/UsedParts/UsedPartsGeoLandingPage';
 import Main from './pages/Main/Main';
 import FindRedirectPage from './pages/Find/FindRedirectPage';
-import CatalogPage from './pages/Catalog/CatalogPage';
 import CartPage from './pages/Cart/CartPage';
-import PartDetail from './pages/PartDetail/PartDetail';
-import NotFound from './pages/NotFound/NotFound';
-import ProductNotFound from './pages/Chat/ProductNotFound';
+
+// Lazy: вторичные публичные страницы
+const AboutCompany = lazy(() => import('./pages/About/AboutCompany'));
+const DeliveryPage = lazy(() => import('./pages/About/DeliveryPage'));
+const PaymentPage = lazy(() => import('./pages/About/PaymentPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/About/PrivacyPolicyPage'));
+const PersonalDataConsentPage = lazy(() => import('./pages/About/PersonalDataConsentPage'));
+const PublicOfferPage = lazy(() => import('./pages/About/PublicOfferPage'));
+const CookiePolicyPage = lazy(() => import('./pages/About/CookiePolicyPage'));
+const UsedPartsFiltersPage = lazy(() => import('./pages/AutoParts/UsedParts/UsedPartsFiltersPage'));
+const NewPartsFiltersPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartsFiltersPage'));
+const NewPartDetailPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartDetailPage'));
+const NewPartsBrandLandingPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartsBrandLandingPage'));
+const NewPartsCategoryLandingPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartsCategoryLandingPage'));
+const UsedPartsBrandLandingPage = lazy(() => import('./pages/AutoParts/UsedParts/UsedPartsBrandLandingPage'));
+const UsedPartsCategoryLandingPage = lazy(() => import('./pages/AutoParts/UsedParts/UsedPartsCategoryLandingPage'));
+const UsedPartsGeoLandingPage = lazy(() => import('./pages/AutoParts/UsedParts/UsedPartsGeoLandingPage'));
+const CatalogPage = lazy(() => import('./pages/Catalog/CatalogPage'));
+const PartDetail = lazy(() => import('./pages/PartDetail/PartDetail'));
+const NotFound = lazy(() => import('./pages/NotFound/NotFound'));
+const ProductNotFound = lazy(() => import('./pages/Chat/ProductNotFound'));
 
 // Lazy: кабинет продавца
 const ProfilePage = lazy(() => import('./pages/Profile/ProfilePage'));
@@ -182,24 +184,24 @@ function App() {
           <Route index element={<Main />} />
           <Route path="/find" element={<FindRedirectPage />} />
           <Route path="/autoparts" element={<Navigate to="/autoparts/new" replace />} />
-          <Route path="/autoparts/new/filters" element={<NewPartsFiltersPage />} />
+          <Route path="/autoparts/new/filters" element={<LazyRoute><NewPartsFiltersPage /></LazyRoute>} />
           <Route path="/autoparts/new" element={<AutoParts />} />
-          <Route path="/autoparts/new/brand/:brandSlug" element={<NewPartsBrandLandingPage />} />
-          <Route path="/autoparts/new/category/:categorySlug" element={<NewPartsCategoryLandingPage />} />
-          <Route path="/autoparts/new/part/:cardId" element={<NewPartDetailPage />} />
-          <Route path="/autoparts/used/filters" element={<UsedPartsFiltersPage />} />
+          <Route path="/autoparts/new/brand/:brandSlug" element={<LazyRoute><NewPartsBrandLandingPage /></LazyRoute>} />
+          <Route path="/autoparts/new/category/:categorySlug" element={<LazyRoute><NewPartsCategoryLandingPage /></LazyRoute>} />
+          <Route path="/autoparts/new/part/:cardId" element={<LazyRoute><NewPartDetailPage /></LazyRoute>} />
+          <Route path="/autoparts/used/filters" element={<LazyRoute><UsedPartsFiltersPage /></LazyRoute>} />
           <Route path="/autoparts/used" element={<AutoParts />} />
-          <Route path="/autoparts/used/brand/:brandSlug" element={<UsedPartsBrandLandingPage />} />
-          <Route path="/autoparts/used/category/:categorySlug" element={<UsedPartsCategoryLandingPage />} />
-          <Route path="/autoparts/used/geo/:geoSlug" element={<UsedPartsGeoLandingPage />} />
-          <Route path="/catalog" element={<CatalogPage />} />
-          <Route path="/about" element={<AboutCompany />} />
-          <Route path="/privacy" element={<PrivacyPolicyPage />} />
-          <Route path="/personal-data-consent" element={<PersonalDataConsentPage />} />
-          <Route path="/offer" element={<PublicOfferPage />} />
-          <Route path="/cookie-policy" element={<CookiePolicyPage />} />
-          <Route path="/delivery" element={<DeliveryPage />} />
-          <Route path="/payment" element={<PaymentPage />} />
+          <Route path="/autoparts/used/brand/:brandSlug" element={<LazyRoute><UsedPartsBrandLandingPage /></LazyRoute>} />
+          <Route path="/autoparts/used/category/:categorySlug" element={<LazyRoute><UsedPartsCategoryLandingPage /></LazyRoute>} />
+          <Route path="/autoparts/used/geo/:geoSlug" element={<LazyRoute><UsedPartsGeoLandingPage /></LazyRoute>} />
+          <Route path="/catalog" element={<LazyRoute><CatalogPage /></LazyRoute>} />
+          <Route path="/about" element={<LazyRoute><AboutCompany /></LazyRoute>} />
+          <Route path="/privacy" element={<LazyRoute><PrivacyPolicyPage /></LazyRoute>} />
+          <Route path="/personal-data-consent" element={<LazyRoute><PersonalDataConsentPage /></LazyRoute>} />
+          <Route path="/offer" element={<LazyRoute><PublicOfferPage /></LazyRoute>} />
+          <Route path="/cookie-policy" element={<LazyRoute><CookiePolicyPage /></LazyRoute>} />
+          <Route path="/delivery" element={<LazyRoute><DeliveryPage /></LazyRoute>} />
+          <Route path="/payment" element={<LazyRoute><PaymentPage /></LazyRoute>} />
           <Route path="/reviews" element={<ReviewsRoute />} />
           <Route
             path="/organizations"
@@ -260,9 +262,9 @@ function App() {
               </LazyRoute>
             )}
           />
-          <Route path="/part/:productId" element={<PartDetail />} />
-          <Route path="/product-not-found" element={<ProductNotFound />} />
-          <Route path="*" element={<NotFound />} />
+          <Route path="/part/:productId" element={<LazyRoute><PartDetail /></LazyRoute>} />
+          <Route path="/product-not-found" element={<LazyRoute><ProductNotFound /></LazyRoute>} />
+          <Route path="*" element={<LazyRoute><NotFound /></LazyRoute>} />
         </Route>
 
         <Route element={<ProfileWithMenuLayout />}>

@@ -314,7 +314,11 @@ export const fetchProducts = createAsyncThunk(
                 '/products/public/',
                 { params }
             );
-            return response.data;
+            const data = response.data;
+            if (data && Array.isArray(data.items)) {
+                return data.items;
+            }
+            return data;
         } catch (error) {
             return rejectWithValue(
                 error.response?.data?.detail || 'Ошибка загрузки товаров'
