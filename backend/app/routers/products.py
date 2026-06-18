@@ -1151,11 +1151,15 @@ def get_public_products(
         product.is_on_avito = len(product.avito_listing_links) > 0
         product.is_on_drom = len(product.drom_listing_links) > 0
 
-    payload = {
-        "items": jsonable_encoder(products),
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-    }
-    set_cached_json_sync(cache_key, payload, settings.PRODUCTS_PUBLIC_CACHE_TTL_SECONDS)
-    return payload
+    response = PublicProductsResponse(
+        items=products,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+    set_cached_json_sync(
+        cache_key,
+        response.model_dump(mode="json"),
+        settings.PRODUCTS_PUBLIC_CACHE_TTL_SECONDS,
+    )
+    return response
