@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
@@ -402,6 +402,31 @@ const PartDetail = () => {
     setIsPhoneModalOpen(false);
   };
 
+  const handleBackToList = useCallback(() => {
+    const explicitBack = location.state?.backTo;
+    if (typeof explicitBack === 'string' && explicitBack.startsWith('/')) {
+      navigate(explicitBack);
+      return;
+    }
+
+    const historyIdx = window.history.state?.idx;
+    if (typeof historyIdx === 'number' && historyIdx > 0) {
+      navigate(-1);
+      return;
+    }
+
+    navigate('/autoparts/used');
+  }, [location.state, navigate]);
+
+  useEffect(() => {
+    if (!isPhoneModalOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') handleClosePhoneModal();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isPhoneModalOpen]);
+
   const isVideo = (item) => {
     if (typeof item === 'string') {
       return item.toLowerCase().endsWith('.mp4') ||
@@ -494,7 +519,8 @@ const PartDetail = () => {
           <p className="text-lg text-red-600">Ошибка загрузки информации о запчасти</p>
           <p className="text-sm text-gray-500 mt-2">{formatErrorText(error)}</p>
           <button 
-            onClick={() => navigate(-1)}
+            type="button"
+            onClick={handleBackToList}
             className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
           >
             Назад
@@ -563,7 +589,7 @@ const PartDetail = () => {
       <div className="max-w-6xl mx-auto px-4 py-4">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={handleBackToList}
           className="flex items-center text-sm font-medium text-gray-600 hover:text-indigo-600"
         >
           <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -616,7 +642,7 @@ const PartDetail = () => {
                 />
               </div>
               <div className="shrink-0 sm:text-right">
-                <div className="text-2xl font-bold text-gray-900 sm:text-3xl">
+                <div className="text-2xl font-bold text-indigo-700 sm:text-3xl">
                   {currentProduct.price ? `${currentProduct.price.toLocaleString('ru-RU')} ₽` : '—'}
                 </div>
               </div>
@@ -787,15 +813,15 @@ const PartDetail = () => {
           </div>
 
           {/* Right - Info & Actions */}
-          <div className="space-y-5 p-4 sm:p-5">
-            <dl className="space-y-2.5 text-sm">
-              <div className="flex items-baseline justify-between gap-4 border-b border-gray-100 pb-2.5">
-                <dt className="text-gray-500">В наличии</dt>
+          <div className="flex flex-col gap-5 border-t border-gray-100 bg-slate-50/40 p-4 sm:p-5 lg:border-t-0 lg:border-l lg:bg-slate-50/50">
+            <dl className="space-y-3 rounded-lg border border-gray-200/80 bg-white p-3.5 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <dt className="shrink-0 text-gray-500">В наличии</dt>
                 <dd className="font-semibold text-gray-900">{currentProduct.quantity || 0} шт.</dd>
               </div>
-              <div className="flex items-baseline justify-between gap-4 border-b border-gray-100 pb-2.5">
-                <dt className="text-gray-500">Склад / адрес</dt>
-                <dd className="max-w-[14rem] text-right font-medium text-gray-900 sm:max-w-none">
+              <div>
+                <dt className="text-gray-500">Адрес</dt>
+                <dd className="mt-1 font-medium leading-snug text-gray-900 break-words">
                   {currentProduct.storage_location?.address
                     || currentProduct.storage_location?.name
                     || '—'}
@@ -805,7 +831,7 @@ const PartDetail = () => {
 
             {/* Description */}
             {currentProduct.description && (
-              <div>
+              <div className="rounded-lg border border-gray-200/80 bg-white p-3.5">
                 <h2 className="mb-2 text-sm font-semibold text-gray-900">Описание</h2>
                 <div className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">
                   {stripHtmlTags(currentProduct.description)}
@@ -879,30 +905,33 @@ const PartDetail = () => {
 
             {/* Seller */}
             {(sellerOrg?.phone || sellerOrg?.contact_person) && (
-              <div className="border-t border-gray-100 pt-5">
+              <div className="rounded-lg border border-gray-200/80 bg-white p-3.5">
                 <h2 className="mb-3 text-sm font-semibold text-gray-900">Продавец</h2>
-                
-                {sellerOrg?.name && (
-                  <div className="mb-2 text-sm">
-                    <span className="text-gray-500">Организация: </span>
-                    <span className="font-medium text-gray-900">{sellerOrg.name}</span>
+
+                <div className="mb-3 flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+                    {(sellerOrg?.name || 'П').substring(0, 2).toUpperCase()}
                   </div>
-                )}
-                
-                {sellerOrg?.contact_person && (
-                  <div className="mb-3 text-sm">
-                    <span className="text-gray-500">Контакт: </span>
-                    <span className="font-medium text-gray-900">{sellerOrg.contact_person}</span>
+                  <div className="min-w-0">
+                    {sellerOrg?.name ? (
+                      <p className="truncate text-sm font-medium text-gray-900">{sellerOrg.name}</p>
+                    ) : null}
+                    {sellerOrg?.contact_person ? (
+                      <p className="truncate text-xs text-gray-500">{sellerOrg.contact_person}</p>
+                    ) : null}
                   </div>
-                )}
+                </div>
                 
                 <div className="flex flex-col gap-2 sm:flex-row">
                 {sellerOrg?.phone && (
                     <button
                       type="button"
                       onClick={handleOpenPhoneModal}
-                      className="flex flex-1 items-center justify-center rounded-md border border-gray-300 bg-white py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 py-2.5 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
                     >
+                      <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
                       Позвонить
                     </button>
                 )}
@@ -947,47 +976,65 @@ const PartDetail = () => {
 
       {/* Phone Modal */}
       {isPhoneModalOpen && sellerOrg?.phone && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleClosePhoneModal}>
-          <div 
-            className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 transform transition-all"
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          onClick={handleClosePhoneModal}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="part-phone-modal-title"
+        >
+          <div
+            className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                <svg className="w-5 h-5 mr-2 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-                Телефон продавца
-              </h3>
-              <button
-                onClick={handleClosePhoneModal}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Phone Number */}
-            <div className="bg-gray-50 rounded-xl p-4 mb-4">
-              <div className="text-center">
-                <div className="text-sm text-gray-500 mb-2">Номер телефона</div>
-                <div className="text-2xl font-bold text-gray-900">{formatPhoneNumber(sellerOrg.phone)}</div>
+            <div className="border-b border-indigo-100 bg-indigo-50/70 px-5 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 id="part-phone-modal-title" className="text-base font-semibold text-gray-900">
+                    Позвонить продавцу
+                  </h3>
+                  {sellerOrg?.name ? (
+                    <p className="mt-0.5 truncate text-sm text-gray-600">{sellerOrg.name}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClosePhoneModal}
+                  className="shrink-0 rounded-md p-1 text-gray-400 hover:bg-white/80 hover:text-gray-600"
+                  aria-label="Закрыть"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             </div>
 
-            {/* Call Button */}
-            <a
-              href={`tel:${sellerOrg.phone.replace(/\D/g, '')}`}
-              className="flex items-center justify-center w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg transition-colors shadow-sm"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-              Позвонить
-            </a>
+            <div className="px-5 py-5">
+              <p className="text-sm text-gray-500">Номер телефона</p>
+              <p className="mt-1 text-2xl font-bold tracking-wide text-gray-900">
+                {formatPhoneNumber(sellerOrg.phone)}
+              </p>
+
+              <div className="mt-5 flex flex-col gap-2">
+                <a
+                  href={`tel:${sellerOrg.phone.replace(/\D/g, '')}`}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                >
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  Позвонить
+                </a>
+                <button
+                  type="button"
+                  onClick={handleClosePhoneModal}
+                  className="rounded-lg py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1001,8 +1048,8 @@ const PartDetail = () => {
           <div className="mx-auto flex max-w-6xl items-center gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-xs text-gray-500">Цена</div>
-              <div className="truncate text-lg font-bold text-gray-900">
-                {currentProduct.price ? `${currentProduct.price.toLocaleString()} ₽` : '—'}
+              <div className="truncate text-lg font-bold text-indigo-700">
+                {currentProduct.price ? `${currentProduct.price.toLocaleString('ru-RU')} ₽` : '—'}
               </div>
             </div>
             {(() => {
