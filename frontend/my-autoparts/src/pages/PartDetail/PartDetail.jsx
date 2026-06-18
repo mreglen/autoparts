@@ -912,12 +912,18 @@ const PartDetail = () => {
                 <h2 className="mb-3 text-sm font-semibold text-gray-900">Продавец</h2>
 
                 <div className="mb-3 flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 shrink-0 overflow-hidden rounded-full bg-indigo-600">
+                  <div
+                    className={`flex h-9 w-9 shrink-0 overflow-hidden rounded-full ${
+                      sellerLogoUrl
+                        ? 'border border-gray-200 bg-white'
+                        : 'bg-indigo-600'
+                    }`}
+                  >
                     {sellerLogoUrl ? (
                       <img
                         src={sellerLogoUrl}
                         alt={sellerOrg?.name || 'Логотип продавца'}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain p-0.5"
                       />
                     ) : (
                       <span className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
