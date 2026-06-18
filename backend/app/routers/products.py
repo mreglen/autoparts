@@ -338,6 +338,7 @@ def find_public_used_product_match(
     brand: str = Query(..., min_length=1, max_length=120),
     article: str = Query(..., min_length=1, max_length=120),
     limit: int = Query(10, ge=1, le=50),
+    exclude_product_id: int | None = Query(None, ge=1),
     db: Session = Depends(get_db),
 ):
     brand_text = str(brand or "").strip()
@@ -393,6 +394,8 @@ def find_public_used_product_match(
 
     results: list[PublicUsedProductMatchOut] = []
     for product in products:
+        if exclude_product_id is not None and int(product.id) == int(exclude_product_id):
+            continue
         org = getattr(product, "organization", None)
         org_address = getattr(org, "address", None) if org else None
         org_name = getattr(org, "name", None) if org else None
@@ -428,7 +431,8 @@ def read_public_product(
             selectinload(VehicleModel.mileage_row),
         ),
         selectinload(ProductModel.storage_location),
-        selectinload(ProductModel.organization)
+        selectinload(ProductModel.organization),
+        selectinload(ProductModel.part_type),
     ).filter(
         ProductModel.id == product_id,
         ProductModel.quantity > 0  # Only show products that are in stock

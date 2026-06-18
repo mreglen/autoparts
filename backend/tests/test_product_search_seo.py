@@ -1,5 +1,6 @@
 import json
 import unittest
+from dataclasses import replace
 from unittest.mock import MagicMock
 
 from app.services.product_seo_service import build_product_seo_meta, render_product_prerender_html
@@ -161,6 +162,8 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         org.phone = "+79990000000"
         org.address = "620907, г. Екатеринбург, ул. Фруктовая, 17"
         product.organization = org
+        product.part_type = None
+        product.compatible_vehicles = []
         return product
 
     def test_build_product_seo_meta_uses_search_templates(self):
@@ -217,6 +220,32 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         html = render_product_prerender_html(meta)
         self.assertIn('property="og:image"', html)
         self.assertIn("/favicons/apple-touch-icon.png", html)
+
+    def test_prerender_html_includes_specs_fitment_and_alternate_offers(self):
+        product = self._make_product()
+        part_type = MagicMock()
+        part_type.name = "Фильтры"
+        product.part_type = part_type
+        product.compatible_vehicles = []
+        meta = build_product_seo_meta(product, site_origin="https://svoygarage.ru")
+        meta = replace(
+            meta,
+            part_type_name="Фильтры",
+            seller_name="Авторазбор",
+            seller_url="https://svoygarage.ru/organizations/org-1",
+            fitment_text="Toyota Camry, Lexus ES",
+            alternate_offers=(
+                ("MANN IF1009 — другой продавец", "https://svoygarage.ru/part/17-MANN-IF1009"),
+            ),
+        )
+        html = render_product_prerender_html(meta)
+        self.assertIn("Тип детали", html)
+        self.assertIn("Фильтры", html)
+        self.assertIn("Авторазбор", html)
+        self.assertIn("Подходит для автомобилей", html)
+        self.assertIn("Toyota Camry, Lexus ES", html)
+        self.assertIn("Другие предложения MANN IF1009", html)
+        self.assertIn("/part/17-MANN-IF1009", html)
 
 
 if __name__ == "__main__":

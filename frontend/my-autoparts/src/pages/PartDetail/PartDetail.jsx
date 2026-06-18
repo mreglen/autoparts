@@ -14,6 +14,11 @@ import { DEFAULT_OG_IMAGE_URL } from '../../utils/seoConstants';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import PartDetailSeoCrossLinks from './PartDetailSeoCrossLinks';
+import PartDetailSeoSummary from './PartDetailSeoSummary';
+import PartDetailSpecsBlock from './PartDetailSpecsBlock';
+import PartDetailFitmentBlock from './PartDetailFitmentBlock';
+import PartArticleMatchesBlock from '../../components/PartArticleMatchesBlock/PartArticleMatchesBlock';
+import { mergeProductFitment } from '../../utils/mergeProductFitment';
 
 const formatErrorText = (value) => {
   if (!value) return 'Ошибка загрузки товара';
@@ -98,6 +103,11 @@ const PartDetail = () => {
   const [creatingChat, setCreatingChat] = useState(false);
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [apiSeo, setApiSeo] = useState(null);
+  const [alternateOffers, setAlternateOffers] = useState([]);
+  const [alternateOffersLoading, setAlternateOffersLoading] = useState(false);
+  const [alternateOffersError, setAlternateOffersError] = useState('');
+  const [referenceFitment, setReferenceFitment] = useState([]);
+  const [referenceFitmentLoading, setReferenceFitmentLoading] = useState(false);
   const fetchedProductIdRef = useRef(null);
   const searchedBrandArticleRef = useRef(null);
 
@@ -147,6 +157,76 @@ const PartDetail = () => {
     };
     run();
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!showProduct || !currentProduct?.brand || !currentProduct?.article) {
+      setAlternateOffers([]);
+      setAlternateOffersError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      setAlternateOffersLoading(true);
+      setAlternateOffersError('');
+      try {
+        const response = await apiAxiosUnauth.get('/products/public/find-used-match', {
+          params: {
+            brand: currentProduct.brand,
+            article: currentProduct.article,
+            limit: 20,
+            exclude_product_id: currentProduct.id,
+          },
+        });
+        if (!cancelled) {
+          setAlternateOffers(Array.isArray(response?.data) ? response.data : []);
+        }
+      } catch (_error) {
+        if (!cancelled) {
+          setAlternateOffers([]);
+          setAlternateOffersError('Не удалось загрузить другие предложения');
+        }
+      } finally {
+        if (!cancelled) setAlternateOffersLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [showProduct, currentProduct?.id, currentProduct?.brand, currentProduct?.article]);
+
+  useEffect(() => {
+    if (!showProduct || !currentProduct?.brand || !currentProduct?.article) {
+      setReferenceFitment([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      setReferenceFitmentLoading(true);
+      try {
+        const response = await apiAxiosUnauth.get('/public/part-reference-fitment', {
+          params: {
+            brand: currentProduct.brand,
+            article: currentProduct.article,
+            exclude_product_id: currentProduct.id,
+          },
+        });
+        if (!cancelled) {
+          setReferenceFitment(Array.isArray(response?.data?.vehicles) ? response.data.vehicles : []);
+        }
+      } catch (_error) {
+        if (!cancelled) setReferenceFitment([]);
+      } finally {
+        if (!cancelled) setReferenceFitmentLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [showProduct, currentProduct?.id, currentProduct?.brand, currentProduct?.article]);
 
   useEffect(() => {
     if (!currentProduct?.id) return;
@@ -468,6 +548,13 @@ const PartDetail = () => {
     partBrand,
     partArticle,
   );
+  const mergedFitment = mergeProductFitment(
+    currentProduct.compatible_vehicles || [],
+    referenceFitment,
+  );
+  const alternateOffersTitle = partBrand && partArticle
+    ? `Другие предложения ${partBrand} ${partArticle}`
+    : 'Другие предложения с этим артикулом';
 
   return (
     <div className="min-h-screen bg-gray-50 max-md:pb-28">
@@ -500,9 +587,7 @@ const PartDetail = () => {
                     </span>
                   ) : null}
                 </h1>
-                {seo.seoSummary ? (
-                  <p className="sr-only">{seo.seoSummary}</p>
-                ) : null}
+                <PartDetailSeoSummary summary={seo.seoSummary} />
                 <div className="flex flex-wrap gap-2 items-center">
                   <div className="flex items-center bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium">
                     <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -540,6 +625,7 @@ const PartDetail = () => {
                   organizationName={sellerOrg?.name}
                   usedCatalogPath={seo.usedCatalogPath}
                 />
+                <PartDetailSpecsBlock product={currentProduct} />
               </div>
               <div className="text-left sm:text-right">
                 <div className="text-3xl sm:text-4xl font-bold text-gray-900">
@@ -857,62 +943,18 @@ const PartDetail = () => {
         </div>
       </div>
 
-      {/* Compatible Vehicles */}
-      {currentProduct.compatible_vehicles && currentProduct.compatible_vehicles.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mt-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-            <svg className="w-5 h-5 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-            </svg>
-            Совместимые автомобили
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {currentProduct.compatible_vehicles.map((vehicle) => (
-              <div key={vehicle.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                <div className="flex items-center mb-3 pb-3 border-b border-gray-200">
-                  <svg className="w-4 h-4 mr-2 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  <span className="font-bold text-gray-900 text-sm">{vehicle.brand} {vehicle.model}</span>
-                </div>
-                <div className="space-y-1.5 text-xs">
-                  {vehicle.generation && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Поколение:</span>
-                      <span className="font-semibold text-gray-900">{vehicle.generation}</span>
-                    </div>
-                  )}
-                  {vehicle.engine && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Двигатель:</span>
-                      <span className="font-semibold text-gray-900">{vehicle.engine}</span>
-                    </div>
-                  )}
-                  {vehicle.transmission && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">КПП:</span>
-                      <span className="font-semibold text-gray-900">{vehicle.transmission}</span>
-                    </div>
-                  )}
-                  {vehicle.vin && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">VIN:</span>
-                      <span className="font-semibold text-gray-900 truncate max-w-[150px]">{vehicle.vin}</span>
-                    </div>
-                  )}
-                  {vehicle.mileage && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Пробег:</span>
-                      <span className="font-semibold text-gray-900">{vehicle.mileage.toLocaleString()} км</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <PartDetailFitmentBlock
+        vehicles={mergedFitment}
+        loading={referenceFitmentLoading}
+      />
+
+      <PartArticleMatchesBlock
+        title={alternateOffersTitle}
+        items={alternateOffers}
+        loading={alternateOffersLoading}
+        error={alternateOffersError}
+        currentProductId={currentProduct.id}
+      />
 
       {/* Media Modal */}
       <MediaModal

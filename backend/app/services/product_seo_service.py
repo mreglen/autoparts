@@ -9,6 +9,12 @@ from urllib.parse import unquote, urlparse
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.product import Product as ProductModel
+from app.services.product_alternate_offers_service import find_alternate_used_product_offers
+from app.services.product_reference_fitment_service import (
+    format_fitment_text,
+    get_reference_fitment_vehicles,
+    merge_fitment_vehicles,
+)
 from app.services.spa_page_check_service import PART_PATH_RE, _normalize_path
 from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
 from app.utils.page_keywords import build_page_keywords
@@ -48,6 +54,11 @@ class ProductSeoMeta:
     article: str = ""
     city: str = ""
     condition_label: str = ""
+    part_type_name: str = ""
+    seller_name: str = ""
+    seller_url: str = ""
+    fitment_text: str = ""
+    alternate_offers: tuple[tuple[str, str], ...] = ()
 
 
 def _strip_html(value: str | None) -> str:
@@ -74,13 +85,19 @@ def _load_product(db: Session, product_id: int) -> ProductModel | None:
             selectinload(ProductModel.photos),
             selectinload(ProductModel.organization),
             selectinload(ProductModel.part_type),
+            selectinload(ProductModel.compatible_vehicles),
         )
         .filter(ProductModel.id == product_id, ProductModel.quantity > 0)
         .first()
     )
 
 
-def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = None) -> ProductSeoMeta:
+def build_product_seo_meta(
+    product: ProductModel,
+    *,
+    site_origin: str | None = None,
+    db: Session | None = None,
+) -> ProductSeoMeta:
     origin = _resolve_site_origin(site_origin)
     brand = (product.brand or "").strip()
     article = (product.article or "").strip()
@@ -180,6 +197,41 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
     if parsed_catalog.query:
         used_catalog_path = f"{used_catalog_path}?{parsed_catalog.query}"
     condition_label = "Новая" if product.is_new else "Б/у"
+    part_type = getattr(product, "part_type", None)
+    part_type_name = (getattr(part_type, "name", None) or "").strip()
+    seller_url = ""
+    if organization and getattr(organization, "id", None):
+        seller_url = f"{origin.rstrip('/')}/organizations/{organization.id}"
+
+    seller_vehicle_dicts = [
+        {
+            "brand": getattr(vehicle, "brand", None),
+            "model": getattr(vehicle, "model", None),
+            "generation": getattr(vehicle, "generation", None),
+        }
+        for vehicle in (product.compatible_vehicles or [])
+    ]
+    reference_vehicle_dicts: list[dict[str, str]] = []
+    alternate_offers: tuple[tuple[str, str], ...] = ()
+    fitment_text = ""
+    if db is not None and brand and article:
+        reference_vehicle_dicts = get_reference_fitment_vehicles(
+            db,
+            brand=brand,
+            article=article,
+            exclude_product_id=int(product.id),
+        )
+        merged_fitment = merge_fitment_vehicles(seller_vehicle_dicts, reference_vehicle_dicts)
+        fitment_text = format_fitment_text(merged_fitment)
+        offers = find_alternate_used_product_offers(
+            db,
+            brand=brand,
+            article=article,
+            exclude_product_id=int(product.id),
+            limit=5,
+            site_origin=origin,
+        )
+        alternate_offers = tuple((offer.label, offer.url) for offer in offers)
 
     return ProductSeoMeta(
         title=title,
@@ -205,6 +257,11 @@ def build_product_seo_meta(product: ProductModel, *, site_origin: str | None = N
         article=article,
         city=city,
         condition_label=condition_label,
+        part_type_name=part_type_name,
+        seller_name=org_name or "",
+        seller_url=seller_url,
+        fitment_text=fitment_text,
+        alternate_offers=alternate_offers,
     )
 
 
@@ -291,7 +348,7 @@ def get_product_seo_for_path(db: Session, raw_path: str) -> ProductSeoMeta | Non
     product = _load_product(db, product_id)
     if product is None:
         return None
-    return build_product_seo_meta(product)
+    return build_product_seo_meta(product, db=db)
 
 
 def render_product_prerender_html(meta: ProductSeoMeta) -> str:
@@ -355,8 +412,40 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
             if meta.condition_label
             else ""
         )
+        part_type_row = (
+            f"<dt>Тип детали</dt><dd>{html.escape(meta.part_type_name)}</dd>"
+            if meta.part_type_name
+            else ""
+        )
+        seller_row = ""
+        if meta.seller_name:
+            if meta.seller_url:
+                seller_row = (
+                    f'<dt>Продавец</dt><dd><a href="{html.escape(meta.seller_url, quote=True)}">'
+                    f"{html.escape(meta.seller_name)}</a></dd>"
+                )
+            else:
+                seller_row = f"<dt>Продавец</dt><dd>{html.escape(meta.seller_name)}</dd>"
         details_html = (
-            f"    <dl>{brand_row}{article_row}{price_row}{city_row}{condition_row}</dl>\n"
+            "    <dl>"
+            f"{brand_row}{article_row}{price_row}{city_row}{condition_row}{part_type_row}{seller_row}"
+            "</dl>\n"
+        )
+    fitment_html = ""
+    if meta.fitment_text:
+        fitment_html = (
+            f"    <p><strong>Подходит для автомобилей:</strong> {html.escape(meta.fitment_text)}</p>\n"
+            "    <p><em>Справочная информация. Перед покупкой уточните совместимость у продавца.</em></p>\n"
+        )
+    alternate_offers_html = ""
+    if meta.alternate_offers:
+        items = "".join(
+            f'<li><a href="{html.escape(url, quote=True)}">{html.escape(label)}</a></li>'
+            for label, url in meta.alternate_offers
+        )
+        alternate_offers_html = (
+            f"    <h2>Другие предложения {html.escape(meta.brand)} {html.escape(meta.article)}</h2>\n"
+            f"    <ul>{items}</ul>\n"
         )
     breadcrumb_html = (
         "  <nav aria-label=\"Хлебные крошки\">\n"
@@ -388,7 +477,7 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
 {breadcrumb_html}  <article>
     <h1>{h1}</h1>{image_block}
     <p>{body_desc}</p>
-{details_html}{used_catalog_link}  </article>
+{details_html}{fitment_html}{alternate_offers_html}{used_catalog_link}  </article>
 </body>
 </html>
 """

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.core.internal_access import require_internal_prerender
+from app.services.product_reference_fitment_service import get_reference_fitment_vehicles
 from app.services.product_seo_service import (
     get_product_seo_for_path,
     render_product_prerender_html,
@@ -33,6 +34,21 @@ class ProductSeoMetaResponse(BaseModel):
     seo_summary: str = ""
     body_description: str | None = None
     used_catalog_path: str = ""
+    part_type_name: str = ""
+    seller_name: str = ""
+    seller_url: str = ""
+    fitment_text: str = ""
+
+
+class PartReferenceFitmentVehicleOut(BaseModel):
+    brand: str
+    model: str
+    generation: str = ""
+    source: str = "reference"
+
+
+class PartReferenceFitmentResponse(BaseModel):
+    vehicles: list[PartReferenceFitmentVehicleOut] = []
 
 
 class NewPartSeoMetaResponse(BaseModel):
@@ -69,6 +85,36 @@ def public_part_meta(
         seo_summary=meta.seo_summary,
         body_description=meta.body_description,
         used_catalog_path=meta.used_catalog_path,
+        part_type_name=meta.part_type_name,
+        seller_name=meta.seller_name,
+        seller_url=meta.seller_url,
+        fitment_text=meta.fitment_text,
+    )
+
+
+@router.get("/public/part-reference-fitment", response_model=PartReferenceFitmentResponse)
+def public_part_reference_fitment(
+    brand: str = Query(..., min_length=1, max_length=120),
+    article: str = Query(..., min_length=1, max_length=120),
+    exclude_product_id: int | None = Query(None, ge=1),
+    db: Session = Depends(get_db),
+):
+    vehicles = get_reference_fitment_vehicles(
+        db,
+        brand=brand,
+        article=article,
+        exclude_product_id=exclude_product_id,
+    )
+    return PartReferenceFitmentResponse(
+        vehicles=[
+            PartReferenceFitmentVehicleOut(
+                brand=item.get("brand", ""),
+                model=item.get("model", ""),
+                generation=item.get("generation", ""),
+                source=item.get("source", "reference"),
+            )
+            for item in vehicles
+        ]
     )
 
 
