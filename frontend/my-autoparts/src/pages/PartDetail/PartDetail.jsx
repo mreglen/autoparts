@@ -562,8 +562,9 @@ const PartDetail = () => {
       {/* Back Button */}
       <div className="max-w-6xl mx-auto px-4 py-4">
         <button
+          type="button"
           onClick={() => navigate(-1)}
-          className="flex items-center text-gray-600 hover:text-blue-600 transition-colors"
+          className="flex items-center text-sm font-medium text-gray-600 hover:text-indigo-600"
         >
           <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
@@ -574,47 +575,35 @@ const PartDetail = () => {
 
       {/* Main Product Card */}
       <div className="max-w-6xl mx-auto px-4 pb-8 max-md:pb-32">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden max-md:rounded-none max-md:border-x-0 max-md:border-t-0">
-          {/* Header with Product Info */}
-          <div className="p-5 border-b border-gray-100">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-              <div className="flex-1">
-                <h1 className="mb-3 text-xl font-bold leading-tight text-gray-900 sm:text-2xl md:text-3xl">
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white max-md:rounded-none max-md:border-x-0 max-md:border-t-0">
+          {/* Header */}
+          <div className="border-b border-gray-100 px-4 py-4 sm:px-5 sm:py-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl font-bold leading-snug text-gray-900 sm:text-2xl">
                   <span className="block">{h1Primary}</span>
                   {h1Subtitle ? (
-                    <span className="mt-1 block text-base font-medium text-gray-600 sm:text-lg">
+                    <span className="mt-1 block text-base font-medium text-gray-600">
                       {h1Subtitle}
                     </span>
                   ) : null}
                 </h1>
                 <PartDetailSeoSummary summary={seo.seoSummary} />
-                <div className="flex flex-wrap gap-2 items-center">
-                  <div className="flex items-center bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium">
-                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+                  <span className="rounded bg-gray-100 px-2.5 py-1 font-medium text-gray-700">
                     {currentProduct.brand || '—'}
-                  </div>
-                  <div className="flex items-center bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium">
-                    <svg className="w-4 h-4 mr-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-                    </svg>
+                  </span>
+                  <span className="rounded bg-gray-100 px-2.5 py-1 font-medium text-gray-700">
                     Арт. {currentProduct.article || '—'}
-                  </div>
+                  </span>
                   {currentProduct.is_new ? (
-                    <div className="flex items-center bg-green-50 text-green-700 px-3 py-1.5 rounded-lg text-sm font-medium border border-green-200">
-                      <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
+                    <span className="rounded bg-green-100 px-2.5 py-1 font-medium text-green-800">
                       Новая
-                    </div>
+                    </span>
                   ) : (
-                    <div className="flex items-center bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-lg text-sm font-medium border border-yellow-200">
-                      <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                      </svg>
+                    <span className="rounded bg-amber-100 px-2.5 py-1 font-medium text-amber-900">
                       Б/у
-                    </div>
+                    </span>
                   )}
                 </div>
                 <PartDetailSeoCrossLinks
@@ -625,20 +614,19 @@ const PartDetail = () => {
                   organizationName={sellerOrg?.name}
                   usedCatalogPath={seo.usedCatalogPath}
                 />
-                <PartDetailSpecsBlock product={currentProduct} />
               </div>
-              <div className="text-left sm:text-right">
-                <div className="text-3xl sm:text-4xl font-bold text-gray-900">
-                  {currentProduct.price ? `${currentProduct.price.toLocaleString()} ₽` : '—'}
+              <div className="shrink-0 sm:text-right">
+                <div className="text-2xl font-bold text-gray-900 sm:text-3xl">
+                  {currentProduct.price ? `${currentProduct.price.toLocaleString('ru-RU')} ₽` : '—'}
                 </div>
               </div>
             </div>
           </div>
 
           {/* Two Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
-            {/* Left - Media Gallery (2 columns) */}
-            <div className="border-r border-gray-100 p-5 max-md:border-r-0 max-md:px-0 max-md:pt-0 lg:col-span-2">
+          <div className="grid grid-cols-1 gap-0 lg:grid-cols-3">
+            {/* Left - Media Gallery + Specs */}
+            <div className="border-r border-gray-100 p-4 sm:p-5 max-md:border-r-0 max-md:px-4 max-md:pt-0 lg:col-span-2">
               {(currentProduct.photos && currentProduct.photos.length > 0) || (currentProduct.videos && currentProduct.videos.length > 0) ? (
                 <div>
                   {(() => {
@@ -652,8 +640,8 @@ const PartDetail = () => {
                       <>
                         {/* Main Media - Large Display */}
                 <div className="relative">
-                  <div 
-                    className="relative aspect-[4/3] bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden cursor-pointer group mb-4 border-2 border-gray-200 hover:border-blue-400 transition-all duration-300"
+                  <div
+                    className="group relative mb-3 aspect-[4/3] cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
                     onClick={() => handleOpenMediaModal(currentMainMediaIndex)}
                   >
                     {(() => {
@@ -672,9 +660,9 @@ const PartDetail = () => {
                                 playsInline
                                 preload="metadata"
                               />
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center pointer-events-none">
-                                <div className="bg-white/90 rounded-full p-5 shadow-xl transform transition-transform duration-300 group-hover:scale-110">
-                                  <svg className="w-16 h-16 text-indigo-600 ml-1" fill="currentColor" viewBox="0 0 20 20">
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
+                                <div className="rounded-full bg-white/90 p-4">
+                                  <svg className="ml-0.5 h-10 w-10 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
                                     <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                                   </svg>
                                 </div>
@@ -701,7 +689,8 @@ const PartDetail = () => {
                     <>
                       {/* Left Arrow */}
                       <button
-                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-white hover:bg-gray-50 text-gray-700 hover:text-blue-600 p-2.5 rounded-full shadow-lg transition-all duration-200 z-10 border border-gray-200"
+                        type="button"
+                        className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 text-gray-600 hover:text-indigo-600"
                         onClick={(e) => {
                           e.stopPropagation();
                           setCurrentMainMediaIndex(prev => prev > 0 ? prev - 1 : allMediaItems.length - 1);
@@ -714,7 +703,8 @@ const PartDetail = () => {
 
                       {/* Right Arrow */}
                       <button
-                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-white hover:bg-gray-50 text-gray-700 hover:text-blue-600 p-2.5 rounded-full shadow-lg transition-all duration-200 z-10 border border-gray-200"
+                        type="button"
+                        className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 text-gray-600 hover:text-indigo-600"
                         onClick={(e) => {
                           e.stopPropagation();
                           setCurrentMainMediaIndex(prev => prev < allMediaItems.length - 1 ? prev + 1 : 0);
@@ -726,7 +716,7 @@ const PartDetail = () => {
                       </button>
 
                       {/* Media Counter */}
-                      <div className="absolute bottom-3 left-3 bg-black/70 text-white px-3 py-1.5 rounded-full text-sm font-medium">
+                      <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-1 text-xs font-medium text-white">
                         {currentMainMediaIndex + 1} / {allMediaItems.length}
                       </div>
                     </>
@@ -735,7 +725,7 @@ const PartDetail = () => {
 
                 {/* Thumbnails Grid */}
                 {allMediaItems.length > 1 && (
-                  <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-4 lg:grid-cols-5">
                     {allMediaItems.map((item, index) => {
                       const mediaUrl = normalizeImageUrl(getMediaUrl(item));
                       const isVideoItem = isVideo(item);
@@ -743,10 +733,10 @@ const PartDetail = () => {
                       return (
                         <div 
                           key={index}
-                          className={`relative aspect-square bg-gray-50 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border-2 ${
+                          className={`relative aspect-square cursor-pointer overflow-hidden rounded-md border bg-gray-50 ${
                             currentMainMediaIndex === index 
-                              ? 'border-blue-500 ring-2 ring-blue-200' 
-                              : 'border-gray-200 hover:border-blue-400'
+                              ? 'border-indigo-500' 
+                              : 'border-gray-200 hover:border-gray-300'
                           }`}
                           onClick={() => setCurrentMainMediaIndex(index)}
                         >
@@ -788,37 +778,36 @@ const PartDetail = () => {
           })()}
         </div>
       ) : (
-              <div className="flex items-center justify-center h-64 bg-gray-50 rounded-xl">
-                <div className="text-center text-gray-400">
-                  <svg className="w-16 h-16 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <p className="text-sm">Нет фотографий или видео</p>
-                </div>
+              <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50">
+                <p className="text-sm text-gray-400">Нет фотографий или видео</p>
               </div>
             )}
+
+              <PartDetailSpecsBlock product={currentProduct} />
           </div>
 
-          {/* Right - Info & Actions (1 column) */}
-          <div className="p-5 space-y-4">
-            {/* Stock & Location */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-100">
-                <div className="text-2xl font-bold text-emerald-700">{currentProduct.quantity || 0} шт.</div>
+          {/* Right - Info & Actions */}
+          <div className="space-y-5 p-4 sm:p-5">
+            <dl className="space-y-2.5 text-sm">
+              <div className="flex items-baseline justify-between gap-4 border-b border-gray-100 pb-2.5">
+                <dt className="text-gray-500">В наличии</dt>
+                <dd className="font-semibold text-gray-900">{currentProduct.quantity || 0} шт.</dd>
               </div>
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
-                <div className="text-xs font-semibold text-blue-900 line-clamp-2">
-                  {currentProduct.storage_location?.address || 
-                   currentProduct.storage_location?.name || 
-                   '—'}
-                </div>
+              <div className="flex items-baseline justify-between gap-4 border-b border-gray-100 pb-2.5">
+                <dt className="text-gray-500">Склад / адрес</dt>
+                <dd className="max-w-[14rem] text-right font-medium text-gray-900 sm:max-w-none">
+                  {currentProduct.storage_location?.address
+                    || currentProduct.storage_location?.name
+                    || '—'}
+                </dd>
               </div>
-            </div>
+            </dl>
 
             {/* Description */}
             {currentProduct.description && (
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
+              <div>
+                <h2 className="mb-2 text-sm font-semibold text-gray-900">Описание</h2>
+                <div className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">
                   {stripHtmlTags(currentProduct.description)}
                 </div>
               </div>
@@ -826,7 +815,7 @@ const PartDetail = () => {
 
             {/* Add to Cart */}
             {currentProduct && (
-            <div className="hidden rounded-xl border border-gray-200 bg-gray-50 p-4 md:block">
+            <div className="hidden md:block">
               {(() => {
                 const cartQuantity = getCartQuantity(currentProduct.id);
                 const stockInfo = getStockAvailability(currentProduct);
@@ -840,7 +829,7 @@ const PartDetail = () => {
                           <button
                             onClick={() => handleRemoveFromCart(currentProduct)}
                             disabled={isAdding}
-                            className="w-10 h-10 flex items-center justify-center text-xl font-bold rounded-lg border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all"
+                            className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-300 bg-white text-xl font-bold hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                           >
                             −
                           </button>
@@ -850,7 +839,7 @@ const PartDetail = () => {
                           <button
                             onClick={() => handleAddToCart(currentProduct)}
                             disabled={isAdding || stockInfo.noStock}
-                            className="w-10 h-10 flex items-center justify-center text-xl font-bold rounded-lg border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all"
+                            className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-300 bg-white text-xl font-bold hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                           >
                             +
                           </button>
@@ -865,7 +854,7 @@ const PartDetail = () => {
                       <button
                         onClick={() => handleAddToCart(currentProduct)}
                         disabled={isAdding || stockInfo.noStock}
-                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-base font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                        className="w-full rounded-md bg-indigo-600 py-3 text-base font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {isAdding ? (
                           <svg className="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -890,59 +879,50 @@ const PartDetail = () => {
 
             {/* Seller */}
             {(sellerOrg?.phone || sellerOrg?.contact_person) && (
-              <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-100">
-                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center">
-                  <svg className="w-4 h-4 mr-2 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  Продавец
-                </h3>
+              <div className="border-t border-gray-100 pt-5">
+                <h2 className="mb-3 text-sm font-semibold text-gray-900">Продавец</h2>
                 
                 {sellerOrg?.name && (
-                  <div className="mb-3">
-                    <div className="text-xs text-gray-500 mb-1">Организация</div>
-                    <div className="font-semibold text-gray-900 text-sm">{sellerOrg.name}</div>
+                  <div className="mb-2 text-sm">
+                    <span className="text-gray-500">Организация: </span>
+                    <span className="font-medium text-gray-900">{sellerOrg.name}</span>
                   </div>
                 )}
                 
                 {sellerOrg?.contact_person && (
-                  <div className="mb-3">
-                    <div className="text-xs text-gray-500 mb-1">Контактное лицо</div>
-                    <div className="font-semibold text-gray-900 text-sm">{sellerOrg.contact_person}</div>
+                  <div className="mb-3 text-sm">
+                    <span className="text-gray-500">Контакт: </span>
+                    <span className="font-medium text-gray-900">{sellerOrg.contact_person}</span>
                   </div>
                 )}
                 
+                <div className="flex flex-col gap-2 sm:flex-row">
                 {sellerOrg?.phone && (
-                  <div className="mb-2">
                     <button
+                      type="button"
                       onClick={handleOpenPhoneModal}
-                      className="flex items-center justify-center w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg transition-colors shadow-sm"
+                      className="flex flex-1 items-center justify-center rounded-md border border-gray-300 bg-white py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                     >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
                       Позвонить
                     </button>
-                  </div>
                 )}
                 
-                {/* Кнопка "Написать" */}
                 <button
+                  type="button"
                   onClick={handleWriteToSeller}
                   disabled={creatingChat}
-                  className="flex items-center justify-center w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors shadow-sm"
+                  className="flex flex-1 items-center justify-center rounded-md bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-indigo-400"
                 >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                  {creatingChat ? 'Создание чата...' : 'Написать'}
+                  {creatingChat ? 'Создание чата…' : 'Написать'}
                 </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
 
+      <div className="max-w-6xl mx-auto px-4">
       <PartDetailFitmentBlock
         vehicles={mergedFitment}
         loading={referenceFitmentLoading}
@@ -955,6 +935,7 @@ const PartDetail = () => {
         error={alternateOffersError}
         currentProductId={currentProduct.id}
       />
+      </div>
 
       {/* Media Modal */}
       <MediaModal
@@ -1056,7 +1037,7 @@ const PartDetail = () => {
                   type="button"
                   onClick={() => handleAddToCart(currentProduct)}
                   disabled={isAdding || stockInfo.noStock}
-                  className="min-h-11 shrink-0 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-h-11 shrink-0 rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isAdding ? '…' : 'В корзину'}
                 </button>
@@ -1067,7 +1048,7 @@ const PartDetail = () => {
                 type="button"
                 onClick={handleWriteToSeller}
                 disabled={creatingChat}
-                className="min-h-11 shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-800 disabled:opacity-50"
+                className="min-h-11 shrink-0 rounded-md border border-indigo-200 bg-indigo-50 px-3 text-sm font-semibold text-indigo-800 disabled:opacity-50"
               >
                 {creatingChat ? '…' : 'Чат'}
               </button>

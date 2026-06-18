@@ -4,8 +4,8 @@ import { resolveProductCity } from '../../utils/productSearchSeo';
 
 function SpecRow({ label, children }) {
   return (
-    <div className="grid grid-cols-[7.5rem_1fr] gap-2 border-b border-gray-100 py-2.5 last:border-b-0">
-      <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</dt>
+    <div className="grid grid-cols-[6.5rem_1fr] gap-x-3 gap-y-1 border-b border-gray-100 py-2 last:border-b-0 sm:grid-cols-[8rem_1fr]">
+      <dt className="text-sm text-gray-500">{label}</dt>
       <dd className="text-sm text-gray-900">{children}</dd>
     </div>
   );
@@ -23,10 +23,8 @@ export default function PartDetailSpecsBlock({ product }) {
   const sellerName = (seller?.name || '').trim();
 
   return (
-    <section className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-      <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-gray-900">
-        Характеристики
-      </h2>
+    <section className="mt-5 border-t border-gray-200 pt-5">
+      <h2 className="mb-2 text-sm font-semibold text-gray-900">Характеристики</h2>
       <dl>
         {partTypeName ? <SpecRow label="Тип детали">{partTypeName}</SpecRow> : null}
         <SpecRow label="Состояние">{conditionLabel}</SpecRow>

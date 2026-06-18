@@ -56,11 +56,11 @@ export default function PartDetailSeoCrossLinks({
   }
 
   return (
-    <div className="mt-4 flex flex-wrap gap-3">
+    <div className="mt-3 flex flex-wrap gap-2">
       {catalogHref ? (
         <Link
           to={catalogHref}
-          className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+          className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
         >
           Каталог по артикулу
         </Link>
@@ -68,7 +68,7 @@ export default function PartDetailSeoCrossLinks({
       {brandSlug ? (
         <Link
           to={`/autoparts/used/brand/${encodeURIComponent(brandSlug)}`}
-          className="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+          className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 sm:text-sm"
         >
           Все б/у {brandText}
         </Link>
@@ -76,7 +76,7 @@ export default function PartDetailSeoCrossLinks({
       {newPartHref ? (
         <Link
           to={newPartHref}
-          className="inline-flex items-center rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-100"
+          className="rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-100 sm:text-sm"
         >
           Новая аналогичная
         </Link>
@@ -84,7 +84,7 @@ export default function PartDetailSeoCrossLinks({
       {organizationId ? (
         <Link
           to={`/organizations/${organizationId}`}
-          className="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+          className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
         >
           {organizationName ? `Продавец: ${organizationName}` : 'Страница продавца'}
         </Link>
