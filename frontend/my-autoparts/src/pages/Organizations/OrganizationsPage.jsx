@@ -10,6 +10,7 @@ import {
   getOrganizationLogoUrl,
 } from './organizationPublicUtils';
 import { buildOrganizationsListSeo } from './organizationSeo';
+import YandexWebmasterCounter from '../../components/Seo/YandexWebmasterCounter';
 
 function OrganizationCard({ org }) {
   const name = getOrganizationDisplayName(org.name);
@@ -226,6 +227,7 @@ export default function OrganizationsPage() {
           )}
         </div>
       </div>
+      <YandexWebmasterCounter />
     </div>
   );
 }

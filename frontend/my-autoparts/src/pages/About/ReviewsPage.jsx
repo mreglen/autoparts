@@ -9,6 +9,7 @@ import PageAmbientBackground from '../../components/PageAmbientBackground/PageAm
 import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
 import { reviewSourceLabel } from '../../components/Reviews/reviewUtils';
 import YandexReviewsEmbed from '../../components/Reviews/YandexReviewsEmbed';
+import YandexWebmasterCounter from '../../components/Seo/YandexWebmasterCounter';
 
 const FILTER_OPTIONS = [
   { id: 'all', label: 'Все' },
@@ -200,6 +201,7 @@ export default function ReviewsPage() {
         </section>
         </div>
       </div>
+      <YandexWebmasterCounter />
     </>
   );
 }
