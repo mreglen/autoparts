@@ -1,84 +1,64 @@
-import React from 'react';
-import NewPartVehicleCompatibilityStrip from '../AutoParts/NewParts/NewPartVehicleCompatibilityStrip';
+import React, { useMemo } from 'react';
+import { hasDonorDetails } from '../../utils/fitmentDisplay';
+import { splitFitmentForDisplay } from '../../utils/mergeProductFitment';
+import PartDetailDonorVehicleCard from './PartDetailDonorVehicleCard';
+import PartDetailCompatibilityList from './PartDetailCompatibilityList';
 
-function FitmentCard({ vehicle }) {
+function FitmentSkeleton() {
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <div className="mb-2 border-b border-gray-200 pb-2 text-sm font-semibold text-gray-900">
-        {vehicle.brand} {vehicle.model}
+    <div className="mt-4 space-y-3">
+      <div className="h-24 animate-pulse rounded-xl bg-gray-100" />
+      <div className="flex gap-2">
+        <div className="h-16 w-40 animate-pulse rounded-xl bg-gray-100" />
+        <div className="h-16 w-40 animate-pulse rounded-xl bg-gray-100" />
+        <div className="hidden h-16 w-40 animate-pulse rounded-xl bg-gray-100 sm:block" />
       </div>
-      <dl className="space-y-1 text-xs">
-        {vehicle.generation ? (
-          <div className="flex justify-between gap-3">
-            <dt className="text-gray-500">Поколение</dt>
-            <dd className="font-medium text-gray-900">{vehicle.generation}</dd>
-          </div>
-        ) : null}
-        {vehicle.engine ? (
-          <div className="flex justify-between gap-3">
-            <dt className="text-gray-500">Двигатель</dt>
-            <dd className="font-medium text-gray-900">{vehicle.engine}</dd>
-          </div>
-        ) : null}
-        {vehicle.transmission ? (
-          <div className="flex justify-between gap-3">
-            <dt className="text-gray-500">КПП</dt>
-            <dd className="font-medium text-gray-900">{vehicle.transmission}</dd>
-          </div>
-        ) : null}
-        {vehicle.vin ? (
-          <div className="flex justify-between gap-3">
-            <dt className="text-gray-500">VIN</dt>
-            <dd className="max-w-[150px] truncate font-medium text-gray-900">{vehicle.vin}</dd>
-          </div>
-        ) : null}
-        {vehicle.mileage ? (
-          <div className="flex justify-between gap-3">
-            <dt className="text-gray-500">Пробег</dt>
-            <dd className="font-medium text-gray-900">
-              {Number(vehicle.mileage).toLocaleString('ru-RU')} км
-            </dd>
-          </div>
-        ) : null}
-      </dl>
     </div>
   );
 }
 
-export default function PartDetailFitmentBlock({ vehicles = [], loading = false }) {
-  const list = Array.isArray(vehicles) ? vehicles.filter(Boolean) : [];
-  if (loading && list.length === 0) {
+export default function PartDetailFitmentBlock({
+  sellerVehicles = [],
+  referenceVehicles = [],
+  loading = false,
+}) {
+  const { donors, compatibility } = useMemo(
+    () => splitFitmentForDisplay(sellerVehicles, referenceVehicles),
+    [sellerVehicles, referenceVehicles],
+  );
+
+  const visibleDonors = donors.filter(hasDonorDetails);
+  const hasContent = visibleDonors.length > 0 || compatibility.length > 0;
+
+  if (loading && !hasContent) {
     return (
-      <section className="mt-6 rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
-        <h2 className="text-base font-semibold text-gray-900">Подходит для автомобилей</h2>
-        <p className="mt-2 text-sm text-gray-500">Загрузка применимости…</p>
+      <section className="border-b border-gray-200 py-5">
+        <h2 className="text-xl font-semibold text-gray-900">Подходит для автомобилей</h2>
+        <FitmentSkeleton />
       </section>
     );
   }
-  if (!list.length) return null;
 
-  const useDetailedCards = list.length <= 3 && list.some(
-    (vehicle) => vehicle.engine || vehicle.transmission || vehicle.vin || vehicle.mileage,
-  );
+  if (!hasContent) return null;
 
   return (
-    <section className="mt-6 rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
-      <h2 className="text-base font-semibold text-gray-900">Подходит для автомобилей</h2>
-      <p className="mt-1 text-xs text-gray-500">
-        Справочная информация. Перед покупкой уточните совместимость у продавца.
-      </p>
-      {useDetailedCards ? (
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {list.map((vehicle) => (
-            <FitmentCard
-              key={`${vehicle.brand}|${vehicle.model}|${vehicle.generation}|${vehicle.engine}`}
+    <section className="border-b border-gray-200 py-5">
+      <h2 className="text-xl font-semibold text-gray-900">Подходит для автомобилей</h2>
+
+      {visibleDonors.length > 0 ? (
+        <div className="mt-4 space-y-3">
+          {visibleDonors.map((vehicle) => (
+            <PartDetailDonorVehicleCard
+              key={`${vehicle.brand}|${vehicle.model}|${vehicle.generation}|donor`}
               vehicle={vehicle}
             />
           ))}
         </div>
-      ) : (
-        <NewPartVehicleCompatibilityStrip vehicles={list} className="mt-4" />
-      )}
+      ) : null}
+
+      {compatibility.length > 0 ? (
+        <PartDetailCompatibilityList vehicles={compatibility} />
+      ) : null}
     </section>
   );
 }

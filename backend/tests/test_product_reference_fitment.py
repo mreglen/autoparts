@@ -1,10 +1,13 @@
 import unittest
+from unittest.mock import MagicMock, patch
 
 from app.services.product_reference_fitment_service import (
+    ReferenceFitmentVehicle,
     format_fitment_text,
     merge_fitment_vehicles,
     _parse_payload_vehicles,
 )
+from app.services.tecdoc_article_fitment_service import get_tecdoc_article_fitment_vehicles
 
 
 class MergeFitmentTests(unittest.TestCase):
@@ -22,6 +25,11 @@ class MergeFitmentTests(unittest.TestCase):
         self.assertEqual(len(merged), 2)
         self.assertEqual(merged[0]["source"], "seller")
         self.assertEqual(merged[1]["source"], "reference")
+
+    def test_preserves_tecdoc_source(self):
+        reference = [{"brand": "BMW", "model": "X5", "source": "tecdoc"}]
+        merged = merge_fitment_vehicles([], reference)
+        self.assertEqual(merged[0]["source"], "tecdoc")
 
     def test_format_fitment_text(self):
         vehicles = [
@@ -47,6 +55,32 @@ class ParsePayloadVehiclesTests(unittest.TestCase):
         self.assertEqual(len(vehicles), 2)
         self.assertEqual(vehicles[0].brand, "BMW")
         self.assertEqual(vehicles[1].brand, "Audi")
+
+
+class TecdocFitmentServiceTests(unittest.TestCase):
+    def test_returns_empty_when_link_tables_missing(self):
+        db = MagicMock()
+        db.execute.return_value.fetchall.return_value = [
+            ("tecdoc_articles",),
+            ("tecdoc_passengercars",),
+        ]
+        with patch(
+            "app.services.tecdoc_article_fitment_service._find_article_ids",
+            return_value=[1],
+        ):
+            self.assertEqual(
+                get_tecdoc_article_fitment_vehicles(db, brand="MANN", article="W712/75"),
+                [],
+            )
+
+    def test_reference_vehicle_carries_source(self):
+        vehicle = ReferenceFitmentVehicle(
+            brand="Audi",
+            model="A4",
+            generation="B8",
+            source="catalog",
+        )
+        self.assertEqual(vehicle.to_dict()["source"], "catalog")
 
 
 if __name__ == "__main__":

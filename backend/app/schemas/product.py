@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import BaseModel
 from app.schemas.storage_location import StorageLocation
 from app.schemas.organization import Organization
@@ -127,6 +127,11 @@ class VehicleBase(BaseModel):
 
 class Vehicle(VehicleBase):
     id: int
+    tecdoc_manufacturer_json: Optional[dict[str, Any]] = None
+    tecdoc_model_json: Optional[dict[str, Any]] = None
+    tecdoc_passengercar_json: Optional[dict[str, Any]] = None
+    tecdoc_engine_json: Optional[dict[str, Any]] = None
+    tecdoc_transmission_json: Optional[dict[str, Any]] = None
 
     class Config:
         from_attributes = True

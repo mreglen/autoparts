@@ -18,7 +18,6 @@ import PartDetailSeoSummary from './PartDetailSeoSummary';
 import PartDetailSpecsBlock from './PartDetailSpecsBlock';
 import PartDetailFitmentBlock from './PartDetailFitmentBlock';
 import PartArticleMatchesBlock from '../../components/PartArticleMatchesBlock/PartArticleMatchesBlock';
-import { mergeProductFitment } from '../../utils/mergeProductFitment';
 
 const formatErrorText = (value) => {
   if (!value) return 'Ошибка загрузки товара';
@@ -577,10 +576,6 @@ const PartDetail = () => {
     partBrand,
     partArticle,
   );
-  const mergedFitment = mergeProductFitment(
-    currentProduct.compatible_vehicles || [],
-    referenceFitment,
-  );
   const alternateOffersTitle = partBrand && partArticle
     ? `Другие предложения ${partBrand} ${partArticle}`
     : 'Другие предложения с этим артикулом';
@@ -972,7 +967,8 @@ const PartDetail = () => {
 
       <div className="max-w-6xl mx-auto px-4">
       <PartDetailFitmentBlock
-        vehicles={mergedFitment}
+        sellerVehicles={currentProduct.compatible_vehicles}
+        referenceVehicles={referenceFitment}
         loading={referenceFitmentLoading}
       />
 

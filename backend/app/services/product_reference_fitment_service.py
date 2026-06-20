@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.product import Product as ProductModel
 from app.models.seo_rossko_seed_queue import SeoRosskoSeedQueue
+from app.services.tecdoc_article_fitment_service import get_tecdoc_article_fitment_vehicles
 from app.utils.json_cache_sync import get_cached_json_sync, set_cached_json_sync
 from app.utils.partnumber import build_product_lookup_key, normalize_partnumber
 
@@ -36,9 +37,10 @@ class ReferenceFitmentVehicle:
     brand: str
     model: str
     generation: str = ""
+    source: str = "reference"
 
     def to_dict(self) -> dict[str, str]:
-        payload = {"brand": self.brand, "model": self.model, "source": "reference"}
+        payload = {"brand": self.brand, "model": self.model, "source": self.source}
         if self.generation:
             payload["generation"] = self.generation
         return payload
@@ -264,7 +266,14 @@ def _load_catalog_reference_vehicles(
             if key in seen:
                 continue
             seen.add(key)
-            found.append(ReferenceFitmentVehicle(brand=brand_name, model=model_name, generation=generation))
+            found.append(
+                ReferenceFitmentVehicle(
+                    brand=brand_name,
+                    model=model_name,
+                    generation=generation,
+                    source="catalog",
+                )
+            )
             if len(found) >= 24:
                 return found
     return found
@@ -301,7 +310,9 @@ def get_reference_fitment_vehicles(
             if len(vehicles) >= 24:
                 return
 
-    _add_many(_load_seed_payload_vehicles(db, brand_text, article_text))
+    _add_many(get_tecdoc_article_fitment_vehicles(db, brand=brand_text, article=article_text))
+    if len(vehicles) < 24:
+        _add_many(_load_seed_payload_vehicles(db, brand_text, article_text))
     if len(vehicles) < 24:
         _add_many(
             _load_catalog_reference_vehicles(
