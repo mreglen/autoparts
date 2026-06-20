@@ -88,6 +88,11 @@ class YandexManualTokenPayload(BaseModel):
     access_token: str = Field(..., min_length=10, max_length=4096)
 
 
+class YandexVerificationCodePayload(BaseModel):
+    code: str = Field(..., min_length=3, max_length=512)
+    host_url: str = "https://svoygarage.ru"
+
+
 class YandexEnableSetupPayload(BaseModel):
     host_url: str = "https://svoygarage.ru"
     trigger_sync: bool = True
@@ -292,6 +297,73 @@ def oauth_callback(
         )
 
     return RedirectResponse(f"{redirect_to}?yandex_connected=1", status_code=302)
+
+
+@router.get("/oauth/authorize-url")
+def oauth_authorize_url_endpoint(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = get_or_create_yandex_integration(db)
+    client_id = (row.client_id or "").strip()
+    if not client_id:
+        raise HTTPException(status_code=400, detail="Сначала сохраните client_id Яндекса")
+    return {
+        "authorize_url": oauth_authorize_url(client_id, secrets.token_urlsafe(16)),
+        "redirect_uri": (
+            settings.YANDEX_OAUTH_REDIRECT_URI
+            or f"{settings.PUBLIC_BASE_URL.rstrip('/')}/api/admin/yandex/oauth/callback"
+        ),
+    }
+
+
+@router.post("/oauth/exchange-code", response_model=YandexIntegrationView)
+def oauth_exchange_verification_code(
+    payload: YandexVerificationCodePayload,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    code = payload.code.strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="code обязателен")
+
+    row = get_or_create_yandex_integration(db)
+    client_id = (row.client_id or "").strip()
+    client_secret = get_plain_client_secret(row) if row.client_secret_encrypted else None
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=400, detail="Сначала сохраните client_id и client_secret")
+
+    try:
+        tokens = exchange_code_for_tokens(client_id, client_secret, code)
+        save_tokens(db, row, tokens)
+        row.oauth_connected_at = datetime.now(timezone.utc)
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+    except YandexApiError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    host_url = (payload.host_url or "https://svoygarage.ru").strip()
+    try:
+        _ensure_host_bindings(db, row, host_url)
+    except YandexApiError as exc:
+        log_audit(
+            db,
+            event_type="yandex_oauth_code_exchanged",
+            category="settings",
+            summary="OAuth код обменян, но host_id не привязан",
+            user=current_user,
+        )
+        return _integration_view(db, row)
+
+    log_audit(
+        db,
+        event_type="yandex_oauth_code_exchanged",
+        category="settings",
+        summary="OAuth подключён через verification code",
+        user=current_user,
+    )
+    return _integration_view(db, row)
 
 
 @router.post("/oauth/disconnect", response_model=YandexIntegrationView)

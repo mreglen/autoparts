@@ -7,6 +7,7 @@ import {
   RECOMMENDATION_STYLES,
 } from './analyticsFormatters';
 import { DataTable, LoadingState, Section } from './AnalyticsUi';
+import YandexConnectSection from './YandexConnectSection';
 
 const CLUSTER_LABELS = {
   A: 'Карточка',
@@ -66,6 +67,7 @@ export default function QueryReviewTab() {
 
   return (
     <div className="space-y-4">
+      <YandexConnectSection />
       <Section
         title="Ежемесячный разбор запросов"
         subtitle="Топ-50 из Яндекс Вебмастера → страница или действие"
