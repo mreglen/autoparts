@@ -16,7 +16,7 @@ import {
   formatPhoneInput,
   formatPhoneFromRaw,
 } from '../../utils/contactValidation';
-import { trackFormField, trackFormSubmit } from '../../utils/siteAnalytics';
+import { trackFormField, trackFormSubmit, trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
 import CheckoutPaymentAndOffer from '../../components/Legal/CheckoutPaymentAndOffer';
 
 function formatApiErrorDetail(detail) {
@@ -443,6 +443,7 @@ export default function OrderRegistration() {
         type: 'success',
         message: buildSuccessMessage(response.data),
       });
+      trackConversion(CONVERSION_EVENTS.ORDER_PLACED, { path: '/order-reg' });
     } catch (error) {
       const detail = error?.response?.data?.detail;
       setNotification({

@@ -4,42 +4,75 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiRequest } from '../../utils/apiClient';
 import { ErrorBanner, TabSwitcher } from './analytics/AnalyticsUi';
+import ConversionsTab from './analytics/ConversionsTab';
+import QueryReviewTab from './analytics/QueryReviewTab';
 import SeoTab from './analytics/SeoTab';
-import TrafficTab from './analytics/TrafficTab';
 
 const TABS = [
-  { id: 'traffic', label: 'Посещаемость' },
+  { id: 'conversions', label: 'Конверсии' },
+  { id: 'iterations', label: 'Итерации' },
   { id: 'seo', label: 'SEO' },
 ];
 
 export default function AnalyticsPage() {
   const { isReady, user, isAuthenticated } = useAuthReady();
   const [searchParams] = useSearchParams();
-  const [viewMode, setViewMode] = useState(() => (searchParams.get('tab') === 'seo' ? 'seo' : 'traffic'));
+  const tabFromUrl = searchParams.get('tab');
+  const [viewMode, setViewMode] = useState(() => {
+    if (tabFromUrl === 'seo') return 'seo';
+    if (tabFromUrl === 'iterations') return 'iterations';
+    return 'conversions';
+  });
   const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [funnel, setFunnel] = useState(null);
+  const [sources, setSources] = useState(null);
+  const [landings, setLandings] = useState(null);
+  const [conversionTrend, setConversionTrend] = useState(null);
+  const [productCards, setProductCards] = useState(null);
   const [pages, setPages] = useState([]);
   const [activity, setActivity] = useState([]);
   const [selectedPath, setSelectedPath] = useState(null);
   const [pageDetail, setPageDetail] = useState(null);
 
   useEffect(() => {
-    if (searchParams.get('tab') === 'seo') setViewMode('seo');
-  }, [searchParams]);
+    if (tabFromUrl === 'seo') setViewMode('seo');
+    else if (tabFromUrl === 'iterations') setViewMode('iterations');
+    else if (tabFromUrl === 'conversions' || tabFromUrl === 'traffic') setViewMode('conversions');
+  }, [tabFromUrl]);
 
-  const loadPagesData = useCallback(async () => {
+  const loadConversionsData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [summaryRes, pagesRes, activityRes] = await Promise.all([
+      const [
+        summaryRes,
+        funnelRes,
+        sourcesRes,
+        landingsRes,
+        trendRes,
+        cardsRes,
+        pagesRes,
+        activityRes,
+      ] = await Promise.all([
         apiRequest(`/admin/analytics/summary?days=${days}`),
+        apiRequest(`/admin/analytics/funnel?days=${days}`),
+        apiRequest(`/admin/analytics/sources?days=${days}`),
+        apiRequest(`/admin/analytics/landings?days=${days}`),
+        apiRequest(`/admin/analytics/conversions/trend?days=${days}`),
+        apiRequest(`/admin/analytics/product-cards?days=${days}&limit=50`),
         apiRequest(`/admin/analytics/pages?days=${days}`),
         apiRequest(`/admin/analytics/activity?days=${days}`),
       ]);
       setSummary(summaryRes);
+      setFunnel(funnelRes);
+      setSources(sourcesRes);
+      setLandings(landingsRes);
+      setConversionTrend(trendRes);
+      setProductCards(cardsRes);
       const items = pagesRes?.items || [];
       setPages(items);
       setActivity(activityRes?.items || []);
@@ -72,12 +105,12 @@ export default function AnalyticsPage() {
   );
 
   useEffect(() => {
-    if (!isReady || !user?.is_admin || viewMode !== 'traffic') return;
-    loadPagesData();
-  }, [isReady, user?.is_admin, viewMode, loadPagesData]);
+    if (!isReady || !user?.is_admin || viewMode !== 'conversions') return;
+    loadConversionsData();
+  }, [isReady, user?.is_admin, viewMode, loadConversionsData]);
 
   useEffect(() => {
-    if (!isReady || !user?.is_admin || viewMode !== 'traffic' || !selectedPath) return;
+    if (!isReady || !user?.is_admin || viewMode !== 'conversions' || !selectedPath) return;
     loadPageDetail(selectedPath);
   }, [isReady, user?.is_admin, viewMode, selectedPath, days, loadPageDetail]);
 
@@ -96,12 +129,17 @@ export default function AnalyticsPage() {
 
       <ErrorBanner message={error} onDismiss={() => setError(null)} />
 
-      {viewMode === 'traffic' && (
-        <TrafficTab
+      {viewMode === 'conversions' && (
+        <ConversionsTab
           days={days}
           onDaysChange={setDays}
           loading={loading}
           summary={summary}
+          funnel={funnel}
+          sources={sources}
+          landings={landings}
+          conversionTrend={conversionTrend}
+          productCards={productCards}
           pages={pages}
           activity={activity}
           selectedPath={selectedPath}
@@ -110,6 +148,8 @@ export default function AnalyticsPage() {
           detailLoading={detailLoading}
         />
       )}
+
+      {viewMode === 'iterations' && <QueryReviewTab />}
 
       {viewMode === 'seo' && <SeoTab />}
     </div>

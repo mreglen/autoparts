@@ -13,6 +13,7 @@ from app.db.schema_patches import (
     ensure_site_reviews_table,
     ensure_site_reviews_user_id_column,
     ensure_site_settings_show_site_reviews_column,
+    ensure_site_settings_used_parts_purchase_mode_column,
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
     ensure_seo_product_url_exports_table,
@@ -37,6 +38,9 @@ from app.db.schema_patches import (
     ensure_garage_new_order_yookassa_columns,
     ensure_seo_landing_pages_table,
     ensure_openrouter_tables,
+    ensure_site_analytics_attribution_columns,
+    ensure_site_analytics_conversion_events_table,
+    ensure_analytics_query_review_tables,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
@@ -64,6 +68,7 @@ import app.models.yandex_oauth_state  # noqa: F401 — yandex oauth state
 import app.models.site_delivery_option  # noqa: F401 — site delivery matrix
 import app.models.site_quick_link  # noqa: F401 — site quick links
 import app.models.site_analytics  # noqa: F401 — site analytics
+import app.models.analytics_query_review  # noqa: F401 — query review snapshots
 import app.models.site_review  # noqa: F401 — site reviews
 import app.models.seo_product_url_export  # noqa: F401 — SEO URL export tracking
 import app.models.seo_new_part_url_export  # noqa: F401 — Rossko SEO URL export tracking
@@ -135,6 +140,7 @@ try:
     ensure_site_reviews_table()
     ensure_site_reviews_user_id_column()
     ensure_site_settings_show_site_reviews_column()
+    ensure_site_settings_used_parts_purchase_mode_column()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
     ensure_group_chat_columns()
@@ -161,6 +167,9 @@ try:
     ensure_garage_new_order_yookassa_columns()
     ensure_seo_landing_pages_table()
     ensure_openrouter_tables()
+    ensure_site_analytics_attribution_columns()
+    ensure_site_analytics_conversion_events_table()
+    ensure_analytics_query_review_tables()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise

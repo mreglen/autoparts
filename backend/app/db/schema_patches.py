@@ -477,6 +477,33 @@ def ensure_site_settings_show_site_reviews_column() -> None:
     logger.info("Applied site_settings show_site_reviews column patch")
 
 
+def ensure_site_settings_used_parts_purchase_mode_column() -> None:
+    """Add used_parts_purchase_mode to site_settings."""
+    inspector = inspect(engine)
+    if "site_settings" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("site_settings")}
+    if "used_parts_purchase_mode" in columns:
+        return
+
+    if engine.dialect.name == "postgresql":
+        stmt = (
+            "ALTER TABLE site_settings ADD COLUMN used_parts_purchase_mode "
+            "VARCHAR(20) NOT NULL DEFAULT 'both'"
+        )
+    else:
+        stmt = (
+            "ALTER TABLE site_settings ADD COLUMN used_parts_purchase_mode "
+            "VARCHAR(20) NOT NULL DEFAULT 'both'"
+        )
+
+    with engine.begin() as conn:
+        conn.execute(text(stmt))
+
+    logger.info("Applied site_settings used_parts_purchase_mode column patch")
+
+
 def ensure_group_chat_columns() -> None:
     """Add group chat columns to chats and create chat_participants table."""
     inspector = inspect(engine)
@@ -1633,4 +1660,187 @@ def ensure_openrouter_tables() -> None:
                 )
             )
         logger.info("Applied ai_description_generation_log table patch")
+
+
+def ensure_site_analytics_attribution_columns() -> None:
+    """Add traffic attribution columns to site_analytics_sessions."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "site_analytics_sessions" not in table_names:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("site_analytics_sessions")}
+    statements = []
+    is_pg = engine.dialect.name == "postgresql"
+
+    patches = [
+        ("landing_path", "VARCHAR(2048)" if is_pg else "VARCHAR(2048)"),
+        ("landing_path_template", "VARCHAR(512)" if is_pg else "VARCHAR(512)"),
+        ("traffic_source", "VARCHAR(32)" if is_pg else "VARCHAR(32)"),
+        ("referrer_host", "VARCHAR(255)" if is_pg else "VARCHAR(255)"),
+        ("utm_source", "VARCHAR(128)" if is_pg else "VARCHAR(128)"),
+        ("utm_medium", "VARCHAR(128)" if is_pg else "VARCHAR(128)"),
+        ("utm_campaign", "VARCHAR(128)" if is_pg else "VARCHAR(128)"),
+    ]
+    for name, col_type in patches:
+        if name not in columns:
+            statements.append(f"ALTER TABLE site_analytics_sessions ADD COLUMN {name} {col_type}")
+
+    if statements:
+        with engine.begin() as conn:
+            for stmt in statements:
+                conn.execute(text(stmt))
+        logger.info("Applied site_analytics_sessions attribution patches: %s", statements)
+
+    indexes = [
+        ("ix_site_analytics_sessions_landing_path_template", "landing_path_template"),
+        ("ix_site_analytics_sessions_traffic_source", "traffic_source"),
+    ]
+    for index_name, column_name in indexes:
+        if column_name in columns or any(column_name in s for s in statements):
+            if not _index_exists(inspector, "site_analytics_sessions", index_name):
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            f"CREATE INDEX IF NOT EXISTS {index_name} "
+                            f"ON site_analytics_sessions ({column_name})"
+                        )
+                    )
+
+
+def ensure_site_analytics_conversion_events_table() -> None:
+    """Create site_analytics_conversion_events if missing."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "site_analytics_conversion_events" in table_names:
+        return
+
+    is_pg = engine.dialect.name == "postgresql"
+    if is_pg:
+        ddl = """
+        CREATE TABLE site_analytics_conversion_events (
+            id SERIAL PRIMARY KEY,
+            session_id INTEGER NOT NULL REFERENCES site_analytics_sessions(id),
+            event_type VARCHAR(32) NOT NULL,
+            path VARCHAR(2048),
+            path_template VARCHAR(512),
+            product_id INTEGER,
+            metadata_json TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE site_analytics_conversion_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES site_analytics_sessions(id),
+            event_type VARCHAR(32) NOT NULL,
+            path VARCHAR(2048),
+            path_template VARCHAR(512),
+            product_id INTEGER,
+            metadata_json TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        for index_name, columns in (
+            ("ix_site_analytics_conv_session_id", "session_id"),
+            ("ix_site_analytics_conv_event_type", "event_type"),
+            ("ix_site_analytics_conv_path_template", "path_template"),
+            ("ix_site_analytics_conv_product_id", "product_id"),
+            ("ix_site_analytics_conv_created_at", "created_at"),
+        ):
+            conn.execute(
+                text(
+                    f"CREATE INDEX IF NOT EXISTS {index_name} "
+                    f"ON site_analytics_conversion_events ({columns})"
+                )
+            )
+    logger.info("Applied site_analytics_conversion_events table patch")
+
+
+def ensure_analytics_query_review_tables() -> None:
+    """Create analytics query review snapshot tables."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    is_pg = engine.dialect.name == "postgresql"
+
+    if "analytics_query_review_snapshots" not in table_names:
+        if is_pg:
+            ddl = """
+            CREATE TABLE analytics_query_review_snapshots (
+                id SERIAL PRIMARY KEY,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                period_start DATE NOT NULL,
+                period_end DATE NOT NULL,
+                source VARCHAR(32) NOT NULL DEFAULT 'yandex_webmaster',
+                status VARCHAR(32) NOT NULL DEFAULT 'ok',
+                error_message TEXT
+            )
+            """
+        else:
+            ddl = """
+            CREATE TABLE analytics_query_review_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                period_start DATE NOT NULL,
+                period_end DATE NOT NULL,
+                source VARCHAR(32) NOT NULL DEFAULT 'yandex_webmaster',
+                status VARCHAR(32) NOT NULL DEFAULT 'ok',
+                error_message TEXT
+            )
+            """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_aqr_snapshots_created_at "
+                    "ON analytics_query_review_snapshots (created_at)"
+                )
+            )
+
+    if "analytics_query_review_items" not in table_names:
+        if is_pg:
+            ddl = """
+            CREATE TABLE analytics_query_review_items (
+                id SERIAL PRIMARY KEY,
+                snapshot_id INTEGER NOT NULL REFERENCES analytics_query_review_snapshots(id) ON DELETE CASCADE,
+                query_text VARCHAR(512) NOT NULL,
+                cluster VARCHAR(16) NOT NULL DEFAULT 'unknown',
+                impressions INTEGER NOT NULL DEFAULT 0,
+                clicks INTEGER NOT NULL DEFAULT 0,
+                ctr VARCHAR(16) NOT NULL DEFAULT '0',
+                position VARCHAR(16) NOT NULL DEFAULT '0',
+                matched_path VARCHAR(512),
+                recommendation VARCHAR(32) NOT NULL DEFAULT 'review',
+                recommendation_label VARCHAR(128) NOT NULL DEFAULT '',
+                sort_order INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        else:
+            ddl = """
+            CREATE TABLE analytics_query_review_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                snapshot_id INTEGER NOT NULL REFERENCES analytics_query_review_snapshots(id) ON DELETE CASCADE,
+                query_text VARCHAR(512) NOT NULL,
+                cluster VARCHAR(16) NOT NULL DEFAULT 'unknown',
+                impressions INTEGER NOT NULL DEFAULT 0,
+                clicks INTEGER NOT NULL DEFAULT 0,
+                ctr VARCHAR(16) NOT NULL DEFAULT '0',
+                position VARCHAR(16) NOT NULL DEFAULT '0',
+                matched_path VARCHAR(512),
+                recommendation VARCHAR(32) NOT NULL DEFAULT 'review',
+                recommendation_label VARCHAR(128) NOT NULL DEFAULT '',
+                sort_order INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_aqr_items_snapshot_id "
+                    "ON analytics_query_review_items (snapshot_id)"
+                )
+            )
 

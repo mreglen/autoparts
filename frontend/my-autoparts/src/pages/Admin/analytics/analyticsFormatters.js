@@ -1,9 +1,31 @@
 export const PERIOD_OPTIONS = [
-  { value: 1, label: '1 дн.' },
   { value: 7, label: '7 дн.' },
   { value: 30, label: '30 дн.' },
   { value: 90, label: '90 дн.' },
 ];
+
+export const FUNNEL_LABELS = {
+  part_view: 'Просмотр карточки',
+  add_to_cart: 'В корзину',
+  show_phone: 'Показать телефон',
+  chat_start: 'Чат',
+  order_placed: 'Заказ',
+};
+
+export const SOURCE_LABELS = {
+  organic: 'Organic',
+  direct: 'Direct',
+  referral: 'Referral',
+  paid: 'Paid',
+  unknown: 'Unknown',
+};
+
+export const RECOMMENDATION_STYLES = {
+  covered: 'bg-green-50 text-green-800',
+  create_landing: 'bg-amber-50 text-amber-900',
+  improve_title: 'bg-indigo-50 text-indigo-800',
+  review: 'bg-gray-100 text-gray-700',
+};
 
 export const PAGE_LABELS = {
   '/': 'Главная',
@@ -19,6 +41,11 @@ export const PAGE_LABELS = {
   '/order-reg': 'Заказ',
   '/auth': 'Вход',
   '/part/:productId': 'Карточки товаров',
+  '/autoparts/new/brand/:slug': 'Brand · new',
+  '/autoparts/new/category/:slug': 'Category · new',
+  '/autoparts/used/brand/:slug': 'Brand · used',
+  '/autoparts/used/category/:slug': 'Category · used',
+  '/autoparts/used/geo/:slug': 'Geo · used',
 };
 
 export function formatDuration(seconds) {

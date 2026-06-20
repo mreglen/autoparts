@@ -1,6 +1,8 @@
 import { API_BASE, getAuthHeaders } from './apiClient';
+import { METRIKA_GOALS, reachMetrikaGoal } from './metrikaGoals';
 
 const VISITOR_ID_KEY = 'site_analytics_visitor_id';
+const ATTRIBUTION_KEY = 'site_analytics_attribution_sent';
 const HEARTBEAT_INTERVAL_MS = 30000;
 const FLUSH_INTERVAL_MS = 5000;
 const MAX_QUEUE_SIZE = 40;
@@ -11,6 +13,7 @@ let currentViewId = null;
 let currentPath = null;
 let pageEnteredAt = null;
 let heartbeatTimer = null;
+let cachedAttribution = null;
 
 function generateId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -29,6 +32,39 @@ export function getVisitorId() {
     return id;
   } catch {
     return generateId();
+  }
+}
+
+function captureAttribution() {
+  if (cachedAttribution) return cachedAttribution;
+  if (typeof window === 'undefined') {
+    cachedAttribution = {};
+    return cachedAttribution;
+  }
+
+  const params = new URLSearchParams(window.location.search || '');
+  cachedAttribution = {
+    referrer: document.referrer || '',
+    utm_source: params.get('utm_source') || '',
+    utm_medium: params.get('utm_medium') || '',
+    utm_campaign: params.get('utm_campaign') || '',
+  };
+  return cachedAttribution;
+}
+
+function shouldAttachAttribution() {
+  try {
+    return !sessionStorage.getItem(ATTRIBUTION_KEY);
+  } catch {
+    return true;
+  }
+}
+
+function markAttributionSent() {
+  try {
+    sessionStorage.setItem(ATTRIBUTION_KEY, '1');
+  } catch {
+    // ignore
   }
 }
 
@@ -135,14 +171,49 @@ export function trackPageView(path) {
   currentViewId = generateId();
   pageEnteredAt = Date.now();
 
-  enqueue({
+  const payload = {
     type: 'page_view',
     path: nextPath,
     view_id: currentViewId,
-  });
+  };
 
+  if (shouldAttachAttribution()) {
+    const attribution = captureAttribution();
+    payload.referrer = attribution.referrer || undefined;
+    payload.utm_source = attribution.utm_source || undefined;
+    payload.utm_medium = attribution.utm_medium || undefined;
+    payload.utm_campaign = attribution.utm_campaign || undefined;
+    markAttributionSent();
+  }
+
+  enqueue(payload);
   startHeartbeat();
 }
+
+export function trackConversion(eventName, options = {}) {
+  if (!eventName) return;
+
+  const path = options.path || currentPath || (typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search || ''}` : '/');
+  const productId = options.productId != null ? Number(options.productId) : undefined;
+  const section = options.section || undefined;
+
+  enqueue({
+    type: 'conversion',
+    event_name: eventName,
+    path,
+    product_id: Number.isFinite(productId) && productId > 0 ? productId : undefined,
+  });
+
+  reachMetrikaGoal(eventName, {
+    product_id: productId,
+    path,
+    section,
+  });
+
+  flushEvents(false);
+}
+
+export const CONVERSION_EVENTS = METRIKA_GOALS;
 
 export function trackFormField(formId, fieldName) {
   if (!formId || !fieldName) return;

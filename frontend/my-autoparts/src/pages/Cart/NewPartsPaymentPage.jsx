@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { QRCodeSVG } from 'qrcode.react';
+import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
 import {
     createCardPayment,
     fetchCart,
@@ -23,6 +24,7 @@ export default function NewPartsPaymentPage() {
     const error = useSelector(selectPaymentSessionError);
     const [cardLoading, setCardLoading] = useState(false);
     const [cardError, setCardError] = useState(null);
+    const trackedOrderRef = useRef(false);
 
     const loadSession = useCallback(() => {
         if (sessionId) {
@@ -48,6 +50,16 @@ export default function NewPartsPaymentPage() {
             dispatch(fetchCart());
         }
     }, [session?.status, session?.garage_order_id, dispatch]);
+
+    useEffect(() => {
+        const paid = session?.status === 'paid' || session?.status === 'fulfilled';
+        if (!paid || trackedOrderRef.current) return;
+        trackedOrderRef.current = true;
+        trackConversion(CONVERSION_EVENTS.ORDER_PLACED, {
+            path: `/cart/new/pay/${sessionId}`,
+            section: 'new',
+        });
+    }, [session?.status, sessionId]);
 
     const handlePayByCard = async () => {
         setCardLoading(true);

@@ -7,19 +7,24 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app.models.site_analytics import (
+    SiteAnalyticsConversionEvent,
     SiteAnalyticsFormEvent,
     SiteAnalyticsPageView,
     SiteAnalyticsSession,
 )
 from app.schemas.site_analytics import AnalyticsEventIn
 from app.services.site_analytics_service import (
+    classify_traffic_source,
     clear_popular_new_part_queries_cache,
     extract_product_id_from_path,
     get_forms,
+    get_funnel,
+    get_landings,
     get_page_detail,
     get_pages,
     get_popular_new_part_queries,
     get_product_cards,
+    get_sources,
     get_summary,
     ingest_events,
     normalize_path,
@@ -49,7 +54,14 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
                         started_at DATETIME,
                         last_seen_at DATETIME,
                         duration_sec INTEGER NOT NULL DEFAULT 0,
-                        page_views_count INTEGER NOT NULL DEFAULT 0
+                        page_views_count INTEGER NOT NULL DEFAULT 0,
+                        landing_path VARCHAR(2048),
+                        landing_path_template VARCHAR(512),
+                        traffic_source VARCHAR(32),
+                        referrer_host VARCHAR(255),
+                        utm_source VARCHAR(128),
+                        utm_medium VARCHAR(128),
+                        utm_campaign VARCHAR(128)
                     )
                     """
                 )
@@ -86,6 +98,22 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
             conn.execute(
                 text(
                     """
+                    CREATE TABLE site_analytics_conversion_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        session_id INTEGER NOT NULL,
+                        event_type VARCHAR(32) NOT NULL,
+                        path VARCHAR(2048),
+                        path_template VARCHAR(512),
+                        product_id INTEGER,
+                        metadata_json TEXT,
+                        created_at DATETIME
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
                     CREATE TABLE products (
                         id INTEGER PRIMARY KEY,
                         article VARCHAR(30),
@@ -101,6 +129,114 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
                     """
                 )
             )
+
+    def test_normalize_path_landing(self):
+        template, raw = normalize_path("/autoparts/used/brand/bosch")
+        self.assertEqual(template, "/autoparts/used/brand/:slug")
+        self.assertEqual(raw, "/autoparts/used/brand/bosch")
+
+    def test_classify_traffic_source(self):
+        self.assertEqual(classify_traffic_source("", None), "direct")
+        self.assertEqual(classify_traffic_source("https://yandex.ru/search", None), "organic")
+        self.assertEqual(classify_traffic_source("https://example.com/", None), "referral")
+        self.assertEqual(classify_traffic_source("", "cpc"), "paid")
+
+    def test_ingest_attribution_on_first_page_view(self):
+        visitor_id = "visitor-attribution"
+        ingest_events(
+            self.db,
+            [
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id=visitor_id,
+                    path="/autoparts/used/brand/bosch?utm_source=yandex",
+                    view_id="view-landing",
+                    referrer="https://yandex.ru/search",
+                    utm_source="yandex",
+                    utm_medium="organic",
+                ),
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id=visitor_id,
+                    path="/part/10-brand-art",
+                    view_id="view-part",
+                    referrer="https://google.com/",
+                ),
+            ],
+            user_id=None,
+        )
+        session = self.db.query(SiteAnalyticsSession).filter_by(visitor_id=visitor_id).one()
+        self.assertEqual(session.traffic_source, "organic")
+        self.assertEqual(session.landing_path_template, "/autoparts/used/brand/:slug")
+        self.assertEqual(session.referrer_host, "yandex.ru")
+
+    def test_ingest_conversion_events(self):
+        visitor_id = "visitor-conv"
+        ingest_events(
+            self.db,
+            [
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id=visitor_id,
+                    path="/part/10-brand-art",
+                    view_id="view-part",
+                ),
+                AnalyticsEventIn(
+                    type="conversion",
+                    visitor_id=visitor_id,
+                    event_name="add_to_cart",
+                    path="/part/10-brand-art",
+                    product_id=10,
+                ),
+                AnalyticsEventIn(
+                    type="conversion",
+                    visitor_id=visitor_id,
+                    event_name="order_placed",
+                    path="/order-reg",
+                ),
+            ],
+            user_id=None,
+        )
+        events = self.db.query(SiteAnalyticsConversionEvent).all()
+        self.assertEqual(len(events), 2)
+        funnel = get_funnel(self.db, days=7)
+        self.assertEqual(len(funnel.steps), 5)
+        add_to_cart = next(step for step in funnel.steps if step.event_type == "add_to_cart")
+        self.assertEqual(add_to_cart.count, 1)
+
+    def test_sources_and_landings(self):
+        ingest_events(
+            self.db,
+            [
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id="visitor-organic",
+                    path="/autoparts/used/brand/bosch",
+                    view_id="v1",
+                    referrer="https://yandex.ru/search",
+                ),
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id="visitor-direct",
+                    path="/",
+                    view_id="v2",
+                ),
+                AnalyticsEventIn(
+                    type="conversion",
+                    visitor_id="visitor-organic",
+                    event_name="order_placed",
+                    path="/order-reg",
+                ),
+            ],
+            user_id=None,
+        )
+        sources = get_sources(self.db, days=7)
+        self.assertGreaterEqual(len(sources.items), 1)
+        landings = get_landings(self.db, days=7)
+        self.assertGreaterEqual(len(landings.items), 1)
+        landing = landings.items[0]
+        self.assertEqual(landing.path_template, "/autoparts/used/brand/:slug")
+        self.assertEqual(landing.order_placed, 1)
 
     def test_normalize_path_product_detail(self):
         template, raw = normalize_path("/part/123-brand-article")

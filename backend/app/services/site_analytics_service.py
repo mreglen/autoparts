@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import json
 import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from typing import Iterable, Optional
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 
 from fastapi import HTTPException, status
-from sqlalchemy import bindparam, func, text
+from sqlalchemy import bindparam, func, or_, text
 from sqlalchemy.orm import Session
 
 from app.models.site_analytics import (
+    SiteAnalyticsConversionEvent,
     SiteAnalyticsFormEvent,
     SiteAnalyticsPageView,
     SiteAnalyticsSession,
@@ -18,15 +20,23 @@ from app.models.site_analytics import (
 from app.schemas.site_analytics import (
     AnalyticsActivityOut,
     AnalyticsActivityRowOut,
+    AnalyticsConversionTrendOut,
+    AnalyticsConversionTrendRowOut,
     AnalyticsEventIn,
     AnalyticsFormRowOut,
     AnalyticsFormsOut,
+    AnalyticsFunnelOut,
+    AnalyticsFunnelStepOut,
+    AnalyticsLandingRowOut,
+    AnalyticsLandingsOut,
     AnalyticsPageDetailOut,
     AnalyticsPageInstanceRowOut,
     AnalyticsPageRowOut,
     AnalyticsPagesOut,
     AnalyticsProductCardRowOut,
     AnalyticsProductCardsOut,
+    AnalyticsSourceRowOut,
+    AnalyticsSourcesOut,
     AnalyticsSummaryOut,
 )
 
@@ -44,6 +54,12 @@ SENSITIVE_FIELD_NAMES = frozenset(
 )
 
 PRODUCT_CARD_PATH_RE = re.compile(r"^/part/(\d+)(?:-|$)")
+LANDING_PATH_RE = re.compile(r"^/autoparts/(new|used)/(brand|category|geo)/([^/]+)$")
+LANDING_PATH_TEMPLATE_RE = re.compile(r"^/autoparts/(new|used)/(brand|category|geo)/:slug$")
+
+ORGANIC_HOST_MARKERS = ("yandex.", "google.", "bing.", "duckduckgo.", "yahoo.")
+PAID_UTM_MEDIUMS = frozenset({"cpc", "ppc", "paid", "paidsearch", "cpm", "display"})
+FUNNEL_EVENT_TYPES = ("part_view", "add_to_cart", "show_phone", "chat_start", "order_placed")
 
 PATH_NORMALIZATION_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^/part/[^/]+$"), "/part/:productId"),
@@ -103,12 +119,70 @@ def normalize_path(path: str) -> tuple[str, str]:
     if len(full) > 2048:
         full = full[:2048]
     pathname = full.split("?", 1)[0].strip() or "/"
+    landing_match = LANDING_PATH_RE.match(pathname)
+    if landing_match:
+        section, kind, _slug = landing_match.groups()
+        template = f"/autoparts/{section}/{kind}/:slug"
+        return template, full
     template = pathname
     for pattern, replacement in PATH_NORMALIZATION_RULES:
         if pattern.match(pathname):
             template = replacement
             break
     return template, full
+
+
+def classify_traffic_source(referrer: Optional[str], utm_medium: Optional[str]) -> str:
+    medium = (utm_medium or "").strip().lower()
+    if medium in PAID_UTM_MEDIUMS:
+        return "paid"
+    ref = (referrer or "").strip()
+    if not ref:
+        return "direct"
+    try:
+        host = urlparse(ref).netloc.lower()
+    except Exception:
+        return "referral"
+    if not host:
+        return "direct"
+    if any(marker in host for marker in ORGANIC_HOST_MARKERS):
+        return "organic"
+    return "referral"
+
+
+def extract_referrer_host(referrer: Optional[str]) -> Optional[str]:
+    ref = (referrer or "").strip()
+    if not ref:
+        return None
+    try:
+        host = urlparse(ref).netloc.lower().strip()
+        return host[:255] if host else None
+    except Exception:
+        return None
+
+
+def _apply_session_attribution(
+    session: SiteAnalyticsSession,
+    *,
+    path: str,
+    path_template: str,
+    referrer: Optional[str],
+    utm_source: Optional[str],
+    utm_medium: Optional[str],
+    utm_campaign: Optional[str],
+) -> None:
+    if session.landing_path:
+        return
+    session.landing_path = path[:2048]
+    session.landing_path_template = path_template[:512]
+    session.traffic_source = classify_traffic_source(referrer, utm_medium)
+    session.referrer_host = extract_referrer_host(referrer)
+    if utm_source:
+        session.utm_source = utm_source.strip()[:128]
+    if utm_medium:
+        session.utm_medium = utm_medium.strip()[:128]
+    if utm_campaign:
+        session.utm_campaign = utm_campaign.strip()[:128]
 
 
 def _utcnow() -> datetime:
@@ -226,6 +300,16 @@ def ingest_events(
             path = event.path or "/"
             path_template, path_raw = normalize_path(path)
 
+            _apply_session_attribution(
+                session,
+                path=path_raw,
+                path_template=path_template,
+                referrer=event.referrer,
+                utm_source=event.utm_source,
+                utm_medium=event.utm_medium,
+                utm_campaign=event.utm_campaign,
+            )
+
             if event.duration_sec and event.view_id:
                 previous = _find_open_page_view(db, session.id, event.view_id)
                 if previous:
@@ -251,6 +335,28 @@ def ingest_events(
                     current = _find_open_page_view(db, session.id, event.view_id)
                     if current:
                         _apply_duration(current, increment)
+            continue
+
+        if event.type == "conversion":
+            event_name = (event.event_name or "").strip()
+            if not event_name or event_name not in FUNNEL_EVENT_TYPES:
+                continue
+            path = event.path or "/"
+            path_template, path_raw = normalize_path(path)
+            metadata = {}
+            if event.product_id:
+                metadata["product_id"] = event.product_id
+            db.add(
+                SiteAnalyticsConversionEvent(
+                    session_id=session.id,
+                    event_type=event_name,
+                    path=path_raw,
+                    path_template=path_template,
+                    product_id=event.product_id,
+                    metadata_json=json.dumps(metadata) if metadata else None,
+                    created_at=now,
+                )
+            )
             continue
 
         if event.type == "form_field":
@@ -730,6 +836,264 @@ def get_popular_new_part_queries(
         _POPULAR_NEW_QUERIES_CACHE["items"] = items
 
     return items[:safe_limit], datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
+
+
+def _conversion_counts_by_type(db: Session, since: datetime) -> dict[str, int]:
+    rows = (
+        db.query(
+            SiteAnalyticsConversionEvent.event_type,
+            func.count(SiteAnalyticsConversionEvent.id),
+        )
+        .filter(SiteAnalyticsConversionEvent.created_at >= since)
+        .group_by(SiteAnalyticsConversionEvent.event_type)
+        .all()
+    )
+    return {str(event_type): int(count) for event_type, count in rows}
+
+
+def get_funnel(db: Session, days: int) -> AnalyticsFunnelOut:
+    since = _period_start(days)
+    counts = _conversion_counts_by_type(db, since)
+    base = counts.get("part_view", 0) or 1
+    steps = []
+    for index, event_type in enumerate(FUNNEL_EVENT_TYPES):
+        count = counts.get(event_type, 0)
+        prev_count = counts.get(FUNNEL_EVENT_TYPES[index - 1], 0) if index > 0 else None
+        conversion_rate = None
+        if index == 0:
+            conversion_rate = 100.0 if count else 0.0
+        elif prev_count and prev_count > 0:
+            conversion_rate = round(count / prev_count * 100.0, 2)
+        elif base > 0:
+            conversion_rate = round(count / base * 100.0, 2)
+        steps.append(
+            AnalyticsFunnelStepOut(
+                event_type=event_type,
+                count=count,
+                conversion_rate=conversion_rate,
+            )
+        )
+    return AnalyticsFunnelOut(days=days, steps=steps)
+
+
+def _conversion_counts_for_sessions(
+    db: Session,
+    since: datetime,
+    session_filter,
+) -> dict[str, int]:
+    rows = (
+        db.query(
+            SiteAnalyticsConversionEvent.event_type,
+            func.count(SiteAnalyticsConversionEvent.id),
+        )
+        .join(
+            SiteAnalyticsSession,
+            SiteAnalyticsSession.id == SiteAnalyticsConversionEvent.session_id,
+        )
+        .filter(
+            SiteAnalyticsConversionEvent.created_at >= since,
+            session_filter,
+        )
+        .group_by(SiteAnalyticsConversionEvent.event_type)
+        .all()
+    )
+    return {str(event_type): int(count) for event_type, count in rows}
+
+
+def get_sources(db: Session, days: int) -> AnalyticsSourcesOut:
+    since = _period_start(days)
+    session_rows = (
+        db.query(
+            SiteAnalyticsSession.traffic_source,
+            func.count(SiteAnalyticsSession.id).label("sessions"),
+        )
+        .filter(
+            SiteAnalyticsSession.started_at >= since,
+            SiteAnalyticsSession.traffic_source.isnot(None),
+        )
+        .group_by(SiteAnalyticsSession.traffic_source)
+        .all()
+    )
+    page_view_rows = (
+        db.query(
+            SiteAnalyticsSession.traffic_source,
+            func.count(SiteAnalyticsPageView.id).label("page_views"),
+        )
+        .join(
+            SiteAnalyticsPageView,
+            SiteAnalyticsPageView.session_id == SiteAnalyticsSession.id,
+        )
+        .filter(
+            SiteAnalyticsPageView.entered_at >= since,
+            SiteAnalyticsSession.traffic_source.isnot(None),
+        )
+        .group_by(SiteAnalyticsSession.traffic_source)
+        .all()
+    )
+    page_views_by_source = {
+        str(row.traffic_source or "unknown"): int(row.page_views) for row in page_view_rows
+    }
+
+    items: list[AnalyticsSourceRowOut] = []
+    for row in session_rows:
+        source = str(row.traffic_source or "unknown")
+        conv = _conversion_counts_for_sessions(
+            db,
+            since,
+            SiteAnalyticsSession.traffic_source == row.traffic_source,
+        )
+        items.append(
+            AnalyticsSourceRowOut(
+                traffic_source=source,
+                sessions=int(row.sessions),
+                page_views=page_views_by_source.get(source, 0),
+                part_views=conv.get("part_view", 0),
+                add_to_cart=conv.get("add_to_cart", 0),
+                show_phone=conv.get("show_phone", 0),
+                chat_start=conv.get("chat_start", 0),
+                order_placed=conv.get("order_placed", 0),
+            )
+        )
+    items.sort(key=lambda item: item.sessions, reverse=True)
+    return AnalyticsSourcesOut(days=days, items=items)
+
+
+def get_landings(db: Session, days: int) -> AnalyticsLandingsOut:
+    since = _period_start(days)
+    session_rows = (
+        db.query(
+            SiteAnalyticsSession.landing_path_template,
+            func.min(SiteAnalyticsSession.landing_path).label("sample_path"),
+            func.count(SiteAnalyticsSession.id).label("unique_visitors"),
+        )
+        .filter(
+            SiteAnalyticsSession.started_at >= since,
+            SiteAnalyticsSession.landing_path_template.isnot(None),
+        )
+        .group_by(SiteAnalyticsSession.landing_path_template)
+        .all()
+    )
+
+    view_rows = (
+        db.query(
+            SiteAnalyticsPageView.path_template,
+            func.count(SiteAnalyticsPageView.id).label("views"),
+            func.count(func.distinct(SiteAnalyticsSession.visitor_id)).label("unique_visitors"),
+        )
+        .join(
+            SiteAnalyticsSession,
+            SiteAnalyticsSession.id == SiteAnalyticsPageView.session_id,
+        )
+        .filter(
+            SiteAnalyticsPageView.entered_at >= since,
+            or_(
+                SiteAnalyticsPageView.path_template.like("/autoparts/%/brand/:slug"),
+                SiteAnalyticsPageView.path_template.like("/autoparts/%/category/:slug"),
+                SiteAnalyticsPageView.path_template.like("/autoparts/%/geo/:slug"),
+            ),
+        )
+        .group_by(SiteAnalyticsPageView.path_template)
+        .all()
+    )
+    views_by_template = {
+        str(row.path_template): {
+            "views": int(row.views),
+            "unique_visitors": int(row.unique_visitors),
+        }
+        for row in view_rows
+    }
+
+    items: list[AnalyticsLandingRowOut] = []
+    seen_templates: set[str] = set()
+    for row in session_rows:
+        template = str(row.landing_path_template or "")
+        if not LANDING_PATH_TEMPLATE_RE.match(template):
+            continue
+        seen_templates.add(template)
+        view_stats = views_by_template.get(template, {})
+        conv = _conversion_counts_for_sessions(
+            db,
+            since,
+            SiteAnalyticsSession.landing_path_template == template,
+        )
+        views = int(view_stats.get("views", 0))
+        visitors = max(int(row.unique_visitors), int(view_stats.get("unique_visitors", 0)))
+        orders = conv.get("order_placed", 0)
+        conversion_rate = round(orders / visitors * 100.0, 2) if visitors > 0 else 0.0
+        items.append(
+            AnalyticsLandingRowOut(
+                path_template=template,
+                landing_path=str(row.sample_path or template),
+                views=views,
+                unique_visitors=visitors,
+                part_views=conv.get("part_view", 0),
+                add_to_cart=conv.get("add_to_cart", 0),
+                show_phone=conv.get("show_phone", 0),
+                chat_start=conv.get("chat_start", 0),
+                order_placed=orders,
+                conversion_rate=conversion_rate,
+            )
+        )
+
+    for template, stats in views_by_template.items():
+        if template in seen_templates or not LANDING_PATH_TEMPLATE_RE.match(template):
+            continue
+        conv = _conversion_counts_for_sessions(
+            db,
+            since,
+            SiteAnalyticsSession.landing_path_template == template,
+        )
+        visitors = int(stats["unique_visitors"])
+        orders = conv.get("order_placed", 0)
+        items.append(
+            AnalyticsLandingRowOut(
+                path_template=template,
+                landing_path=template,
+                views=int(stats["views"]),
+                unique_visitors=visitors,
+                part_views=conv.get("part_view", 0),
+                add_to_cart=conv.get("add_to_cart", 0),
+                show_phone=conv.get("show_phone", 0),
+                chat_start=conv.get("chat_start", 0),
+                order_placed=orders,
+                conversion_rate=round(orders / visitors * 100.0, 2) if visitors > 0 else 0.0,
+            )
+        )
+
+    items.sort(key=lambda item: (item.order_placed, item.views), reverse=True)
+    return AnalyticsLandingsOut(days=days, items=items)
+
+
+def get_conversion_trend(db: Session, days: int) -> AnalyticsConversionTrendOut:
+    since = _period_start(days)
+    rows = (
+        db.query(
+            func.date(SiteAnalyticsConversionEvent.created_at).label("day"),
+            SiteAnalyticsConversionEvent.event_type,
+            func.count(SiteAnalyticsConversionEvent.id).label("cnt"),
+        )
+        .filter(SiteAnalyticsConversionEvent.created_at >= since)
+        .group_by(func.date(SiteAnalyticsConversionEvent.created_at), SiteAnalyticsConversionEvent.event_type)
+        .order_by(func.date(SiteAnalyticsConversionEvent.created_at).desc())
+        .all()
+    )
+    by_day: dict[date, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for row in rows:
+        day_value = row.day if isinstance(row.day, date) else datetime.fromisoformat(str(row.day)).date()
+        by_day[day_value][str(row.event_type)] = int(row.cnt)
+
+    items = [
+        AnalyticsConversionTrendRowOut(
+            day=day,
+            part_view=counts.get("part_view", 0),
+            add_to_cart=counts.get("add_to_cart", 0),
+            show_phone=counts.get("show_phone", 0),
+            chat_start=counts.get("chat_start", 0),
+            order_placed=counts.get("order_placed", 0),
+        )
+        for day, counts in sorted(by_day.items(), reverse=True)
+    ]
+    return AnalyticsConversionTrendOut(days=days, items=items)
 
 
 def validate_days(days: int) -> int:

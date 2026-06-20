@@ -10,6 +10,7 @@ import {
 } from '../../../redux/slices/CartSlice';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { buildNewPartDetailPath } from '../../../utils/partRoutes';
+import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
 import { isRosskoFastDelivery } from './rosskoHelpers';
 import {
   extractProductDescription,
@@ -275,6 +276,10 @@ export default function NewPartProductCard({
       const cartItem = prepareCartItem(stock, 1);
       if (!cartItem.stock_id || cartItem.price <= 0) return;
       await dispatch(addNewPartsToCart(cartItem)).unwrap();
+      trackConversion(CONVERSION_EVENTS.ADD_TO_CART, {
+        path: window.location.pathname + window.location.search,
+        section: 'new',
+      });
     } catch (_e) {
       // silent: existing screen already displays global cart errors
     } finally {

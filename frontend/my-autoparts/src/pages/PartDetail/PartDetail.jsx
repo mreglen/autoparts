@@ -18,6 +18,7 @@ import PartDetailSeoSummary from './PartDetailSeoSummary';
 import PartDetailSpecsBlock from './PartDetailSpecsBlock';
 import PartDetailFitmentBlock from './PartDetailFitmentBlock';
 import PartArticleMatchesBlock from '../../components/PartArticleMatchesBlock/PartArticleMatchesBlock';
+import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
 
 const formatErrorText = (value) => {
   if (!value) return 'Ошибка загрузки товара';
@@ -109,6 +110,7 @@ const PartDetail = () => {
   const [referenceFitmentLoading, setReferenceFitmentLoading] = useState(false);
   const fetchedProductIdRef = useRef(null);
   const searchedBrandArticleRef = useRef(null);
+  const trackedPartViewRef = useRef(null);
 
   const productMatchesRoute = useMemo(() => {
     if (!currentProduct?.id) return false;
@@ -228,6 +230,17 @@ const PartDetail = () => {
   }, [showProduct, currentProduct?.id, currentProduct?.brand, currentProduct?.article]);
 
   useEffect(() => {
+    if (!showProduct || !currentProduct?.id) return;
+    if (trackedPartViewRef.current === currentProduct.id) return;
+    trackedPartViewRef.current = currentProduct.id;
+    trackConversion(CONVERSION_EVENTS.PART_VIEW, {
+      productId: currentProduct.id,
+      path: buildPartDetailPath(currentProduct) || location.pathname,
+      section: 'used',
+    });
+  }, [showProduct, currentProduct, location.pathname]);
+
+  useEffect(() => {
     if (!currentProduct?.id) return;
     const canonicalPath = buildPartDetailPath(currentProduct);
     if (canonicalPath && location.pathname !== canonicalPath) {
@@ -320,6 +333,11 @@ const PartDetail = () => {
       }
 
       await dispatch(addUsedPartsToCart({ product_id: part.id, quantity: 1 })).unwrap();
+      trackConversion(CONVERSION_EVENTS.ADD_TO_CART, {
+        productId: part.id,
+        path: buildPartDetailPath(part) || location.pathname,
+        section: 'used',
+      });
     } catch (error) {
       console.error('Ошибка добавления в корзину:', error);
     } finally {
@@ -382,7 +400,12 @@ const PartDetail = () => {
       };
 
       const result = await dispatch(createOrGetChat(chatData)).unwrap();
-      
+      trackConversion(CONVERSION_EVENTS.CHAT_START, {
+        productId: currentProduct.id,
+        path: buildPartDetailPath(currentProduct) || location.pathname,
+        section: 'used',
+      });
+
       // Переходим на страницу чата
       navigate(`/chats/${result.id}`);
     } catch (error) {
@@ -394,6 +417,13 @@ const PartDetail = () => {
   };
 
   const handleOpenPhoneModal = () => {
+    if (currentProduct?.id) {
+      trackConversion(CONVERSION_EVENTS.SHOW_PHONE, {
+        productId: currentProduct.id,
+        path: buildPartDetailPath(currentProduct) || location.pathname,
+        section: 'used',
+      });
+    }
     setIsPhoneModalOpen(true);
   };
 

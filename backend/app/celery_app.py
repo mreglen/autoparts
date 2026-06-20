@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 from app.core.config import settings
 import logging
 
@@ -15,6 +16,7 @@ celery_app = Celery(
         'app.tasks.chat_media_tasks',
         'app.tasks.yandex_feed_tasks',
         'app.tasks.seo_tasks',
+        'app.tasks.analytics_tasks',
     ]
 )
 
@@ -41,6 +43,12 @@ celery_app.conf.update(
     task_compression='gzip',  # Сжимать данные задач (быстрее передача)
     result_expires=3600,  # Истечение результатов через 1 час (экономия памяти)
     broker_pool_limit=100,  # Увеличить пул соединений с брокером
+    beat_schedule={
+        "analytics-monthly-query-review": {
+            "task": "analytics.run_monthly_query_review",
+            "schedule": crontab(day_of_month=1, hour=3, minute=0),
+        },
+    },
 )
 
 
