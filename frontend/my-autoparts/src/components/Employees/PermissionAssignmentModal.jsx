@@ -5,6 +5,46 @@ import {
   fetchEmployeePermissions,
   saveEmployeePermissions,
 } from '../../redux/slices/OrganizationSlice';
+import { groupPermissionsForGrid } from './permissionGridGroups';
+
+function PermissionTile({ permission, checked, disabled, onToggle }) {
+  return (
+    <label
+      className={`flex min-h-[88px] cursor-pointer flex-col justify-between rounded-xl border-2 p-3 transition-all duration-150 ${
+        checked
+          ? 'border-indigo-500 bg-indigo-50/70 shadow-sm'
+          : 'border-gray-200 bg-white hover:border-indigo-200 hover:bg-gray-50/80'
+      } ${disabled ? 'pointer-events-none opacity-60' : ''}`}
+    >
+      <input
+        type="checkbox"
+        className="sr-only"
+        checked={checked}
+        onChange={onToggle}
+        disabled={disabled}
+      />
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-sm font-medium leading-snug text-gray-900">{permission.name}</span>
+        <span
+          className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 ${
+            checked ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300 bg-white'
+          }`}
+        >
+          {checked && (
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </span>
+      </div>
+      {permission.code && (
+        <span className="mt-2 truncate font-mono text-[11px] text-gray-400" title={permission.code}>
+          {permission.code}
+        </span>
+      )}
+    </label>
+  );
+}
 
 const PermissionAssignmentModal = ({ show, employee, onClose }) => {
   const dispatch = useDispatch();
@@ -34,9 +74,14 @@ const PermissionAssignmentModal = ({ show, employee, onClose }) => {
     }
   }, [employee, employeePermissions, show]);
 
-  const sortedPermissions = useMemo(
-    () => [...(permissions || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ru')),
+  const permissionGroups = useMemo(
+    () => groupPermissionsForGrid(permissions),
     [permissions]
+  );
+
+  const totalCount = useMemo(
+    () => permissionGroups.reduce((sum, g) => sum + g.permissions.length, 0),
+    [permissionGroups]
   );
 
   const togglePermission = (permissionId) => {
@@ -47,8 +92,18 @@ const PermissionAssignmentModal = ({ show, employee, onClose }) => {
     );
   };
 
+  const toggleGroup = (groupPermissionIds, selectAll) => {
+    setLocalPermissions((prev) => {
+      if (selectAll) {
+        return [...new Set([...prev, ...groupPermissionIds])];
+      }
+      return prev.filter((id) => !groupPermissionIds.includes(id));
+    });
+  };
+
   const handleSelectAll = () => {
-    setLocalPermissions(sortedPermissions.map((p) => p.id));
+    const allIds = permissionGroups.flatMap((g) => g.permissions.map((p) => p.id));
+    setLocalPermissions(allIds);
   };
 
   const handleClearAll = () => {
@@ -81,7 +136,7 @@ const PermissionAssignmentModal = ({ show, employee, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
         <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Права доступа</h3>
@@ -121,16 +176,15 @@ const PermissionAssignmentModal = ({ show, employee, onClose }) => {
             </div>
           ) : permissionsError ? (
             <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{permissionsError}</p>
-          ) : sortedPermissions.length === 0 ? (
-            <p className="text-center text-sm text-gray-500 py-8">Нет доступных прав</p>
+          ) : totalCount === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-500">Нет доступных прав</p>
           ) : (
             <>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-3">
                 <p className="text-sm text-gray-600">
-                  Выбрано:{' '}
+                  Выбрано{' '}
                   <span className="font-semibold text-gray-900">{localPermissions.length}</span>
-                  {' '}
-                  из {sortedPermissions.length}
+                  {' '}из {totalCount}
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -152,47 +206,48 @@ const PermissionAssignmentModal = ({ show, employee, onClose }) => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {sortedPermissions.map((permission) => {
-                  const checked = localPermissions.includes(permission.id);
+              <div className="space-y-6">
+                {permissionGroups.map((group) => {
+                  const groupIds = group.permissions.map((p) => p.id);
+                  const selectedInGroup = groupIds.filter((id) => localPermissions.includes(id)).length;
+                  const allInGroup = selectedInGroup === groupIds.length && groupIds.length > 0;
+
                   return (
-                    <label
-                      key={permission.id}
-                      className={`relative flex cursor-pointer flex-col gap-2 rounded-xl border-2 p-4 transition-all duration-200 ${
-                        checked
-                          ? 'border-indigo-500 bg-indigo-50/60 shadow-sm'
-                          : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/80'
-                      } ${isSaving ? 'pointer-events-none opacity-60' : ''}`}
-                    >
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={checked}
-                        onChange={() => togglePermission(permission.id)}
-                        disabled={isSaving}
-                      />
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-sm font-medium leading-snug text-gray-900">
-                          {permission.name}
-                        </span>
-                        <span
-                          className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 transition-colors ${
-                            checked
-                              ? 'border-indigo-600 bg-indigo-600 text-white'
-                              : 'border-gray-300 bg-white'
-                          }`}
-                        >
-                          {checked && (
-                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
+                    <section key={group.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-3">
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-900">{group.title}</h4>
+                          {group.description && (
+                            <p className="mt-0.5 text-xs text-gray-500">{group.description}</p>
                           )}
-                        </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">
+                            {selectedInGroup}/{groupIds.length}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={isSaving}
+                            onClick={() => toggleGroup(groupIds, !allInGroup)}
+                            className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                          >
+                            {allInGroup ? 'Снять раздел' : 'Весь раздел'}
+                          </button>
+                        </div>
                       </div>
-                      {permission.code && (
-                        <span className="font-mono text-xs text-gray-500">{permission.code}</span>
-                      )}
-                    </label>
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {group.permissions.map((permission) => (
+                          <PermissionTile
+                            key={permission.id}
+                            permission={permission}
+                            checked={localPermissions.includes(permission.id)}
+                            disabled={isSaving}
+                            onToggle={() => togglePermission(permission.id)}
+                          />
+                        ))}
+                      </div>
+                    </section>
                   );
                 })}
               </div>

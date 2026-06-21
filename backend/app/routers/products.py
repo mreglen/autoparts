@@ -29,7 +29,8 @@ from app.services.yandex_feed_sync_service import (
     mark_yandex_feed_dirty_for_used_product,
 )
 from sqlalchemy.orm import selectinload
-from app.routers.search_products import normalize_partnumber, get_sql_normalize
+from app.utils.partnumber import normalize_partnumber
+from app.utils.search_sql import get_sql_normalize
 from app.core.config import settings
 from app.utils.json_cache_sync import get_cached_json_sync, set_cached_json_sync
 from app.utils.internal_code import is_valid_internal_code, next_internal_code

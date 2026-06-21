@@ -85,7 +85,7 @@ function Search() {
         value={searchTerm}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
-        placeholder="Поиск по названию, артикулу или VIN"
+        placeholder="Поиск: бренд, артикул, название или комбинация"
         className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-4 pr-11 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
         disabled={isSearching}
       />

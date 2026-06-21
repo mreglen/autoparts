@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import and_, or_, func
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 import logging
 from app.models.product import Product as ProductModel
@@ -12,137 +12,38 @@ from app.utils.search_cache import build_cache_key, get_cached_json, set_cached_
 from app.utils.singleflight import SingleFlight
 from app.utils.product_list_item import map_product_to_list_item
 from app.utils.partnumber import normalize_partnumber
-from app.utils.search_query import parse_brand_article_from_query
+from app.utils.search_query import parse_search_query
+from app.services.local_product_search import (
+    search_local_products_query,
+    _brand_article_pair_condition,
+)
+from app.utils.search_sql import get_sql_normalize
 
 router = APIRouter(prefix="/search-products", tags=["Search-Products"])
 logger = logging.getLogger(__name__)
 _SEARCH_CACHE_TTL_SECONDS = 120
 _rossko_singleflight = SingleFlight()
 
-def get_sql_normalize(col):
-    """
-    SQL-выражение для нормализации артикула в базе данных.
-    """
-    # Цепочка замен для удаления распространенных разделителей
-    return func.replace(func.replace(func.replace(func.replace(func.replace(func.replace(func.replace(func.upper(col), 
-        '-', ''), ' ', ''), '.', ''), '/', ''), '(', ''), ')', ''), '_', '')
-
-
-def get_sql_normalize_brand(col):
-    """Нормализация бренда для нечёткого сравнения (MANN-FILTER == MANN FILTER)."""
-    return func.replace(
-        func.replace(func.replace(func.upper(col), '-', ''), ' ', ''),
-        '/',
-        '',
-    )
-
-
-def _brand_match_conditions(brand_text: str):
-    brand_trim = brand_text.strip()
-    conditions = [
-        ProductModel.brand.ilike(brand_trim),
-        func.lower(func.trim(ProductModel.brand)) == brand_trim.casefold(),
-    ]
-    brand_norm = normalize_partnumber(brand_trim)
-    if brand_norm:
-        conditions.append(get_sql_normalize_brand(ProductModel.brand) == brand_norm)
-    return or_(*conditions)
-
-
-def _article_match_conditions(article_text: str):
-    article_trim = article_text.strip()
-    conditions = [
-        ProductModel.article.ilike(article_trim),
-        ProductModel.article.ilike(f"%{article_trim}%"),
-    ]
-    article_norm = normalize_partnumber(article_trim)
-    if article_norm:
-        conditions.extend([
-            get_sql_normalize(ProductModel.article) == article_norm,
-            get_sql_normalize(ProductModel.article).ilike(f"%{article_norm}%"),
-        ])
-    return or_(*conditions)
-
-
-def search_local_products_query(db: Session, q: str, is_new: bool = None):
-    """
-    Поиск в локальной БД: артикул, название, бренд и комбинация «бренд + артикул».
-    """
-    trimmed_q = (q or "").strip()
-    if not trimmed_q:
-        return (
-            db.query(ProductModel)
-            .options(
-                selectinload(ProductModel.photos),
-                selectinload(ProductModel.storage_location),
-                selectinload(ProductModel.organization),
-            )
-            .filter(ProductModel.id == -1)
-        )
-
-    normalized_q = normalize_partnumber(trimmed_q)
-    conditions = [
-        ProductModel.article.ilike(f"%{trimmed_q}%"),
-        ProductModel.name.ilike(f"%{trimmed_q}%"),
-        ProductModel.brand.ilike(f"%{trimmed_q}%"),
-    ]
-
-    parsed = parse_brand_article_from_query(trimmed_q)
-    if parsed:
-        brand_text, article_text = parsed
-        conditions.append(
-            and_(
-                _brand_match_conditions(brand_text),
-                _article_match_conditions(article_text),
-            )
-        )
-        canonical_q = f"{brand_text} {article_text}".strip().casefold()
-        conditions.append(
-            func.lower(
-                func.trim(
-                    func.concat(
-                        func.trim(ProductModel.brand),
-                        " ",
-                        func.trim(ProductModel.article),
-                    )
-                )
-            )
-            == canonical_q
-        )
-
-    if normalized_q:
-        conditions.append(get_sql_normalize(ProductModel.article).ilike(f"%{normalized_q}%"))
-        conditions.append(get_sql_normalize_brand(ProductModel.brand).ilike(f"%{normalized_q}%"))
-        conditions.append(func.replace(ProductModel.name, ' ', '').ilike(f"%{normalized_q}%"))
-
-    query = db.query(ProductModel).options(
-        selectinload(ProductModel.photos),
-        selectinload(ProductModel.storage_location),
-        selectinload(ProductModel.organization)
-    ).filter(or_(*conditions), func.coalesce(ProductModel.quantity, 0) > 0)
-
-    if is_new is not None:
-        query = query.filter(ProductModel.is_new == is_new)
-
-    return query
 
 @router.get("/search", response_model=list[ProductSchema])
-def search_products(q: str, db: Session = Depends(get_db)):
-    """Простой поиск (универсальный)"""
-    return search_local_products_query(db, q).all()
+def search_products(
+    q: str,
+    limit: int = Query(200, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    """Поиск по артикулу, бренду, названию и их комбинациям."""
+    return search_local_products_query(db, q, limit=limit).all()
 
 
 @router.get("/resolve")
 def resolve_product(q: str, db: Session = Depends(get_db)):
     """
-    Определяет одну карточку товара по артикулу или названию.
+    Определяет одну карточку товара по артикулу, бренду+артикулу или названию.
     Используется для прямого перехода из адресной строки (/find?q=...) и быстрого поиска.
     """
     trimmed = q.strip()
     if not trimmed:
         return jsonable_encoder({"status": "not_found", "query": q, "match_type": None, "product": None, "products": []})
-
-    normalized = normalize_partnumber(trimmed)
 
     base_query = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
@@ -150,8 +51,30 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
         selectinload(ProductModel.organization),
     ).filter(func.coalesce(ProductModel.quantity, 0) > 0)
 
+    parsed = parse_search_query(trimmed)
+
+    for brand_text, article_text in parsed.brand_article_pairs[:8]:
+        by_pair = base_query.filter(_brand_article_pair_condition(brand_text, article_text)).limit(2).all()
+        if len(by_pair) == 1:
+            return jsonable_encoder({
+                "status": "found",
+                "query": trimmed,
+                "match_type": "brand_article",
+                "product": by_pair[0],
+                "products": by_pair,
+            })
+        if len(by_pair) > 1:
+            return jsonable_encoder({
+                "status": "multiple",
+                "query": trimmed,
+                "match_type": "brand_article",
+                "product": None,
+                "products": by_pair,
+            })
+
+    normalized = normalize_partnumber(trimmed)
     if normalized:
-        by_article = base_query.filter(get_sql_normalize(ProductModel.article) == normalized).all()
+        by_article = base_query.filter(get_sql_normalize(ProductModel.article) == normalized).limit(2).all()
         if len(by_article) == 1:
             return jsonable_encoder({
                 "status": "found",
@@ -169,7 +92,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
                 "products": by_article,
             })
 
-    by_name = base_query.filter(func.lower(func.trim(ProductModel.name)) == trimmed.lower()).all()
+    by_name = base_query.filter(func.lower(func.trim(ProductModel.name)) == trimmed.lower()).limit(2).all()
     if len(by_name) == 1:
         return jsonable_encoder({
             "status": "found",
@@ -187,7 +110,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
             "products": by_name,
         })
 
-    results = search_local_products_query(db, trimmed).limit(20).all()
+    results = search_local_products_query(db, trimmed, limit=20).all()
     if len(results) == 1:
         return jsonable_encoder({
             "status": "found",
@@ -248,7 +171,14 @@ async def search_combined(q: str, db: Session = Depends(get_db)):
     if cached_payload is not None:
         return cached_payload
 
-    # 1. Запрос к ROSSKO API (основной источник для новых запчастей)
+    parsed = parse_search_query(trimmed_query)
+    normalized_q = parsed.normalized_full or normalize_partnumber(trimmed_query)
+
+    # 1. Локальный поиск — сразу, не ждём ROSSKO.
+    local_products = search_local_products_query(db, trimmed_query, limit=200).all()
+    local_direct_ids = {p.id for p in local_products}
+
+    # 2. ROSSKO API (новые запчасти + аналоги).
     rossko_response = None
     rossko_direct_normalized = set()
     rossko_analogs_normalized = set()
@@ -264,55 +194,57 @@ async def search_combined(q: str, db: Session = Depends(get_db)):
 
         rossko_response = await _rossko_singleflight.do(f"rossko:combined:{trimmed_query.lower()}", rossko_call)
 
-        def extract_rossko_pns(parts, target_set, is_analog=False):
-            if not parts: return
+        def extract_rossko_pns(parts, target_set):
+            if not parts:
+                return
             for part in parts:
                 pn = part.get("partnumber")
-                if pn: target_set.add(normalize_partnumber(pn))
+                if pn:
+                    target_set.add(normalize_partnumber(pn))
                 
                 crosses = part.get("crosses") or {}
                 cross_parts = crosses.get("Part") or []
-                if not isinstance(cross_parts, list): cross_parts = [cross_parts]
-                extract_rossko_pns(cross_parts, rossko_analogs_normalized, is_analog=True)
+                if not isinstance(cross_parts, list):
+                    cross_parts = [cross_parts]
+                extract_rossko_pns(cross_parts, rossko_analogs_normalized)
 
         parts_list = rossko_response.get("PartsList", {}).get("Part", [])
-        if not isinstance(parts_list, list): parts_list = [parts_list]
+        if not isinstance(parts_list, list):
+            parts_list = [parts_list]
         extract_rossko_pns(parts_list, rossko_direct_normalized)
     except Exception as e:
         logger.warning("ROSSKO error in combined search: %s", e)
 
-    # 2. Поиск в локальной базе (учитываем всё: и новые, и б/у)
-    normalized_q = normalize_partnumber(trimmed_query)
-    
-    # Собираем все артикулы, которые нас интересуют
+    # 3. Дополнительный локальный поиск по артикулам из ROSSKO.
     all_target_pns = rossko_direct_normalized | rossko_analogs_normalized
     if normalized_q:
         all_target_pns.add(normalized_q)
 
-    # Ищем в базе: по нормализованному запросу ИЛИ по артикулам из ROSSKO
-    db_products = db.query(ProductModel).options(
-        selectinload(ProductModel.photos),
-        selectinload(ProductModel.storage_location),
-        selectinload(ProductModel.organization)
-    ).filter(
-        or_(
+    extra_products = []
+    if all_target_pns:
+        extra_products = db.query(ProductModel).options(
+            selectinload(ProductModel.photos),
+            selectinload(ProductModel.storage_location),
+            selectinload(ProductModel.organization)
+        ).filter(
             get_sql_normalize(ProductModel.article).in_(list(all_target_pns)),
-            get_sql_normalize(ProductModel.article).ilike(f"%{normalized_q}%") if normalized_q else False,
-            ProductModel.name.ilike(f"%{trimmed_query}%")
-        ),
-        func.coalesce(ProductModel.quantity, 0) > 0
-    ).all()
+            func.coalesce(ProductModel.quantity, 0) > 0,
+        ).limit(200).all()
 
-    # 3. Разделение результатов
+    db_products = list(local_products)
+    seen_ids = local_direct_ids.copy()
+    for p in extra_products:
+        if p.id not in seen_ids:
+            db_products.append(p)
+            seen_ids.add(p.id)
+
     direct_products = []
     analog_products = []
-    
     seen_ids = set()
     for p in db_products:
-        if p.id in seen_ids: continue
-        
+        if p.id in seen_ids:
+            continue
         p_norm = normalize_partnumber(p.article)
-        # Если артикул совпадает с запросом или с прямым ответом ROSSKO
         if p_norm == normalized_q or p_norm in rossko_direct_normalized:
             direct_products.append(p)
         else:
@@ -354,14 +286,11 @@ async def search_used_parts(
     analog_parts = []
     rossko_response = None
 
-    # --- ШАГ 1: Быстрый поиск в наличии (всё локальное наличие считаем "в наличии" для этой вкладки) ---
-    # Получаем прямые соответствия запросу для отображения или для исключения из аналогов
-    direct_matches = search_local_products_query(db, trimmed_query, is_new=False).all()
+    direct_matches = search_local_products_query(db, trimmed_query, is_new=False, limit=200).all()
     
     if not only_analogs:
         available_parts = direct_matches
 
-    # --- ШАГ 2: Поиск аналогов (через ROSSKO) ---
     if not only_in_stock:
         try:
             async def rossko_call():
@@ -377,24 +306,26 @@ async def search_used_parts(
                 rossko_call,
             )
             
-            # Извлекаем аналоги из ROSSKO
             analog_pns = set()
             def extract_analogs(parts):
-                if not parts: return
+                if not parts:
+                    return
                 for part in parts:
                     crosses = part.get("crosses") or {}
                     cross_parts = crosses.get("Part") or []
-                    if not isinstance(cross_parts, list): cross_parts = [cross_parts]
+                    if not isinstance(cross_parts, list):
+                        cross_parts = [cross_parts]
                     for cp in cross_parts:
                         pn = cp.get("partnumber")
-                        if pn: analog_pns.add(normalize_partnumber(pn))
+                        if pn:
+                            analog_pns.add(normalize_partnumber(pn))
             
             parts_list = rossko_response.get("PartsList", {}).get("Part", [])
-            if not isinstance(parts_list, list): parts_list = [parts_list]
+            if not isinstance(parts_list, list):
+                parts_list = [parts_list]
             extract_analogs(parts_list)
 
             if analog_pns:
-                # Ищем б/у аналоги в нашей базе (показываем всё наличие, подходящее под аналоги)
                 db_analogs = db.query(ProductModel).options(
                     selectinload(ProductModel.photos),
                     selectinload(ProductModel.storage_location),
@@ -403,9 +334,8 @@ async def search_used_parts(
                     get_sql_normalize(ProductModel.article).in_(list(analog_pns)),
                     func.coalesce(ProductModel.quantity, 0) > 0,
                     ProductModel.is_new.is_(False),
-                ).all()
+                ).limit(200).all()
                 
-                # Исключаем те, что уже найдены как прямые соответствия
                 seen_ids = {p.id for p in direct_matches}
                 for a in db_analogs:
                     if a.id not in seen_ids:

@@ -9,7 +9,7 @@ from app.db.database import get_db
 from app.models.organization import Organization
 from app.models.product import Product as ProductModel, ProductPhoto
 from app.models.vehicle import Vehicle as VehicleModel
-from app.routers.search_products import search_local_products_query
+from app.services.local_product_search import search_local_products_query
 from app.schemas.product import Product as ProductSchema
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])

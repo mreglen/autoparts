@@ -50,6 +50,7 @@ from app.routers import websocket as websocket_router
 from app.routers import notifications as notifications_router
 from app.routers import avito_messenger_webhook as avito_messenger_webhook_router
 from app.tasks.yandex_feed_tasks import run_yandex_feed_sync
+from app.utils.celery_enqueue import enqueue_celery_task
 from app.utils.yandex_integration_db import (
     get_or_create_yandex_feed_sync_state,
     get_or_create_yandex_integration,
@@ -457,7 +458,7 @@ async def run_new_parts_seo_sync_tick():
         if settings.NEW_PARTS_SEO_SYNC_USE_CELERY:
             from app.tasks.seo_tasks import run_new_parts_seo_sync_batch_task
 
-            run_new_parts_seo_sync_batch_task.delay()
+            await enqueue_celery_task(run_new_parts_seo_sync_batch_task)
             logger.info("Rossko SEO micro-batch dispatched to Celery")
             return
 
@@ -618,7 +619,7 @@ async def run_yandex_feed_scheduler_tick():
                 state.last_enqueued_at = now
                 db.add(state)
                 db.commit()
-                run_yandex_feed_sync.delay(trigger="scheduler", force=False)
+                await enqueue_celery_task(run_yandex_feed_sync, trigger="scheduler", force=False)
         finally:
             db.close()
     except Exception as e:

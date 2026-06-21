@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Request, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.carts import Cart, NewPartsCart, UsedPartsCart, GuestCart, GuestNewPartsCart, GuestUsedPartsCart
 from app.models.product import Product
@@ -38,6 +38,29 @@ def get_guest_token_from_request(request: Request) -> Optional[str]:
 def get_guest_cart_by_token(db: Session, raw_token: str) -> Optional[GuestCart]:
     token_hash = hash_guest_token(raw_token)
     guest_cart = db.query(GuestCart).filter(GuestCart.token_hash == token_hash).first()
+    if not guest_cart:
+        return None
+    if guest_cart.expires_at <= _utcnow():
+        db.delete(guest_cart)
+        db.commit()
+        return None
+    return guest_cart
+
+
+def load_guest_cart_with_items(db: Session, raw_token: str) -> Optional[GuestCart]:
+    """Гостевая корзина с eager-load позиций и product.organization."""
+    token_hash = hash_guest_token(raw_token)
+    guest_cart = (
+        db.query(GuestCart)
+        .options(
+            selectinload(GuestCart.new_parts_items),
+            selectinload(GuestCart.used_parts_items)
+            .selectinload(GuestUsedPartsCart.product)
+            .selectinload(Product.organization),
+        )
+        .filter(GuestCart.token_hash == token_hash)
+        .first()
+    )
     if not guest_cart:
         return None
     if guest_cart.expires_at <= _utcnow():

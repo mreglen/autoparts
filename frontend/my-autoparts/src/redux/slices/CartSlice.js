@@ -127,14 +127,28 @@ export const createCardPayment = createAsyncThunk(
 export const fetchCart = createAsyncThunk(
     'cart/fetchCart',
     async (_, { rejectWithValue }) => {
-        try {
-            const response = await apiAxios.get('/cart/');
-            return response.data;
-        } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка загрузки корзины'
-            );
+        const retryableStatuses = new Set([502, 503, 504]);
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+            try {
+                const response = await apiAxios.get('/cart/');
+                return response.data;
+            } catch (error) {
+                lastError = error;
+                const status = error.response?.status;
+                if (!retryableStatuses.has(status) || attempt === 3) {
+                    break;
+                }
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 400 * attempt);
+                });
+            }
         }
+
+        return rejectWithValue(
+            lastError?.response?.data?.detail || 'Ошибка загрузки корзины'
+        );
     }
 );
 

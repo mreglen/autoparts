@@ -32,7 +32,11 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=600,  # Увеличено до 10 минут для обработки видео
     worker_prefetch_multiplier=1,  # Брать по 1 задаче на воркер (важно для больших задач!)
-    broker_transport_options={'visibility_timeout': 3600},
+    broker_transport_options={
+        'visibility_timeout': 3600,
+        'socket_connect_timeout': 3,
+        'socket_timeout': 3,
+    },
     broker_connection_retry_on_startup=True,
     # HIGH PERFORMANCE OPTIMIZATIONS
     worker_max_tasks_per_child=50,  # Перезапускать воркеры каждые 50 задач (предотвращает утечки памяти)

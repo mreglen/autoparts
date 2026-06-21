@@ -44,7 +44,20 @@ ON products (
   '_', '')
 );
 
--- Partial index for "only in stock" scans.
+-- Trigram index for brand ILIKE/contains lookups.
+CREATE INDEX IF NOT EXISTS idx_products_brand_trgm
+ON products USING gin (brand gin_trgm_ops);
+
+-- Functional index for normalized brand matching.
+CREATE INDEX IF NOT EXISTS idx_products_brand_normalized
+ON products (
+  replace(
+    replace(
+      replace(upper(brand), '-', ''),
+    ' ', ''),
+  '/', '')
+);
+
 CREATE INDEX IF NOT EXISTS idx_products_quantity_positive
 ON products (id)
 WHERE quantity > 0;

@@ -10,7 +10,13 @@ from app.models.organization import Organization
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.carts import NewPartsCartItem, UsedPartsCartItem, CartItemResponse, CartResponse, UpdateQuantityRequest
-from app.utils.guest_cart import get_or_create_guest_cart, get_guest_cart_by_token, get_guest_token_from_request, touch_guest_cart, get_or_create_user_cart
+from app.utils.guest_cart import (
+    get_or_create_guest_cart,
+    get_guest_token_from_request,
+    load_guest_cart_with_items,
+    touch_guest_cart,
+    get_or_create_user_cart,
+)
 from app.utils.phone import normalize_to_storage_format
 
 router = APIRouter(prefix="/cart", tags=["Cart"])
@@ -309,7 +315,7 @@ def get_cart(
         )
 
     guest_token = get_guest_token_from_request(request)
-    guest_cart = get_guest_cart_by_token(db, guest_token) if guest_token else None
+    guest_cart = load_guest_cart_with_items(db, guest_token) if guest_token else None
     if not guest_cart:
         guest_cart = get_or_create_guest_cart(db, request, response)
     return CartResponse(

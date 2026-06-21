@@ -7,39 +7,13 @@ from app.models.organization import Organization
 from app.models.product import Product, ProductPhoto
 from app.utils.partnumber import normalize_partnumber
 from app.utils.product_urls import build_product_used_catalog_search_query
+from app.utils.search_query import parse_search_query
+from app.utils.search_sql import get_sql_normalize, get_sql_normalize_brand
 from app.utils.slug_utils import slugify_brand
 
 
 def _normalize_used_catalog_query(q: str) -> str:
     return (q or "").strip().casefold()
-
-
-def _sql_normalize_article(column):
-    return func.replace(
-        func.replace(
-            func.replace(
-                func.replace(
-                    func.replace(
-                        func.replace(
-                            func.replace(func.upper(column), "-", ""),
-                            " ",
-                            "",
-                        ),
-                        ".",
-                        "",
-                    ),
-                    "/",
-                    "",
-                ),
-                "(",
-                "",
-            ),
-            ")",
-            "",
-        ),
-        "_",
-        "",
-    )
 
 
 def _working_product_photo_exists():
@@ -102,11 +76,25 @@ def find_indexable_used_catalog_product(db: Session, q: str) -> tuple[Product, s
     if canonical_match is not None:
         return canonical_match, "canonical"
 
+    parsed = parse_search_query(q)
+    for brand_text, article_text in parsed.brand_article_pairs[:8]:
+        brand_norm = normalize_partnumber(brand_text)
+        article_norm = normalize_partnumber(article_text)
+        if not brand_norm or not article_norm:
+            continue
+        pair_match = _unique_working_product(
+            db,
+            get_sql_normalize_brand(Product.brand) == brand_norm,
+            get_sql_normalize(Product.article) == article_norm,
+        )
+        if pair_match is not None:
+            return pair_match, "brand_article"
+
     article_norm = normalize_partnumber(q)
     if article_norm:
         article_match = _unique_working_product(
             db,
-            _sql_normalize_article(Product.article) == article_norm,
+            get_sql_normalize(Product.article) == article_norm,
         )
         if article_match is not None:
             return article_match, "article"
