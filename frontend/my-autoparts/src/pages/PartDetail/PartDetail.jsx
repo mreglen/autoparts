@@ -18,6 +18,7 @@ import PartDetailSeoSummary from './PartDetailSeoSummary';
 import PartDetailSpecsBlock from './PartDetailSpecsBlock';
 import PartDetailFitmentBlock from './PartDetailFitmentBlock';
 import PartArticleMatchesBlock from '../../components/PartArticleMatchesBlock/PartArticleMatchesBlock';
+import ShareButton from '../../components/ShareButton/ShareButton';
 import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
 
 const formatErrorText = (value) => {
@@ -609,6 +610,12 @@ const PartDetail = () => {
   const alternateOffersTitle = partBrand && partArticle
     ? `Другие предложения ${partBrand} ${partArticle}`
     : 'Другие предложения с этим артикулом';
+  const shareText = [
+    h1Primary,
+    currentProduct.price ? `${currentProduct.price.toLocaleString('ru-RU')} ₽` : null,
+  ]
+    .filter(Boolean)
+    .join(' — ');
 
   return (
     <div className="min-h-screen bg-gray-50 max-md:pb-28">
@@ -669,7 +676,13 @@ const PartDetail = () => {
                   usedCatalogPath={seo.usedCatalogPath}
                 />
               </div>
-              <div className="shrink-0 sm:text-right">
+              <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+                <ShareButton
+                  url={seo.canonicalUrl}
+                  title={h1Primary}
+                  text={shareText}
+                  size="sm"
+                />
                 <div className="text-2xl font-bold text-indigo-700 sm:text-3xl">
                   {currentProduct.price ? `${currentProduct.price.toLocaleString('ru-RU')} ₽` : '—'}
                 </div>
@@ -1145,6 +1158,14 @@ const PartDetail = () => {
                 {creatingChat ? '…' : 'Чат'}
               </button>
             ) : null}
+            <ShareButton
+              url={seo.canonicalUrl}
+              title={h1Primary}
+              text={shareText}
+              showLabel={false}
+              size="sm"
+              className="min-h-11 min-w-11 shrink-0"
+            />
           </div>
         </div>
       ) : null}

@@ -7,6 +7,7 @@ import {
   formatStockInMoney,
   getStockInLineTotal,
 } from '../../utils/stockInUi';
+import { formatInternalCodeDisplay } from '../../utils/internalCode';
 
 function DetailBlock({ label, children }) {
   return (
@@ -56,7 +57,7 @@ export default function StockInCard({ doc, isExpanded, onToggle, onImageClick })
               </span>
               <span className="text-sm text-gray-500">{formatStockInDate(doc.created_at)}</span>
               {product.internal_code && (
-                <span className="font-mono text-xs text-gray-400">#{product.internal_code}</span>
+                <span className="font-mono text-xs text-gray-400">#{formatInternalCodeDisplay(product.internal_code)}</span>
               )}
             </div>
 

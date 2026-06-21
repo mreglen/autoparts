@@ -13,6 +13,7 @@ from app.services.audit_service import log_audit
 from app.tasks.photo_tasks import process_and_upload_photo
 from app.tasks.video_tasks import process_and_upload_video
 from app.models.organization import Organization
+from app.utils.internal_code import next_internal_code
 
 router = APIRouter(prefix="/pending-products", tags=["Pending Products"])
 
@@ -63,6 +64,7 @@ def create_pending_product(
     current_user: User = Depends(get_current_user),
 ):
     """Создать новую запчасть в статусе ожидания модерации"""
+    _require_organization(current_user)
     
     # Validate media limits
     if product_data.photos:
@@ -86,21 +88,7 @@ def create_pending_product(
             detail="Выберите вид запчасти"
         )
     
-    # Генерируем последовательный числовой внутренний код
-    # Находим все существующие internal_code для организации
-    existing_codes_result = db.query(PendingProductModel.internal_code).all()
-    
-    # Извлекаем существующие коды как строки
-    existing_codes = [code_tuple[0] for code_tuple in existing_codes_result]
-    
-    # Начинаем с 1 и находим следующий свободный код в формате 00001
-    next_code = 1
-    while True:
-        candidate_code = f"{next_code:05d}"  # Формат 00001, 00002, etc.
-        if candidate_code not in existing_codes:
-            internal_code = candidate_code
-            break
-        next_code += 1
+    internal_code = next_internal_code(db, current_user.organization_id)
     
     # Преобразуем списки в JSON строки
     photos_json = json.dumps(product_data.photos) if product_data.photos else None

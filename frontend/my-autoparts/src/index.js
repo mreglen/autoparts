@@ -36,9 +36,16 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'NAVIGATE_TO_CHAT') {
       console.log('[SW] Navigate to chat:', event.data.chatId);
-      // Dispatch a custom event that App.jsx can listen to
-      window.dispatchEvent(new CustomEvent('navigateToChat', { 
-        detail: { chatId: event.data.chatId } 
+      window.dispatchEvent(new CustomEvent('navigateToChat', {
+        detail: {
+          chatId: event.data.chatId,
+          url: event.data.url,
+        },
+      }));
+    }
+    if (event.data && event.data.type === 'NAVIGATE_TO_URL') {
+      window.dispatchEvent(new CustomEvent('navigateToUrl', {
+        detail: { url: event.data.url },
       }));
     }
   });

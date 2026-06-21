@@ -17,6 +17,7 @@ from app.schemas.rossko_settings import (
 )
 from app.utils.rossko_settings_db import rossko_settings_configured
 from app.services.new_parts_order_fulfillment import fulfill_new_parts_order
+from app.services.push_notifications import notify_sellers_new_order
 from app.services.rossko_order_service import extract_rossko_notice_message
 from app.utils.guest_cart import get_or_create_user_cart
 
@@ -94,6 +95,15 @@ async def create_new_parts_order(
     )
     db.commit()
     db.refresh(new_order)
+
+    notify_sellers_new_order(
+        db,
+        organization_id=str(new_order.organization_id) if new_order.organization_id else None,
+        order_id=new_order.id,
+        order_kind="new",
+        buyer_name=new_order.buyer_name,
+        total_amount=float(new_order.total_amount) if new_order.total_amount is not None else None,
+    )
 
     rossko_response = None
     if new_order.rossko_response_raw:

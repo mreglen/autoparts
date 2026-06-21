@@ -13,6 +13,7 @@ import { normalizeImageUrl, apiRequest, apiRequestFormData } from '../../../util
 import { useAuthReady } from '../../../hooks/useAuthReady';
 import { useAiDescriptionGenerator } from '../../../hooks/useAiDescriptionGenerator';
 import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../../utils/internalCode';
 import MobilePageSection from '../../../components/MobilePageSection/MobilePageSection';
 import MobileStickyFooter from '../../../components/MobileStickyFooter/MobileStickyFooter';
 
@@ -1055,14 +1056,13 @@ const EditPart = () => {
           />
         </div>
 
-        {/* Внутренний код (только для чтения) */}
         {currentProduct?.internal_code && (
           <div>
-            <label className="block text-sm font-medium">Внутренний код</label>
+            <label className="block text-sm font-medium">{INTERNAL_CODE_LABEL}</label>
             <input
-              value={currentProduct.internal_code}
+              value={formatInternalCodeDisplay(currentProduct.internal_code)}
               readOnly
-              className="mt-1 block w-full px-3 py-2 border rounded-md bg-gray-50 text-gray-600"
+              className="mt-1 block w-full px-3 py-2 border rounded-md bg-gray-50 text-gray-600 font-mono"
             />
           </div>
         )}

@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { fetchAvitoChatProductLink } from '../redux/slices/AvitoChatSlice';
+import { INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../utils/internalCode';
 
 /**
  * Компонент карточки заказа "Свой Гараж"
@@ -240,10 +241,11 @@ export function GarageOrderCard({
                         <span className="text-gray-900 font-medium">{item.partnumber || item.product?.partnumber || '-'}</span>
                       </div>
                       
-                      {/* Внутренний код */}
                       <div>
-                        <span className="text-gray-500">Внутр. код: </span>
-                        <span className="text-gray-900 font-medium">{item.internal_code || item.product?.internal_code || '-'}</span>
+                        <span className="text-gray-500">{INTERNAL_CODE_LABEL}: </span>
+                        <span className="text-gray-900 font-medium font-mono">
+                          {formatInternalCodeDisplay(item.internal_code || item.product?.internal_code)}
+                        </span>
                       </div>
                       
                       {/* Product ID */}

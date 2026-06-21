@@ -30,6 +30,9 @@ function AdminPanelPage() {
   const [photoMigrationBusy, setPhotoMigrationBusy] = useState(false);
   const [photoMigrationResult, setPhotoMigrationResult] = useState(null);
   const [photoMigrationOrgId, setPhotoMigrationOrgId] = useState('');
+  const [internalCodeMigrationBusy, setInternalCodeMigrationBusy] = useState(false);
+  const [internalCodeMigrationResult, setInternalCodeMigrationResult] = useState(null);
+  const [internalCodeMigrationOrgId, setInternalCodeMigrationOrgId] = useState('');
 
   const [siteQuickLinks, setSiteQuickLinks] = useState([]);
   const [siteQuickLinksLoading, setSiteQuickLinksLoading] = useState(true);
@@ -196,6 +199,32 @@ function AdminPanelPage() {
       setError(e?.message || 'Не удалось запустить локализацию фото');
     } finally {
       setPhotoMigrationBusy(false);
+    }
+  };
+
+  const runInternalCodeMigration = async ({ dryRun }) => {
+    if (!dryRun) {
+      const ok = window.confirm(
+        'Пересчитать внутренние коды товаров в формат XXXX-AAAAA? Для организаций с Avito после миграции нужно перезалить autoload xlsx.'
+      );
+      if (!ok) return;
+    }
+    setInternalCodeMigrationBusy(true);
+    setError(null);
+    try {
+      const payload = { dry_run: dryRun };
+      const trimmedOrgId = internalCodeMigrationOrgId.trim();
+      if (trimmedOrgId) payload.org_id = trimmedOrgId;
+
+      const res = await apiRequest('/admin/products/migrate-internal-codes', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setInternalCodeMigrationResult(res);
+    } catch (e) {
+      setError(e?.message || 'Не удалось запустить миграцию внутренних кодов');
+    } finally {
+      setInternalCodeMigrationBusy(false);
     }
   };
 
@@ -488,6 +517,84 @@ function AdminPanelPage() {
                   {photoMigrationResult.failures.map((row) => (
                     <li key={`${row.photo_id}-${row.reason}`} className="text-xs text-gray-600">
                       photo_id={row.photo_id}: {row.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Миграция внутренних кодов</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Приводит коды товаров и заявок к формату <span className="font-mono">XXXX-AAAAA</span>{' '}
+          (префикс организации + 5 латинских букв). Уже валидные коды не меняются.
+          После миграции для Avito перегенерируйте и загрузите autoload xlsx.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="internal-code-migration-org-id" className="block text-sm font-medium text-gray-700 mb-1">
+              Организация (опционально)
+            </label>
+            <input
+              id="internal-code-migration-org-id"
+              type="text"
+              placeholder="например qMHbBIoD51"
+              className="block w-52 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              value={internalCodeMigrationOrgId}
+              disabled={internalCodeMigrationBusy}
+              onChange={(e) => setInternalCodeMigrationOrgId(e.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => runInternalCodeMigration({ dryRun: true })}
+            disabled={internalCodeMigrationBusy}
+            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+          >
+            {internalCodeMigrationBusy ? 'Выполняется…' : 'Проверить'}
+          </button>
+          <button
+            type="button"
+            onClick={() => runInternalCodeMigration({ dryRun: false })}
+            disabled={internalCodeMigrationBusy}
+            className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {internalCodeMigrationBusy ? 'Выполняется…' : 'Пересчитать коды'}
+          </button>
+        </div>
+        {internalCodeMigrationResult && (
+          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 space-y-3">
+            <p className="font-medium text-gray-900">
+              Результат: {internalCodeMigrationResult.dry_run ? 'dry-run' : 'выполнение'}
+            </p>
+            <p>
+              Проверено: <span className="font-semibold">{internalCodeMigrationResult.scanned}</span>, изменено:{' '}
+              <span className="font-semibold">{internalCodeMigrationResult.migrated}</span>, пропущено:{' '}
+              <span className="font-semibold">{internalCodeMigrationResult.skipped}</span>, ошибок:{' '}
+              <span className="font-semibold">{internalCodeMigrationResult.failed}</span>
+            </p>
+            {Array.isArray(internalCodeMigrationResult.changes) && internalCodeMigrationResult.changes.length > 0 && (
+              <div>
+                <p className="font-medium text-gray-900 mb-1">Примеры изменений:</p>
+                <ul className="space-y-1 max-h-44 overflow-auto pr-1 font-mono text-xs">
+                  {internalCodeMigrationResult.changes.map((row) => (
+                    <li key={`${row.entity_type}-${row.entity_id}`}>
+                      {row.entity_type} #{row.entity_id}: {row.old_code} → {row.new_code}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {Array.isArray(internalCodeMigrationResult.failures) && internalCodeMigrationResult.failures.length > 0 && (
+              <div>
+                <p className="font-medium text-gray-900 mb-1">Ошибки:</p>
+                <ul className="space-y-1 max-h-44 overflow-auto pr-1 text-xs text-red-700">
+                  {internalCodeMigrationResult.failures.map((row) => (
+                    <li key={`${row.entity_type}-${row.entity_id}-${row.reason}`}>
+                      {row.entity_type} #{row.entity_id}: {row.reason}
                     </li>
                   ))}
                 </ul>

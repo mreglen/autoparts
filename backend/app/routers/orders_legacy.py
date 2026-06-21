@@ -17,6 +17,7 @@ from app.services.marketplace_used_order import (
     create_used_orders_from_payload,
 )
 from app.services.audit_service import log_audit
+from app.services.push_notifications import notify_sellers_new_order
 
 router = APIRouter(prefix="/orders", tags=["Orders Legacy"])
 
@@ -188,6 +189,14 @@ def create_order_legacy(
 
     if used_orders_out:
         for o in used_orders_out:
+            notify_sellers_new_order(
+                db,
+                organization_id=o.organization_id,
+                order_id=o.id,
+                order_kind="used",
+                buyer_name=payload.recipient_name,
+                total_amount=o.total_amount,
+            )
             log_audit(
                 db,
                 event_type="order_created",
@@ -200,6 +209,14 @@ def create_order_legacy(
                 entity_id=o.id,
             )
     if created_new_id:
+        notify_sellers_new_order(
+            db,
+            organization_id=current_user.organization_id,
+            order_id=created_new_id,
+            order_kind="new",
+            buyer_name=payload.recipient_name,
+            total_amount=float(payload.total_amount or 0) if payload.total_amount else None,
+        )
         log_audit(
             db,
             event_type="order_created",

@@ -48,6 +48,7 @@ from app.schemas.avito_integration import (
 from app.tasks.avito_tasks import run_avito_export_job, run_avito_publish_job, _map_avito_category
 from app.services import avito_api as avito_api_svc
 from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload, upsert_products_to_avito_autoload
+from app.utils.internal_code import next_internal_code, resolve_internal_code_for_import
 from app.services.avito_media import (
     ensure_local_pictures,
     normalize_for_xlsx,
@@ -226,32 +227,6 @@ def _save_autoload_cache(
     row.avito_token_error = avito_token_error
     row.warnings_json = json.dumps(warnings, ensure_ascii=False) if warnings else None
     db.commit()
-
-
-def _next_internal_code(db: Session) -> str:
-    # В модели Product internal_code уникален глобально (не по organization_id),
-    # поэтому подбираем код по всей таблице products.
-    # Начинаем с большего номера, чтобы избежать конфликтов
-    existing = db.query(ProductModel.internal_code).all()
-    existing_codes = {r[0] for r in existing if r[0]}
-    
-    # Находим максимальный существующий числовой код
-    max_code = 0
-    for code in existing_codes:
-        try:
-            num = int(code)
-            if num > max_code:
-                max_code = num
-        except (ValueError, TypeError):
-            pass
-    
-    # Начинаем с max_code + 1
-    idx = max_code + 1
-    while True:
-        candidate = f"{idx:05d}"
-        if candidate not in existing_codes:
-            return candidate
-        idx += 1
 
 
 def _get_part_type_id_by_name(db: Session, name: str) -> int | None:
@@ -1542,7 +1517,7 @@ async def import_avito_autoload_rows(
         if product is None:
             # Create new product
             product_created = True  # Устанавливаем флаг
-            internal_code = unique_ad_id or _next_internal_code(db)
+            internal_code = resolve_internal_code_for_import(db, org_id, unique_ad_id)
             # part_type_id is REQUIRED - try to get from item or use default
             part_type_id = None
             if item.get("part_type_id"):
@@ -1578,7 +1553,7 @@ async def import_avito_autoload_rows(
                 db.rollback()
                 # Если internal_code уже существует, пробуем другой
                 if not unique_ad_id:
-                    internal_code = _next_internal_code(db)
+                    internal_code = next_internal_code(db, org_id)
                     product = ProductModel(
                         article=(part_number or avito_id or internal_code or f"ROW-{key[1]}")[:30],
                         name=(title or part_number or f"Avito row {key[1]}")[:255],

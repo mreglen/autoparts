@@ -13,6 +13,7 @@ from app.models.product import Product
 from app.models.stock_out import StockOut
 from app.services.finance_reports import FinanceFilters
 from app.services.finance_xlsx_export import build_finance_workbook_bytes
+from app.utils.internal_code import build_internal_code
 
 
 class FinanceXlsxExportTests(unittest.TestCase):
@@ -84,7 +85,7 @@ class FinanceXlsxExportTests(unittest.TestCase):
         self.db.add(
             Product(
                 id=1,
-                internal_code="P-1",
+                internal_code=build_internal_code("org1", 1),
                 article="A-1",
                 name="Test",
                 brand="B",

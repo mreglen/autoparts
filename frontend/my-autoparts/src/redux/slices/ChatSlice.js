@@ -827,22 +827,22 @@ export const disconnectWebSocket = () => (dispatch) => {
 };
 
 // Push Notification Subscription
-export const subscribeToPushNotifications = () => async (dispatch, getState) => {
+export const subscribeToPushNotifications = ({ prompt = true } = {}) => async (dispatch, getState) => {
     try {
-        // Check if browser supports notifications
         if (!('Notification' in window) || !('serviceWorker' in navigator)) {
             console.log('[Push] Push notifications not supported');
             return;
         }
-        
-        // Request permission
-        const permission = await Notification.requestPermission();
+
+        let permission = Notification.permission;
+        if (permission === 'default' && prompt) {
+            permission = await Notification.requestPermission();
+        }
         if (permission !== 'granted') {
-            console.log('[Push] Notification permission denied');
+            console.log('[Push] Notification permission not granted');
             return;
         }
-        
-        // Get VAPID public key from backend
+
         const response = await fetch(`${API_BASE}/notifications/vapid-public-key`);
         const contentType = response.headers.get('content-type') || '';
         if (!response.ok || !contentType.includes('application/json')) {
@@ -850,40 +850,44 @@ export const subscribeToPushNotifications = () => async (dispatch, getState) => 
             return;
         }
         const { public_key } = await response.json();
-        
+
         if (!public_key) {
             console.log('[Push] VAPID public key not configured');
             return;
         }
-        
-        // Register service worker
-        const registration = await navigator.serviceWorker.register('/service-worker.js');
-        console.log('[Push] Service Worker registered');
-        
-        // Subscribe to push
-        const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(public_key)
-        });
-        
-        console.log('[Push] Subscribed to push notifications');
-        
-        // Send subscription to backend
+
+        let registration = await navigator.serviceWorker.getRegistration('/');
+        if (!registration) {
+            registration = await navigator.serviceWorker.register('/service-worker.js');
+        }
+        console.log('[Push] Service Worker ready');
+
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+            subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(public_key),
+            });
+            console.log('[Push] Subscribed to push notifications');
+        }
+
         const token = getState().auth.token;
+        if (!token) return;
+
         await fetch(`${API_BASE}/notifications/subscribe`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({
                 endpoint: subscription.endpoint,
                 p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')))),
                 auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')))),
-                user_agent: navigator.userAgent
-            })
+                user_agent: navigator.userAgent,
+            }),
         });
-        
+
         console.log('[Push] Subscription sent to backend');
     } catch (error) {
         console.error('[Push] Subscription failed:', error);

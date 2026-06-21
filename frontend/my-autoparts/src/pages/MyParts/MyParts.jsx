@@ -14,6 +14,7 @@ import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
 import { useActionsDropdownPlacement } from '../../hooks/useActionsDropdownPlacement';
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 import StorageCellsDisplayTable from '../../components/StorageCellsTable/StorageCellsDisplayTable';
+import { normalizeInternalCodeForSearch, INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../utils/internalCode';
 
 const CardPart = ({
   part,
@@ -240,7 +241,7 @@ const CardPart = ({
             </div>
             {part.internal_code && (
               <div className="text-xs text-gray-500 mb-1">
-                Внутренний код: <span className="font-mono">{part.internal_code}</span>
+                {INTERNAL_CODE_LABEL}: <span className="font-mono">{formatInternalCodeDisplay(part.internal_code)}</span>
               </div>
             )}
             <h3 className="text-sm font-medium text-gray-800 mb-2 line-clamp-2">{part.name || '—'}</h3>
@@ -402,7 +403,7 @@ const CardPart = ({
                 </div>
                 {part.internal_code && (
                   <div className="text-xs text-gray-500 mb-1">
-                    Внутренний код: <span className="font-mono">{part.internal_code}</span>
+                    {INTERNAL_CODE_LABEL}: <span className="font-mono">{formatInternalCodeDisplay(part.internal_code)}</span>
                   </div>
                 )}
                 <h3 className="text-sm font-medium text-gray-800 line-clamp-2">{part.name || '—'}</h3>
@@ -726,14 +727,6 @@ const DEFAULT_MODERATION_FILTERS = { search: '', storage: '', sort: 'date_desc',
 const URL_SEARCH_DEBOUNCE_MS = 400;
 
 const getModerationPartKey = (part) => `${part.moderationKind || 'pending'}-${part.id}`;
-
-const normalizeInternalCodeForSearch = (code) => {
-  if (code == null || code === '') return '';
-  if (typeof code === 'object') {
-    return String(code.code || code.id || '');
-  }
-  return String(code);
-};
 
 function MyParts() {
   const [searchParams, setSearchParams] = useSearchParams();

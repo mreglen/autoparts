@@ -32,6 +32,7 @@ from sqlalchemy.orm import selectinload
 from app.routers.search_products import normalize_partnumber, get_sql_normalize
 from app.core.config import settings
 from app.utils.json_cache_sync import get_cached_json_sync, set_cached_json_sync
+from app.utils.internal_code import is_valid_internal_code, next_internal_code
 
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -143,24 +144,13 @@ def create_product(
     # Подготавливаем данные продукта
     product_data = product.dict(exclude={"vehicle_ids", "photos", "videos"})
 
-    # Автоматическая генерация internal_code, если не предоставлен
     if not product_data.get("internal_code"):
-        # Находим все существующие internal_code для организации
-        existing_codes_result = db.query(ProductModel.internal_code).filter(
-            ProductModel.organization_id == current_user.organization_id
-        ).all()
-
-        # Извлекаем существующие коды как строки
-        existing_codes = [code_tuple[0] for code_tuple in existing_codes_result]
-
-        # Начинаем с 1 и находим следующий свободный код в формате 00001
-        next_code = 1
-        while True:
-            candidate_code = f"{next_code:05d}"  # Формат 00001, 00002, etc.
-            if candidate_code not in existing_codes:
-                product_data["internal_code"] = candidate_code
-                break
-            next_code += 1
+        product_data["internal_code"] = next_internal_code(db, current_user.organization_id)
+    elif not is_valid_internal_code(product_data["internal_code"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Некорректный формат внутреннего кода (ожидается XXXX-AAAAA)",
+        )
 
     # Создаём продукт
     db_product = ProductModel(
@@ -540,17 +530,20 @@ def update_product(
                 detail="Максимум 1 видео на запчасть"
             )
 
-    # Проверяем уникальность internal_code (если он изменился)
     if product.internal_code != db_product.internal_code:
+        if product.internal_code and not is_valid_internal_code(product.internal_code):
+            raise HTTPException(
+                status_code=400,
+                detail="Некорректный формат внутреннего кода (ожидается XXXX-AAAAA)",
+            )
         existing_product = db.query(ProductModel).filter(
             ProductModel.internal_code == product.internal_code,
-            ProductModel.organization_id == current_user.organization_id,
-            ProductModel.id != product_id  # Исключаем текущий продукт
+            ProductModel.id != product_id,
         ).first()
         if existing_product:
             raise HTTPException(
                 status_code=400,
-                detail=f"Внутренний код '{product.internal_code}' уже используется другим продуктом"
+                detail=f"Внутренний код '{product.internal_code}' уже используется другим продуктом",
             )
 
     # Обновляем основные поля

@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
+import { subscribeToPushNotifications } from './redux/slices/ChatSlice';
 import { fetchPublicSiteConfig, fetchSiteQuickLinks } from './redux/slices/PublicInfoSlice';
 
 import RouteFallback from './components/RouteFallback';
@@ -113,15 +114,34 @@ function ServiceWorkerNavigationHandler() {
         navigate('/auth', { replace: true });
         return;
       }
-      const { chatId } = event.detail;
-      console.log('[App] Navigating to chat from notification:', chatId);
-      navigate(`/chats/${chatId}`, { state: { scrollToBottom: true } });
+      const { chatId, url } = event.detail;
+      if (url) {
+        navigate(url, { state: { scrollToBottom: true } });
+        return;
+      }
+      if (chatId) {
+        console.log('[App] Navigating to chat from notification:', chatId);
+        navigate(`/chats?source=garage&chatId=${chatId}`, { state: { scrollToBottom: true } });
+      }
+    };
+
+    const handleNavigateToUrl = (event) => {
+      const storedToken = localStorage.getItem('token');
+      const { url } = event.detail;
+      if (!url) return;
+      if (!storedToken && !url.startsWith('/')) {
+        navigate('/auth', { replace: true });
+        return;
+      }
+      navigate(url);
     };
 
     window.addEventListener('navigateToChat', handleNavigateToChat);
+    window.addEventListener('navigateToUrl', handleNavigateToUrl);
 
     return () => {
       window.removeEventListener('navigateToChat', handleNavigateToChat);
+      window.removeEventListener('navigateToUrl', handleNavigateToUrl);
     };
   }, [navigate]);
 
@@ -163,6 +183,9 @@ function App() {
     if (!token) return;
     dispatch(fetchProfile())
       .unwrap()
+      .then(() => {
+        dispatch(subscribeToPushNotifications({ prompt: false }));
+      })
       .catch((error) => {
         if (error?.includes('401') || error?.includes('Unauthorized')) {
           localStorage.removeItem('token');

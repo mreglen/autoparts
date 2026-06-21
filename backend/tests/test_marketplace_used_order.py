@@ -15,6 +15,7 @@ from app.services.marketplace_used_order import (
     UsedOrderItemInput,
     create_used_orders_from_payload,
 )
+from app.utils.internal_code import build_internal_code
 
 
 class MarketplaceUsedOrderTests(unittest.TestCase):
@@ -169,7 +170,7 @@ class MarketplaceUsedOrderTests(unittest.TestCase):
     ):
         product = Product(
             id=product_id,
-            internal_code=f"P-{product_id}",
+            internal_code=build_internal_code(organization_id, product_id),
             article=f"A-{product_id}",
             name=f"Part {product_id}",
             brand="Test",

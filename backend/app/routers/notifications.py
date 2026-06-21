@@ -11,10 +11,11 @@ import json
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
-# VAPID config
-VAPID_CLAIMS = {
-    "sub": "mailto:support@autoparts.com"  # Update with your email
-}
+def _vapid_claims() -> dict:
+    email = (settings.EMAIL_FROM or "support@svoygarage.ru").strip()
+    if not email.startswith("mailto:"):
+        email = f"mailto:{email}"
+    return {"sub": email}
 
 
 @router.post("/subscribe")
@@ -81,7 +82,10 @@ def get_vapid_public_key():
 def send_push_notification(user_id: int, message_data: dict, db: Session):
     """Send push notification to all user's active subscriptions"""
     from sqlalchemy import func
-    
+
+    if not settings.VAPID_PRIVATE_KEY or not settings.VAPID_PUBLIC_KEY:
+        return
+
     subscriptions = db.query(PushSubscription).filter(
         PushSubscription.user_id == user_id,
         PushSubscription.is_active == True
@@ -101,7 +105,7 @@ def send_push_notification(user_id: int, message_data: dict, db: Session):
                 subscription_info=subscription_info,
                 data=json.dumps(message_data),
                 vapid_private_key=settings.VAPID_PRIVATE_KEY,
-                vapid_claims=VAPID_CLAIMS
+                vapid_claims=_vapid_claims()
             )
             
             # Update last_used

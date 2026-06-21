@@ -107,83 +107,83 @@ export default function PurchaseOrderCard({
         isExpanded ? 'border-indigo-200 shadow-md ring-1 ring-indigo-100' : 'border-gray-200/80 hover:border-gray-300 hover:shadow'
       }`}
     >
+      {/* Шапка заказа — div, чтобы вложенные кнопки работали корректно */}
+      <div className="border-b border-gray-100 px-4 py-4 sm:px-5 sm:py-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {isUsed ? (
+                <span className="inline-flex items-center rounded-lg bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-800 ring-1 ring-gray-100">
+                  №{order.id}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1 ring-1 ring-gray-100">
+                  <NewPartsTypeBadge />
+                  <span className="text-xs font-semibold text-gray-800">№{order.id}</span>
+                </span>
+              )}
+              <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 truncate">{sellerLabel}</h3>
+              <p className="mt-1 text-sm text-gray-600 line-clamp-2">{getDeliveryInfo(order)}</p>
+              <div className="mt-2">
+                <OrderWriteMessageButton
+                  label="Написать продавцу"
+                  targetUserId={order.seller_user_id}
+                  productId={fallbackProductId}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-end justify-between gap-4 sm:flex-col sm:items-end">
+            <div className="text-left sm:text-right">
+              <div className="text-xs text-gray-500">Сумма заказа</div>
+              <div className="text-xl font-bold tabular-nums text-gray-900">{formatPrice(order.total_amount)}</div>
+            </div>
+            <div
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(statusCode)}`}
+            >
+              {statusIcon}
+              {getStatusName(statusCode)}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+              order.is_paid ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-100'
+            }`}
+          >
+            {order.is_paid ? 'Оплачен' : 'Ожидает оплаты'}
+          </span>
+          <span className="text-xs text-gray-500">
+            {items.length} {items.length === 1 ? 'позиция' : items.length < 5 ? 'позиции' : 'позиций'}
+          </span>
+        </div>
+      </div>
+
+      {/* Кнопка раскрытия состава заказа */}
       <button
         type="button"
         onClick={() => onToggle(order.id)}
-        className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+        className="flex w-full items-center justify-between bg-gray-50/80 px-4 py-3 text-left sm:px-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500"
         aria-expanded={isExpanded}
       >
-        <div className="border-b border-gray-100 px-4 py-4 sm:px-5 sm:py-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                {isUsed ? (
-                  <span className="inline-flex items-center rounded-lg bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-800 ring-1 ring-gray-100">
-                    №{order.id}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1 ring-1 ring-gray-100">
-                    <NewPartsTypeBadge />
-                    <span className="text-xs font-semibold text-gray-800">№{order.id}</span>
-                  </span>
-                )}
-                <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-gray-900 truncate">{sellerLabel}</h3>
-                <p className="mt-1 text-sm text-gray-600 line-clamp-2">{getDeliveryInfo(order)}</p>
-                <div className="mt-2">
-                  <OrderWriteMessageButton
-                    label="Написать продавцу"
-                    targetUserId={order.seller_user_id}
-                    productId={fallbackProductId}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex shrink-0 items-end justify-between gap-4 sm:flex-col sm:items-end">
-              <div className="text-left sm:text-right">
-                <div className="text-xs text-gray-500">Сумма заказа</div>
-                <div className="text-xl font-bold tabular-nums text-gray-900">{formatPrice(order.total_amount)}</div>
-              </div>
-              <div
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(statusCode)}`}
-              >
-                {statusIcon}
-                {getStatusName(statusCode)}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span
-              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                order.is_paid ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-100'
-              }`}
-            >
-              {order.is_paid ? 'Оплачен' : 'Ожидает оплаты'}
-            </span>
-            <span className="text-xs text-gray-500">
-              {items.length} {items.length === 1 ? 'позиция' : items.length < 5 ? 'позиции' : 'позиций'}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between px-4 py-3 sm:px-5 bg-gray-50/80">
-          <span className="text-sm font-medium text-indigo-600">
-            {isExpanded ? 'Скрыть состав заказа' : 'Показать состав заказа'}
-          </span>
-          <svg
-            className={`h-5 w-5 text-indigo-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+        <span className="text-sm font-medium text-indigo-600">
+          {isExpanded ? 'Скрыть состав заказа' : `Состав заказа · ${items.length} поз.`}
+        </span>
+        <svg
+          className={`h-5 w-5 text-indigo-600 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          aria-hidden
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
       </button>
 
       {isExpanded && items.length > 0 && (

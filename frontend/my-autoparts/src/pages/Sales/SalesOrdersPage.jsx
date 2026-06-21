@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
+import { subscribeToPushNotifications } from '../../redux/slices/ChatSlice';
 import { AvitoOrderCard } from '../../components/AvitoOrderCard';
 import SalesGarageOrderCard from '../../components/SalesOrders/SalesGarageOrderCard';
 import SalesOrdersEmptyState from '../../components/SalesOrders/SalesOrdersEmptyState';
@@ -62,6 +63,7 @@ function matchesAvitoStatusFilter(order, filterId) {
 }
 
 export default function SalesOrdersPage() {
+  const dispatch = useDispatch();
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const { status: avitoAccountStatus } = useAvitoAccountStatus(user?.organization_id, {
     enabled: Boolean(user?.organization_id),
@@ -70,6 +72,11 @@ export default function SalesOrdersPage() {
 
   const hasPermission = user?.is_admin || user?.is_seller ||
     (user?.is_employee && permissionCodes && permissionCodes.includes('sales.orders'));
+
+  useEffect(() => {
+    if (!hasPermission) return;
+    dispatch(subscribeToPushNotifications({ prompt: true }));
+  }, [dispatch, hasPermission]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

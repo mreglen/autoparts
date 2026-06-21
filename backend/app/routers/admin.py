@@ -49,6 +49,10 @@ from app.services.photo_localization import (
     format_failures_for_output,
     migrate_external_product_photos,
 )
+from app.services.internal_code_migration import (
+    format_changes_for_output,
+    migrate_internal_codes,
+)
 from app.services.sitemap_service import (
     DEFAULT_PRODUCT_URLS_LIMIT,
     generate_latest_product_urls_download,
@@ -136,6 +140,38 @@ class PhotoLocalizationAdminResponse(BaseModel):
     failed: int
     skipped: int
     failures: List[PhotoLocalizationFailure]
+
+
+class InternalCodeMigrationRequest(BaseModel):
+    dry_run: bool = True
+    org_id: Optional[str] = None
+    limit: Optional[int] = Field(None, ge=1, le=50000)
+    change_limit: int = Field(50, ge=1, le=200)
+
+
+class InternalCodeMigrationChange(BaseModel):
+    entity_type: str
+    entity_id: int
+    organization_id: Optional[str] = None
+    old_code: str
+    new_code: str
+    prefix: Optional[str] = None
+
+
+class InternalCodeMigrationFailure(BaseModel):
+    entity_type: str
+    entity_id: int
+    reason: str
+
+
+class InternalCodeMigrationResponse(BaseModel):
+    dry_run: bool
+    scanned: int
+    migrated: int
+    skipped: int
+    failed: int
+    changes: List[InternalCodeMigrationChange]
+    failures: List[InternalCodeMigrationFailure]
 
 
 @router.get("/server-stats", response_model=ServerStatsOut)
@@ -279,6 +315,53 @@ def localize_external_product_photos_admin(
         migrated=counters.migrated,
         failed=counters.failed,
         skipped=counters.skipped,
+        failures=failures,
+    )
+
+
+@router.post("/products/migrate-internal-codes", response_model=InternalCodeMigrationResponse)
+def migrate_product_internal_codes_admin(
+    payload: InternalCodeMigrationRequest,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    result = migrate_internal_codes(
+        db,
+        dry_run=payload.dry_run,
+        org_id=payload.org_id,
+        limit=payload.limit,
+        change_limit=payload.change_limit,
+    )
+    counters = result.counters
+    changes = format_changes_for_output(result.changes, limit=payload.change_limit)
+    failures = [
+        InternalCodeMigrationFailure(entity_type=entity_type, entity_id=entity_id, reason=reason)
+        for entity_type, entity_id, reason in result.failures[: payload.change_limit]
+    ]
+    log_audit(
+        db,
+        event_type="admin_internal_code_migration_run",
+        category="admin",
+        summary="Запущена миграция внутренних кодов товаров",
+        user=current_user,
+        details={
+            "dry_run": payload.dry_run,
+            "org_id": payload.org_id,
+            "limit": payload.limit,
+            "scanned": counters.scanned,
+            "migrated": counters.migrated,
+            "skipped": counters.skipped,
+            "failed": counters.failed,
+            "changes_preview": changes[:10],
+        },
+    )
+    return InternalCodeMigrationResponse(
+        dry_run=payload.dry_run,
+        scanned=counters.scanned,
+        migrated=counters.migrated,
+        skipped=counters.skipped,
+        failed=counters.failed,
+        changes=[InternalCodeMigrationChange(**row) for row in changes],
         failures=failures,
     )
 

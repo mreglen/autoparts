@@ -18,6 +18,7 @@ from app.services.avito_warehouse_fulfillment import (
     FULFILLMENT_FULFILLED,
     FULFILLMENT_PARTIAL,
 )
+from app.utils.internal_code import build_internal_code
 
 
 class AvitoClosedOrderProcessorTests(unittest.TestCase):
@@ -117,7 +118,7 @@ class AvitoClosedOrderProcessorTests(unittest.TestCase):
     def _product(self, *, product_id=1, quantity=5, price=1000, storage_location_id=1):
         product = Product(
             id=product_id,
-            internal_code=f"P-{product_id}",
+            internal_code=build_internal_code(organization_id, product_id),
             article=f"A-{product_id}",
             name="Test part",
             brand="Test",

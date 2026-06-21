@@ -615,6 +615,16 @@ async def _on_payment_succeeded(
         )
         session.garage_order_id = order.id
         session.status = "fulfilled"
+        from app.services.push_notifications import notify_sellers_new_order
+
+        notify_sellers_new_order(
+            db,
+            organization_id=str(order.organization_id) if order.organization_id else None,
+            order_id=order.id,
+            order_kind="new",
+            buyer_name=order.buyer_name,
+            total_amount=float(order.total_amount) if order.total_amount is not None else None,
+        )
     except HTTPException as exc:
         db.rollback()
         reloaded = _reload_checkout_entities(db, session_id, payment_row_id)

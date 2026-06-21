@@ -22,6 +22,7 @@ from app.schemas.product import ProductCreate
 from app.core.auth import get_current_admin_user, get_current_user
 from app.services.audit_service import log_audit
 from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty_for_used_product
+from app.utils.internal_code import is_valid_internal_code, next_internal_code
 
 
 router = APIRouter(prefix="/moderation/products", tags=["Moderation Products"])
@@ -282,22 +283,11 @@ def approve_product(
             detail="Тип запчасти из заявки отсутствует в справочнике.",
         )
     
-    # Генерируем последовательный числовой внутренний код для продуктов
-    # Находим все существующие internal_code в products
-    existing_codes_result = db.query(ProductModel.internal_code).all()
-    
-    # Извлекаем существующие коды как строки
-    existing_codes = [code_tuple[0] for code_tuple in existing_codes_result]
-    
-    # Начинаем с 1 и находим следующий свободный код в формате 00001
-    next_code = 1
-    while True:
-        candidate_code = f"{next_code:05d}"  # Формат 00001, 00002, etc.
-        if candidate_code not in existing_codes:
-            internal_code = candidate_code
-            break
-        next_code += 1
-    
+    if is_valid_internal_code(pending_product.internal_code):
+        internal_code = pending_product.internal_code
+    else:
+        internal_code = next_internal_code(db, pending_product.organization_id)
+
     approved_quantity = pending_product.quantity
     if approved_quantity is None or approved_quantity < 1:
         approved_quantity = 1

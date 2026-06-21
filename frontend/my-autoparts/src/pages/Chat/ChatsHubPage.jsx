@@ -221,11 +221,12 @@ const ChatsHubPage = () => {
   );
   const showSellersFilter = Boolean(user?.is_seller || hasSellersChat);
 
-  // Подключаем WebSocket при загрузке
+  // Подключаем WebSocket и push-уведомления при загрузке
   useEffect(() => {
     if (!user?.id) return;
     dispatch(connectWebSocket(user.id));
-    
+    dispatch(subscribeToPushNotifications({ prompt: true }));
+
     return () => {
       dispatch(disconnectWebSocket());
     };

@@ -19,6 +19,7 @@ from app.services.finance_reports import (
     list_finance_stock_ins,
     list_finance_writeoffs,
 )
+from app.utils.internal_code import build_internal_code
 
 
 class FinanceReportsTests(unittest.TestCase):
@@ -100,7 +101,7 @@ class FinanceReportsTests(unittest.TestCase):
     def _seed(self):
         p1 = Product(
             id=1,
-            internal_code="P-1",
+            internal_code=build_internal_code("org1", 1),
             article="A-1",
             name="Part One",
             brand="B",
@@ -113,7 +114,7 @@ class FinanceReportsTests(unittest.TestCase):
         )
         p2 = Product(
             id=2,
-            internal_code="P-2",
+            internal_code=build_internal_code("org1", 2),
             article="A-2",
             name="Part Two",
             brand="B",

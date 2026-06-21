@@ -8,6 +8,7 @@ import PrintReceiptModal from '../MyParts/PrintReceiptModal/PrintReceiptModal';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import StorageCellsDisplayTable from '../../components/StorageCellsTable/StorageCellsDisplayTable';
+import { INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../utils/internalCode';
 import { buildSellerPartCardSeo, PageSeoHelmet } from '../../utils/pageSeo';
 
 const SellerPartCardPage = () => {
@@ -237,8 +238,8 @@ const SellerPartCardPage = () => {
               </div>
 
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Внутренний код</div>
-                <div className="text-sm font-medium text-gray-900">{part.internal_code || '—'}</div>
+                <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">{INTERNAL_CODE_LABEL}</div>
+                <div className="text-sm font-medium text-gray-900 font-mono">{formatInternalCodeDisplay(part.internal_code)}</div>
               </div>
 
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">

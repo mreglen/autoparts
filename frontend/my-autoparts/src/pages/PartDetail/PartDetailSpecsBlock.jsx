@@ -30,6 +30,11 @@ export default function PartDetailSpecsBlock({ product }) {
         <SpecRow label="Состояние">{conditionLabel}</SpecRow>
         {brand ? <SpecRow label="Бренд">{brand}</SpecRow> : null}
         {article ? <SpecRow label="Артикул">{article}</SpecRow> : null}
+        {(product.internal_code || '').trim() ? (
+          <SpecRow label="Код товара">
+            <span className="font-mono">{String(product.internal_code).trim()}</span>
+          </SpecRow>
+        ) : null}
         <SpecRow label="Город">{city}</SpecRow>
         <SpecRow label="Доставка">
           <span>

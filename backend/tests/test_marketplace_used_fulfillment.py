@@ -15,6 +15,7 @@ from app.services.marketplace_used_fulfillment import (
     FULFILLMENT_TRIGGER_STATUS,
     fulfill_used_order_on_status_change,
 )
+from app.utils.internal_code import build_internal_code
 
 
 class MarketplaceUsedFulfillmentTests(unittest.TestCase):
@@ -118,7 +119,7 @@ class MarketplaceUsedFulfillmentTests(unittest.TestCase):
     def _product(self, *, product_id=1, quantity=5, org="ORG_SELLER"):
         product = Product(
             id=product_id,
-            internal_code=f"P-{product_id}",
+            internal_code=build_internal_code(organization_id, product_id),
             article=f"A-{product_id}",
             name="Test part",
             brand="Test",

@@ -10,6 +10,7 @@ import { apiAxios } from '../../../utils/apiClient';
 import LabelStorageCellsPreview from '../../../components/LabelPrint/LabelStorageCellsPreview';
 import { buildStorageCellsForLabel } from '../../../utils/labelPrintDisplay';
 import { getLabelQrUrl } from '../../../utils/labelQrUrl';
+import { formatInternalCodeDisplay } from '../../../utils/internalCode';
 
 const MM_TO_PX = 96 / 25.4;
 const PRINTER_POLL_MS = 4000;
@@ -24,14 +25,6 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
-function formatInternalCode(internalCode) {
-  if (!internalCode) return '—';
-  if (typeof internalCode === 'object') {
-    return internalCode.code || internalCode.id || '—';
-  }
-  return internalCode;
-}
-
 function buildLabelPrintPayload(selectedPart, productStorageCells, cellCatalog = []) {
   const storageCells = buildStorageCellsForLabel(productStorageCells, cellCatalog).map((cell) => ({
     name_short: cell.nameShort,
@@ -42,7 +35,7 @@ function buildLabelPrintPayload(selectedPart, productStorageCells, cellCatalog =
     brand: selectedPart?.brand || '—',
     article: selectedPart?.article || '—',
     name: selectedPart?.name || '—',
-    internal_code: formatInternalCode(selectedPart?.internal_code),
+    internal_code: formatInternalCodeDisplay(selectedPart?.internal_code),
     price: selectedPart?.price != null
       ? `${parseFloat(selectedPart.price).toFixed(0)} ₽`
       : '—',
@@ -144,11 +137,7 @@ function LabelPreview({ widthMm, heightMm, selectedPart, storageCellsForLabel })
     };
   }, [qrTargetUrl]);
 
-  const internalCodeLabel = selectedPart?.internal_code
-    ? (typeof selectedPart.internal_code === 'object'
-      ? (selectedPart.internal_code.code || selectedPart.internal_code.id || '—')
-      : selectedPart.internal_code)
-    : '—';
+  const internalCodeLabel = formatInternalCodeDisplay(selectedPart?.internal_code);
 
   return (
     <div
