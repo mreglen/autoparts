@@ -9,7 +9,10 @@ from app.db.database import get_db
 from app.models.organization import Organization
 from app.models.product import Product as ProductModel, ProductPhoto
 from app.models.vehicle import Vehicle as VehicleModel
-from app.services.local_product_search import search_local_products_query
+from app.services.local_product_search import (
+    build_search_relevance_score,
+    search_local_products_query,
+)
 from app.schemas.product import Product as ProductSchema
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
@@ -107,11 +110,13 @@ def _in_stock_filter():
     return func.coalesce(ProductModel.quantity, 0) > 0
 
 
-def _apply_sort(query, sort: str):
+def _apply_sort(query, sort: str, *, relevance=None):
     if sort == "price_asc":
         return query.order_by(ProductModel.price.asc().nulls_last(), ProductModel.id.desc())
     if sort == "price_desc":
         return query.order_by(ProductModel.price.desc().nulls_last(), ProductModel.id.desc())
+    if relevance is not None:
+        return query.order_by(relevance.desc(), ProductModel.id.desc())
     return query.order_by(ProductModel.id.desc())
 
 
@@ -139,8 +144,15 @@ def list_catalog_products(
         sort = "created_at_desc"
 
     trimmed_q = q.strip() if q else ""
+    search_relevance = build_search_relevance_score(trimmed_q) if trimmed_q else None
     if trimmed_q:
-        query = search_local_products_query(db, trimmed_q, is_new=is_new)
+        query = search_local_products_query(
+            db,
+            trimmed_q,
+            is_new=is_new,
+            limit=None,
+            apply_order=False,
+        )
     else:
         query = (
             db.query(ProductModel)
@@ -170,9 +182,10 @@ def list_catalog_products(
         city=city,
     )
 
-    id_subq = query.with_entities(ProductModel.id).distinct().subquery()
+    count_query = query.order_by(None)
+    id_subq = count_query.with_entities(ProductModel.id).distinct().subquery()
     total = db.query(func.count()).select_from(id_subq).scalar() or 0
-    query = _apply_sort(query, sort)
+    query = _apply_sort(query, sort, relevance=search_relevance)
     offset = (page - 1) * page_size
     items = query.offset(offset).limit(page_size).all()
 

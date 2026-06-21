@@ -197,10 +197,11 @@ def search_local_products_query(
     is_new: bool | None = None,
     *,
     limit: int | None = _DEFAULT_LIMIT,
+    apply_order: bool = True,
 ) -> Query:
     """
     Поиск в локальной БД с поддержкой комбинаций бренд/артикул/название.
-    Результаты сортируются по релевантности, есть верхний limit.
+    apply_order=False — для каталога (сортировку и count делает вызывающий код).
     """
     parsed = parse_search_query(q)
     if not parsed.has_terms:
@@ -227,13 +228,22 @@ def search_local_products_query(
     if is_new is not None:
         query = query.filter(ProductModel.is_new == is_new)
 
-    relevance = _build_relevance_score(parsed)
-    if relevance is not None:
-        query = query.order_by(relevance.desc(), ProductModel.id.desc())
-    else:
-        query = query.order_by(ProductModel.id.desc())
+    if apply_order:
+        relevance = _build_relevance_score(parsed)
+        if relevance is not None:
+            query = query.order_by(relevance.desc(), ProductModel.id.desc())
+        else:
+            query = query.order_by(ProductModel.id.desc())
 
     if limit is not None and limit > 0:
         query = query.limit(limit)
 
     return query
+
+
+def build_search_relevance_score(q: str):
+    """CASE-выражение релевантности для сортировки результатов поиска."""
+    parsed = parse_search_query(q)
+    if not parsed.has_terms:
+        return None
+    return _build_relevance_score(parsed)
