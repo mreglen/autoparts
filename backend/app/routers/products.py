@@ -337,6 +337,14 @@ def find_public_used_product_match(
     if not brand_text or not article_text:
         return []
 
+    cache_key = (
+        f"products:used-match:{brand_text.lower()}:{article_text.lower()}:"
+        f"{limit}:{exclude_product_id or 0}"
+    )
+    cached = get_cached_json_sync(cache_key)
+    if cached is not None:
+        return cached
+
     from app.utils.organization_city import extract_city_from_address
 
     load_options = (
@@ -406,6 +414,8 @@ def find_public_used_product_match(
                 compatible_vehicles=list(product.compatible_vehicles or []),
             )
         )
+    payload = [item.model_dump(mode="json") for item in results]
+    set_cached_json_sync(cache_key, payload, settings.USED_MATCH_CACHE_TTL_SECONDS)
     return results
 
 
@@ -414,6 +424,11 @@ def read_public_product(
     product_id: int,
     db: Session = Depends(get_db)
 ):
+    cache_key = f"products:public:detail:{product_id}"
+    cached = get_cached_json_sync(cache_key)
+    if cached is not None:
+        return cached
+
     product = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
         selectinload(ProductModel.videos),
@@ -430,6 +445,8 @@ def read_public_product(
     ).first()
     if not product:
         raise HTTPException(status_code=404, detail="Продукт не найден или недоступен")
+    payload = ProductSchema.model_validate(product).model_dump(mode="json")
+    set_cached_json_sync(cache_key, payload, settings.PRODUCT_DETAIL_CACHE_TTL_SECONDS)
     return product
 
 

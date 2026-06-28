@@ -357,9 +357,16 @@ export const fetchMyProducts = createAsyncThunk(
     }
 );
 
+const PUBLIC_PRODUCT_CACHE_TTL_MS = 5 * 60 * 1000;
+
 export const fetchPublicProduct = createAsyncThunk(
     'products/fetchPublicProduct',
-    async (productId, { rejectWithValue }) => {
+    async (productId, { rejectWithValue, getState }) => {
+        const cacheEntry = getState().products.publicProductCache?.[productId];
+        if (cacheEntry && (Date.now() - cacheEntry.timestamp) < PUBLIC_PRODUCT_CACHE_TTL_MS) {
+            return cacheEntry.data;
+        }
+
         try {
             const response = await apiAxiosUnauth.get(`/products/public/${productId}`);
             return response.data;
@@ -687,7 +694,10 @@ export const fetchCatalogProducts = createAsyncThunk(
 
 export const fetchCatalogFacets = createAsyncThunk(
     'products/fetchCatalogFacets',
-    async (params = {}, { rejectWithValue }) => {
+    async (params = {}, { rejectWithValue, getState }) => {
+        if (getState().products.catalogFacets) {
+            return getState().products.catalogFacets;
+        }
         try {
             const response = await apiAxiosUnauth.get('/catalog/facets', { params });
             return response.data;
@@ -701,7 +711,11 @@ export const fetchCatalogFacets = createAsyncThunk(
 
 export const fetchPublicPartTypes = createAsyncThunk(
     'products/fetchPublicPartTypes',
-    async (_, { rejectWithValue }) => {
+    async (_, { rejectWithValue, getState }) => {
+        const existing = getState().products.publicPartTypes;
+        if (existing?.length) {
+            return existing;
+        }
         try {
             const response = await apiAxiosUnauth.get('/part-types/public');
             return response.data;
@@ -846,6 +860,8 @@ const productSlice = createSlice({
         vehiclesLoading: false,
         error: null,
         searchCache: {}, // Кэш результатов поиска: {query: {data, timestamp}}
+        publicProductCache: {}, // Кэш карточек: {productId: {data, timestamp}}
+        catalogFilterKey: null,
         usedPartsData: null, // Данные поиска б/у запчастей: {available_parts, analog_parts, rossko_data}
         usedPartsCache: {}, // Кэш результатов поиска б/у запчастей: {query: {data, timestamp}}
         catalogItems: [],
@@ -1071,6 +1087,10 @@ const productSlice = createSlice({
                 const hasRoomByTotal = state.catalogItems.length < state.catalogTotal;
                 state.catalogHasMore =
                     hasRoomByTotal && receivedFullPage && (append ? addedCount > 0 : newItems.length > 0);
+                if (!append) {
+                    const { append: _append, page: _page, ...filterArg } = action.meta?.arg || {};
+                    state.catalogFilterKey = JSON.stringify(filterArg);
+                }
             })
             .addCase(fetchCatalogProducts.rejected, (state, action) => {
                 if (action.meta?.aborted || action.payload?.aborted) {
@@ -1225,9 +1245,15 @@ const productSlice = createSlice({
                 state.error = action.payload;
             })
             .addCase(fetchPublicProduct.pending, (state, action) => {
-                state.loading = true;
                 state.error = null;
                 const nextId = action.meta.arg;
+                const cacheEntry = state.publicProductCache[nextId];
+                if (cacheEntry && (Date.now() - cacheEntry.timestamp) < PUBLIC_PRODUCT_CACHE_TTL_MS) {
+                    state.currentProduct = cacheEntry.data;
+                    state.loading = false;
+                    return;
+                }
+                state.loading = true;
                 if (state.currentProduct?.id !== nextId) {
                     state.currentProduct = null;
                 }
@@ -1235,6 +1261,12 @@ const productSlice = createSlice({
             .addCase(fetchPublicProduct.fulfilled, (state, action) => {
                 state.loading = false;
                 state.currentProduct = action.payload;
+                if (action.payload?.id) {
+                    state.publicProductCache[action.payload.id] = {
+                        data: action.payload,
+                        timestamp: Date.now(),
+                    };
+                }
             })
             .addCase(fetchPublicProduct.rejected, (state, action) => {
                 state.loading = false;
@@ -1369,6 +1401,7 @@ export const selectCatalogLoading = (state) => state.products.catalogLoading;
 export const selectCatalogLoadingMore = (state) => state.products.catalogLoadingMore;
 export const selectCatalogHasMore = (state) => state.products.catalogHasMore;
 export const selectCatalogFacets = (state) => state.products.catalogFacets;
+export const selectCatalogFilterKey = (state) => state.products.catalogFilterKey;
 export const selectPublicPartTypes = (state) => state.products.publicPartTypes;
 export const selectAnalogsLoading = (state) => state.products.analogsLoading;
 export default productSlice.reducer;

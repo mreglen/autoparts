@@ -14,6 +14,9 @@ from app.services.local_product_search import (
     search_local_products_query,
 )
 from app.schemas.product import Product as ProductSchema
+from app.core.config import settings
+from app.utils.catalog_cache import build_catalog_cache_key
+from app.utils.json_cache_sync import get_cached_json_sync, set_cached_json_sync
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
@@ -143,6 +146,29 @@ def list_catalog_products(
     if sort not in SORT_OPTIONS:
         sort = "created_at_desc"
 
+    cache_key = build_catalog_cache_key(
+        "catalog:products",
+        page=page,
+        page_size=page_size,
+        sort=sort,
+        q=q.strip() if q else None,
+        is_new=is_new,
+        part_type_id=part_type_id,
+        brand=brand,
+        price_min=price_min,
+        price_max=price_max,
+        storage_location_id=storage_location_id,
+        organization_id=organization_id,
+        has_photos=has_photos,
+        vehicle_brand=vehicle_brand,
+        vehicle_model=vehicle_model,
+        vehicle_id=vehicle_id,
+        city=city,
+    )
+    cached = get_cached_json_sync(cache_key)
+    if cached is not None:
+        return cached
+
     trimmed_q = q.strip() if q else ""
     search_relevance = build_search_relevance_score(trimmed_q) if trimmed_q else None
     if trimmed_q:
@@ -189,12 +215,18 @@ def list_catalog_products(
     offset = (page - 1) * page_size
     items = query.offset(offset).limit(page_size).all()
 
-    return CatalogProductsResponse(
+    response = CatalogProductsResponse(
         items=items,
         total=int(total),
         page=page,
         page_size=page_size,
     )
+    set_cached_json_sync(
+        cache_key,
+        response.model_dump(mode="json"),
+        settings.CATALOG_CACHE_TTL_SECONDS,
+    )
+    return response
 
 
 @router.get("/facets", response_model=CatalogFacetsResponse)
@@ -205,6 +237,17 @@ def get_catalog_facets(
     city: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
+    cache_key = build_catalog_cache_key(
+        "catalog:facets",
+        is_new=is_new,
+        limit=limit,
+        vehicle_brand=vehicle_brand,
+        city=city,
+    )
+    cached = get_cached_json_sync(cache_key)
+    if cached is not None:
+        return cached
+
     brand_q = db.query(ProductModel.brand, func.count(ProductModel.id)).filter(
         _in_stock_filter(),
         ProductModel.brand.isnot(None),
@@ -254,7 +297,7 @@ def get_catalog_facets(
         .all()
     )
 
-    return CatalogFacetsResponse(
+    response = CatalogFacetsResponse(
         brands=[CatalogFacetItem(value=r[0], count=int(r[1])) for r in brand_rows if r[0]],
         vehicle_brands=[
             CatalogFacetItem(value=r[0], count=int(r[1])) for r in vehicle_brand_rows if r[0]
@@ -263,3 +306,9 @@ def get_catalog_facets(
             CatalogFacetItem(value=r[0], count=int(r[1])) for r in vehicle_model_rows if r[0]
         ],
     )
+    set_cached_json_sync(
+        cache_key,
+        response.model_dump(mode="json"),
+        settings.CATALOG_FACETS_CACHE_TTL_SECONDS,
+    )
+    return response

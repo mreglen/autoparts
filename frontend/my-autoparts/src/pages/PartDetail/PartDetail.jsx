@@ -20,6 +20,11 @@ import PartDetailFitmentBlock from './PartDetailFitmentBlock';
 import PartArticleMatchesBlock from '../../components/PartArticleMatchesBlock/PartArticleMatchesBlock';
 import ShareButton from '../../components/ShareButton/ShareButton';
 import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
+import {
+  PART_DETAIL_CACHE,
+  readPartDetailCache,
+  writePartDetailCache,
+} from '../../utils/partDetailCache';
 
 const formatErrorText = (value) => {
   if (!value) return 'Ошибка загрузки товара';
@@ -149,15 +154,29 @@ const PartDetail = () => {
       return;
     }
 
+    const cachedSeo = readPartDetailCache(PART_DETAIL_CACHE.partMeta, path);
+    if (cachedSeo) {
+      setApiSeo(cachedSeo);
+      return undefined;
+    }
+
+    let cancelled = false;
     const run = async () => {
       try {
         const response = await apiAxiosUnauth.get('/public/part-meta', { params: { path } });
-        setApiSeo(seoFromPartMetaResponse(response?.data));
+        const seo = seoFromPartMetaResponse(response?.data);
+        if (!cancelled) {
+          writePartDetailCache(PART_DETAIL_CACHE.partMeta, path, seo);
+          setApiSeo(seo);
+        }
       } catch (_e) {
-        setApiSeo(null);
+        if (!cancelled) setApiSeo(null);
       }
     };
     run();
+    return () => {
+      cancelled = true;
+    };
   }, [location.pathname]);
 
   useEffect(() => {
@@ -168,6 +187,15 @@ const PartDetail = () => {
     }
 
     let cancelled = false;
+    const cacheKey = `${currentProduct.brand}|${currentProduct.article}|${currentProduct.id}`;
+    const cachedOffers = readPartDetailCache(PART_DETAIL_CACHE.alternateOffers, cacheKey);
+    if (cachedOffers) {
+      setAlternateOffers(cachedOffers);
+      setAlternateOffersLoading(false);
+      setAlternateOffersError('');
+      return undefined;
+    }
+
     const run = async () => {
       setAlternateOffersLoading(true);
       setAlternateOffersError('');
@@ -180,8 +208,10 @@ const PartDetail = () => {
             exclude_product_id: currentProduct.id,
           },
         });
+        const items = Array.isArray(response?.data) ? response.data : [];
         if (!cancelled) {
-          setAlternateOffers(Array.isArray(response?.data) ? response.data : []);
+          writePartDetailCache(PART_DETAIL_CACHE.alternateOffers, cacheKey, items);
+          setAlternateOffers(items);
         }
       } catch (_error) {
         if (!cancelled) {
@@ -205,6 +235,14 @@ const PartDetail = () => {
     }
 
     let cancelled = false;
+    const fitmentKey = `${currentProduct.brand}|${currentProduct.article}|${currentProduct.id}`;
+    const cachedFitment = readPartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey);
+    if (cachedFitment) {
+      setReferenceFitment(cachedFitment);
+      setReferenceFitmentLoading(false);
+      return undefined;
+    }
+
     const run = async () => {
       setReferenceFitmentLoading(true);
       try {
@@ -215,8 +253,10 @@ const PartDetail = () => {
             exclude_product_id: currentProduct.id,
           },
         });
+        const vehicles = Array.isArray(response?.data?.vehicles) ? response.data.vehicles : [];
         if (!cancelled) {
-          setReferenceFitment(Array.isArray(response?.data?.vehicles) ? response.data.vehicles : []);
+          writePartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey, vehicles);
+          setReferenceFitment(vehicles);
         }
       } catch (_error) {
         if (!cancelled) setReferenceFitment([]);

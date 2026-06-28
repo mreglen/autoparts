@@ -3,6 +3,11 @@ import { Link } from 'react-router-dom';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 import { buildNewPartDetailPath } from '../../utils/partRoutes';
 import { slugifyBrand } from '../../utils/slugUtils';
+import {
+  PART_DETAIL_CACHE,
+  readPartDetailCache,
+  writePartDetailCache,
+} from '../../utils/partDetailCache';
 
 export default function PartDetailSeoCrossLinks({
   brand,
@@ -26,6 +31,13 @@ export default function PartDetailSeoCrossLinks({
       setNewPartHref(null);
       return undefined;
     }
+    const cacheKey = `${brandText}|${articleText}`;
+    const cachedHref = readPartDetailCache(PART_DETAIL_CACHE.newPartResolve, cacheKey);
+    if (cachedHref !== null) {
+      setNewPartHref(cachedHref);
+      return undefined;
+    }
+
     let cancelled = false;
     (async () => {
       try {
@@ -34,16 +46,20 @@ export default function PartDetailSeoCrossLinks({
         });
         const data = response?.data;
         if (cancelled) return;
+        let href = null;
         if (data?.canonical_url) {
           const path = data.canonical_url.replace(/^https?:\/\/[^/]+/, '');
-          setNewPartHref(path || data.canonical_url);
-          return;
+          href = path || data.canonical_url;
+        } else if (data?.card_id) {
+          href = buildNewPartDetailPath({ id: data.card_id, brand: brandText, article: articleText });
         }
-        if (data?.card_id) {
-          setNewPartHref(buildNewPartDetailPath({ id: data.card_id, brand: brandText, article: articleText }));
-        }
+        writePartDetailCache(PART_DETAIL_CACHE.newPartResolve, cacheKey, href);
+        setNewPartHref(href);
       } catch (_e) {
-        if (!cancelled) setNewPartHref(null);
+        if (!cancelled) {
+          writePartDetailCache(PART_DETAIL_CACHE.newPartResolve, cacheKey, null);
+          setNewPartHref(null);
+        }
       }
     })();
     return () => {

@@ -584,7 +584,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
         <aside className="hidden w-full flex-shrink-0 lg:block lg:w-64">
           <div className="rounded-lg border border-gray-200 bg-white p-4 lg:sticky lg:top-4">
             <h3 className="font-semibold text-gray-900 mb-3">Фильтры</h3>
-            <UsedPartsFiltersForm updateCatalogUrl={updateCatalogUrl} showClearInPanel />
+            <UsedPartsFiltersForm updateCatalogUrl={updateCatalogUrl} deferApply showClearInPanel={false} />
           </div>
         </aside>
         <div className="flex-1 min-w-0">

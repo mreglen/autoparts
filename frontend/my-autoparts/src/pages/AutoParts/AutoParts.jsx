@@ -16,8 +16,8 @@ import {
   fetchPublicPartTypes,
   resetCatalogCatalog,
   clearUsedPartsSearch,
+  selectCatalogFilterKey,
 } from '../../redux/slices/ProductSlice';
-import { fetchCart } from '../../redux/slices/CartSlice';
 import UsedPartsList from './UsedParts/UsedPartsList';
 import NewPartsLanding from './NewParts/NewPartsLanding';
 import NewPartsResults from './NewParts/NewPartsResults';
@@ -45,6 +45,8 @@ function AutoParts() {
   const status = useSelector(selectRosskoStatus);
   const error = useSelector(selectRosskoError);
   const searchQuery = useSelector(selectSearchQuery);
+  
+  const catalogFilterKey = useSelector(selectCatalogFilterKey);
   
   // Determine active tab from URL path
   const isUsedTab = !showNewAutoparts || location.pathname.includes('/autoparts/used');
@@ -247,9 +249,13 @@ function AutoParts() {
       dispatch(setSearchQuery(''));
     }
 
-    dispatch(resetCatalogCatalog());
-    dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams, 1)));
-  }, [searchQuery, activeTab, usedCatalogFilterKey, searchParams, dispatch]);
+    const catalogAlreadyLoaded = catalogFilterKey === usedCatalogFilterKey
+      && catalogFilterKey !== null;
+    if (!catalogAlreadyLoaded) {
+      dispatch(resetCatalogCatalog());
+      dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams, 1)));
+    }
+  }, [searchQuery, activeTab, usedCatalogFilterKey, searchParams, dispatch, catalogFilterKey]);
 
   useEffect(() => {
     if (activeTab !== 'my') return;
@@ -300,11 +306,6 @@ function AutoParts() {
 
     return () => clearTimeout(timer);
   }, [activeTab, urlQuery, dispatch]);
-
-  // Загружаем корзину при монтировании компонента
-  useEffect(() => {
-    dispatch(fetchCart());
-  }, [dispatch]);
 
   const fallbackSeo = useMemo(
     () => buildAutoPartsSeo(location.pathname, searchParams),

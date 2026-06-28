@@ -103,14 +103,50 @@ export default function UsedPartsFiltersForm({
   const vehicleBrandOptions = isCatalogMode ? (catalogFacets?.vehicle_brands || []) : searchFacets.vehicle_brands;
   const vehicleModelOptions = isCatalogMode ? (catalogFacets?.vehicle_models || []) : searchFacets.vehicle_models;
 
+  const draftFieldByUrlKey = {
+    part_type: 'partTypes',
+    brand: 'brands',
+    vb: 'vehicleBrands',
+    vm: 'vehicleModels',
+    vmin: 'priceMin',
+    vmax: 'priceMax',
+    has_photos: 'hasPhotos',
+  };
+
+  const updateDraftField = (field, value) => {
+    setDraftFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
   const setFilter = (key, value) => {
-    if (!updateCatalogUrl) return;
     trackFormField('used_parts_filters', key);
+    if (deferApply) {
+      const field = draftFieldByUrlKey[key];
+      if (field === 'hasPhotos') {
+        updateDraftField('hasPhotos', value === '1');
+        return;
+      }
+      if (field) {
+        updateDraftField(field, value ?? (key === 'vmin' || key === 'vmax' ? '' : []));
+      }
+      return;
+    }
+    if (!updateCatalogUrl) return;
     updateCatalogUrl({ [key]: value });
   };
 
   const toggleMultiFilter = (key, value) => {
     trackFormField('used_parts_filters', key);
+    const field = draftFieldByUrlKey[key];
+    if (deferApply && field) {
+      setDraftFilters((prev) => {
+        const currentValues = prev[field];
+        const nextValues = currentValues.includes(String(value))
+          ? currentValues.filter((item) => item !== String(value))
+          : [...currentValues, String(value)];
+        return { ...prev, [field]: nextValues };
+      });
+      return;
+    }
     const currentValues = searchParams.getAll(key);
     const nextValues = currentValues.includes(String(value))
       ? currentValues.filter((item) => item !== String(value))
@@ -118,14 +154,28 @@ export default function UsedPartsFiltersForm({
     setFilter(key, nextValues);
   };
 
-  const currentSort = getUsedUiSort(searchParams);
+  const currentSort = deferApply ? draftFilters.sort : getUsedUiSort(searchParams);
 
   const setSort = (uiSort) => {
+    if (deferApply) {
+      updateDraftField('sort', uiSort);
+      return;
+    }
     const apiValue = uiSortToApi(uiSort);
     setFilter('sort', apiValue === 'created_at_desc' ? null : apiValue);
   };
 
   const clearFilters = () => {
+    if (deferApply) {
+      const empty = usedEmptyDraft();
+      setDraftFilters(empty);
+      if (!updateCatalogUrl) return;
+      updateCatalogUrl({
+        ...usedDraftToUrlUpdates(empty),
+        vehicle_id: null,
+      });
+      return;
+    }
     if (!updateCatalogUrl) return;
     updateCatalogUrl({
       part_type: null,
@@ -138,6 +188,11 @@ export default function UsedPartsFiltersForm({
       has_photos: null,
       sort: null,
     });
+  };
+
+  const applyFilters = () => {
+    if (!updateCatalogUrl || !deferApply) return;
+    updateCatalogUrl(usedDraftToUrlUpdates(draftFilters));
   };
 
   const toggleFilterGroup = (groupKey) => {
@@ -251,8 +306,8 @@ export default function UsedPartsFiltersForm({
         urlKey: 'brand',
       })}
       <div className="grid grid-cols-2 gap-2">
-        <input type="number" placeholder="Цена от" value={searchParams.get('vmin') || ''} onChange={(e) => setFilter('vmin', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-        <input type="number" placeholder="Цена до" value={searchParams.get('vmax') || ''} onChange={(e) => setFilter('vmax', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        <input type="number" placeholder="Цена от" value={activeFilters.priceMin} onChange={(e) => setFilter('vmin', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        <input type="number" placeholder="Цена до" value={activeFilters.priceMax} onChange={(e) => setFilter('vmax', e.target.value || null)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm" />
       </div>
       {renderCheckboxGroup({
         title: 'Марки авто',
@@ -269,10 +324,32 @@ export default function UsedPartsFiltersForm({
         urlKey: 'vm',
       })}
       <label className="flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" checked={searchParams.get('has_photos') === '1'} onChange={(e) => setFilter('has_photos', e.target.checked ? '1' : null)} />
+        <input type="checkbox" checked={activeFilters.hasPhotos} onChange={(e) => setFilter('has_photos', e.target.checked ? '1' : null)} />
         Только с фото
       </label>
-      {showClearInPanel && (
+      {deferApply ? (
+        <div className="space-y-2 border-t border-gray-100 pt-3">
+          {hasPendingChanges ? (
+            <button
+              type="button"
+              onClick={applyFilters}
+              className="w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+            >
+              Применить фильтры
+            </button>
+          ) : null}
+          {(hasDraftFilters || hasAppliedFilters) ? (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 transition-colors hover:bg-gray-50"
+            >
+              Сбросить фильтры
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {!deferApply && showClearInPanel && (
         <button type="button" onClick={clearFilters} className="w-full text-sm text-indigo-600 hover:text-indigo-800 font-medium">Сбросить фильтры</button>
       )}
     </div>
