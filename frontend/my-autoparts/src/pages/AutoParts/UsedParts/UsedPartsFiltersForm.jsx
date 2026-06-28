@@ -1,7 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
 import { trackFormField } from '../../../utils/siteAnalytics';
+import {
+  usedDraftFromSearchParams,
+  usedDraftHasActiveFilters,
+  usedDraftsEqual,
+  usedDraftToUrlUpdates,
+  usedEmptyDraft,
+  usedHasActiveFilters,
+} from '../../../utils/autopartsFilters';
 import {
   selectCatalogItems,
   selectCatalogFacets,
@@ -23,10 +31,21 @@ const COLLAPSED_FILTER_LIMIT = 3;
  * Содержимое панели фильтров б/у (каталог и поиск).
  * @param {function} props.updateCatalogUrl
  * @param {boolean} [props.showClearInPanel=true] — кнопка «Сбросить» внутри панели (десктоп).
+ * @param {boolean} [props.deferApply=false] — на десктопе: применять фильтры по кнопке.
  */
-export default function UsedPartsFiltersForm({ updateCatalogUrl, showClearInPanel = true }) {
+export default function UsedPartsFiltersForm({
+  updateCatalogUrl,
+  showClearInPanel = true,
+  deferApply = false,
+}) {
   const [searchParams] = useSearchParams();
   const [expandedFilterGroups, setExpandedFilterGroups] = useState({});
+  const [draftFilters, setDraftFilters] = useState(() => usedDraftFromSearchParams(searchParams));
+
+  useEffect(() => {
+    if (!deferApply) return;
+    setDraftFilters(usedDraftFromSearchParams(searchParams));
+  }, [searchParams, deferApply]);
 
   const usedPartsData = useSelector(selectUsedPartsData);
   const catalogItems = useSelector(selectCatalogItems);
@@ -43,15 +62,13 @@ export default function UsedPartsFiltersForm({ updateCatalogUrl, showClearInPane
     [isCatalogMode, usedPartsData]
   );
 
-  const activeFilters = useMemo(() => ({
-    partTypes: searchParams.getAll('part_type'),
-    brands: searchParams.getAll('brand'),
-    priceMin: searchParams.get('vmin') || '',
-    priceMax: searchParams.get('vmax') || '',
-    vehicleBrands: searchParams.getAll('vb'),
-    vehicleModels: searchParams.getAll('vm'),
-    hasPhotos: searchParams.get('has_photos') === '1',
-  }), [searchParams]);
+  const appliedFilters = useMemo(() => usedDraftFromSearchParams(searchParams), [searchParams]);
+  const activeFilters = deferApply ? draftFilters : appliedFilters;
+
+  const hasPendingChanges = deferApply
+    && !usedDraftsEqual(draftFilters, appliedFilters);
+  const hasDraftFilters = deferApply && usedDraftHasActiveFilters(draftFilters);
+  const hasAppliedFilters = usedHasActiveFilters(searchParams);
 
   const searchFacets = useMemo(() => {
     const countValues = (values) => {
