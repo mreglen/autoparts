@@ -28,6 +28,7 @@ from app.services.audit_service import log_audit
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 import asyncio
+import os
 import secrets
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -40,6 +41,12 @@ active_connections: Dict[int, dict] = {}
 # Store print jobs in memory (for demo purposes)
 print_jobs: Dict[int, dict] = {}
 job_counter = 0
+
+# Limit concurrent Playwright PDF renders so parallel label prints do not block the API.
+MAX_CONCURRENT_LABEL_PDF_RENDERS = max(2, min(8, (os.cpu_count() or 4)))
+_pdf_render_semaphore: asyncio.Semaphore | None = None
+_job_counter_lock = asyncio.Lock()
+_agent_send_locks: Dict[int, asyncio.Lock] = {}
 
 _templates_env = Environment(
     loader=FileSystemLoader(str(Path(__file__).resolve().parents[1] / "templates" / "printing")),
@@ -266,6 +273,42 @@ def _html_to_pdf_bytes(html: str, width_mm: int, height_mm: int) -> bytes:
         return pdf_path.read_bytes()
 
 
+def _get_pdf_render_semaphore() -> asyncio.Semaphore:
+    global _pdf_render_semaphore
+    if _pdf_render_semaphore is None:
+        _pdf_render_semaphore = asyncio.Semaphore(MAX_CONCURRENT_LABEL_PDF_RENDERS)
+    return _pdf_render_semaphore
+
+
+async def _render_label_pdf_bytes(html: str, width_mm: int, height_mm: int) -> bytes:
+    async with _get_pdf_render_semaphore():
+        return await asyncio.to_thread(_html_to_pdf_bytes, html, width_mm, height_mm)
+
+
+async def _next_job_id() -> int:
+    global job_counter
+    async with _job_counter_lock:
+        job_counter += 1
+        return job_counter
+
+
+def _get_agent_send_lock(agent_id: int) -> asyncio.Lock:
+    lock = _agent_send_locks.get(agent_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _agent_send_locks[agent_id] = lock
+    return lock
+
+
+async def _send_agent_json(agent_id: int, websocket, payload: dict) -> None:
+    async with _get_agent_send_lock(agent_id):
+        await websocket.send_json(payload)
+
+
+def _clear_agent_send_lock(agent_id: int) -> None:
+    _agent_send_locks.pop(agent_id, None)
+
+
 def generate_printer_token() -> str:
     """Generate a new printer token for organization"""
     return secrets.token_urlsafe(32)
@@ -446,8 +489,6 @@ async def print_to_printer(
     """
     Send a print job to a specific printer
     """
-    global job_counter
-
     # В этой версии printer_id = ID записи в printer_agent_printers
     try:
         printer_id_int = int(printer_id)
@@ -489,8 +530,7 @@ async def print_to_printer(
     websocket = websocket_data["websocket"]
 
     # Create print job in memory
-    job_counter += 1
-    job_id = job_counter
+    job_id = await _next_job_id()
 
     print_job = {
         "id": job_id,
@@ -518,7 +558,7 @@ async def print_to_printer(
     }
 
     try:
-        await websocket.send_json(print_command)
+        await _send_agent_json(p.agent_id, websocket, print_command)
 
         print_job["status"] = "printing"
         print_job["started_at"] = datetime.utcnow().isoformat()
@@ -543,7 +583,6 @@ async def print_test_label(
     """
     Печать пробной этикетки по HTML-шаблону label_print_test.html, как PDF.
     """
-    global job_counter
     try:
         printer_id_int = int(printer_id)
     except Exception:
@@ -595,11 +634,10 @@ async def print_test_label(
         storage_cell_rows=_chunk_test_storage_cells(test_storage_cells, width_mm),
     )
 
-    pdf_bytes = _html_to_pdf_bytes(html, width_mm=width_mm, height_mm=height_mm)
+    pdf_bytes = await _render_label_pdf_bytes(html, width_mm=width_mm, height_mm=height_mm)
     pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
 
-    job_counter += 1
-    job_id = job_counter
+    job_id = await _next_job_id()
     print_jobs[job_id] = {
         "id": job_id,
         "printer_id": printer_id_int,
@@ -623,7 +661,7 @@ async def print_test_label(
     }
 
     try:
-        await websocket_data["websocket"].send_json(print_command)
+        await _send_agent_json(p.agent_id, websocket_data["websocket"], print_command)
         print_jobs[job_id]["status"] = "printing"
         print_jobs[job_id]["started_at"] = datetime.utcnow().isoformat()
         return {"status": "success", "message": "Test label sent", "job_id": job_id}
@@ -705,7 +743,6 @@ async def print_product_label(
     """
     Печать этикетки товара по HTML-шаблону label_print_test.html, как PDF.
     """
-    global job_counter
     try:
         printer_id_int = int(printer_id)
     except Exception:
@@ -763,13 +800,12 @@ async def print_product_label(
         storage_cell_rows=storage_cell_rows,
     )
 
-    pdf_bytes = _html_to_pdf_bytes(html, width_mm=width_mm, height_mm=height_mm)
+    pdf_bytes = await _render_label_pdf_bytes(html, width_mm=width_mm, height_mm=height_mm)
     pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
 
     copies = int(payload.get("copies", 1))
 
-    job_counter += 1
-    job_id = job_counter
+    job_id = await _next_job_id()
     print_jobs[job_id] = {
         "id": job_id,
         "printer_id": printer_id_int,
@@ -793,7 +829,7 @@ async def print_product_label(
     }
 
     try:
-        await websocket_data["websocket"].send_json(print_command)
+        await _send_agent_json(p.agent_id, websocket_data["websocket"], print_command)
         print_jobs[job_id]["status"] = "printing"
         print_jobs[job_id]["started_at"] = datetime.utcnow().isoformat()
         return {"status": "success", "message": "Label sent to printer", "job_id": job_id}
@@ -1319,9 +1355,11 @@ async def printer_websocket_endpoint(
     except WebSocketDisconnect:
         if agent_id in active_connections:
             del active_connections[agent_id]
+        _clear_agent_send_lock(agent_id)
         print(f"WebSocket disconnected for agent_id={agent_id} hostname={hostname}")
 
     except Exception as e:
         if agent_id in active_connections:
             del active_connections[agent_id]
+        _clear_agent_send_lock(agent_id)
         print(f"WebSocket error: {e}")

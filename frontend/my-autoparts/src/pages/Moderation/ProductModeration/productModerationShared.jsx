@@ -30,6 +30,20 @@ export const formatPrice = (price) => (
     }).format(Number(price) || 0)
 );
 
+export const getProductConditionLabel = (product) => (product?.is_new ? 'Новая' : 'Б/у');
+
+export const ProductConditionBadge = ({ product }) => (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+        product?.is_new ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
+    }`}>
+        {getProductConditionLabel(product)}
+    </span>
+);
+
+export const getResponsibleFullName = (product) => (
+    product?.creator_full_name || product?.creator_name || null
+);
+
 export const getOrganization = (product) => (
     product.organization || {
         id: product.organization_id || UNKNOWN_ORG_ID,
@@ -208,7 +222,7 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
                 className="group hover:bg-gray-50/50 transition-all duration-200 border-b border-gray-100 cursor-pointer"
                 onDoubleClick={handleRowDoubleClick}
             >
-                <td className="px-4 py-4" colSpan={4}>
+                <td className="px-4 py-4" colSpan={3}>
                     <div className="flex items-start gap-4 min-w-0">
                         <div
                             className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 cursor-pointer"
@@ -251,17 +265,15 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
                                         На модерации
                                     </span>
                                 )}
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    product.is_new ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
-                                }`}>
-                                    {product.is_new ? 'Новая' : 'Б/у'}
-                                </span>
                             </div>
                             {isRejected && product.rejection_reason && (
                                 <p className="mt-2 text-xs text-red-700 line-clamp-2">{product.rejection_reason}</p>
                             )}
                         </div>
                     </div>
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap">
+                    <ProductConditionBadge product={product} />
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                     <div className="text-center">
@@ -271,6 +283,9 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                     <div className="text-base font-bold text-gray-900">{priceLabel}</div>
+                </td>
+                <td className="px-4 py-4">
+                    <div className="text-sm text-gray-900 leading-snug">{getResponsibleFullName(product) || '—'}</div>
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                     <div ref={desktopActionsPlacement.anchorRef} className="relative moderation-actions-dropdown">
@@ -353,7 +368,12 @@ const ModerationProductRow = ({ product, onView, onApprove, onReject, onImageCli
                                         На модерации
                                     </span>
                                 )}
+                                <ProductConditionBadge product={product} />
                             </div>
+                            <p className="mt-2 text-xs text-gray-500">
+                                Ответственный:{' '}
+                                <span className="text-gray-800">{getResponsibleFullName(product) || '—'}</span>
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -377,9 +397,11 @@ export const ProductTable = ({ products, onApprove, onReject, onView, onImageCli
                 <table className="w-full table-fixed divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider" colSpan={4}>Запчасть</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider" colSpan={3}>Запчасть</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-24">Состояние</th>
                             <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-24">Остаток</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">Цена</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-44">Ответственный</th>
                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-36">Действия</th>
                         </tr>
                     </thead>

@@ -279,6 +279,11 @@ export default function NewPartDetailPage() {
     [liveStocks, card, markupPercent]
   );
 
+  const seoPrice = useMemo(
+    () => getMinStockPrice(liveStocks, 0) ?? getMinStockPrice(stocksFromCardApi(card), 0),
+    [liveStocks, card]
+  );
+
   const analogParts = useMemo(() => {
     const bestPart = livePart;
     const rosskoParts = getRosskoParts(rosskoData);
@@ -315,14 +320,14 @@ export default function NewPartDetailPage() {
         article,
         rawName: card?.name,
         cardId: card.id,
-        price: displayPrice,
+        price: seoPrice,
       }),
       description: buildNewPartSearchDescription({
         brand,
         article,
         rawName: card?.name,
         cardId: card.id,
-        price: displayPrice,
+        price: seoPrice,
         inStock: (card?.stock_count || 0) > 0,
         uniqueDescription: card?.description,
       }),
@@ -333,7 +338,7 @@ export default function NewPartDetailPage() {
       price: displayPrice,
       keywords: buildNewPartCardKeywords({ brand, article }),
     };
-  }, [seoMeta, card, canonicalPath, displayPrice]);
+  }, [seoMeta, card, canonicalPath, displayPrice, seoPrice]);
 
   const handleAnalogNavigateCreate = useCallback(async (part) => {
     const brand = safeText(part?.brand);

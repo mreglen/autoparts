@@ -2,8 +2,60 @@
 <html lang="ru">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#ffffff" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Свой Гараж" />
+    <script>
+      (function () {
+        var standalone = window.matchMedia('(display-mode: standalone)').matches
+          || window.matchMedia('(display-mode: fullscreen)').matches
+          || window.navigator.standalone === true;
+        var mobile = standalone
+          || window.matchMedia('(max-width: 1023px)').matches
+          || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+        if (standalone) {
+          document.documentElement.classList.add('pwa-standalone');
+        }
+        if (mobile) {
+          document.documentElement.classList.add('mobile-shell');
+        }
+      })();
+    </script>
+    <style>
+      #pwa-splash {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
+        align-items: center;
+        justify-content: center;
+        background: #fefdfb;
+        transition: opacity 0.25s ease, visibility 0.25s;
+      }
+
+      html.pwa-standalone #pwa-splash {
+        display: flex;
+      }
+
+      #pwa-splash.pwa-splash--hide {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      #pwa-splash img {
+        width: 96px;
+        height: 96px;
+        animation: pwa-splash-pulse 1.4s ease-in-out infinite;
+      }
+
+      @keyframes pwa-splash-pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.88; transform: scale(0.96); }
+      }
+    </style>
     <meta
       name="description"
       content="Свой Гараж — маркетплейс новых и б/у автозапчастей. Каталог, доставка по России, оплата и чаты с продавцами."
@@ -43,6 +95,7 @@
     <!-- /Yandex.Metrika counter -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="image" href="%PUBLIC_URL%/favicons/favicon.svg" type="image/svg+xml" />
     <link rel="preload" as="image" href="%PUBLIC_URL%/img/LogoWithoutBg.png" />
     <link
       rel="stylesheet"
@@ -61,6 +114,9 @@
     <noscript>You need to enable JavaScript to run this app.
     <!-- Yandex.Metrika noscript (disabled in development) -->
     </noscript>
+    <div id="pwa-splash" aria-hidden="true">
+      <img src="%PUBLIC_URL%/favicons/favicon.svg" alt="" width="96" height="96" decoding="sync" />
+    </div>
     <div id="root"></div>
     <!--
       This HTML file is a template.

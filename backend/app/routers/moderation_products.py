@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 import json
 
 from app.db.database import get_db
@@ -84,6 +84,7 @@ def _serialize_moderation_product(product):
     )
     product_dict["organization"] = _organization_payload(product.organization)
     product_dict["creator_name"] = getattr(product, "creator_name", None)
+    product_dict["creator_full_name"] = getattr(product, "creator_full_name", None)
     product_dict.pop("_sa_instance_state", None)
     return product_dict
 
@@ -115,10 +116,13 @@ def get_pending_products(
 ):
     """Получить список всех запчастей в ожидании модерации"""
     
-    products = db.query(PendingProductModel)\
-        .offset(skip)\
-        .limit(limit)\
+    products = (
+        db.query(PendingProductModel)
+        .options(joinedload(PendingProductModel.creator))
+        .offset(skip)
+        .limit(limit)
         .all()
+    )
     
     result = [_serialize_moderation_product(product) for product in products]
 
@@ -490,10 +494,13 @@ def get_rejected_products(
 ):
     """Получить список отклоненных запчастей"""
     
-    products = db.query(RejectedProductModel)\
-        .offset(skip)\
-        .limit(limit)\
+    products = (
+        db.query(RejectedProductModel)
+        .options(joinedload(RejectedProductModel.creator))
+        .offset(skip)
+        .limit(limit)
         .all()
+    )
     
     result = [_serialize_moderation_product(product) for product in products]
 

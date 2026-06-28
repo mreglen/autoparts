@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { apiAxios, normalizeImageUrl } from '../../utils/apiClient';
+import { useDispatch } from 'react-redux';
+import { normalizeImageUrl } from '../../utils/apiClient';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import StockOutModal from '../MyParts/StockOutModal/StockOutModal';
 import PrintReceiptModal from '../MyParts/PrintReceiptModal/PrintReceiptModal';
@@ -10,12 +10,14 @@ import { updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import StorageCellsDisplayTable from '../../components/StorageCellsTable/StorageCellsDisplayTable';
 import { INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../utils/internalCode';
 import { buildSellerPartCardSeo, PageSeoHelmet } from '../../utils/pageSeo';
+import { resolveProductQrScan } from '../../utils/resolveProductQrScan';
+import { useAuthReady } from '../../hooks/useAuthReady';
 
 const SellerPartCardPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
+  const { isReady, user } = useAuthReady();
 
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -32,24 +34,48 @@ const SellerPartCardPage = () => {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
 
   useEffect(() => {
-    const fetchCard = async () => {
+    if (!isReady) return undefined;
+
+    let cancelled = false;
+
+    const resolveRoute = async () => {
       if (!id) {
-        setNotFound(true);
+        if (!cancelled) {
+          setNotFound(true);
+          setLoading(false);
+        }
+        return;
+      }
+
+      setLoading(true);
+      setNotFound(false);
+      setPart(null);
+
+      const result = await resolveProductQrScan(id, user);
+
+      if (cancelled) return;
+
+      if (result.mode === 'seller') {
+        setPart(result.part);
         setLoading(false);
         return;
       }
-      try {
-        const response = await apiAxios.get(`/products/qr-card/${id}`);
-        setPart(response.data);
-      } catch (error) {
-        // For non-seller/unauthorized users open public product card instead of local 404.
-        navigate(`/part/${id}`, { replace: true });
-      } finally {
-        setLoading(false);
+
+      if (result.mode === 'public') {
+        navigate(result.path, { replace: true });
+        return;
       }
+
+      setNotFound(true);
+      setLoading(false);
     };
-    fetchCard();
-  }, [id, navigate]);
+
+    resolveRoute();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isReady, navigate, user]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -69,27 +95,6 @@ const SellerPartCardPage = () => {
     const videos = (part.videos || []).map((v) => ({ type: 'video', src: normalizeImageUrl(v.full_url || v.video_url || '') }));
     return [...photos, ...videos].filter((x) => x.src);
   }, [part]);
-
-  const isSellerFromProductOrganization = useMemo(() => {
-    if (!part) return false;
-    if (!user?.is_seller) return false;
-
-    const userOrgId = user?.organization_id;
-    const partOrgId = part?.organization_id ?? part?.organization?.id ?? null;
-
-    // /products/qr-card is already protected on backend by organization check.
-    // If org id is not present in payload, trust successful access response.
-    if (partOrgId == null) return true;
-    if (userOrgId == null) return false;
-    return String(userOrgId) === String(partOrgId);
-  }, [part, user]);
-
-  useEffect(() => {
-    if (loading || !part) return;
-    if (!isSellerFromProductOrganization) {
-      navigate(`/part/${part.id || id}`, { replace: true });
-    }
-  }, [loading, part, isSellerFromProductOrganization, navigate, id]);
 
   const handleOpenMedia = (idx = 0) => {
     setCurrentMediaItems(mediaItems);
@@ -137,14 +142,11 @@ const SellerPartCardPage = () => {
     setOperationType(null);
   };
 
-  if (loading) {
+  if (!isReady || loading) {
     return <div className="p-8 text-center text-gray-600">Загрузка...</div>;
   }
   if (notFound || !part) {
     return <div className="p-8 text-center text-gray-700 text-lg">404: Страница не найдена</div>;
-  }
-  if (!isSellerFromProductOrganization) {
-    return null;
   }
 
   const seo = buildSellerPartCardSeo(part);

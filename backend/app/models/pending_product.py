@@ -35,9 +35,12 @@ class PendingProduct(Base):
 
     @property
     def creator_name(self):
-        if self.creator:
-            initials = f"{self.creator.first_name[0]}." if self.creator.first_name else ""
-            if self.creator.patronymic:
-                initials += f"{self.creator.patronymic[0]}."
-            return f"{self.creator.last_name or ''} {initials}".strip()
-        return None
+        from app.utils.user_display_name import format_user_short_name
+
+        return format_user_short_name(self.creator)
+
+    @property
+    def creator_full_name(self):
+        from app.utils.user_display_name import format_user_full_name
+
+        return format_user_full_name(self.creator)

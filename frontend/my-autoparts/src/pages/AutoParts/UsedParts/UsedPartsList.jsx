@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import ProductCard from '../ProductCard';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
+import { buildPartDetailPath } from '../../../utils/partRoutes';
 import UsedPartsFiltersForm from './UsedPartsFiltersForm';
 import {
   fetchCatalogProducts,
@@ -75,6 +76,17 @@ const formatPhoneNumber = (phone) => {
   return formatted;
 };
 
+const UsedPartsFiltersAside = React.memo(function UsedPartsFiltersAside({ updateCatalogUrl }) {
+  return (
+    <aside className="hidden w-full shrink-0 lg:block lg:w-64">
+      <div className="rounded-lg border border-gray-200 bg-white p-4 lg:sticky lg:top-4">
+        <h3 className="mb-3 font-semibold text-gray-900">Фильтры</h3>
+        <UsedPartsFiltersForm updateCatalogUrl={updateCatalogUrl} deferApply showClearInPanel={false} />
+      </div>
+    </aside>
+  );
+});
+
 const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl }) => {
   const dispatch = useDispatch();
   const location = useLocation();
@@ -132,7 +144,9 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     return (usedPartsData?.analog_parts || []).filter((p) => !catalogIds.has(p.id));
   }, [urlQ, usedPartsData, catalogItems]);
 
-  const status = catalogLoading && catalogItems.length === 0 ? 'loading' : 'idle';
+  const isInitialLoad = catalogLoading && catalogItems.length === 0;
+  const isRefreshing = catalogLoading && catalogItems.length > 0;
+  const status = isInitialLoad ? 'loading' : 'idle';
 
   const loadMoreCatalog = useCallback(() => {
     if (
@@ -474,50 +488,56 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const renderPartListCard = (part, listKey) => {
     const availableQty = part.quantity || part.available_count || 0;
     const sellerOrg = part.organization || organization;
+    const detailPath = buildPartDetailPath(part);
     return (
-      <div
+      <article
         key={listKey}
         className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
       >
-        <div className="flex flex-row gap-3 p-3 sm:gap-4 sm:p-4">
-          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-40 sm:w-40 lg:h-44 lg:w-44">
-            <MediaDisplay part={part} />
-          </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-              <div className="min-w-0 flex-1">
-                <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-gray-900 sm:text-base sm:leading-normal lg:text-lg">
-                  {formatProductDisplayTitle(part.brand, part.article, part.name)}
-                </h3>
-                <p className="mt-0.5 text-xs text-gray-500 sm:text-sm">
-                  Артикул: <span className="font-medium text-gray-700">{part.article || '—'}</span>
-                </p>
+        <Link
+          to={detailPath}
+          className="block text-inherit no-underline"
+        >
+          <div className="flex flex-row gap-3 p-3 sm:gap-4 sm:p-4">
+            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-40 sm:w-40 lg:h-44 lg:w-44">
+              <MediaDisplay part={part} />
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                <div className="min-w-0 flex-1">
+                  <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-gray-900 hover:text-indigo-700 sm:text-base sm:leading-normal lg:text-lg">
+                    {formatProductDisplayTitle(part.brand, part.article, part.name)}
+                  </h3>
+                  <p className="mt-0.5 text-xs text-gray-500 sm:text-sm">
+                    Артикул: <span className="font-medium text-gray-700">{part.article || '—'}</span>
+                  </p>
+                </div>
+                <div className="shrink-0 text-base font-bold text-indigo-600 sm:text-right sm:text-xl lg:text-2xl">
+                  {part.price ? `${Number(part.price).toLocaleString('ru-RU')} ₽` : '—'}
+                </div>
               </div>
-              <div className="shrink-0 text-base font-bold text-indigo-600 sm:text-right sm:text-xl lg:text-2xl">
-                {part.price ? `${Number(part.price).toLocaleString('ru-RU')} ₽` : '—'}
+              {part.description ? (
+                <p className="line-clamp-2 text-xs text-gray-600 sm:text-sm">{part.description}</p>
+              ) : null}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 sm:text-sm">
+                <div className="flex min-w-0 max-w-full items-start gap-1">
+                  <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  </svg>
+                  <span className="min-w-0 break-words">{getStorageAddress(part.storage_location_id, part.storage_location)}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className={availableQty > 0 ? 'font-medium text-green-600' : 'font-medium text-red-600'}>
+                    {availableQty > 0 ? `В наличии: ${availableQty} шт.` : 'Нет в наличии'}
+                  </span>
+                </div>
               </div>
             </div>
-            {part.description ? (
-              <p className="line-clamp-2 text-xs text-gray-600 sm:text-sm">{part.description}</p>
-            ) : null}
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 sm:text-sm">
-              <div className="flex min-w-0 max-w-full items-start gap-1">
-                <svg className="mt-0.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                </svg>
-                <span className="min-w-0 break-words">{getStorageAddress(part.storage_location_id, part.storage_location)}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className={availableQty > 0 ? 'font-medium text-green-600' : 'font-medium text-red-600'}>
-                  {availableQty > 0 ? `В наличии: ${availableQty} шт.` : 'Нет в наличии'}
-                </span>
-              </div>
-            </div>
           </div>
-        </div>
+        </Link>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-slate-50/80 px-3 py-2.5 sm:px-4">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
@@ -543,7 +563,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             </a>
           ) : null}
         </div>
-      </div>
+      </article>
     );
   };
 
@@ -580,14 +600,24 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           Фильтры
         </Link>
       </div>
-      <div className="flex flex-col gap-4 px-3 sm:gap-6 sm:px-0 lg:flex-row">
-        <aside className="hidden w-full flex-shrink-0 lg:block lg:w-64">
-          <div className="rounded-lg border border-gray-200 bg-white p-4 lg:sticky lg:top-4">
-            <h3 className="font-semibold text-gray-900 mb-3">Фильтры</h3>
-            <UsedPartsFiltersForm updateCatalogUrl={updateCatalogUrl} deferApply showClearInPanel={false} />
-          </div>
-        </aside>
-        <div className="flex-1 min-w-0">
+      <div className="flex flex-col gap-4 px-3 sm:gap-6 sm:px-0 lg:flex-row lg:items-start">
+        <UsedPartsFiltersAside updateCatalogUrl={updateCatalogUrl} />
+        <div className="relative min-w-0 flex-1">
+          {isRefreshing ? (
+            <div
+              className="pointer-events-none absolute inset-0 z-10 flex justify-center rounded-lg bg-white/55 pt-20 backdrop-blur-[1px]"
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 shadow-sm">
+                <svg className="h-4 w-4 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Обновление списка…
+              </span>
+            </div>
+          ) : null}
       {status === 'loading' && (
         <div className="mt-5 text-center py-10">
           <p className="text-lg text-gray-600">Загрузка запчастей...</p>
@@ -768,4 +798,4 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 };
 
 
-export default UsedPartsList;
+export default React.memo(UsedPartsList);

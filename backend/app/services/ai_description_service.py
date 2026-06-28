@@ -186,20 +186,23 @@ def can_generate_ai_description(user: User) -> bool:
     return can_use_ai_description_ui(user)
 
 
-def _resolve_block_reason(
+def _resolve_generation_block_reason(
     *,
-    user: User,
     integration: SiteOpenRouterIntegration,
     org_enabled: bool,
+    global_used: int,
+    global_limit: int,
+    org_used: int,
+    org_limit: int,
 ) -> str | None:
-    if not can_use_ai_description_ui(user):
-        return "Доступно только продавцам и сотрудникам организации"
     if not integration.api_key_encrypted:
         return "Администратор ещё не сохранил API-ключ OpenRouter"
-    if not integration.is_enabled:
-        return "Генерация отключена в /admin-settings → OpenRouter"
     if not org_enabled:
         return "Для вашей организации доступ не включён в /admin-settings"
+    if global_used >= global_limit:
+        return "Исчерпан дневной лимит генерации на сайте"
+    if org_used >= org_limit:
+        return "Исчерпан дневной лимит вашей организации"
     return None
 
 
@@ -227,13 +230,22 @@ def get_seller_access_info(db: Session, user: User) -> dict:
     org_used = count_org_requests_today(db, org_id) if org_id else 0
     org_limit = int(integration.per_org_daily_limit or 10)
 
-    show_ui = can_use_ai_description_ui(user)
-    block_reason = _resolve_block_reason(
-        user=user,
-        integration=integration,
-        org_enabled=org_enabled,
+    show_ui = (
+        can_use_ai_description_ui(user)
+        and org_enabled
+        and bool(integration.is_enabled)
     )
-    enabled = show_ui and block_reason is None
+    generation_block = None
+    if show_ui:
+        generation_block = _resolve_generation_block_reason(
+            integration=integration,
+            org_enabled=org_enabled,
+            global_used=global_used,
+            global_limit=global_limit,
+            org_used=org_used,
+            org_limit=org_limit,
+        )
+    enabled = show_ui and generation_block is None
     remaining_global = max(0, global_limit - global_used)
     remaining_org = max(0, org_limit - org_used)
     remaining_today = min(remaining_global, remaining_org) if enabled else 0
@@ -241,7 +253,7 @@ def get_seller_access_info(db: Session, user: User) -> dict:
     return {
         "show_ui": show_ui,
         "enabled": enabled,
-        "reason": block_reason,
+        "reason": generation_block,
         "remaining_today": remaining_today,
         "org_limit": org_limit,
         "global_limit": global_limit,

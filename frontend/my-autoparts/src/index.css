@@ -1,6 +1,20 @@
 /* Onest подключается в public/index.html (без блокирующего @import) */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: hidden;
+  width: 100%;
+  background-color: #f9fafb;
+}
+
 body {
   margin: 0;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+  background-color: #f9fafb;
+  touch-action: manipulation;
+  overscroll-behavior-x: none;
   /* font-family: "Sansation", sans-serif; */
   /* font-family: "Arial", sans-serif; */
   font-family: "Onest", sans-serif;
@@ -8,6 +22,44 @@ body {
   /* font-family: "Roboto", sans-serif; */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+}
+
+/*
+ * Mobile / PWA: no double-tap zoom drift, no horizontal rubber-band gap.
+ * Scroll lives in #root so the layout stays locked to the viewport width.
+ */
+html.mobile-shell,
+html.pwa-standalone {
+  height: 100%;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+html.mobile-shell body,
+html.pwa-standalone body {
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+html.mobile-shell #root,
+html.pwa-standalone #root {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 

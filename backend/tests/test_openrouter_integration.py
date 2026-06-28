@@ -289,6 +289,68 @@ class AiDescriptionServiceTests(unittest.TestCase):
         self.assertFalse(info["show_ui"])
         self.assertFalse(info["enabled"])
 
+    def test_get_seller_access_info_show_ui_when_org_enabled_without_api_key(self):
+        db = MagicMock()
+        integration = MagicMock()
+        integration.is_enabled = True
+        integration.api_key_encrypted = None
+        integration.daily_limit = 50
+        integration.per_org_daily_limit = 10
+        integration.requests_today = 0
+        integration.requests_today_date = None
+
+        user = MagicMock()
+        user.is_seller = True
+        user.is_director = False
+        user.is_employee = False
+        user.organization_id = "org1"
+
+        with patch(
+            "app.services.ai_description_service.get_or_create_openrouter_integration",
+            return_value=integration,
+        ), patch(
+            "app.services.ai_description_service.is_org_ai_description_enabled",
+            return_value=True,
+        ), patch(
+            "app.services.ai_description_service.count_org_requests_today",
+            return_value=0,
+        ):
+            info = get_seller_access_info(db, user)
+        self.assertTrue(info["show_ui"])
+        self.assertFalse(info["enabled"])
+        self.assertIn("API-ключ", info["reason"] or "")
+
+    def test_get_seller_access_info_hide_ui_when_org_not_enabled(self):
+        db = MagicMock()
+        integration = MagicMock()
+        integration.is_enabled = True
+        integration.api_key_encrypted = "enc"
+        integration.daily_limit = 50
+        integration.per_org_daily_limit = 10
+        integration.requests_today = 0
+        integration.requests_today_date = None
+
+        user = MagicMock()
+        user.is_seller = True
+        user.is_director = False
+        user.is_employee = False
+        user.organization_id = "org1"
+
+        with patch(
+            "app.services.ai_description_service.get_or_create_openrouter_integration",
+            return_value=integration,
+        ), patch(
+            "app.services.ai_description_service.is_org_ai_description_enabled",
+            return_value=False,
+        ), patch(
+            "app.services.ai_description_service.count_org_requests_today",
+            return_value=0,
+        ):
+            info = get_seller_access_info(db, user)
+        self.assertFalse(info["show_ui"])
+        self.assertFalse(info["enabled"])
+        self.assertIsNone(info["reason"])
+
 
 if __name__ == "__main__":
     unittest.main()

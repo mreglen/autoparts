@@ -722,8 +722,8 @@ const CardPart = ({
   );
 };
 
-const DEFAULT_IN_STOCK_FILTERS = { search: '', storage: '', sort: 'date_desc' };
-const DEFAULT_MODERATION_FILTERS = { search: '', storage: '', sort: 'date_desc', hideRejected: false };
+const DEFAULT_IN_STOCK_FILTERS = { storage: '', sort: 'date_desc' };
+const DEFAULT_MODERATION_FILTERS = { storage: '', sort: 'date_desc', hideRejected: false };
 const URL_SEARCH_DEBOUNCE_MS = 400;
 
 const getModerationPartKey = (part) => `${part.moderationKind || 'pending'}-${part.id}`;
@@ -752,17 +752,22 @@ function MyParts() {
   const bulkActionsPlacement = useActionsDropdownPlacement(showBulkActions, 130);
   const mobileBulkActionsPlacement = useActionsDropdownPlacement(showBulkActions, 130);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'in-stock');
+  const initialUrlSearch = searchParams.get('q') || '';
   const [inStockFilters, setInStockFilters] = useState(() => ({
     ...DEFAULT_IN_STOCK_FILTERS,
-    search: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('q') || ''),
     storage: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('storage') || ''),
   }));
   const [moderationFilters, setModerationFilters] = useState(() => ({
     ...DEFAULT_MODERATION_FILTERS,
-    search: searchParams.get('tab') === 'pending' ? (searchParams.get('q') || '') : '',
     storage: searchParams.get('tab') === 'pending' ? (searchParams.get('storage') || '') : '',
     hideRejected: searchParams.get('hide_rejected') === '1',
   }));
+  const [inStockSearchDraft, setInStockSearchDraft] = useState(
+    searchParams.get('tab') === 'pending' ? '' : initialUrlSearch,
+  );
+  const [moderationSearchDraft, setModerationSearchDraft] = useState(
+    searchParams.get('tab') === 'pending' ? initialUrlSearch : '',
+  );
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -773,16 +778,26 @@ function MyParts() {
 
   const isModerationTab = activeTab === 'pending';
   const activeFilters = isModerationTab ? moderationFilters : inStockFilters;
-  const activeSearchQuery = activeFilters.search;
-  const [debouncedUrlSearch, setDebouncedUrlSearch] = useState(activeSearchQuery);
+  const searchDraft = isModerationTab ? moderationSearchDraft : inStockSearchDraft;
+  const setSearchDraft = isModerationTab ? setModerationSearchDraft : setInStockSearchDraft;
+  const [inStockDebouncedSearch, setInStockDebouncedSearch] = useState(inStockSearchDraft);
+  const [moderationDebouncedSearch, setModerationDebouncedSearch] = useState(moderationSearchDraft);
+  const debouncedSearch = isModerationTab ? moderationDebouncedSearch : inStockDebouncedSearch;
   const searchInputRef = useRef(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDebouncedUrlSearch(activeSearchQuery);
+      setInStockDebouncedSearch(inStockSearchDraft);
     }, URL_SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [activeSearchQuery]);
+  }, [inStockSearchDraft]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setModerationDebouncedSearch(moderationSearchDraft);
+    }, URL_SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [moderationSearchDraft]);
   const updateActiveFilters = (patch) => {
     if (isModerationTab) {
       setModerationFilters((prev) => ({ ...prev, ...patch }));
@@ -811,14 +826,14 @@ function MyParts() {
     if (inStockFilters.storage && part.storage_location_id != inStockFilters.storage) {
       return false;
     }
-    if (!inStockFilters.search.trim()) return true;
-    const query = inStockFilters.search.toLowerCase().replace(/\s+/g, '');
+    if (!inStockDebouncedSearch.trim()) return true;
+    const query = inStockDebouncedSearch.toLowerCase().replace(/\s+/g, '');
     return (
       (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
       (normalizeInternalCodeForSearch(part.internal_code).toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (part.name && part.name.toLowerCase().includes(inStockFilters.search.toLowerCase()))
+      (part.name && part.name.toLowerCase().includes(inStockDebouncedSearch.toLowerCase()))
     );
-  }), [products, inStockFilters]);
+  }), [products, inStockFilters.storage, inStockDebouncedSearch]);
 
   const sortedDisplayParts = React.useMemo(() => {
     const items = [...displayParts];
@@ -855,15 +870,15 @@ function MyParts() {
       items = items.filter((part) => String(part.storage_location_id) === String(moderationFilters.storage));
     }
 
-    if (!moderationFilters.search.trim()) return items;
+    if (!moderationDebouncedSearch.trim()) return items;
 
-    const query = moderationFilters.search.toLowerCase().replace(/\s+/g, '');
+    const query = moderationDebouncedSearch.toLowerCase().replace(/\s+/g, '');
     return items.filter((part) =>
       (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
       (normalizeInternalCodeForSearch(part.internal_code).toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (part.name && part.name.toLowerCase().includes(moderationFilters.search.toLowerCase()))
+      (part.name && part.name.toLowerCase().includes(moderationDebouncedSearch.toLowerCase()))
     );
-  }, [pendingItems, rejectedItems, moderationFilters]);
+  }, [pendingItems, rejectedItems, moderationFilters.hideRejected, moderationFilters.storage, moderationDebouncedSearch]);
 
   const sortedModerationParts = React.useMemo(() => {
     const items = [...displayModerationParts];
@@ -1252,8 +1267,8 @@ function MyParts() {
     const params = new URLSearchParams();
     const storage = isModerationTab ? moderationFilters.storage : inStockFilters.storage;
 
-    if (debouncedUrlSearch) {
-      params.set('q', debouncedUrlSearch);
+    if (debouncedSearch) {
+      params.set('q', debouncedSearch);
     }
 
     if (storage) {
@@ -1274,17 +1289,9 @@ function MyParts() {
     if (next === currentSearch) return;
 
     setSearchParams(params, { replace: true });
-    // Restore focus after URL update (mobile browsers may blur the input)
-    const input = searchInputRef.current;
-    if (input && document.activeElement !== input) {
-      requestAnimationFrame(() => {
-        input.focus({ preventScroll: true });
-      });
-    }
   }, [
     location.pathname,
-    location.search,
-    debouncedUrlSearch,
+    debouncedSearch,
     inStockFilters.storage,
     moderationFilters.storage,
     moderationFilters.hideRejected,
@@ -1542,18 +1549,21 @@ function MyParts() {
               inputMode="search"
               enterKeyHint="search"
               autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               placeholder="Поиск по номеру, внутр. коду или названию..."
-              value={activeFilters.search}
-              onChange={(e) => updateActiveFilters({ search: e.target.value })}
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
               className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
-            <div className={`absolute inset-y-0 right-0 pr-3 flex items-center ${activeFilters.search ? '' : 'invisible pointer-events-none'}`}>
+            <div className={`absolute inset-y-0 right-0 pr-3 flex items-center ${searchDraft ? '' : 'invisible pointer-events-none'}`}>
               <button
                 type="button"
-                onClick={() => updateActiveFilters({ search: '' })}
+                onClick={() => setSearchDraft('')}
                 className="text-gray-400 hover:text-gray-600 focus:outline-none"
-                tabIndex={activeFilters.search ? 0 : -1}
-                aria-hidden={!activeFilters.search}
+                tabIndex={searchDraft ? 0 : -1}
+                aria-hidden={!searchDraft}
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1745,17 +1755,17 @@ function MyParts() {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            {inStockFilters.search ? 'Ничего не найдено' : 'Запчастей нет'}
+            {inStockDebouncedSearch ? 'Ничего не найдено' : 'Запчастей нет'}
           </h2>
           <p className="text-gray-600 text-base mb-6">
-            {inStockFilters.search
-              ? `По запросу "${inStockFilters.search}" ${inStockFilters.storage ? 'в выбранном складе ' : ''}ничего не найдено. Попробуйте изменить поисковый запрос.`
+            {inStockDebouncedSearch
+              ? `По запросу "${inStockDebouncedSearch}" ${inStockFilters.storage ? 'в выбранном складе ' : ''}ничего не найдено. Попробуйте изменить поисковый запрос.`
               : inStockFilters.storage 
                 ? 'В выбранном складе пока нет запчастей'
                 : 'У вас пока нет добавленных запчастей'
             }
           </p>
-          {!inStockFilters.search && (
+          {!inStockDebouncedSearch && (
             <button
               onClick={() => navigate('/my-parts/add')}
               className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
@@ -1772,7 +1782,7 @@ function MyParts() {
               <div className="mb-3 flex items-center justify-between py-2 border-b border-gray-200">
                 <span className="text-sm text-gray-500">
                   <span className="ml-2">Выбрано: {selectedParts.size}</span>
-                  {inStockFilters.search && selectedParts.size > 0 && (
+                  {inStockDebouncedSearch && selectedParts.size > 0 && (
                     <span className="ml-2 text-indigo-600">
                       (из {displayParts.length} найденных)
                     </span>
@@ -1856,7 +1866,7 @@ function MyParts() {
                 </label>
                 <span className="text-sm text-gray-500 whitespace-nowrap">
                   Выбрано: {selectedParts.size}
-                  {inStockFilters.search && selectedParts.size > 0 && (
+                  {inStockDebouncedSearch && selectedParts.size > 0 && (
                     <span className="text-indigo-600"> / {displayParts.length}</span>
                   )}
                 </span>
@@ -1944,15 +1954,15 @@ function MyParts() {
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              {moderationFilters.search || moderationFilters.storage
+              {moderationDebouncedSearch || moderationFilters.storage
                 ? 'Ничего не найдено'
                 : moderationFilters.hideRejected && moderationItemsCount > 0
                   ? 'Отклонённые скрыты'
                   : 'Запчастей на модерации нет'}
             </h2>
             <p className="text-gray-600 text-base mb-6">
-              {moderationFilters.search
-                ? `По запросу "${moderationFilters.search}" ничего не найдено среди запчастей на модерации.`
+              {moderationDebouncedSearch
+                ? `По запросу "${moderationDebouncedSearch}" ничего не найдено среди запчастей на модерации.`
                 : moderationFilters.storage
                   ? 'В выбранном складе нет запчастей на модерации.'
                   : moderationFilters.hideRejected && moderationItemsCount > 0

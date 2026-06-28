@@ -252,7 +252,6 @@ function AutoParts() {
     const catalogAlreadyLoaded = catalogFilterKey === usedCatalogFilterKey
       && catalogFilterKey !== null;
     if (!catalogAlreadyLoaded) {
-      dispatch(resetCatalogCatalog());
       dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams, 1)));
     }
   }, [searchQuery, activeTab, usedCatalogFilterKey, searchParams, dispatch, catalogFilterKey]);

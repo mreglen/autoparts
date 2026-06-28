@@ -93,14 +93,13 @@ export function PartDetailContent({
                         <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                             На модерации
                         </span>
-                    ) : (
-                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
-                            part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}
-                        >
-                            {part.is_new ? 'Новый' : 'Б/у'}
-                        </span>
-                    )}
+                    ) : null}
+                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${
+                        part.is_new ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}
+                    >
+                        {part.is_new ? 'Новая' : 'Б/у'}
+                    </span>
                     {!moderationKind && part.is_on_avito && (
                         <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Avito</span>
                     )}
@@ -114,7 +113,7 @@ export function PartDetailContent({
                     <DetailField label="Цена" value={priceLabel} />
                     <DetailField label="Внутренний код" value={part.internal_code} mono />
                     <DetailField label="Склад" value={storageLabel} />
-                    <DetailField label="Ответственный" value={part.creator_name} />
+                    <DetailField label="Ответственный" value={part.creator_full_name || part.creator_name} />
                     {moderationKind === 'rejected' && part.rejected_at && (
                         <DetailField label="Дата отклонения" value={new Date(part.rejected_at).toLocaleString('ru-RU')} />
                     )}

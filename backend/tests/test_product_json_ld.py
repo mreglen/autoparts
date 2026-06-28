@@ -192,6 +192,15 @@ class NewPartSeoServiceJsonLdIntegrationTests(unittest.TestCase):
         self.assertIn("alternateName", json_ld)
         self.assertIn("shippingDetails", json_ld["offers"])
 
+    def test_build_new_part_seo_meta_title_description_use_base_price(self):
+        meta = build_new_part_seo_meta(self._make_card(), site_origin="https://svoygarage.ru", markup_percent=15)
+        self.assertIn("от 1 200 ₽", meta.title)
+        self.assertNotIn("1 380", meta.title)
+        self.assertIn("1 200 ₽.", meta.description)
+        self.assertNotIn("1 380", meta.description)
+        json_ld = json.loads(meta.json_ld)
+        self.assertEqual(json_ld["offers"]["price"], "1380.00")
+
     def test_build_new_part_seo_meta_json_ld_graph(self):
         meta = build_new_part_seo_meta(self._make_card(), site_origin="https://svoygarage.ru", markup_percent=15)
         self.assertTrue(meta.json_ld_graph)

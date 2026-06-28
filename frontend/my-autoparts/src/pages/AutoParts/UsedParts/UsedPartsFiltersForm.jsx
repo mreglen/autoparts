@@ -11,7 +11,6 @@ import {
   usedHasActiveFilters,
 } from '../../../utils/autopartsFilters';
 import {
-  selectCatalogItems,
   selectCatalogFacets,
   selectPublicPartTypes,
 } from '../../../redux/slices/ProductSlice';
@@ -23,8 +22,6 @@ import {
 } from '../../../utils/autopartsPublic';
 import SortFilterSection from '../../../components/Autoparts/SortFilterSection';
 
-const selectUsedPartsData = (state) => state.products.usedPartsData;
-
 const COLLAPSED_FILTER_LIMIT = 3;
 
 /**
@@ -33,7 +30,7 @@ const COLLAPSED_FILTER_LIMIT = 3;
  * @param {boolean} [props.showClearInPanel=true] — кнопка «Сбросить» внутри панели (десктоп).
  * @param {boolean} [props.deferApply=false] — на десктопе: применять фильтры по кнопке.
  */
-export default function UsedPartsFiltersForm({
+function UsedPartsFiltersForm({
   updateCatalogUrl,
   showClearInPanel = true,
   deferApply = false,
@@ -47,19 +44,24 @@ export default function UsedPartsFiltersForm({
     setDraftFilters(usedDraftFromSearchParams(searchParams));
   }, [searchParams, deferApply]);
 
-  const usedPartsData = useSelector(selectUsedPartsData);
-  const catalogItems = useSelector(selectCatalogItems);
   const catalogFacets = useSelector(selectCatalogFacets);
   const publicPartTypes = useSelector(selectPublicPartTypes);
   const isCatalogMode = isUsedCatalogBrowseMode(searchParams);
 
+  const legacyAvailableParts = useSelector((state) => (
+    isCatalogMode ? null : (state.products.usedPartsData?.available_parts || [])
+  ));
+  const legacyAnalogParts = useSelector((state) => (
+    isCatalogMode ? null : (state.products.usedPartsData?.analog_parts || [])
+  ));
+
   const availableParts = useMemo(
-    () => (isCatalogMode ? catalogItems : (usedPartsData?.available_parts || [])),
-    [isCatalogMode, catalogItems, usedPartsData]
+    () => (isCatalogMode ? [] : (legacyAvailableParts || [])),
+    [isCatalogMode, legacyAvailableParts],
   );
   const analogParts = useMemo(
-    () => (isCatalogMode ? [] : (usedPartsData?.analog_parts || [])),
-    [isCatalogMode, usedPartsData]
+    () => (isCatalogMode ? [] : (legacyAnalogParts || [])),
+    [isCatalogMode, legacyAnalogParts],
   );
 
   const appliedFilters = useMemo(() => usedDraftFromSearchParams(searchParams), [searchParams]);
@@ -355,3 +357,5 @@ export default function UsedPartsFiltersForm({
     </div>
   );
 }
+
+export default React.memo(UsedPartsFiltersForm);

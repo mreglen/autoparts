@@ -19,7 +19,7 @@ from app.utils.product_search_seo import (
     build_new_part_search_description,
     build_new_part_search_title,
 )
-from app.utils.new_part_price_utils import min_stock_price_with_markup
+from app.utils.new_part_price_utils import min_stock_base_price, min_stock_price_with_markup
 from app.utils.org_markup import global_markup_percent
 from app.utils.seo_constants import resolve_default_og_image_url
 from app.utils.page_keywords import build_page_keywords
@@ -591,13 +591,14 @@ def build_new_part_seo_meta(
     display_name = _safe_text(card.name) or f"{card.brand} {card.article}"
     markup = float(markup_percent) if markup_percent is not None else 15.0
     display_price = min_stock_price_with_markup(card, markup)
+    seo_price = min_stock_base_price(card)
     in_stock = (card.stock_count or 0) > 0
     title = build_new_part_search_title(
         brand=card.brand,
         article=card.article,
         raw_name=_safe_text(card.name),
         card_id=int(card.id),
-        price=display_price,
+        price=seo_price,
     )
     h1 = build_new_part_h1(
         brand=card.brand,
@@ -609,7 +610,7 @@ def build_new_part_seo_meta(
         article=card.article,
         raw_name=_safe_text(card.name),
         card_id=int(card.id),
-        price=display_price,
+        price=seo_price,
         in_stock=in_stock,
         unique_description=_safe_text(card.description),
     )

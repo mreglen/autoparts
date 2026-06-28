@@ -25,6 +25,13 @@ import { useAuthReady } from '../../../hooks/useAuthReady';
 import { useAiDescriptionGenerator } from '../../../hooks/useAiDescriptionGenerator';
 import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
 import {
+  hasPartFormErrors,
+  partFieldClass,
+  partFieldLabelClass,
+  scrollToFirstPartFormError,
+  validatePartForm,
+} from '../../../utils/partFormValidation';
+import {
   buildRosskoLookupText,
   getRosskoMinPrice,
   pickBestRosskoPart,
@@ -107,6 +114,9 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
   const [rosskoLookupNotice, setRosskoLookupNotice] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [loadingFormData, setLoadingFormData] = useState(resubmitMode || editPendingMode);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const showFieldError = (name) => Boolean(submitAttempted && fieldErrors[name]);
   const [existingPendingStorageCells, setExistingPendingStorageCells] = useState([]);
 
   const [photos, setPhotos] = useState([]);
@@ -133,10 +143,25 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
       dispatch(fetchStorageCells(formData.storage_location_id))
         .then((result) => {
           if (fetchStorageCells.fulfilled.match(result)) {
-            setLocationCells(Array.isArray(result.payload) ? result.payload : []);
-            // Initialize cell quantities
+            const cells = Array.isArray(result.payload) ? result.payload : [];
+            setLocationCells(cells);
+
+            if (editPendingMode || resubmitMode) {
+              // Не затираем значения, загруженные из pending/rejected — только добавляем ключи для новых ячеек
+              setCellQuantities((prev) => {
+                const next = { ...prev };
+                cells.forEach((cell) => {
+                  if (next[cell.id] === undefined) {
+                    next[cell.id] = '';
+                  }
+                });
+                return next;
+              });
+              return;
+            }
+
             const initialQuantities = {};
-            (Array.isArray(result.payload) ? result.payload : []).forEach(cell => {
+            cells.forEach((cell) => {
               initialQuantities[cell.id] = '';
             });
             setCellQuantities(initialQuantities);
@@ -144,9 +169,11 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
         });
     } else {
       setLocationCells([]);
-      setCellQuantities({});
+      if (!editPendingMode && !resubmitMode) {
+        setCellQuantities({});
+      }
     }
-  }, [dispatch, formData.storage_location_id]);
+  }, [dispatch, formData.storage_location_id, editPendingMode, resubmitMode]);
   
   // Refresh storage cells when they are modified elsewhere
   useEffect(() => {
@@ -580,6 +607,12 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
     if (name === 'article' || name === 'brand') {
       setRosskoLookupError(null);
       setRosskoLookupNotice(null);
@@ -811,34 +844,15 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
     }
 
     // Validate required fields
-    if (!formData.article || !formData.article.trim()) {
-      alert('Артикул обязателен');
+    const errors = validatePartForm(formData);
+    if (hasPartFormErrors(errors)) {
+      setSubmitAttempted(true);
+      setFieldErrors(errors);
+      scrollToFirstPartFormError(errors);
       return;
     }
-    if (!formData.name || !formData.name.trim()) {
-      alert('Название обязательно');
-      return;
-    }
-    if (!formData.brand || !formData.brand.trim()) {
-      alert('Бренд обязателен');
-      return;
-    }
-    if (!formData.sale_price || isNaN(parseFloat(formData.sale_price))) {
-      alert('Укажите корректную цену');
-      return;
-    }
-    if (!formData.quantity || isNaN(parseInt(formData.quantity, 10))) {
-      alert('Укажите корректное количество');
-      return;
-    }
-    if (!formData.storage_location_id) {
-      alert('Выберите место хранения');
-      return;
-    }
-    if (!formData.part_type_id) {
-      alert('Выберите вид запчасти');
-      return;
-    }
+    setSubmitAttempted(false);
+    setFieldErrors({});
 
     let photoUrls = [];
     let videoUrls = [];
@@ -1072,19 +1086,18 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
           <p className="mt-1 text-sm text-red-700">{rejectionReason}</p>
         </div>
       )}
-      <form id="add-part-form" onSubmit={handleSubmit} className="space-y-6 md:space-y-6">
+      <form id="add-part-form" onSubmit={handleSubmit} noValidate className="space-y-6 md:space-y-6">
         <MobilePageSection title="Основное">
         {/* Артикул */}
-        <div>
-          <label className="block text-sm font-medium">Артикул *</label>
+        <div data-part-field="article">
+          <label className={partFieldLabelClass(showFieldError('article'))}>Артикул *</label>
           <input
             name="article"
             value={formData.article}
             onChange={handleInputChange}
             onFocus={() => setArticleFocused(true)}
             onBlur={() => setTimeout(() => setArticleFocused(false), 120)}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('article'))}
             autoComplete="off"
           />
           {articleFocused && (articleLoading || articleOptions.length > 0) && (
@@ -1137,28 +1150,26 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
         </div>
 
         {/* Наименование */}
-        <div>
-          <label className="block text-sm font-medium">Наименование *</label>
+        <div data-part-field="name">
+          <label className={partFieldLabelClass(showFieldError('name'))}>Наименование *</label>
           <input
             name="name"
             value={formData.name}
             onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('name'))}
           />
         </div>
 
         {/* Бренд */}
-        <div>
-          <label className="block text-sm font-medium">Бренд *</label>
+        <div data-part-field="brand">
+          <label className={partFieldLabelClass(showFieldError('brand'))}>Бренд *</label>
           <input
             name="brand"
             value={formData.brand}
             onChange={handleInputChange}
             onFocus={() => setBrandFocused(true)}
             onBlur={() => setTimeout(() => setBrandFocused(false), 120)}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('brand'))}
             autoComplete="off"
           />
           {brandFocused && (brandLoading || brandOptions.length > 0) && (
@@ -1186,16 +1197,15 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
         </div>
         
         {/* Вид запчасти */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+        <div data-part-field="part_type_id">
+          <label className={`${partFieldLabelClass(showFieldError('part_type_id'))} mb-1`}>
             Вид запчасти *
           </label>
           <select
             name="part_type_id"
             value={formData.part_type_id}
             onChange={handleInputChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            required
+            className={partFieldClass(showFieldError('part_type_id'))}
           >
             <option value="">Выберите вид запчасти</option>
             {partTypes.map(partType => (
@@ -1210,7 +1220,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
             <label className="block text-sm font-medium">Описание</label>
-            {!aiDescriptionLoading && aiDescriptionAccess?.enabled && (
+            {!aiDescriptionLoading && aiDescriptionAccess?.show_ui && (
               <span className="text-xs text-gray-500">
                 Осталось сегодня: {aiDescriptionAccess.remaining_today ?? 0}
               </span>
@@ -1224,7 +1234,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
             className="mt-1 block w-full px-3 py-2 border rounded-md"
             placeholder="Введите описание запчасти..."
           />
-          {!aiDescriptionLoading && (aiDescriptionAccess?.show_ui || aiDescriptionAccess?.enabled) && (
+          {!aiDescriptionLoading && aiDescriptionAccess?.show_ui && (
             <div className="mt-2 space-y-1">
               <button
                 type="button"
@@ -1234,16 +1244,10 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
               >
                 {aiDescriptionGenerating ? 'Генерация…' : 'Сгенерировать описание'}
               </button>
-              {!aiDescriptionAccess?.enabled && aiDescriptionAccess?.reason && (
-                <p className="text-xs text-amber-700">{aiDescriptionAccess.reason}</p>
-              )}
               {aiDescriptionError && (
                 <p className="text-xs text-red-600">{aiDescriptionError}</p>
               )}
             </div>
-          )}
-          {aiDescriptionLoading && (
-            <p className="mt-2 text-xs text-gray-500">Проверка доступа к AI…</p>
           )}
         </div>
         </MobilePageSection>
@@ -1442,22 +1446,21 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
 
         <MobilePageSection title="Остаток и склад">
         {/* Количество */}
-        <div>
-          <label className="block text-sm font-medium">Количество *</label>
+        <div data-part-field="quantity">
+          <label className={partFieldLabelClass(showFieldError('quantity'))}>Количество *</label>
           <input
             name="quantity"
             type="number"
             min="0"
             value={formData.quantity}
             onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('quantity'))}
           />
         </div>
 
         {/* Цена продажи */}
-        <div>
-          <label className="block text-sm font-medium">Цена продажи (₽) *</label>
+        <div data-part-field="sale_price">
+          <label className={partFieldLabelClass(showFieldError('sale_price'))}>Цена продажи (₽) *</label>
           <input
             name="sale_price"
             type="number"
@@ -1465,20 +1468,18 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
             min="0"
             value={formData.sale_price}
             onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('sale_price'))}
           />
         </div>
 
         {/* Склад */}
-        <div>
-          <label className="block text-sm font-medium">Склад *</label>
+        <div data-part-field="storage_location_id">
+          <label className={partFieldLabelClass(showFieldError('storage_location_id'))}>Склад *</label>
           <select
             name="storage_location_id"
             value={formData.storage_location_id}
             onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('storage_location_id'))}
           >
             <option value="">Выберите склад</option>
             {storageLocations.map((loc) => (

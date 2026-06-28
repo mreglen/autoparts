@@ -1,7 +1,11 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from app.utils.new_part_price_utils import apply_markup_price, min_stock_price_with_markup
+from app.utils.new_part_price_utils import (
+    apply_markup_price,
+    min_stock_base_price,
+    min_stock_price_with_markup,
+)
 
 
 class NewPartPriceUtilsTests(unittest.TestCase):
@@ -25,6 +29,24 @@ class NewPartPriceUtilsTests(unittest.TestCase):
         card = MagicMock()
         card.price = 1000
         self.assertEqual(min_stock_price_with_markup(card, 10), 1100.0)
+
+    @patch("app.services.new_parts_seo_card_service._stocks_from_card")
+    def test_min_stock_base_price_from_stocks(self, mock_stocks):
+        mock_stocks.return_value = [
+            {"stock_id": "a", "price": 1000, "available_count": 2},
+            {"stock_id": "b", "price": 900, "available_count": 1},
+            {"stock_id": "c", "price": 800, "available_count": 0},
+        ]
+        card = MagicMock()
+        card.price = 1100
+        self.assertEqual(min_stock_base_price(card), 900.0)
+
+    @patch("app.services.new_parts_seo_card_service._stocks_from_card")
+    def test_min_stock_base_price_fallback_to_card_price(self, mock_stocks):
+        mock_stocks.return_value = []
+        card = MagicMock()
+        card.price = 1000
+        self.assertEqual(min_stock_base_price(card), 1000.0)
 
 
 if __name__ == "__main__":

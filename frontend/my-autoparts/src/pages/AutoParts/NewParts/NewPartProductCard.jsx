@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   addNewPartsToCart,
   removeFromCart,
@@ -8,8 +8,8 @@ import {
   selectCartLoading,
   updateCartItemQuantity,
 } from '../../../redux/slices/CartSlice';
-import { apiAxiosUnauth } from '../../../utils/apiClient';
-import { buildNewPartDetailPath } from '../../../utils/partRoutes';
+import { buildNewPartOpenPath } from '../../../utils/partRoutes';
+import { isPlainLeftClick, resolveNewPartDetailPath } from '../../../utils/openNewPartFromCatalog';
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
 import { isRosskoFastDelivery } from './rosskoHelpers';
 import {
@@ -197,52 +197,38 @@ export default function NewPartProductCard({
     };
   };
 
-  const handleNavigateToDetail = () => {
+  const handleNavigateToDetail = async (event) => {
     if (isDetailView) return;
-    const open = async () => {
-      setOpeningCard(true);
-      try {
-        const payload = {
-          source: 'rossko',
-          supplier_stock_id: String(mainStock?.stock_id || ''),
-          brand,
-          article: number,
-          name: displayTitle,
-          description: title,
-          price: mainStock?.price ?? null,
-          currency: 'RUB',
-          stock_count: Number(mainStock?.available_count) || 0,
-          delivery_start: mainStock?.delivery_start || null,
-          delivery_end: mainStock?.delivery_end || null,
-          image_url: null,
-          guid: part?.guid ? String(part.guid) : null,
-          stocks: stocks.map((stock) => ({
-            stock_id: String(stock.stock_id),
-            price: stock.price,
-            available_count: Number(stock.available_count) || 0,
-            delivery_start: stock.delivery_start || null,
-            delivery_end: stock.delivery_end || null,
-          })),
-        };
-        const response = await apiAxiosUnauth.post('/public/new-parts/cards/create-or-get', payload);
-        const cardData = response?.data;
-        const cardId = Number(cardData?.id);
-        if (cardId > 0) {
-          navigate(
-            buildNewPartDetailPath(cardData) || cardData?.canonical_url || `/autoparts/new/part/${cardId}`,
-            { state: { backTo: `/autoparts/new${location.search || ''}` } }
-          );
-          return;
-        }
-      } catch (_e) {
-        // fallback below
-      } finally {
-        setOpeningCard(false);
+    if (!isPlainLeftClick(event)) return;
+
+    event.preventDefault();
+    setOpeningCard(true);
+    try {
+      const backTo = `/autoparts/new${location.search || ''}`;
+      const path = await resolveNewPartDetailPath({
+        brand,
+        article: number,
+        part,
+        stocksData: stocks,
+      });
+      if (path) {
+        navigate(path, { state: { backTo } });
+        return;
       }
-      navigate(`/autoparts/new?q=${encodeURIComponent(`${brand} ${number}`.trim())}`);
-    };
-    open();
+    } catch (_error) {
+      // fallback below
+    } finally {
+      setOpeningCard(false);
+    }
+    navigate(`/autoparts/new?q=${encodeURIComponent(`${brand} ${number}`.trim())}`);
   };
+
+  const backToListPath = `/autoparts/new${location.search || ''}`;
+  const detailHref = buildNewPartOpenPath({
+    brand,
+    article: number,
+    backTo: backToListPath,
+  });
 
   const prepareCartItem = (stock, quantityToAdd) => {
     const cartItem = {
@@ -318,19 +304,38 @@ export default function NewPartProductCard({
     <article className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5" data-card-id={uniqueId}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{brand}</span>
-            <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{number}</span>
-            {showAnalog && <span className="rounded bg-orange-100 px-2 py-0.5 font-medium text-orange-800">Аналог</span>}
-            {fastDelivery && <span className="rounded bg-green-100 px-2 py-0.5 font-medium text-green-800">Быстрая поставка</span>}
-          </div>
-          <h3
-            className={`text-base font-semibold leading-snug text-gray-900 sm:text-lg ${isDetailView ? '' : 'cursor-pointer hover:text-indigo-700'}`}
-            onClick={isDetailView ? undefined : handleNavigateToDetail}
-          >
-            {displayTitle}
-          </h3>
-          <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-gray-600 sm:line-clamp-2">{title}</p>
+          {!isDetailView ? (
+            <Link
+              to={detailHref}
+              state={{ backTo: backToListPath }}
+              onClick={handleNavigateToDetail}
+              className={`block text-inherit no-underline ${openingCard ? 'pointer-events-none opacity-70' : ''}`}
+            >
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{brand}</span>
+                <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{number}</span>
+                {showAnalog && <span className="rounded bg-orange-100 px-2 py-0.5 font-medium text-orange-800">Аналог</span>}
+                {fastDelivery && <span className="rounded bg-green-100 px-2 py-0.5 font-medium text-green-800">Быстрая поставка</span>}
+              </div>
+              <h3 className="text-base font-semibold leading-snug text-gray-900 hover:text-indigo-700 sm:text-lg">
+                {displayTitle}
+              </h3>
+              <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-gray-600 sm:line-clamp-2">{title}</p>
+            </Link>
+          ) : (
+            <>
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{brand}</span>
+                <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{number}</span>
+                {showAnalog && <span className="rounded bg-orange-100 px-2 py-0.5 font-medium text-orange-800">Аналог</span>}
+                {fastDelivery && <span className="rounded bg-green-100 px-2 py-0.5 font-medium text-green-800">Быстрая поставка</span>}
+              </div>
+              <h3 className="text-base font-semibold leading-snug text-gray-900 sm:text-lg">
+                {displayTitle}
+              </h3>
+              <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-gray-600 sm:line-clamp-2">{title}</p>
+            </>
+          )}
         </div>
 
         <div className="w-full rounded-lg bg-gray-50 p-3 sm:p-4 lg:w-[280px] lg:flex-shrink-0">

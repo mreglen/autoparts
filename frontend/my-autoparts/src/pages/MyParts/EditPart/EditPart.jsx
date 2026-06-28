@@ -16,6 +16,13 @@ import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoading
 import { INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../../utils/internalCode';
 import MobilePageSection from '../../../components/MobilePageSection/MobilePageSection';
 import MobileStickyFooter from '../../../components/MobileStickyFooter/MobileStickyFooter';
+import {
+  hasPartFormErrors,
+  partFieldClass,
+  partFieldLabelClass,
+  scrollToFirstPartFormError,
+  validatePartForm,
+} from '../../../utils/partFormValidation';
 
 const EditPart = () => {
   const navigate = useNavigate();
@@ -40,6 +47,16 @@ const EditPart = () => {
   const [showNewCellForm, setShowNewCellForm] = useState(false);
   const [newCellName, setNewCellName] = useState('');
   const [newCellValue, setNewCellValue] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const showFieldError = (name) => Boolean(submitAttempted && fieldErrors[name]);
+
+  useEffect(() => {
+    if (!isReady) return;
+    if (!canAccess && id) {
+      navigate(`/seller/part-card/${id}`, { replace: true });
+    }
+  }, [isReady, canAccess, id, navigate]);
 
   useEffect(() => {
     if (user?.organization_id) {
@@ -766,6 +783,12 @@ const EditPart = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   };
 
   const handleCellValueChange = (cellId, value) => {
@@ -814,11 +837,15 @@ const EditPart = () => {
       return;
     }
 
-    // Validate part_type_id is selected
-    if (!formData.part_type_id) {
-      alert('Выберите вид запчасти');
+    const errors = validatePartForm(formData);
+    if (hasPartFormErrors(errors)) {
+      setSubmitAttempted(true);
+      setFieldErrors(errors);
+      scrollToFirstPartFormError(errors);
       return;
     }
+    setSubmitAttempted(false);
+    setFieldErrors({});
 
     let photoUrls = [];
     let videoUrls = [];
@@ -1042,17 +1069,16 @@ const EditPart = () => {
           Печать
         </button>
       </div>
-      <form id="edit-part-form" onSubmit={handleSubmit} className="space-y-6 md:space-y-6">
+      <form id="edit-part-form" onSubmit={handleSubmit} noValidate className="space-y-6 md:space-y-6">
         <MobilePageSection title="Основное">
         {/* Артикул */}
-        <div>
-          <label className="block text-sm font-medium">Артикул *</label>
+        <div data-part-field="article">
+          <label className={partFieldLabelClass(showFieldError('article'))}>Артикул *</label>
           <input
             name="article"
             value={formData.article}
             onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('article'))}
           />
         </div>
 
@@ -1069,40 +1095,37 @@ const EditPart = () => {
 
 
         {/* Наименование */}
-        <div>
-          <label className="block text-sm font-medium">Наименование *</label>
+        <div data-part-field="name">
+          <label className={partFieldLabelClass(showFieldError('name'))}>Наименование *</label>
           <input
             name="name"
             value={formData.name}
             onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('name'))}
           />
         </div>
 
         {/* Бренд */}
-        <div>
-          <label className="block text-sm font-medium">Бренд *</label>
+        <div data-part-field="brand">
+          <label className={partFieldLabelClass(showFieldError('brand'))}>Бренд *</label>
           <input
             name="brand"
             value={formData.brand}
             onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('brand'))}
           />
         </div>
 
         {/* Вид запчасти */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+        <div data-part-field="part_type_id">
+          <label className={`${partFieldLabelClass(showFieldError('part_type_id'))} mb-1`}>
             Вид запчасти *
           </label>
           <select
             name="part_type_id"
             value={formData.part_type_id}
             onChange={handleInputChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            required
+            className={partFieldClass(showFieldError('part_type_id'))}
           >
             <option value="">Выберите вид запчасти</option>
             {partTypes.map(partType => (
@@ -1117,7 +1140,7 @@ const EditPart = () => {
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
             <label className="block text-sm font-medium">Описание</label>
-            {!aiDescriptionLoading && aiDescriptionAccess?.enabled && (
+            {!aiDescriptionLoading && aiDescriptionAccess?.show_ui && (
               <span className="text-xs text-gray-500">
                 Осталось сегодня: {aiDescriptionAccess.remaining_today ?? 0}
               </span>
@@ -1131,7 +1154,7 @@ const EditPart = () => {
             className="mt-1 block w-full px-3 py-2 border rounded-md"
             placeholder="Введите описание запчасти..."
           />
-          {!aiDescriptionLoading && (aiDescriptionAccess?.show_ui || aiDescriptionAccess?.enabled) && (
+          {!aiDescriptionLoading && aiDescriptionAccess?.show_ui && (
             <div className="mt-2 space-y-1">
               <button
                 type="button"
@@ -1141,16 +1164,10 @@ const EditPart = () => {
               >
                 {aiDescriptionGenerating ? 'Генерация…' : 'Сгенерировать описание'}
               </button>
-              {!aiDescriptionAccess?.enabled && aiDescriptionAccess?.reason && (
-                <p className="text-xs text-amber-700">{aiDescriptionAccess.reason}</p>
-              )}
               {aiDescriptionError && (
                 <p className="text-xs text-red-600">{aiDescriptionError}</p>
               )}
             </div>
-          )}
-          {aiDescriptionLoading && (
-            <p className="mt-2 text-xs text-gray-500">Проверка доступа к AI…</p>
           )}
         </div>
         </MobilePageSection>
@@ -1476,22 +1493,21 @@ const EditPart = () => {
 
         <MobilePageSection title="Остаток и склад">
         {/* Количество */}
-        <div>
-          <label className="block text-sm font-medium">Количество *</label>
+        <div data-part-field="quantity">
+          <label className={partFieldLabelClass(showFieldError('quantity'))}>Количество *</label>
           <input
             name="quantity"
             type="number"
             min="0"
             value={formData.quantity}
             onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('quantity'))}
           />
         </div>
 
         {/* Цена продажи */}
-        <div>
-          <label className="block text-sm font-medium">Цена продажи (₽) *</label>
+        <div data-part-field="sale_price">
+          <label className={partFieldLabelClass(showFieldError('sale_price'))}>Цена продажи (₽) *</label>
           <input
             name="sale_price"
             type="number"
@@ -1499,20 +1515,18 @@ const EditPart = () => {
             min="0"
             value={formData.sale_price}
             onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('sale_price'))}
           />
         </div>
 
         {/* Склад */}
-        <div>
-          <label className="block text-sm font-medium">Склад *</label>
+        <div data-part-field="storage_location_id">
+          <label className={partFieldLabelClass(showFieldError('storage_location_id'))}>Склад *</label>
           <select
             name="storage_location_id"
             value={formData.storage_location_id}
             onChange={handleInputChange}
-            required
-            className="mt-1 block w-full px-3 py-2 border rounded-md"
+            className={partFieldClass(showFieldError('storage_location_id'))}
           >
             <option value="">Выберите склад</option>
             {storageLocations.map((loc) => (

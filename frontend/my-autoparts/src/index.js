@@ -7,6 +7,16 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+function hidePwaSplash() {
+  const splash = document.getElementById('pwa-splash');
+  if (!splash || splash.classList.contains('pwa-splash--hide')) return;
+
+  splash.classList.add('pwa-splash--hide');
+  const removeSplash = () => splash.remove();
+  splash.addEventListener('transitionend', removeSplash, { once: true });
+  window.setTimeout(removeSplash, 400);
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
@@ -17,6 +27,10 @@ root.render(
     </Provider>
   </React.StrictMode>
 );
+
+requestAnimationFrame(() => {
+  requestAnimationFrame(hidePwaSplash);
+});
 
 // Register Service Worker for Push Notifications
 if ('serviceWorker' in navigator) {

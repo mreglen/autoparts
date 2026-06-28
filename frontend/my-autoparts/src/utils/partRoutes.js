@@ -78,6 +78,20 @@ export function buildNewPartSearchFallbackPath(item) {
   return `/autoparts/new?q=${encodeURIComponent(`${brand} ${article}`.trim())}`;
 }
 
+export function buildNewPartOpenPath({ brand, article, backTo } = {}) {
+  const brandText = String(brand || '').trim();
+  const articleText = String(article || '').trim();
+  if (!brandText || !articleText) return '/autoparts/new';
+
+  const params = new URLSearchParams();
+  params.set('brand', brandText);
+  params.set('article', articleText);
+  if (backTo) {
+    params.set('back', backTo);
+  }
+  return `/autoparts/new/open?${params.toString()}`;
+}
+
 /** Переход к карточке товара из заказа (б/у — /part/..., новые — /autoparts/new/part/...). */
 export function navigateGarageOrderItem(navigate, item, orderType) {
   if (orderType === 'new') {

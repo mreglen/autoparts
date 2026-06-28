@@ -9,6 +9,7 @@ import { fetchPublicSiteConfig, fetchSiteQuickLinks } from './redux/slices/Publi
 import RouteFallback from './components/RouteFallback';
 import RequireAuth from './components/auth/RequireAuth';
 import CookieBanner from './components/Legal/CookieBanner';
+import PullToRefresh from './components/PullToRefresh/PullToRefresh';
 import MainLayout from './layouts/MainLayout';
 import ProfileWithMenuLayout from './layouts/ProfileWithMenuLayout';
 import { useShowSiteReviews } from './utils/siteReviewsPublic';
@@ -33,6 +34,7 @@ const CookiePolicyPage = lazy(() => import('./pages/About/CookiePolicyPage'));
 const UsedPartsFiltersPage = lazy(() => import('./pages/AutoParts/UsedParts/UsedPartsFiltersPage'));
 const NewPartsFiltersPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartsFiltersPage'));
 const NewPartDetailPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartDetailPage'));
+const NewPartOpenPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartOpenPage'));
 const NewPartsBrandLandingPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartsBrandLandingPage'));
 const NewPartsCategoryLandingPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartsCategoryLandingPage'));
 const UsedPartsBrandLandingPage = lazy(() => import('./pages/AutoParts/UsedParts/UsedPartsBrandLandingPage'));
@@ -196,6 +198,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <PullToRefresh />
       <CookieBanner />
       <ServiceWorkerNavigationHandler />
       <SiteAnalyticsTracker />
@@ -211,6 +214,7 @@ function App() {
           <Route path="/autoparts/new" element={<AutoParts />} />
           <Route path="/autoparts/new/brand/:brandSlug" element={<LazyRoute><NewPartsBrandLandingPage /></LazyRoute>} />
           <Route path="/autoparts/new/category/:categorySlug" element={<LazyRoute><NewPartsCategoryLandingPage /></LazyRoute>} />
+          <Route path="/autoparts/new/open" element={<LazyRoute><NewPartOpenPage /></LazyRoute>} />
           <Route path="/autoparts/new/part/:cardId" element={<LazyRoute><NewPartDetailPage /></LazyRoute>} />
           <Route path="/autoparts/used/filters" element={<LazyRoute><UsedPartsFiltersPage /></LazyRoute>} />
           <Route path="/autoparts/used" element={<AutoParts />} />

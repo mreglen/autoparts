@@ -214,6 +214,36 @@ export default function Navigation() {
           </div>
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+            <Link
+              to="/cart"
+              aria-label="Корзина"
+              className="relative hidden items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm transition hover:border-indigo-200 hover:bg-indigo-50/50 sm:flex"
+            >
+              <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              {cartData.itemCount > 0 ? (
+                <span className="flex flex-col items-start leading-tight">
+                  <span className="text-xs text-gray-500">{cartData.itemCount} шт.</span>
+                  <span className="font-semibold text-gray-900">{formatPrice(cartData.totalPrice)}</span>
+                </span>
+              ) : (
+                <span className="font-medium text-gray-700">Корзина</span>
+              )}
+              <HeaderBadge count={cartData.itemCount} />
+            </Link>
+
+            <Link
+              to="/cart"
+              aria-label="Корзина"
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-gray-100 hover:text-indigo-600 sm:hidden"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <HeaderBadge count={cartData.itemCount} />
+            </Link>
+
             {token && user ? (
               <>
                 <HeaderIconLink to="/chats" label="Чаты" badge={totalUnreadCount}>
@@ -221,36 +251,6 @@ export default function Navigation() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                 </HeaderIconLink>
-
-                <Link
-                  to="/cart"
-                  aria-label="Корзина"
-                  className="relative hidden items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm transition hover:border-indigo-200 hover:bg-indigo-50/50 sm:flex"
-                >
-                  <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  {cartData.itemCount > 0 ? (
-                    <span className="flex flex-col items-start leading-tight">
-                      <span className="text-xs text-gray-500">{cartData.itemCount} шт.</span>
-                      <span className="font-semibold text-gray-900">{formatPrice(cartData.totalPrice)}</span>
-                    </span>
-                  ) : (
-                    <span className="font-medium text-gray-700">Корзина</span>
-                  )}
-                  <HeaderBadge count={cartData.itemCount} />
-                </Link>
-
-                <Link
-                  to="/cart"
-                  aria-label="Корзина"
-                  className="relative flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-gray-100 hover:text-indigo-600 sm:hidden"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  <HeaderBadge count={cartData.itemCount} />
-                </Link>
 
                 <div
                   className="relative ml-1 flex items-center"
