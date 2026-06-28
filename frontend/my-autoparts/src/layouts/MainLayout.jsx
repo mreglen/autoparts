@@ -69,7 +69,7 @@ export default function MainLayout() {
                         : 'max-w-7xl max-lg:px-3 max-lg:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                 }`}
             >
-                {breadcrumbItems.length > 0 && !isSeoLandingPage ? (
+                {breadcrumbItems.length > 0 && !isSeoLandingPage && !isPartPage ? (
                     <div className={isFullBleedAmbientPage ? 'mx-auto max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8' : undefined}>
                         <Breadcrumbs items={breadcrumbItems} includeJsonLd={!isPartPage} />
                     </div>

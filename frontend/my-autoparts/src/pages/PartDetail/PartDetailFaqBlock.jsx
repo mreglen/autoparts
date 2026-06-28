@@ -24,21 +24,26 @@ export default function PartDetailFaqBlock({
   if (!items.length) return null;
 
   return (
-    <section className="border-b border-gray-200 py-6">
-      <h2 className="text-xl font-semibold text-gray-900">Частые вопросы</h2>
-      <div className="mt-4 divide-y divide-gray-200 rounded-xl border border-gray-200 bg-white">
+    <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
+      <h2 className="text-lg font-semibold text-gray-900">Частые вопросы</h2>
+      <div className="mt-4 divide-y divide-gray-100 rounded-xl border border-gray-100">
         {items.map((item, index) => {
           const isOpen = openIndex === index;
           return (
             <div key={item.question}>
               <button
                 type="button"
-                className="flex w-full items-start justify-between gap-3 px-4 py-3.5 text-left text-sm font-medium text-gray-900 hover:bg-gray-50"
+                className="flex w-full items-start justify-between gap-3 px-4 py-3.5 text-left text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
                 onClick={() => setOpenIndex(isOpen ? -1 : index)}
                 aria-expanded={isOpen}
               >
                 <span>{item.question}</span>
-                <span className="shrink-0 text-gray-400" aria-hidden="true">
+                <span
+                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                    isOpen ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'
+                  }`}
+                  aria-hidden="true"
+                >
                   {isOpen ? '−' : '+'}
                 </span>
               </button>

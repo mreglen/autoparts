@@ -773,30 +773,50 @@ const PartDetail = () => {
     .join(' — ');
 
   return (
-    <div className="min-h-screen bg-gray-50 max-md:pb-28">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-gray-50 to-gray-100 max-md:pb-28">
       <PartProductSeoHelmet seo={seo} structuredData={structuredData} product={currentProduct} />
-      <div className="max-w-6xl mx-auto px-4 pt-4">
-        <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
-        <button
-          type="button"
-          onClick={handleBackToList}
-          className="mb-2 flex items-center text-sm font-medium text-gray-600 hover:text-indigo-600"
-        >
-          <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-          </svg>
-          <span className="text-sm font-medium">Назад к списку</span>
-        </button>
-      </div>
+      <div className="mx-auto max-w-6xl px-4 pb-8 pt-3 max-md:pb-32">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="inline-flex items-center self-start rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:border-indigo-200 hover:text-indigo-600 sm:self-auto"
+          >
+            <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            Назад к списку
+          </button>
+        </div>
 
-      {/* Main Product Card */}
-      <div className="max-w-6xl mx-auto px-4 pb-8 max-md:pb-32">
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white max-md:rounded-none max-md:border-x-0 max-md:border-t-0">
-          {/* Header */}
-          <div className="border-b border-gray-100 px-4 py-4 sm:px-5 sm:py-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm max-md:rounded-xl max-md:border-x-0">
+          <div className="border-b border-gray-100 bg-gradient-to-r from-white to-slate-50/80 px-4 py-5 sm:px-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl font-bold leading-snug text-gray-900 sm:text-2xl">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                    {currentProduct.brand || '—'}
+                  </span>
+                  <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                    Арт. {currentProduct.article || '—'}
+                  </span>
+                  {currentProduct.is_new ? (
+                    <span className="rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                      Новая
+                    </span>
+                  ) : (
+                    <span className="rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
+                      Б/у
+                    </span>
+                  )}
+                  {inStock ? (
+                    <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                      В наличии
+                    </span>
+                  ) : null}
+                </div>
+                <h1 className="text-xl font-bold leading-snug text-gray-900 sm:text-2xl lg:text-[1.65rem]">
                   <span className="block">{h1Primary}</span>
                   {h1Subtitle ? (
                     <span className="mt-1 block text-base font-medium text-gray-600">
@@ -806,23 +826,6 @@ const PartDetail = () => {
                 </h1>
                 <PartDetailSeoSummary summary={seo.seoSummary} />
                 <PartDetailTrustRow />
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                  <span className="rounded bg-gray-100 px-2.5 py-1 font-medium text-gray-700">
-                    {currentProduct.brand || '—'}
-                  </span>
-                  <span className="rounded bg-gray-100 px-2.5 py-1 font-medium text-gray-700">
-                    Арт. {currentProduct.article || '—'}
-                  </span>
-                  {currentProduct.is_new ? (
-                    <span className="rounded bg-green-100 px-2.5 py-1 font-medium text-green-800">
-                      Новая
-                    </span>
-                  ) : (
-                    <span className="rounded bg-amber-100 px-2.5 py-1 font-medium text-amber-900">
-                      Б/у
-                    </span>
-                  )}
-                </div>
                 <PartDetailSeoCrossLinks
                   brand={partBrand}
                   article={partArticle}
@@ -832,24 +835,25 @@ const PartDetail = () => {
                   usedCatalogPath={seo.usedCatalogPath}
                 />
               </div>
-              <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+              <div className="flex shrink-0 flex-row items-center justify-between gap-4 sm:flex-col sm:items-end lg:min-w-[180px]">
                 <ShareButton
                   url={seo.canonicalUrl}
                   title={h1Primary}
                   text={shareText}
                   size="sm"
                 />
-                <div className="text-2xl font-bold text-indigo-700 sm:text-3xl">
-                  {currentProduct.price ? `${currentProduct.price.toLocaleString('ru-RU')} ₽` : '—'}
+                <div className="text-right">
+                  <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Цена</div>
+                  <div className="text-2xl font-bold text-indigo-700 sm:text-3xl">
+                    {currentProduct.price ? `${currentProduct.price.toLocaleString('ru-RU')} ₽` : '—'}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Two Column Layout */}
-          <div className="grid grid-cols-1 gap-0 lg:grid-cols-3">
-            {/* Left - Media Gallery + Specs */}
-            <div className="border-r border-gray-100 p-4 sm:p-5 max-md:border-r-0 max-md:px-4 max-md:pt-0 lg:col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-5">
+            <div className="space-y-4 border-gray-100 p-4 sm:p-5 lg:col-span-3 lg:border-r">
               {(currentProduct.photos && currentProduct.photos.length > 0) || (currentProduct.videos && currentProduct.videos.length > 0) ? (
                 <div>
                   {(() => {
@@ -864,7 +868,7 @@ const PartDetail = () => {
                         {/* Main Media - Large Display */}
                 <div className="relative">
                   <div
-                    className="group relative mb-3 aspect-[4/3] cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                    className="group relative mb-3 aspect-[4/3] cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-inner"
                     onClick={() => handleOpenMediaModal(currentMainMediaIndex)}
                   >
                     {(() => {
@@ -1006,34 +1010,38 @@ const PartDetail = () => {
               </div>
             )}
 
-              <PartDetailSpecsBlock product={currentProduct} />
               <PartDetailAboutBlock
                 bodyDescription={bodyDescription}
                 isNew={Boolean(currentProduct.is_new)}
               />
-          </div>
+              <PartDetailSpecsBlock product={currentProduct} />
+            </div>
 
           {/* Right - Info & Actions */}
-          <div className="flex flex-col gap-5 border-t border-gray-100 bg-slate-50/40 p-4 sm:p-5 lg:border-t-0 lg:border-l lg:bg-slate-50/50">
-            <dl className="space-y-3 rounded-lg border border-gray-200/80 bg-white p-3.5 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <dt className="shrink-0 text-gray-500">В наличии</dt>
-                <dd className="font-semibold text-gray-900">{currentProduct.quantity || 0} шт.</dd>
-              </div>
-              <div>
-                <dt className="text-gray-500">Адрес</dt>
-                <dd className="mt-1 font-medium leading-snug text-gray-900 break-words">
-                  {currentProduct.storage_location?.address
-                    || currentProduct.storage_location?.name
-                    || '—'}
-                </dd>
-              </div>
-            </dl>
+          <div className="flex flex-col gap-4 bg-slate-50/70 p-4 sm:p-5 lg:col-span-2">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <dl className="space-y-2.5 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-gray-500">В наличии</dt>
+                  <dd className={`font-semibold ${inStock ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {currentProduct.quantity || 0} шт.
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-gray-500">Адрес</dt>
+                  <dd className="mt-1 font-medium leading-snug text-gray-900 break-words">
+                    {currentProduct.storage_location?.address
+                      || currentProduct.storage_location?.name
+                      || '—'}
+                  </dd>
+                </div>
+              </dl>
+            </div>
 
             {/* Description */}
             {currentProduct.description && (
-              <div className="rounded-lg border border-gray-200/80 bg-white p-3.5">
-                <h2 className="mb-2 text-sm font-semibold text-gray-900">Описание</h2>
+              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                <h2 className="mb-2 text-sm font-semibold text-gray-900">Описание от продавца</h2>
                 <div className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">
                   {stripHtmlTags(currentProduct.description)}
                 </div>
@@ -1106,7 +1114,7 @@ const PartDetail = () => {
 
             {/* Seller */}
             {(sellerOrg?.phone || sellerOrg?.contact_person) && (
-              <div className="rounded-lg border border-gray-200/80 bg-white p-3.5">
+              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <h2 className="mb-3 text-sm font-semibold text-gray-900">Продавец</h2>
 
                 <div className="mb-3 flex items-center gap-2.5">
@@ -1168,7 +1176,7 @@ const PartDetail = () => {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4">
+        <div className="mt-6 space-y-4">
       <PartDetailFitmentBlock
         sellerVehicles={currentProduct.compatible_vehicles}
         referenceVehicles={referenceFitment}
@@ -1192,6 +1200,7 @@ const PartDetail = () => {
         fitmentText={fitmentText}
         inStock={inStock}
       />
+        </div>
       </div>
 
       {/* Media Modal */}
@@ -1266,7 +1275,6 @@ const PartDetail = () => {
           </div>
         </div>
       )}
-    </div>
 
       {currentProduct ? (
         <div
