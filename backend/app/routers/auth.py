@@ -14,7 +14,8 @@ from app.schemas.auth import (
     RegisterStep1,
     UserLogin,
     VerifyCode,
-    Token
+    Token,
+    LoginResponse,
 )
 from app.schemas.pending_seller import SellerRegisterRequest, SellerRegisterResponse
 from app.core.security import get_password_hash
@@ -40,6 +41,27 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 settings = Settings()
+
+
+def build_user_profile_response(user: User) -> dict:
+    return {
+        "id": user.id,
+        "public_code": user.public_code,
+        "last_name": user.last_name,
+        "first_name": user.first_name,
+        "patronymic": user.patronymic,
+        "email": user.email,
+        "phone": user.phone,
+        "avatar_url": avatar_public_url(user.avatar_url),
+        "is_buyer": user.is_buyer,
+        "is_seller": user.is_seller,
+        "is_admin": user.is_admin,
+        "is_director": user.is_director,
+        "is_employee": user.is_employee,
+        "organization_id": user.organization_id,
+        "organization_name": user.organization.name if user.organization_id and user.organization else None,
+        "organization_phone": user.organization.phone if user.organization_id and user.organization else None,
+    }
 
 
 def _validate_and_normalize_phone(phone: str) -> str:
@@ -212,7 +234,7 @@ def register_confirm(data: VerifyCode, request: Request, response: Response, db:
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login", response_model=LoginResponse)
 def login(
     username: str = Form(...),
     password: str = Form(...),
@@ -229,6 +251,13 @@ def login(
             detail="Неверный email/телефон или пароль",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    user = (
+        db.query(User)
+        .options(joinedload(User.organization))
+        .filter(User.id == user.id)
+        .first()
+    )
 
     # Получаем IP адрес
     ip_address = request.client.host if request else None
@@ -273,34 +302,21 @@ def login(
 
     if request is not None and response is not None:
         merge_guest_cart_from_request(db, request, response, user.id)
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": build_user_profile_response(user),
+    }
 
 @router.get("/profile", response_model=UserResponse)
 def get_profile(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Получаем пользователя с данными организации
-    user_data = db.query(User).filter(User.id == current_user.id).first()
-
-    # Создаем объект ответа с названием и телефоном организации
-    response_data = {
-        "id": user_data.id,
-        "public_code": user_data.public_code,
-        "last_name": user_data.last_name,
-        "first_name": user_data.first_name,
-        "patronymic": user_data.patronymic,
-        "email": user_data.email,
-        "phone": user_data.phone,
-        "avatar_url": avatar_public_url(user_data.avatar_url),
-        "is_buyer": user_data.is_buyer,
-        "is_seller": user_data.is_seller,
-        "is_admin": user_data.is_admin,
-        "is_director": user_data.is_director,
-        "is_employee": user_data.is_employee,
-        "organization_id": user_data.organization_id,
-        "organization_name": user_data.organization.name if user_data.organization_id and user_data.organization else None,
-        "organization_phone": user_data.organization.phone if user_data.organization_id and user_data.organization else None
-    }
-
-    return response_data
+    user_data = (
+        db.query(User)
+        .options(joinedload(User.organization))
+        .filter(User.id == current_user.id)
+        .first()
+    )
+    return build_user_profile_response(user_data)
 
 @router.post("/register/send-code")
 def send_code(data: EmailOnly, db: Session = Depends(get_db)):

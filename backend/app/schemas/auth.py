@@ -1,5 +1,10 @@
+from typing import Optional
+
 from fastapi import Form
 from pydantic import BaseModel, EmailStr
+
+from app.schemas.user import UserResponse
+
 
 class UserRegister(BaseModel):
     last_name: str
@@ -26,6 +31,10 @@ class UserLogin(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class LoginResponse(Token):
+    user: Optional[UserResponse] = None
 
 class RegisterStep1(BaseModel):
     last_name: str

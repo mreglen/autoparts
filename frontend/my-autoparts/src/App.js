@@ -174,7 +174,7 @@ function RedirectLegacyProfileRoute() {
 
 function App() {
   const dispatch = useDispatch();
-  const { token } = useSelector((state) => state.auth);
+  const { token, user } = useSelector((state) => state.auth);
 
   useEffect(() => {
     dispatch(fetchPublicSiteConfig());
@@ -182,7 +182,7 @@ function App() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || user) return;
     dispatch(fetchProfile())
       .unwrap()
       .then(() => {
@@ -194,7 +194,7 @@ function App() {
           dispatch(logout());
         }
       });
-  }, [dispatch, token]);
+  }, [dispatch, token, user]);
 
   return (
     <BrowserRouter>

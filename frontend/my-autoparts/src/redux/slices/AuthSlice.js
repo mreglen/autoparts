@@ -326,7 +326,10 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.token = action.payload.access_token;
                 localStorage.setItem('token', action.payload.access_token);
-                
+                if (action.payload.user) {
+                    state.user = action.payload.user;
+                }
+
                 // Decode token to extract user_permissions and permission_codes for employees
                 const decodedToken = decodeToken(action.payload.access_token);
                 if (decodedToken && decodedToken.user_permissions) {

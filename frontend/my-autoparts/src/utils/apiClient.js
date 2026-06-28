@@ -194,7 +194,7 @@ const setGuestCartToken = (token) => {
 
 const GUEST_CART_HEADER_NAME = 'X-Guest-Cart-Token';
 
-export const apiRequest = async (endpoint, options = {}) => {
+export const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
     const url = `${API_BASE}${endpoint}`;
     const defaultOptions = {
         credentials: 'include',
@@ -215,6 +215,10 @@ export const apiRequest = async (endpoint, options = {}) => {
     }
 
     if (!response.ok) {
+        if (retryCount < 2 && [502, 503, 504].includes(response.status)) {
+            await new Promise((resolve) => setTimeout(resolve, 400 * (retryCount + 1)));
+            return apiRequest(endpoint, options, retryCount + 1);
+        }
         const errorData = await response.json().catch(() => ({}));
         const msg = formatApiDetail(errorData.detail) || `HTTP ${response.status}: ${response.statusText}`;
         throw new Error(msg);

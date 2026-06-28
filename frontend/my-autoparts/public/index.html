@@ -45,38 +45,10 @@
         pointer-events: none;
       }
 
-      .pwa-splash__brand {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 16px;
-        padding: 24px;
-        text-align: center;
-      }
-
       #pwa-splash img {
-        width: 120px;
-        height: 120px;
-        border-radius: 28px;
-        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+        width: 96px;
+        height: 96px;
         animation: pwa-splash-pulse 1.4s ease-in-out infinite;
-      }
-
-      .pwa-splash__title {
-        margin: 0;
-        font-family: "Onest", system-ui, sans-serif;
-        font-size: 1.25rem;
-        font-weight: 700;
-        letter-spacing: 0.02em;
-        color: #0f172a;
-      }
-
-      .pwa-splash__subtitle {
-        margin: 0;
-        font-family: "Onest", system-ui, sans-serif;
-        font-size: 0.8125rem;
-        font-weight: 500;
-        color: #64748b;
       }
 
       @keyframes pwa-splash-pulse {
@@ -123,7 +95,7 @@
     <!-- /Yandex.Metrika counter -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="image" href="%PUBLIC_URL%/favicons/android-chrome-192x192.png" type="image/png" />
+    <link rel="preload" as="image" href="%PUBLIC_URL%/favicons/favicon.svg" type="image/svg+xml" />
     <link rel="preload" as="image" href="%PUBLIC_URL%/img/LogoWithoutBg.png" />
     <link
       rel="stylesheet"
@@ -143,17 +115,7 @@
     <!-- Yandex.Metrika noscript (disabled in development) -->
     </noscript>
     <div id="pwa-splash" aria-hidden="true">
-      <div class="pwa-splash__brand">
-        <img
-          src="%PUBLIC_URL%/favicons/android-chrome-192x192.png"
-          alt="Свой Гараж"
-          width="120"
-          height="120"
-          decoding="sync"
-        />
-        <p class="pwa-splash__title">Свой Гараж</p>
-        <p class="pwa-splash__subtitle">Все запчасти в одном месте</p>
-      </div>
+      <img src="%PUBLIC_URL%/favicons/favicon.svg" alt="" width="96" height="96" decoding="sync" />
     </div>
     <div id="root"></div>
     <!--
