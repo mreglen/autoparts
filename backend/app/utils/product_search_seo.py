@@ -142,15 +142,36 @@ def build_product_search_title(
     fallback_display_name: str | None = None,
     seller_name: str | None = None,
     listing_id: int | None = None,
+    part_type_name: str | None = None,
+    short_name: str | None = None,
+    city: str | None = None,
+    is_new: bool = False,
 ) -> str:
-    core = _build_title_core(
-        brand=brand,
-        article=article,
-        product_name=product_name,
-        fallback_display_name=fallback_display_name,
-    )
-    suffix = _build_listing_context_suffix(seller_name=seller_name, listing_id=listing_id)
-    max_core_len = max(20, 70 - len(_TITLE_SUFFIX))
+    brand_str = (brand or "").strip()
+    article_str = (article or "").strip()
+    city_text = (city or DEFAULT_CITY).strip() or DEFAULT_CITY
+    part_type = str(part_type_name or "").strip()
+    short = str(short_name or "").strip()
+
+    if brand_str or article_str:
+        base_label = f"{brand_str} {article_str}".strip()
+        detail = part_type or short
+        if detail and detail.casefold() not in base_label.casefold():
+            core = f"{base_label} {detail}"
+        else:
+            core = base_label
+    else:
+        core = _build_title_core(
+            brand=brand,
+            article=article,
+            product_name=product_name,
+            fallback_display_name=fallback_display_name,
+        )
+
+    condition_suffix = "" if is_new else " б/у"
+    city_suffix = f" — {city_text}"
+    suffix = f"{condition_suffix}{city_suffix}"
+    max_core_len = max(24, 85 - len(_TITLE_SUFFIX) - len(suffix))
     core_with_suffix = _fit_core_with_suffix(core, suffix, max_core_len)
     title = f"{core_with_suffix}{_TITLE_SUFFIX}"
     return re.sub(r"\s+", " ", title).strip()
@@ -240,11 +261,15 @@ def build_product_search_description(
     unique_description: str | None = None,
     seller_name: str | None = None,
     listing_id: int | None = None,
+    part_type_name: str | None = None,
+    fitment_hint: str | None = None,
 ) -> str:
     brand_str = (brand or "").strip()
     article_str = (article or "").strip()
     condition = "Новая" if is_new else "Б/у"
     city_prep = format_city_in_prepositional(city or DEFAULT_CITY)
+    part_type = (part_type_name or "").strip()
+    fitment = re.sub(r"\s+", " ", (fitment_hint or "")).strip().rstrip(".")
     snippet_source = _merge_content_snippet(
         short_name=short_name,
         unique_description=unique_description,
@@ -257,8 +282,11 @@ def build_product_search_description(
     else:
         buy_line = "Купить автозапчасть."
 
+    type_part = f" {part_type.lower()}" if part_type else ""
     stock_phrase = "в наличии" if in_stock else "доступна"
-    core = f"{buy_line} {condition} запчасть {stock_phrase} в {city_prep}."
+    core = f"{buy_line} {condition}{type_part} запчасть {stock_phrase} в {city_prep}."
+    if fitment:
+        core = f"{core} Подходит для: {fitment[:60]}{'…' if len(fitment) > 60 else ''}."
     price_text = _format_price_rub(price)
     if price_text:
         core = f"{core} {price_text} ₽."

@@ -42,7 +42,7 @@ export default function PartDetailFitmentBlock({
   if (!hasContent) return null;
 
   return (
-    <section className="border-b border-gray-200 py-5">
+    <section className="rounded-2xl border border-gray-200 bg-white px-4 py-5 sm:px-5">
       <h2 className="text-xl font-semibold text-gray-900">Подходит для автомобилей</h2>
 
       {visibleDonors.length > 0 ? (

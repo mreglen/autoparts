@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,7 @@ from app.services.product_reference_fitment_service import get_reference_fitment
 from app.services.product_seo_service import (
     get_product_seo_for_path,
     render_product_prerender_html,
+    resolve_out_of_stock_part_redirect,
 )
 from app.services.new_parts_seo_card_service import (
     get_new_part_seo_for_path,
@@ -128,6 +129,10 @@ def public_part_prerender(
     HTML с корректным &lt;title&gt; для поисковых роботов (Яндекс, Google).
     Nginx отдаёт этот ответ ботам вместо пустого index.html.
     """
+    redirect_url = resolve_out_of_stock_part_redirect(db, path)
+    if redirect_url:
+        return RedirectResponse(url=redirect_url, status_code=301)
+
     meta = get_product_seo_for_path(db, path)
     if meta is None:
         return HTMLResponse(

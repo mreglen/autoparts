@@ -17,9 +17,17 @@ import PartDetailSeoCrossLinks from './PartDetailSeoCrossLinks';
 import PartDetailSeoSummary from './PartDetailSeoSummary';
 import PartDetailSpecsBlock from './PartDetailSpecsBlock';
 import PartDetailFitmentBlock from './PartDetailFitmentBlock';
+import PartDetailAboutBlock from './PartDetailAboutBlock';
+import PartDetailFaqBlock from './PartDetailFaqBlock';
+import PartDetailTrustRow from './PartDetailTrustRow';
 import PartArticleMatchesBlock from '../../components/PartArticleMatchesBlock/PartArticleMatchesBlock';
 import ShareButton from '../../components/ShareButton/ShareButton';
+import Breadcrumbs from '../../components/Breadcrumbs/Breadcrumbs';
 import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
+import { mergeProductFitment } from '../../utils/mergeProductFitment';
+import { buildProductFaqJsonLd } from '../../utils/partDetailFaq';
+import { resolveProductCity } from '../../utils/productSearchSeo';
+import { buildProductUsedCatalogPath } from '../../utils/productSeo';
 import {
   PART_DETAIL_CACHE,
   readPartDetailCache,
@@ -114,6 +122,8 @@ const PartDetail = () => {
   const [alternateOffersError, setAlternateOffersError] = useState('');
   const [referenceFitment, setReferenceFitment] = useState([]);
   const [referenceFitmentLoading, setReferenceFitmentLoading] = useState(false);
+  const [soldOutAlternates, setSoldOutAlternates] = useState([]);
+  const [soldOutAlternatesLoading, setSoldOutAlternatesLoading] = useState(false);
   const fetchedProductIdRef = useRef(null);
   const searchedBrandArticleRef = useRef(null);
   const trackedPartViewRef = useRef(null);
@@ -269,6 +279,40 @@ const PartDetail = () => {
       cancelled = true;
     };
   }, [showProduct, currentProduct?.id, currentProduct?.brand, currentProduct?.article]);
+
+  useEffect(() => {
+    if (showProduct || !error) {
+      setSoldOutAlternates([]);
+      return undefined;
+    }
+    if (!extractedBrand || !extractedArticle) return undefined;
+
+    let cancelled = false;
+    const run = async () => {
+      setSoldOutAlternatesLoading(true);
+      try {
+        const decodedBrand = decodeURIComponent(extractedBrand);
+        const decodedArticle = decodeURIComponent(extractedArticle);
+        const response = await apiAxiosUnauth.get('/products/public/find-used-match', {
+          params: {
+            brand: decodedBrand,
+            article: decodedArticle,
+            limit: 12,
+          },
+        });
+        const items = Array.isArray(response?.data) ? response.data : [];
+        if (!cancelled) setSoldOutAlternates(items);
+      } catch (_err) {
+        if (!cancelled) setSoldOutAlternates([]);
+      } finally {
+        if (!cancelled) setSoldOutAlternatesLoading(false);
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [showProduct, error, extractedBrand, extractedArticle]);
 
   useEffect(() => {
     if (!showProduct || !currentProduct?.id) return;
@@ -579,6 +623,54 @@ const PartDetail = () => {
   };
 
   if (!showProduct && error) {
+    const soldOutBrand = extractedBrand ? decodeURIComponent(extractedBrand) : '';
+    const soldOutArticle = extractedArticle ? decodeURIComponent(extractedArticle) : '';
+    const soldOutLabel = [soldOutBrand, soldOutArticle].filter(Boolean).join(' ');
+    const catalogPath = buildProductUsedCatalogPath({ brand: soldOutBrand, article: soldOutArticle });
+
+    if (soldOutLabel) {
+      return (
+        <div className="min-h-screen bg-gray-50">
+          <Helmet>
+            <title>{soldOutLabel} — продано | Свой Гараж</title>
+            <meta name="robots" content="noindex, follow" />
+          </Helmet>
+          <div className="max-w-6xl mx-auto px-4 py-8">
+            <Breadcrumbs
+              items={[
+                { label: 'Главная', href: '/' },
+                { label: 'Б/у запчасти', href: '/autoparts/used' },
+                { label: soldOutLabel },
+              ]}
+              includeJsonLd={false}
+            />
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center shadow-sm">
+              <p className="text-sm font-semibold uppercase tracking-wide text-amber-800">Продано</p>
+              <h1 className="mt-2 text-2xl font-bold text-gray-900">{soldOutLabel}</h1>
+              <p className="mt-3 text-gray-600">
+                Это предложение уже недоступно. Посмотрите другие варианты с тем же артикулом.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate(catalogPath)}
+                className="mt-5 inline-flex rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                Каталог по артикулу
+              </button>
+            </div>
+            <div className="mt-6">
+              <PartArticleMatchesBlock
+                title={`Другие предложения ${soldOutLabel}`}
+                items={soldOutAlternates}
+                loading={soldOutAlternatesLoading}
+                error={soldOutAlternates.length ? '' : 'Других предложений не найдено'}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Helmet>
@@ -623,16 +715,39 @@ const PartDetail = () => {
     : localSeo;
   const breadcrumbItems = buildBreadcrumbsForPath(location.pathname, { product: currentProduct });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
+  const partBrand = (currentProduct.brand || '').trim();
+  const partArticle = (currentProduct.article || '').trim();
+  const partTypeName = (currentProduct.part_type?.name || '').trim();
+  const productCity = resolveProductCity(currentProduct.organization);
+  const mergedFitment = mergeProductFitment(
+    currentProduct.compatible_vehicles,
+    referenceFitment,
+  );
+  const fitmentText = mergedFitment
+    .slice(0, 8)
+    .map((vehicle) => [vehicle.brand, vehicle.model, vehicle.generation].filter(Boolean).join(' '))
+    .join(', ');
+  const inStock = (currentProduct.quantity || 0) > 0;
+  const bodyDescription = seo.bodyDescription || localSeo.bodyDescription;
+  const faqJsonLd = buildProductFaqJsonLd({
+    canonicalUrl: seo.canonicalUrl,
+    brand: partBrand,
+    article: partArticle,
+    partTypeName,
+    isNew: Boolean(currentProduct.is_new),
+    city: productCity,
+    fitmentText,
+    inStock,
+  });
   const structuredData = buildProductStructuredDataGraph({
     productJsonLd: seo.jsonLd,
     breadcrumbJsonLd,
     canonicalUrl: seo.canonicalUrl,
     title: seo.title,
     description: seo.description,
+    faqJsonLd,
   });
 
-  const partBrand = (currentProduct.brand || '').trim();
-  const partArticle = (currentProduct.article || '').trim();
   const photoAltMain = buildProductPhotoAlt({
     brand: partBrand,
     article: partArticle,
@@ -660,12 +775,12 @@ const PartDetail = () => {
   return (
     <div className="min-h-screen bg-gray-50 max-md:pb-28">
       <PartProductSeoHelmet seo={seo} structuredData={structuredData} product={currentProduct} />
-      {/* Back Button */}
-      <div className="max-w-6xl mx-auto px-4 py-4">
+      <div className="max-w-6xl mx-auto px-4 pt-4">
+        <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
         <button
           type="button"
           onClick={handleBackToList}
-          className="flex items-center text-sm font-medium text-gray-600 hover:text-indigo-600"
+          className="mb-2 flex items-center text-sm font-medium text-gray-600 hover:text-indigo-600"
         >
           <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
@@ -690,6 +805,7 @@ const PartDetail = () => {
                   ) : null}
                 </h1>
                 <PartDetailSeoSummary summary={seo.seoSummary} />
+                <PartDetailTrustRow />
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
                   <span className="rounded bg-gray-100 px-2.5 py-1 font-medium text-gray-700">
                     {currentProduct.brand || '—'}
@@ -891,6 +1007,10 @@ const PartDetail = () => {
             )}
 
               <PartDetailSpecsBlock product={currentProduct} />
+              <PartDetailAboutBlock
+                bodyDescription={bodyDescription}
+                isNew={Boolean(currentProduct.is_new)}
+              />
           </div>
 
           {/* Right - Info & Actions */}
@@ -1061,6 +1181,16 @@ const PartDetail = () => {
         loading={alternateOffersLoading}
         error={alternateOffersError}
         currentProductId={currentProduct.id}
+      />
+
+      <PartDetailFaqBlock
+        brand={partBrand}
+        article={partArticle}
+        partTypeName={partTypeName}
+        isNew={Boolean(currentProduct.is_new)}
+        city={productCity}
+        fitmentText={fitmentText}
+        inStock={inStock}
       />
       </div>
 

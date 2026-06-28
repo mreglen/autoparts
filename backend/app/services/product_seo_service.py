@@ -19,6 +19,7 @@ from app.services.spa_page_check_service import PART_PATH_RE, _normalize_path
 from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
 from app.utils.page_keywords import build_page_keywords
 from app.utils.product_display_name import extract_product_description, format_product_display_title
+from app.utils.product_part_faq import build_product_faq_items, build_product_faq_json_ld
 from app.utils.product_json_ld import (
     build_catalog_product_json_ld,
     dumps_json_ld,
@@ -58,6 +59,7 @@ class ProductSeoMeta:
     seller_name: str = ""
     seller_url: str = ""
     fitment_text: str = ""
+    internal_code: str = ""
     alternate_offers: tuple[tuple[str, str], ...] = ()
 
 
@@ -78,8 +80,8 @@ def parse_part_path_product_id(path: str) -> int | None:
         return None
 
 
-def _load_product(db: Session, product_id: int) -> ProductModel | None:
-    return (
+def _load_product(db: Session, product_id: int, *, require_stock: bool = True) -> ProductModel | None:
+    query = (
         db.query(ProductModel)
         .options(
             selectinload(ProductModel.photos),
@@ -87,9 +89,11 @@ def _load_product(db: Session, product_id: int) -> ProductModel | None:
             selectinload(ProductModel.part_type),
             selectinload(ProductModel.compatible_vehicles),
         )
-        .filter(ProductModel.id == product_id, ProductModel.quantity > 0)
-        .first()
+        .filter(ProductModel.id == product_id)
     )
+    if require_stock:
+        query = query.filter(ProductModel.quantity > 0)
+    return query.first()
 
 
 def build_product_seo_meta(
@@ -102,7 +106,7 @@ def build_product_seo_meta(
     brand = (product.brand or "").strip()
     article = (product.article or "").strip()
     name = format_product_display_title(brand, article, product.name)
-    short_name = extract_product_description(product.name, brand, article)
+    short_name = str(extract_product_description(product.name, brand, article) or "").strip()
     canonical_url = build_product_page_url(product, origin)
 
     organization = getattr(product, "organization", None)
@@ -112,13 +116,17 @@ def build_product_seo_meta(
     org_phone_raw = getattr(organization, "phone", None) if organization else None
     org_phone = org_phone_raw.strip() if isinstance(org_phone_raw, str) and org_phone_raw.strip() else None
     city = resolve_product_city(organization_address=str(org_address) if org_address is not None else None)
+    part_type = getattr(product, "part_type", None)
+    part_type_name = (getattr(part_type, "name", None) or "").strip()
 
     title = build_product_search_title(
         brand=brand,
         article=article,
         product_name=product.name,
-        seller_name=org_name,
-        listing_id=int(product.id),
+        part_type_name=part_type_name,
+        short_name=short_name,
+        city=city,
+        is_new=bool(product.is_new),
     )
 
     unique_desc = _strip_html(product.description)
@@ -142,6 +150,7 @@ def build_product_seo_meta(
         unique_description=unique_desc,
         seller_name=org_name,
         listing_id=int(product.id),
+        part_type_name=part_type_name,
     )
 
     image_url = None
@@ -157,51 +166,6 @@ def build_product_seo_meta(
             break
     if not image_url:
         image_url = resolve_default_og_image_url(origin)
-
-    product_json_ld = build_catalog_product_json_ld(
-        product,
-        site_origin=origin,
-        canonical_url=canonical_url,
-        city=city,
-    )
-    json_ld = dumps_json_ld(product_json_ld)
-    json_ld_graph = build_product_json_ld_graph(
-        json_ld=json_ld,
-        canonical_url=canonical_url,
-        h1=name,
-        title=title,
-        description=description,
-    )
-    body_description = product_body_description(
-        brand=brand,
-        article=article,
-        name=name,
-        unique_description=unique_desc,
-        short_name=short_name,
-        is_new=bool(product.is_new),
-    )
-    seo_summary = build_product_seo_summary(
-        brand=brand,
-        article=article,
-        name=name,
-        is_new=bool(product.is_new),
-        city=city,
-        price=product.price,
-        in_stock=in_stock,
-        short_name=short_name,
-        unique_description=unique_desc,
-    )
-    used_catalog_url = build_product_used_catalog_url(product, origin)
-    parsed_catalog = urlparse(used_catalog_url)
-    used_catalog_path = parsed_catalog.path
-    if parsed_catalog.query:
-        used_catalog_path = f"{used_catalog_path}?{parsed_catalog.query}"
-    condition_label = "Новая" if product.is_new else "Б/у"
-    part_type = getattr(product, "part_type", None)
-    part_type_name = (getattr(part_type, "name", None) or "").strip()
-    seller_url = ""
-    if organization and getattr(organization, "id", None):
-        seller_url = f"{origin.rstrip('/')}/organizations/{organization.id}"
 
     seller_vehicle_dicts = [
         {
@@ -233,6 +197,77 @@ def build_product_seo_meta(
         )
         alternate_offers = tuple((offer.label, offer.url) for offer in offers)
 
+    if fitment_text:
+        description = build_product_search_description(
+            brand=brand,
+            article=article,
+            is_new=bool(product.is_new),
+            city=city,
+            price=product.price,
+            in_stock=in_stock,
+            short_name=short_name,
+            unique_description=unique_desc,
+            seller_name=org_name,
+            listing_id=int(product.id),
+            part_type_name=part_type_name,
+            fitment_hint=fitment_text,
+        )
+
+    product_json_ld = build_catalog_product_json_ld(
+        product,
+        site_origin=origin,
+        canonical_url=canonical_url,
+        city=city,
+    )
+    json_ld = dumps_json_ld(product_json_ld)
+    json_ld_graph = build_product_json_ld_graph(
+        json_ld=json_ld,
+        canonical_url=canonical_url,
+        h1=name,
+        title=title,
+        description=description,
+        brand=brand,
+        article=article,
+        part_type_name=part_type_name,
+        is_new=bool(product.is_new),
+        city=city,
+        fitment_text=fitment_text,
+        in_stock=in_stock,
+    )
+    body_description = product_body_description(
+        brand=brand,
+        article=article,
+        name=name,
+        unique_description=unique_desc,
+        short_name=short_name,
+        part_type_name=part_type_name,
+        city=city,
+        fitment_text=fitment_text,
+        seller_name=org_name,
+        is_new=bool(product.is_new),
+    )
+    seo_summary = build_product_seo_summary(
+        brand=brand,
+        article=article,
+        name=name,
+        is_new=bool(product.is_new),
+        city=city,
+        price=product.price,
+        in_stock=in_stock,
+        short_name=short_name,
+        unique_description=unique_desc,
+    )
+    used_catalog_url = build_product_used_catalog_url(product, origin)
+    parsed_catalog = urlparse(used_catalog_url)
+    used_catalog_path = parsed_catalog.path
+    if parsed_catalog.query:
+        used_catalog_path = f"{used_catalog_path}?{parsed_catalog.query}"
+    condition_label = "Новая" if product.is_new else "Б/у"
+    internal_code = str(getattr(product, "internal_code", "") or "").strip()
+    seller_url = ""
+    if organization and getattr(organization, "id", None):
+        seller_url = f"{origin.rstrip('/')}/organizations/{organization.id}"
+
     return ProductSeoMeta(
         title=title,
         description=description,
@@ -261,6 +296,7 @@ def build_product_seo_meta(
         seller_name=org_name or "",
         seller_url=seller_url,
         fitment_text=fitment_text,
+        internal_code=internal_code,
         alternate_offers=alternate_offers,
     )
 
@@ -272,6 +308,13 @@ def build_product_json_ld_graph(
     h1: str,
     title: str | None = None,
     description: str | None = None,
+    brand: str | None = None,
+    article: str | None = None,
+    part_type_name: str | None = None,
+    is_new: bool = False,
+    city: str | None = None,
+    fitment_text: str | None = None,
+    in_stock: bool = True,
 ) -> str:
     """Product + BreadcrumbList + WebPage для JSON-LD (Яндекс.Вебмастер, Google)."""
     product_obj = None
@@ -332,6 +375,18 @@ def build_product_json_ld_graph(
                 "mainEntity": {"@id": f"{canonical_url}#product"},
             }
         )
+        graph.append(
+            build_product_faq_json_ld(
+                canonical_url=canonical_url,
+                brand=brand,
+                article=article,
+                part_type_name=part_type_name,
+                is_new=is_new,
+                city=city,
+                fitment_text=fitment_text,
+                in_stock=in_stock,
+            )
+        )
 
     if len(graph) == 1:
         graph_obj = {"@context": "https://schema.org", **graph[0]}
@@ -345,10 +400,44 @@ def get_product_seo_for_path(db: Session, raw_path: str) -> ProductSeoMeta | Non
     product_id = parse_part_path_product_id(raw_path)
     if product_id is None:
         return None
-    product = _load_product(db, product_id)
+    product = _load_product(db, product_id, require_stock=False)
     if product is None:
         return None
+    if (product.quantity or 0) <= 0:
+        return None
     return build_product_seo_meta(product, db=db)
+
+
+def resolve_out_of_stock_part_redirect(
+    db: Session,
+    raw_path: str,
+    *,
+    site_origin: str | None = None,
+) -> str | None:
+    """301 target for sold-out cards when alternate offers exist."""
+    product_id = parse_part_path_product_id(raw_path)
+    if product_id is None:
+        return None
+    product = _load_product(db, product_id, require_stock=False)
+    if product is None or (product.quantity or 0) > 0:
+        return None
+    brand = (product.brand or "").strip()
+    article = (product.article or "").strip()
+    if not brand or not article:
+        return None
+    origin = _resolve_site_origin(site_origin)
+    offers = find_alternate_used_product_offers(
+        db,
+        brand=brand,
+        article=article,
+        exclude_product_id=int(product.id),
+        limit=1,
+        site_origin=origin,
+    )
+    if not offers:
+        return None
+    catalog_url = build_product_used_catalog_url(product, origin)
+    return catalog_url
 
 
 def render_product_prerender_html(meta: ProductSeoMeta) -> str:
@@ -356,7 +445,7 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
     description = html.escape(meta.description, quote=True)
     canonical = html.escape(meta.canonical_url, quote=True)
     h1 = html.escape(meta.h1)
-    body_desc = html.escape(meta.seo_summary or meta.body_description or meta.description)
+    about_text = html.escape(meta.body_description or meta.seo_summary or meta.description)
     image_tag = (
         f'<meta property="og:image" content="{html.escape(meta.image_url, quote=True)}" />'
         if meta.image_url
@@ -371,6 +460,13 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
         h1=meta.h1,
         title=meta.title,
         description=meta.description,
+        brand=meta.brand,
+        article=meta.article,
+        part_type_name=meta.part_type_name,
+        is_new=meta.condition_label == "Новая",
+        city=meta.city,
+        fitment_text=meta.fitment_text,
+        in_stock=meta.in_stock,
     )
     keywords_tag = ""
     if meta.keywords:
@@ -385,56 +481,88 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
             f'    <p><a href="{html.escape(meta.used_catalog_url, quote=True)}">'
             f"Каталог по артикулу {html.escape(meta.brand)} {html.escape(meta.article)}</a></p>\n"
         )
-    details_html = ""
-    if meta.brand or meta.article or meta.price:
-        brand_row = (
-            f"<dt>Бренд</dt><dd>{html.escape(meta.brand)}</dd>"
-            if meta.brand
-            else ""
+
+    stock_label = "В наличии" if meta.in_stock else "Нет в наличии"
+    brand_row = (
+        f"<dt>Бренд</dt><dd>{html.escape(meta.brand)}</dd>"
+        if meta.brand
+        else ""
+    )
+    article_row = (
+        f"<dt>Артикул</dt><dd>{html.escape(meta.article)}</dd>"
+        if meta.article
+        else ""
+    )
+    internal_code_row = (
+        f"<dt>Код товара</dt><dd>{html.escape(meta.internal_code)}</dd>"
+        if meta.internal_code
+        else ""
+    )
+    price_row = (
+        f"<dt>Цена</dt><dd>{html.escape(meta.price)} ₽</dd>"
+        if meta.price
+        else ""
+    )
+    stock_row = f"<dt>Наличие</dt><dd>{html.escape(stock_label)}</dd>"
+    city_row = (
+        f"<dt>Город</dt><dd>{html.escape(meta.city)}</dd>"
+        if meta.city
+        else ""
+    )
+    condition_row = (
+        f"<dt>Состояние</dt><dd>{html.escape(meta.condition_label)}</dd>"
+        if meta.condition_label
+        else ""
+    )
+    part_type_row = (
+        f"<dt>Тип детали</dt><dd>{html.escape(meta.part_type_name)}</dd>"
+        if meta.part_type_name
+        else ""
+    )
+    seller_row = ""
+    if meta.seller_name:
+        if meta.seller_url:
+            seller_row = (
+                f'<dt>Продавец</dt><dd><a href="{html.escape(meta.seller_url, quote=True)}">'
+                f"{html.escape(meta.seller_name)}</a></dd>"
+            )
+        else:
+            seller_row = f"<dt>Продавец</dt><dd>{html.escape(meta.seller_name)}</dd>"
+    details_html = (
+        "    <dl>"
+        f"{brand_row}{article_row}{internal_code_row}{price_row}{stock_row}"
+        f"{city_row}{condition_row}{part_type_row}{seller_row}"
+        "</dl>\n"
+    )
+
+    about_html = (
+        f"    <h2>О запчасти</h2>\n"
+        f"    <p>{about_text}</p>\n"
+    )
+    delivery_html = (
+        "    <h2>Доставка и оплата</h2>\n"
+        "    <p>Доставка по России и самовывоз у продавца. Способы оплаты и сроки "
+        f"отправки согласуются при оформлении заказа. Подробнее — "
+        f'<a href="{html.escape(site_origin, quote=True)}/delivery">страница «Доставка»</a>.</p>\n'
+    )
+    warranty_html = (
+        "    <h2>Гарантия и осмотр</h2>\n"
+        "    <p>Б/у запчасть рекомендуется осмотреть перед покупкой или запросить "
+        "дополнительные фото и видео у продавца. Условия возврата и гарантии "
+        "уточняйте у продавца до оплаты.</p>\n"
+    )
+    if meta.condition_label == "Новая":
+        warranty_html = (
+            "    <h2>Гарантия и комплектация</h2>\n"
+            "    <p>Новая запчасть. Состояние упаковки, комплектацию и условия "
+            "гарантии уточняйте у продавца до оплаты.</p>\n"
         )
-        article_row = (
-            f"<dt>Артикул</dt><dd>{html.escape(meta.article)}</dd>"
-            if meta.article
-            else ""
-        )
-        price_row = (
-            f"<dt>Цена</dt><dd>{html.escape(meta.price)} ₽</dd>"
-            if meta.price
-            else ""
-        )
-        city_row = (
-            f"<dt>Город</dt><dd>{html.escape(meta.city)}</dd>"
-            if meta.city
-            else ""
-        )
-        condition_row = (
-            f"<dt>Состояние</dt><dd>{html.escape(meta.condition_label)}</dd>"
-            if meta.condition_label
-            else ""
-        )
-        part_type_row = (
-            f"<dt>Тип детали</dt><dd>{html.escape(meta.part_type_name)}</dd>"
-            if meta.part_type_name
-            else ""
-        )
-        seller_row = ""
-        if meta.seller_name:
-            if meta.seller_url:
-                seller_row = (
-                    f'<dt>Продавец</dt><dd><a href="{html.escape(meta.seller_url, quote=True)}">'
-                    f"{html.escape(meta.seller_name)}</a></dd>"
-                )
-            else:
-                seller_row = f"<dt>Продавец</dt><dd>{html.escape(meta.seller_name)}</dd>"
-        details_html = (
-            "    <dl>"
-            f"{brand_row}{article_row}{price_row}{city_row}{condition_row}{part_type_row}{seller_row}"
-            "</dl>\n"
-        )
+
     fitment_html = ""
     if meta.fitment_text:
         fitment_html = (
-            f"    <p><strong>Подходит для автомобилей:</strong> {html.escape(meta.fitment_text)}</p>\n"
+            f"    <h2>Подходит для автомобилей</h2>\n"
+            f"    <p>{html.escape(meta.fitment_text)}</p>\n"
             "    <p><em>Справочная информация. Перед покупкой уточните совместимость у продавца.</em></p>\n"
         )
     alternate_offers_html = ""
@@ -447,6 +575,25 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
             f"    <h2>Другие предложения {html.escape(meta.brand)} {html.escape(meta.article)}</h2>\n"
             f"    <ul>{items}</ul>\n"
         )
+
+    faq_items = build_product_faq_items(
+        brand=meta.brand,
+        article=meta.article,
+        part_type_name=meta.part_type_name,
+        is_new=meta.condition_label == "Новая",
+        city=meta.city,
+        fitment_text=meta.fitment_text,
+        in_stock=meta.in_stock,
+    )
+    faq_html = ""
+    if faq_items:
+        faq_entries = "".join(
+            f"      <details><summary>{html.escape(item['question'])}</summary>"
+            f"<p>{html.escape(item['answer'])}</p></details>\n"
+            for item in faq_items
+        )
+        faq_html = f"    <h2>Частые вопросы</h2>\n    <section>\n{faq_entries}    </section>\n"
+
     breadcrumb_html = (
         "  <nav aria-label=\"Хлебные крошки\">\n"
         f'    <a href="{html.escape(site_origin, quote=True)}">Главная</a> ›\n'
@@ -476,8 +623,7 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
 <body>
 {breadcrumb_html}  <article>
     <h1>{h1}</h1>{image_block}
-    <p>{body_desc}</p>
-{details_html}{fitment_html}{alternate_offers_html}{used_catalog_link}  </article>
+{about_html}{details_html}{fitment_html}{delivery_html}{warranty_html}{alternate_offers_html}{faq_html}{used_catalog_link}  </article>
 </body>
 </html>
 """

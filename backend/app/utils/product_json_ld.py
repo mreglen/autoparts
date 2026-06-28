@@ -36,6 +36,24 @@ def _strip_html(value: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _truncate_body(text: str, max_len: int) -> str:
+    value = re.sub(r"\s+", " ", (text or "")).strip()
+    if not value:
+        return ""
+    if len(value) <= max_len:
+        return value
+    return f"{value[: max_len - 1].strip()}…"
+
+
+def _fitment_hint(fitment_text: str | None, max_len: int = 80) -> str:
+    fitment = re.sub(r"\s+", " ", (fitment_text or "")).strip().rstrip(".")
+    if not fitment:
+        return ""
+    if len(fitment) <= max_len:
+        return fitment
+    return f"{fitment[: max_len - 1].strip()}…"
+
+
 def product_body_description(
     *,
     brand: str | None,
@@ -43,29 +61,68 @@ def product_body_description(
     name: str | None,
     unique_description: str | None,
     short_name: str | None = None,
+    part_type_name: str | None = None,
+    city: str | None = None,
+    fitment_text: str | None = None,
+    seller_name: str | None = None,
     is_new: bool = False,
     max_len: int = 500,
 ) -> str:
     unique = _strip_html(unique_description)
     short = (short_name or "").strip()
     display = (name or "").strip()
-
-    for candidate in (unique, short, display):
-        if candidate and len(candidate) >= 20:
-            if len(candidate) <= max_len:
-                return candidate
-            return f"{candidate[: max_len - 1].strip()}…"
-
     brand_text = (brand or "").strip()
     article_text = (article or "").strip()
+    part_type = (part_type_name or "").strip()
+    city_text = (city or DEFAULT_CITY).strip() or DEFAULT_CITY
+    seller = (seller_name or "").strip()
     condition = "Новая" if is_new else "Б/у"
-    if brand_text and article_text:
-        fallback = f"{condition} автозапчасть {brand_text} {article_text}."
-    elif article_text:
-        fallback = f"{condition} автозапчасть {article_text}."
+    label = f"{brand_text} {article_text}".strip() or display or "автозапчасть"
+    fitment = _fitment_hint(fitment_text)
+
+    sentences: list[str] = []
+
+    if unique and len(unique) >= 20:
+        sentences.append(unique if unique.endswith(".") else f"{unique}.")
+
+    if part_type:
+        sentences.append(
+            f"{condition} {part_type.lower()} {label} — предложение на маркетплейсе «Свой Гараж»."
+        )
     else:
-        fallback = f"{condition} автозапчасть."
-    return fallback
+        sentences.append(
+            f"{condition} автозапчасть {label} — предложение на маркетплейсе «Свой Гараж»."
+        )
+
+    if short and short.casefold() not in " ".join(sentences).casefold():
+        sentences.append(f"Назначение: {short}.")
+
+    if fitment:
+        sentences.append(f"По справочнику подходит для: {fitment}.")
+
+    if seller:
+        sentences.append(f"Продавец: {seller}, город {city_text}.")
+    else:
+        sentences.append(f"Товар находится в {city_text}.")
+
+    if is_new:
+        sentences.append(
+            "Новая деталь в упаковке или на складе. Доставка по России, самовывоз — у продавца."
+        )
+    else:
+        sentences.append(
+            "Перед покупкой можно осмотреть деталь и уточнить совместимость у продавца. "
+            "Доставка по России, самовывоз — у продавца."
+        )
+
+    if not unique:
+        for candidate in (short, display):
+            if candidate and len(candidate) >= 20 and candidate.casefold() not in " ".join(sentences).casefold():
+                sentences.insert(0, candidate if candidate.endswith(".") else f"{candidate}.")
+                break
+
+    combined = " ".join(sentence for sentence in sentences if sentence)
+    return _truncate_body(combined, max_len)
 
 
 def sanitize_json_ld(value: Any) -> Any:
@@ -229,6 +286,8 @@ def build_catalog_product_json_ld(
         name=name,
         unique_description=unique_desc,
         short_name=short_name,
+        part_type_name=category_name or None,
+        city=city,
         is_new=bool(product.is_new),
     )
 

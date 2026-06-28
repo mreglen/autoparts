@@ -22,30 +22,69 @@ export function productBodyDescription({
   name,
   uniqueDescription,
   shortName,
+  partTypeName,
+  city,
+  fitmentText,
+  sellerName,
   isNew = false,
   maxLen = 500,
 }) {
   const unique = stripHtmlTags(uniqueDescription || '').replace(/\s+/g, ' ').trim();
   const short = String(shortName || '').trim();
   const display = String(name || '').trim();
-
-  for (const candidate of [unique, short, display]) {
-    if (candidate && candidate.length >= 20) {
-      if (candidate.length <= maxLen) return candidate;
-      return `${candidate.slice(0, maxLen - 1).trim()}…`;
-    }
-  }
-
   const brandText = String(brand || '').trim();
   const articleText = String(article || '').trim();
+  const partType = String(partTypeName || '').trim();
+  const cityText = String(city || DEFAULT_CITY).trim() || DEFAULT_CITY;
+  const seller = String(sellerName || '').trim();
   const condition = isNew ? 'Новая' : 'Б/у';
-  if (brandText && articleText) {
-    return `${condition} автозапчасть ${brandText} ${articleText}.`;
+  const label = [brandText, articleText].filter(Boolean).join(' ') || display || 'автозапчасть';
+  const fitment = String(fitmentText || '').replace(/\s+/g, ' ').trim().replace(/\.$/, '');
+  const fitmentShort = fitment.length > 80 ? `${fitment.slice(0, 79).trim()}…` : fitment;
+
+  const sentences = [];
+
+  if (unique && unique.length >= 20) {
+    sentences.push(unique.endsWith('.') ? unique : `${unique}.`);
   }
-  if (articleText) {
-    return `${condition} автозапчасть ${articleText}.`;
+
+  if (partType) {
+    sentences.push(
+      `${condition} ${partType.toLowerCase()} ${label} — предложение на маркетплейсе «Свой Гараж».`,
+    );
+  } else {
+    sentences.push(
+      `${condition} автозапчасть ${label} — предложение на маркетплейсе «Свой Гараж».`,
+    );
   }
-  return `${condition} автозапчасть.`;
+
+  if (short && !sentences.join(' ').toLowerCase().includes(short.toLowerCase())) {
+    sentences.push(`Назначение: ${short}.`);
+  }
+
+  if (fitmentShort) {
+    sentences.push(`По справочнику подходит для: ${fitmentShort}.`);
+  }
+
+  if (seller) {
+    sentences.push(`Продавец: ${seller}, город ${cityText}.`);
+  } else {
+    sentences.push(`Товар находится в ${cityText}.`);
+  }
+
+  if (isNew) {
+    sentences.push(
+      'Новая деталь в упаковке или на складе. Доставка по России, самовывоз — у продавца.',
+    );
+  } else {
+    sentences.push(
+      'Перед покупкой можно осмотреть деталь и уточнить совместимость у продавца. Доставка по России, самовывоз — у продавца.',
+    );
+  }
+
+  const combined = sentences.filter(Boolean).join(' ');
+  if (combined.length <= maxLen) return combined;
+  return `${combined.slice(0, maxLen - 1).trim()}…`;
 }
 
 export function sanitizeJsonLd(value) {

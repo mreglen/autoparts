@@ -13,6 +13,7 @@ import {
 import { buildCatalogProductJsonLd, productBodyDescription } from './productJsonLd';
 import { buildProductUsedKeywords } from './pageKeywords';
 import { DEFAULT_CITY } from './organizationCity';
+import { buildProductFaqJsonLd } from './partDetailFaq';
 
 function formatPriceRub(price) {
   if (price == null || price === '') return null;
@@ -71,6 +72,7 @@ export function buildProductStructuredDataGraph({
   canonicalUrl,
   title,
   description,
+  faqJsonLd,
 } = {}) {
   const graph = [];
   if (productJsonLd) {
@@ -96,6 +98,9 @@ export function buildProductStructuredDataGraph({
       breadcrumb: { '@id': `${canonicalUrl}#breadcrumb` },
       mainEntity: { '@id': `${canonicalUrl}#product` },
     });
+    if (faqJsonLd) {
+      graph.push(faqJsonLd);
+    }
   }
   if (!graph.length) return null;
   return { '@context': 'https://schema.org', '@graph': graph };
@@ -132,12 +137,15 @@ export function buildProductSeo(product) {
   const organization = product?.organization || null;
   const sellerName = organization?.name || null;
   const listingId = product?.id != null ? Number(product.id) : null;
+  const partTypeName = (product?.part_type?.name || '').trim();
   const title = buildProductSearchTitle({
     brand,
     article,
     productName: product?.name,
-    sellerName,
-    listingId,
+    partTypeName,
+    shortName,
+    city: resolveProductCity(organization),
+    isNew: Boolean(product?.is_new),
   });
   const city = resolveProductCity(organization);
   const inStock = (product?.quantity || 0) > 0;
@@ -154,6 +162,7 @@ export function buildProductSeo(product) {
     uniqueDescription: uniqueDesc,
     sellerName,
     listingId,
+    partTypeName,
   });
 
   const firstPhoto = product?.photos?.[0]?.photo_url;
@@ -177,6 +186,9 @@ export function buildProductSeo(product) {
     name,
     uniqueDescription: uniqueDesc,
     shortName,
+    partTypeName,
+    city,
+    sellerName,
     isNew: Boolean(product?.is_new),
   });
 

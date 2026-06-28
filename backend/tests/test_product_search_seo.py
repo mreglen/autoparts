@@ -16,10 +16,14 @@ from app.utils.product_search_seo import (
 
 class ProductSearchTitleTests(unittest.TestCase):
     def test_brand_and_article_title(self):
-        title = build_product_search_title(brand="MANN", article="IF1009")
-        self.assertEqual(title, "MANN IF1009 | Свой Гараж")
-        self.assertTrue(title.startswith("MANN"))
-        self.assertIn("IF1009", title)
+        title = build_product_search_title(
+            brand="MANN",
+            article="IF1009",
+            city="Екатеринбург",
+        )
+        self.assertIn("MANN IF1009", title)
+        self.assertIn("б/у", title)
+        self.assertIn("Екатеринбург", title)
         self.assertIn("Свой Гараж", title)
 
     def test_brand_article_and_name_title(self):
@@ -27,24 +31,26 @@ class ProductSearchTitleTests(unittest.TestCase):
             brand="KRAFT",
             article="KT 100529",
             product_name="Подшипник сцепления ВАЗ 2110-2115",
+            short_name="Подшипник сцепления ВАЗ 2110-2115",
+            city="Екатеринбург",
         )
-        self.assertEqual(
-            title,
-            "KRAFT KT 100529 Подшипник сцепления ВАЗ 2110-2115 | Свой Гараж",
-        )
+        self.assertTrue(title.startswith("KRAFT KT 100529"))
+        self.assertIn("б/у", title)
+        self.assertIn("Свой Гараж", title)
 
-    def test_title_preserves_listing_suffix_when_truncating(self):
+    def test_title_uses_part_type_over_seller(self):
         title = build_product_search_title(
             brand="KRAFT",
             article="KT 100529",
-            product_name="Подшипник сцепления ВАЗ 2110-2115 очень длинное название которое не помещается",
+            part_type_name="Подшипники",
             seller_name="Авторазбор",
             listing_id=999,
+            city="Екатеринбург",
         )
-        self.assertTrue(title.startswith("KRAFT KT 100529"))
-        self.assertIn("Авторазбор", title)
-        self.assertIn("№999", title)
-        self.assertIn("Свой Гараж", title)
+        self.assertIn("KRAFT KT 100529", title)
+        self.assertIn("Подшипники", title)
+        self.assertNotIn("Авторазбор", title)
+        self.assertNotIn("№999", title)
 
     def test_new_part_title_order(self):
         title = build_new_part_search_title(
@@ -75,16 +81,19 @@ class ProductSearchTitleTests(unittest.TestCase):
         self.assertEqual(h1, "MANN IF1009 — Масляный фильтр")
 
     def test_article_only_title(self):
-        title = build_product_search_title(brand="", article="24410-3E500")
-        self.assertEqual(title, "24410-3E500 | Свой Гараж")
+        title = build_product_search_title(brand="", article="24410-3E500", city="Екатеринбург")
+        self.assertIn("24410-3E500", title)
+        self.assertIn("Екатеринбург", title)
 
     def test_fallback_title(self):
         title = build_product_search_title(
             brand="",
             article="",
             fallback_display_name="MANN IF1009 Фильтр",
+            city="Екатеринбург",
         )
-        self.assertEqual(title, "MANN IF1009 Фильтр | Свой Гараж")
+        self.assertIn("MANN IF1009 Фильтр", title)
+        self.assertIn("Свой Гараж", title)
 
 
 class ProductSearchDescriptionTests(unittest.TestCase):
@@ -152,7 +161,7 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         product.article = "IF1009"
         product.name = "MANN / IF1009 Масляный фильтр"
         product.description = "Оригинальный фильтр в отличном состоянии."
-        product.is_new = True
+        product.is_new = False
         product.price = 1200
         product.quantity = 2
         product.photos = photos if photos is not None else [MagicMock(photo_url="/uploads/pictures/test.jpg")]
@@ -168,7 +177,10 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
 
     def test_build_product_seo_meta_uses_search_templates(self):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
-        self.assertEqual(meta.title, "MANN IF1009 Масляный фильтр — Авторазбор №16 | Свой Гараж")
+        self.assertIn("MANN IF1009", meta.title)
+        self.assertIn("б/у", meta.title)
+        self.assertIn("Екатеринбург", meta.title)
+        self.assertNotIn("Авторазбор", meta.title)
         self.assertIn("Купить MANN IF1009.", meta.description)
         self.assertIn("в Екатеринбурге.", meta.description)
         self.assertIn("1 200 ₽.", meta.description)
@@ -189,12 +201,14 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         self.assertIn('type="application/ld+json"', html)
         self.assertIn('"@type": "Product"', html)
         self.assertIn('"@type": "BreadcrumbList"', html)
+        self.assertIn('"@type": "FAQPage"', html)
 
     def test_prerender_html_has_no_noindex(self):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
         html = render_product_prerender_html(meta)
         self.assertIn("MANN IF1009 Масляный фильтр", html)
-        self.assertIn("Оригинальный фильтр в отличном состоянии.", html)
+        self.assertIn("О запчасти", html)
+        self.assertIn("Частые вопросы", html)
         self.assertNotIn("noindex", html)
         self.assertNotIn("Открыть карточку", html)
         self.assertNotIn("Цена:", html)

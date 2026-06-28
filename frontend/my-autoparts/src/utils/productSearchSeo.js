@@ -96,10 +96,34 @@ export function buildProductSearchTitle({
   fallbackDisplayName,
   sellerName,
   listingId,
+  partTypeName,
+  shortName,
+  city,
+  isNew = false,
 }) {
-  const core = buildTitleCore({ brand, article, productName, fallbackDisplayName });
-  const suffix = buildListingContextSuffix({ sellerName, listingId });
-  const maxCoreLen = Math.max(20, 70 - TITLE_SUFFIX.length);
+  const brandStr = String(brand || '').trim();
+  const articleStr = String(article || '').trim();
+  const cityText = String(city || DEFAULT_CITY).trim() || DEFAULT_CITY;
+  const partType = String(partTypeName || '').trim();
+  const short = String(shortName || '').trim();
+
+  let core;
+  if (brandStr || articleStr) {
+    const baseLabel = [brandStr, articleStr].filter(Boolean).join(' ');
+    const detail = partType || short;
+    if (detail && !baseLabel.toLowerCase().includes(detail.toLowerCase())) {
+      core = `${baseLabel} ${detail}`;
+    } else {
+      core = baseLabel;
+    }
+  } else {
+    core = buildTitleCore({ brand, article, productName, fallbackDisplayName });
+  }
+
+  const conditionSuffix = isNew ? '' : ' б/у';
+  const citySuffix = ` — ${cityText}`;
+  const suffix = `${conditionSuffix}${citySuffix}`;
+  const maxCoreLen = Math.max(24, 85 - TITLE_SUFFIX.length - suffix.length);
   const coreWithSuffix = fitCoreWithSuffix(core, suffix, maxCoreLen);
   return `${coreWithSuffix}${TITLE_SUFFIX}`.replace(/\s+/g, ' ').trim();
 }
@@ -171,11 +195,15 @@ export function buildProductSearchDescription({
   uniqueDescription,
   sellerName,
   listingId,
+  partTypeName,
+  fitmentHint,
 }) {
   const brandStr = String(brand || '').trim();
   const articleStr = String(article || '').trim();
   const condition = isNew ? 'Новая' : 'Б/у';
   const cityPrep = formatCityInPrepositional(city || DEFAULT_CITY);
+  const partType = String(partTypeName || '').trim();
+  const fitment = String(fitmentHint || '').replace(/\s+/g, ' ').trim().replace(/\.$/, '');
   const snippetSource = mergeContentSnippet({ shortName, uniqueDescription });
 
   let buyLine;
@@ -187,8 +215,13 @@ export function buildProductSearchDescription({
     buyLine = 'Купить автозапчасть.';
   }
 
+  const typePart = partType ? ` ${partType.toLowerCase()}` : '';
   const stockPhrase = inStock ? 'в наличии' : 'доступна';
-  let core = `${buyLine} ${condition} запчасть ${stockPhrase} в ${cityPrep}.`;
+  let core = `${buyLine} ${condition}${typePart} запчасть ${stockPhrase} в ${cityPrep}.`;
+  if (fitment) {
+    const hint = fitment.length > 60 ? `${fitment.slice(0, 59).trim()}…` : fitment;
+    core = `${core} Подходит для: ${hint}.`;
+  }
   const priceText = formatPriceRub(price);
   if (priceText) {
     core = `${core} ${priceText} ₽.`;

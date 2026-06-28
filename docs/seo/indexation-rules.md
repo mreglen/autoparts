@@ -30,11 +30,24 @@
 | `/autoparts/used/brand/{slug}` | index, follow | self | авто, `buildPageKeywords` | `usedPartsBrandSeo` |
 | `/autoparts/used/category/{slug}` | index, follow | self | авто, `buildPageKeywords` | `usedPartsCategorySeo` |
 | `/autoparts/used/geo/{slug}` | index, follow | self | авто, `buildPageKeywords` | `usedPartsGeoSeo` |
-| `/part/{id}-…` | index, follow | self | авто, `buildPageKeywords` | `buildProductSeo` / part prerender |
+| `/part/{id}-…` | index, follow | self | авто, `buildPageKeywords` | `buildProductSeo` / part prerender; обогащённый контент (О запчасти, FAQ, доставка); FAQPage JSON-LD |
 | `/seller/part-card/{id}` | noindex, follow | `/part/…` | — | `buildSellerPartCardSeo` |
 | `/about`, `/delivery`, `/organizations` | index, follow | self | — | static SEO builders |
 
 **keywords:** автогенерация через [`page_keywords.py`](../../backend/app/utils/page_keywords.py) / [`pageKeywords.js`](../../frontend/my-autoparts/src/utils/pageKeywords.js). На **noindex**-страницах тег `<meta name="keywords">` **не выводится**.
+
+## Карточки товаров `/part/` (SEO)
+
+- **Title:** `{brand} {article} {тип|название} б/у — {город} | Свой Гараж` (без «Продавец №ID» в title; продавец остаётся в description).
+- **Prerender для ботов:** блоки «О запчасти», характеристики, применимость, «Доставка и оплата», «Гарантия и осмотр», FAQ, другие предложения.
+- **JSON-LD:** Product + BreadcrumbList + WebPage + FAQPage.
+- **Проданный товар (`quantity=0`):** если есть другие предложения с тем же brand+article — prerender отдаёт **301** на `/autoparts/used?q={brand} {article}`; иначе 404. На фронте — экран «Продано» с альтернативами.
+
+## После деплоя (Yandex LOW_DEMAND)
+
+1. Пересобрать кэш sitemap товаров (админка SEO или `rebuild_products_sitemap_cache`).
+2. В Яндекс.Вебмастере отправить на переобход URL из выгрузки `svoygarage.ru_a69cf727df5e35e95c48baf7.xlsx` (лист с `status=LOW_DEMAND`, ~206 карточек `/part/`).
+3. Проверить несколько карточек в [Микротесте](https://webmaster.yandex.ru/tools/microtest/) — наличие FAQPage и Product.
 
 ## robots.txt
 
