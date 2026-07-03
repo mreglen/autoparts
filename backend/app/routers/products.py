@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from app.models.product import ProductPhoto, ProductVideo, Product as ProductModel
@@ -1106,17 +1106,8 @@ def delete_product_video(
     return
 
 
-@router.get("/", response_model=list[ProductSchema])
-def get_products(
-    storage_location_id: int = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    if not current_user.organization_id:
-        raise HTTPException(status_code=403, detail="Организация не указана")
-    
-    # Базовый запрос
-    query = db.query(ProductModel).options(
+def _my_products_load_options():
+    return [
         selectinload(ProductModel.photos),
         selectinload(ProductModel.videos),
         selectinload(ProductModel.compatible_vehicles).options(
@@ -1126,25 +1117,80 @@ def get_products(
         selectinload(ProductModel.creator),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization),
-        selectinload(ProductModel.avito_listing_links),  # Load Avito listing links
-        selectinload(ProductModel.drom_listing_links)  # Load Drom listing links
+        selectinload(ProductModel.avito_listing_links),
+        selectinload(ProductModel.drom_listing_links),
+    ]
+
+
+def _apply_my_products_search(query, q: str):
+    trimmed = (q or "").strip()
+    if not trimmed:
+        return query
+    compact = trimmed.lower().replace(" ", "")
+    pattern = f"%{trimmed.lower()}%"
+    compact_pattern = f"%{compact}%"
+    return query.filter(
+        or_(
+            func.lower(ProductModel.name).like(pattern),
+            func.lower(func.coalesce(ProductModel.article, "")).like(pattern),
+            func.replace(func.lower(func.coalesce(ProductModel.article, "")), " ", "").like(compact_pattern),
+            func.replace(func.lower(func.coalesce(ProductModel.internal_code, "")), " ", "").like(compact_pattern),
+        )
+    )
+
+
+def _apply_my_products_sort(query, sort: str):
+    if sort == "date_asc":
+        return query.order_by(ProductModel.created_at.asc(), ProductModel.id.asc())
+    if sort == "name_asc":
+        return query.order_by(ProductModel.name.asc(), ProductModel.id.asc())
+    if sort == "name_desc":
+        return query.order_by(ProductModel.name.desc(), ProductModel.id.desc())
+    return query.order_by(ProductModel.created_at.desc(), ProductModel.id.desc())
+
+
+@router.get("/", response_model=PublicProductsResponse)
+def get_products(
+    storage_location_id: Optional[int] = None,
+    q: Optional[str] = None,
+    sort: str = Query("date_desc", pattern="^(date_desc|date_asc|name_asc|name_desc)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Организация не указана")
+
+    query = db.query(ProductModel).options(
+        *_my_products_load_options()
     ).filter(
         ProductModel.organization_id == current_user.organization_id,
-        ProductModel.quantity > 0
+        ProductModel.quantity > 0,
     )
-    
-    # Фильтрация по складу, если указан
+
     if storage_location_id is not None:
         query = query.filter(ProductModel.storage_location_id == storage_location_id)
-    
-    products = query.all()
-    
-    # Set is_on_avito and is_on_drom flags for each product
+
+    query = _apply_my_products_search(query, q or "")
+    total = query.order_by(None).count()
+    products = (
+        _apply_my_products_sort(query, sort)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
     for product in products:
         product.is_on_avito = len(product.avito_listing_links) > 0
         product.is_on_drom = len(product.drom_listing_links) > 0
-    
-    return products
+
+    return PublicProductsResponse(
+        items=products,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/public/", response_model=PublicProductsResponse)

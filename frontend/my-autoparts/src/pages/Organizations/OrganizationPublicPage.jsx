@@ -9,7 +9,8 @@ import {
   getOrganizationInitials,
   getOrganizationLogoUrl,
 } from './organizationPublicUtils';
-import { buildOrganizationDetailSeo } from './organizationSeo';
+import { buildOrganizationDetailSeo, buildOrganizationLoadingSeo } from './organizationSeo';
+import { PageSeoHelmet } from '../../utils/pageSeo';
 
 function DetailSkeleton() {
   return (
@@ -72,19 +73,25 @@ export default function OrganizationPublicPage() {
   }, [orgId]);
 
   const seo = useMemo(
-    () => (organization ? buildOrganizationDetailSeo(organization) : null),
-    [organization]
+    () =>
+      organization
+        ? buildOrganizationDetailSeo(organization)
+        : buildOrganizationLoadingSeo(orgId),
+    [organization, orgId],
   );
 
   if (loading) {
     return (
-      <div className="relative mx-auto max-w-5xl px-4 py-6 sm:px-6">
-        <DetailSkeleton />
-      </div>
+      <>
+        <PageSeoHelmet seo={seo} />
+        <div className="relative mx-auto max-w-5xl px-4 py-6 sm:px-6">
+          <DetailSkeleton />
+        </div>
+      </>
     );
   }
 
-  if (error || !organization || !seo) {
+  if (error || !organization) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
         <Helmet>

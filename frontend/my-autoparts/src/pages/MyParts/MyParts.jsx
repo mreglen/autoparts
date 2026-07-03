@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import { normalizeImageUrl, apiRequest } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
-import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
+import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI, selectMyProductsTotal, selectMyProductsPage, selectMyProductsHasMore, selectMyProductsLoadingMore, selectMyProductsFilterKey } from '../../redux/slices/ProductSlice';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchProductStorageCellsBatch, fetchStorageCells, invalidateProductStorageCells } from '../../redux/slices/StorageCellsSlice';
@@ -15,6 +15,7 @@ import { useActionsDropdownPlacement } from '../../hooks/useActionsDropdownPlace
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 import StorageCellsDisplayTable from '../../components/StorageCellsTable/StorageCellsDisplayTable';
 import { normalizeInternalCodeForSearch, INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../utils/internalCode';
+import MyPartsRowSkeleton from '../../components/skeletons/MyPartsRowSkeleton';
 
 const CardPart = ({
   part,
@@ -725,6 +726,16 @@ const CardPart = ({
 const DEFAULT_IN_STOCK_FILTERS = { storage: '', sort: 'date_desc' };
 const DEFAULT_MODERATION_FILTERS = { storage: '', sort: 'date_desc', hideRejected: false };
 const URL_SEARCH_DEBOUNCE_MS = 400;
+const MY_PRODUCTS_PAGE_SIZE = 30;
+
+const buildMyProductsRequest = ({ page = 1, storage, q, sort, append = false } = {}) => ({
+  page,
+  page_size: MY_PRODUCTS_PAGE_SIZE,
+  sort: sort || 'date_desc',
+  ...(storage ? { storage_location_id: storage } : {}),
+  ...(q?.trim() ? { q: q.trim() } : {}),
+  append,
+});
 
 const getModerationPartKey = (part) => `${part.moderationKind || 'pending'}-${part.id}`;
 
@@ -735,6 +746,12 @@ function MyParts() {
   const dispatch = useDispatch();
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const { items: products, pendingItems, rejectedItems, loading, error } = useSelector((state) => state.products);
+  const myProductsTotal = useSelector(selectMyProductsTotal);
+  const myProductsPage = useSelector(selectMyProductsPage);
+  const myProductsHasMore = useSelector(selectMyProductsHasMore);
+  const myProductsLoadingMore = useSelector(selectMyProductsLoadingMore);
+  const myProductsFilterKey = useSelector(selectMyProductsFilterKey);
+  const loadMoreSentinelRef = useRef(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [moderationLoading, setModerationLoading] = useState(false);
   const [moderationLoadError, setModerationLoadError] = useState(null);
@@ -822,39 +839,69 @@ function MyParts() {
   // Сортировка: по умолчанию сначала новые
   const [showSortDropdown, setShowSortDropdown] = useState(false);
 
-  const displayParts = React.useMemo(() => products.filter((part) => {
-    if (inStockFilters.storage && part.storage_location_id != inStockFilters.storage) {
-      return false;
+  const displayParts = products;
+  const sortedDisplayParts = products;
+
+  const inStockFilterKey = useMemo(
+    () => JSON.stringify({
+      storage: inStockFilters.storage || '',
+      q: inStockDebouncedSearch.trim(),
+      sort: inStockFilters.sort || 'date_desc',
+    }),
+    [inStockFilters.storage, inStockDebouncedSearch, inStockFilters.sort],
+  );
+
+  const loadMoreMyProducts = useCallback(() => {
+    if (
+      activeTab !== 'in-stock'
+      || loading
+      || myProductsLoadingMore
+      || !myProductsHasMore
+      || products.length >= myProductsTotal
+    ) {
+      return;
     }
-    if (!inStockDebouncedSearch.trim()) return true;
-    const query = inStockDebouncedSearch.toLowerCase().replace(/\s+/g, '');
-    return (
-      (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (normalizeInternalCodeForSearch(part.internal_code).toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (part.name && part.name.toLowerCase().includes(inStockDebouncedSearch.toLowerCase()))
+    dispatch(fetchMyProducts(buildMyProductsRequest({
+      page: myProductsPage + 1,
+      storage: inStockFilters.storage,
+      q: inStockDebouncedSearch,
+      sort: inStockFilters.sort,
+      append: true,
+    })));
+  }, [
+    activeTab,
+    loading,
+    myProductsLoadingMore,
+    myProductsHasMore,
+    products.length,
+    myProductsTotal,
+    dispatch,
+    myProductsPage,
+    inStockFilters.storage,
+    inStockFilters.sort,
+    inStockDebouncedSearch,
+  ]);
+
+  useEffect(() => {
+    if (activeTab !== 'in-stock' || !myProductsHasMore || loading || myProductsLoadingMore) {
+      return undefined;
+    }
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMoreMyProducts();
+        }
+      },
+      { root: null, rootMargin: '160px', threshold: 0 },
     );
-  }), [products, inStockFilters.storage, inStockDebouncedSearch]);
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [activeTab, myProductsHasMore, loading, myProductsLoadingMore, loadMoreMyProducts, products.length]);
 
-  const sortedDisplayParts = React.useMemo(() => {
-    const items = [...displayParts];
-    const sortOrder = inStockFilters.sort;
-
-    if (sortOrder === 'date_desc') {
-      items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
-    } else if (sortOrder === 'date_asc') {
-      items.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-    } else if (sortOrder === 'name_asc' || sortOrder === 'name_desc') {
-      items.sort((a, b) => {
-        const aName = (a.name || a.brand || a.article || '').toString().toLowerCase();
-        const bName = (b.name || b.brand || b.article || '').toString().toLowerCase();
-        if (aName < bName) return sortOrder === 'name_asc' ? -1 : 1;
-        if (aName > bName) return sortOrder === 'name_asc' ? 1 : -1;
-        return 0;
-      });
-    }
-
-    return items;
-  }, [displayParts, inStockFilters.sort]);
+  const isInitialMyProductsLoad = activeTab === 'in-stock' && loading && products.length === 0;
 
   const displayModerationParts = React.useMemo(() => {
     let items = [
@@ -1300,17 +1347,30 @@ function MyParts() {
   ]);
 
   useEffect(() => {
-    const params = {};
-    if (inStockFilters.storage) {
-      params.storage_location_id = inStockFilters.storage;
+    if (activeTab !== 'in-stock' || !user?.organization_id) return;
+
+    const alreadyLoaded = myProductsFilterKey === inStockFilterKey && myProductsFilterKey !== null;
+    if (!alreadyLoaded) {
+      dispatch(fetchMyProducts(buildMyProductsRequest({
+        page: 1,
+        storage: inStockFilters.storage,
+        q: inStockDebouncedSearch,
+        sort: inStockFilters.sort,
+      })));
     }
 
-    dispatch(fetchMyProducts(params));
-    if (user?.organization_id) {
-      dispatch(fetchStorageLocations(user.organization_id));
-      dispatch(fetchStorageCells());
-    }
-  }, [dispatch, user?.organization_id, inStockFilters.storage]);
+    dispatch(fetchStorageLocations(user.organization_id));
+    dispatch(fetchStorageCells());
+  }, [
+    dispatch,
+    user?.organization_id,
+    activeTab,
+    inStockFilterKey,
+    myProductsFilterKey,
+    inStockFilters.storage,
+    inStockFilters.sort,
+    inStockDebouncedSearch,
+  ]);
 
   useEffect(() => {
     if (!user?.organization_id) {
@@ -1690,9 +1750,9 @@ function MyParts() {
           >
             <div className="pb-2 inline-block border-b-4 border-blue-500">
               В наличии
-              {products.length > 0 && (
+              {myProductsTotal > 0 && (
                 <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                  {products.length}
+                  {myProductsTotal}
                 </span>
               )}
             </div>
@@ -1714,16 +1774,31 @@ function MyParts() {
       </div>
 
       {activeTab === 'in-stock' && (
-        loading ? (
-        <div className="mt-8 text-center py-16 px-6">
-          <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <svg className="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+        isInitialMyProductsLoad ? (
+        <div className="mt-4">
+          <div className="hidden md:block w-full">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left" />
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider" colSpan={4}>Запчасть</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Остаток</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Цена</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Действия</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {Array.from({ length: 8 }, (_, index) => (
+                  <MyPartsRowSkeleton key={index} renderMode="table" />
+                ))}
+              </tbody>
+            </table>
           </div>
-          <h2 className="text-xl font-medium text-gray-900 mb-2">Загрузка запчастей...</h2>
-          <p className="text-gray-600 text-base">Пожалуйста, подождите</p>
+          <div className="space-y-3 md:hidden">
+            {Array.from({ length: 5 }, (_, index) => (
+              <MyPartsRowSkeleton key={index} renderMode="card" />
+            ))}
+          </div>
         </div>
       ) : error ? (
         <div className="mt-8 text-center py-16 px-6">
@@ -1736,11 +1811,12 @@ function MyParts() {
           <p className="text-gray-500 mb-6 text-base">{error}</p>
           <button
             onClick={() => {
-              const params = {};
-              if (inStockFilters.storage) {
-                params.storage_location_id = inStockFilters.storage;
-              }
-              dispatch(fetchMyProducts(params));
+              dispatch(fetchMyProducts(buildMyProductsRequest({
+                page: 1,
+                storage: inStockFilters.storage,
+                q: inStockDebouncedSearch,
+                sort: inStockFilters.sort,
+              })));
             }}
             className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"
           >
@@ -1915,6 +1991,29 @@ function MyParts() {
               />
             ))}
           </div>
+
+          {myProductsHasMore && (
+            <div ref={loadMoreSentinelRef} className="mt-4 min-h-4" aria-hidden="true">
+              {myProductsLoadingMore && (
+                <div className="space-y-3">
+                  <div className="hidden md:block">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {Array.from({ length: 3 }, (_, index) => (
+                          <MyPartsRowSkeleton key={index} renderMode="table" />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="md:hidden space-y-3">
+                    {Array.from({ length: 2 }, (_, index) => (
+                      <MyPartsRowSkeleton key={index} renderMode="card" />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </>
       ))}
 

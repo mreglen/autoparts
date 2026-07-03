@@ -50,6 +50,7 @@ _SPA_ROUTE_RULES: tuple[_RouteRule, ...] = (
     _RouteRule(re.compile(r"^/autoparts/used$")),
     _RouteRule(re.compile(r"^/catalog$")),
     _RouteRule(re.compile(r"^/about$")),
+    _RouteRule(re.compile(r"^/contacts$")),
     _RouteRule(re.compile(r"^/privacy$")),
     _RouteRule(re.compile(r"^/personal-data-consent$")),
     _RouteRule(re.compile(r"^/offer$")),

@@ -119,6 +119,45 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertIsNotNone(meta)
         self.assertIn("О компании", meta.title)
 
+    def test_autoparts_redirect_seo(self):
+        meta = get_static_page_seo_for_path(None, "/autoparts")
+        self.assertIsNotNone(meta)
+        self.assertIn("Автозапчасти", meta.title)
+        self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/new")
+
+    def test_payment_seo(self):
+        meta = get_static_page_seo_for_path(None, "/payment")
+        self.assertIsNotNone(meta)
+        self.assertIn("Оплата", meta.title)
+        self.assertEqual(meta.canonical_url, "https://svoygarage.ru/payment")
+
+    def test_reviews_seo(self):
+        meta = get_static_page_seo_for_path(None, "/reviews")
+        self.assertIsNotNone(meta)
+        self.assertIn("Отзывы", meta.title)
+
+    def test_cookie_policy_seo(self):
+        meta = get_static_page_seo_for_path(None, "/cookie-policy")
+        self.assertIsNotNone(meta)
+        self.assertIn("cookie", meta.title.lower())
+
+    def test_organization_detail_seo(self):
+        org = MagicMock()
+        org.id = "TVgpq7hgzd"
+        org.name = "Test Org"
+        org.address = "ул. Тестовая, 1"
+        org.phone = "+79991234567"
+        org.description = "Описание организации"
+        org.logo_organization = None
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = org
+
+        meta = get_static_page_seo_for_path(db, "/organizations/TVgpq7hgzd")
+        self.assertIsNotNone(meta)
+        self.assertIn("Test Org", meta.title)
+        self.assertEqual(meta.canonical_url, "https://svoygarage.ru/organizations/TVgpq7hgzd")
+        self.assertIn("AutoPartsStore", meta.json_ld)
+
     def test_unknown_path_returns_none(self):
         self.assertIsNone(get_static_page_seo_for_path(None, "/dashboard"))
 

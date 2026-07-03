@@ -82,7 +82,7 @@ const StorageAddressesPage = () => {
   useEffect(() => {
     // This will trigger re-fetching of all storage-related data
     if (user?.organization_id && lastModified) {
-      dispatch(fetchMyProducts());
+      dispatch(fetchMyProducts({ page: 1, page_size: 500 }));
       // Also refresh storage cell data
       dispatch(fetchLocationsWithCells());
       dispatch(fetchStorageCells());

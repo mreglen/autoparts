@@ -13,6 +13,7 @@ import PullToRefresh from './components/PullToRefresh/PullToRefresh';
 import MainLayout from './layouts/MainLayout';
 import ProfileWithMenuLayout from './layouts/ProfileWithMenuLayout';
 import { useShowSiteReviews } from './utils/siteReviewsPublic';
+import { buildAutopartsRedirectSeo, PageSeoHelmet } from './utils/pageSeo';
 import useSiteAnalytics from './hooks/useSiteAnalytics';
 
 // Eager: публичный каталог и первый экран
@@ -155,6 +156,16 @@ function SiteAnalyticsTracker() {
   return null;
 }
 
+function AutopartsRedirect() {
+  const seo = buildAutopartsRedirectSeo();
+  return (
+    <>
+      <PageSeoHelmet seo={seo} />
+      <Navigate to="/autoparts/new" replace />
+    </>
+  );
+}
+
 function ReviewsRoute() {
   const showSiteReviews = useShowSiteReviews();
   if (!showSiteReviews) {
@@ -209,7 +220,8 @@ function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Main />} />
           <Route path="/find" element={<FindRedirectPage />} />
-          <Route path="/autoparts" element={<Navigate to="/autoparts/new" replace />} />
+          <Route path="/autoparts" element={<AutopartsRedirect />} />
+          <Route path="/contacts" element={<Navigate to="/about" replace />} />
           <Route path="/autoparts/new/filters" element={<LazyRoute><NewPartsFiltersPage /></LazyRoute>} />
           <Route path="/autoparts/new" element={<AutoParts />} />
           <Route path="/autoparts/new/brand/:brandSlug" element={<LazyRoute><NewPartsBrandLandingPage /></LazyRoute>} />

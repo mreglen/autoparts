@@ -6,6 +6,7 @@ export default function PersonalDataConsentPage() {
   return (
     <LegalDocumentPage
       title="Согласие на обработку персональных данных"
+      path="/personal-data-consent"
       description="Согласие пользователя на обработку персональных данных на сайте «Свой Гараж»."
       paragraphs={PERSONAL_DATA_CONSENT_PARAGRAPHS}
       relatedLinks={[

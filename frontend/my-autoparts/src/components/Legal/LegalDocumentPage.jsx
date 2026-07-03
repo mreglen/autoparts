@@ -1,14 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { buildLegalPageSeo, PageSeoHelmet } from '../../utils/pageSeo';
 
-export default function LegalDocumentPage({ title, description, paragraphs, relatedLinks = [] }) {
+export default function LegalDocumentPage({ title, description, path, paragraphs, relatedLinks = [] }) {
+  const seo = buildLegalPageSeo({ title, description, path });
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <Helmet>
-        <title>{title} | Свой Гараж</title>
-        {description ? <meta name="description" content={description} /> : null}
-      </Helmet>
+      <PageSeoHelmet seo={seo} />
 
       <header className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{title}</h1>

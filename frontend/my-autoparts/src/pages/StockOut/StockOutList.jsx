@@ -143,7 +143,7 @@ export const StockOutList = () => {
     try {
       await dispatch(createReturn({ items: returnData })).unwrap();
       dispatch(fetchStockOuts());
-      dispatch(fetchMyProducts());
+      dispatch(fetchMyProducts({ page: 1, page_size: 500 }));
       dispatch(fetchStockIns());
       setReturnModalOpen(false);
       setItemsToReturn([]);

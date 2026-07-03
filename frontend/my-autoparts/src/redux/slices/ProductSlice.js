@@ -340,9 +340,10 @@ export const fetchMyProducts = createAsyncThunk(
         const { signal } = fetchMyProductsAbortController;
 
         try {
+            const { append: _append, ...apiParams } = params;
             const response = await apiAxios.get(
                 '/products/',
-                { params, signal }
+                { params: apiParams, signal }
             );
             return response.data;
         } catch (error) {
@@ -873,6 +874,12 @@ const productSlice = createSlice({
         catalogLoadingMore: false,
         catalogFacets: null,
         publicPartTypes: [],
+        myProductsTotal: 0,
+        myProductsPage: 1,
+        myProductsPageSize: 30,
+        myProductsHasMore: false,
+        myProductsLoadingMore: false,
+        myProductsFilterKey: null,
     },
     reducers: {
         clearProductError: (state) => {
@@ -1219,17 +1226,49 @@ const productSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
             })
-            .addCase(fetchMyProducts.pending, (state) => {
-                state.loading = true;
+            .addCase(fetchMyProducts.pending, (state, action) => {
+                const append = Boolean(action.meta?.arg?.append);
+                if (append) {
+                    state.myProductsLoadingMore = true;
+                } else {
+                    state.loading = true;
+                }
                 state.error = null;
             })
             .addCase(fetchMyProducts.fulfilled, (state, action) => {
+                const append = Boolean(action.meta?.arg?.append);
                 state.loading = false;
-                state.items = action.payload;
+                state.myProductsLoadingMore = false;
+                const newItems = action.payload?.items || [];
+                const pageSize = action.payload?.page_size ?? state.myProductsPageSize ?? 30;
+                const beforeLen = state.items.length;
+                if (append) {
+                    const existingIds = new Set(state.items.map((p) => p.id));
+                    newItems.forEach((item) => {
+                        if (!existingIds.has(item.id)) {
+                            state.items.push(item);
+                        }
+                    });
+                } else {
+                    state.items = newItems;
+                }
+                state.myProductsTotal = action.payload?.total ?? state.items.length;
+                state.myProductsPage = action.payload?.page ?? 1;
+                state.myProductsPageSize = pageSize;
+                const addedCount = state.items.length - (append ? beforeLen : 0);
+                const receivedFullPage = newItems.length >= pageSize;
+                const hasRoomByTotal = state.items.length < state.myProductsTotal;
+                state.myProductsHasMore =
+                    hasRoomByTotal && receivedFullPage && (append ? addedCount > 0 : newItems.length > 0);
+                if (!append) {
+                    const { append: _append, page: _page, ...filterArg } = action.meta?.arg || {};
+                    state.myProductsFilterKey = JSON.stringify(filterArg);
+                }
             })
             .addCase(fetchMyProducts.rejected, (state, action) => {
                 if (action.meta.aborted) return;
                 state.loading = false;
+                state.myProductsLoadingMore = false;
                 state.error = action.payload;
             })
             .addCase(fetchProduct.pending, (state) => {
@@ -1393,6 +1432,11 @@ export { fetchAllProducts };
 export const selectMyParts = (state) => state.products.items;
 export const selectMyPartsStatus = (state) => state.products.loading ? 'loading' : 'idle';
 export const selectMyPartsError = (state) => state.products.error;
+export const selectMyProductsTotal = (state) => state.products.myProductsTotal;
+export const selectMyProductsPage = (state) => state.products.myProductsPage;
+export const selectMyProductsHasMore = (state) => state.products.myProductsHasMore;
+export const selectMyProductsLoadingMore = (state) => state.products.myProductsLoadingMore;
+export const selectMyProductsFilterKey = (state) => state.products.myProductsFilterKey;
 export const selectCatalogItems = (state) => state.products.catalogItems;
 export const selectCatalogTotal = (state) => state.products.catalogTotal;
 export const selectCatalogPage = (state) => state.products.catalogPage;

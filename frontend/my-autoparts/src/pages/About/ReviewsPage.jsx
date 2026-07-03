@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { buildReviewsSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 import ReviewCard from '../../components/Reviews/ReviewCard';
 import StarRating from '../../components/Reviews/StarRating';
@@ -57,6 +57,7 @@ export default function ReviewsPage() {
   }, [data?.reviews]);
 
   const total = data?.total_count || 0;
+  const seo = buildReviewsSeo();
 
   if (!showSiteReviews) {
     return <Navigate to="/" replace />;
@@ -64,13 +65,7 @@ export default function ReviewsPage() {
 
   return (
     <>
-      <Helmet>
-        <title>Отзывы — Свой Гараж</title>
-        <meta
-          name="description"
-          content="Отзывы покупателей и партнёров о магазине «Свой Гараж»: подбор запчастей, доставка, чаты с продавцами и работа платформы."
-        />
-      </Helmet>
+      <PageSeoHelmet seo={seo} />
 
       <div className="relative w-full pb-16 md:pb-20">
         <PageAmbientBackground />

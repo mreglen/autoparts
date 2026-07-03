@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, unquote, urlsplit, urlparse
 
 from sqlalchemy.orm import Session, selectinload
 
+from app.models.organization import Organization as OrganizationModel
 from app.models.product import Product as ProductModel
 from app.services.spa_page_check_service import PART_PATH_RE, _normalize_path
 from app.services.yandex_feed_xml_service import _resolve_site_origin
@@ -23,6 +24,7 @@ NEW_CATEGORY_LANDING_RE = re.compile(r"^/autoparts/new/category/(?P<slug>[^/]+)$
 USED_BRAND_LANDING_RE = re.compile(r"^/autoparts/used/brand/(?P<slug>[^/]+)$")
 USED_CATEGORY_LANDING_RE = re.compile(r"^/autoparts/used/category/(?P<slug>[^/]+)$")
 USED_GEO_LANDING_RE = re.compile(r"^/autoparts/used/geo/(?P<slug>[^/]+)$")
+ORGANIZATION_DETAIL_RE = re.compile(r"^/organizations/(?P<org_id>[A-Za-z0-9_-]+)$")
 
 
 @dataclass(frozen=True)
@@ -263,6 +265,155 @@ def _build_delivery_seo(site_origin: str) -> StaticPageSeoMeta:
         description=description,
         canonical_url=canonical_url,
         h1="Доставка",
+    )
+
+
+def _build_autoparts_redirect_seo(site_origin: str) -> StaticPageSeoMeta:
+    canonical_url = _absolute_url(site_origin, "/autoparts/new")
+    title = "Автозапчасти — новые и б/у | Свой Гараж"
+    description = (
+        "Каталог автозапчастей на «Свой Гараж»: новые запчасти с доставкой "
+        "и б/у от продавцов. Поиск по артикулу и бренду."
+    )
+    return StaticPageSeoMeta(
+        title=title,
+        description=description,
+        canonical_url=canonical_url,
+        h1="Автозапчасти",
+    )
+
+
+def _build_payment_seo(site_origin: str) -> StaticPageSeoMeta:
+    canonical_url = _absolute_url(site_origin, "/payment")
+    title = "Оплата заказов — способы и условия | Свой Гараж"
+    description = (
+        "Способы оплаты заказов в «Свой Гараж»: перевод, наличные при получении "
+        "и онлайн-оплата. Условия покупки — в публичной оферте."
+    )
+    return StaticPageSeoMeta(
+        title=title,
+        description=description,
+        canonical_url=canonical_url,
+        h1="Оплата",
+    )
+
+
+def _build_reviews_seo(site_origin: str) -> StaticPageSeoMeta:
+    canonical_url = _absolute_url(site_origin, "/reviews")
+    title = "Отзывы — Свой Гараж"
+    description = (
+        "Отзывы покупателей и партнёров о магазине «Свой Гараж»: подбор запчастей, "
+        "доставка, чаты с продавцами и работа платформы."
+    )
+    return StaticPageSeoMeta(
+        title=title,
+        description=description,
+        canonical_url=canonical_url,
+        h1="Отзывы о «Свой Гараж»",
+    )
+
+
+def _build_cookie_policy_seo(site_origin: str) -> StaticPageSeoMeta:
+    canonical_url = _absolute_url(site_origin, "/cookie-policy")
+    title = "Политика обработки cookie | Свой Гараж"
+    description = "Информация об использовании файлов cookie на сайте «Свой Гараж»."
+    return StaticPageSeoMeta(
+        title=title,
+        description=description,
+        canonical_url=canonical_url,
+        h1="Политика обработки cookie",
+    )
+
+
+def _build_privacy_seo(site_origin: str) -> StaticPageSeoMeta:
+    canonical_url = _absolute_url(site_origin, "/privacy")
+    title = "Политика конфиденциальности | Свой Гараж"
+    description = "Политика конфиденциальности интернет-магазина «Свой Гараж»."
+    return StaticPageSeoMeta(
+        title=title,
+        description=description,
+        canonical_url=canonical_url,
+        h1="Политика конфиденциальности",
+    )
+
+
+def _build_offer_seo(site_origin: str) -> StaticPageSeoMeta:
+    canonical_url = _absolute_url(site_origin, "/offer")
+    title = "Публичная оферта | Свой Гараж"
+    description = "Условия покупки товаров в интернет-магазине «Свой Гараж»."
+    return StaticPageSeoMeta(
+        title=title,
+        description=description,
+        canonical_url=canonical_url,
+        h1="Публичная оферта",
+    )
+
+
+def _build_personal_data_consent_seo(site_origin: str) -> StaticPageSeoMeta:
+    canonical_url = _absolute_url(site_origin, "/personal-data-consent")
+    title = "Согласие на обработку персональных данных | Свой Гараж"
+    description = "Согласие пользователя на обработку персональных данных на сайте «Свой Гараж»."
+    return StaticPageSeoMeta(
+        title=title,
+        description=description,
+        canonical_url=canonical_url,
+        h1="Согласие на обработку персональных данных",
+    )
+
+
+def _build_organization_detail_seo(db: Session, org_id: str, *, site_origin: str) -> StaticPageSeoMeta | None:
+    org = db.query(OrganizationModel).filter(OrganizationModel.id == org_id).first()
+    if org is None:
+        return None
+
+    name = (org.name or "").strip() or "Организация"
+    path = f"/organizations/{org_id}"
+    canonical_url = _absolute_url(site_origin, path)
+    description_raw = (org.description or "").strip() or " — ".join(
+        part for part in (name, org.address, "телефон для связи" if org.phone else None) if part
+    )
+    description = _truncate(description_raw, 160)
+    title = f"{name} — организация | Свой Гараж"
+    logo = (org.logo_organization or "").strip()
+    if logo.startswith("http"):
+        image_url = logo
+    elif logo:
+        image_url = _absolute_url(site_origin, logo if logo.startswith("/") else f"/{logo}")
+    else:
+        image_url = _absolute_url(site_origin, "/img/LogoWithoutBg.png")
+
+    json_ld = json.dumps(
+        {
+            "@context": "https://schema.org",
+            "@type": "AutoPartsStore",
+            "name": name,
+            "description": _truncate(description_raw, 500) or None,
+            "url": canonical_url,
+            "image": image_url,
+            "telephone": org.phone or None,
+            "address": {
+                "@type": "PostalAddress",
+                "streetAddress": org.address,
+                "addressLocality": "Екатеринбург",
+                "addressCountry": "RU",
+            }
+            if org.address
+            else None,
+            "parentOrganization": {
+                "@type": "Organization",
+                "name": "Свой Гараж",
+                "url": site_origin.rstrip("/"),
+            },
+        },
+        ensure_ascii=False,
+    )
+
+    return StaticPageSeoMeta(
+        title=title,
+        description=description,
+        canonical_url=canonical_url,
+        h1=name,
+        json_ld=json_ld,
     )
 
 
@@ -605,6 +756,8 @@ def get_static_page_seo_for_path(
         return _build_home_seo(origin)
     if path == "/catalog":
         return _build_catalog_seo(origin)
+    if path == "/autoparts":
+        return _build_autoparts_redirect_seo(origin)
     if path == "/autoparts/new":
         return _build_new_parts_seo(origin, search_q, brands=brand_filters)
     if path == "/autoparts/used":
@@ -620,6 +773,22 @@ def get_static_page_seo_for_path(
         return _build_delivery_seo(origin)
     if path == "/organizations":
         return _build_organizations_seo(origin)
+    if path == "/payment":
+        return _build_payment_seo(origin)
+    if path == "/reviews":
+        return _build_reviews_seo(origin)
+    if path == "/cookie-policy":
+        return _build_cookie_policy_seo(origin)
+    if path == "/privacy":
+        return _build_privacy_seo(origin)
+    if path == "/offer":
+        return _build_offer_seo(origin)
+    if path == "/personal-data-consent":
+        return _build_personal_data_consent_seo(origin)
+
+    org_match = ORGANIZATION_DETAIL_RE.match(path)
+    if org_match and db is not None:
+        return _build_organization_detail_seo(db, org_match.group("org_id"), site_origin=origin)
 
     brand_match = NEW_BRAND_LANDING_RE.match(path)
     if brand_match and db is not None:

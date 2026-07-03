@@ -173,6 +173,45 @@ export function buildAutoPartsSeo(pathname, searchParams) {
   return buildNewPartsSeo(searchParams);
 }
 
+export function buildAutopartsRedirectSeo() {
+  return {
+    title: 'Автозапчасти — новые и б/у | Свой Гараж',
+    description:
+      'Каталог автозапчастей на «Свой Гараж»: новые запчасти с доставкой и б/у от продавцов. Поиск по артикулу и бренду.',
+    canonicalUrl: absoluteUrl('/autoparts/new'),
+    robots: 'index, follow',
+  };
+}
+
+export function buildPaymentSeo() {
+  return {
+    title: 'Оплата заказов — способы и условия | Свой Гараж',
+    description:
+      'Способы оплаты заказов в «Свой Гараж»: перевод, наличные при получении и онлайн-оплата. Условия покупки — в публичной оферте.',
+    canonicalUrl: absoluteUrl('/payment'),
+    robots: 'index, follow',
+  };
+}
+
+export function buildReviewsSeo() {
+  return {
+    title: 'Отзывы — Свой Гараж',
+    description:
+      'Отзывы покупателей и партнёров о магазине «Свой Гараж»: подбор запчастей, доставка, чаты с продавцами и работа платформы.',
+    canonicalUrl: absoluteUrl('/reviews'),
+    robots: 'index, follow',
+  };
+}
+
+export function buildLegalPageSeo({ title, description, path }) {
+  return {
+    title: `${title} | Свой Гараж`,
+    description,
+    canonicalUrl: absoluteUrl(path),
+    robots: 'index, follow',
+  };
+}
+
 export function buildAboutSeo() {
   return {
     title: 'О компании — Свой Гараж',

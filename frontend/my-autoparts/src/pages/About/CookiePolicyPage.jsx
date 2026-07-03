@@ -8,6 +8,7 @@ export default function CookiePolicyPage() {
     <>
       <LegalDocumentPage
         title="Политика обработки cookie"
+        path="/cookie-policy"
         description="Информация об использовании файлов cookie на сайте «Свой Гараж»."
         paragraphs={COOKIE_POLICY_PARAGRAPHS}
         relatedLinks={[

@@ -6,6 +6,7 @@ export default function PrivacyPolicyPage() {
   return (
     <LegalDocumentPage
       title="Политика конфиденциальности"
+      path="/privacy"
       description="Политика конфиденциальности интернет-магазина «Свой Гараж»."
       paragraphs={PRIVACY_POLICY_PARAGRAPHS}
       relatedLinks={[

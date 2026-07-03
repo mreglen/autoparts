@@ -6,6 +6,7 @@ export default function PublicOfferPage() {
   return (
     <LegalDocumentPage
       title="Публичная оферта"
+      path="/offer"
       description="Условия покупки товаров в интернет-магазине «Свой Гараж»."
       paragraphs={PUBLIC_OFFER_PARAGRAPHS}
       relatedLinks={[

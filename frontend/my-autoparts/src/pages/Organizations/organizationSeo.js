@@ -76,3 +76,14 @@ export function buildOrganizationDetailSeo(org) {
 
   return { title, description, canonicalUrl, jsonLd, imageUrl, name };
 }
+
+export function buildOrganizationLoadingSeo(orgId) {
+  const path = `/organizations/${orgId || ''}`;
+  return {
+    title: 'Организация — Свой Гараж',
+    description:
+      'Карточка продавца автозапчастей на маркетплейсе «Свой Гараж»: контакты, адрес и каталог.',
+    canonicalUrl: absoluteUrl(path),
+    robots: 'index, follow',
+  };
+}

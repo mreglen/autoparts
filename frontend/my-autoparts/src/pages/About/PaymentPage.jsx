@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiAxiosUnauth } from '../../utils/apiClient';
+import { buildPaymentSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import YandexWebmasterCounter from '../../components/Seo/YandexWebmasterCounter';
 
 export default function PaymentPage() {
+  const seo = buildPaymentSeo();
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,6 +29,7 @@ export default function PaymentPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
+      <PageSeoHelmet seo={seo} />
       <header className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Оплата</h1>
         <p className="mt-3 text-gray-600 leading-relaxed">

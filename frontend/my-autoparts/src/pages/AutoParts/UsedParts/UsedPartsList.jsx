@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import ProductCard from '../ProductCard';
+import { ProductCardSkeletonGrid, UsedPartListSkeleton } from '../../../components/skeletons/ProductCardSkeleton';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import { buildPartDetailPath } from '../../../utils/partRoutes';
 import UsedPartsFiltersForm from './UsedPartsFiltersForm';
@@ -145,7 +146,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   }, [urlQ, usedPartsData, catalogItems]);
 
   const isInitialLoad = catalogLoading && catalogItems.length === 0;
-  const isRefreshing = catalogLoading && catalogItems.length > 0;
   const status = isInitialLoad ? 'loading' : 'idle';
 
   const loadMoreCatalog = useCallback(() => {
@@ -603,25 +603,10 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
       <div className="flex flex-col gap-4 px-3 sm:gap-6 sm:px-0 lg:flex-row lg:items-start">
         <UsedPartsFiltersAside updateCatalogUrl={updateCatalogUrl} />
         <div className="relative min-w-0 flex-1">
-          {isRefreshing ? (
-            <div
-              className="pointer-events-none absolute inset-0 z-10 flex justify-center rounded-lg bg-white/55 pt-20 backdrop-blur-[1px]"
-              aria-live="polite"
-              aria-busy="true"
-            >
-              <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 shadow-sm">
-                <svg className="h-4 w-4 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Обновление списка…
-              </span>
-            </div>
-          ) : null}
       {status === 'loading' && (
-        <div className="mt-5 text-center py-10">
-          <p className="text-lg text-gray-600">Загрузка запчастей...</p>
-        </div>
+        viewMode === 'list'
+          ? <UsedPartListSkeleton count={8} />
+          : <ProductCardSkeletonGrid count={8} />
       )}
       {status !== 'loading' && !hasAvailableParts && !hasAnalogParts && (
         <div className="mt-16 flex flex-col items-center text-center max-w-2xl mx-auto px-4">
@@ -745,9 +730,11 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           )}
 
           {isCatalogMode && catalogHasMore && (
-            <div ref={loadMoreSentinelRef} className="mt-6 flex justify-center py-4" aria-hidden="true">
+            <div ref={loadMoreSentinelRef} className="mt-6 min-h-4" aria-hidden="true">
               {catalogLoadingMore && (
-                <span className="text-sm text-gray-500">Загрузка…</span>
+                viewMode === 'list'
+                  ? <UsedPartListSkeleton count={3} />
+                  : <ProductCardSkeletonGrid count={4} className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mt-2" />
               )}
             </div>
           )}
