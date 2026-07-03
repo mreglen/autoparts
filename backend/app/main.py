@@ -41,9 +41,11 @@ from app.db.schema_patches import (
     ensure_site_analytics_attribution_columns,
     ensure_site_analytics_conversion_events_table,
     ensure_analytics_query_review_tables,
+    ensure_public_catalog_indexes,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
+from app.middleware.slow_request_middleware import SlowRequestLoggingMiddleware
 from app.routers import api_router
 from app.routers import chats as chats_router
 from app.routers import websocket as websocket_router
@@ -171,6 +173,7 @@ try:
     ensure_site_analytics_attribution_columns()
     ensure_site_analytics_conversion_events_table()
     ensure_analytics_query_review_tables()
+    ensure_public_catalog_indexes()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise
@@ -217,6 +220,7 @@ app.add_middleware(
     expose_headers=["X-Guest-Cart-Token"],
 )
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(SlowRequestLoggingMiddleware)
 
 
 @app.middleware("http")

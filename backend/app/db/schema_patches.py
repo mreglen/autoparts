@@ -1844,3 +1844,37 @@ def ensure_analytics_query_review_tables() -> None:
                 )
             )
 
+
+def ensure_public_catalog_indexes() -> None:
+    """Indexes for public catalog filters (quantity > 0, org, part_type)."""
+    inspector = inspect(engine)
+    if "products" not in inspector.get_table_names():
+        return
+
+    indexes = {idx["name"] for idx in inspector.get_indexes("products")}
+    statements = []
+    if "ix_products_public_catalog" not in indexes:
+        statements.append(
+            "CREATE INDEX IF NOT EXISTS ix_products_public_catalog "
+            "ON products (quantity, is_new, id DESC) "
+            "WHERE quantity > 0"
+        )
+    if "ix_products_org_qty" not in indexes:
+        statements.append(
+            "CREATE INDEX IF NOT EXISTS ix_products_org_qty "
+            "ON products (organization_id, quantity)"
+        )
+    if "ix_products_part_type_qty" not in indexes:
+        statements.append(
+            "CREATE INDEX IF NOT EXISTS ix_products_part_type_qty "
+            "ON products (part_type_id, quantity)"
+        )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.info("Applied public catalog indexes on products")
+

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { buildImageUrlFallbackChain } from '../../utils/apiClient';
+import { buildListImageUrlFallbackChain } from '../../utils/apiClient';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { buildPartDetailPath } from '../../utils/partRoutes';
 
@@ -53,7 +53,7 @@ const ProductCard = ({
     for (let i = 0; i < photos.length; i += 1) {
       const photo = photos[i];
       if (!isVideoItem(photo)) {
-        const chain = buildImageUrlFallbackChain(photo);
+        const chain = buildListImageUrlFallbackChain(photo);
         if (chain.length > 0) {
           return { type: 'photo', url: chain[0], photo, urlChain: chain };
         }
@@ -192,4 +192,4 @@ const ProductCard = ({
   );
 };
 
-export default ProductCard;
+export default React.memo(ProductCard);

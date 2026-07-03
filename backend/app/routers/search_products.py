@@ -9,6 +9,7 @@ from app.db.database import get_db
 from app.routers.rossko_api.rossko_api import rossko_search, rossko_delivery_id, rossko_address_id
 from app.schemas.rossko import SearchRequest
 from app.utils.search_cache import build_cache_key, get_cached_json, set_cached_json
+from app.utils.json_cache_sync import get_cached_json_sync, set_cached_json_sync
 from app.utils.singleflight import SingleFlight
 from app.utils.product_list_item import map_product_to_list_item
 from app.utils.partnumber import normalize_partnumber
@@ -25,6 +26,12 @@ _SEARCH_CACHE_TTL_SECONDS = 120
 _rossko_singleflight = SingleFlight()
 
 
+def _cache_resolve_payload(cache_key: str, payload: dict) -> dict:
+    encoded = jsonable_encoder(payload)
+    set_cached_json_sync(cache_key, encoded, _SEARCH_CACHE_TTL_SECONDS)
+    return encoded
+
+
 @router.get("/search", response_model=list[ProductSchema])
 def search_products(
     q: str,
@@ -32,7 +39,18 @@ def search_products(
     db: Session = Depends(get_db),
 ):
     """Поиск по артикулу, бренду, названию и их комбинациям."""
-    return search_local_products_query(db, q, limit=limit).all()
+    trimmed = (q or "").strip()
+    if not trimmed:
+        return []
+    cache_key = build_cache_key("local", trimmed, limit=limit)
+    cached = get_cached_json_sync(cache_key)
+    if cached is not None:
+        return cached
+
+    results = search_local_products_query(db, trimmed, limit=limit).all()
+    payload = jsonable_encoder(results)
+    set_cached_json_sync(cache_key, payload, _SEARCH_CACHE_TTL_SECONDS)
+    return payload
 
 
 @router.get("/resolve")
@@ -45,6 +63,11 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
     if not trimmed:
         return jsonable_encoder({"status": "not_found", "query": q, "match_type": None, "product": None, "products": []})
 
+    cache_key = build_cache_key("resolve", trimmed)
+    cached = get_cached_json_sync(cache_key)
+    if cached is not None:
+        return cached
+
     base_query = db.query(ProductModel).options(
         selectinload(ProductModel.photos),
         selectinload(ProductModel.storage_location),
@@ -56,7 +79,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
     for brand_text, article_text in parsed.brand_article_pairs[:8]:
         by_pair = base_query.filter(_brand_article_pair_condition(brand_text, article_text)).limit(2).all()
         if len(by_pair) == 1:
-            return jsonable_encoder({
+            return _cache_resolve_payload(cache_key, {
                 "status": "found",
                 "query": trimmed,
                 "match_type": "brand_article",
@@ -64,7 +87,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
                 "products": by_pair,
             })
         if len(by_pair) > 1:
-            return jsonable_encoder({
+            return _cache_resolve_payload(cache_key, {
                 "status": "multiple",
                 "query": trimmed,
                 "match_type": "brand_article",
@@ -76,7 +99,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
     if normalized:
         by_article = base_query.filter(get_sql_normalize(ProductModel.article) == normalized).limit(2).all()
         if len(by_article) == 1:
-            return jsonable_encoder({
+            return _cache_resolve_payload(cache_key, {
                 "status": "found",
                 "query": trimmed,
                 "match_type": "article",
@@ -84,7 +107,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
                 "products": by_article,
             })
         if len(by_article) > 1:
-            return jsonable_encoder({
+            return _cache_resolve_payload(cache_key, {
                 "status": "multiple",
                 "query": trimmed,
                 "match_type": "article",
@@ -94,7 +117,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
 
     by_name = base_query.filter(func.lower(func.trim(ProductModel.name)) == trimmed.lower()).limit(2).all()
     if len(by_name) == 1:
-        return jsonable_encoder({
+        return _cache_resolve_payload(cache_key, {
             "status": "found",
             "query": trimmed,
             "match_type": "name",
@@ -102,7 +125,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
             "products": by_name,
         })
     if len(by_name) > 1:
-        return jsonable_encoder({
+        return _cache_resolve_payload(cache_key, {
             "status": "multiple",
             "query": trimmed,
             "match_type": "name",
@@ -112,7 +135,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
 
     results = search_local_products_query(db, trimmed, limit=20).all()
     if len(results) == 1:
-        return jsonable_encoder({
+        return _cache_resolve_payload(cache_key, {
             "status": "found",
             "query": trimmed,
             "match_type": "search",
@@ -120,7 +143,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
             "products": results,
         })
     if len(results) > 1:
-        return jsonable_encoder({
+        return _cache_resolve_payload(cache_key, {
             "status": "multiple",
             "query": trimmed,
             "match_type": "search",
@@ -128,7 +151,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
             "products": results,
         })
 
-    return jsonable_encoder({
+    return _cache_resolve_payload(cache_key, {
         "status": "not_found",
         "query": trimmed,
         "match_type": None,

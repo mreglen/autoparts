@@ -15,6 +15,10 @@ from app.services.stock_sale_fulfillment import (
 )
 from app.services.audit_service import log_audit
 from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty
+from app.utils.public_catalog_cache import (
+    invalidate_public_catalog_cache,
+    invalidate_public_product_detail,
+)
 
 router = APIRouter(prefix="/stock-outs", tags=["Stock Out"])
 
@@ -214,6 +218,10 @@ def create_return(
         for row in processed_returns
     ):
         mark_yandex_feed_dirty(db, "stock_out_return_used")
+
+    invalidate_public_catalog_cache()
+    for row in processed_returns:
+        invalidate_public_product_detail(row["product_id"])
 
     # Refresh для получения ID новых записей
     for stock_in in created_stock_ins:

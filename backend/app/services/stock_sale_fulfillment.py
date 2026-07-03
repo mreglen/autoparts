@@ -12,6 +12,10 @@ from sqlalchemy.orm import Session
 from app.models.product import Product
 from app.models.stock_out import StockOut
 from app.services.audit_service import log_audit
+from app.utils.public_catalog_cache import (
+    invalidate_public_catalog_cache,
+    invalidate_public_product_detail,
+)
 
 
 class StockOutSourceKind(str, Enum):
@@ -173,5 +177,8 @@ def fulfill_stock_out(
         entity_type="stock_out",
         entity_id=stock_out.id,
     )
+
+    invalidate_public_catalog_cache()
+    invalidate_public_product_detail(request.product_id)
 
     return FulfillStockOutResult(stock_out=stock_out, created=True)

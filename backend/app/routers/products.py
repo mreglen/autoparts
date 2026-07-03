@@ -34,6 +34,16 @@ from app.utils.search_sql import get_sql_normalize
 from app.core.config import settings
 from app.utils.json_cache_sync import get_cached_json_sync, set_cached_json_sync
 from app.utils.internal_code import is_valid_internal_code, next_internal_code
+from app.utils.public_catalog_cache import (
+    invalidate_public_catalog_cache,
+    invalidate_public_product_detail,
+)
+
+
+def _invalidate_public_product_cache(product_id: int | None = None) -> None:
+    invalidate_public_catalog_cache()
+    if product_id is not None:
+        invalidate_public_product_detail(product_id)
 
 
 router = APIRouter(prefix="/products", tags=["Products"])
@@ -297,6 +307,7 @@ def create_product(
     )
     if db_product.is_new is False:
         mark_yandex_feed_dirty(db, "product_created_used")
+    _invalidate_public_product_cache(db_product.id)
     return db_product
 
 @router.get("/{product_id}", response_model=ProductSchema)
@@ -718,6 +729,7 @@ def update_product(
     )
     if db_product.is_new is False or ("is_new" in update_data):
         mark_yandex_feed_dirty(db, "product_updated")
+    _invalidate_public_product_cache(db_product.id)
     return db_product
 
 @router.patch("/{product_id}/quantity", response_model=ProductSchema)
@@ -752,6 +764,7 @@ def update_product_quantity(
     )
     if db_product.is_new is False:
         mark_yandex_feed_dirty(db, "product_quantity_changed")
+    _invalidate_public_product_cache(db_product.id)
     return db_product
 
 @router.delete("/{product_id}", status_code=204)
@@ -783,6 +796,7 @@ def delete_product(
         entity_type="product",
         entity_id=product_id_val,
     )
+    _invalidate_public_product_cache(product_id_val)
     return
 
 # Bulk delete endpoints MUST come before single delete endpoints for proper routing

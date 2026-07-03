@@ -18,7 +18,7 @@ import {
   selectAnalogsLoading,
 } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
-import { buildImageUrlFallbackChain } from '../../../utils/apiClient';
+import { buildListImageUrlFallbackChain } from '../../../utils/apiClient';
 import {
   buildUsedCatalogParams,
   getUsedPartsUrlQuery,
@@ -361,7 +361,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     // Combine photos and videos
     const allMedia = React.useMemo(() => {
       const photos = (part.photos || []).slice(0, 1).map((photo) => {
-        const urlChain = buildImageUrlFallbackChain(photo);
+        const urlChain = buildListImageUrlFallbackChain(photo);
         return {
           type: 'photo',
           url: urlChain[0] || '',

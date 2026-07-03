@@ -1,5 +1,5 @@
 // src/components/AutoParts.js
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -18,9 +18,7 @@ import {
   clearUsedPartsSearch,
   selectCatalogFilterKey,
 } from '../../redux/slices/ProductSlice';
-import UsedPartsList from './UsedParts/UsedPartsList';
 import NewPartsLanding from './NewParts/NewPartsLanding';
-import NewPartsResults from './NewParts/NewPartsResults';
 import MobileCompactSearch from '../../components/MobileCompactSearch/MobileCompactSearch';
 import {
   buildUsedCatalogParams,
@@ -33,6 +31,9 @@ import {
 } from '../../utils/autopartsPublic';
 import { buildAutoPartsSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import { apiAxiosUnauth } from '../../utils/apiClient';
+
+const UsedPartsList = React.lazy(() => import('./UsedParts/UsedPartsList'));
+const NewPartsResults = React.lazy(() => import('./NewParts/NewPartsResults'));
 
 const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs'];
 
@@ -589,6 +590,7 @@ function AutoParts() {
       </div>
 
       {/* Отображение контента в зависимости от вкладки */}
+      <Suspense fallback={<div className="py-12 text-center text-gray-500">Загрузка каталога…</div>}>
       {activeTab === 'my' ? (
         <UsedPartsList
           viewMode={usedPartsView}
@@ -605,6 +607,7 @@ function AutoParts() {
           onToggleExpand={handleToggleExpand}
         />
       )}
+      </Suspense>
     </div>
   );
 }

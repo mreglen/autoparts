@@ -124,7 +124,7 @@ function QuantityControl({
   );
 }
 
-export default function NewPartProductCard({
+function NewPartProductCard({
   part,
   stocksData,
   sectionType = 'available',
@@ -411,3 +411,5 @@ export default function NewPartProductCard({
     </article>
   );
 }
+
+export default React.memo(NewPartProductCard);

@@ -121,7 +121,7 @@ export const normalizeImageUrl = (imageUrl) => {
     return url;
 };
 
-/** Уникальные URL для <img onError> — full → thumb → list → photo_url. */
+/** Уникальные URL для <img onError> — full → thumb → list → photo_url (карточка товара). */
 export const buildImageUrlFallbackChain = (photo) => {
     if (!photo) return [];
     if (typeof photo === 'string') {
@@ -148,6 +148,33 @@ export const buildImageUrlFallbackChain = (photo) => {
     return chain;
 };
 
+/** Списки/каталог: thumb → list → full (меньше трафика на LCP списка). */
+export const buildListImageUrlFallbackChain = (photo) => {
+    if (!photo) return [];
+    if (typeof photo === 'string') {
+        const one = normalizeImageUrl(photo);
+        return one ? [one] : [];
+    }
+    const raw = [
+        photo.thumb_url,
+        photo.list_photo_url,
+        pickFullImageUrl(photo),
+        photo.photo_url,
+        photo.url,
+        photo.image_url,
+    ];
+    const seen = new Set();
+    const chain = [];
+    for (const item of raw) {
+        if (!item || typeof item !== 'string') continue;
+        const normalized = normalizeImageUrl(item.trim());
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        chain.push(normalized);
+    }
+    return chain;
+};
+
 /** Полноразмерное фото для fallback, если превью недоступно. */
 export const pickFullImageUrl = (photo) => {
     if (!photo) return '';
@@ -155,13 +182,11 @@ export const pickFullImageUrl = (photo) => {
     return photo.full_url || photo.photo_url || photo.url || photo.image_url || '';
 };
 
-/** URL для списков/каталога: сначала полное фото (стабильно на диске), затем thumb. */
+/** URL для списков/каталога: thumb → list → full. */
 export const pickListImageUrl = (photo) => {
     if (!photo) return '';
     if (typeof photo === 'string') return photo;
-    const full = pickFullImageUrl(photo);
-    if (full) return full;
-    return photo.thumb_url || photo.list_photo_url || '';
+    return photo.thumb_url || photo.list_photo_url || pickFullImageUrl(photo) || '';
 };
 
 export const pickListImageUrlNormalized = (photo) => normalizeImageUrl(pickListImageUrl(photo));
