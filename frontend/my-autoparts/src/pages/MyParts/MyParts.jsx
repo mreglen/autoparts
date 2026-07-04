@@ -5,7 +5,8 @@ import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import { normalizeImageUrl, apiRequest } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
-import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI, selectMyProductsTotal, selectMyProductsPage, selectMyProductsHasMore, selectMyProductsLoadingMore, selectMyProductsFilterKey } from '../../redux/slices/ProductSlice';
+import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI, fetchMyProductDrafts, deleteProductDraft, submitProductDraft, selectMyProductsTotal, selectMyProductsPage, selectMyProductsHasMore, selectMyProductsLoadingMore, selectMyProductsFilterKey, selectDraftItems, selectDraftLoading, selectDraftError } from '../../redux/slices/ProductSlice';
+import { formatDraftTitle } from '../../utils/productDraftUtils';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchProductStorageCellsBatch, fetchStorageCells, invalidateProductStorageCells } from '../../redux/slices/StorageCellsSlice';
@@ -751,6 +752,9 @@ function MyParts() {
   const myProductsHasMore = useSelector(selectMyProductsHasMore);
   const myProductsLoadingMore = useSelector(selectMyProductsLoadingMore);
   const myProductsFilterKey = useSelector(selectMyProductsFilterKey);
+  const draftItems = useSelector(selectDraftItems);
+  const draftLoading = useSelector(selectDraftLoading);
+  const draftError = useSelector(selectDraftError);
   const loadMoreSentinelRef = useRef(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [moderationLoading, setModerationLoading] = useState(false);
@@ -788,12 +792,13 @@ function MyParts() {
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'pending' || tab === 'in-stock') {
+    if (tab === 'pending' || tab === 'in-stock' || tab === 'drafts') {
       setActiveTab(tab);
     }
   }, [searchParams]);
 
   const isModerationTab = activeTab === 'pending';
+  const isDraftsTab = activeTab === 'drafts';
   const activeFilters = isModerationTab ? moderationFilters : inStockFilters;
   const searchDraft = isModerationTab ? moderationSearchDraft : inStockSearchDraft;
   const setSearchDraft = isModerationTab ? setModerationSearchDraft : setInStockSearchDraft;
@@ -1327,6 +1332,8 @@ function MyParts() {
       if (moderationFilters.hideRejected) {
         params.set('hide_rejected', '1');
       }
+    } else if (isDraftsTab) {
+      params.set('tab', 'drafts');
     }
 
     const next = params.toString();
@@ -1343,6 +1350,7 @@ function MyParts() {
     moderationFilters.storage,
     moderationFilters.hideRejected,
     isModerationTab,
+    isDraftsTab,
     setSearchParams,
   ]);
 
@@ -1441,6 +1449,47 @@ function MyParts() {
       loadModerationParts();
     }
   }, [activeTab, user?.id, loadModerationParts]);
+
+  useEffect(() => {
+    if (activeTab === 'drafts' && user?.id) {
+      dispatch(fetchMyProductDrafts());
+    }
+  }, [activeTab, user?.id, dispatch]);
+
+  const handleDeleteDraft = async (draft) => {
+    if (!draft?.id) return;
+    if (!window.confirm('Удалить черновик?')) return;
+    try {
+      await dispatch(deleteProductDraft(draft.id)).unwrap();
+    } catch (err) {
+      alert(typeof err === 'string' ? err : 'Не удалось удалить черновик');
+    }
+  };
+
+  const handleSubmitDraft = async (draft) => {
+    if (!draft?.id) return;
+    try {
+      await dispatch(submitProductDraft(draft.id)).unwrap();
+      await dispatch(fetchMyPendingProducts());
+    } catch (err) {
+      alert(typeof err === 'string' ? err : 'Не удалось отправить черновик на модерацию');
+    }
+  };
+
+  const formatDraftUpdatedAt = (value) => {
+    if (!value) return '';
+    try {
+      return new Date(value).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '';
+    }
+  };
 
   useEffect(() => {
     if (activeTab !== 'pending' || !pendingItems?.length) return undefined;
@@ -1556,6 +1605,7 @@ function MyParts() {
     <div className="mt-4 sm:mt-5 px-4 sm:px-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
         <h1 className="text-2xl sm:text-2xl font-bold text-gray-800">Мои запчасти</h1>
+        {!isDraftsTab && (
         <div className="text-left sm:text-right">
           <div className="text-xl sm:text-2xl font-bold text-gray-700">
             {totalValue.toLocaleString('ru-RU')} ₽
@@ -1574,11 +1624,12 @@ function MyParts() {
               : (isModerationTab ? 'Количество на модерации' : 'Общее количество всех складов')}
           </div>
         </div>
+        )}
       </div>
 
-      {/* Фильтр по складу, поиск и сортировка */}
+      {!isDraftsTab && (
       <div className="mb-6 flex flex-col md:flex-row gap-4 md:items-end">
-        {/* Фильтр по складу */}
+        {/* Фильтр по складу, поиск и сортировка */}
         <div className="md:w-64">
           <label className="block text-sm font-medium text-gray-700 mb-1">Склад</label>
           <select
@@ -1729,6 +1780,7 @@ function MyParts() {
           )}
         </div>
       </div>
+      )}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start mb-6 gap-4">
         <button
@@ -1769,6 +1821,19 @@ function MyParts() {
               {moderationItemsCount > 0 && (
                 <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                   {moderationItemsCount}
+                </span>
+              )}
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('drafts')}
+            className={`font-medium text-lg sm:text-base ${activeTab === 'drafts' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <div className="pb-2 inline-block border-b-4 border-slate-500">
+              Черновики
+              {draftItems.length > 0 && (
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                  {draftItems.length}
                 </span>
               )}
             </div>
@@ -2131,6 +2196,100 @@ function MyParts() {
               ))}
             </div>
           </>
+        )
+      )}
+
+      {activeTab === 'drafts' && (
+        draftLoading ? (
+          <div className="mt-8 text-center py-16 px-6">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
+            <p className="mt-4 text-gray-600">Загрузка черновиков…</p>
+          </div>
+        ) : draftError ? (
+          <div className="mt-8 text-center py-16 px-6">
+            <h2 className="text-xl font-medium text-gray-900 mb-2">Ошибка загрузки черновиков</h2>
+            <p className="text-gray-500 mb-6">{draftError}</p>
+            <button
+              onClick={() => dispatch(fetchMyProductDrafts())}
+              className="inline-flex items-center px-5 py-3 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Попробовать снова
+            </button>
+          </div>
+        ) : draftItems.length === 0 ? (
+          <div className="mt-12 text-center py-16 px-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Черновиков нет</h2>
+            <p className="text-gray-600 text-base mb-6">
+              Начните добавлять запчасть — форма сохранится автоматически, даже если вы выйдете со страницы.
+            </p>
+            <button
+              onClick={() => navigate('/my-parts/add')}
+              className="inline-flex items-center px-5 py-3 rounded-lg text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Добавить запчасть
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {draftItems.map((draft) => {
+              const firstPhoto = draft.photos?.[0];
+              const photoUrl = firstPhoto ? normalizeImageUrl(firstPhoto) : null;
+              return (
+                <div
+                  key={draft.id}
+                  className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-start gap-4">
+                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+                        {photoUrl ? (
+                          <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                            Нет фото
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="truncate text-base font-semibold text-gray-900">
+                          {formatDraftTitle(draft)}
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Обновлён: {formatDraftUpdatedAt(draft.updated_at)}
+                        </p>
+                        <p className="mt-1 text-sm text-gray-500">
+                          {draft.photos?.length || 0} фото · {draft.videos?.length || 0} видео
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/my-parts/drafts/${draft.id}/edit`)}
+                        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                      >
+                        Продолжить
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSubmitDraft(draft)}
+                        className="rounded-lg border border-indigo-200 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+                      >
+                        На модерацию
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDraft(draft)}
+                        className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )
       )}
 

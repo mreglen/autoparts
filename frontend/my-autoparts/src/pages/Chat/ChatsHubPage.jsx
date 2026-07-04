@@ -148,9 +148,15 @@ function ChatEmptyState({ icon, title, subtitle, action }) {
   );
 }
 
-function ChatPanelHeader({ onBack, avatar, title, subtitle, subtitleAction, badge, trailing }) {
+function ChatPanelHeader({ onBack, avatar, title, subtitle, subtitleAction, badge, trailing, pinned = false }) {
   return (
-    <div className="flex-shrink-0 border-b border-gray-200/80 bg-white/95 px-3 py-3 backdrop-blur-sm sm:px-4">
+    <div
+      className={`flex-shrink-0 border-b border-gray-200/80 bg-white px-3 py-3 sm:px-4 lg:bg-white/95 lg:backdrop-blur-sm ${
+        pinned
+          ? 'max-lg:sticky max-lg:top-0 max-lg:z-20 max-lg:pt-[max(0px,env(safe-area-inset-top))] max-lg:shadow-sm'
+          : ''
+      }`}
+    >
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -445,7 +451,7 @@ const ChatsHubPage = () => {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl min-h-0 flex-col max-md:min-h-0 md:h-full md:overflow-hidden">
+    <div className="mx-auto flex h-full w-full max-w-7xl min-h-0 flex-col md:h-full md:overflow-hidden">
       <CreateGroupChatModal
         isOpen={createChatOpen}
         onClose={() => setCreateChatOpen(false)}
@@ -453,8 +459,8 @@ const ChatsHubPage = () => {
         user={user}
       />
 
-      <div className="flex min-h-0 w-full flex-1 flex-col max-md:min-h-[calc(100dvh-7rem)] max-md:pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] md:h-0 md:overflow-hidden">
-        <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden bg-white max-md:min-h-[calc(100dvh-7rem)] md:h-full md:max-h-full md:rounded-2xl md:border md:border-gray-200/80 md:shadow-lg md:shadow-gray-200/50">
+      <div className="flex min-h-0 w-full flex-1 flex-col max-md:h-full max-md:pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] md:h-0 md:overflow-hidden">
+        <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden bg-white max-md:h-full md:h-full md:max-h-full md:rounded-2xl md:border md:border-gray-200/80 md:shadow-lg md:shadow-gray-200/50">
           {/* Левая панель — список чатов */}
           <div
             className={`${
@@ -1110,6 +1116,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] max-md:min-h-0 md:h-full">
       <ChatPanelHeader
+        pinned
         onBack={onBack}
         avatar={
           isGroupChat ? (
@@ -1557,6 +1564,7 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#eef2f6] max-md:min-h-0 md:h-full">
       <ChatPanelHeader
+        pinned
         onBack={onBack}
         avatar={
           displayChat?.context_image_url || displayChat?.avatar_url ? (

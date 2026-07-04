@@ -1,5 +1,5 @@
 import { useSelector } from 'react-redux';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useSearchParams } from 'react-router-dom';
 import Navigation from '../pages/Navigation/Navigation';
 import MobileHeader from '../components/MobileHeader/MobileHeader';
 import MobileBottomNav from '../components/MobileBottomNav/MobileBottomNav';
@@ -14,6 +14,7 @@ import useCartSync from '../hooks/useCartSync';
 
 export default function MainLayout() {
     const location = useLocation();
+    const [searchParams] = useSearchParams();
     const { user } = useSelector((state) => state.auth);
     useCartSync();
     const breadcrumbItems = usePageBreadcrumbs();
@@ -26,6 +27,8 @@ export default function MainLayout() {
     });
 
     const isAutopartsPage = location.pathname.startsWith('/autoparts');
+    const isChatsPage = location.pathname.startsWith('/chats');
+    const isMobileActiveChat = isChatsPage && Boolean(searchParams.get('chatId'));
     const isFullBleedAmbientPage =
         location.pathname === '/reviews' ||
         location.pathname === '/' ||
@@ -49,7 +52,7 @@ export default function MainLayout() {
                 <Navigation />
             </div>
 
-            <MobileHeader onMenuClick={openMenu} />
+            <MobileHeader onMenuClick={openMenu} hidden={isMobileActiveChat} />
 
             <MobileSideMenu
                 isOpen={isMobileMenuOpen}
@@ -64,12 +67,18 @@ export default function MainLayout() {
                 className={`mx-auto ${
                     isFullBleedAmbientPage
                         ? 'max-w-none bg-[#f4f6fb] px-0 py-0 min-h-[calc(100dvh-3.75rem-4.5rem)] lg:min-h-[calc(100dvh-7.5rem)]'
+                        : isChatsPage
+                        ? `max-w-7xl max-lg:px-0 max-lg:py-0 max-lg:overflow-hidden px-3 sm:px-1 lg:px-2 py-6 sm:py-8 ${
+                            isMobileActiveChat
+                              ? 'max-lg:h-[calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px))]'
+                              : 'max-lg:h-[calc(100dvh-3.75rem-4.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]'
+                          } lg:min-h-[calc(100dvh-7.5rem)]`
                         : isAutopartsPage
                         ? 'max-w-7xl max-lg:px-0 max-lg:py-2 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                         : 'max-w-7xl max-lg:px-3 max-lg:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                 }`}
             >
-                {breadcrumbItems.length > 0 && !isSeoLandingPage && !isPartPage ? (
+                {breadcrumbItems.length > 0 && !isSeoLandingPage && !isPartPage && !isChatsPage ? (
                     <div className={isFullBleedAmbientPage ? 'mx-auto max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8' : undefined}>
                         <Breadcrumbs items={breadcrumbItems} includeJsonLd={!isPartPage} />
                     </div>

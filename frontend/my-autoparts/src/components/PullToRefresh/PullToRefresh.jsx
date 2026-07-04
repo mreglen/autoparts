@@ -1,8 +1,40 @@
-import React from 'react';
+import React, { useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import usePullToRefresh from '../../hooks/usePullToRefresh';
+import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
+import { fetchPartTypes } from '../../redux/slices/PartTypeSlice';
+import { isMyPartsFormRoute } from '../../utils/partRoutes';
+
+const SOFT_REFRESH_MIN_MS = 350;
 
 export default function PullToRefresh() {
-  const { distance, refreshing, threshold, isActive } = usePullToRefresh();
+  const location = useLocation();
+  const dispatch = useDispatch();
+  const organizationId = useSelector((state) => state.auth.user?.organization_id);
+
+  const onRefresh = useCallback(async () => {
+    if (!isMyPartsFormRoute(location.pathname)) {
+      window.location.reload();
+      return;
+    }
+
+    const startedAt = Date.now();
+    const tasks = [dispatch(fetchPartTypes())];
+    if (organizationId) {
+      tasks.push(dispatch(fetchStorageLocations(organizationId)));
+    }
+    await Promise.allSettled(tasks);
+
+    const elapsed = Date.now() - startedAt;
+    if (elapsed < SOFT_REFRESH_MIN_MS) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, SOFT_REFRESH_MIN_MS - elapsed);
+      });
+    }
+  }, [dispatch, location.pathname, organizationId]);
+
+  const { distance, refreshing, threshold, isActive } = usePullToRefresh({ onRefresh });
 
   if (!isActive || (distance <= 0 && !refreshing)) {
     return null;
@@ -10,6 +42,7 @@ export default function PullToRefresh() {
 
   const progress = Math.min(distance / threshold, 1);
   const ready = distance >= threshold;
+  const onFormPage = isMyPartsFormRoute(location.pathname);
 
   return (
     <div
@@ -67,7 +100,9 @@ export default function PullToRefresh() {
         </div>
         {(ready || refreshing) && (
           <span className="mt-1.5 rounded-full bg-white/90 px-2.5 py-0.5 text-xs font-medium text-gray-600 shadow-sm">
-            {refreshing ? 'Обновление…' : 'Отпустите для обновления'}
+            {refreshing
+              ? (onFormPage ? 'Обновление справочников…' : 'Обновление…')
+              : 'Отпустите для обновления'}
           </span>
         )}
       </div>

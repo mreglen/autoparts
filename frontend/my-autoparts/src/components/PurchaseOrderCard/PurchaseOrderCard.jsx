@@ -191,8 +191,8 @@ export default function PurchaseOrderCard({
           <ul className="space-y-3">
             {items.map((item, idx) => {
               const lineTotal = (item.price || 0) * (item.quantity || 0);
-              const productId = item.product_id;
               const title = item.name || item.product_name || 'Товар';
+              const canLink = canLinkGarageOrderItem(item, orderType);
 
               return (
                 <li
@@ -212,10 +212,10 @@ export default function PurchaseOrderCard({
                           </>
                         )}
                       </div>
-                      {productId ? (
+                      {canLink ? (
                         <button
                           type="button"
-                          onClick={(e) => onProductClick(item, e)}
+                          onClick={(e) => onProductClick(item, e, orderType)}
                           className="text-left text-sm font-medium text-gray-900 hover:text-indigo-600 hover:underline"
                         >
                           {title}

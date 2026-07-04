@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateProduct, uploadPhotos, uploadMedia, clearProductError, resetProducts, fetchProduct, deleteProductPhotos, deleteProductVideos, deleteProductVideo } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
-import { fetchStorageCells, fetchProductStorageCells, linkProductToCell, deleteProductCellLink } from '../../../redux/slices/StorageCellsSlice';
+import { fetchStorageCells, fetchProductStorageCells, linkProductToCell, deleteProductCellLink, invalidateProductStorageCells } from '../../../redux/slices/StorageCellsSlice';
 import { fetchPartTypes } from '../../../redux/slices/PartTypeSlice';
 import VehicleModal from '../AddPart/VehicleModal';
 import PhotoGallery from '../../../components/PhotoGallery/PhotoGallery';
@@ -50,6 +50,32 @@ const EditPart = () => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const showFieldError = (name) => Boolean(submitAttempted && fieldErrors[name]);
+
+  const applyStorageLinks = (links) => {
+    const safeLinks = Array.isArray(links) ? links : [];
+    setExistingLinks(safeLinks);
+    const initialValues = {};
+    safeLinks.forEach((link) => {
+      if (link?.storage_cell_id != null) {
+        initialValues[link.storage_cell_id] = link.value || '';
+      }
+    });
+    setCellValues(initialValues);
+  };
+
+  const loadProductStorageCells = (productId) => {
+    const cachedLinks = productStorageCells[productId];
+    if (Array.isArray(cachedLinks) && cachedLinks.length > 0) {
+      applyStorageLinks(cachedLinks);
+    }
+
+    dispatch(invalidateProductStorageCells([productId]));
+    return dispatch(fetchProductStorageCells(productId)).then((result) => {
+      if (fetchProductStorageCells.fulfilled.match(result)) {
+        applyStorageLinks(result.payload.links || []);
+      }
+    });
+  };
 
   useEffect(() => {
     if (!isReady) return;
@@ -156,8 +182,15 @@ const EditPart = () => {
 
   // Загрузка данных продукта при получении
   useEffect(() => {
-    if (currentProduct && !productLoaded) {
-      setFormData({
+    const productId = parseInt(id, 10);
+    if (!currentProduct || productLoaded || !Number.isFinite(productId)) {
+      return;
+    }
+    if (currentProduct.id !== productId) {
+      return;
+    }
+
+    setFormData({
         article: currentProduct.article || '',
         name: currentProduct.name || '',
         brand: currentProduct.brand || '',
@@ -189,56 +222,31 @@ const EditPart = () => {
         setSelectedVehicle(currentProduct.compatible_vehicles[0]);
       }
 
-      // Загрузка существующих связей продукта с ячейками
-      if (currentProduct.id) {
-        dispatch(fetchProductStorageCells(currentProduct.id))
-          .then((result) => {
-            if (fetchProductStorageCells.fulfilled.match(result)) {
-              const links = result.payload.links || [];
-              setExistingLinks(links);
-              
-              // Инициализация значений ячеек из существующих связей
-              const initialValues = {};
-              links.forEach(link => {
-                initialValues[link.storage_cell_id] = link.value || '';
-              });
-              setCellValues(initialValues);
-            }
-          });
-      }
-    }
-  }, [currentProduct, productLoaded, dispatch]);
+      loadProductStorageCells(productId);
+  }, [currentProduct, productLoaded, dispatch, id]);
   
   // Refresh storage cell data when storage cells are modified
   // This ensures we get updated data after additions/deletions
   useEffect(() => {
-    if (currentProduct?.id && productLoaded && lastModified) {
-      dispatch(fetchProductStorageCells(currentProduct.id))
+    const productId = parseInt(id, 10);
+    if (!Number.isFinite(productId) || !productLoaded || !lastModified) {
+      return;
+    }
+    if (currentProduct?.id !== productId) {
+      return;
+    }
+
+    loadProductStorageCells(productId);
+
+    if (formData.storage_location_id) {
+      dispatch(fetchStorageCells(formData.storage_location_id))
         .then((result) => {
-          if (fetchProductStorageCells.fulfilled.match(result)) {
-            const links = result.payload.links || [];
-            setExistingLinks(links);
-            
-            // Update cell values with latest data
-            const initialValues = {};
-            links.forEach(link => {
-              initialValues[link.storage_cell_id] = link.value || '';
-            });
-            setCellValues(initialValues);
+          if (fetchStorageCells.fulfilled.match(result)) {
+            setLocationCells(Array.isArray(result.payload) ? result.payload : []);
           }
         });
-      
-      // Also refresh available storage cells for the current location
-      if (formData.storage_location_id) {
-        dispatch(fetchStorageCells(formData.storage_location_id))
-          .then((result) => {
-            if (fetchStorageCells.fulfilled.match(result)) {
-              setLocationCells(Array.isArray(result.payload) ? result.payload : []);
-            }
-          });
-      }
     }
-  }, [lastModified]); // Trigger when storage cells are modified
+  }, [lastModified, currentProduct?.id, productLoaded, id]);
 
   // Сброс состояния при изменении ID продукта
   useEffect(() => {

@@ -69,6 +69,7 @@ _SPA_ROUTE_RULES: tuple[_RouteRule, ...] = (
     _RouteRule(re.compile(r"^/cart/new/checkout$")),
     _RouteRule(re.compile(rf"^/cart/new/pay/(?P<session_id>{_ID})$")),
     _RouteRule(re.compile(r"^/my-parts/add$")),
+    _RouteRule(re.compile(rf"^/my-parts/drafts/(?P<draft_id>{_NUM})/edit$")),
     _RouteRule(re.compile(rf"^/my-parts/edit/(?P<part_id>{_NUM})$")),
     _RouteRule(re.compile(rf"^/part/(?P<product_id>{_NUM})(?:[-/][^/]*)?$"), "product"),
     _RouteRule(re.compile(r"^/product-not-found$")),

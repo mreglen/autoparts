@@ -217,6 +217,90 @@ export const fetchMyPendingProducts = createAsyncThunk(
     }
 );
 
+export const fetchMyProductDrafts = createAsyncThunk(
+    'products/fetchMyProductDrafts',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get('/product-drafts/my');
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                formatApiDetail(error.response?.data?.detail) || 'Ошибка загрузки черновиков'
+            );
+        }
+    }
+);
+
+export const fetchProductDraft = createAsyncThunk(
+    'products/fetchProductDraft',
+    async (draftId, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.get(`/product-drafts/${draftId}`);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                formatApiDetail(error.response?.data?.detail) || 'Ошибка загрузки черновика'
+            );
+        }
+    }
+);
+
+export const createProductDraft = createAsyncThunk(
+    'products/createProductDraft',
+    async (payload, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.post('/product-drafts/', payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                formatApiDetail(error.response?.data?.detail) || 'Ошибка сохранения черновика'
+            );
+        }
+    }
+);
+
+export const updateProductDraft = createAsyncThunk(
+    'products/updateProductDraft',
+    async ({ id, payload }, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.patch(`/product-drafts/${id}`, payload);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                formatApiDetail(error.response?.data?.detail) || 'Ошибка сохранения черновика'
+            );
+        }
+    }
+);
+
+export const deleteProductDraft = createAsyncThunk(
+    'products/deleteProductDraft',
+    async (draftId, { rejectWithValue }) => {
+        try {
+            await apiAxios.delete(`/product-drafts/${draftId}`);
+            return draftId;
+        } catch (error) {
+            return rejectWithValue(
+                formatApiDetail(error.response?.data?.detail) || 'Ошибка удаления черновика'
+            );
+        }
+    }
+);
+
+export const submitProductDraft = createAsyncThunk(
+    'products/submitProductDraft',
+    async (draftId, { rejectWithValue }) => {
+        try {
+            const response = await apiAxios.post(`/product-drafts/${draftId}/submit`);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(
+                formatApiDetail(error.response?.data?.detail) || 'Ошибка отправки черновика'
+            );
+        }
+    }
+);
+
 // Async thunk: создание продукта в статусе ожидания
 export const createPendingProduct = createAsyncThunk(
     'products/createPendingProduct',
@@ -889,6 +973,11 @@ const productSlice = createSlice({
         myProductsHasMore: false,
         myProductsLoadingMore: false,
         myProductsFilterKey: null,
+        draftItems: [],
+        draftLoading: false,
+        draftSaving: false,
+        draftError: null,
+        currentDraft: null,
     },
     reducers: {
         clearProductError: (state) => {
@@ -1430,6 +1519,77 @@ const productSlice = createSlice({
             .addCase(updateProductQuantityAPI.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
+            })
+            .addCase(fetchMyProductDrafts.pending, (state) => {
+                state.draftLoading = true;
+                state.draftError = null;
+            })
+            .addCase(fetchMyProductDrafts.fulfilled, (state, action) => {
+                state.draftLoading = false;
+                state.draftItems = action.payload || [];
+            })
+            .addCase(fetchMyProductDrafts.rejected, (state, action) => {
+                state.draftLoading = false;
+                state.draftError = action.payload;
+            })
+            .addCase(fetchProductDraft.pending, (state) => {
+                state.draftLoading = true;
+                state.draftError = null;
+            })
+            .addCase(fetchProductDraft.fulfilled, (state, action) => {
+                state.draftLoading = false;
+                state.currentDraft = action.payload;
+            })
+            .addCase(fetchProductDraft.rejected, (state, action) => {
+                state.draftLoading = false;
+                state.draftError = action.payload;
+            })
+            .addCase(createProductDraft.pending, (state) => {
+                state.draftSaving = true;
+                state.draftError = null;
+            })
+            .addCase(createProductDraft.fulfilled, (state, action) => {
+                state.draftSaving = false;
+                state.currentDraft = action.payload;
+                const exists = state.draftItems.some((item) => item.id === action.payload.id);
+                if (!exists) {
+                    state.draftItems = [action.payload, ...state.draftItems];
+                }
+            })
+            .addCase(createProductDraft.rejected, (state, action) => {
+                state.draftSaving = false;
+                state.draftError = action.payload;
+            })
+            .addCase(updateProductDraft.pending, (state) => {
+                state.draftSaving = true;
+                state.draftError = null;
+            })
+            .addCase(updateProductDraft.fulfilled, (state, action) => {
+                state.draftSaving = false;
+                state.currentDraft = action.payload;
+                const index = state.draftItems.findIndex((item) => item.id === action.payload.id);
+                if (index >= 0) {
+                    state.draftItems[index] = action.payload;
+                }
+            })
+            .addCase(updateProductDraft.rejected, (state, action) => {
+                state.draftSaving = false;
+                state.draftError = action.payload;
+            })
+            .addCase(deleteProductDraft.fulfilled, (state, action) => {
+                state.draftItems = state.draftItems.filter((item) => item.id !== action.payload);
+                if (state.currentDraft?.id === action.payload) {
+                    state.currentDraft = null;
+                }
+            })
+            .addCase(submitProductDraft.fulfilled, (state, action) => {
+                const draftId = action.meta?.arg;
+                if (draftId) {
+                    state.draftItems = state.draftItems.filter((item) => item.id !== draftId);
+                }
+                if (state.currentDraft?.id === draftId) {
+                    state.currentDraft = null;
+                }
             });
     },
 });
@@ -1463,6 +1623,11 @@ export const selectMyProductsPage = (state) => state.products.myProductsPage;
 export const selectMyProductsHasMore = (state) => state.products.myProductsHasMore;
 export const selectMyProductsLoadingMore = (state) => state.products.myProductsLoadingMore;
 export const selectMyProductsFilterKey = (state) => state.products.myProductsFilterKey;
+export const selectDraftItems = (state) => state.products.draftItems;
+export const selectDraftLoading = (state) => state.products.draftLoading;
+export const selectDraftSaving = (state) => state.products.draftSaving;
+export const selectDraftError = (state) => state.products.draftError;
+export const selectCurrentDraft = (state) => state.products.currentDraft;
 export const selectCatalogItems = (state) => state.products.catalogItems;
 export const selectCatalogTotal = (state) => state.products.catalogTotal;
 export const selectCatalogPage = (state) => state.products.catalogPage;

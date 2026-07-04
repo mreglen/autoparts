@@ -75,7 +75,7 @@ function CartIcon() {
     );
 }
 
-export default function MobileHeader({ onMenuClick, showMenuButton = true }) {
+export default function MobileHeader({ onMenuClick, showMenuButton = true, hidden = false }) {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, token } = useSelector((state) => state.auth);
@@ -101,7 +101,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true }) {
     };
 
     return (
-        <header className="lg:hidden sticky top-0 z-40 border-b border-gray-200/90 bg-white/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-white/85 pt-safe-top">
+        <header className={`lg:hidden sticky top-0 z-40 border-b border-gray-200/90 bg-white/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-white/85 pt-safe-top ${hidden ? 'hidden' : ''}`}>
             <div className="flex h-[3.75rem] items-center gap-2.5 px-3 sm:px-4">
                 {showBack ? (
                     <HeaderIconButton onClick={handleBack} label="Назад">

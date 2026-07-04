@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -11,6 +11,10 @@ import {
   uploadMedia,
   clearProductError,
   resetProducts,
+  fetchProductDraft,
+  createProductDraft,
+  updateProductDraft,
+  submitProductDraft,
 } from '../../../redux/slices/ProductSlice';
 import { createStockIn, clearStockInError } from '../../../redux/slices/StockInSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
@@ -37,6 +41,10 @@ import {
   pickBestRosskoPart,
   roundRosskoSalePrice,
 } from '../../AutoParts/NewParts/rosskoHelpers';
+import {
+  buildProductDraftPayload,
+  draftPayloadHasContent,
+} from '../../../utils/productDraftUtils';
 
 import VehicleModal from './VehicleModal';
 import MobilePageSection from '../../../components/MobilePageSection/MobilePageSection';
@@ -47,11 +55,14 @@ const SUGGEST_LIST =
 const SUGGEST_ITEM =
   'w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none';
 
-const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
+const DRAFT_AUTOSAVE_MS = 1000;
+
+const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = false }) => {
   const navigate = useNavigate();
-  const { id: routeId } = useParams();
+  const { id: routeId, draftId: routeDraftId } = useParams();
   const resubmitId = resubmitMode ? routeId : null;
   const editPendingId = editPendingMode ? routeId : null;
+  const isDraftFlow = !resubmitMode && !editPendingMode;
   const dispatch = useDispatch();
   const { isReady } = useAuthReady();
   const user = useSelector((state) => state.auth.user);
@@ -113,7 +124,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
   const [rosskoLookupError, setRosskoLookupError] = useState(null);
   const [rosskoLookupNotice, setRosskoLookupNotice] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
-  const [loadingFormData, setLoadingFormData] = useState(resubmitMode || editPendingMode);
+  const [loadingFormData, setLoadingFormData] = useState(resubmitMode || editPendingMode || draftMode);
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const showFieldError = (name) => Boolean(submitAttempted && fieldErrors[name]);
@@ -129,6 +140,21 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [uploadedTempFiles, setUploadedTempFiles] = useState([]); // Track uploaded temp filenames
   const [uploadProgress, setUploadProgress] = useState({}); // Track upload status by file index
+  const draftIdRef = useRef(draftMode && routeDraftId ? Number(routeDraftId) : null);
+  const skipAutosaveRef = useRef(false);
+  const [draftSaveStatus, setDraftSaveStatus] = useState('idle');
+  const draftSaving = useSelector((state) => state.products.draftSaving);
+
+  const draftPayload = useMemo(
+    () => buildProductDraftPayload({
+      formData,
+      photos,
+      videos,
+      selectedVehicle,
+      cellQuantities,
+    }),
+    [formData, photos, videos, selectedVehicle, cellQuantities],
+  );
 
   useEffect(() => {
     if (user?.organization_id) {
@@ -353,6 +379,125 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
       cancelled = true;
     };
   }, [dispatch, editPendingMode, editPendingId, navigate]);
+
+  useEffect(() => {
+    if (!draftMode || !routeDraftId || !isReady) return undefined;
+
+    let cancelled = false;
+    setLoadingFormData(true);
+
+    dispatch(fetchProductDraft(Number(routeDraftId)))
+      .unwrap()
+      .then((draft) => {
+        if (cancelled || !draft) return;
+
+        draftIdRef.current = draft.id;
+        skipAutosaveRef.current = true;
+        setFormData({
+          article: draft.article || '',
+          name: draft.name || '',
+          brand: draft.brand || '',
+          description: draft.description || '',
+          condition: draft.is_new ? 'новый' : 'б/у',
+          quantity: draft.quantity != null ? String(draft.quantity) : '',
+          sale_price: draft.price != null ? String(draft.price) : '',
+          storage_location_id: draft.storage_location_id ? String(draft.storage_location_id) : '',
+          part_type_id: draft.part_type_id ? String(draft.part_type_id) : '',
+        });
+
+        setPhotos(
+          (draft.photos || []).map((url) => ({
+            finalPath: typeof url === 'string' ? url : (url.full_url || url.photo_url || url.url || ''),
+            name: 'photo',
+            isExisting: true,
+          })).filter((item) => item.finalPath),
+        );
+
+        setVideos(
+          (draft.videos || []).map((url) => ({
+            finalPath: typeof url === 'string' ? url : (url.full_url || url.video_url || url.url || ''),
+            name: 'video',
+            isExisting: true,
+          })).filter((item) => item.finalPath),
+        );
+
+        const initialQuantities = {};
+        (draft.storage_cells || []).forEach((link) => {
+          if (link.storage_cell_id) {
+            initialQuantities[link.storage_cell_id] = link.value || '';
+          }
+        });
+        setCellQuantities(initialQuantities);
+
+        if (draft.vehicle_ids?.length) {
+          apiRequest(`/vehicles/${draft.vehicle_ids[0]}`)
+            .then((vehicle) => {
+              if (!cancelled && vehicle) setSelectedVehicle(vehicle);
+            })
+            .catch(() => {});
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          alert(typeof err === 'string' ? err : 'Не удалось загрузить черновик');
+          navigate('/my-parts?tab=drafts', { replace: true });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingFormData(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, draftMode, routeDraftId, isReady, navigate]);
+
+  useEffect(() => {
+    if (!isDraftFlow || !isReady || !canAccess || loadingFormData) return undefined;
+    if (!draftPayloadHasContent(draftPayload)) return undefined;
+
+    if (skipAutosaveRef.current) {
+      skipAutosaveRef.current = false;
+      return undefined;
+    }
+
+    const timer = window.setTimeout(async () => {
+      setDraftSaveStatus('saving');
+      try {
+        if (draftIdRef.current) {
+          await dispatch(updateProductDraft({
+            id: draftIdRef.current,
+            payload: draftPayload,
+          })).unwrap();
+        } else {
+          const created = await dispatch(createProductDraft(draftPayload)).unwrap();
+          draftIdRef.current = created.id;
+          if (!draftMode) {
+            window.history.replaceState(null, '', `/my-parts/drafts/${created.id}/edit`);
+          }
+        }
+        setDraftSaveStatus('saved');
+      } catch (_err) {
+        setDraftSaveStatus('error');
+      }
+    }, DRAFT_AUTOSAVE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    isDraftFlow,
+    isReady,
+    canAccess,
+    loadingFormData,
+    draftPayload,
+    draftMode,
+    dispatch,
+  ]);
+
+  useEffect(() => {
+    if (draftSaving) {
+      setDraftSaveStatus('saving');
+    }
+  }, [draftSaving]);
 
   const handleFileAdd = async (e) => {
     const files = Array.from(e.target.files);
@@ -854,6 +999,22 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
     setSubmitAttempted(false);
     setFieldErrors({});
 
+    if (isDraftFlow && draftIdRef.current) {
+      try {
+        const action = await dispatch(submitProductDraft(draftIdRef.current));
+        if (submitProductDraft.rejected.match(action)) {
+          return;
+        }
+        draftIdRef.current = null;
+        navigate('/my-parts?tab=pending');
+        return;
+      } catch (err) {
+        console.error(err);
+        alert('Не удалось отправить черновик на модерацию');
+        return;
+      }
+    }
+
     let photoUrls = [];
     let videoUrls = [];
 
@@ -1073,13 +1234,34 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
     ? 'Повторная отправка на модерацию'
     : editPendingMode
       ? 'Редактирование запчасти на модерации'
-      : 'Добавить запчасть';
+      : draftMode
+        ? 'Черновик запчасти'
+        : 'Добавить запчасть';
 
-  const cancelPath = (resubmitMode || editPendingMode) ? '/my-parts?tab=pending' : '/my-parts';
+  const cancelPath = (resubmitMode || editPendingMode)
+    ? '/my-parts?tab=pending'
+    : draftMode
+      ? '/my-parts?tab=drafts'
+      : '/my-parts';
+
+  const draftStatusLabel = draftSaveStatus === 'saving'
+    ? 'Сохранение черновика…'
+    : draftSaveStatus === 'saved'
+      ? 'Черновик сохранён'
+      : draftSaveStatus === 'error'
+        ? 'Не удалось сохранить черновик'
+        : isDraftFlow
+          ? 'Изменения сохраняются автоматически'
+          : '';
 
   return (
     <div className="max-w-4xl mx-auto p-6 max-md:pb-32">
       <h1 className="mb-6 text-2xl font-bold max-md:hidden">{pageTitle}</h1>
+      {isDraftFlow && draftStatusLabel && (
+        <p className={`mb-4 text-sm ${draftSaveStatus === 'error' ? 'text-red-600' : 'text-gray-500'}`}>
+          {draftStatusLabel}
+        </p>
+      )}
       {resubmitMode && rejectionReason && (
         <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-lg">
           <p className="text-sm font-medium text-red-800">Причина отклонения</p>
@@ -1603,10 +1785,11 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
           <button
             type="button"
             onClick={async () => {
-              // Clean up uploaded files
-              await cleanupFiles();
-              setPhotos([]);
-              setVideos([]);
+              if (!isDraftFlow) {
+                await cleanupFiles();
+                setPhotos([]);
+                setVideos([]);
+              }
               navigate(cancelPath);
             }}
             className="px-4 py-2 border border-gray-300 rounded-md"
@@ -1622,9 +1805,11 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false }) => {
         primaryDisabled={productStatus || isUploadingMedia}
         secondaryLabel="Отмена"
         onSecondary={async () => {
-          await cleanupFiles();
-          setPhotos([]);
-          setVideos([]);
+          if (!isDraftFlow) {
+            await cleanupFiles();
+            setPhotos([]);
+            setVideos([]);
+          }
           navigate(cancelPath);
         }}
       />

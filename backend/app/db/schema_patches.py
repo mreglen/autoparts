@@ -1878,3 +1878,72 @@ def ensure_public_catalog_indexes() -> None:
             conn.execute(text(stmt))
     logger.info("Applied public catalog indexes on products")
 
+
+def ensure_product_drafts_table() -> None:
+    """Create product_drafts table for personal add-part drafts."""
+    inspector = inspect(engine)
+    if "product_drafts" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE product_drafts (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            article VARCHAR(30),
+            name VARCHAR(255),
+            brand VARCHAR(100),
+            description TEXT,
+            is_new BOOLEAN DEFAULT TRUE,
+            price NUMERIC(12, 2),
+            quantity INTEGER,
+            storage_location_id INTEGER REFERENCES storage_locations(id),
+            part_type_id INTEGER REFERENCES part_types(id),
+            photos TEXT,
+            videos TEXT,
+            vehicle_ids TEXT,
+            storage_cells_json TEXT
+        )
+        """
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS ix_product_drafts_org ON product_drafts (organization_id)",
+            "CREATE INDEX IF NOT EXISTS ix_product_drafts_user ON product_drafts (created_by)",
+        ]
+    else:
+        ddl = """
+        CREATE TABLE product_drafts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            article VARCHAR(30),
+            name VARCHAR(255),
+            brand VARCHAR(100),
+            description TEXT,
+            is_new BOOLEAN DEFAULT 1,
+            price NUMERIC(12, 2),
+            quantity INTEGER,
+            storage_location_id INTEGER REFERENCES storage_locations(id),
+            part_type_id INTEGER REFERENCES part_types(id),
+            photos TEXT,
+            videos TEXT,
+            vehicle_ids TEXT,
+            storage_cells_json TEXT
+        )
+        """
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS ix_product_drafts_org ON product_drafts (organization_id)",
+            "CREATE INDEX IF NOT EXISTS ix_product_drafts_user ON product_drafts (created_by)",
+        ]
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        for stmt in indexes:
+            conn.execute(text(stmt))
+
+    logger.info("Applied product_drafts table patch")
+

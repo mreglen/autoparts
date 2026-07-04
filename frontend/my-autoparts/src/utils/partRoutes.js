@@ -124,3 +124,8 @@ export function navigateGarageOrderItem(navigate, item, orderType) {
 
   navigate(`/part/${productId}`);
 }
+
+/** Формы добавления/редактирования запчастей — pull-to-refresh без перезагрузки страницы. */
+export function isMyPartsFormRoute(pathname) {
+  return /^\/my-parts\/(?:add|edit\/\d+|edit-pending\/\d+|resubmit\/\d+|drafts\/\d+\/edit)(?:\/|$)/.test(pathname || '');
+}

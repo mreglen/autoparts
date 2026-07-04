@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import PurchaseOrderCard, { PurchaseOrdersEmptyState } from '../../components/PurchaseOrderCard/PurchaseOrderCard';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
 import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus } from '../../utils/garageOrderUi';
+import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
+import { openOrderItemProductFlow } from '../../utils/avitoProductFlow';
 
 const ACTIVE_STATUSES = new Set([
   'pending',
@@ -90,6 +93,7 @@ function matchesStatusFilter(order, filterId, source = 'used') {
 
 export default function PurchasesOrdersPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { isReady, isAuthenticated } = useAuthReady();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -199,23 +203,16 @@ export default function PurchasesOrdersPage() {
     return { total: allOrdersPool.length, activeCount, totalSum };
   }, [allOrdersPool]);
 
-  const handleProductClick = (item, e) => {
+  const handleProductClick = useCallback(async (item, e, orderType = 'used') => {
     e?.stopPropagation?.();
-    if (item.product_id) {
-      const productId = item.product_id;
-      const brand = item.brand || item.product?.brand;
-      const article = item.partnumber || item.product?.partnumber;
-
-      if (brand && article) {
-        navigate(
-          `/part/${productId}-${encodeURIComponent(String(brand))}-${encodeURIComponent(String(article))}`,
-        );
-        return;
-      }
-
-      navigate(`/part/${productId}`);
-    }
-  };
+    await openOrderItemProductFlow({
+      item,
+      orderType,
+      dispatch,
+      navigate,
+      fetchLinkThunk: fetchAvitoChatProductLink,
+    });
+  }, [dispatch, navigate]);
 
   const toggleOrderExpand = (key) => {
     setExpandedOrderKey((prev) => (prev === key ? null : key));

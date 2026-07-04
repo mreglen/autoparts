@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { fetchAvitoChatProductLink } from '../redux/slices/AvitoChatSlice';
-import { openAvitoProductFlow } from '../utils/avitoProductFlow';
+import { openOrderItemProductFlow } from '../utils/avitoProductFlow';
 import {
   getAvitoBuyerAndDelivery,
   getAvitoDisplayTotal,
@@ -86,8 +86,10 @@ export function AvitoOrderCard({
 
   const handleProductClick = async (item, e) => {
     e?.stopPropagation?.();
-    await openAvitoProductFlow({
+    await openOrderItemProductFlow({
       item,
+      orderType: 'avito',
+      order,
       dispatch,
       navigate,
       fetchLinkThunk: fetchAvitoChatProductLink,

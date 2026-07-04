@@ -1,0 +1,45 @@
+from datetime import datetime
+from typing import Optional, List
+
+from pydantic import BaseModel, Field
+
+
+class StorageCellDraftItem(BaseModel):
+    storage_cell_id: int
+    value: str = ""
+
+
+class ProductDraftBase(BaseModel):
+    article: Optional[str] = None
+    name: Optional[str] = None
+    brand: Optional[str] = None
+    description: Optional[str] = None
+    is_new: bool = True
+    price: Optional[float] = None
+    quantity: Optional[int] = None
+    storage_location_id: Optional[int] = None
+    part_type_id: Optional[int] = None
+    photos: Optional[List[str]] = None
+    videos: Optional[List[str]] = None
+    vehicle_ids: Optional[List[int]] = None
+    storage_cells: Optional[List[StorageCellDraftItem]] = None
+
+
+class ProductDraftCreate(ProductDraftBase):
+    pass
+
+
+class ProductDraftUpdate(ProductDraftBase):
+    pass
+
+
+class ProductDraft(ProductDraftBase):
+    id: int
+    organization_id: str
+    created_by: int
+    created_at: datetime
+    updated_at: datetime
+    creator_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True

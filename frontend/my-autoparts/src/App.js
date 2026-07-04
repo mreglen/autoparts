@@ -348,6 +348,14 @@ function App() {
             )}
           />
           <Route
+            path="/my-parts/drafts/:draftId/edit"
+            element={(
+              <LazyRoute>
+                <AddPart draftMode />
+              </LazyRoute>
+            )}
+          />
+          <Route
             path="/my-parts/edit/:id"
             element={(
               <LazyRoute>
