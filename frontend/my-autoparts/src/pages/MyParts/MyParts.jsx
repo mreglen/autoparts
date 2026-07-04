@@ -5,7 +5,7 @@ import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import { normalizeImageUrl, apiRequest } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
-import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI, fetchMyProductDrafts, deleteProductDraft, submitProductDraft, selectMyProductsTotal, selectMyProductsPage, selectMyProductsHasMore, selectMyProductsLoadingMore, selectMyProductsFilterKey, selectDraftItems, selectDraftLoading, selectDraftError } from '../../redux/slices/ProductSlice';
+import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI, fetchMyProductDrafts, deleteProductDraft, submitProductDraft, selectMyProductsTotal, selectMyProductsTotalQuantity, selectMyProductsTotalValue, selectMyProductsPage, selectMyProductsHasMore, selectMyProductsLoadingMore, selectMyProductsFilterKey, selectDraftItems, selectDraftLoading, selectDraftError } from '../../redux/slices/ProductSlice';
 import { formatDraftTitle } from '../../utils/productDraftUtils';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
@@ -748,6 +748,8 @@ function MyParts() {
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const { items: products, pendingItems, rejectedItems, loading, error } = useSelector((state) => state.products);
   const myProductsTotal = useSelector(selectMyProductsTotal);
+  const myProductsTotalQuantity = useSelector(selectMyProductsTotalQuantity);
+  const myProductsTotalValue = useSelector(selectMyProductsTotalValue);
   const myProductsPage = useSelector(selectMyProductsPage);
   const myProductsHasMore = useSelector(selectMyProductsHasMore);
   const myProductsLoadingMore = useSelector(selectMyProductsLoadingMore);
@@ -964,8 +966,21 @@ function MyParts() {
   const moderationItemsCount = (pendingItems?.length || 0) + (rejectedItems?.length || 0);
 
   const statsParts = isModerationTab ? sortedModerationParts : sortedDisplayParts;
-  const totalValue = statsParts.reduce((sum, part) => sum + ((Number(part.price) || 0) * (Number(part.quantity) || 0)), 0);
-  const totalQuantity = statsParts.reduce((sum, part) => sum + (Number(part.quantity) || 0), 0);
+  const clientStatsValue = statsParts.reduce(
+    (sum, part) => sum + ((Number(part.price) || 0) * (Number(part.quantity) || 0)),
+    0,
+  );
+  const clientStatsQuantity = statsParts.reduce(
+    (sum, part) => sum + (Number(part.quantity) || 0),
+    0,
+  );
+  const inStockListFullyLoaded = !isModerationTab && products.length >= myProductsTotal;
+  const totalValue = isModerationTab
+    ? clientStatsValue
+    : (inStockListFullyLoaded ? clientStatsValue : myProductsTotalValue);
+  const totalQuantity = isModerationTab
+    ? clientStatsQuantity
+    : (inStockListFullyLoaded ? clientStatsQuantity : myProductsTotalQuantity);
 
   const handleOpenModal = (part, type) => {
     setSelectedPart(part);
@@ -1620,9 +1635,19 @@ function MyParts() {
           </div>
           <div className="text-sm text-gray-500">
             {activeFilters.storage
-              ? (isModerationTab ? 'Количество по складу (модерация)' : 'Общее количество склада')
-              : (isModerationTab ? 'Количество на модерации' : 'Общее количество всех складов')}
+              ? (isModerationTab ? 'Количество по складу (модерация)' : 'Количество штук по складу')
+              : (isModerationTab ? 'Количество на модерации' : 'Количество штук на всех складах')}
           </div>
+          {!isModerationTab && myProductsTotal > 0 && (
+            <>
+              <div className="text-lg font-semibold text-gray-700 mt-1">
+                {myProductsTotal.toLocaleString('ru-RU')} поз.
+              </div>
+              <div className="text-sm text-gray-500">
+                {activeFilters.storage ? 'Позиций на складе' : 'Позиций на всех складах'}
+              </div>
+            </>
+          )}
         </div>
         )}
       </div>
@@ -1806,7 +1831,10 @@ function MyParts() {
             <div className="pb-2 inline-block border-b-4 border-blue-500">
               В наличии
               {myProductsTotal > 0 && (
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                <span
+                  className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                  title={`${myProductsTotal} позиций`}
+                >
                   {myProductsTotal}
                 </span>
               )}

@@ -968,6 +968,8 @@ const productSlice = createSlice({
         catalogFacets: null,
         publicPartTypes: [],
         myProductsTotal: 0,
+        myProductsTotalQuantity: 0,
+        myProductsTotalValue: 0,
         myProductsPage: 1,
         myProductsPageSize: 30,
         myProductsHasMore: false,
@@ -988,6 +990,8 @@ const productSlice = createSlice({
             state.loading = false;
             state.error = null;
             state.myProductsTotal = 0;
+            state.myProductsTotalQuantity = 0;
+            state.myProductsTotalValue = 0;
             state.myProductsPage = 1;
             state.myProductsHasMore = false;
             state.myProductsLoadingMore = false;
@@ -1356,6 +1360,8 @@ const productSlice = createSlice({
                     state.items = newItems;
                 }
                 state.myProductsTotal = action.payload?.total ?? state.items.length;
+                state.myProductsTotalQuantity = action.payload?.total_quantity ?? 0;
+                state.myProductsTotalValue = action.payload?.total_value ?? 0;
                 state.myProductsPage = action.payload?.page ?? 1;
                 state.myProductsPageSize = pageSize;
                 const addedCount = state.items.length - (append ? beforeLen : 0);
@@ -1619,6 +1625,8 @@ export const selectMyParts = (state) => state.products.items;
 export const selectMyPartsStatus = (state) => state.products.loading ? 'loading' : 'idle';
 export const selectMyPartsError = (state) => state.products.error;
 export const selectMyProductsTotal = (state) => state.products.myProductsTotal;
+export const selectMyProductsTotalQuantity = (state) => state.products.myProductsTotalQuantity;
+export const selectMyProductsTotalValue = (state) => state.products.myProductsTotalValue;
 export const selectMyProductsPage = (state) => state.products.myProductsPage;
 export const selectMyProductsHasMore = (state) => state.products.myProductsHasMore;
 export const selectMyProductsLoadingMore = (state) => state.products.myProductsLoadingMore;

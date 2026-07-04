@@ -56,6 +56,12 @@ class PublicProductsResponse(BaseModel):
     page_size: int
 
 
+class MyProductsListResponse(PublicProductsResponse):
+    """Список «Мои запчасти» с агрегатами по всему фильтру (не только текущая страница)."""
+    total_quantity: int = 0
+    total_value: float = 0
+
+
 def _public_list_load_options():
     return [
         selectinload(ProductModel.photos),
@@ -1150,7 +1156,7 @@ def _apply_my_products_sort(query, sort: str):
     return query.order_by(ProductModel.id.desc())
 
 
-@router.get("/", response_model=PublicProductsResponse)
+@router.get("/", response_model=MyProductsListResponse)
 def get_products(
     storage_location_id: Optional[int] = None,
     q: Optional[str] = None,
@@ -1174,7 +1180,14 @@ def get_products(
         query = query.filter(ProductModel.storage_location_id == storage_location_id)
 
     query = _apply_my_products_search(query, q or "")
-    total = query.order_by(None).count()
+    stats_query = query.order_by(None)
+    total = stats_query.count()
+    agg = stats_query.with_entities(
+        func.coalesce(func.sum(ProductModel.quantity), 0),
+        func.coalesce(func.sum(ProductModel.quantity * ProductModel.price), 0),
+    ).one()
+    total_quantity = int(agg[0] or 0)
+    total_value = float(agg[1] or 0)
     products = (
         _apply_my_products_sort(query, sort)
         .offset((page - 1) * page_size)
@@ -1186,9 +1199,11 @@ def get_products(
         product.is_on_avito = len(product.avito_listing_links) > 0
         product.is_on_drom = len(product.drom_listing_links) > 0
 
-    return PublicProductsResponse(
+    return MyProductsListResponse(
         items=products,
         total=total,
+        total_quantity=total_quantity,
+        total_value=total_value,
         page=page,
         page_size=page_size,
     )
