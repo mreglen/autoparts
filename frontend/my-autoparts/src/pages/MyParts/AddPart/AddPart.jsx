@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -44,6 +44,10 @@ import {
 import {
   buildProductDraftPayload,
   draftPayloadHasContent,
+  draftToFormSnapshot,
+  readDraftSessionCache,
+  writeDraftSessionCache,
+  clearDraftSessionCache,
 } from '../../../utils/productDraftUtils';
 
 import VehicleModal from './VehicleModal';
@@ -57,14 +61,28 @@ const SUGGEST_ITEM =
 
 const DRAFT_AUTOSAVE_MS = 1000;
 
+const EMPTY_FORM_DATA = {
+  article: '',
+  name: '',
+  brand: '',
+  description: '',
+  condition: 'новый',
+  quantity: '',
+  sale_price: '',
+  storage_location_id: '',
+  part_type_id: '',
+};
+
 const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = false }) => {
   const navigate = useNavigate();
   const { id: routeId, draftId: routeDraftId } = useParams();
   const resubmitId = resubmitMode ? routeId : null;
   const editPendingId = editPendingMode ? routeId : null;
   const isDraftFlow = !resubmitMode && !editPendingMode;
+  const initialDraftCache =
+    draftMode && routeDraftId ? readDraftSessionCache(Number(routeDraftId)) : null;
   const dispatch = useDispatch();
-  const { isReady } = useAuthReady();
+  const { isReady, token } = useAuthReady();
   const user = useSelector((state) => state.auth.user);
   const canAccess = Boolean(user?.is_seller || user?.is_employee || user?.is_admin);
   const productStatus = useSelector((state) => state.products.loading);
@@ -75,19 +93,9 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
 
   const stockInError = useSelector((state) => state.stockIn.error);
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
-  const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [selectedVehicle, setSelectedVehicle] = useState(() => initialDraftCache?.vehicle || null);
   
-  const [formData, setFormData] = useState({
-    article: '',
-    name: '',
-    brand: '',
-    description: '',
-    condition: 'новый',
-    quantity: '',
-    sale_price: '',
-    storage_location_id: '',
-    part_type_id: '',
-  });
+  const [formData, setFormData] = useState(() => initialDraftCache?.formData || EMPTY_FORM_DATA);
 
   const {
     access: aiDescriptionAccess,
@@ -124,16 +132,18 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
   const [rosskoLookupError, setRosskoLookupError] = useState(null);
   const [rosskoLookupNotice, setRosskoLookupNotice] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
-  const [loadingFormData, setLoadingFormData] = useState(resubmitMode || editPendingMode || draftMode);
+  const [loadingFormData, setLoadingFormData] = useState(
+    () => (resubmitMode || editPendingMode || (draftMode && !initialDraftCache)),
+  );
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const showFieldError = (name) => Boolean(submitAttempted && fieldErrors[name]);
   const [existingPendingStorageCells, setExistingPendingStorageCells] = useState([]);
 
-  const [photos, setPhotos] = useState([]);
-  const [videos, setVideos] = useState([]);
+  const [photos, setPhotos] = useState(() => initialDraftCache?.photos || []);
+  const [videos, setVideos] = useState(() => initialDraftCache?.videos || []);
   const [locationCells, setLocationCells] = useState([]);
-  const [cellQuantities, setCellQuantities] = useState({});
+  const [cellQuantities, setCellQuantities] = useState(() => initialDraftCache?.cellQuantities || {});
   const [newCellName, setNewCellName] = useState('');
   const [newCellValue, setNewCellValue] = useState('');
   const [showNewCellForm, setShowNewCellForm] = useState(false);
@@ -141,6 +151,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
   const [uploadedTempFiles, setUploadedTempFiles] = useState([]); // Track uploaded temp filenames
   const [uploadProgress, setUploadProgress] = useState({}); // Track upload status by file index
   const draftIdRef = useRef(draftMode && routeDraftId ? Number(routeDraftId) : null);
+  const hadDraftCacheRef = useRef(Boolean(initialDraftCache));
   const skipAutosaveRef = useRef(false);
   const [draftSaveStatus, setDraftSaveStatus] = useState('idle');
   const draftSaving = useSelector((state) => state.products.draftSaving);
@@ -172,8 +183,8 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
             const cells = Array.isArray(result.payload) ? result.payload : [];
             setLocationCells(cells);
 
-            if (editPendingMode || resubmitMode) {
-              // Не затираем значения, загруженные из pending/rejected — только добавляем ключи для новых ячеек
+            if (editPendingMode || resubmitMode || draftMode) {
+              // Не затираем значения, загруженные из pending/rejected/черновика — только добавляем ключи для новых ячеек
               setCellQuantities((prev) => {
                 const next = { ...prev };
                 cells.forEach((cell) => {
@@ -195,11 +206,11 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         });
     } else {
       setLocationCells([]);
-      if (!editPendingMode && !resubmitMode) {
+      if (!editPendingMode && !resubmitMode && !draftMode) {
         setCellQuantities({});
       }
     }
-  }, [dispatch, formData.storage_location_id, editPendingMode, resubmitMode]);
+  }, [dispatch, formData.storage_location_id, editPendingMode, resubmitMode, draftMode]);
   
   // Refresh storage cells when they are modified elsewhere
   useEffect(() => {
@@ -380,65 +391,66 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
     };
   }, [dispatch, editPendingMode, editPendingId, navigate]);
 
+  const applyDraftSnapshot = useCallback((snapshot, { skipAutosave = true, draftId } = {}) => {
+    if (!snapshot) return;
+    if (skipAutosave) skipAutosaveRef.current = true;
+    if (draftId != null) draftIdRef.current = draftId;
+    if (snapshot.formData) setFormData(snapshot.formData);
+    if (snapshot.photos) setPhotos(snapshot.photos);
+    if (snapshot.videos) setVideos(snapshot.videos);
+    if (snapshot.cellQuantities) setCellQuantities(snapshot.cellQuantities);
+    if (snapshot.vehicle) {
+      setSelectedVehicle(snapshot.vehicle);
+    } else if (snapshot.vehicleId) {
+      apiRequest(`/vehicles/${snapshot.vehicleId}`)
+        .then((vehicle) => {
+          if (vehicle) setSelectedVehicle(vehicle);
+        })
+        .catch(() => {});
+    }
+  }, []);
+
   useEffect(() => {
-    if (!draftMode || !routeDraftId || !isReady) return undefined;
+    if (!draftMode || !routeDraftId) return undefined;
+    if (!readDraftSessionCache(Number(routeDraftId))) return undefined;
+    skipAutosaveRef.current = true;
+    draftIdRef.current = Number(routeDraftId);
+    return undefined;
+  }, [draftMode, routeDraftId]);
+
+  useEffect(() => {
+    if (!draftMode || !routeDraftId) return undefined;
+    if (!token && !localStorage.getItem('token')) return undefined;
 
     let cancelled = false;
-    setLoadingFormData(true);
+    const draftIdNum = Number(routeDraftId);
+    const hadCache = hadDraftCacheRef.current;
+    if (!hadCache) setLoadingFormData(true);
 
-    dispatch(fetchProductDraft(Number(routeDraftId)))
+    dispatch(fetchProductDraft(draftIdNum))
       .unwrap()
       .then((draft) => {
         if (cancelled || !draft) return;
 
-        draftIdRef.current = draft.id;
-        skipAutosaveRef.current = true;
-        setFormData({
-          article: draft.article || '',
-          name: draft.name || '',
-          brand: draft.brand || '',
-          description: draft.description || '',
-          condition: draft.is_new ? 'новый' : 'б/у',
-          quantity: draft.quantity != null ? String(draft.quantity) : '',
-          sale_price: draft.price != null ? String(draft.price) : '',
-          storage_location_id: draft.storage_location_id ? String(draft.storage_location_id) : '',
-          part_type_id: draft.part_type_id ? String(draft.part_type_id) : '',
-        });
+        const snapshot = draftToFormSnapshot(draft);
+        applyDraftSnapshot(snapshot, { skipAutosave: true, draftId: draft.id });
 
-        setPhotos(
-          (draft.photos || []).map((url) => ({
-            finalPath: typeof url === 'string' ? url : (url.full_url || url.photo_url || url.url || ''),
-            name: 'photo',
-            isExisting: true,
-          })).filter((item) => item.finalPath),
-        );
-
-        setVideos(
-          (draft.videos || []).map((url) => ({
-            finalPath: typeof url === 'string' ? url : (url.full_url || url.video_url || url.url || ''),
-            name: 'video',
-            isExisting: true,
-          })).filter((item) => item.finalPath),
-        );
-
-        const initialQuantities = {};
-        (draft.storage_cells || []).forEach((link) => {
-          if (link.storage_cell_id) {
-            initialQuantities[link.storage_cell_id] = link.value || '';
-          }
-        });
-        setCellQuantities(initialQuantities);
-
-        if (draft.vehicle_ids?.length) {
+        if (draft.vehicle_ids?.length && !snapshot.vehicle) {
           apiRequest(`/vehicles/${draft.vehicle_ids[0]}`)
             .then((vehicle) => {
-              if (!cancelled && vehicle) setSelectedVehicle(vehicle);
+              if (cancelled || !vehicle) return;
+              setSelectedVehicle(vehicle);
+              writeDraftSessionCache(draft.id, { ...snapshot, vehicle });
             })
-            .catch(() => {});
+            .catch(() => {
+              writeDraftSessionCache(draft.id, snapshot);
+            });
+        } else {
+          writeDraftSessionCache(draft.id, snapshot);
         }
       })
       .catch((err) => {
-        if (!cancelled) {
+        if (!cancelled && !hadCache) {
           alert(typeof err === 'string' ? err : 'Не удалось загрузить черновик');
           navigate('/my-parts?tab=drafts', { replace: true });
         }
@@ -450,7 +462,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
     return () => {
       cancelled = true;
     };
-  }, [dispatch, draftMode, routeDraftId, isReady, navigate]);
+  }, [dispatch, draftMode, routeDraftId, token, applyDraftSnapshot, navigate]);
 
   useEffect(() => {
     if (!isDraftFlow || !isReady || !canAccess || loadingFormData) return undefined;
@@ -469,9 +481,18 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
             id: draftIdRef.current,
             payload: draftPayload,
           })).unwrap();
+          writeDraftSessionCache(draftIdRef.current, {
+            formData,
+            photos,
+            videos,
+            cellQuantities,
+            vehicle: selectedVehicle,
+            vehicleId: selectedVehicle?.id ?? null,
+          });
         } else {
           const created = await dispatch(createProductDraft(draftPayload)).unwrap();
           draftIdRef.current = created.id;
+          writeDraftSessionCache(created.id, draftToFormSnapshot(created));
           if (!draftMode) {
             window.history.replaceState(null, '', `/my-parts/drafts/${created.id}/edit`);
           }
@@ -491,6 +512,11 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
     draftPayload,
     draftMode,
     dispatch,
+    formData,
+    photos,
+    videos,
+    cellQuantities,
+    selectedVehicle,
   ]);
 
   useEffect(() => {
@@ -1005,7 +1031,9 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         if (submitProductDraft.rejected.match(action)) {
           return;
         }
+        const submittedDraftId = draftIdRef.current;
         draftIdRef.current = null;
+        clearDraftSessionCache(submittedDraftId);
         navigate('/my-parts?tab=pending');
         return;
       } catch (err) {
@@ -1210,7 +1238,15 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
     }
   }, [isReady, canAccess, navigate]);
 
-  if (!isReady || loadingFormData) {
+  if (!isReady) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <AuthLoadingScreen />
+      </div>
+    );
+  }
+
+  if (loadingFormData && !draftMode) {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <AuthLoadingScreen />
@@ -1255,7 +1291,18 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
           : '';
 
   return (
-    <div className="max-w-4xl mx-auto p-6 max-md:pb-32">
+    <div className="relative max-w-4xl mx-auto p-6 max-md:pb-32">
+      {draftMode && loadingFormData && (
+        <div
+          className="absolute inset-0 z-20 flex items-start justify-center bg-white/75 pt-24"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <p className="rounded-full bg-white px-4 py-2 text-sm text-gray-600 shadow-sm">
+            Обновление черновика…
+          </p>
+        </div>
+      )}
       <h1 className="mb-6 text-2xl font-bold max-md:hidden">{pageTitle}</h1>
       {isDraftFlow && draftStatusLabel && (
         <p className={`mb-4 text-sm ${draftSaveStatus === 'error' ? 'text-red-600' : 'text-gray-500'}`}>
@@ -1311,7 +1358,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
             <div>
               <p className="text-sm font-medium text-gray-900">Заполнение из Rossko</p>
               <p className="text-xs text-gray-600 mt-1">
-                Введите артикул и при необходимости бренд, затем подгрузите название и цену (округление до 5 или 10 ₽, без копеек).
+                Введите артикул и при необходимости бренд, затем подгрузите название и цену.
               </p>
             </div>
             <button

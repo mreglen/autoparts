@@ -28,10 +28,11 @@ export default function PullToRefresh() {
     }
     await Promise.allSettled(tasks);
 
+    const minMs = isMyPartsFormRoute(location.pathname) ? 0 : SOFT_REFRESH_MIN_MS;
     const elapsed = Date.now() - startedAt;
-    if (elapsed < SOFT_REFRESH_MIN_MS) {
+    if (minMs > 0 && elapsed < minMs) {
       await new Promise((resolve) => {
-        setTimeout(resolve, SOFT_REFRESH_MIN_MS - elapsed);
+        setTimeout(resolve, minMs - elapsed);
       });
     }
   }, [dispatch, location.pathname, organizationId]);
