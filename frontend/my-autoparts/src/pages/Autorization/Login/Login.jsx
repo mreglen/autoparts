@@ -20,8 +20,8 @@ export default function Login() {
         dispatch(loginThunk({ login: loginValue, password }))
             .unwrap()
             .then(() => {
+                navigate('/', { replace: true });
                 dispatch(fetchCart());
-                navigate('/');
             })
             .catch(() => { });
     };

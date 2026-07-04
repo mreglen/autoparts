@@ -219,8 +219,28 @@ const setGuestCartToken = (token) => {
 
 const GUEST_CART_HEADER_NAME = 'X-Guest-Cart-Token';
 
+const API_REQUEST_TIMEOUT_MS = 20000;
+
+const withRequestTimeout = (options = {}, timeoutMs = API_REQUEST_TIMEOUT_MS) => {
+    if (options.signal) return { fetchOptions: options, timeoutId: null };
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+    const { _timeoutId: _ignored, ...rest } = options;
+    return {
+        fetchOptions: { ...rest, signal: controller.signal },
+        timeoutId,
+    };
+};
+
+const clearRequestTimeout = (timeoutId) => {
+    if (timeoutId) {
+        window.clearTimeout(timeoutId);
+    }
+};
+
 export const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
     const url = `${API_BASE}${endpoint}`;
+    const timed = withRequestTimeout(options);
     const defaultOptions = {
         credentials: 'include',
         headers: {
@@ -229,10 +249,20 @@ export const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
             [GUEST_CART_HEADER_NAME]: getGuestCartToken() || undefined,
             ...options.headers
         },
-        ...options
+        ...timed.fetchOptions
     };
 
-    const response = await fetch(url, defaultOptions);
+    let response;
+    try {
+        response = await fetch(url, defaultOptions);
+    } catch (err) {
+        clearRequestTimeout(timed.timeoutId);
+        if (err?.name === 'AbortError') {
+            throw new Error('Сервер не отвечает. Попробуйте ещё раз через несколько секунд.');
+        }
+        throw err;
+    }
+    clearRequestTimeout(timed.timeoutId);
 
     const guestTokenFromResponse = response.headers.get(GUEST_CART_HEADER_NAME);
     if (guestTokenFromResponse) {
@@ -240,7 +270,7 @@ export const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
     }
 
     if (!response.ok) {
-        if (retryCount < 2 && [502, 503, 504].includes(response.status)) {
+        if (retryCount < 1 && [502, 503, 504].includes(response.status)) {
             await new Promise((resolve) => setTimeout(resolve, 400 * (retryCount + 1)));
             return apiRequest(endpoint, options, retryCount + 1);
         }
@@ -292,11 +322,9 @@ export const apiRequestUnauth = async (endpoint, options = {}) => {
 };
 
 
-export const apiRequestFormData = async (endpoint, formData, options = {}) => {
+export const apiRequestFormData = async (endpoint, formData, options = {}, retryCount = 0) => {
     const url = `${API_BASE}${endpoint}`;
-    const token = localStorage.getItem('token');
-    console.log('apiRequestFormData - Token exists:', !!token);
-    console.log('apiRequestFormData - Endpoint:', endpoint);
+    const timed = withRequestTimeout(options);
 
     const defaultOptions = {
         method: 'POST',
@@ -304,19 +332,30 @@ export const apiRequestFormData = async (endpoint, formData, options = {}) => {
             ...getAuthHeaders(),
             ...options.headers
         },
-        ...options
+        ...timed.fetchOptions
     };
-    
-    console.log('apiRequestFormData - Headers:', defaultOptions.headers);
 
-    const response = await fetch(url, {
-        ...defaultOptions,
-        body: formData
-    });
+    let response;
+    try {
+        response = await fetch(url, {
+            ...defaultOptions,
+            body: formData
+        });
+    } catch (err) {
+        clearRequestTimeout(timed.timeoutId);
+        if (err?.name === 'AbortError') {
+            throw new Error('Сервер не отвечает. Попробуйте ещё раз через несколько секунд.');
+        }
+        throw err;
+    }
+    clearRequestTimeout(timed.timeoutId);
 
     if (!response.ok) {
+        if (retryCount < 1 && [502, 503, 504].includes(response.status)) {
+            await new Promise((resolve) => setTimeout(resolve, 400 * (retryCount + 1)));
+            return apiRequestFormData(endpoint, formData, options, retryCount + 1);
+        }
         const errorData = await response.json().catch(() => ({}));
-        console.error('apiRequestFormData - Error:', errorData);
         const msg = formatApiDetail(errorData.detail) || `HTTP ${response.status}: ${response.statusText}`;
         throw new Error(msg);
     }

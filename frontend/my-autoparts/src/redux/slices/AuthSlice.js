@@ -206,7 +206,8 @@ const authSlice = createSlice({
         })(), // Stores permission codes for employees (from JWT token) - e.g., ['sellers', 'orders.view']
 
         // Общее — при наличии токена ждём fetchProfile перед проверками доступа
-        loading: Boolean(localStorage.getItem('token')),
+        profileLoading: Boolean(localStorage.getItem('token')),
+        loading: false,
         error: null,
     },
     reducers: {
@@ -345,15 +346,15 @@ const authSlice = createSlice({
             })
             // fetchProfile
             .addCase(fetchProfile.pending, (state) => {
-                state.loading = true;
+                state.profileLoading = true;
                 state.error = null;
             })
             .addCase(fetchProfile.fulfilled, (state, action) => {
-                state.loading = false;
+                state.profileLoading = false;
                 state.user = action.payload;
             })
             .addCase(fetchProfile.rejected, (state, action) => {
-                state.loading = false;
+                state.profileLoading = false;
                 state.error = action.payload;
                 
                 // Only clear token if it's definitely an authentication error
