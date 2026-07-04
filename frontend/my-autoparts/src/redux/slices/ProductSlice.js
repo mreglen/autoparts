@@ -345,7 +345,16 @@ export const fetchMyProducts = createAsyncThunk(
                 '/products/',
                 { params: apiParams, signal }
             );
-            return response.data;
+            const data = response.data;
+            if (Array.isArray(data)) {
+                return {
+                    items: data,
+                    total: data.length,
+                    page: apiParams.page ?? 1,
+                    page_size: apiParams.page_size ?? data.length,
+                };
+            }
+            return data;
         } catch (error) {
             if (signal.aborted || error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
                 throw error;
@@ -889,6 +898,11 @@ const productSlice = createSlice({
             state.items = [];
             state.loading = false;
             state.error = null;
+            state.myProductsTotal = 0;
+            state.myProductsPage = 1;
+            state.myProductsHasMore = false;
+            state.myProductsLoadingMore = false;
+            state.myProductsFilterKey = null;
         },
         clearSearchCache: (state) => {
             state.searchCache = {};
@@ -1261,12 +1275,24 @@ const productSlice = createSlice({
                 state.myProductsHasMore =
                     hasRoomByTotal && receivedFullPage && (append ? addedCount > 0 : newItems.length > 0);
                 if (!append) {
-                    const { append: _append, page: _page, ...filterArg } = action.meta?.arg || {};
-                    state.myProductsFilterKey = JSON.stringify(filterArg);
+                    const arg = action.meta?.arg || {};
+                    state.myProductsFilterKey = JSON.stringify({
+                        storage: String(arg.storage_location_id || ''),
+                        q: (arg.q || '').trim(),
+                        sort: arg.sort || 'date_desc',
+                    });
                 }
             })
             .addCase(fetchMyProducts.rejected, (state, action) => {
-                if (action.meta.aborted) return;
+                const append = Boolean(action.meta?.arg?.append);
+                if (action.meta?.aborted) {
+                    if (append) {
+                        state.myProductsLoadingMore = false;
+                    } else {
+                        state.loading = false;
+                    }
+                    return;
+                }
                 state.loading = false;
                 state.myProductsLoadingMore = false;
                 state.error = action.payload;

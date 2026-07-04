@@ -1349,7 +1349,10 @@ function MyParts() {
   useEffect(() => {
     if (activeTab !== 'in-stock' || !user?.organization_id) return;
 
-    const alreadyLoaded = myProductsFilterKey === inStockFilterKey && myProductsFilterKey !== null;
+    const alreadyLoaded =
+      myProductsFilterKey === inStockFilterKey
+      && myProductsFilterKey !== null
+      && (products.length > 0 || myProductsTotal === 0);
     if (!alreadyLoaded) {
       dispatch(fetchMyProducts(buildMyProductsRequest({
         page: 1,
