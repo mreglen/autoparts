@@ -6,16 +6,9 @@ import { store } from './redux/store';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import { scheduleAppSplashHide } from './utils/appSplash';
 
-function hidePwaSplash() {
-  const splash = document.getElementById('pwa-splash');
-  if (!splash || splash.classList.contains('pwa-splash--hide')) return;
-
-  splash.classList.add('pwa-splash--hide');
-  const removeSplash = () => splash.remove();
-  splash.addEventListener('transitionend', removeSplash, { once: true });
-  window.setTimeout(removeSplash, 400);
-}
+window.__sgSplashStart = Date.now();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -29,7 +22,7 @@ root.render(
 );
 
 requestAnimationFrame(() => {
-  requestAnimationFrame(hidePwaSplash);
+  requestAnimationFrame(scheduleAppSplashHide);
 });
 
 // Register Service Worker for Push Notifications

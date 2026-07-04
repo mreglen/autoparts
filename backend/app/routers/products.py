@@ -1140,13 +1140,14 @@ def _apply_my_products_search(query, q: str):
 
 
 def _apply_my_products_sort(query, sort: str):
+    # products.id монотонно растёт — используем как прокси даты создания
     if sort == "date_asc":
-        return query.order_by(ProductModel.created_at.asc(), ProductModel.id.asc())
+        return query.order_by(ProductModel.id.asc())
     if sort == "name_asc":
         return query.order_by(ProductModel.name.asc(), ProductModel.id.asc())
     if sort == "name_desc":
         return query.order_by(ProductModel.name.desc(), ProductModel.id.desc())
-    return query.order_by(ProductModel.created_at.desc(), ProductModel.id.desc())
+    return query.order_by(ProductModel.id.desc())
 
 
 @router.get("/", response_model=PublicProductsResponse)

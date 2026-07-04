@@ -32,10 +32,11 @@
         align-items: center;
         justify-content: center;
         background: #fefdfb;
-        transition: opacity 0.25s ease, visibility 0.25s;
+        transition: opacity 0.45s ease, visibility 0.45s;
       }
 
-      html.pwa-standalone #pwa-splash {
+      html.pwa-standalone #pwa-splash,
+      html.mobile-shell #pwa-splash {
         display: flex;
       }
 
@@ -46,9 +47,10 @@
       }
 
       #pwa-splash img {
-        width: 96px;
-        height: 96px;
-        animation: pwa-splash-pulse 1.4s ease-in-out infinite;
+        width: 112px;
+        height: 112px;
+        object-fit: contain;
+        animation: pwa-splash-pulse 1.6s ease-in-out infinite;
       }
 
       @keyframes pwa-splash-pulse {
@@ -115,7 +117,7 @@
     <!-- Yandex.Metrika noscript (disabled in development) -->
     </noscript>
     <div id="pwa-splash" aria-hidden="true">
-      <img src="%PUBLIC_URL%/favicons/favicon.svg" alt="" width="96" height="96" decoding="sync" />
+      <img src="%PUBLIC_URL%/img/LogoWithoutBg.png" alt="" width="112" height="112" decoding="sync" />
     </div>
     <div id="root"></div>
     <!--

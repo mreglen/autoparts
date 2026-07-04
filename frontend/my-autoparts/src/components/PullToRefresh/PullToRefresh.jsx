@@ -5,6 +5,7 @@ import usePullToRefresh from '../../hooks/usePullToRefresh';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchPartTypes } from '../../redux/slices/PartTypeSlice';
 import { isMyPartsFormRoute } from '../../utils/partRoutes';
+import { showSplashBeforeReload } from '../../utils/appSplash';
 
 const SOFT_REFRESH_MIN_MS = 350;
 
@@ -15,6 +16,7 @@ export default function PullToRefresh() {
 
   const onRefresh = useCallback(async () => {
     if (!isMyPartsFormRoute(location.pathname)) {
+      await showSplashBeforeReload();
       window.location.reload();
       return;
     }
@@ -59,31 +61,17 @@ export default function PullToRefresh() {
         }}
       >
         <div
-          className={`flex h-9 w-9 items-center justify-center rounded-full border bg-white shadow-md ${
-            ready || refreshing ? 'border-indigo-200 text-indigo-600' : 'border-gray-200 text-gray-400'
+          className={`flex h-11 w-11 items-center justify-center rounded-full border bg-white shadow-md ${
+            ready || refreshing ? 'border-indigo-200' : 'border-gray-200 text-gray-400'
           }`}
         >
           {refreshing ? (
-            <svg
-              className="h-4 w-4 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
+            <img
+              src="/img/LogoWithoutBg.png"
+              alt=""
+              className="h-8 w-8 animate-pulse object-contain"
               aria-hidden="true"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
+            />
           ) : (
             <svg
               className="h-4 w-4 transition-transform duration-100"
