@@ -1,0 +1,18 @@
+[Unit]
+Description=SvoyGarage Telegram Alert Bot
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=fast
+Group=fast
+SupplementaryGroups=adm systemd-journal
+WorkingDirectory=/home/fast/autoparts/alert-bot
+EnvironmentFile=/etc/autoparts/alert-bot.env
+ExecStart=/home/fast/autoparts/alert-bot/venv/bin/python -m alert_bot.main
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

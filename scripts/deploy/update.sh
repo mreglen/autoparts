@@ -452,6 +452,83 @@ verify_monitoring() {
   fi
 }
 
+install_alert_bot_deps() {
+  local alert_bot="$ROOT/alert-bot"
+  local alert_venv="$alert_bot/venv"
+  local req="$alert_bot/requirements.txt"
+  local hash_file="$alert_bot/.requirements.sha256"
+  local new_hash
+  [[ -f "$req" ]] || return 0
+  if [[ ! -d "$alert_venv" ]]; then
+    log "alert-bot: создание venv..."
+    sudo -u fast python3 -m venv "$alert_venv"
+  fi
+  new_hash=$(sha256sum "$req" | awk '{print $1}')
+  if [[ -f "$hash_file" ]] && [[ "$(cat "$hash_file")" == "$new_hash" ]]; then
+    log "alert-bot: зависимости без изменений"
+    return 0
+  fi
+  log "alert-bot: pip install -r requirements.txt ..."
+  sudo -u fast "$alert_venv/bin/pip" install -r "$req" -q
+  echo "$new_hash" > "$hash_file"
+  chown fast:fast "$hash_file"
+}
+
+ensure_alert_bot() {
+  local alert_bot="$ROOT/alert-bot"
+  local unit_src="$alert_bot/docs/ops/alert-bot.service"
+  local unit_dst="/etc/systemd/system/alert-bot.service"
+  local env_example="$alert_bot/docs/ops/alert-bot.env.example"
+  local env_target="/etc/autoparts/alert-bot.env"
+  local db_url
+
+  [[ -d "$alert_bot" ]] || return 0
+
+  usermod -aG adm,systemd-journal fast 2>/dev/null || true
+  install_alert_bot_deps
+
+  if [[ -f "$unit_src" ]]; then
+    if [[ ! -f "$unit_dst" ]] || ! cmp -s "$unit_src" "$unit_dst"; then
+      cp "$unit_src" "$unit_dst"
+      systemctl daemon-reload
+      log "alert-bot: обновлён $unit_dst"
+    fi
+  fi
+
+  if [[ -f "$env_example" && ! -f "$env_target" ]]; then
+    cp "$env_example" "$env_target"
+    db_url=$(grep -E '^DATABASE_URL=' "$BACKEND/.env" 2>/dev/null | head -1 | cut -d= -f2- || true)
+    if [[ -n "$db_url" ]]; then
+      sed -i "s|^DATABASE_URL=.*|DATABASE_URL=${db_url}|" "$env_target"
+    fi
+    chmod 600 "$env_target"
+    log "alert-bot: создан $env_target (добавьте BOT_TOKEN)"
+  fi
+
+  if [[ -f "$unit_dst" && -f "$env_target" ]]; then
+    if grep -qE '^BOT_TOKEN=.+$' "$env_target" 2>/dev/null; then
+      systemctl enable alert-bot.service 2>/dev/null || true
+      systemctl restart alert-bot.service 2>/dev/null || true
+      log "alert-bot: service restarted"
+    else
+      log "alert-bot: BOT_TOKEN не задан в $env_target — сервис не запущен"
+    fi
+  fi
+}
+
+verify_alert_bot() {
+  local active token_ok
+  active=$(systemctl is-active alert-bot 2>/dev/null || echo inactive)
+  token_ok=0
+  if [[ -f /etc/autoparts/alert-bot.env ]] && grep -qE '^BOT_TOKEN=.+$' /etc/autoparts/alert-bot.env 2>/dev/null; then
+    token_ok=1
+  fi
+  log "alert-bot: active=$active token_configured=$token_ok"
+  if [[ "$token_ok" -eq 1 && "$active" != "active" ]]; then
+    log "WARN: alert-bot не active (проверьте journalctl -u alert-bot)"
+  fi
+}
+
 apply_nginx_configs() {
   local site="/etc/nginx/sites-available/svoygarage"
   local ts
@@ -542,6 +619,7 @@ main() {
   ensure_pgbouncer
   ensure_postgresql_tuning
   ensure_monitoring
+  ensure_alert_bot
 
   if [[ $SKIP_FRONTEND -eq 0 ]]; then
     install_backend_deps
@@ -565,6 +643,7 @@ main() {
   verify_gunicorn
   verify_pgbouncer
   verify_monitoring
+  verify_alert_bot
   log "========== Обновление завершено =========="
 }
 

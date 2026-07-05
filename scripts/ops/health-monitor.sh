@@ -68,7 +68,13 @@ send_alert() {
   log_line "ALERT: $message" | tee -a "$ALERT_LOG"
   if should_alert "$key"; then
     mark_alert "$key"
-    if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then
+    local ingest_py="$ROOT/alert-bot/scripts/ingest_alert.py"
+    local ingest_python="$ROOT/alert-bot/venv/bin/python"
+    if [[ -x "$ingest_python" && -f "$ingest_py" ]]; then
+      "$ingest_python" "$ingest_py" \
+        --source health-monitor --key "$key" --severity warning \
+        --title "$key" --message "$message" 2>/dev/null || true
+    elif [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then
       curl -sf --max-time 10 -X POST \
         "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
         -d "chat_id=${TELEGRAM_CHAT_ID}" \

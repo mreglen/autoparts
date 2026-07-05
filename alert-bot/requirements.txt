@@ -1,0 +1,5 @@
+python-telegram-bot==21.10
+sqlalchemy==2.0.38
+psycopg2-binary==2.9.10
+argon2-cffi==23.1.0
+python-dotenv==1.0.1

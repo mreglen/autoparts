@@ -12,6 +12,7 @@
 | `/etc/autoparts/monitor.env` | Пороги и опционально Telegram |
 | Админка → **Сервер** | `/api/admin/server-stats` — live CPU/RAM + операционные метрики |
 | fail2ban `nginx-req-limit` | Бан IP при частых 429/503 |
+| `@svoygarage_bot` (alert-bot) | Telegram-бот: алерты + история ошибок (только admin) |
 
 ## Пороги по умолчанию
 
@@ -34,7 +35,39 @@
 - шаблон `/etc/autoparts/monitor.env` (если файла ещё нет)
 - fail2ban filter/jail (если установлен `fail2ban`)
 
-## Telegram (опционально)
+## Telegram alert-bot
+
+Бот `@svoygarage_bot` — основной канал алертов для администраторов.
+
+**Авторизация:** `/start` → email администратора → пароль (только `is_admin`).
+
+**Функции:**
+- push-уведомления об ошибках (nginx, kroan, celery, health-monitor)
+- кнопка «История ошибок» с пагинацией
+- кнопка «Статус» — состояние сервисов
+
+**Установка (автоматически через `update`):**
+- venv и systemd unit `alert-bot`
+- env: `/etc/autoparts/alert-bot.env`
+
+```bash
+sudo nano /etc/autoparts/alert-bot.env   # BOT_TOKEN (DATABASE_URL подставляется из backend/.env)
+sudo chmod 600 /etc/autoparts/alert-bot.env
+sudo systemctl restart alert-bot
+journalctl -u alert-bot -f
+```
+
+**Тестовый алерт:**
+
+```bash
+/home/fast/autoparts/alert-bot/venv/bin/python \
+  /home/fast/autoparts/alert-bot/scripts/ingest_alert.py \
+  --source test --key manual --severity info --title test --message "Deploy OK"
+```
+
+`health-monitor.sh` при наличии alert-bot отправляет алерты через `ingest_alert.py` (fallback — старый `TELEGRAM_CHAT_ID` в monitor.env).
+
+## Telegram (legacy, опционально)
 
 ```bash
 sudo cp docs/ops/monitor.env.example /etc/autoparts/monitor.env
