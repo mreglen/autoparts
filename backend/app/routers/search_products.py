@@ -66,6 +66,7 @@ def resolve_product(q: str, db: Session = Depends(get_db)):
     cache_key = build_cache_key("resolve", trimmed)
     cached = get_cached_json_sync(cache_key)
     if cached is not None:
+        logger.info("search cache HIT: resolve q=%r", trimmed)
         return cached
 
     base_query = db.query(ProductModel).options(

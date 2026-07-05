@@ -363,7 +363,7 @@ update
 | 1 Стабильность | **выполнено** | 2026-07-05 | update `0dc458f`, verify 200/200/200/200, API за 8s |
 | 2 Baseline | **выполнено** | 2026-07-05 | TTFB API 19–57ms, HTML 7–8ms, main.js 725KiB, PSI links в performance.md |
 | 3 Nginx | **выполнено** | 2026-07-05 | prerender cache 15m, Brotli br, catalog HIT |
-| 4 Backend | | | SEO sync всё ещё в APScheduler uvicorn (~3 мин блокировки) |
+| 4 Backend | **выполнено** | 2026-07-05 | heavy jobs → Celery, USE_CELERY=true, thin scheduler |
 | 5 Frontend | | | коммит 0dc458f на сервере |
 | 6 Gunicorn | | | |
 | 7 PostgreSQL | | | |
@@ -396,6 +396,13 @@ update
 - Microcache: catalog/part-types `X-Cache-Status: HIT`
 - Brotli: модули установлены, `content-encoding: br` на main.js
 - Следующий шаг — **этап 4** (Celery, sitemap вне uvicorn)
+
+**После этапа 4 (2026-07-05):**
+- Тяжёлые scheduler job'ы (SEO, sitemap, seed, TecDoc) → Celery через thin APScheduler ticks
+- Sitemap warm-up при старте → Celery `countdown=60`, не блокирует uvicorn
+- `NEW_PARTS_SEO_SYNC_USE_CELERY=true` на prod (`ensure_scheduler_env` в update)
+- Поиск: Redis cache 120 с на `/search`, `/resolve`, `/search-combined`; инвалидация в stock_ins
+- Следующий шаг — **этап 5** (проверка frontend)
 
 **Дополнительно (аудит 2026-07-05, до update):**
 - Все сервисы active; git на сервере: `9d861d84`

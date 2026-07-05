@@ -326,14 +326,14 @@ async def startup_event():
     scheduler.start()
     logger.info("Scheduler started. Expired session cleanup job scheduled.")
 
-    async def _deferred_sitemap_warmup() -> None:
-        await asyncio.sleep(30)
-        await run_rebuild_products_sitemap_cache()
+    try:
+        from app.tasks.seo_tasks import rebuild_sitemaps_cache_task
 
-    asyncio.create_task(_deferred_sitemap_warmup())
-    logger.info("Products sitemap cache warm-up scheduled (deferred 30s on startup).")
-    
-    
+        rebuild_sitemaps_cache_task.apply_async(countdown=60)
+        logger.info("Products sitemap cache warm-up dispatched to Celery (countdown=60s).")
+    except Exception as exc:
+        logger.warning("Failed to dispatch sitemap warm-up to Celery: %s", exc)
+
     try:
         from app.models.delivery_method import DeliveryMethod, organization_delivery_methods
         from app.models.organization import Organization
@@ -427,152 +427,62 @@ async def run_cleanup_expired_guest_carts():
 
 async def run_rebuild_products_sitemap_cache():
     try:
-        from app.services.sitemap_service import rebuild_all_sitemaps_cache
+        from app.tasks.seo_tasks import rebuild_sitemaps_cache_task
 
-        db_gen = get_db()
-        db = next(db_gen)
-        try:
-            integration = get_or_create_yandex_integration(db)
-            products_snapshot, new_parts_snapshot, new_brands_snapshot, new_categories_snapshot = rebuild_all_sitemaps_cache(
-                db,
-                preferred_host_url=integration.host_url,
-            )
-            logger.info(
-                "Products sitemap cache rebuilt: url_count=%s generated_at=%s",
-                products_snapshot.url_count,
-                products_snapshot.generated_at.isoformat(),
-            )
-            logger.info(
-                "New parts sitemap cache rebuilt: url_count=%s generated_at=%s",
-                new_parts_snapshot.url_count,
-                new_parts_snapshot.generated_at.isoformat(),
-            )
-            logger.info(
-                "New brands sitemap cache rebuilt: url_count=%s generated_at=%s",
-                new_brands_snapshot.url_count,
-                new_brands_snapshot.generated_at.isoformat(),
-            )
-            logger.info(
-                "New categories sitemap cache rebuilt: url_count=%s generated_at=%s",
-                new_categories_snapshot.url_count,
-                new_categories_snapshot.generated_at.isoformat(),
-            )
-        finally:
-            db.close()
+        await enqueue_celery_task(rebuild_sitemaps_cache_task)
+        logger.info("Sitemap rebuild dispatched to Celery")
     except Exception as e:
-        logger.error("Ошибка при пересборке кэша sitemap: %s", e)
+        logger.error("Ошибка постановки sitemap rebuild в Celery: %s", e)
 
 
 async def run_new_parts_seo_sync_tick():
     try:
-        if settings.NEW_PARTS_SEO_SYNC_USE_CELERY:
-            from app.tasks.seo_tasks import run_new_parts_seo_sync_batch_task
+        from app.tasks.seo_tasks import run_new_parts_seo_sync_batch_task
 
-            await enqueue_celery_task(run_new_parts_seo_sync_batch_task)
-            logger.info("Rossko SEO micro-batch dispatched to Celery")
-            return
-
-        from app.services.new_parts_seo_batch_runner import execute_seo_sync_batch_job
-
-        db_gen = get_db()
-        db = next(db_gen)
-        try:
-            sync_stats = await execute_seo_sync_batch_job(db)
-            logger.info(
-                "Rossko SEO micro-batch: batch_size=%s created=%s processed=%s skipped=%s "
-                "not_found=%s errors=%s remaining_daily=%s",
-                sync_stats.batch_size,
-                sync_stats.created,
-                sync_stats.processed,
-                sync_stats.skipped,
-                sync_stats.not_found,
-                sync_stats.errors,
-                sync_stats.remaining_daily_quota,
-            )
-        finally:
-            db.close()
+        await enqueue_celery_task(run_new_parts_seo_sync_batch_task)
+        logger.info("Rossko SEO micro-batch dispatched to Celery")
     except Exception as e:
-        logger.error("Ошибка Rossko SEO micro-batch: %s", e)
+        logger.error("Ошибка постановки Rossko SEO micro-batch в Celery: %s", e)
 
 
 async def run_refresh_new_parts_seo_cards():
     try:
-        from app.services.new_parts_seo_refresh_service import refresh_new_parts_seo_cards
+        from app.tasks.seo_tasks import refresh_new_parts_seo_cards_task
 
-        db_gen = get_db()
-        db = next(db_gen)
-        try:
-            refresh_stats = await refresh_new_parts_seo_cards(db)
-            logger.info(
-                "New parts SEO refresh: candidates=%s updated=%s not_found=%s errors=%s",
-                refresh_stats.candidates,
-                refresh_stats.updated,
-                refresh_stats.not_found,
-                refresh_stats.errors,
-            )
-        finally:
-            db.close()
+        await enqueue_celery_task(refresh_new_parts_seo_cards_task)
+        logger.info("Rossko SEO refresh dispatched to Celery")
     except Exception as e:
-        logger.error("Ошибка при refresh SEO-карточек: %s", e)
+        logger.error("Ошибка постановки SEO refresh в Celery: %s", e)
 
 
 async def run_seo_seed_precheck_tick():
     try:
-        from app.services.seo_rossko_seed_service import run_seed_precheck_batch
+        from app.tasks.seo_tasks import seed_precheck_batch_task
 
-        db_gen = get_db()
-        db = next(db_gen)
-        try:
-            stats = await run_seed_precheck_batch(db)
-            logger.info(
-                "Rossko SEO seed precheck: checked=%s ready=%s not_found=%s skipped=%s",
-                stats.get("checked"),
-                stats.get("ready"),
-                stats.get("not_found"),
-                stats.get("skipped"),
-            )
-        finally:
-            db.close()
+        await enqueue_celery_task(seed_precheck_batch_task)
+        logger.info("Rossko SEO seed precheck dispatched to Celery")
     except Exception as e:
-        logger.error("Ошибка Rossko SEO seed precheck: %s", e)
+        logger.error("Ошибка постановки SEO seed precheck в Celery: %s", e)
 
 
 async def run_seo_tecdoc_harvest():
     try:
-        from app.services.tecdoc_pair_harvest_service import (
-            harvest_tecdoc_cross_pairs,
-            harvest_tecdoc_direct_pairs,
-        )
+        from app.tasks.seo_tasks import tecdoc_harvest_task
 
-        db_gen = get_db()
-        db = next(db_gen)
-        try:
-            direct_stats = harvest_tecdoc_direct_pairs(db)
-            cross_stats = harvest_tecdoc_cross_pairs(db)
-            logger.info(
-                "TecDoc harvest: direct=%s cross=%s",
-                direct_stats,
-                cross_stats,
-            )
-        finally:
-            db.close()
+        await enqueue_celery_task(tecdoc_harvest_task)
+        logger.info("TecDoc harvest dispatched to Celery")
     except Exception as e:
-        logger.error("Ошибка TecDoc harvest: %s", e)
+        logger.error("Ошибка постановки TecDoc harvest в Celery: %s", e)
 
 
 async def run_seo_seed_populate():
     try:
-        from app.services.seo_rossko_seed_service import populate_seed_queue_from_catalog
+        from app.tasks.seo_tasks import seed_populate_task
 
-        db_gen = get_db()
-        db = next(db_gen)
-        try:
-            stats = populate_seed_queue_from_catalog(db)
-            logger.info("Rossko SEO seed populate: %s", stats)
-        finally:
-            db.close()
+        await enqueue_celery_task(seed_populate_task)
+        logger.info("Rossko SEO seed populate dispatched to Celery")
     except Exception as e:
-        logger.error("Ошибка Rossko SEO seed populate: %s", e)
+        logger.error("Ошибка постановки SEO seed populate в Celery: %s", e)
 
 
 async def run_weekly_backups():

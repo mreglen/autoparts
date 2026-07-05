@@ -82,6 +82,22 @@ wait_for_api() {
   die "API не ответил за ${HEALTH_MAX_WAIT}s — см. journalctl -u kroan"
 }
 
+ensure_scheduler_env() {
+  local env="$BACKEND/.env"
+  [[ -f "$env" ]] || return 0
+  if grep -qE '^NEW_PARTS_SEO_SYNC_USE_CELERY=false' "$env" 2>/dev/null; then
+    log "Включение NEW_PARTS_SEO_SYNC_USE_CELERY=true в backend/.env"
+    sed -i 's/^NEW_PARTS_SEO_SYNC_USE_CELERY=false/NEW_PARTS_SEO_SYNC_USE_CELERY=true/' "$env"
+    chown fast:fast "$env"
+    chmod 600 "$env"
+  elif ! grep -qE '^NEW_PARTS_SEO_SYNC_USE_CELERY=' "$env" 2>/dev/null; then
+    log "Добавление NEW_PARTS_SEO_SYNC_USE_CELERY=true в backend/.env"
+    printf '\nNEW_PARTS_SEO_SYNC_USE_CELERY=true\n' >> "$env"
+    chown fast:fast "$env"
+    chmod 600 "$env"
+  fi
+}
+
 fix_backend_env() {
   local env="$BACKEND/.env"
   [[ -f "$env" ]] || return 0
@@ -302,6 +318,7 @@ main() {
   ensure_upload_dirs
   ensure_nginx_cache_dirs
   fix_backend_env
+  ensure_scheduler_env
   git_pull
   sync_installer
 

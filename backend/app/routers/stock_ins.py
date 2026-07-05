@@ -10,6 +10,7 @@ from app.models.product import Product as ProductModel
 from app.models.vehicle import Vehicle as VehicleModel
 from app.services.audit_service import log_audit
 from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty
+from app.utils.public_catalog_cache import invalidate_public_catalog_cache
 
 router = APIRouter(prefix="/stock-ins", tags=["Stock In"])
 
@@ -84,6 +85,7 @@ def create_stock_in(
     )
     if product.is_new is False:
         mark_yandex_feed_dirty(db, "stock_in_created_used")
+        invalidate_public_catalog_cache()
     return db_stock_in
 
 @router.get("/{stock_in_id}", response_model=StockInSchema)
@@ -122,6 +124,7 @@ def update_stock_in(
     product = db.query(ProductModel).filter(ProductModel.id == db_stock_in.product_id).first()
     if product and product.is_new is False:
         mark_yandex_feed_dirty(db, "stock_in_updated_used")
+        invalidate_public_catalog_cache()
     return db_stock_in
 
 @router.delete("/{stock_in_id}", status_code=204)
@@ -142,4 +145,5 @@ def delete_stock_in(
     db.commit()
     if product and product.is_new is False:
         mark_yandex_feed_dirty(db, "stock_in_deleted_used")
+        invalidate_public_catalog_cache()
     return

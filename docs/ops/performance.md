@@ -160,5 +160,7 @@ curl -sI -H 'Accept-Encoding: gzip' -H 'Host: svoygarage.ru' \
 
 ## Prod: фоновые задачи
 
-- `NEW_PARTS_SEO_SYNC_USE_CELERY=true` — SEO sync вне uvicorn process.
-- Sitemap rebuild — только Celery/cron.
+- `NEW_PARTS_SEO_SYNC_USE_CELERY=true` — SEO sync, sitemap rebuild, seed/TecDoc jobs в Celery (не в uvicorn).
+- APScheduler в uvicorn — только thin ticks: enqueue в Celery + лёгкая очистка сессий/корзин.
+- Sitemap warm-up при старте API — Celery task с `countdown=60`, без blocking startup.
+- Поиск: Redis TTL 120 с (`search:*`), инвалидация через `invalidate_public_catalog_cache()`.
