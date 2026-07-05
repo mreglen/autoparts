@@ -39,7 +39,6 @@ function Main() {
   const navigate = useNavigate();
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
   const showSiteReviews = useShowSiteReviews();
-  const quickLinks = useSelector((state) => state.publicInfo.quickLinks) || [];
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -128,49 +127,6 @@ function Main() {
                     Поиск по артикулу, бренду или названию. При точном совпадении откроется карточка товара.
                   </p>
                 </form>
-              </div>
-
-            {quickLinks.length > 0 ? (
-              <div className="space-y-3">
-                <h2 className="text-lg font-semibold text-gray-900">Популярные разделы</h2>
-                <div className="flex flex-wrap gap-2">
-                  {quickLinks.map((link) => (
-                    <Link
-                      key={link.id}
-                      to={link.url}
-                      className="inline-flex items-center rounded-xl border border-indigo-100 bg-white px-4 py-2.5 text-sm font-medium text-indigo-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50"
-                    >
-                      {link.title}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200/80 shadow-sm">
-                  Новые и б/у
-                </span>
-                <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200/80 shadow-sm">
-                  Чаты на платформе
-                </span>
-                <Link
-                  to="/delivery"
-                  className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200/80 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-900"
-                >
-                  Доставка
-                </Link>
-                {showSiteReviews && (
-                <Link
-                  to="/reviews"
-                  className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200/80 shadow-sm transition hover:bg-indigo-50 hover:text-indigo-900"
-                >
-                  Отзывы
-                </Link>
-                )}
-                <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200/80 shadow-sm">
-                  Для бизнеса
-                </span>
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
