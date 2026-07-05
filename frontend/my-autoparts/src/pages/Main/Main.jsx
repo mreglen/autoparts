@@ -103,7 +103,7 @@ function Main() {
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Артикул, бренд, название или VIN"
+                        placeholder="Артикул, бренд или название"
                         disabled={busy}
                         className="min-h-[3rem] w-full rounded-xl border border-gray-200 bg-gray-50/80 py-2.5 pl-11 pr-4 text-base text-gray-900 shadow-inner placeholder:text-gray-400 transition focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/25 disabled:opacity-60"
                       />
