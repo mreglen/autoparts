@@ -115,7 +115,7 @@ sudo apt install libnginx-mod-http-brotli-filter libnginx-mod-http-brotli-static
 
 | Файл | Raw | Gzip (wire) | Brotli |
 |------|-----|-------------|--------|
-| `main.b584bc6a.js` | 725 KiB (741 815 B) | ~725 KiB (nginx gzip без существенного сжатия на hashed static) | не установлен |
+| `main.b584bc6a.js` | 725 KiB (741 815 B) raw | **185 kB** после gzip (отчёт `npm run build`) | не установлен |
 
 Проверка Brotli: `nginx -V | grep brotli` → модуль отсутствует (этап 3).
 
