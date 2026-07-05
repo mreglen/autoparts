@@ -158,6 +158,22 @@ curl -sI -H 'Accept-Encoding: gzip' -H 'Host: svoygarage.ru' \
 3. Nginx: microcache + Brotli по инструкции выше (можно без деплоя кода).
 4. Smoke: `/autoparts/used` (скролл, превью), `/find?q=...`, вход в кабинет, возврат на склад.
 
+### Этап 5 — Frontend (2026-07-05)
+
+Проверено на prod после `update` (коммит `9d861d8`+):
+
+| Проверка | Результат |
+|----------|-----------|
+| Lazy chunks в build | `UsedPartsList` → `1532.*.chunk.js`, `prefetchPartDetail` → `9435.*.chunk.js` |
+| HTML TTFB `/autoparts/used` | ~9 ms |
+| Catalog API (HIT) | ~7 ms |
+| Product API `/products/public/{id}` (HIT) | ~8 ms |
+| Thumb-first в списках | `buildListImageUrlFallbackChain` в `ProductCard` |
+| Виртуализация >48 | `VIRTUALIZE_THRESHOLD=48` в `UsedPartsList` |
+| Retry/outage | `apiClient.js` — 502/503/504 + `isApiOutage()` |
+
+**Критерии этапа 5:** API/HTML отклик << 2 s; клик в карточку упирается в кэшированный API <50 ms (данные); LCP lab — ссылки PSI в таблице выше.
+
 ## Prod: фоновые задачи
 
 - `NEW_PARTS_SEO_SYNC_USE_CELERY=true` — SEO sync, sitemap rebuild, seed/TecDoc jobs в Celery (не в uvicorn).

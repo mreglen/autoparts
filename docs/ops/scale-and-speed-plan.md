@@ -364,7 +364,7 @@ update
 | 2 Baseline | **выполнено** | 2026-07-05 | TTFB API 19–57ms, HTML 7–8ms, main.js 725KiB, PSI links в performance.md |
 | 3 Nginx | **выполнено** | 2026-07-05 | prerender cache 15m, Brotli br, catalog HIT |
 | 4 Backend | **выполнено** | 2026-07-05 | heavy jobs → Celery, USE_CELERY=true, thin scheduler |
-| 5 Frontend | | | коммит 0dc458f на сервере |
+| 5 Frontend | **выполнено** | 2026-07-05 | lazy chunks, prefetch, virtual list, retry 502/504 |
 | 6 Gunicorn | | | |
 | 7 PostgreSQL | | | |
 | 8 Мониторинг | | | |
@@ -403,6 +403,14 @@ update
 - `NEW_PARTS_SEO_SYNC_USE_CELERY=true` на prod (`ensure_scheduler_env` в update)
 - Поиск: Redis cache 120 с на `/search`, `/resolve`, `/search-combined`; инвалидация в stock_ins
 - Следующий шаг — **этап 5** (проверка frontend)
+
+**После этапа 5 (2026-07-05):**
+- Lazy chunks: `UsedPartsList`, `NewPartsResults` в `AutoParts.jsx`; prefetch в `9435.*.chunk.js`
+- Карточки: мгновенный `Link` для новых запчастей; prefetch JS+API на hover/touch для б/у
+- `MainLayout`: без `key={pathname}` remount; виртуализация списка б/у >48 (`@tanstack/react-virtual`)
+- `apiClient`: retry 502/503/504 + outage guard; баннер «Повторить загрузку» в каталоге
+- Smoke: HTML `/autoparts/used` TTFB ~9 ms; catalog HIT ~7 ms; product API HIT ~8 ms
+- Следующий шаг — **этап 6** (Gunicorn workers)
 
 **Дополнительно (аудит 2026-07-05, до update):**
 - Все сервисы active; git на сервере: `9d861d84`

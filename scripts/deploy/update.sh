@@ -291,6 +291,18 @@ verify_nginx_cache() {
   log "Nginx cache: catalog1=$cache1 catalog2=$cache2; ${main_js} br=$brotli_enc"
 }
 
+verify_frontend_chunks() {
+  [[ -d "$WEB_ROOT/static/js" ]] || return 0
+  local main_js chunk_count prefetch_ok used_ok
+  main_js=$(basename "$(ls "$WEB_ROOT/static/js/main."*.js 2>/dev/null | head -1)" 2>/dev/null || echo "none")
+  chunk_count=$(ls "$WEB_ROOT/static/js/"*.chunk.js 2>/dev/null | wc -l)
+  prefetch_ok=$(grep -rl 'prefetchPartDetail' "$WEB_ROOT/static/js/"*.map 2>/dev/null | head -1 || true)
+  used_ok=$(grep -rl 'UsedPartsList' "$WEB_ROOT/static/js/"*.map 2>/dev/null | head -1 || true)
+  log "Frontend build: main=$main_js chunks=$chunk_count prefetch=${prefetch_ok:+ok} used_list=${used_ok:+ok}"
+  [[ -n "$prefetch_ok" ]] || log "WARN: prefetchPartDetail missing from build source maps"
+  [[ -n "$used_ok" ]] || log "WARN: UsedPartsList lazy chunk missing from build source maps"
+}
+
 verify() {
   local cart_code public_code part_types_code catalog_code
   cart_code=$(curl -sf -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8080/api/cart/ || echo "000")
@@ -340,6 +352,7 @@ main() {
   fi
 
   verify
+  verify_frontend_chunks
   log "========== Обновление завершено =========="
 }
 
