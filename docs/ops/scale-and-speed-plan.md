@@ -420,7 +420,7 @@ update
 
 **После этапа 7 (2026-07-05):**
 - PgBouncer transaction pool на `127.0.0.1:6432`; `DATABASE_URL` через 6432, `DATABASE_URL_DIRECT` для pg_dump
-- SQLAlchemy `NullPool` при PgBouncer; индексы каталога (`ensure_public_catalog_indexes`)
+- SQLAlchemy `NullPool` при PgBouncer (порт 6432); индексы каталога (`ensure_public_catalog_indexes`)
 - PostgreSQL tuning `tuning-4gb.conf`; nginx `sg_api` 50 r/s (burst 60)
 - Следующий шаг — **этап 9** (load test; этап 8 пропущен)
 

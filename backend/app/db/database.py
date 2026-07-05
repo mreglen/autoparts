@@ -20,10 +20,10 @@ def _build_engine():
     if _uses_pgbouncer(SQLALCHEMY_DATABASE_URL):
         from sqlalchemy.pool import NullPool
 
+        # psycopg2: NullPool only (prepare_threshold is psycopg3-only).
         return create_engine(
             SQLALCHEMY_DATABASE_URL,
             poolclass=NullPool,
-            connect_args={"prepare_threshold": 0},
             **common,
         )
 

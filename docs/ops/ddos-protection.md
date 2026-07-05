@@ -65,7 +65,7 @@ nginx дополнительно (этап 7, 2026-07-05): **50 req/s** на API
 | PgBouncer | `127.0.0.1:6432`, `pool_mode=transaction` |
 | `DATABASE_URL` | порт **6432** (через PgBouncer) |
 | `DATABASE_URL_DIRECT` | порт 5432 (бэкапы, `pg_dump`, EXPLAIN) |
-| SQLAlchemy | `NullPool` + `prepare_threshold=0` при `:6432` |
+| SQLAlchemy | `NullPool` при `:6432` (psycopg2) |
 | Индексы | `ix_products_public_catalog`, `ix_products_org_qty`, `ix_products_part_type_qty` |
 
 Тюнинг PostgreSQL (4 GB RAM): `docs/postgresql/tuning-4gb.conf` → `conf.d/99-autoparts-tuning.conf`.
