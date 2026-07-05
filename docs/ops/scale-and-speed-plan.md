@@ -287,16 +287,16 @@ systemctl daemon-reload && systemctl restart kroan
 ### Задачи агента
 
 **На сервере:**
-- [ ] `EXPLAIN ANALYZE` типичного запроса каталога
-- [ ] Индексы (patch при старте или миграция):
+- [x] `EXPLAIN ANALYZE` типичного запроса каталога
+- [x] Индексы (patch при старте или миграция):
   - `products (quantity, is_new, id DESC) WHERE quantity > 0`
   - `products (organization_id, quantity)`, `(part_type_id, quantity)`
-- [ ] PgBouncer (transaction mode), `DATABASE_URL` через порт 6432
-- [ ] Тюнинг PostgreSQL: `shared_buffers`, `effective_cache_size` (осторожно на 4 GB RAM)
+- [x] PgBouncer (transaction mode), `DATABASE_URL` через порт 6432
+- [x] Тюнинг PostgreSQL: `shared_buffers`, `effective_cache_size` (осторожно на 4 GB RAM)
 
 **В репозитории:**
-- [ ] `docs/nginx/http-ddos-limits.conf` — пересмотреть `sg_api` burst для легитимного трафика
-- [ ] Документировать лимиты в `docs/ops/ddos-protection.md`
+- [x] `docs/nginx/http-ddos-limits.conf` — пересмотреть `sg_api` burst для легитимного трафика
+- [x] Документировать лимиты в `docs/ops/ddos-protection.md`
 
 ### Деплой пользователя
 
@@ -366,7 +366,7 @@ update
 | 4 Backend | **выполнено** | 2026-07-05 | heavy jobs → Celery, USE_CELERY=true, thin scheduler |
 | 5 Frontend | **выполнено** | 2026-07-05 | lazy chunks, prefetch, virtual list, retry 502/504 |
 | 6 Gunicorn | **выполнено** | 2026-07-05 | 2 workers, scheduler Redis lock, WS pub/sub |
-| 7 PostgreSQL | | | |
+| 7 PostgreSQL | **выполнено** | 2026-07-05 | PgBouncer 6432, indexes, sg_api 50r/s |
 | 8 Мониторинг | | | |
 | 9 Load test | | | |
 
@@ -417,6 +417,12 @@ update
 - DB pool: 10+10 на worker (вместо 50+50)
 - WebSocket чат: Redis pub/sub `ws:push` + глобальный online-счётчик
 - Следующий шаг — **этап 7** (PgBouncer, индексы)
+
+**После этапа 7 (2026-07-05):**
+- PgBouncer transaction pool на `127.0.0.1:6432`; `DATABASE_URL` через 6432, `DATABASE_URL_DIRECT` для pg_dump
+- SQLAlchemy `NullPool` при PgBouncer; индексы каталога (`ensure_public_catalog_indexes`)
+- PostgreSQL tuning `tuning-4gb.conf`; nginx `sg_api` 50 r/s (burst 60)
+- Следующий шаг — **этап 9** (load test; этап 8 пропущен)
 
 **Дополнительно (аудит 2026-07-05, до update):**
 - Все сервисы active; git на сервере: `9d861d84`

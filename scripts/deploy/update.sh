@@ -285,6 +285,120 @@ verify_gunicorn() {
   fi
 }
 
+ensure_pgbouncer() {
+  local env="$BACKEND/.env" template="$ROOT/docs/ops/pgbouncer.ini.template"
+  [[ -f "$env" && -f "$template" ]] || return 0
+
+  if ! command -v pgbouncer >/dev/null 2>&1; then
+    log "Установка pgbouncer..."
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq pgbouncer
+  fi
+
+  python3 - "$env" "$template" <<'PY'
+import sys
+from pathlib import Path
+from urllib.parse import quote, urlparse, urlunparse
+
+env_path = Path(sys.argv[1])
+template_path = Path(sys.argv[2])
+lines = env_path.read_text(encoding="utf-8").splitlines()
+url = None
+out_lines = []
+direct_saved = False
+for line in lines:
+    if line.startswith("DATABASE_URL=") and url is None:
+        url = line.split("=", 1)[1].strip()
+    if line.startswith("DATABASE_URL_DIRECT="):
+        direct_saved = True
+    out_lines.append(line)
+
+if not url:
+    sys.exit(0)
+
+parsed = urlparse(url)
+user = parsed.username or ""
+password = parsed.password or ""
+dbname = (parsed.path or "/").lstrip("/")
+host = parsed.hostname or "127.0.0.1"
+port = parsed.port or 5432
+
+if not user or not dbname:
+    print("skip pgbouncer: incomplete DATABASE_URL", file=sys.stderr)
+    sys.exit(0)
+
+ini = template_path.read_text(encoding="utf-8")
+ini = ini.replace("__DB_ALIAS__", dbname)
+ini = ini.replace("__DB_NAME__", dbname)
+ini = ini.replace("__DB_USER__", user)
+Path("/etc/pgbouncer/pgbouncer.ini").write_text(ini, encoding="utf-8")
+
+userlist = f'"{user}" "{password}"\n'
+Path("/etc/pgbouncer/userlist.txt").write_text(userlist, encoding="utf-8")
+import os
+import pwd
+import grp
+
+os.chmod("/etc/pgbouncer/userlist.txt", 0o600)
+os.chmod("/etc/pgbouncer/pgbouncer.ini", 0o644)
+
+if host in ("127.0.0.1", "localhost") and port == 5432:
+    user_q = quote(user, safe="")
+    auth = f"{user_q}:{quote(password, safe='')}" if password else user_q
+    netloc = f"{auth}@{host}:6432"
+    new_url = urlunparse(parsed._replace(netloc=netloc))
+    replaced = False
+    new_lines = []
+    for line in out_lines:
+        if line.startswith("DATABASE_URL=") and not replaced:
+            if not direct_saved:
+                new_lines.append(f"DATABASE_URL_DIRECT={url}")
+                direct_saved = True
+            new_lines.append(f"DATABASE_URL={new_url}")
+            replaced = True
+        else:
+            new_lines.append(line)
+    if replaced:
+        env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+        os.chmod(str(env_path), 0o600)
+        uid = pwd.getpwnam("fast").pw_uid
+        gid = grp.getgrnam("fast").gr_gid
+        os.chown(str(env_path), uid, gid)
+PY
+
+  chown pgbouncer:pgbouncer /etc/pgbouncer/pgbouncer.ini /etc/pgbouncer/userlist.txt 2>/dev/null || true
+  systemctl enable pgbouncer.service 2>/dev/null || true
+  systemctl restart pgbouncer.service
+  log "PgBouncer: configured on 127.0.0.1:6432 (transaction pool)"
+}
+
+ensure_postgresql_tuning() {
+  local src="$ROOT/docs/postgresql/tuning-4gb.conf" confd
+  [[ -f "$src" ]] || return 0
+  confd=$(find /etc/postgresql -maxdepth 3 -type d -name conf.d 2>/dev/null | head -1)
+  [[ -n "$confd" ]] || return 0
+  if [[ ! -f "$confd/99-autoparts-tuning.conf" ]] || ! cmp -s "$src" "$confd/99-autoparts-tuning.conf"; then
+    cp "$src" "$confd/99-autoparts-tuning.conf"
+    systemctl reload postgresql 2>/dev/null || systemctl restart postgresql 2>/dev/null || true
+    log "PostgreSQL tuning: $confd/99-autoparts-tuning.conf"
+  fi
+}
+
+verify_pgbouncer() {
+  local listening direct_url
+  listening=$(ss -lntp 2>/dev/null | grep -c ':6432' || true)
+  listening=${listening:-0}
+  direct_url=$(grep -E '^DATABASE_URL=' "$BACKEND/.env" 2>/dev/null | grep -c ':6432' || true)
+  direct_url=${direct_url:-0}
+  log "PgBouncer: listen_6432=$listening env_uses_6432=$direct_url"
+  if [[ "$listening" -lt 1 ]]; then
+    log "WARN: PgBouncer not listening on 6432"
+  fi
+  if [[ "$direct_url" -lt 1 ]]; then
+    log "WARN: DATABASE_URL does not use port 6432"
+  fi
+}
+
 apply_nginx_configs() {
   local site="/etc/nginx/sites-available/svoygarage"
   local ts
@@ -372,6 +486,8 @@ main() {
   sync_installer
   ensure_scheduler_env
   install_kroan_unit
+  ensure_pgbouncer
+  ensure_postgresql_tuning
 
   if [[ $SKIP_FRONTEND -eq 0 ]]; then
     install_backend_deps
@@ -393,6 +509,7 @@ main() {
   verify
   verify_frontend_chunks
   verify_gunicorn
+  verify_pgbouncer
   log "========== Обновление завершено =========="
 }
 

@@ -54,7 +54,23 @@ WEBSOCKET_MAX_CONNECTIONS_PER_USER=5
 | `/api/public/analytics/events` | 120 / мин / IP |
 | Остальной `/api/` | 300 / мин / IP |
 
-nginx дополнительно: 30 req/s на API, 3 req/min на auth, 10 conn/IP на WebSocket.
+nginx дополнительно (этап 7, 2026-07-05): **50 req/s** на API (`sg_api`, burst 60), 5 req/min на auth, 10 conn/IP на WebSocket.
+
+Публичный каталог (`/server/api/catalog/`, `/products/public/`) использует microcache nginx — лимит 50 r/s + burst 60 достаточен для активного просмотра без 429.
+
+## PostgreSQL и PgBouncer (этап 7)
+
+| Компонент | Значение |
+|-----------|----------|
+| PgBouncer | `127.0.0.1:6432`, `pool_mode=transaction` |
+| `DATABASE_URL` | порт **6432** (через PgBouncer) |
+| `DATABASE_URL_DIRECT` | порт 5432 (бэкапы, `pg_dump`, EXPLAIN) |
+| SQLAlchemy | `NullPool` + `prepare_threshold=0` при `:6432` |
+| Индексы | `ix_products_public_catalog`, `ix_products_org_qty`, `ix_products_part_type_qty` |
+
+Тюнинг PostgreSQL (4 GB RAM): `docs/postgresql/tuning-4gb.conf` → `conf.d/99-autoparts-tuning.conf`.
+
+Скрипты на сервере: `scripts/ops/catalog-explain.sh`, `scripts/ops/catalog-latency.sh`.
 
 ## UFW
 

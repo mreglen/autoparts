@@ -1,0 +1,23 @@
+; Managed by scripts/deploy/update.sh (ensure_pgbouncer).
+; Do not edit /etc/pgbouncer/pgbouncer.ini manually on prod — changes are overwritten on update.
+
+[databases]
+__DB_ALIAS__ = host=127.0.0.1 port=5432 dbname=__DB_NAME__
+
+[pgbouncer]
+listen_addr = 127.0.0.1
+listen_port = 6432
+auth_type = plain
+auth_file = /etc/pgbouncer/userlist.txt
+admin_users = __DB_USER__
+stats_users = __DB_USER__
+pool_mode = transaction
+max_client_conn = 200
+default_pool_size = 20
+min_pool_size = 5
+reserve_pool_size = 5
+reserve_pool_timeout = 3
+server_reset_query = DISCARD ALL
+server_idle_timeout = 600
+query_timeout = 120
+ignore_startup_parameters = extra_float_digits

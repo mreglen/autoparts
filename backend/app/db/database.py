@@ -8,15 +8,36 @@ settings = Settings()
 SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
-    pool_timeout=60,       # Увеличен таймаут до 60 секунд
-    pool_recycle=1800,     # Переподключение через 30 минут (меньше, чтобы избежать stale connections)
-    pool_pre_ping=True,    # Проверка соединения перед использованием
-    echo_pool=False        # Отключить логирование пула (включить для отладки)
-)
+def _uses_pgbouncer(database_url: str) -> bool:
+    return ":6432" in database_url
+
+
+def _build_engine():
+    common = {
+        "pool_pre_ping": True,
+        "echo_pool": False,
+    }
+    if _uses_pgbouncer(SQLALCHEMY_DATABASE_URL):
+        from sqlalchemy.pool import NullPool
+
+        return create_engine(
+            SQLALCHEMY_DATABASE_URL,
+            poolclass=NullPool,
+            connect_args={"prepare_threshold": 0},
+            **common,
+        )
+
+    return create_engine(
+        SQLALCHEMY_DATABASE_URL,
+        pool_size=settings.DB_POOL_SIZE,
+        max_overflow=settings.DB_MAX_OVERFLOW,
+        pool_timeout=60,
+        pool_recycle=1800,
+        **common,
+    )
+
+
+engine = _build_engine()
 
 SessionLocal = sessionmaker(
     autocommit=False, 

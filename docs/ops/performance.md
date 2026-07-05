@@ -189,6 +189,18 @@ curl -sI -H 'Accept-Encoding: gzip' -H 'Host: svoygarage.ru' \
 
 **Printer WebSocket** (`/api/printers/ws`) — in-memory per worker; ограничение задокументировано, вне scope публичного каталога.
 
+### Этап 7 — PostgreSQL + PgBouncer (2026-07-05)
+
+| Компонент | Значение |
+|-----------|----------|
+| PgBouncer | `transaction` mode, `default_pool_size=20`, порт **6432** |
+| App DB | `NullPool` when `DATABASE_URL` contains `:6432` |
+| Индексы | `products (quantity, is_new, id DESC) WHERE quantity > 0`, org/part_type |
+| PG tuning | `shared_buffers=512MB`, `effective_cache_size=1536MB` |
+| nginx `sg_api` | **50 r/s**, burst **60** (было 30 r/s) |
+
+Скрипты: `scripts/ops/catalog-explain.sh`, `scripts/ops/catalog-latency.sh`.
+
 ## Prod: фоновые задачи
 
 - `NEW_PARTS_SEO_SYNC_USE_CELERY=true` — SEO sync, sitemap rebuild, seed/TecDoc jobs в Celery (не в uvicorn).
