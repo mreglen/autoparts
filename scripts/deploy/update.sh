@@ -101,12 +101,23 @@ ensure_upload_dirs() {
 }
 
 git_pull() {
-  log "git fetch + pull..."
-  local branch
+  log "git fetch + sync с origin (локальные правки сбрасываются, backend/.env сохраняется)..."
+  local branch env_backup=""
   branch=$(sudo -u fast git -C "$ROOT" rev-parse --abbrev-ref HEAD)
+  if [[ -f "$BACKEND/.env" ]]; then
+    env_backup=$(mktemp)
+    cp "$BACKEND/.env" "$env_backup"
+  fi
   sudo -u fast git -C "$ROOT" fetch origin "$branch"
-  sudo -u fast git -C "$ROOT" pull --ff-only origin "$branch" \
-    || die "git pull не удался (есть локальные изменения? git status в $ROOT)"
+  sudo -u fast git -C "$ROOT" reset --hard "origin/$branch"
+  sudo -u fast git -C "$ROOT" clean -fd
+  if [[ -n "$env_backup" && -f "$env_backup" ]]; then
+    cp "$env_backup" "$BACKEND/.env"
+    chown fast:fast "$BACKEND/.env"
+    chmod 600 "$BACKEND/.env"
+    rm -f "$env_backup"
+  fi
+  rm -f "$BACKEND/.requirements.sha256"
   log "Коммит: $(sudo -u fast git -C "$ROOT" log -1 --oneline)"
 }
 
