@@ -49,7 +49,7 @@ export default function MobileCompactSearch({
     };
 
     return (
-        <div className={`lg:hidden ${sticky ? 'sticky top-14 z-30' : ''} bg-gray-50 px-3 py-2 ${className}`}>
+        <div className={`lg:hidden ${sticky ? 'sticky top-[var(--sg-mobile-header-h)] z-30' : ''} bg-gray-50 px-3 py-2 ${className}`}>
             <div className="relative">
                 <svg
                     className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"

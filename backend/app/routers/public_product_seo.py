@@ -81,7 +81,7 @@ def public_part_meta(
         image_url=meta.image_url,
         price=meta.price,
         in_stock=meta.in_stock,
-        json_ld=meta.json_ld_graph,
+        json_ld=meta.json_ld or None,
         keywords=meta.keywords,
         seo_summary=meta.seo_summary,
         body_description=meta.body_description,
@@ -162,7 +162,7 @@ def public_new_part_meta(
         image_url=meta.image_url,
         price=meta.price,
         in_stock=meta.in_stock,
-        json_ld=meta.json_ld_graph or meta.json_ld,
+        json_ld=meta.json_ld or meta.json_ld_graph or None,
         keywords=meta.keywords,
     )
 

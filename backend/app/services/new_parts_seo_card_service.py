@@ -13,7 +13,15 @@ from app.models.new_parts_seo_card import NewPartsSeoCard
 from app.models.seo_landing_page import SeoLandingPage
 from app.utils.slug_utils import slugify_brand
 from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
-from app.utils.product_json_ld import build_new_part_card_json_ld, dumps_json_ld, product_body_description
+from app.utils.product_json_ld import (
+    build_json_ld_script_tags,
+    build_new_part_card_json_ld,
+    build_product_article_microdata_prefix,
+    build_product_og_meta_tags,
+    dumps_json_ld,
+    product_body_description,
+    split_graph_json_ld_for_yandex,
+)
 from app.utils.product_search_seo import (
     build_new_part_h1,
     build_new_part_search_description,
@@ -21,7 +29,7 @@ from app.utils.product_search_seo import (
 )
 from app.utils.new_part_price_utils import min_stock_base_price, min_stock_price_with_markup
 from app.utils.org_markup import global_markup_percent
-from app.utils.seo_constants import resolve_default_og_image_url
+from app.utils.seo_constants import resolve_product_placeholder_image_url
 from app.utils.page_keywords import build_page_keywords
 from app.utils.site_settings_db import get_or_create_site_settings
 
@@ -616,7 +624,7 @@ def build_new_part_seo_meta(
     )
     price_text = f"{display_price:.2f}" if display_price is not None else None
     canonical = f"{origin}{build_new_part_card_path(card.id, card.brand, card.article)}"
-    image_url = _absolute_photo_url(_safe_text(card.image_url), origin) or resolve_default_og_image_url(origin)
+    image_url = _absolute_photo_url(_safe_text(card.image_url), origin) or resolve_product_placeholder_image_url(origin)
 
     product_json_ld = build_new_part_card_json_ld(
         card,
@@ -696,7 +704,7 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
     canonical = html.escape(meta.canonical_url, quote=True)
     h1 = html.escape(meta.h1)
     body_desc = html.escape(meta.product_description or meta.description)
-    image_tag = f'<meta property="og:image" content="{html.escape(meta.image_url or resolve_default_og_image_url(), quote=True)}" />'
+    image_tag = f'<meta property="og:image" content="{html.escape(meta.image_url or resolve_product_placeholder_image_url(""), quote=True)}" />'
     image_block = ""
     if meta.image_url:
         image_block = f'\n    <img src="{html.escape(meta.image_url, quote=True)}" alt="{h1}" />'
@@ -706,6 +714,23 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
         h1=meta.h1,
         title=meta.title,
         description=meta.description,
+    )
+    json_ld_scripts = build_json_ld_script_tags(
+        *split_graph_json_ld_for_yandex(
+            product_json_ld=meta.json_ld,
+            json_ld_graph=json_ld_graph,
+        )
+    )
+    product_og_meta = build_product_og_meta_tags(price=meta.price, in_stock=meta.in_stock)
+    article_microdata = build_product_article_microdata_prefix(
+        name=meta.h1,
+        description=meta.product_description or meta.description,
+        brand=meta.brand,
+        article=meta.article,
+        image_url=meta.image_url,
+        price=meta.price,
+        in_stock=meta.in_stock,
+        canonical_url=meta.canonical_url,
     )
     keywords_tag = ""
     if meta.keywords:
@@ -756,11 +781,11 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
   <meta property="og:url" content="{canonical}" />
   <meta property="og:locale" content="ru_RU" />
   {image_tag}
-  <script type="application/ld+json">{json_ld_graph}</script>
+  {product_og_meta}
+  {json_ld_scripts}
 </head>
 <body>
-{breadcrumb_html}  <article>
-    <h1>{h1}</h1>{image_block}
+{breadcrumb_html}{article_microdata}    <h1>{h1}</h1>{image_block}
     <p>{body_desc}</p>
 {details_html}  </article>
 </body>

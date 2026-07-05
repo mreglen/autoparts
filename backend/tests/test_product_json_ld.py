@@ -11,6 +11,7 @@ from app.utils.product_json_ld import (
     is_catalog_product_json_ld_eligible,
     is_new_part_json_ld_eligible,
     product_body_description,
+    split_graph_json_ld_for_yandex,
 )
 
 
@@ -84,9 +85,19 @@ class CatalogProductJsonLdTests(unittest.TestCase):
             )
         )
 
-    def test_no_photo_means_not_eligible(self):
+    def test_no_photo_uses_logo_placeholder(self):
         product = self._make_product(photos=[])
-        self.assertFalse(is_catalog_product_json_ld_eligible(product))
+        self.assertTrue(is_catalog_product_json_ld_eligible(product))
+        json_ld = build_catalog_product_json_ld(
+            product,
+            site_origin="https://svoygarage.ru",
+            canonical_url="https://svoygarage.ru/part/16-MANN-IF1009",
+        )
+        self.assertIsNotNone(json_ld)
+        self.assertEqual(
+            json_ld["image"],
+            ["https://svoygarage.ru/img/product-placeholder-white.png"],
+        )
 
 
 class NewPartJsonLdTests(unittest.TestCase):
@@ -150,17 +161,27 @@ class ProductSeoServiceJsonLdIntegrationTests(unittest.TestCase):
         self.assertIn("manufacturer", json_ld)
         self.assertNotEqual(json_ld["description"], meta.description)
 
-    def test_build_product_seo_meta_without_photo_has_no_product_json_ld(self):
+    def test_build_product_seo_meta_without_photo_uses_logo_placeholder(self):
         meta = build_product_seo_meta(self._make_product(photos=[]), site_origin="https://svoygarage.ru")
-        self.assertEqual(meta.json_ld, "")
+        self.assertTrue(meta.json_ld)
+        json_ld = json.loads(meta.json_ld)
+        self.assertEqual(json_ld["@type"], "Product")
+        self.assertEqual(
+            json_ld["image"],
+            ["https://svoygarage.ru/img/product-placeholder-white.png"],
+        )
         graph = json.loads(meta.json_ld_graph)
-        self.assertEqual(graph["@type"], "BreadcrumbList")
+        types = {node["@type"] for node in graph["@graph"]}
+        self.assertIn("Product", types)
 
     def test_prerender_html_contains_product_json_ld(self):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
         html = render_product_prerender_html(meta)
         self.assertIn('type="application/ld+json"', html)
         self.assertIn('"@type": "Product"', html)
+        self.assertNotIn('"@graph"', html)
+        self.assertIn('itemscope itemtype="https://schema.org/Product"', html)
+        self.assertIn('product:price:amount', html)
         self.assertIn("<img ", html)
 
 
@@ -215,11 +236,38 @@ class NewPartSeoServiceJsonLdIntegrationTests(unittest.TestCase):
         meta = build_new_part_seo_meta(self._make_card(), site_origin="https://svoygarage.ru", markup_percent=15)
         html = render_new_part_prerender_html(meta)
         self.assertIn('type="application/ld+json"', html)
-        self.assertIn('"@graph"', html)
+        self.assertNotIn('"@graph"', html)
         self.assertIn('"@type": "Product"', html)
+        self.assertIn('itemscope itemtype="https://schema.org/Product"', html)
         self.assertIn('aria-label="Хлебные крошки"', html)
         self.assertIn("<img ", html)
         self.assertIn(meta.h1, html)
+
+
+class SplitGraphJsonLdForYandexTests(unittest.TestCase):
+    def test_splits_product_from_graph(self):
+        product = {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": "MANN IF1009",
+            "offers": {"@type": "Offer", "price": "1200.00", "priceCurrency": "RUB"},
+        }
+        graph = {
+            "@context": "https://schema.org",
+            "@graph": [
+                {**product, "@context": None},
+                {"@type": "BreadcrumbList", "itemListElement": []},
+            ],
+        }
+        blocks = split_graph_json_ld_for_yandex(
+            product_json_ld=json.dumps(product),
+            json_ld_graph=json.dumps(graph),
+        )
+        self.assertEqual(len(blocks), 2)
+        first = json.loads(blocks[0])
+        self.assertEqual(first["@type"], "Product")
+        self.assertEqual(first["name"], "MANN IF1009")
+        self.assertNotIn("@graph", first)
 
 
 if __name__ == "__main__":

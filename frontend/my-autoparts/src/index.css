@@ -1,4 +1,9 @@
 /* Onest подключается в public/index.html (без блокирующего @import) */
+:root {
+  --sg-mobile-header-h: calc(3.75rem + env(safe-area-inset-top, 0px));
+  --sg-desktop-header-h: calc(2.25rem + 4.25rem + 2px);
+}
+
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;

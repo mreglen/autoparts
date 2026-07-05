@@ -9,7 +9,7 @@ import { normalizeImageUrl, apiAxiosUnauth } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
 import { buildPartDetailPath, parsePartDetailParam } from '../../utils/partRoutes';
 import { extractProductDescription, formatProductDisplayTitle } from '../../utils/productDisplayName';
-import { buildProductSeo, seoFromPartMetaResponse, buildProductStructuredDataGraph, buildProductPhotoAlt } from '../../utils/productSeo';
+import { buildProductSeo, seoFromPartMetaResponse, buildProductStructuredDataBlocks, buildProductPhotoAlt } from '../../utils/productSeo';
 import { DEFAULT_OG_IMAGE_URL } from '../../utils/seoConstants';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
@@ -54,7 +54,7 @@ const formatErrorText = (value) => {
   return 'Ошибка загрузки товара';
 };
 
-function PartProductSeoHelmet({ seo, structuredData, product }) {
+function PartProductSeoHelmet({ seo, structuredDataBlocks, product }) {
   if (!seo) return null;
   const ogImage = seo.imageUrl || DEFAULT_OG_IMAGE_URL;
   const ogImageAlt = seo.ogImageAlt || seo.title;
@@ -89,9 +89,11 @@ function PartProductSeoHelmet({ seo, structuredData, product }) {
         property="product:availability"
         content={inStock ? 'in stock' : 'out of stock'}
       />
-      {structuredData ? (
-        <script type="application/ld+json">{JSON.stringify(structuredData)}</script>
-      ) : null}
+      {structuredDataBlocks?.map((block) => (
+        <script key={block['@type'] || block['@id']} type="application/ld+json">
+          {JSON.stringify(block)}
+        </script>
+      ))}
     </Helmet>
   );
 }
@@ -695,7 +697,7 @@ const PartDetail = () => {
   if (!showProduct) {
     return (
       <div className="min-h-screen bg-gray-50 max-md:pb-28">
-        {apiSeo ? <PartProductSeoHelmet seo={apiSeo} structuredData={null} product={null} /> : null}
+        {apiSeo ? <PartProductSeoHelmet seo={apiSeo} structuredDataBlocks={null} product={null} /> : null}
         <div className="max-w-6xl mx-auto px-4 py-16">
           <div className="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center shadow-sm">
             <p className="text-lg text-gray-600">Загрузка информации о запчасти...</p>
@@ -739,12 +741,9 @@ const PartDetail = () => {
     fitmentText,
     inStock,
   });
-  const structuredData = buildProductStructuredDataGraph({
+  const structuredDataBlocks = buildProductStructuredDataBlocks({
     productJsonLd: seo.jsonLd,
     breadcrumbJsonLd,
-    canonicalUrl: seo.canonicalUrl,
-    title: seo.title,
-    description: seo.description,
     faqJsonLd,
   });
 
@@ -774,7 +773,7 @@ const PartDetail = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-gray-50 to-gray-100 max-md:pb-28">
-      <PartProductSeoHelmet seo={seo} structuredData={structuredData} product={currentProduct} />
+      <PartProductSeoHelmet seo={seo} structuredDataBlocks={structuredDataBlocks} product={currentProduct} />
       <div className="mx-auto max-w-6xl px-4 pb-8 pt-3 max-md:pb-32">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />

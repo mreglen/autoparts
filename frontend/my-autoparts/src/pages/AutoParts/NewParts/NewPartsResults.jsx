@@ -152,7 +152,7 @@ const NewPartsResults = ({ updateNewPartsUrl, onSearch }) => {
 
       <div className="flex flex-col gap-4 px-3 sm:gap-6 sm:px-0 lg:flex-row">
         <aside className="hidden w-full flex-shrink-0 lg:block lg:w-64">
-          <div className="rounded-lg border border-gray-200 bg-white p-4 lg:sticky lg:top-4">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 lg:sticky lg:top-[calc(var(--sg-desktop-header-h)+1rem)]">
             <h3 className="mb-3 font-semibold text-gray-900">Фильтры</h3>
             <NewPartsFiltersForm updateNewPartsUrl={updateNewPartsUrl} showClearInPanel />
           </div>

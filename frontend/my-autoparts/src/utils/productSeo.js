@@ -106,6 +106,34 @@ export function buildProductStructuredDataGraph({
   return { '@context': 'https://schema.org', '@graph': graph };
 }
 
+const SCHEMA_ORG_CONTEXT = 'https://schema.org';
+
+function withSchemaContext(node) {
+  if (!node) return null;
+  if (node['@context']) return node;
+  return { '@context': SCHEMA_ORG_CONTEXT, ...node };
+}
+
+/** Отдельные JSON-LD блоки (Яндекс «Товары» не разбирает @graph). */
+export function buildProductStructuredDataBlocks({
+  productJsonLd,
+  breadcrumbJsonLd,
+  faqJsonLd,
+} = {}) {
+  const blocks = [];
+  if (productJsonLd) {
+    blocks.push(withSchemaContext(productJsonLd));
+  }
+  if (breadcrumbJsonLd) {
+    blocks.push(withSchemaContext(breadcrumbJsonLd));
+  }
+  if (faqJsonLd) {
+    const faqNode = typeof faqJsonLd === 'string' ? JSON.parse(faqJsonLd) : faqJsonLd;
+    blocks.push(withSchemaContext(faqNode));
+  }
+  return blocks.filter(Boolean);
+}
+
 export function buildNewPartStructuredDataGraph({
   productJsonLd,
   canonicalUrl,

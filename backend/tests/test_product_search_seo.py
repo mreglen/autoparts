@@ -213,12 +213,13 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         self.assertNotIn("Открыть карточку", html)
         self.assertNotIn("Цена:", html)
 
-    def test_prerender_html_without_photo_has_no_product_json_ld(self):
+    def test_prerender_html_without_photo_uses_logo_placeholder(self):
         meta = build_product_seo_meta(self._make_product(photos=[]), site_origin="https://svoygarage.ru")
         html = render_product_prerender_html(meta)
         self.assertIn('type="application/ld+json"', html)
-        self.assertNotIn('"@type": "Product"', html)
+        self.assertIn('"@type": "Product"', html)
         self.assertIn('"@type": "BreadcrumbList"', html)
+        self.assertIn("/img/product-placeholder-white.png", html)
 
     def test_prerender_html_includes_og_image(self):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
@@ -233,7 +234,7 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         meta = build_product_seo_meta(product, site_origin="https://svoygarage.ru")
         html = render_product_prerender_html(meta)
         self.assertIn('property="og:image"', html)
-        self.assertIn("/favicons/apple-touch-icon.png", html)
+        self.assertIn("/img/product-placeholder-white.png", html)
 
     def test_prerender_html_includes_specs_fitment_and_alternate_offers(self):
         product = self._make_product()

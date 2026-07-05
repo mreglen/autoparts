@@ -49,9 +49,44 @@
   }
   function appendJsonLd(jsonLd) {
     if (!jsonLd) return;
+    var payload = jsonLd;
+    try {
+      var parsed = typeof jsonLd === 'string' ? JSON.parse(jsonLd) : jsonLd;
+      if (parsed && parsed['@graph']) {
+        var productNode = null;
+        for (var i = 0; i < parsed['@graph'].length; i += 1) {
+          if (parsed['@graph'][i] && parsed['@graph'][i]['@type'] === 'Product') {
+            productNode = parsed['@graph'][i];
+            break;
+          }
+        }
+        if (productNode) {
+          payload = JSON.stringify({
+            '@context': 'https://schema.org',
+            name: productNode.name,
+            description: productNode.description,
+            sku: productNode.sku,
+            mpn: productNode.mpn,
+            url: productNode.url,
+            image: productNode.image,
+            brand: productNode.brand,
+            manufacturer: productNode.manufacturer,
+            category: productNode.category,
+            alternateName: productNode.alternateName,
+            offers: productNode.offers,
+            '@type': 'Product',
+            '@id': productNode['@id'],
+          });
+        }
+      } else if (parsed && parsed['@type'] === 'Product' && !parsed['@context']) {
+        payload = JSON.stringify(Object.assign({ '@context': 'https://schema.org' }, parsed));
+      }
+    } catch (e) {
+      payload = jsonLd;
+    }
     var script = document.createElement('script');
     script.type = 'application/ld+json';
-    script.text = String(jsonLd);
+    script.text = String(payload);
     document.head.appendChild(script);
   }
 

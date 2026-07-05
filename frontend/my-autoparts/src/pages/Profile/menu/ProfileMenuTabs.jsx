@@ -368,7 +368,7 @@ export default function ProfileMenuTabs({
 
     return (
         <div
-            className="w-full min-w-[15.5rem] rounded-xl border border-gray-200 bg-white shadow-md sticky top-24 h-[calc(100vh-7rem)] overflow-y-auto overscroll-contain scroll-pb-32 [&::-webkit-scrollbar]:hidden"
+            className="w-full min-w-[15.5rem] rounded-xl border border-gray-200 bg-white shadow-md sticky top-[calc(var(--sg-desktop-header-h)+1rem)] h-[calc(100vh-var(--sg-desktop-header-h)-2rem)] overflow-y-auto overscroll-contain scroll-pb-32 [&::-webkit-scrollbar]:hidden"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
             <div className="flex flex-col pb-4 pt-1">{tabs.map(renderMenuItem)}</div>

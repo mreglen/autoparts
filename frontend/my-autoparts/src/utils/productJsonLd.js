@@ -2,7 +2,7 @@ import { stripHtmlTags } from './text';
 import { buildPartDetailPath, buildNewPartDetailPath } from './partRoutes';
 import { formatProductDisplayTitle, extractProductDescription } from './productDisplayName';
 import { normalizeImageUrl } from './apiClient';
-import { resolveOgImageUrl } from './seoConstants';
+import { resolveOgImageUrl, PRODUCT_PLACEHOLDER_IMAGE_URL } from './seoConstants';
 import { DEFAULT_CITY } from './organizationCity';
 import { buildProductAlternateNames, buildProductOfferJsonLd, resolveProductCity } from './productSearchSeo';
 
@@ -123,11 +123,10 @@ function catalogProductImageUrls(product, siteOrigin = SITE_ORIGIN, maxCount = 5
     urls.push(absolute);
     if (urls.length >= maxCount) break;
   }
+  if (!urls.length) {
+    urls.push(PRODUCT_PLACEHOLDER_IMAGE_URL);
+  }
   return urls;
-}
-
-function catalogProductImageUrl(product, siteOrigin = SITE_ORIGIN) {
-  return catalogProductImageUrls(product, siteOrigin, 1)[0] || null;
 }
 
 export function isCatalogProductJsonLdEligible(product) {
@@ -137,7 +136,7 @@ export function isCatalogProductJsonLdEligible(product) {
   if (!brand || !article) return false;
   if (!String(product?.name || '').trim()) return false;
   if (!formatPriceLd(product?.price)) return false;
-  return Boolean(catalogProductImageUrl(product));
+  return true;
 }
 
 export function buildCatalogProductJsonLd(product, { siteOrigin = SITE_ORIGIN, canonicalUrl } = {}) {
@@ -205,9 +204,7 @@ export function isNewPartJsonLdEligible(card) {
   if (!formatPriceLd(card?.price)) return false;
   const name = String(card?.name || '').trim();
   if (!name && !`${brand} ${article}`.trim()) return false;
-  const stockCount = Number(card?.stock_count || 0);
-  const imageUrl = String(card?.image_url || '').trim();
-  return Boolean(imageUrl || stockCount > 0);
+  return true;
 }
 
 export function buildNewPartCardJsonLd(card, { siteOrigin = SITE_ORIGIN, canonicalUrl, displayPrice } = {}) {
@@ -231,7 +228,7 @@ export function buildNewPartCardJsonLd(card, { siteOrigin = SITE_ORIGIN, canonic
   if (imageUrl && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
     imageUrl = resolveOgImageUrl(imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`);
   } else if (!imageUrl) {
-    imageUrl = resolveOgImageUrl(null);
+    imageUrl = PRODUCT_PLACEHOLDER_IMAGE_URL;
   }
 
   const priceSource = displayPrice != null ? displayPrice : card.price;

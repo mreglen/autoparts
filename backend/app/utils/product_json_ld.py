@@ -10,7 +10,7 @@ from app.utils.product_search_seo import (
     build_product_alternate_names,
     build_product_offer_json_ld,
 )
-from app.utils.seo_constants import resolve_default_og_image_url
+from app.utils.seo_constants import resolve_product_placeholder_image_url
 
 SCHEMA_ORG = "https://schema.org"
 IN_STOCK = f"{SCHEMA_ORG}/InStock"
@@ -195,14 +195,6 @@ def build_offer_json_ld(
     return offer
 
 
-def _product_has_working_photo(product) -> bool:
-    for photo in product.photos or []:
-        photo_url = str(getattr(photo, "photo_url", "") or "").strip()
-        if photo_url:
-            return True
-    return False
-
-
 def _catalog_product_image_urls(product, site_origin: str, *, max_count: int = 5) -> list[str]:
     from app.services.yandex_feed_xml_service import _absolute_photo_url
 
@@ -222,6 +214,9 @@ def _catalog_product_image_urls(product, site_origin: str, *, max_count: int = 5
         urls.append(image_url)
         if len(urls) >= max_count:
             break
+    if not urls:
+        # Карточка без фото — лого сайта на белом фоне, чтобы разметка Product была валидной.
+        urls.append(resolve_product_placeholder_image_url(site_origin))
     return urls
 
 
@@ -242,7 +237,8 @@ def is_catalog_product_json_ld_eligible(product) -> bool:
         return False
     if not format_price_ld(product.price):
         return False
-    return _product_has_working_photo(product)
+    # Фото не обязательно: для карточек без фото используется лого-фолбэк.
+    return True
 
 
 def build_catalog_product_json_ld(
@@ -329,9 +325,8 @@ def is_new_part_json_ld_eligible(card) -> bool:
     name = str(getattr(card, "name", "") or "").strip()
     if not name and not f"{brand} {article}".strip():
         return False
-    stock_count = int(getattr(card, "stock_count", 0) or 0)
-    image_url = str(getattr(card, "image_url", "") or "").strip()
-    return bool(image_url or stock_count > 0)
+    # Фото не обязательно: для карточек без фото используется лого-фолбэк.
+    return True
 
 
 def build_new_part_card_json_ld(
@@ -360,7 +355,7 @@ def build_new_part_card_json_ld(
 
     image_url = _absolute_photo_url(str(card.image_url or "").strip(), site_origin)
     if not image_url:
-        image_url = resolve_default_og_image_url(site_origin)
+        image_url = resolve_product_placeholder_image_url(site_origin)
 
     price_source = display_price if display_price is not None else card.price
     price = format_price_ld(price_source)
@@ -418,3 +413,118 @@ def build_new_part_card_json_ld(
         "offers": offers,
     }
     return sanitize_json_ld(product_json)
+
+
+def build_json_ld_script_tags(*json_ld_strings: str) -> str:
+    tags: list[str] = []
+    for raw in json_ld_strings:
+        if not raw or not str(raw).strip():
+            continue
+        tags.append(f'<script type="application/ld+json">{str(raw).strip()}</script>')
+    return "\n  ".join(tags)
+
+
+def split_graph_json_ld_for_yandex(*, product_json_ld: str, json_ld_graph: str) -> list[str]:
+    """
+    Отдельные JSON-LD блоки для Яндекса (не @graph).
+    Первым идёт standalone Product с @context — иначе «Товары» не видят name/price/brand.
+    """
+    blocks: list[str] = []
+    has_product = bool(product_json_ld and str(product_json_ld).strip())
+
+    if has_product:
+        blocks.append(str(product_json_ld).strip())
+
+    if not json_ld_graph:
+        return blocks
+
+    try:
+        parsed = json.loads(json_ld_graph)
+    except json.JSONDecodeError:
+        return blocks
+
+    nodes: list[dict[str, Any]] = []
+    if isinstance(parsed, dict) and isinstance(parsed.get("@graph"), list):
+        nodes = [node for node in parsed["@graph"] if isinstance(node, dict)]
+    elif isinstance(parsed, dict) and parsed.get("@type"):
+        nodes = [parsed]
+
+    for node in nodes:
+        node_type = node.get("@type")
+        if node_type == "Product":
+            if not has_product:
+                node_copy = dict(node)
+                node_copy.pop("@context", None)
+                dumped = dumps_json_ld({"@context": SCHEMA_ORG, **node_copy})
+                if dumped:
+                    blocks.append(dumped)
+            continue
+        if node_type == "WebPage":
+            continue
+        node_copy = dict(node)
+        node_copy.pop("@context", None)
+        dumped = dumps_json_ld({"@context": SCHEMA_ORG, **node_copy})
+        if dumped:
+            blocks.append(dumped)
+
+    return blocks
+
+
+def build_product_og_meta_tags(*, price: str | None, in_stock: bool) -> str:
+    import html as html_module
+
+    tags: list[str] = []
+    if price:
+        tags.append(
+            f'<meta property="product:price:amount" content="{html_module.escape(str(price), quote=True)}" />'
+        )
+        tags.append('<meta property="product:price:currency" content="RUB" />')
+    availability = "in stock" if in_stock else "out of stock"
+    tags.append(
+        f'<meta property="product:availability" content="{html_module.escape(availability, quote=True)}" />'
+    )
+    return "\n  ".join(tags)
+
+
+def build_product_article_microdata_prefix(
+    *,
+    name: str,
+    description: str,
+    brand: str,
+    article: str,
+    image_url: str | None,
+    price: str | None,
+    in_stock: bool,
+    canonical_url: str,
+) -> str:
+    import html as html_module
+
+    esc = html_module.escape
+    availability_href = IN_STOCK if in_stock else OUT_OF_STOCK
+    image_link = (
+        f'    <link itemprop="image" href="{esc(image_url, quote=True)}" />\n'
+        if image_url
+        else ""
+    )
+    price_meta = (
+        f'    <meta itemprop="price" content="{esc(str(price), quote=True)}" />\n'
+        if price
+        else ""
+    )
+    return (
+        f'  <article itemscope itemtype="{SCHEMA_ORG}/Product">\n'
+        f'    <meta itemprop="name" content="{esc(name, quote=True)}" />\n'
+        f'    <meta itemprop="description" content="{esc(description, quote=True)}" />\n'
+        f'    <link itemprop="url" href="{esc(canonical_url, quote=True)}" />\n'
+        f'    <meta itemprop="sku" content="{esc(article, quote=True)}" />\n'
+        f"{image_link}"
+        f'    <div itemprop="brand" itemscope itemtype="{SCHEMA_ORG}/Brand">\n'
+        f'      <meta itemprop="name" content="{esc(brand, quote=True)}" />\n'
+        f"    </div>\n"
+        f'    <div itemprop="offers" itemscope itemtype="{SCHEMA_ORG}/Offer">\n'
+        f'      <link itemprop="url" href="{esc(canonical_url, quote=True)}" />\n'
+        f"{price_meta}"
+        f'      <meta itemprop="priceCurrency" content="RUB" />\n'
+        f'      <link itemprop="availability" href="{availability_href}" />\n'
+        f"    </div>\n"
+    )

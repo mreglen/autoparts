@@ -386,7 +386,7 @@ function AutoParts() {
   return (
     <div className="mt-0 sm:mt-5 px-0 w-full">
       <PageSeoHelmet seo={seo} />
-      <div className="max-lg:sticky max-lg:top-0 max-lg:z-20 max-lg:bg-gray-50">
+      <div className="max-lg:sticky max-lg:top-[var(--sg-mobile-header-h)] max-lg:z-20 max-lg:bg-gray-50">
         {activeTab === 'my' && (
           <MobileCompactSearch
             onSearch={handleUsedPartsSearch}

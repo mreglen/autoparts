@@ -859,7 +859,7 @@ export default function OrderRegistration() {
         </div>
 
         <aside className="mt-6 lg:col-span-4 lg:mt-0">
-          <div className="lg:sticky lg:top-24">
+          <div className="lg:sticky lg:top-[calc(var(--sg-desktop-header-h)+1rem)]">
             <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
               <h3 className="text-base font-semibold text-gray-900">Итого по заказу</h3>
               <p className="mt-0.5 text-sm text-gray-500">{seller}</p>

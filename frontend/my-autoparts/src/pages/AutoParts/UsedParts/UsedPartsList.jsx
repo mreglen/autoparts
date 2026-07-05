@@ -81,7 +81,7 @@ const formatPhoneNumber = (phone) => {
 const UsedPartsFiltersAside = React.memo(function UsedPartsFiltersAside({ updateCatalogUrl }) {
   return (
     <aside className="hidden w-full shrink-0 lg:block lg:w-64">
-      <div className="rounded-lg border border-gray-200 bg-white p-4 lg:sticky lg:top-4">
+      <div className="rounded-lg border border-gray-200 bg-white p-4 lg:sticky lg:top-[calc(var(--sg-desktop-header-h)+1rem)]">
         <h3 className="mb-3 font-semibold text-gray-900">Фильтры</h3>
         <UsedPartsFiltersForm updateCatalogUrl={updateCatalogUrl} deferApply showClearInPanel={false} />
       </div>

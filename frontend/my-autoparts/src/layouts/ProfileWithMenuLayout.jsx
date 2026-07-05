@@ -56,6 +56,8 @@ export default function ProfileWithMenuLayout() {
                     <Navigation />
                 </div>
                 <MobileHeader onMenuClick={() => {}} />
+                <div className="hidden lg:block h-[var(--sg-desktop-header-h)] shrink-0" aria-hidden="true" />
+                <div className="lg:hidden h-[var(--sg-mobile-header-h)] shrink-0" aria-hidden="true" />
                 <main className="max-w-7xl mx-auto max-lg:px-3 max-lg:py-4 px-3 py-12">
                     <AuthLoadingScreen className="h-48" />
                 </main>
@@ -71,6 +73,9 @@ export default function ProfileWithMenuLayout() {
 
             <MobileHeader onMenuClick={openMenu} />
 
+            <div className="hidden lg:block h-[var(--sg-desktop-header-h)] shrink-0" aria-hidden="true" />
+            <div className="lg:hidden h-[var(--sg-mobile-header-h)] shrink-0" aria-hidden="true" />
+
             <MobileSideMenu
                 isOpen={isMobileMenuOpen}
                 onClose={closeMenu}
@@ -83,7 +88,7 @@ export default function ProfileWithMenuLayout() {
             <main
                 className={`mx-auto ${
                     isChatsPage
-                        ? 'max-w-full max-lg:px-0 max-lg:py-0 px-3 py-6 sm:py-8 lg:flex lg:max-h-[calc(100dvh-4rem)] lg:min-h-0 lg:flex-col lg:overflow-hidden lg:py-4 lg:max-w-7xl'
+                        ? 'max-w-full max-lg:px-0 max-lg:py-0 px-3 py-6 sm:py-8 lg:flex lg:max-h-[calc(100dvh-var(--sg-desktop-header-h))] lg:min-h-0 lg:flex-col lg:overflow-hidden lg:py-4 lg:max-w-7xl'
                         : 'max-w-7xl max-lg:px-3 max-lg:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                 }`}
             >

@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { PageSeoHelmet } from '../../../utils/pageSeo';
-import { SITE_ORIGIN } from '../../../utils/breadcrumbs';
+import { SITE_ORIGIN, buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../../utils/breadcrumbs';
 import { resolveOgImageUrl } from '../../../utils/seoConstants';
 import { buildNewPartDetailPath, parseNewPartDetailParam } from '../../../utils/partRoutes';
 import { extractProductDescription, formatProductDisplayTitle } from '../../../utils/productDisplayName';
@@ -13,7 +13,7 @@ import NewPartDeliveryStockBlock from './NewPartDeliveryStockBlock';
 import NewPartAnalogsTable from './NewPartAnalogsTable';
 import NewPartUsedMatchesBlock from './NewPartUsedMatchesBlock';
 import { buildNewPartCardJsonLd, parseJsonLdString } from '../../../utils/productJsonLd';
-import { buildNewPartStructuredDataGraph } from '../../../utils/productSeo';
+import { buildProductStructuredDataBlocks } from '../../../utils/productSeo';
 import { buildNewPartCardKeywords } from '../../../utils/pageKeywords';
 import {
   buildNewPartH1,
@@ -425,17 +425,13 @@ export default function NewPartDetailPage() {
       ? parsedApiJsonLd
       : buildNewPartCardJsonLd(card, { canonicalUrl, displayPrice });
 
-  const structuredData = parsedApiJsonLd?.['@graph']
-    ? parsedApiJsonLd
-    : buildNewPartStructuredDataGraph({
-        productJsonLd,
-        canonicalUrl,
-        title: seo?.title,
-        description: seo?.description,
-        brand,
-        article,
-        cardName: card?.name,
-      });
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    buildBreadcrumbsForPath(canonicalPath, { brand, article, cardName: card?.name }),
+  );
+  const structuredDataBlocks = buildProductStructuredDataBlocks({
+    productJsonLd,
+    breadcrumbJsonLd,
+  });
 
   const analogsLoading = rosskoStatus === 'loading' && analogParts.length === 0;
   const hasLiveStocks = Boolean(livePart) && liveStocks.length > 0;
@@ -459,7 +455,13 @@ export default function NewPartDetailPage() {
   return (
     <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6 md:py-8">
       <PageSeoHelmet seo={seo} />
-      {structuredData ? <script type="application/ld+json">{JSON.stringify(structuredData)}</script> : null}
+      <Helmet>
+        {structuredDataBlocks.map((block) => (
+          <script key={block['@type'] || block['@id']} type="application/ld+json">
+            {JSON.stringify(block)}
+          </script>
+        ))}
+      </Helmet>
 
       <section className="mb-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-4 shadow-sm sm:mb-6 sm:p-6">
         <button

@@ -22,8 +22,12 @@ from app.utils.product_display_name import extract_product_description, format_p
 from app.utils.product_part_faq import build_product_faq_items, build_product_faq_json_ld
 from app.utils.product_json_ld import (
     build_catalog_product_json_ld,
+    build_json_ld_script_tags,
+    build_product_article_microdata_prefix,
+    build_product_og_meta_tags,
     dumps_json_ld,
     product_body_description,
+    split_graph_json_ld_for_yandex,
 )
 from app.utils.product_search_seo import (
     build_product_search_description,
@@ -32,7 +36,7 @@ from app.utils.product_search_seo import (
     resolve_product_city,
 )
 from app.utils.product_urls import build_product_page_url, build_product_used_catalog_url
-from app.utils.seo_constants import resolve_default_og_image_url
+from app.utils.seo_constants import resolve_product_placeholder_image_url
 
 
 @dataclass(frozen=True)
@@ -165,7 +169,8 @@ def build_product_seo_meta(
         if image_url:
             break
     if not image_url:
-        image_url = resolve_default_og_image_url(origin)
+        # Карточка без фото — лого сайта на белом фоне.
+        image_url = resolve_product_placeholder_image_url(origin)
 
     seller_vehicle_dicts = [
         {
@@ -468,6 +473,23 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
         fitment_text=meta.fitment_text,
         in_stock=meta.in_stock,
     )
+    json_ld_scripts = build_json_ld_script_tags(
+        *split_graph_json_ld_for_yandex(
+            product_json_ld=meta.json_ld,
+            json_ld_graph=json_ld_graph,
+        )
+    )
+    product_og_meta = build_product_og_meta_tags(price=meta.price, in_stock=meta.in_stock)
+    article_microdata = build_product_article_microdata_prefix(
+        name=meta.h1,
+        description=meta.body_description or meta.description,
+        brand=meta.brand,
+        article=meta.article,
+        image_url=meta.image_url,
+        price=meta.price,
+        in_stock=meta.in_stock,
+        canonical_url=meta.canonical_url,
+    )
     keywords_tag = ""
     if meta.keywords:
         keywords_tag = (
@@ -618,11 +640,11 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
   <meta property="og:url" content="{canonical}" />
   <meta property="og:locale" content="ru_RU" />
   {image_tag}
-  <script type="application/ld+json">{json_ld_graph}</script>
+  {product_og_meta}
+  {json_ld_scripts}
 </head>
 <body>
-{breadcrumb_html}  <article>
-    <h1>{h1}</h1>{image_block}
+{breadcrumb_html}{article_microdata}    <h1>{h1}</h1>{image_block}
 {about_html}{details_html}{fitment_html}{delivery_html}{warranty_html}{alternate_offers_html}{faq_html}{used_catalog_link}  </article>
 </body>
 </html>
