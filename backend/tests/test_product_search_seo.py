@@ -199,6 +199,7 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
         html = render_product_prerender_html(meta)
         self.assertIn('type="application/ld+json"', html)
+        self.assertIn('prefix="og: http://ogp.me/ns# product: http://ogp.me/ns/product#"', html)
         self.assertIn('"@type": "Product"', html)
         self.assertIn('"@type": "BreadcrumbList"', html)
         self.assertIn('"@type": "FAQPage"', html)

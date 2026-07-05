@@ -29,7 +29,7 @@ from app.utils.product_search_seo import (
 )
 from app.utils.new_part_price_utils import min_stock_base_price, min_stock_price_with_markup
 from app.utils.org_markup import global_markup_percent
-from app.utils.seo_constants import resolve_product_placeholder_image_url
+from app.utils.seo_constants import HTML_OG_PRODUCT_PREFIX, resolve_product_placeholder_image_url
 from app.utils.page_keywords import build_page_keywords
 from app.utils.site_settings_db import get_or_create_site_settings
 
@@ -766,7 +766,7 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
     )
 
     return f"""<!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" prefix="{html.escape(HTML_OG_PRODUCT_PREFIX, quote=True)}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />

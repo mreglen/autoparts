@@ -36,7 +36,7 @@ from app.utils.product_search_seo import (
     resolve_product_city,
 )
 from app.utils.product_urls import build_product_page_url, build_product_used_catalog_url
-from app.utils.seo_constants import resolve_product_placeholder_image_url
+from app.utils.seo_constants import HTML_OG_PRODUCT_PREFIX, resolve_product_placeholder_image_url
 
 
 @dataclass(frozen=True)
@@ -625,7 +625,7 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
     )
 
     return f"""<!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" prefix="{html.escape(HTML_OG_PRODUCT_PREFIX, quote=True)}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
