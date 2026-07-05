@@ -318,9 +318,9 @@ main() {
   ensure_upload_dirs
   ensure_nginx_cache_dirs
   fix_backend_env
-  ensure_scheduler_env
   git_pull
   sync_installer
+  ensure_scheduler_env
 
   if [[ $SKIP_FRONTEND -eq 0 ]]; then
     install_backend_deps
