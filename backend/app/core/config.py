@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC: float = 0.2
     NEW_PARTS_SEO_SYNC_BATCH_INTERVAL_MINUTES: int = 30
     NEW_PARTS_SEO_SYNC_BATCH_SIZE: int = 0
-    NEW_PARTS_SEO_SYNC_USE_CELERY: bool = False
+    NEW_PARTS_SEO_SYNC_USE_CELERY: bool = True
     NEW_PARTS_SEO_MAX_CARDS_PER_RESPONSE: int = 5
     # 0 = все позиции с остатком из ответа Rossko (до SEED_EXTRACT_MAX_PARTS)
     NEW_PARTS_SEO_MAX_CARDS_PER_SEED_RESPONSE: int = 0

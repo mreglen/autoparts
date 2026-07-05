@@ -15,6 +15,7 @@ import {
   extractProductDescription,
   formatProductDisplayTitle,
 } from '../../../utils/productDisplayName';
+import { prefetchNewPartOpenChunk } from '../../../utils/prefetchPartDetail';
 
 const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const weekdays = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
@@ -205,6 +206,9 @@ function NewPartProductCard({
     rosskoPart: part,
     stocksData: stocks,
   };
+  const prefetchDetail = () => {
+    prefetchNewPartOpenChunk();
+  };
 
   const prepareCartItem = (stock, quantityToAdd) => {
     const cartItem = {
@@ -285,6 +289,9 @@ function NewPartProductCard({
               to={detailHref}
               state={detailLinkState}
               className="block text-inherit no-underline"
+              onMouseEnter={prefetchDetail}
+              onFocus={prefetchDetail}
+              onTouchStart={prefetchDetail}
             >
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{brand}</span>

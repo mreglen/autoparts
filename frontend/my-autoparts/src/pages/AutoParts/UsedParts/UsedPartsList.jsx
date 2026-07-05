@@ -623,7 +623,9 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           <h2 className="text-2xl font-bold text-gray-800 mb-3">Нет б/у запчастей</h2>
           {catalogError ? (
             <>
-              <p className="text-red-600 text-base leading-relaxed">{String(catalogError)}</p>
+              <p className="text-gray-600 text-base leading-relaxed">
+                Каталог временно недоступен. Попробуйте повторить загрузку.
+              </p>
               <button
                 type="button"
                 onClick={() => dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams, 1)))}

@@ -2,6 +2,7 @@ import { fetchPublicProduct } from '../redux/slices/ProductSlice';
 
 let usedPartChunkPromise = null;
 let newPartChunkPromise = null;
+let newPartOpenChunkPromise = null;
 const prefetchedProductIds = new Set();
 
 export function prefetchUsedPartDetailChunk() {
@@ -16,6 +17,13 @@ export function prefetchNewPartDetailChunk() {
     newPartChunkPromise = import('../pages/AutoParts/NewParts/NewPartDetailPage');
   }
   return newPartChunkPromise;
+}
+
+export function prefetchNewPartOpenChunk() {
+  if (!newPartOpenChunkPromise) {
+    newPartOpenChunkPromise = import('../pages/AutoParts/NewParts/NewPartOpenPage');
+  }
+  return newPartOpenChunkPromise;
 }
 
 /** Предзагрузка JS-чанка и данных товара при наведении / touch на карточку б/у. */

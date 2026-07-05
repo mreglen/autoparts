@@ -202,12 +202,18 @@ apply_nginx_configs() {
 }
 
 verify() {
-  local cart_code public_code
+  local cart_code public_code part_types_code catalog_code
   cart_code=$(curl -sf -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8080/api/cart/ || echo "000")
   public_code=$(curl -sf -o /dev/null -w '%{http_code}' --max-time 10 \
     -H 'Host: svoygarage.ru' https://127.0.0.1/server/api/cart/ -k || echo "000")
-  log "Проверка: local cart=$cart_code public cart=$public_code"
+  part_types_code=$(curl -sf -o /dev/null -w '%{http_code}' --max-time 10 \
+    -H 'Host: svoygarage.ru' https://127.0.0.1/server/api/part-types/public -k || echo "000")
+  catalog_code=$(curl -sf -o /dev/null -w '%{http_code}' --max-time 15 \
+    -H 'Host: svoygarage.ru' "https://127.0.0.1/server/api/catalog/products?page=1&page_size=1" -k || echo "000")
+  log "Проверка: local cart=$cart_code public cart=$public_code part-types=$part_types_code catalog=$catalog_code"
   [[ "$cart_code" =~ ^(200|401)$ ]] || log "WARN: неожиданный код local cart=$cart_code"
+  [[ "$part_types_code" == "200" ]] || log "WARN: неожиданный код part-types=$part_types_code"
+  [[ "$catalog_code" == "200" ]] || log "WARN: неожиданный код catalog=$catalog_code"
 }
 
 main() {
