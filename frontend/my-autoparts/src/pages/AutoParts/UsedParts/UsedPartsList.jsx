@@ -26,6 +26,7 @@ import {
   isUsedCatalogBrowseMode,
 } from '../../../utils/autopartsPublic';
 import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
+import { prefetchUsedPartDetail } from '../../../utils/prefetchPartDetail';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
@@ -489,6 +490,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     const availableQty = part.quantity || part.available_count || 0;
     const sellerOrg = part.organization || organization;
     const detailPath = buildPartDetailPath(part);
+    const prefetchDetail = () => prefetchUsedPartDetail(part.id, dispatch);
     return (
       <article
         key={listKey}
@@ -497,6 +499,9 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
         <Link
           to={detailPath}
           className="block text-inherit no-underline"
+          onMouseEnter={prefetchDetail}
+          onFocus={prefetchDetail}
+          onTouchStart={prefetchDetail}
         >
           <div className="flex flex-row gap-3 p-3 sm:gap-4 sm:p-4">
             <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-40 sm:w-40 lg:h-44 lg:w-44">

@@ -1,8 +1,10 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { buildListImageUrlFallbackChain } from '../../utils/apiClient';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { buildPartDetailPath } from '../../utils/partRoutes';
+import { prefetchUsedPartDetail } from '../../utils/prefetchPartDetail';
 
 const isVideoUrl = (value) => {
   if (!value || typeof value !== 'string') return false;
@@ -40,6 +42,7 @@ const ProductCard = ({
   hideConditionAndQuantity = false,
   listPriority = false,
 }) => {
+  const dispatch = useDispatch();
   const displayTitle = formatProductDisplayTitle(part.brand, part.article, part.title);
   const product = part;
   const detailPath = buildPartDetailPath({
@@ -47,6 +50,10 @@ const ProductCard = ({
     brand: product.brand,
     article: product.article,
   });
+
+  const prefetchDetail = useCallback(() => {
+    prefetchUsedPartDetail(product.id, dispatch);
+  }, [dispatch, product.id]);
 
   const listPreview = useMemo(() => {
     const photos = part.photos || [];
@@ -80,6 +87,9 @@ const ProductCard = ({
         <Link
           to={detailPath}
           className="group flex flex-col flex-1 text-inherit no-underline"
+          onMouseEnter={prefetchDetail}
+          onFocus={prefetchDetail}
+          onTouchStart={prefetchDetail}
         >
           <div className="bg-gray-50 aspect-[4/3] w-full flex items-center justify-center relative overflow-hidden cursor-pointer">
             {listPreview?.type === 'photo' && photoSrc ? (

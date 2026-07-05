@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { resolveNewPartDetailPath } from '../../../utils/openNewPartFromCatalog';
 
 export default function NewPartOpenPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const [error, setError] = useState(null);
 
@@ -21,7 +22,12 @@ export default function NewPartOpenPage() {
 
     (async () => {
       try {
-        const path = await resolveNewPartDetailPath({ brand, article });
+        const path = await resolveNewPartDetailPath({
+          brand,
+          article,
+          part: location.state?.rosskoPart,
+          stocksData: location.state?.stocksData,
+        });
         if (cancelled) return;
         if (path) {
           navigate(path, { replace: true, state: { backTo } });
@@ -38,7 +44,7 @@ export default function NewPartOpenPage() {
     return () => {
       cancelled = true;
     };
-  }, [brand, article, backTo, navigate]);
+  }, [brand, article, backTo, navigate, location.state]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">

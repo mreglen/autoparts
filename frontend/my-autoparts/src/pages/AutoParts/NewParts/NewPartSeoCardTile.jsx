@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
+import { prefetchNewPartDetail } from '../../../utils/prefetchPartDetail';
 
 function formatPrice(price) {
   const value = Number(price);
@@ -19,6 +20,9 @@ export default function NewPartSeoCardTile({ card }) {
     <Link
       to={to}
       className="group flex h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+      onMouseEnter={() => prefetchNewPartDetail(card?.id)}
+      onFocus={() => prefetchNewPartDetail(card?.id)}
+      onTouchStart={() => prefetchNewPartDetail(card?.id)}
     >
       <div className="aspect-[4/3] overflow-hidden bg-gray-50">
         {card?.image_url ? (

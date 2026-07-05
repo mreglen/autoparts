@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Outlet, useLocation, useSearchParams } from 'react-router-dom';
 import Navigation from '../pages/Navigation/Navigation';
@@ -46,6 +47,10 @@ export default function MainLayout() {
         guestContent,
     } = useMobileMenuShell(user);
 
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, [location.pathname]);
+
     return (
         <div className="min-h-screen max-w-full overflow-x-hidden bg-gray-50 pb-[4.5rem] lg:pb-0">
             <div className="hidden lg:block">
@@ -84,7 +89,7 @@ export default function MainLayout() {
                     </div>
                 ) : null}
                 <AvitoProExpiredBanner status={avitoAccountStatus} />
-                <Outlet key={location.pathname} />
+                <Outlet />
             </main>
 
             <InstallPwaPrompt />

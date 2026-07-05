@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import {
   addNewPartsToCart,
   removeFromCart,
@@ -9,7 +9,6 @@ import {
   updateCartItemQuantity,
 } from '../../../redux/slices/CartSlice';
 import { buildNewPartOpenPath } from '../../../utils/partRoutes';
-import { isPlainLeftClick, resolveNewPartDetailPath } from '../../../utils/openNewPartFromCatalog';
 import { trackConversion, CONVERSION_EVENTS } from '../../../utils/siteAnalytics';
 import { isRosskoFastDelivery } from './rosskoHelpers';
 import {
@@ -132,7 +131,6 @@ function NewPartProductCard({
   isDetailView = false,
 }) {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   const location = useLocation();
   const cartLoading = useSelector(selectCartLoading);
   const cart = useSelector(selectCart);
@@ -142,7 +140,6 @@ function NewPartProductCard({
 
   const [showDetails, setShowDetails] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
-  const [openingCard, setOpeningCard] = useState(false);
 
   const brand = toSafeText(part?.brand);
   const number = toSafeText(part?.partnumber);
@@ -197,38 +194,17 @@ function NewPartProductCard({
     };
   };
 
-  const handleNavigateToDetail = async (event) => {
-    if (isDetailView) return;
-    if (!isPlainLeftClick(event)) return;
-
-    event.preventDefault();
-    setOpeningCard(true);
-    try {
-      const backTo = `/autoparts/new${location.search || ''}`;
-      const path = await resolveNewPartDetailPath({
-        brand,
-        article: number,
-        part,
-        stocksData: stocks,
-      });
-      if (path) {
-        navigate(path, { state: { backTo } });
-        return;
-      }
-    } catch (_error) {
-      // fallback below
-    } finally {
-      setOpeningCard(false);
-    }
-    navigate(`/autoparts/new?q=${encodeURIComponent(`${brand} ${number}`.trim())}`);
-  };
-
   const backToListPath = `/autoparts/new${location.search || ''}`;
   const detailHref = buildNewPartOpenPath({
     brand,
     article: number,
     backTo: backToListPath,
   });
+  const detailLinkState = {
+    backTo: backToListPath,
+    rosskoPart: part,
+    stocksData: stocks,
+  };
 
   const prepareCartItem = (stock, quantityToAdd) => {
     const cartItem = {
@@ -307,9 +283,8 @@ function NewPartProductCard({
           {!isDetailView ? (
             <Link
               to={detailHref}
-              state={{ backTo: backToListPath }}
-              onClick={handleNavigateToDetail}
-              className={`block text-inherit no-underline ${openingCard ? 'pointer-events-none opacity-70' : ''}`}
+              state={detailLinkState}
+              className="block text-inherit no-underline"
             >
               <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{brand}</span>
@@ -365,7 +340,6 @@ function NewPartProductCard({
               </span>
             )}
           </div>
-          {openingCard && <p className="mt-2 text-xs text-gray-500">Открываем карточку…</p>}
         </div>
       </div>
 
