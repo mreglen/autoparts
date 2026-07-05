@@ -84,6 +84,10 @@ class ServerStatsServiceTests(unittest.TestCase):
                     name="Celery worker", ok=True, latency_ms=3.0, detail="1 worker(s)"
                 )
             ),
+            _check_pgbouncer=MagicMock(
+                return_value=ServiceHealth(name="PgBouncer", ok=True, latency_ms=1.0)
+            ),
+            _collect_operations=MagicMock(return_value=None),
         )
 
     def test_collect_server_stats_structure(self):
@@ -98,7 +102,7 @@ class ServerStatsServiceTests(unittest.TestCase):
         self.assertEqual(result.cpu.load_avg_1m, 1.2)
         self.assertEqual(result.memory.percent, 75.0)
         self.assertEqual(result.process.pid, 12345)
-        self.assertEqual(len(result.services), 3)
+        self.assertEqual(len(result.services), 4)
         self.assertTrue(all(service.ok for service in result.services))
 
     def test_warnings_on_high_load(self):

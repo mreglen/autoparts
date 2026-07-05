@@ -113,7 +113,11 @@ ignoreregex =
 
 ## Мониторинг
 
-Админка: server stats (`/api/admin/...`) — CPU, RAM, Redis, Celery. Алерт при load avg > 4.
+Админка: server stats (`/api/admin/server-stats`) — CPU, RAM, Redis, Celery, PgBouncer, 502/504, рестарты kroan.
+
+Cron: `scripts/ops/health-monitor.sh` каждые 5 мин — алерты при load > 4, 502/504 > 5 за 5 мин, рестартах kroan.
+
+Подробнее: [monitoring.md](./monitoring.md).
 
 ## Ограничения
 

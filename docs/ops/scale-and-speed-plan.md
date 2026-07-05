@@ -318,7 +318,42 @@ update           # если менялся backend pool
 ```
 
 ---
-этап 8 пока что пропускаем и не делаем
+## Этап 8 — Мониторинг и алерты
+
+**Цель:** заметить деградацию (502/504, рестарты, нагрузка) до жалоб пользователей.
+
+### Задачи агента
+
+**На сервере:**
+- [x] `scripts/ops/health-monitor.sh` — cron каждые 5 мин
+- [x] Алерты: 502/504 > 5 за 5 мин, restart `kroan` > 2 за 15 мин, сервис down
+- [x] fail2ban `nginx-req-limit` (429/503)
+- [x] Логи: `/var/log/autoparts-health.log`, `/var/log/autoparts-alerts.log`
+
+**В репозитории:**
+- [x] Расширить `/api/admin/server-stats` — 502/504, рестарты, PgBouncer
+- [x] `docs/ops/monitoring.md`, `docs/ops/monitor.env.example`
+- [x] `ensure_monitoring()` в `update.sh`
+
+### Деплой пользователя
+
+```bash
+update
+```
+
+### Критерии готовности
+
+- [x] cron `health-monitor` active
+- [x] Алерт пишется в `/var/log/autoparts-alerts.log`
+- [x] Админка показывает 502/504 и рестарты kroan
+
+### Команда для Plan mode
+
+```
+Этап 8 из docs/ops/scale-and-speed-plan.md
+```
+
+---
 
 ## Этап 9 — Нагрузочное тестирование и горизонталь
 
@@ -367,7 +402,7 @@ update
 | 5 Frontend | **выполнено** | 2026-07-05 | lazy chunks, prefetch, virtual list, retry 502/504 |
 | 6 Gunicorn | **выполнено** | 2026-07-05 | 2 workers, scheduler Redis lock, WS pub/sub |
 | 7 PostgreSQL | **выполнено** | 2026-07-05 | PgBouncer 6432, indexes, sg_api 50r/s |
-| 8 Мониторинг | | | |
+| 8 Мониторинг | **выполнено** | 2026-07-05 | health-monitor cron, fail2ban, server-stats ops |
 | 9 Load test | | | |
 
 **502/504 baseline (до этапа 1):** 502 = 2, 504 = 302
@@ -424,7 +459,13 @@ update
 - PostgreSQL tuning `tuning-4gb.conf`; nginx `sg_api` 50 r/s (burst 60)
 - Smoke: catalog miss p95 **~11 ms** (10 samples), EXPLAIN execution **0.57 ms**, `too many connections` — 0
 - Hotfix `2bae84a`: убран `prepare_threshold` (psycopg3-only), kroan стабилен
-- Следующий шаг — **этап 9** (load test; этап 8 пропущен)
+- Следующий шаг — **этап 8** (мониторинг и алерты)
+
+**После этапа 8 (2026-07-05):**
+- `health-monitor.sh` в cron каждые 5 мин; алерты в `/var/log/autoparts-alerts.log`
+- fail2ban `nginx-req-limit`; опционально Telegram через `/etc/autoparts/monitor.env`
+- Админка server-stats: 502/504 за 15 мин, рестарты kroan за 24 ч, PgBouncer health
+- Следующий шаг — **этап 9** (load test)
 
 **Дополнительно (аудит 2026-07-05, до update):**
 - Все сервисы active; git на сервере: `9d861d84`
@@ -441,6 +482,7 @@ update
 - [Аудит сервера 2026-07-04](./server-audit-2026-07-04.md)
 - [Производительность](./performance.md)
 - [DDoS / rate limits](./ddos-protection.md)
+- [Мониторинг и алерты](./monitoring.md)
 - Nginx: `docs/nginx/svoygarage.conf`, `docs/nginx/http-microcache.conf`
 - Деплой: `scripts/deploy/update.sh`
 

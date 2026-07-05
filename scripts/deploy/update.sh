@@ -399,6 +399,59 @@ verify_pgbouncer() {
   fi
 }
 
+ensure_monitoring() {
+  local cron_line monitor_script env_example env_target
+  monitor_script="$ROOT/scripts/ops/health-monitor.sh"
+  [[ -f "$monitor_script" ]] || return 0
+  chmod +x "$monitor_script"
+
+  mkdir -p /var/lib/autoparts /etc/autoparts
+  touch /var/log/autoparts-health.log /var/log/autoparts-alerts.log
+  chmod 644 /var/log/autoparts-health.log /var/log/autoparts-alerts.log
+
+  env_example="$ROOT/docs/ops/monitor.env.example"
+  env_target="/etc/autoparts/monitor.env"
+  if [[ -f "$env_example" && ! -f "$env_target" ]]; then
+    cp "$env_example" "$env_target"
+    chmod 600 "$env_target"
+    log "Monitoring: создан $env_target (отредактируйте Telegram при необходимости)"
+  fi
+
+  cron_line="*/5 * * * * root $monitor_script >> /var/log/autoparts-health.log 2>&1"
+  if [[ -f /etc/cron.d/autoparts-monitor ]]; then
+    if ! grep -qF "$monitor_script" /etc/cron.d/autoparts-monitor 2>/dev/null; then
+      echo "$cron_line" > /etc/cron.d/autoparts-monitor
+      chmod 644 /etc/cron.d/autoparts-monitor
+      log "Monitoring: обновлён /etc/cron.d/autoparts-monitor"
+    fi
+  else
+    echo "$cron_line" > /etc/cron.d/autoparts-monitor
+    chmod 644 /etc/cron.d/autoparts-monitor
+    log "Monitoring: установлен cron /etc/cron.d/autoparts-monitor"
+  fi
+
+  if command -v fail2ban-client >/dev/null 2>&1; then
+    if [[ -f "$ROOT/docs/ops/fail2ban/nginx-req-limit.filter" ]]; then
+      cp "$ROOT/docs/ops/fail2ban/nginx-req-limit.filter" /etc/fail2ban/filter.d/nginx-req-limit.conf
+    fi
+    if [[ -f "$ROOT/docs/ops/fail2ban/nginx-req-limit.conf" ]]; then
+      cp "$ROOT/docs/ops/fail2ban/nginx-req-limit.conf" /etc/fail2ban/jail.d/nginx-req-limit.conf
+      systemctl reload fail2ban 2>/dev/null || systemctl restart fail2ban 2>/dev/null || true
+      log "Monitoring: fail2ban nginx-req-limit применён"
+    fi
+  fi
+}
+
+verify_monitoring() {
+  local cron_ok
+  cron_ok=$(grep -c 'health-monitor.sh' /etc/cron.d/autoparts-monitor 2>/dev/null || echo 0)
+  cron_ok=${cron_ok:-0}
+  log "Monitoring: cron_entries=$cron_ok"
+  if [[ "$cron_ok" -lt 1 ]]; then
+    log "WARN: health-monitor cron not installed"
+  fi
+}
+
 apply_nginx_configs() {
   local site="/etc/nginx/sites-available/svoygarage"
   local ts
@@ -488,6 +541,7 @@ main() {
   install_kroan_unit
   ensure_pgbouncer
   ensure_postgresql_tuning
+  ensure_monitoring
 
   if [[ $SKIP_FRONTEND -eq 0 ]]; then
     install_backend_deps
@@ -510,6 +564,7 @@ main() {
   verify_frontend_chunks
   verify_gunicorn
   verify_pgbouncer
+  verify_monitoring
   log "========== Обновление завершено =========="
 }
 

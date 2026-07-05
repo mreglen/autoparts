@@ -46,6 +46,13 @@ class ServiceHealth(BaseModel):
     detail: Optional[str] = None
 
 
+class OperationalStats(BaseModel):
+    nginx_502_15m: int = 0
+    nginx_504_15m: int = 0
+    kroan_restarts_24h: int = 0
+    gunicorn_workers: Optional[int] = None
+
+
 class ServerStatsOut(BaseModel):
     collected_at: datetime
     hostname: str
@@ -60,4 +67,5 @@ class ServerStatsOut(BaseModel):
     disks: list[DiskStats] = Field(default_factory=list)
     process: ProcessStats
     services: list[ServiceHealth] = Field(default_factory=list)
+    operations: Optional[OperationalStats] = None
     warnings: list[str] = Field(default_factory=list)

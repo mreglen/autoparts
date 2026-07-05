@@ -253,6 +253,30 @@ function ServerStatsPanel() {
               </div>
             </div>
           ) : null}
+
+          {stats.operations ? (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Операционные метрики</h3>
+              <div className="rounded-lg border border-gray-100 bg-gray-50/60 px-4 py-1">
+                <InfoRow
+                  label="nginx 502 (15 мин)"
+                  value={stats.operations.nginx_502_15m ?? 0}
+                />
+                <InfoRow
+                  label="nginx 504 (15 мин)"
+                  value={stats.operations.nginx_504_15m ?? 0}
+                />
+                <InfoRow
+                  label="Рестарты kroan (24 ч)"
+                  value={stats.operations.kroan_restarts_24h ?? 0}
+                />
+                <InfoRow
+                  label="Gunicorn процессов"
+                  value={stats.operations.gunicorn_workers ?? '—'}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

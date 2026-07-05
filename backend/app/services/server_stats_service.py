@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import socket
+import subprocess
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional
 
 import psutil
@@ -16,6 +19,7 @@ from app.schemas.server_stats import (
     CpuStats,
     DiskStats,
     MemoryStats,
+    OperationalStats,
     ProcessStats,
     ServerStatsOut,
     ServiceHealth,
@@ -26,6 +30,8 @@ _SKIP_FS_TYPES = frozenset(
 )
 _PREFERRED_MOUNTS = ("/", "/var", "/home")
 _CPU_INTERVAL = 0.2
+_NGINX_ACCESS_LOG = Path("/var/log/nginx/svoygarage_ssl_access.log")
+_NGINX_TS_RE = re.compile(r"\[(\d{2}/\w{3}/\d{4}:\d{2}:\d{2}:\d{2})")
 
 
 def _read_os_version() -> str:
@@ -155,24 +161,118 @@ def _check_celery() -> ServiceHealth:
         return ServiceHealth(name="Celery worker", ok=False, detail=str(exc))
 
 
+def _check_pgbouncer() -> ServiceHealth:
+    started = time.perf_counter()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(1.0)
+    try:
+        sock.connect(("127.0.0.1", 6432))
+        latency_ms = (time.perf_counter() - started) * 1000
+        return ServiceHealth(name="PgBouncer", ok=True, latency_ms=round(latency_ms, 1))
+    except Exception as exc:
+        return ServiceHealth(name="PgBouncer", ok=False, detail=str(exc))
+    finally:
+        sock.close()
+
+
+def _count_nginx_status(minutes: int, status_code: int) -> int:
+    if not _NGINX_ACCESS_LOG.is_file():
+        return 0
+    cutoff = datetime.now() - timedelta(minutes=minutes)
+    needle = f" {status_code} "
+    count = 0
+    try:
+        with _NGINX_ACCESS_LOG.open("r", encoding="utf-8", errors="ignore") as handle:
+            for line in handle:
+                if needle not in line:
+                    continue
+                match = _NGINX_TS_RE.search(line)
+                if not match:
+                    continue
+                try:
+                    ts = datetime.strptime(match.group(1), "%d/%b/%Y:%H:%M:%S")
+                except ValueError:
+                    continue
+                if ts >= cutoff:
+                    count += 1
+    except OSError:
+        return 0
+    return count
+
+
+def _count_kroan_restarts(hours: float = 24.0) -> int:
+    try:
+        proc = subprocess.run(
+            ["journalctl", "-u", "kroan", f"--since={hours} hours ago", "--no-pager"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return 0
+        return proc.stdout.count("Started kroan")
+    except (OSError, subprocess.TimeoutExpired):
+        return 0
+
+
+def _gunicorn_worker_count() -> Optional[int]:
+    try:
+        proc = subprocess.run(
+            ["pgrep", "-c", "gunicorn"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+        if proc.returncode not in (0, 1):
+            return None
+        value = proc.stdout.strip()
+        return int(value) if value.isdigit() else None
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None
+
+
+def _collect_operations() -> Optional[OperationalStats]:
+    if platform.system() != "Linux":
+        return None
+    return OperationalStats(
+        nginx_502_15m=_count_nginx_status(15, 502),
+        nginx_504_15m=_count_nginx_status(15, 504),
+        kroan_restarts_24h=_count_kroan_restarts(24),
+        gunicorn_workers=_gunicorn_worker_count(),
+    )
+
+
 def _build_warnings(
     *,
     cpu: CpuStats,
     memory: MemoryStats,
     disks: list[DiskStats],
+    operations: Optional[OperationalStats] = None,
 ) -> list[str]:
     warnings: list[str] = []
     if cpu.usage_percent > 85:
         warnings.append(f"Высокая загрузка CPU: {cpu.usage_percent:.1f}%")
     if memory.percent > 85:
         warnings.append(f"Высокая загрузка RAM: {memory.percent:.1f}%")
-    if cpu.load_avg_1m is not None and cpu.load_avg_1m > cpu.cores_logical * 1.5:
-        warnings.append(
-            f"Load average 1m ({cpu.load_avg_1m:.2f}) выше нормы для {cpu.cores_logical} ядер"
-        )
+    if cpu.load_avg_1m is not None:
+        if cpu.load_avg_1m > 4:
+            warnings.append(f"Load average 1m ({cpu.load_avg_1m:.2f}) выше 4")
+        elif cpu.load_avg_1m > cpu.cores_logical * 1.5:
+            warnings.append(
+                f"Load average 1m ({cpu.load_avg_1m:.2f}) выше нормы для {cpu.cores_logical} ядер"
+            )
     for disk in disks:
         if disk.percent > 90:
             warnings.append(f"Диск {disk.mount} заполнен на {disk.percent:.1f}%")
+    if operations is not None:
+        if operations.nginx_502_15m > 5:
+            warnings.append(f"nginx 502 за 15 мин: {operations.nginx_502_15m}")
+        if operations.nginx_504_15m > 5:
+            warnings.append(f"nginx 504 за 15 мин: {operations.nginx_504_15m}")
+        if operations.kroan_restarts_24h > 3:
+            warnings.append(f"Рестартов kroan за 24 ч: {operations.kroan_restarts_24h}")
     return warnings
 
 
@@ -209,12 +309,14 @@ def collect_server_stats(db: Session) -> ServerStatsOut:
 
     disks = _collect_disks()
     process = _collect_process_stats()
+    operations = _collect_operations()
     services = [
         _check_postgresql(db),
         _check_redis(),
         _check_celery(),
+        _check_pgbouncer(),
     ]
-    warnings = _build_warnings(cpu=cpu, memory=memory, disks=disks)
+    warnings = _build_warnings(cpu=cpu, memory=memory, disks=disks, operations=operations)
 
     return ServerStatsOut(
         collected_at=now,
@@ -230,5 +332,6 @@ def collect_server_stats(db: Session) -> ServerStatsOut:
         disks=disks,
         process=process,
         services=services,
+        operations=operations,
         warnings=warnings,
     )

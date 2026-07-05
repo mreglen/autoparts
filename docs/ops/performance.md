@@ -201,6 +201,17 @@ curl -sI -H 'Accept-Encoding: gzip' -H 'Host: svoygarage.ru' \
 
 Скрипты: `scripts/ops/catalog-explain.sh`, `scripts/ops/catalog-latency.sh`.
 
+### Этап 8 — Мониторинг (2026-07-05)
+
+| Компонент | Значение |
+|-----------|----------|
+| health-monitor | cron `*/5`, пороги 502/504/kroan/load/RAM |
+| Алерты | `/var/log/autoparts-alerts.log`, опционально Telegram |
+| fail2ban | `nginx-req-limit` (429/503) |
+| Админка | `operations`: 502/504 15m, kroan restarts 24h |
+
+Документация: `docs/ops/monitoring.md`.
+
 ## Prod: фоновые задачи
 
 - `NEW_PARTS_SEO_SYNC_USE_CELERY=true` — SEO sync, sitemap rebuild, seed/TecDoc jobs в Celery (не в uvicorn).
