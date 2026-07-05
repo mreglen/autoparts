@@ -108,6 +108,7 @@ git_pull() {
     env_backup=$(mktemp)
     cp "$BACKEND/.env" "$env_backup"
   fi
+  chown -R fast:fast "$ROOT"
   sudo -u fast git -C "$ROOT" fetch origin "$branch"
   sudo -u fast git -C "$ROOT" reset --hard "origin/$branch"
   sudo -u fast git -C "$ROOT" clean -fd
