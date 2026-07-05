@@ -100,6 +100,11 @@ ensure_upload_dirs() {
   chown -R fast:fast "$BACKEND/uploads"
 }
 
+ensure_nginx_cache_dirs() {
+  mkdir -p /var/cache/nginx/sg_api /var/cache/nginx/sg_page_check
+  chown www-data:www-data /var/cache/nginx/sg_api /var/cache/nginx/sg_page_check
+}
+
 git_pull() {
   log "git fetch + sync с origin (локальные правки сбрасываются, backend/.env сохраняется)..."
   local branch env_backup=""
@@ -226,6 +231,7 @@ main() {
   log "========== Старт обновления =========="
 
   ensure_upload_dirs
+  ensure_nginx_cache_dirs
   fix_backend_env
   git_pull
   sync_installer
