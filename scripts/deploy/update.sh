@@ -293,12 +293,16 @@ verify_nginx_cache() {
 
 verify_frontend_chunks() {
   [[ -d "$WEB_ROOT/static/js" ]] || return 0
-  local main_js chunk_count prefetch_ok used_ok
+  local main_js chunk_count prefetch_ok used_ok prefetch_status used_status
   main_js=$(basename "$(ls "$WEB_ROOT/static/js/main."*.js 2>/dev/null | head -1)" 2>/dev/null || echo "none")
   chunk_count=$(ls "$WEB_ROOT/static/js/"*.chunk.js 2>/dev/null | wc -l)
   prefetch_ok=$(grep -rl 'prefetchPartDetail' "$WEB_ROOT/static/js/"*.map 2>/dev/null | head -1 || true)
   used_ok=$(grep -rl 'UsedPartsList' "$WEB_ROOT/static/js/"*.map 2>/dev/null | head -1 || true)
-  log "Frontend build: main=$main_js chunks=$chunk_count prefetch=${prefetch_ok:+ok} used_list=${used_ok:+ok}"
+  prefetch_status="miss"
+  used_status="miss"
+  [[ -n "$prefetch_ok" ]] && prefetch_status="ok"
+  [[ -n "$used_ok" ]] && used_status="ok"
+  log "Frontend build: main=$main_js chunks=$chunk_count prefetch=$prefetch_status used_list=$used_status"
   [[ -n "$prefetch_ok" ]] || log "WARN: prefetchPartDetail missing from build source maps"
   [[ -n "$used_ok" ]] || log "WARN: UsedPartsList lazy chunk missing from build source maps"
 }
