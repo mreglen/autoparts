@@ -264,19 +264,24 @@ install_kroan_unit() {
 }
 
 verify_gunicorn() {
-  local gunicorn_count=0 uvicorn_standalone=0 sched_count=0
-  gunicorn_count=$(pgrep -fc 'gunicorn.*app.main:app' 2>/dev/null || true)
-  uvicorn_standalone=$(pgrep -fc 'uvicorn app.main:app' 2>/dev/null || true)
-  sched_count=$(journalctl -u kroan --since "5 min ago" --no-pager 2>/dev/null | grep -c 'Scheduler started' || true)
-  log "Gunicorn: processes=${gunicorn_count:-0} standalone_uvicorn=${uvicorn_standalone:-0} scheduler_logs=${sched_count:-0}"
-  if [[ "${gunicorn_count:-0}" -lt 3 ]]; then
-    log "WARN: expected gunicorn master + 2 workers (got ${gunicorn_count:-0})"
+  local gunicorn_count uvicorn_standalone sched_started sched_skipped
+  gunicorn_count=$(pgrep -f 'gunicorn.*app.main:app' 2>/dev/null | wc -l | tr -d ' ')
+  uvicorn_standalone=$(pgrep -f '/bin/uvicorn app.main:app' 2>/dev/null | wc -l | tr -d ' ')
+  sched_started=$(journalctl -u kroan -n 50 --no-pager 2>/dev/null | grep -c 'Scheduler started. Expired' || true)
+  sched_skipped=$(journalctl -u kroan -n 50 --no-pager 2>/dev/null | grep -c 'Scheduler skipped' || true)
+  gunicorn_count=${gunicorn_count:-0}
+  uvicorn_standalone=${uvicorn_standalone:-0}
+  sched_started=${sched_started:-0}
+  sched_skipped=${sched_skipped:-0}
+  log "Gunicorn: processes=$gunicorn_count standalone_uvicorn=$uvicorn_standalone scheduler_started=$sched_started scheduler_skipped=$sched_skipped"
+  if [[ "$gunicorn_count" -lt 3 ]]; then
+    log "WARN: expected gunicorn master + 2 workers (got $gunicorn_count)"
   fi
-  if [[ "${uvicorn_standalone:-0}" -gt 0 ]]; then
-    log "WARN: standalone uvicorn still running (${uvicorn_standalone:-0})"
+  if [[ "$uvicorn_standalone" -gt 0 ]]; then
+    log "WARN: standalone uvicorn still running ($uvicorn_standalone)"
   fi
-  if [[ "${sched_count:-0}" -ne 1 ]]; then
-    log "WARN: expected 1 Scheduler started log (got ${sched_count:-0})"
+  if [[ "$sched_started" -lt 1 || "$sched_skipped" -lt 1 ]]; then
+    log "WARN: expected 1 scheduler leader and 1 skipped worker in recent logs"
   fi
 }
 
