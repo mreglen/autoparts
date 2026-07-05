@@ -1,12 +1,18 @@
 import { API_BASE, getAuthHeaders } from './apiClient';
-import { isApiOutage, registerApiFailure, registerApiSuccess } from './apiOutageGuard';
+import {
+  getOutageRemainingMs,
+  isApiOutage,
+  registerApiFailure,
+  registerApiSuccess,
+} from './apiOutageGuard';
 import { METRIKA_GOALS, reachMetrikaGoal } from './metrikaGoals';
 
 const VISITOR_ID_KEY = 'site_analytics_visitor_id';
 const ATTRIBUTION_KEY = 'site_analytics_attribution_sent';
-const HEARTBEAT_INTERVAL_MS = 30000;
-const FLUSH_INTERVAL_MS = 5000;
+const HEARTBEAT_INTERVAL_MS = 60000;
+const FLUSH_INTERVAL_MS = 8000;
 const MAX_QUEUE_SIZE = 40;
+const MAX_QUEUE_TOTAL = 80;
 
 let eventQueue = [];
 let flushTimer = null;
@@ -15,6 +21,7 @@ let currentPath = null;
 let pageEnteredAt = null;
 let heartbeatTimer = null;
 let cachedAttribution = null;
+let analyticsPausedUntil = 0;
 
 function generateId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -73,8 +80,35 @@ function buildPayload(events) {
   return JSON.stringify({ events });
 }
 
+function isAnalyticsPaused() {
+  return Date.now() < analyticsPausedUntil || isApiOutage();
+}
+
+function pauseAnalytics(ms = 60000) {
+  analyticsPausedUntil = Math.max(analyticsPausedUntil, Date.now() + ms);
+}
+
+function isTabVisible() {
+  return typeof document === 'undefined' || document.visibilityState === 'visible';
+}
+
+function canSendViaFetch() {
+  if (!API_BASE) return false;
+  if (isAnalyticsPaused()) return false;
+  if (!isTabVisible()) return false;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+  return true;
+}
+
+function restoreBatch(batch) {
+  if (!batch.length) return;
+  eventQueue = [...batch, ...eventQueue].slice(0, MAX_QUEUE_TOTAL);
+}
+
 function sendEvents(events, useBeacon = false) {
-  if (!events.length || !API_BASE || isApiOutage()) return;
+  if (!events.length || !API_BASE) {
+    return Promise.resolve(false);
+  }
 
   const url = `${API_BASE}/public/analytics/events`;
   const body = buildPayload(events);
@@ -83,13 +117,17 @@ function sendEvents(events, useBeacon = false) {
     ...getAuthHeaders(),
   };
 
-  if (useBeacon && navigator.sendBeacon) {
+  if (useBeacon && typeof navigator !== 'undefined' && navigator.sendBeacon) {
     const blob = new Blob([body], { type: 'application/json' });
     navigator.sendBeacon(url, blob);
-    return;
+    return Promise.resolve(true);
   }
 
-  fetch(url, {
+  if (!canSendViaFetch()) {
+    return Promise.resolve(false);
+  }
+
+  return fetch(url, {
     method: 'POST',
     headers,
     body,
@@ -98,33 +136,67 @@ function sendEvents(events, useBeacon = false) {
     .then((response) => {
       if (response.ok) {
         registerApiSuccess();
-        return;
+        analyticsPausedUntil = 0;
+        return true;
       }
       if ([502, 503, 504].includes(response.status)) {
         registerApiFailure(response.status);
+        pauseAnalytics(60000);
       }
+      return false;
     })
-    .catch(() => {});
+    .catch(() => {
+      registerApiFailure(504);
+      pauseAnalytics(60000);
+      return false;
+    });
+}
+
+function nextFlushDelayMs() {
+  return Math.max(
+    FLUSH_INTERVAL_MS,
+    getOutageRemainingMs(),
+    Math.max(0, analyticsPausedUntil - Date.now()),
+  );
 }
 
 function scheduleFlush() {
   if (flushTimer) return;
+  const delay = nextFlushDelayMs();
   flushTimer = window.setTimeout(() => {
     flushTimer = null;
     flushEvents(false);
-  }, FLUSH_INTERVAL_MS);
+  }, delay);
 }
 
 export function flushEvents(useBeacon = false) {
   if (!eventQueue.length) return;
-  const batch = eventQueue.splice(0, MAX_QUEUE_SIZE);
-  sendEvents(batch, useBeacon);
-  if (eventQueue.length) {
+
+  if (!useBeacon && !canSendViaFetch()) {
     scheduleFlush();
+    return;
   }
+
+  const batch = eventQueue.splice(0, MAX_QUEUE_SIZE);
+  sendEvents(batch, useBeacon).then((ok) => {
+    if (!ok && !useBeacon) {
+      restoreBatch(batch);
+      scheduleFlush();
+      return;
+    }
+    if (eventQueue.length) {
+      scheduleFlush();
+    }
+  });
 }
 
 function enqueue(event) {
+  if (event.type === 'heartbeat' && isAnalyticsPaused()) {
+    return;
+  }
+  if (eventQueue.length >= MAX_QUEUE_TOTAL) {
+    eventQueue.shift();
+  }
   eventQueue.push({
     ...event,
     visitor_id: getVisitorId(),
@@ -151,11 +223,11 @@ function stopHeartbeat() {
 function startHeartbeat() {
   stopHeartbeat();
   heartbeatTimer = window.setInterval(() => {
-    if (document.visibilityState !== 'visible' || !currentViewId) return;
+    if (!isTabVisible() || !currentViewId || isAnalyticsPaused()) return;
     enqueue({
       type: 'heartbeat',
       view_id: currentViewId,
-      duration_sec: 30,
+      duration_sec: Math.round(HEARTBEAT_INTERVAL_MS / 1000),
     });
   }, HEARTBEAT_INTERVAL_MS);
 }
@@ -204,7 +276,7 @@ export function trackPageView(path) {
 export function trackConversion(eventName, options = {}) {
   if (!eventName) return;
 
-  const path = options.path || currentPath || (typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search || ''}` : '/');
+  const path = options.path || currentPath || (typeof window !== 'undefined' ? `${location.pathname}${location.search || ''}` : '/');
   const productId = options.productId != null ? Number(options.productId) : undefined;
   const section = options.section || undefined;
 
@@ -251,8 +323,14 @@ export function trackFormSubmit(formId, filledFields = []) {
 export function initSiteAnalyticsLifecycle() {
   const handleVisibility = () => {
     if (document.visibilityState === 'hidden') {
+      stopHeartbeat();
       closeCurrentPageView();
       flushEvents(true);
+      return;
+    }
+    startHeartbeat();
+    if (canSendViaFetch() && eventQueue.length) {
+      scheduleFlush();
     }
   };
 
@@ -261,14 +339,22 @@ export function initSiteAnalyticsLifecycle() {
     flushEvents(true);
   };
 
+  const handleOnline = () => {
+    if (canSendViaFetch() && eventQueue.length) {
+      scheduleFlush();
+    }
+  };
+
   window.addEventListener('visibilitychange', handleVisibility);
   window.addEventListener('pagehide', handleBeforeUnload);
   window.addEventListener('beforeunload', handleBeforeUnload);
+  window.addEventListener('online', handleOnline);
 
   return () => {
     stopHeartbeat();
     window.removeEventListener('visibilitychange', handleVisibility);
     window.removeEventListener('pagehide', handleBeforeUnload);
     window.removeEventListener('beforeunload', handleBeforeUnload);
+    window.removeEventListener('online', handleOnline);
   };
 }

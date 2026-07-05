@@ -1946,16 +1946,23 @@ function MyParts() {
 
       {/* Tabs */}
       <div className="mb-6">
-        <div className="flex space-x-8">
+        <div className="grid grid-cols-3 gap-1 sm:flex sm:gap-8">
           <button
+            type="button"
             onClick={() => setActiveTab('in-stock')}
-            className={`font-medium text-lg sm:text-base ${activeTab === 'in-stock' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`min-w-0 font-medium text-xs sm:text-base ${
+              activeTab === 'in-stock' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
+            }`}
           >
-            <div className="pb-2 inline-block border-b-4 border-blue-500">
-              В наличии
+            <div
+              className={`flex items-center justify-center gap-1 whitespace-nowrap pb-2 border-b-2 sm:border-b-4 border-blue-500 sm:justify-start ${
+                activeTab === 'in-stock' ? 'opacity-100' : 'opacity-70'
+              }`}
+            >
+              <span>В наличии</span>
               {myProductsTotal > 0 && (
                 <span
-                  className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                  className="inline-flex shrink-0 items-center rounded-full bg-indigo-100 px-1.5 py-0 text-[10px] font-medium text-indigo-800 sm:px-2.5 sm:py-0.5 sm:text-xs"
                   title={`${myProductsTotal} позиций`}
                 >
                   {myProductsTotal}
@@ -1964,26 +1971,41 @@ function MyParts() {
             </div>
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('pending')}
-            className={`font-medium text-lg sm:text-base ${activeTab === 'pending' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`min-w-0 font-medium text-xs sm:text-base ${
+              activeTab === 'pending' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
+            }`}
           >
-            <div className="pb-2 inline-block border-b-4 border-yellow-500">
-              На модерации
+            <div
+              className={`flex items-center justify-center gap-1 whitespace-nowrap pb-2 border-b-2 sm:border-b-4 border-yellow-500 sm:justify-start ${
+                activeTab === 'pending' ? 'opacity-100' : 'opacity-70'
+              }`}
+            >
+              <span className="sm:hidden">Модерация</span>
+              <span className="hidden sm:inline">На модерации</span>
               {moderationItemsCount > 0 && (
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                <span className="inline-flex shrink-0 items-center rounded-full bg-yellow-100 px-1.5 py-0 text-[10px] font-medium text-yellow-800 sm:px-2.5 sm:py-0.5 sm:text-xs">
                   {moderationItemsCount}
                 </span>
               )}
             </div>
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('drafts')}
-            className={`font-medium text-lg sm:text-base ${activeTab === 'drafts' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`min-w-0 font-medium text-xs sm:text-base ${
+              activeTab === 'drafts' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'
+            }`}
           >
-            <div className="pb-2 inline-block border-b-4 border-slate-500">
-              Черновики
+            <div
+              className={`flex items-center justify-center gap-1 whitespace-nowrap pb-2 border-b-2 sm:border-b-4 border-slate-500 sm:justify-start ${
+                activeTab === 'drafts' ? 'opacity-100' : 'opacity-70'
+              }`}
+            >
+              <span>Черновики</span>
               {draftItems.length > 0 && (
-                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">
+                <span className="inline-flex shrink-0 items-center rounded-full bg-slate-100 px-1.5 py-0 text-[10px] font-medium text-slate-800 sm:px-2.5 sm:py-0.5 sm:text-xs">
                   {draftItems.length}
                 </span>
               )}
