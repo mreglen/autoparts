@@ -1,7 +1,7 @@
 [Unit]
 Description=SvoyGarage Telegram Alert Bot
-After=network.target postgresql.service warp-svc.service
-Wants=postgresql.service warp-svc.service
+After=network.target postgresql.service tor.service
+Wants=postgresql.service tor.service
 
 [Service]
 Type=simple

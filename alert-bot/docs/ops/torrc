@@ -1,0 +1,9 @@
+# Tor client for Telegram Bot API (alert-bot only).
+# Deployed to /etc/tor/torrc by scripts/deploy/update.sh
+# Update bridges: https://bridges.torproject.org/bridges?transport=obfs4
+
+SocksPort 9050
+UseBridges 1
+ClientTransportPlugin obfs4 exec /usr/bin/obfs4proxy
+Bridge obfs4 87.254.22.21:8902 B90A053E497D4D97795563A42DBAA0D6A16D3FB0 cert=56v3WQBDGYyyoAJDHdmODDD0hRklZYflJLgfqyxzhi5txCmLlPl7JzjjScCUaJtbCYVDJw iat-mode=0
+Bridge obfs4 85.121.5.22:9130 9AD05E353AD70C6BA556A5A2E63DFAC6F25E111B cert=lYEsvMr1EKhqhsSPAUm3Gl0Tkwp3ivi74gkNtyGXxUxGwiOBMnNfNOn12+q9akYklPmvYw iat-mode=0

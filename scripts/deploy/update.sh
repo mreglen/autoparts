@@ -474,30 +474,35 @@ install_alert_bot_deps() {
   chown fast:fast "$hash_file"
 }
 
-ensure_cloudflare_warp() {
-  local warp_ok=0
-  if ! command -v warp-cli >/dev/null 2>&1; then
-    log "Cloudflare WARP: установка..."
-    mkdir -p /usr/share/keyrings
-    curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg \
-      | gpg --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
-    echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(. /etc/os-release && echo "$VERSION_CODENAME") main" \
-      > /etc/apt/sources.list.d/cloudflare-client.list
-    apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y cloudflare-warp
+ensure_telegram_tor_proxy() {
+  local torrc_src="$ROOT/alert-bot/docs/ops/torrc"
+  local torrc_dst="/etc/tor/torrc"
+  local ts
+
+  [[ -f "$torrc_src" ]] || return 0
+
+  if ! command -v tor >/dev/null 2>&1 || ! command -v obfs4proxy >/dev/null 2>&1; then
+    log "Tor: установка tor + obfs4proxy..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y tor obfs4proxy
   fi
-  warp-cli registration new 2>/dev/null || true
-  warp-cli mode proxy 2>/dev/null || true
-  warp-cli proxy port 40000 2>/dev/null || true
-  systemctl enable warp-svc 2>/dev/null || true
-  systemctl start warp-svc 2>/dev/null || true
-  warp-cli connect 2>/dev/null || true
-  sleep 2
-  if curl -sf --max-time 20 --proxy socks5h://127.0.0.1:40000 https://api.telegram.org/ >/dev/null 2>&1; then
-    warp_ok=1
-    log "Cloudflare WARP: Telegram доступен через socks5://127.0.0.1:40000"
+
+  if [[ ! -f "$torrc_dst" ]] || ! cmp -s "$torrc_src" "$torrc_dst"; then
+    ts=$(date +%Y%m%d_%H%M%S)
+    [[ -f "$torrc_dst" ]] && cp "$torrc_dst" "${torrc_dst}.bak.${ts}"
+    cp "$torrc_src" "$torrc_dst"
+    chmod 644 "$torrc_dst"
+    systemctl restart tor 2>/dev/null || true
+    log "Tor: обновлён $torrc_dst"
+  fi
+
+  systemctl enable tor 2>/dev/null || true
+  systemctl start tor 2>/dev/null || true
+  sleep 3
+
+  if curl -sf --max-time 25 --socks5-hostname 127.0.0.1:9050 https://api.telegram.org/ >/dev/null 2>&1; then
+    log "Tor: Telegram доступен через socks5://127.0.0.1:9050"
   else
-    log "WARN: Cloudflare WARP: Telegram через proxy пока недоступен (warp-cli status)"
+    log "WARN: Tor: Telegram через socks5://127.0.0.1:9050 недоступен (проверьте journalctl -u tor)"
   fi
 }
 
@@ -511,7 +516,7 @@ ensure_alert_bot() {
 
   [[ -d "$alert_bot" ]] || return 0
 
-  ensure_cloudflare_warp
+  ensure_telegram_tor_proxy
   usermod -aG adm,systemd-journal fast 2>/dev/null || true
   install_alert_bot_deps
 
@@ -534,8 +539,13 @@ ensure_alert_bot() {
   fi
 
   if [[ -f "$env_target" ]] && ! grep -qE '^TELEGRAM_PROXY_URL=' "$env_target" 2>/dev/null; then
-    echo "TELEGRAM_PROXY_URL=socks5://127.0.0.1:40000" >> "$env_target"
+    echo "TELEGRAM_PROXY_URL=socks5://127.0.0.1:9050" >> "$env_target"
     log "alert-bot: добавлен TELEGRAM_PROXY_URL в $env_target"
+  fi
+
+  if [[ -f "$env_target" ]] && grep -qE '^TELEGRAM_PROXY_URL=socks5://127\.0\.0\.1:40000$' "$env_target" 2>/dev/null; then
+    sed -i 's|^TELEGRAM_PROXY_URL=socks5://127.0.0.1:40000|TELEGRAM_PROXY_URL=socks5://127.0.0.1:9050|' "$env_target"
+    log "alert-bot: TELEGRAM_PROXY_URL мигрирован с WARP (40000) на Tor (9050)"
   fi
 
   if [[ -f "$unit_dst" && -f "$env_target" ]]; then
@@ -550,15 +560,31 @@ ensure_alert_bot() {
 }
 
 verify_alert_bot() {
-  local active token_ok
+  local active token_ok proxy_url proxy_ok tor_ok
   active=$(systemctl is-active alert-bot 2>/dev/null || echo inactive)
+  tor_ok=$(systemctl is-active tor 2>/dev/null || echo inactive)
   token_ok=0
+  proxy_ok=0
+  proxy_url=""
   if [[ -f /etc/autoparts/alert-bot.env ]] && grep -qE '^BOT_TOKEN=.+$' /etc/autoparts/alert-bot.env 2>/dev/null; then
     token_ok=1
   fi
-  log "alert-bot: active=$active token_configured=$token_ok"
+  if [[ -f /etc/autoparts/alert-bot.env ]]; then
+    proxy_url=$(grep -E '^TELEGRAM_PROXY_URL=' /etc/autoparts/alert-bot.env 2>/dev/null | cut -d= -f2- || true)
+  fi
+  if [[ -n "$proxy_url" ]]; then
+    if curl -sf --max-time 25 --proxy "$proxy_url" https://api.telegram.org/ >/dev/null 2>&1; then
+      proxy_ok=1
+    fi
+  elif curl -sf --max-time 10 https://api.telegram.org/ >/dev/null 2>&1; then
+    proxy_ok=1
+  fi
+  log "alert-bot: active=$active tor=$tor_ok token_configured=$token_ok telegram_reachable=$proxy_ok"
   if [[ "$token_ok" -eq 1 && "$active" != "active" ]]; then
     log "WARN: alert-bot не active (проверьте journalctl -u alert-bot)"
+  fi
+  if [[ "$token_ok" -eq 1 && "$proxy_ok" -eq 0 ]]; then
+    log "WARN: Telegram API недоступен (proxy=${proxy_url:-direct})"
   fi
 }
 
