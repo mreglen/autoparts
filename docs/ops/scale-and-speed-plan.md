@@ -395,19 +395,29 @@ update
 
 | Этап | Статус | Дата | Заметки |
 |------|--------|------|---------|
-| 1 Стабильность | частично | 2026-07-05 | SSH: dirs OK, .env OK, microcache HIT; 20 рестартов/24ч |
+| 1 Стабильность | **выполнено** | 2026-07-05 | update `0dc458f`, verify 200/200/200/200, API за 8s |
 | 2 Baseline | | | |
 | 3 Nginx | | | microcache уже подключён в nginx.conf |
 | 4 Backend | | | SEO sync всё ещё в APScheduler uvicorn (~3 мин блокировки) |
-| 5 Frontend | | | коммит 9d861d84 на сервере |
+| 5 Frontend | | | коммит 0dc458f на сервере |
 | 6 Gunicorn | | | |
 | 7 PostgreSQL | | | |
 | 8 Мониторинг | | | |
 | 9 Load test | | | |
 
-**502/504 baseline (до этапа 1, текущий access log):** 502 = 2, 504 = 302
+**502/504 baseline (до этапа 1):** 502 = 2, 504 = 302
 
-**Дополнительно (аудит 2026-07-05):**
+**После этапа 1 (2026-07-05 14:54 MSK):**
+- `update` завершён без ошибок; `bash -n /usr/local/bin/update` — OK
+- Smoke: cart=200, part-types=200, catalog=200 (local + public)
+- Публичный API: part-types 54ms, catalog 46ms
+- `.env` 600/fast, пробелов нет; `vehicle_pictures` — OK; dotenv warnings за 1 ч — 0
+- Один рестарт `kroan` за деплой (API готов за 8s)
+- Рестартов за 24 ч до этапа: 20 → снижение ожидается при правиле «один update за раз»
+
+**Критерии этапа 1:** все выполнены. Следующий шаг — **этап 2** (baseline LCP/TTFB).
+
+**Дополнительно (аудит 2026-07-05, до update):**
 - Все сервисы active; git на сервере: `9d861d84`
 - `vehicle_pictures` и nginx cache dirs — созданы
 - `.env` без пробелов вокруг `=` (кроме закомментированных строк)
