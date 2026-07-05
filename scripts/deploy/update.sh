@@ -101,8 +101,58 @@ ensure_upload_dirs() {
 }
 
 ensure_nginx_cache_dirs() {
-  mkdir -p /var/cache/nginx/sg_api /var/cache/nginx/sg_page_check
-  chown www-data:www-data /var/cache/nginx/sg_api /var/cache/nginx/sg_page_check
+  mkdir -p /var/cache/nginx/sg_api /var/cache/nginx/sg_page_check /var/cache/nginx/sg_prerender
+  chown www-data:www-data /var/cache/nginx/sg_api /var/cache/nginx/sg_page_check /var/cache/nginx/sg_prerender
+}
+
+nginx_has_brotli() {
+  nginx -V 2>&1 | grep -qi brotli
+}
+
+ensure_brotli_modules() {
+  if nginx_has_brotli; then
+    log "Nginx Brotli: модуль уже доступен"
+    return 0
+  fi
+  if ! command -v apt-get >/dev/null 2>&1; then
+    log "WARN: apt-get недоступен — Brotli не установлен"
+    return 1
+  fi
+  log "Установка libnginx-mod-http-brotli-* ..."
+  if DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    libnginx-mod-http-brotli-filter libnginx-mod-http-brotli-static; then
+    log "Brotli модули установлены"
+    return 0
+  fi
+  log "WARN: не удалось установить Brotli модули"
+  return 1
+}
+
+ensure_nginx_http_includes() {
+  local nginx_conf="/etc/nginx/nginx.conf"
+  [[ -f "$nginx_conf" ]] || return 0
+
+  if ! grep -q 'svoygarage-microcache.conf' "$nginx_conf"; then
+    sed -i '/http {/a \	include /etc/nginx/snippets/svoygarage-microcache.conf;' "$nginx_conf"
+    log "Добавлен include microcache в nginx.conf"
+  fi
+}
+
+ensure_brotli_snippet() {
+  local brotli_src="$ROOT/docs/nginx/svoygarage-brotli.conf"
+  local brotli_dst="/etc/nginx/snippets/svoygarage-brotli.conf"
+  local site="/etc/nginx/sites-available/svoygarage"
+
+  if nginx_has_brotli; then
+    [[ -f "$brotli_src" ]] && cp "$brotli_src" "$brotli_dst"
+    log "Brotli snippet активен"
+    return 0
+  fi
+
+  if [[ -f "$site" ]] && grep -q 'svoygarage-brotli.conf' "$site"; then
+    sed -i '/svoygarage-brotli.conf/d' "$site"
+    log "Brotli: include удалён из site config (модуль недоступен)"
+  fi
 }
 
 git_pull() {
@@ -190,6 +240,9 @@ apply_nginx_configs() {
   local ts
   ts=$(date +%Y%m%d_%H%M%S)
 
+  ensure_brotli_modules || true
+  ensure_nginx_http_includes
+
   if [[ -f "$ROOT/docs/nginx/svoygarage.conf" ]]; then
     cp "$site" "${site}.bak.${ts}"
     cp "$ROOT/docs/nginx/svoygarage.conf" "$site"
@@ -201,9 +254,25 @@ apply_nginx_configs() {
   if [[ -f "$ROOT/docs/nginx/http-ddos-limits.conf" ]]; then
     cp "$ROOT/docs/nginx/http-ddos-limits.conf" /etc/nginx/snippets/svoygarage-ddos-limits.conf
   fi
+  ensure_brotli_snippet
   nginx -t
   systemctl reload nginx
   log "nginx reload OK"
+}
+
+verify_nginx_cache() {
+  local cache1 cache2 brotli_enc main_js
+  cache1=$(curl -sI -H 'Host: svoygarage.ru' \
+    "https://127.0.0.1/server/api/catalog/products?page=1&page_size=1&_nc=$(date +%s)" -k \
+    | grep -i x-cache-status | awk '{print $2}' | tr -d '\r' || echo "unknown")
+  cache2=$(curl -sI -H 'Host: svoygarage.ru' \
+    "https://127.0.0.1/server/api/catalog/products?page=1&page_size=1" -k \
+    | grep -i x-cache-status | awk '{print $2}' | tr -d '\r' || echo "unknown")
+  main_js=$(basename "$(ls /var/www/my-autoparts/static/js/main.*.js 2>/dev/null | head -1)" 2>/dev/null || echo "main.js")
+  brotli_enc=$(curl -sI -H 'Host: svoygarage.ru' -H 'Accept-Encoding: br' \
+    "https://127.0.0.1/static/js/${main_js}" -k 2>/dev/null \
+    | grep -i content-encoding | awk '{print $2}' | tr -d '\r' || echo "none")
+  log "Nginx cache: catalog1=$cache1 catalog2=$cache2; ${main_js} br=$brotli_enc"
 }
 
 verify() {
@@ -250,6 +319,7 @@ main() {
 
   if [[ $RELOAD_NGINX -eq 1 ]]; then
     apply_nginx_configs
+    verify_nginx_cache
   fi
 
   verify
