@@ -318,42 +318,7 @@ update           # если менялся backend pool
 ```
 
 ---
-
-## Этап 8 — Мониторинг и алерты
-
-**Цель:** узнавать о 502/504 до жалоб пользователей.
-
-### Задачи агента
-
-**На сервере:**
-- [ ] Скрипт или cron: считать 502/504 за 5 мин, алерт в Telegram (если бот уже есть)
-- [ ] Алерт на `systemctl restart kroan` / failed state
-- [ ] Ротация логов nginx (не забивать диск)
-- [ ] Опционально: node_exporter + Prometheus или простой healthcheck cron
-
-**В репозитории:**
-- [ ] `scripts/ops/check-health.sh` (или аналог) в репо
-- [ ] Инструкция в `docs/ops/monitoring.md`
-
-### Деплой пользователя
-
-```bash
-update --skip-frontend
-# или копирование скриптов через update + cron вручную
-```
-
-### Критерии готовности
-
-- [ ] Тестовый алерт приходит в Telegram
-- [ ] Дашборд или хотя бы ежедневный отчёт 502/504
-
-### Команда для Plan mode
-
-```
-Этап 8 из docs/ops/scale-and-speed-plan.md
-```
-
----
+этап 8 пока что пропускаем и не делаем
 
 ## Этап 9 — Нагрузочное тестирование и горизонталь
 
@@ -397,7 +362,7 @@ update
 |------|--------|------|---------|
 | 1 Стабильность | **выполнено** | 2026-07-05 | update `0dc458f`, verify 200/200/200/200, API за 8s |
 | 2 Baseline | **выполнено** | 2026-07-05 | TTFB API 19–57ms, HTML 7–8ms, main.js 725KiB, PSI links в performance.md |
-| 3 Nginx | | | microcache уже подключён в nginx.conf |
+| 3 Nginx | **выполнено** | 2026-07-05 | prerender cache 15m, Brotli br, catalog HIT |
 | 4 Backend | | | SEO sync всё ещё в APScheduler uvicorn (~3 мин блокировки) |
 | 5 Frontend | | | коммит 0dc458f на сервере |
 | 6 Gunicorn | | | |
@@ -424,6 +389,13 @@ update
 - Скрипт повторного снятия: `scripts/ops/baseline-metrics.sh`
 
 **Критерии этапа 2:** выполнены. Следующий шаг — **этап 3** (nginx Brotli, prerender cache).
+
+**После этапа 3 (2026-07-05 15:08 MSK):**
+- `update --nginx` → коммит `148bec3`, `nginx -t` OK
+- Prerender: кэш `sg_prerender` TTL 15 мин, `proxy_read_timeout` 120 s
+- Microcache: catalog/part-types `X-Cache-Status: HIT`
+- Brotli: модули установлены, `content-encoding: br` на main.js
+- Следующий шаг — **этап 4** (Celery, sitemap вне uvicorn)
 
 **Дополнительно (аудит 2026-07-05, до update):**
 - Все сервисы active; git на сервере: `9d861d84`

@@ -115,9 +115,17 @@ sudo apt install libnginx-mod-http-brotli-filter libnginx-mod-http-brotli-static
 
 | Файл | Raw | Gzip (wire) | Brotli |
 |------|-----|-------------|--------|
-| `main.b584bc6a.js` | 725 KiB (741 815 B) raw | **185 kB** после gzip (отчёт `npm run build`) | не установлен |
+| `main.b584bc6a.js` | 725 KiB (741 815 B) raw | **185 kB** после gzip (отчёт `npm run build`) | **включён** (`content-encoding: br`) |
 
-Проверка Brotli: `nginx -V | grep brotli` → модуль отсутствует (этап 3).
+Проверка Brotli (этап 3, 2026-07-05): `libnginx-mod-http-brotli-*` установлены; `curl -H 'Accept-Encoding: br' .../main.*.js` → `br`.
+
+### Nginx этап 3 (2026-07-05)
+
+| Изменение | Значение |
+|-----------|----------|
+| Prerender cache | `sg_prerender_cache`, TTL 900 s, `proxy_read_timeout` 120 s |
+| API microcache | catalog/part-types `X-Cache-Status: HIT` |
+| Brotli | `br` на `/static/js/main.*.js`, gzip — fallback |
 
 ### Стабильность (nginx + systemd)
 
