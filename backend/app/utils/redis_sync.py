@@ -19,5 +19,7 @@ def get_redis_sync() -> redis.Redis:
             settings.REDIS_URL,
             encoding="utf-8",
             decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
         )
     return _redis_client

@@ -617,7 +617,16 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-3">Нет б/у запчастей</h2>
           {catalogError ? (
-            <p className="text-red-600 text-base leading-relaxed">{String(catalogError)}</p>
+            <>
+              <p className="text-red-600 text-base leading-relaxed">{String(catalogError)}</p>
+              <button
+                type="button"
+                onClick={() => dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams, 1)))}
+                className="mt-4 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                Повторить загрузку
+              </button>
+            </>
           ) : (
             <p className="text-gray-600 text-base leading-relaxed">
               {urlQ

@@ -1,6 +1,6 @@
 // src/store/slices/ProductSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { apiAxios, apiAxiosUnauth, apiRequestFormData, formatApiDetail } from '../../utils/apiClient';
+import { apiAxios, apiAxiosUnauth, apiRequestFormData, formatApiDetail, formatAxiosErrorMessage } from '../../utils/apiClient';
 
 
 
@@ -780,7 +780,7 @@ export const fetchCatalogProducts = createAsyncThunk(
                 return rejectWithValue({ aborted: true });
             }
             return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка загрузки каталога'
+                formatAxiosErrorMessage(error, 'Ошибка загрузки каталога')
             );
         }
     }
@@ -797,7 +797,7 @@ export const fetchCatalogFacets = createAsyncThunk(
             return response.data;
         } catch (error) {
             return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка загрузки фильтров'
+                formatAxiosErrorMessage(error, 'Ошибка загрузки фильтров')
             );
         }
     }
@@ -815,7 +815,7 @@ export const fetchPublicPartTypes = createAsyncThunk(
             return response.data;
         } catch (error) {
             return rejectWithValue(
-                error.response?.data?.detail || 'Ошибка загрузки категорий'
+                formatAxiosErrorMessage(error, 'Ошибка загрузки категорий')
             );
         }
     }

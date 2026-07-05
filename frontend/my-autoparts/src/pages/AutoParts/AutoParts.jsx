@@ -17,6 +17,7 @@ import {
   resetCatalogCatalog,
   clearUsedPartsSearch,
   selectCatalogFilterKey,
+  selectCatalogLoading,
 } from '../../redux/slices/ProductSlice';
 import NewPartsLanding from './NewParts/NewPartsLanding';
 import MobileCompactSearch from '../../components/MobileCompactSearch/MobileCompactSearch';
@@ -48,6 +49,8 @@ function AutoParts() {
   const searchQuery = useSelector(selectSearchQuery);
   
   const catalogFilterKey = useSelector(selectCatalogFilterKey);
+  const catalogLoading = useSelector(selectCatalogLoading);
+  const catalogError = useSelector((state) => state.products.error);
   
   // Determine active tab from URL path
   const isUsedTab = !showNewAutoparts || location.pathname.includes('/autoparts/used');
@@ -306,6 +309,19 @@ function AutoParts() {
 
     return () => clearTimeout(timer);
   }, [activeTab, urlQuery, dispatch]);
+
+  const handleCatalogRetry = useCallback(() => {
+    if (activeTab === 'my') {
+      dispatch(fetchCatalogFacets({}));
+      dispatch(fetchPublicPartTypes());
+      dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams, 1)));
+      return;
+    }
+    const trimmed = (urlQuery ? decodeURIComponent(urlQuery) : '').trim();
+    if (trimmed) {
+      dispatch(fetchSearchResults({ text: trimmed }));
+    }
+  }, [activeTab, dispatch, searchParams, urlQuery]);
 
   const fallbackSeo = useMemo(
     () => buildAutoPartsSeo(location.pathname, searchParams),
@@ -588,6 +604,19 @@ function AutoParts() {
         </div>
       </div>
       </div>
+
+      {catalogError && activeTab === 'my' && !catalogLoading ? (
+        <div className="mx-3 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:mx-0">
+          <p>{String(catalogError)}</p>
+          <button
+            type="button"
+            onClick={handleCatalogRetry}
+            className="mt-2 font-semibold text-indigo-700 underline hover:text-indigo-900"
+          >
+            Повторить загрузку
+          </button>
+        </div>
+      ) : null}
 
       {/* Отображение контента в зависимости от вкладки */}
       <Suspense fallback={<div className="py-12 text-center text-gray-500">Загрузка каталога…</div>}>

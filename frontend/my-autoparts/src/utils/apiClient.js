@@ -429,12 +429,23 @@ apiAxios.interceptors.response.use(
 export const apiAxiosUnauth = axios.create({
     baseURL: API_BASE,
     withCredentials: true,
+    timeout: API_REQUEST_TIMEOUT_MS,
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
+const applyGuestCartTokenFromResponse = (response) => {
+    const guestTokenFromResponse = response?.headers?.['x-guest-cart-token'];
+    if (guestTokenFromResponse) {
+        setGuestCartToken(guestTokenFromResponse);
+    }
+};
+
 apiAxiosUnauth.interceptors.request.use((config) => {
+    if (isApiOutage() && !config.__outageRetry) {
+        return Promise.reject(new Error(getOutageMessage()));
+    }
     const guestToken = getGuestCartToken();
     if (guestToken) {
         config.headers[GUEST_CART_HEADER_NAME] = guestToken;
@@ -442,12 +453,49 @@ apiAxiosUnauth.interceptors.request.use((config) => {
     return config;
 });
 
-apiAxiosUnauth.interceptors.response.use((response) => {
-    const guestTokenFromResponse = response.headers?.['x-guest-cart-token'];
-    if (guestTokenFromResponse) {
-        setGuestCartToken(guestTokenFromResponse);
+apiAxiosUnauth.interceptors.response.use(
+    (response) => {
+        registerApiSuccess();
+        applyGuestCartTokenFromResponse(response);
+        return response;
+    },
+    async (error) => {
+        const config = error.config;
+        const status = error.response?.status;
+        const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
+
+        if (config && !config.__retryCount && (isRetryableStatus(status) || isTimeout)) {
+            config.__retryCount = 1;
+            config.__outageRetry = true;
+            if (status) registerApiFailure(status);
+            else if (isTimeout) registerApiFailure(504);
+            await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(0)));
+            return apiAxiosUnauth(config);
+        }
+
+        if (isRetryableStatus(status)) {
+            registerApiFailure(status);
+        } else if (isTimeout) {
+            registerApiFailure(504);
+        }
+        return Promise.reject(error);
+    },
+);
+
+/** Сообщение об ошибке из ответа axios/fetch для показа пользователю. */
+export const formatAxiosErrorMessage = (error, fallback = 'Ошибка запроса') => {
+    if (!error) return fallback;
+    if (typeof error === 'string') return error;
+    const status = error.response?.status;
+    const detail = formatApiDetail(error.response?.data?.detail);
+    if (detail) return detail;
+    if (status === 504) return 'Сервер не успел ответить. Попробуйте обновить страницу через несколько секунд.';
+    if (status === 502 || status === 503) return 'Сервер временно недоступен. Попробуйте ещё раз.';
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        return 'Сервер не отвечает. Попробуйте ещё раз через несколько секунд.';
     }
-    return response;
-});
+    if (error.message) return error.message;
+    return fallback;
+};
 
 export default apiRequest;
