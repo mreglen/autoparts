@@ -276,7 +276,7 @@ export function trackPageView(path) {
 export function trackConversion(eventName, options = {}) {
   if (!eventName) return;
 
-  const path = options.path || currentPath || (typeof window !== 'undefined' ? `${location.pathname}${location.search || ''}` : '/');
+  const path = options.path || currentPath || (typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search || ''}` : '/');
   const productId = options.productId != null ? Number(options.productId) : undefined;
   const section = options.section || undefined;
 
