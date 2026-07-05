@@ -365,7 +365,7 @@ update
 | 3 Nginx | **выполнено** | 2026-07-05 | prerender cache 15m, Brotli br, catalog HIT |
 | 4 Backend | **выполнено** | 2026-07-05 | heavy jobs → Celery, USE_CELERY=true, thin scheduler |
 | 5 Frontend | **выполнено** | 2026-07-05 | lazy chunks, prefetch, virtual list, retry 502/504 |
-| 6 Gunicorn | | | |
+| 6 Gunicorn | **выполнено** | 2026-07-05 | 2 workers, scheduler Redis lock, WS pub/sub |
 | 7 PostgreSQL | | | |
 | 8 Мониторинг | | | |
 | 9 Load test | | | |
@@ -410,6 +410,13 @@ update
 - `apiClient`: retry 502/503/504 + outage guard; баннер «Повторить загрузку» в каталоге
 - Smoke: HTML `/autoparts/used` TTFB ~9 ms; catalog HIT ~7 ms; product API HIT ~8 ms
 - Следующий шаг — **этап 6** (Gunicorn workers)
+
+**После этапа 6 (2026-07-05):**
+- `kroan` → Gunicorn + 2 `UvicornWorker` (`docs/ops/kroan.service`)
+- APScheduler только на leader worker (Redis lock `scheduler:leader`)
+- DB pool: 10+10 на worker (вместо 50+50)
+- WebSocket чат: Redis pub/sub `ws:push` + глобальный online-счётчик
+- Следующий шаг — **этап 7** (PgBouncer, индексы)
 
 **Дополнительно (аудит 2026-07-05, до update):**
 - Все сервисы active; git на сервере: `9d861d84`

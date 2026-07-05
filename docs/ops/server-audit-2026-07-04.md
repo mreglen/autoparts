@@ -197,12 +197,14 @@ limiting requests, excess: 60.920 by zone "sg_api"
 ```ini
 User=fast
 WorkingDirectory=/home/fast/autoparts/backend
-ExecStart=.../uvicorn app.main:app --host 127.0.0.1 --port 8080
+ExecStart=.../gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 2 -b 127.0.0.1:8080
 Restart=on-failure
 RestartSec=5
 ```
 
-**Замечания:**
+Актуальный unit (этап 6): [`docs/ops/kroan.service`](kroan.service).
+
+**Замечания (до этапа 6):**
 - один worker — все запросы + websocket + scheduler + startup sitemap в одном процессе;
 - нет `ExecStartPre` healthcheck;
 - нет dependency на postgresql (стартует параллельно).

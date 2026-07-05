@@ -10,8 +10,8 @@ SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    pool_size=50,          # Увеличено до 50 для обработки множества одновременных запросов
-    max_overflow=50,       # Увеличено до 50 для пиковых нагрузок
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
     pool_timeout=60,       # Увеличен таймаут до 60 секунд
     pool_recycle=1800,     # Переподключение через 30 минут (меньше, чтобы избежать stale connections)
     pool_pre_ping=True,    # Проверка соединения перед использованием

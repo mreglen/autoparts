@@ -54,6 +54,11 @@ from app.routers import notifications as notifications_router
 from app.routers import avito_messenger_webhook as avito_messenger_webhook_router
 from app.tasks.yandex_feed_tasks import run_yandex_feed_sync
 from app.utils.celery_enqueue import enqueue_celery_task
+from app.utils.scheduler_leader import (
+    try_acquire_scheduler_lock,
+    renew_scheduler_lock,
+    release_scheduler_lock,
+)
 from app.utils.yandex_integration_db import (
     get_or_create_yandex_feed_sync_state,
     get_or_create_yandex_integration,
@@ -194,6 +199,10 @@ except Exception as e:
 
 app = FastAPI(title="Автозапчасти")
 
+scheduler = None
+_scheduler_leader = False
+_scheduler_renew_task = None
+
 # Best-effort proxy header support. In production, also run uvicorn with proxy headers enabled.
 try:
     from starlette.middleware.proxy_headers import ProxyHeadersMiddleware  # type: ignore
@@ -241,8 +250,16 @@ async def handle_large_files(request: Request, call_next):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the scheduler when the application starts."""
-    global scheduler
+    """Initialize WebSocket bridge on every worker; scheduler only on Redis leader."""
+    global scheduler, _scheduler_leader, _scheduler_renew_task
+
+    await websocket_router.manager.start_pubsub_bridge()
+
+    _scheduler_leader = try_acquire_scheduler_lock()
+    if not _scheduler_leader:
+        logger.info("Scheduler skipped (not leader)")
+        return
+
     scheduler = AsyncIOScheduler()
     
     scheduler.add_job(
@@ -325,6 +342,7 @@ async def startup_event():
     
     scheduler.start()
     logger.info("Scheduler started. Expired session cleanup job scheduled.")
+    _scheduler_renew_task = asyncio.create_task(_scheduler_leader_renew_loop())
 
     try:
         from app.tasks.seo_tasks import rebuild_sitemaps_cache_task
@@ -392,10 +410,34 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    global scheduler
+    global scheduler, _scheduler_leader, _scheduler_renew_task
+
+    await websocket_router.manager.stop_pubsub_bridge()
+
+    if _scheduler_renew_task:
+        _scheduler_renew_task.cancel()
+        try:
+            await _scheduler_renew_task
+        except asyncio.CancelledError:
+            pass
+        _scheduler_renew_task = None
+
     if scheduler:
         scheduler.shutdown()
         logger.info("Scheduler уничтожен")
+        scheduler = None
+
+    if _scheduler_leader:
+        release_scheduler_lock()
+        _scheduler_leader = False
+
+
+async def _scheduler_leader_renew_loop():
+    while True:
+        await asyncio.sleep(30)
+        if not renew_scheduler_lock():
+            logger.warning("Lost scheduler leader lock; stopping renew loop")
+            break
 
 
 async def run_cleanup_expired_sessions():

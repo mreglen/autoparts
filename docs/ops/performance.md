@@ -174,6 +174,21 @@ curl -sI -H 'Accept-Encoding: gzip' -H 'Host: svoygarage.ru' \
 
 **Критерии этапа 5:** API/HTML отклик << 2 s; клик в карточку упирается в кэшированный API <50 ms (данные); LCP lab — ссылки PSI в таблице выше.
 
+### Этап 6 — Gunicorn (2026-07-05)
+
+| Компонент | Значение |
+|-----------|----------|
+| Process manager | Gunicorn 23, `UvicornWorker` |
+| Workers | 2 (`-w 2`) |
+| DB pool / worker | `DB_POOL_SIZE=10`, `DB_MAX_OVERFLOW=10` |
+| Scheduler | Redis leader lock `scheduler:leader`, TTL 90 s |
+| WebSocket | Redis pub/sub `ws:push`, online key `ws:online_count:{user_id}` |
+| Unit file | `docs/ops/kroan.service` → `/etc/systemd/system/kroan.service` |
+
+**Smoke:** `pgrep -af gunicorn` — master + 2 workers; `journalctl -u kroan --since 5m | grep Scheduler started` — 1 строка; параллельные cart+catalog → 200.
+
+**Printer WebSocket** (`/api/printers/ws`) — in-memory per worker; ограничение задокументировано, вне scope публичного каталога.
+
 ## Prod: фоновые задачи
 
 - `NEW_PARTS_SEO_SYNC_USE_CELERY=true` — SEO sync, sitemap rebuild, seed/TecDoc jobs в Celery (не в uvicorn).

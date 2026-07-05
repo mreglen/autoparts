@@ -1,7 +1,9 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
-from typing import Dict, Set
+from typing import Dict, Set, Optional
+import asyncio
 import json
+import logging
 from app.db.database import get_db
 from app.models.chat import Chat, Message, ChatParticipant
 from app.models.user import User
@@ -10,14 +12,21 @@ from jose import jwt
 from app.core.config import Settings
 from app.utils.chat_access import get_accessible_chat, is_group_chat, get_chat_participant_ids
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 settings = Settings()
 MAX_WS_CONNECTIONS_PER_USER = settings.WEBSOCKET_MAX_CONNECTIONS_PER_USER
+WS_PUSH_CHANNEL = "ws:push"
+WS_ONLINE_KEY_PREFIX = "ws:online_count:"
+WS_ONLINE_TTL_SECONDS = 300
 
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[int, Set[WebSocket]] = {}
+        self._pubsub_task: Optional[asyncio.Task] = None
+        self._pubsub_started = False
 
     def connection_count(self, user_id: int) -> int:
         return len(self.active_connections.get(user_id, set()))
@@ -30,6 +39,7 @@ class ConnectionManager:
         if user_id not in self.active_connections:
             self.active_connections[user_id] = set()
         self.active_connections[user_id].add(websocket)
+        await self._incr_user_online(user_id)
         return True
 
     def disconnect(self, user_id: int, websocket: WebSocket):
@@ -38,8 +48,92 @@ class ConnectionManager:
         self.active_connections[user_id].discard(websocket)
         if not self.active_connections[user_id]:
             del self.active_connections[user_id]
+        asyncio.create_task(self._decr_user_online(user_id))
 
-    async def send_personal_message(self, message: dict, user_id: int):
+    async def _incr_user_online(self, user_id: int) -> None:
+        from redis.asyncio import Redis
+
+        redis = Redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        try:
+            key = f"{WS_ONLINE_KEY_PREFIX}{user_id}"
+            await redis.incr(key)
+            await redis.expire(key, WS_ONLINE_TTL_SECONDS)
+        finally:
+            await redis.aclose()
+
+    async def _decr_user_online(self, user_id: int) -> None:
+        from redis.asyncio import Redis
+
+        redis = Redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        try:
+            key = f"{WS_ONLINE_KEY_PREFIX}{user_id}"
+            count = await redis.decr(key)
+            if count <= 0:
+                await redis.delete(key)
+            else:
+                await redis.expire(key, WS_ONLINE_TTL_SECONDS)
+        finally:
+            await redis.aclose()
+
+    async def is_user_online_globally(self, user_id: int) -> bool:
+        from redis.asyncio import Redis
+
+        redis = Redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        try:
+            key = f"{WS_ONLINE_KEY_PREFIX}{user_id}"
+            count = await redis.get(key)
+            return bool(count and int(count) > 0)
+        finally:
+            await redis.aclose()
+
+    async def start_pubsub_bridge(self) -> None:
+        if self._pubsub_started:
+            return
+        self._pubsub_started = True
+        self._pubsub_task = asyncio.create_task(self._pubsub_listener())
+        logger.info("WebSocket Redis pub/sub bridge started (pid channel=%s)", WS_PUSH_CHANNEL)
+
+    async def stop_pubsub_bridge(self) -> None:
+        if self._pubsub_task:
+            self._pubsub_task.cancel()
+            try:
+                await self._pubsub_task
+            except asyncio.CancelledError:
+                pass
+            self._pubsub_task = None
+        self._pubsub_started = False
+
+    async def _pubsub_listener(self) -> None:
+        from redis.asyncio import Redis
+
+        redis = Redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        pubsub = redis.pubsub()
+        await pubsub.subscribe(WS_PUSH_CHANNEL)
+        try:
+            async for message in pubsub.listen():
+                if message.get("type") != "message":
+                    continue
+                try:
+                    data = json.loads(message["data"])
+                    user_id = data.get("user_id")
+                    payload = data.get("payload")
+                    if user_id is not None and payload is not None:
+                        await self._deliver_local(int(user_id), payload)
+                except Exception as exc:
+                    logger.warning("WebSocket pub/sub message handling failed: %s", exc)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning("WebSocket pub/sub listener stopped: %s", exc)
+        finally:
+            try:
+                await pubsub.unsubscribe(WS_PUSH_CHANNEL)
+                await pubsub.aclose()
+                await redis.aclose()
+            except Exception:
+                pass
+
+    async def _deliver_local(self, user_id: int, message: dict) -> None:
         user_sockets = self.active_connections.get(user_id)
         if not user_sockets:
             return
@@ -53,6 +147,25 @@ class ConnectionManager:
 
         for socket in stale_connections:
             self.disconnect(user_id, socket)
+
+    async def _publish_push(self, user_id: int, message: dict) -> None:
+        from redis.asyncio import Redis
+
+        redis = Redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        try:
+            await redis.publish(
+                WS_PUSH_CHANNEL,
+                json.dumps({"user_id": user_id, "payload": message}, ensure_ascii=False),
+            )
+        finally:
+            await redis.aclose()
+
+    async def send_personal_message(self, message: dict, user_id: int):
+        try:
+            await self._publish_push(user_id, message)
+        except Exception as exc:
+            logger.warning("WebSocket publish failed, local fallback: %s", exc)
+            await self._deliver_local(user_id, message)
 
     async def broadcast_to_organization(
         self,
@@ -71,7 +184,7 @@ class ConnectionManager:
         url_suffix = f"/chats?tab=avito&avitoChatId={chat_q}" if chat_q else "/chats?tab=avito"
         for u in users:
             uid = u.id
-            if self.active_connections.get(uid):
+            if await self.is_user_online_globally(uid):
                 await self.send_personal_message(ws_payload, uid)
             else:
                 send_push_notification(
@@ -112,7 +225,7 @@ class ConnectionManager:
         for recipient_id in recipient_ids:
             if recipient_id == exclude_user_id:
                 continue
-            if self.active_connections.get(recipient_id):
+            if await self.is_user_online_globally(recipient_id):
                 await self.send_personal_message(message, recipient_id)
             else:
                 push_data = {

@@ -116,6 +116,10 @@ class Settings(BaseSettings):
     USED_MATCH_CACHE_TTL_SECONDS: int = 120
     WEBSOCKET_MAX_CONNECTIONS_PER_USER: int = 5
 
+    # SQLAlchemy pool per Gunicorn worker (2 workers → max ~40 DB connections)
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 10
+
     # Резервные копии (БД и uploads)
     BACKUP_DIR: Optional[str] = None
     PG_DUMP_PATH: Optional[str] = None

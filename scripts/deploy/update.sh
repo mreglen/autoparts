@@ -251,6 +251,28 @@ restart_backend() {
   systemctl is-active --quiet kroan.service || die "kroan не запустился"
 }
 
+install_kroan_unit() {
+  local src="$ROOT/docs/ops/kroan.service"
+  local dst="/etc/systemd/system/kroan.service"
+  [[ -f "$src" ]] || return 0
+  if [[ ! -f "$dst" ]] || ! cmp -s "$src" "$dst"; then
+    cp "$src" "$dst"
+    systemctl daemon-reload
+    log "Обновлён $dst (Gunicorn unit)"
+  fi
+}
+
+verify_gunicorn() {
+  local gunicorn_count uvicorn_standalone sched_count
+  gunicorn_count=$(pgrep -cf 'gunicorn.*app.main:app' 2>/dev/null || echo 0)
+  uvicorn_standalone=$(pgrep -cf 'uvicorn app.main:app' 2>/dev/null || echo 0)
+  sched_count=$(journalctl -u kroan --since "5 min ago" --no-pager 2>/dev/null | grep -c 'Scheduler started' || echo 0)
+  log "Gunicorn: processes=$gunicorn_count standalone_uvicorn=$uvicorn_standalone scheduler_logs=$sched_count"
+  [[ "$gunicorn_count" -ge 3 ]] || log "WARN: expected gunicorn master + 2 workers (got $gunicorn_count)"
+  [[ "$uvicorn_standalone" -eq 0 ]] || log "WARN: standalone uvicorn still running ($uvicorn_standalone)"
+  [[ "$sched_count" -eq 1 ]] || log "WARN: expected 1 Scheduler started log (got $sched_count)"
+}
+
 apply_nginx_configs() {
   local site="/etc/nginx/sites-available/svoygarage"
   local ts
@@ -337,6 +359,7 @@ main() {
   git_pull
   sync_installer
   ensure_scheduler_env
+  install_kroan_unit
 
   if [[ $SKIP_FRONTEND -eq 0 ]]; then
     install_backend_deps
@@ -357,6 +380,7 @@ main() {
 
   verify
   verify_frontend_chunks
+  verify_gunicorn
   log "========== Обновление завершено =========="
 }
 
