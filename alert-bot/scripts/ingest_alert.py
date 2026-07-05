@@ -11,9 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from telegram import Bot
-
 from alert_bot.config import get_settings
+from alert_bot.telegram_client import build_bot
 from alert_bot.db.models import Base
 from alert_bot.db.session import SessionLocal, engine
 from alert_bot.services.alerts import make_dedupe_key, notify_subscribers, record_alert
@@ -42,7 +41,7 @@ async def _run(args: argparse.Namespace) -> int:
             settings=settings,
         )
         if event and notify:
-            bot = Bot(settings.bot_token)
+            bot = build_bot(settings)
             sent = await notify_subscribers(bot, db, event)
             logger.info("Alert recorded id=%s, notified %s subscribers", event.id, sent)
         elif event:

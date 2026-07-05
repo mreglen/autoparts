@@ -1,9 +1,10 @@
 import asyncio
 import logging
 
-from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
+from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
 from alert_bot.config import get_settings
+from alert_bot.telegram_client import build_application
 from alert_bot.db.models import Base
 from alert_bot.db.session import engine
 from alert_bot.handlers.history import history_callback
@@ -23,7 +24,7 @@ def init_db() -> None:
     logger.info("Database tables ensured")
 
 
-async def _post_init(application: Application) -> None:
+async def _post_init(application) -> None:
     settings = get_settings()
     bot = application.bot
     asyncio.create_task(run_log_collector(bot, settings))
@@ -33,12 +34,7 @@ def main() -> None:
     settings = get_settings()
     init_db()
 
-    app = (
-        Application.builder()
-        .token(settings.bot_token)
-        .post_init(_post_init)
-        .build()
-    )
+    app = build_application(settings, post_init=_post_init)
 
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))

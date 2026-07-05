@@ -474,6 +474,33 @@ install_alert_bot_deps() {
   chown fast:fast "$hash_file"
 }
 
+ensure_cloudflare_warp() {
+  local warp_ok=0
+  if ! command -v warp-cli >/dev/null 2>&1; then
+    log "Cloudflare WARP: установка..."
+    mkdir -p /usr/share/keyrings
+    curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg \
+      | gpg --dearmor -o /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ $(. /etc/os-release && echo "$VERSION_CODENAME") main" \
+      > /etc/apt/sources.list.d/cloudflare-client.list
+    apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y cloudflare-warp
+  fi
+  warp-cli registration new 2>/dev/null || true
+  warp-cli mode proxy 2>/dev/null || true
+  warp-cli proxy port 40000 2>/dev/null || true
+  systemctl enable warp-svc 2>/dev/null || true
+  systemctl start warp-svc 2>/dev/null || true
+  warp-cli connect 2>/dev/null || true
+  sleep 2
+  if curl -sf --max-time 20 --proxy socks5h://127.0.0.1:40000 https://api.telegram.org/ >/dev/null 2>&1; then
+    warp_ok=1
+    log "Cloudflare WARP: Telegram доступен через socks5://127.0.0.1:40000"
+  else
+    log "WARN: Cloudflare WARP: Telegram через proxy пока недоступен (warp-cli status)"
+  fi
+}
+
 ensure_alert_bot() {
   local alert_bot="$ROOT/alert-bot"
   local unit_src="$alert_bot/docs/ops/alert-bot.service"
@@ -484,6 +511,7 @@ ensure_alert_bot() {
 
   [[ -d "$alert_bot" ]] || return 0
 
+  ensure_cloudflare_warp
   usermod -aG adm,systemd-journal fast 2>/dev/null || true
   install_alert_bot_deps
 
@@ -503,6 +531,11 @@ ensure_alert_bot() {
     fi
     chmod 600 "$env_target"
     log "alert-bot: создан $env_target (добавьте BOT_TOKEN)"
+  fi
+
+  if [[ -f "$env_target" ]] && ! grep -qE '^TELEGRAM_PROXY_URL=' "$env_target" 2>/dev/null; then
+    echo "TELEGRAM_PROXY_URL=socks5://127.0.0.1:40000" >> "$env_target"
+    log "alert-bot: добавлен TELEGRAM_PROXY_URL в $env_target"
   fi
 
   if [[ -f "$unit_dst" && -f "$env_target" ]]; then

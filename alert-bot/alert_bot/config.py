@@ -18,6 +18,8 @@ class Settings:
     bot_token: str
     database_url: str
     alert_cooldown_sec: int
+    telegram_proxy_url: str = ""
+    telegram_api_base_url: str = ""
     history_page_size: int = 5
     max_auth_failures: int = 3
     auth_lockout_sec: int = 900
@@ -34,4 +36,6 @@ def get_settings() -> Settings:
         bot_token=token,
         database_url=db_url,
         alert_cooldown_sec=int(os.getenv("ALERT_COOLDOWN_SEC", "300")),
+        telegram_proxy_url=os.getenv("TELEGRAM_PROXY_URL", "").strip(),
+        telegram_api_base_url=os.getenv("TELEGRAM_API_BASE_URL", "").strip(),
     )
