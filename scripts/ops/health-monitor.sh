@@ -125,7 +125,7 @@ load_avg_1m() {
 }
 
 ram_percent() {
-  free 2>/dev/null | awk '/Mem:/ {printf "%.0f", $3/$2 * 100}' || echo 0
+  awk '/MemTotal:/ {t=$2} /MemAvailable:/ {a=$2} END {if (t>0) printf "%.0f", (t-a)/t*100; else print 0}' /proc/meminfo 2>/dev/null || echo 0
 }
 
 root_disk_percent() {
