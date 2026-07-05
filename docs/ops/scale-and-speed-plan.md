@@ -465,6 +465,7 @@ update
 - `health-monitor.sh` в cron каждые 5 мин; алерты в `/var/log/autoparts-alerts.log`
 - fail2ban `nginx-req-limit`; опционально Telegram через `/etc/autoparts/monitor.env`
 - Админка server-stats: 502/504 за 15 мин, рестарты kroan за 24 ч, PgBouncer health
+- Smoke: cron active, fail2ban jail active, API 200/200/200/200; hotfix `deedf1f` RAM в health-monitor
 - Следующий шаг — **этап 9** (load test)
 
 **Дополнительно (аудит 2026-07-05, до update):**
