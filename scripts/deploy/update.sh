@@ -242,6 +242,7 @@ deploy_frontend() {
 }
 
 restart_backend() {
+  install_kroan_unit
   log "systemctl restart kroan (один раз, без повторов)..."
   systemctl restart kroan.service
   wait_for_api
@@ -263,14 +264,20 @@ install_kroan_unit() {
 }
 
 verify_gunicorn() {
-  local gunicorn_count uvicorn_standalone sched_count
-  gunicorn_count=$(pgrep -cf 'gunicorn.*app.main:app' 2>/dev/null || echo 0)
-  uvicorn_standalone=$(pgrep -cf 'uvicorn app.main:app' 2>/dev/null || echo 0)
-  sched_count=$(journalctl -u kroan --since "5 min ago" --no-pager 2>/dev/null | grep -c 'Scheduler started' || echo 0)
-  log "Gunicorn: processes=$gunicorn_count standalone_uvicorn=$uvicorn_standalone scheduler_logs=$sched_count"
-  [[ "$gunicorn_count" -ge 3 ]] || log "WARN: expected gunicorn master + 2 workers (got $gunicorn_count)"
-  [[ "$uvicorn_standalone" -eq 0 ]] || log "WARN: standalone uvicorn still running ($uvicorn_standalone)"
-  [[ "$sched_count" -eq 1 ]] || log "WARN: expected 1 Scheduler started log (got $sched_count)"
+  local gunicorn_count=0 uvicorn_standalone=0 sched_count=0
+  gunicorn_count=$(pgrep -fc 'gunicorn.*app.main:app' 2>/dev/null || true)
+  uvicorn_standalone=$(pgrep -fc 'uvicorn app.main:app' 2>/dev/null || true)
+  sched_count=$(journalctl -u kroan --since "5 min ago" --no-pager 2>/dev/null | grep -c 'Scheduler started' || true)
+  log "Gunicorn: processes=${gunicorn_count:-0} standalone_uvicorn=${uvicorn_standalone:-0} scheduler_logs=${sched_count:-0}"
+  if [[ "${gunicorn_count:-0}" -lt 3 ]]; then
+    log "WARN: expected gunicorn master + 2 workers (got ${gunicorn_count:-0})"
+  fi
+  if [[ "${uvicorn_standalone:-0}" -gt 0 ]]; then
+    log "WARN: standalone uvicorn still running (${uvicorn_standalone:-0})"
+  fi
+  if [[ "${sched_count:-0}" -ne 1 ]]; then
+    log "WARN: expected 1 Scheduler started log (got ${sched_count:-0})"
+  fi
 }
 
 apply_nginx_configs() {
