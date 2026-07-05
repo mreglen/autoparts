@@ -307,9 +307,9 @@ update           # если менялся backend pool
 
 ### Критерии готовности
 
-- [ ] p95 catalog query < 300 ms на cache miss
-- [ ] Нет `too many connections` в логах PostgreSQL
-- [ ] Активный пользователь не упирается в rate limit без причины
+- [x] p95 catalog query < 300 ms на cache miss
+- [x] Нет `too many connections` в логах PostgreSQL
+- [x] Активный пользователь не упирается в rate limit без причины
 
 ### Команда для Plan mode
 
@@ -422,6 +422,8 @@ update
 - PgBouncer transaction pool на `127.0.0.1:6432`; `DATABASE_URL` через 6432, `DATABASE_URL_DIRECT` для pg_dump
 - SQLAlchemy `NullPool` при PgBouncer (порт 6432); индексы каталога (`ensure_public_catalog_indexes`)
 - PostgreSQL tuning `tuning-4gb.conf`; nginx `sg_api` 50 r/s (burst 60)
+- Smoke: catalog miss p95 **~11 ms** (10 samples), EXPLAIN execution **0.57 ms**, `too many connections` — 0
+- Hotfix `2bae84a`: убран `prepare_threshold` (psycopg3-only), kroan стабилен
 - Следующий шаг — **этап 9** (load test; этап 8 пропущен)
 
 **Дополнительно (аудит 2026-07-05, до update):**
