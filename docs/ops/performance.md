@@ -82,21 +82,66 @@ sudo apt install libnginx-mod-http-brotli-filter libnginx-mod-http-brotli-static
 
 До установки модуля не подключайте `svoygarage-brotli.conf` — `nginx -t` упадёт. Gzip остаётся fallback.
 
-## Baseline метрик (этап 0)
+## Baseline метрик (этап 2, 2026-07-05)
 
-Зафиксировать «до/после» для:
+Зафиксировано после этапа 1 стабилизации. Сравнивать с этими цифрами на этапах 3–5.
 
-| URL | LCP | TTFB |
-|-----|-----|------|
-| `/` | | |
-| `/autoparts/used` | | |
-| `/autoparts/new` | | |
-| карточка `/part/...` | | |
+### Страницы (TTFB HTML + LCP)
+
+| URL | LCP PSI mobile | INP | CLS | TTFB HTML | Примечание |
+|-----|----------------|-----|-----|-----------|------------|
+| `/` | [снять в PSI](https://pagespeed.web.dev/analysis?url=https://svoygarage.ru/) | — | — | 8 ms | SPA shell |
+| `/autoparts/used` | [снять в PSI](https://pagespeed.web.dev/analysis?url=https://svoygarage.ru/autoparts/used) | — | — | 8 ms | + catalog API |
+| `/autoparts/new` | [снять в PSI](https://pagespeed.web.dev/analysis?url=https://svoygarage.ru/autoparts/new) | — | — | 7 ms | лендинг |
+| `/part/605-Jakoparts-J2883012` | [снять в PSI](https://pagespeed.web.dev/analysis?url=https://svoygarage.ru/part/605-Jakoparts-J2883012) | — | — | — | б/у карточка |
+| `/autoparts/new/part/23216-Renault-288907815R` | [снять в PSI](https://pagespeed.web.dev/analysis?url=https://svoygarage.ru/autoparts/new/part/23216-Renault-288907815R) | — | — | — | новая карточка |
+
+**LCP/INP/CLS (lab):** Google PSI API вернул `429 Too Many Requests` при автоматическом снятии. Значения LCP заполнить вручную по ссылкам PSI выше или из Яндекс.Метрики (`web_vitals_lcp`, `web_vitals_inp`, `web_vitals_cls` — см. `reportWebVitals.js`).
+
+**Цели для сравнения:** LCP < 2.5 s, INP < 200 ms, CLS < 0.1.
+
+### API TTFB (nginx + microcache, сервер 2026-07-05)
+
+| Endpoint | TTFB | X-Cache-Status | Примечание |
+|----------|------|----------------|------------|
+| `GET /server/api/catalog/products?page=1&page_size=20` | 19 ms | HIT | повторный запрос |
+| `GET /server/api/catalog/products?...&_bust=*` | 57 ms | HIT/MISS | первый с уникальным query |
+| `GET /server/api/part-types/public` | 19 ms | — | |
+| `GET /server/api/catalog/facets` | 35 ms | — | |
+
+Прямой замер (этап 1): catalog ~46 ms, part-types ~54 ms с публичного HTTPS.
+
+### Статика: main.js
+
+| Файл | Raw | Gzip (wire) | Brotli |
+|------|-----|-------------|--------|
+| `main.b584bc6a.js` | 725 KiB (741 815 B) | ~725 KiB (nginx gzip без существенного сжатия на hashed static) | не установлен |
+
+Проверка Brotli: `nginx -V | grep brotli` → модуль отсутствует (этап 3).
+
+### Стабильность (nginx + systemd)
+
+| Метрика | Этап 1 (до) | Этап 2 (2026-07-05) |
+|---------|-------------|---------------------|
+| 502 в `svoygarage_ssl_access.log` | 2 | 2 |
+| 504 в `svoygarage_ssl_access.log` | 302 | 302 |
+| Рестартов `kroan` / 24 ч | 20 | 21 |
+
+Счётчик 502/504 в текущем log-файле (не rolling 24h). Для тренда — сравнивать после этапов 3–4.
+
+### Команды для повторного снятия
+
+Скрипт: [`scripts/ops/baseline-metrics.sh`](../../scripts/ops/baseline-metrics.sh) (запуск на сервере от root).
 
 ```bash
-curl -sI -H 'Accept-Encoding: gzip' https://svoygarage.ru/static/js/main.*.js
-curl -sI 'https://svoygarage.ru/server/api/catalog/products?page=1&page_size=20'
+curl -s -o /dev/null -w 'catalog TTFB:%{time_starttransfer}s total:%{time_total}s\n' \
+  -H 'Host: svoygarage.ru' \
+  "https://127.0.0.1/server/api/catalog/products?page=1&page_size=20" -k
+curl -sI -H 'Accept-Encoding: gzip' -H 'Host: svoygarage.ru' \
+  https://127.0.0.1/static/js/main.b584bc6a.js -k | grep -iE 'content-length|content-encoding'
 ```
+
+---
 
 ## Деплой (кратко)
 

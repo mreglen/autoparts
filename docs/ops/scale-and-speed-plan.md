@@ -396,7 +396,7 @@ update
 | Этап | Статус | Дата | Заметки |
 |------|--------|------|---------|
 | 1 Стабильность | **выполнено** | 2026-07-05 | update `0dc458f`, verify 200/200/200/200, API за 8s |
-| 2 Baseline | | | |
+| 2 Baseline | **выполнено** | 2026-07-05 | TTFB API 19–57ms, HTML 7–8ms, main.js 725KiB, PSI links в performance.md |
 | 3 Nginx | | | microcache уже подключён в nginx.conf |
 | 4 Backend | | | SEO sync всё ещё в APScheduler uvicorn (~3 мин блокировки) |
 | 5 Frontend | | | коммит 0dc458f на сервере |
@@ -416,6 +416,14 @@ update
 - Рестартов за 24 ч до этапа: 20 → снижение ожидается при правиле «один update за раз»
 
 **Критерии этапа 1:** все выполнены. Следующий шаг — **этап 2** (baseline LCP/TTFB).
+
+**После этапа 2 (2026-07-05):**
+- Baseline записан в [performance.md](./performance.md): TTFB API 19–57 ms, HTML 7–8 ms, `main.b584bc6a.js` 725 KiB
+- 502/504 без изменений в текущем log (2 / 302); рестартов kroan/24h: 21 (+1 от update этапа 1)
+- LCP/INP/CLS: ссылки PSI в performance.md (API 429 — lab-значения снять вручную или из Метрики)
+- Скрипт повторного снятия: `scripts/ops/baseline-metrics.sh`
+
+**Критерии этапа 2:** выполнены. Следующий шаг — **этап 3** (nginx Brotli, prerender cache).
 
 **Дополнительно (аудит 2026-07-05, до update):**
 - Все сервисы active; git на сервере: `9d861d84`
