@@ -1,6 +1,6 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
 from app.db.database import get_db
 from app.models.pending_product_storage_cell import PendingProductStorageCell as PendingProductStorageCellModel
 from app.models.pending_product import PendingProduct as PendingProductModel
@@ -25,6 +25,10 @@ class PendingProductStorageCellResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class PendingProductsStorageCellsRequest(BaseModel):
+    pending_product_ids: List[int]
 
 @router.post("/", response_model=PendingProductStorageCellResponse)
 def create_pending_product_storage_cell(
@@ -209,6 +213,35 @@ def get_pending_product_storage_cells(
     
     links = query.all()
     return links
+
+
+@router.post("/by-pending-products", response_model=List[PendingProductStorageCellResponse])
+def read_pending_product_storage_cells_by_products(
+    payload: PendingProductsStorageCellsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Получить связи ячеек для нескольких pending products одним запросом."""
+    unique_ids = list(dict.fromkeys(payload.pending_product_ids))
+    if not unique_ids:
+        return []
+
+    allowed_ids = {
+        row[0]
+        for row in db.query(PendingProductModel.id).filter(
+            PendingProductModel.id.in_(unique_ids),
+            PendingProductModel.organization_id == current_user.organization_id,
+        ).all()
+    }
+    if not allowed_ids:
+        return []
+
+    return (
+        db.query(PendingProductStorageCellModel)
+        .filter(PendingProductStorageCellModel.pending_product_id.in_(allowed_ids))
+        .all()
+    )
+
 
 @router.delete("/{link_id}")
 def delete_pending_product_storage_cell(

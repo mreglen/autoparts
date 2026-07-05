@@ -1,4 +1,5 @@
 import { API_BASE, getAuthHeaders } from './apiClient';
+import { isApiOutage, registerApiFailure, registerApiSuccess } from './apiOutageGuard';
 import { METRIKA_GOALS, reachMetrikaGoal } from './metrikaGoals';
 
 const VISITOR_ID_KEY = 'site_analytics_visitor_id';
@@ -73,7 +74,7 @@ function buildPayload(events) {
 }
 
 function sendEvents(events, useBeacon = false) {
-  if (!events.length || !API_BASE) return;
+  if (!events.length || !API_BASE || isApiOutage()) return;
 
   const url = `${API_BASE}/public/analytics/events`;
   const body = buildPayload(events);
@@ -93,7 +94,17 @@ function sendEvents(events, useBeacon = false) {
     headers,
     body,
     keepalive: true,
-  }).catch(() => {});
+  })
+    .then((response) => {
+      if (response.ok) {
+        registerApiSuccess();
+        return;
+      }
+      if ([502, 503, 504].includes(response.status)) {
+        registerApiFailure(response.status);
+      }
+    })
+    .catch(() => {});
 }
 
 function scheduleFlush() {

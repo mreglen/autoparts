@@ -17,6 +17,7 @@ import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPl
 import StorageCellsDisplayTable from '../../components/StorageCellsTable/StorageCellsDisplayTable';
 import { normalizeInternalCodeForSearch, INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../utils/internalCode';
 import MyPartsRowSkeleton from '../../components/skeletons/MyPartsRowSkeleton';
+import { useAuthReady } from '../../hooks/useAuthReady';
 
 const CardPart = ({
   part,
@@ -724,6 +725,105 @@ const CardPart = ({
   );
 };
 
+const formatDraftUpdatedAt = (value) => {
+  if (!value) return '';
+  try {
+    return new Date(value).toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+};
+
+const DraftCard = ({ draft, onContinue, onSubmit, onDelete }) => {
+  const [showActions, setShowActions] = useState(false);
+  const actionsPlacement = useActionsDropdownPlacement(showActions, 160);
+  const firstPhoto = draft.photos?.[0];
+  const photoUrl = firstPhoto ? normalizeImageUrl(firstPhoto) : null;
+
+  const renderActionsMenu = (menuClassName) => (
+    <div className={menuClassName}>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onContinue(draft); setShowActions(false); }}
+        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+        Продолжить
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onSubmit(draft); setShowActions(false); }}
+        className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        На модерацию
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onDelete(draft); setShowActions(false); }}
+        className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+        Удалить
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+            {photoUrl ? (
+              <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                Нет фото
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h3 className="truncate text-base font-semibold text-gray-900">
+              {formatDraftTitle(draft)}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Обновлён: {formatDraftUpdatedAt(draft.updated_at)}
+            </p>
+            <p className="mt-1 text-sm text-gray-500">
+              {draft.photos?.length || 0} фото · {draft.videos?.length || 0} видео
+            </p>
+          </div>
+        </div>
+        <div ref={actionsPlacement.anchorRef} className="relative actions-dropdown shrink-0 self-end sm:self-center">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowActions(!showActions); }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+            </svg>
+            <span>Действия</span>
+          </button>
+          {showActions && renderActionsMenu(buildActionsDropdownMenuClassName(actionsPlacement.openUp, 'w-48 z-50'))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DEFAULT_IN_STOCK_FILTERS = { storage: '', sort: 'date_desc' };
 const DEFAULT_MODERATION_FILTERS = { storage: '', sort: 'date_desc', hideRejected: false };
 const URL_SEARCH_DEBOUNCE_MS = 400;
@@ -745,6 +845,7 @@ function MyParts() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { isReady } = useAuthReady();
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const { items: products, pendingItems, rejectedItems, loading, error } = useSelector((state) => state.products);
   const myProductsTotal = useSelector(selectMyProductsTotal);
@@ -758,7 +859,8 @@ function MyParts() {
   const draftLoading = useSelector(selectDraftLoading);
   const draftError = useSelector(selectDraftError);
   const loadMoreSentinelRef = useRef(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  const moderationHydratedRef = useRef(false);
+  const draftsHydratedRef = useRef(false);
   const [moderationLoading, setModerationLoading] = useState(false);
   const [moderationLoadError, setModerationLoadError] = useState(null);
   const [pendingStorageCellsByProduct, setPendingStorageCellsByProduct] = useState({});
@@ -909,6 +1011,20 @@ function MyParts() {
   }, [activeTab, myProductsHasMore, loading, myProductsLoadingMore, loadMoreMyProducts, products.length]);
 
   const isInitialMyProductsLoad = activeTab === 'in-stock' && loading && products.length === 0;
+  const isInitialModerationLoad = activeTab === 'pending' && moderationLoading
+    && (pendingItems?.length || 0) === 0
+    && (rejectedItems?.length || 0) === 0;
+  const isInitialDraftsLoad = activeTab === 'drafts' && draftLoading && draftItems.length === 0;
+
+  const pendingIdsNeedingCells = useMemo(() => {
+    if (activeTab !== 'pending' || !pendingItems?.length) return [];
+    return pendingItems
+      .map((part) => part.id)
+      .filter((id) => (
+        id != null
+        && !Object.prototype.hasOwnProperty.call(pendingStorageCellsByProduct, id)
+      ));
+  }, [activeTab, pendingItems, pendingStorageCellsByProduct]);
 
   const displayModerationParts = React.useMemo(() => {
     let items = [
@@ -1370,7 +1486,15 @@ function MyParts() {
   ]);
 
   useEffect(() => {
-    if (activeTab !== 'in-stock' || !user?.organization_id) return;
+    if (!isReady || !user?.organization_id) return;
+    dispatch(fetchStorageLocations(user.organization_id));
+    if (storageCells.length === 0) {
+      dispatch(fetchStorageCells());
+    }
+  }, [dispatch, isReady, user?.organization_id, storageCells.length]);
+
+  useEffect(() => {
+    if (activeTab !== 'in-stock' || !isReady || !user?.organization_id) return;
 
     const alreadyLoaded =
       myProductsFilterKey === inStockFilterKey
@@ -1384,11 +1508,9 @@ function MyParts() {
         sort: inStockFilters.sort,
       })));
     }
-
-    dispatch(fetchStorageLocations(user.organization_id));
-    dispatch(fetchStorageCells());
   }, [
     dispatch,
+    isReady,
     user?.organization_id,
     activeTab,
     inStockFilterKey,
@@ -1396,12 +1518,14 @@ function MyParts() {
     inStockFilters.storage,
     inStockFilters.sort,
     inStockDebouncedSearch,
+    products.length,
+    myProductsTotal,
   ]);
 
   useEffect(() => {
-    if (!user?.organization_id) {
+    if (activeTab !== 'in-stock' || !user?.organization_id) {
       setAvitoIntegrationReady(false);
-      return;
+      return undefined;
     }
     let active = true;
     apiRequest(`/organizations/${user.organization_id}/avito/credentials`, { method: 'GET' })
@@ -1421,12 +1545,12 @@ function MyParts() {
     return () => {
       active = false;
     };
-  }, [user?.organization_id]);
+  }, [activeTab, user?.organization_id]);
 
   useEffect(() => {
-    if (!user?.organization_id) {
+    if (activeTab !== 'in-stock' || !user?.organization_id) {
       setDromIntegrationReady(false);
-      return;
+      return undefined;
     }
     let active = true;
     apiRequest(`/organizations/${user.organization_id}/drom/credentials`, { method: 'GET' })
@@ -1440,11 +1564,13 @@ function MyParts() {
     return () => {
       active = false;
     };
-  }, [user?.organization_id]);
+  }, [activeTab, user?.organization_id]);
 
-  const loadModerationParts = React.useCallback(async () => {
+  const loadModerationParts = React.useCallback(async ({ background = false } = {}) => {
     if (!user?.id) return;
-    setModerationLoading(true);
+    if (!background) {
+      setModerationLoading(true);
+    }
     setModerationLoadError(null);
     try {
       await Promise.all([
@@ -1458,18 +1584,59 @@ function MyParts() {
     }
   }, [dispatch, user?.id]);
 
-  // Load pending and rejected products when pending tab is active
   useEffect(() => {
-    if (activeTab === 'pending' && user?.id) {
-      loadModerationParts();
-    }
-  }, [activeTab, user?.id, loadModerationParts]);
+    if (activeTab !== 'pending' || !isReady || !user?.id) return;
+    const background = moderationHydratedRef.current;
+    loadModerationParts({ background });
+    moderationHydratedRef.current = true;
+  }, [activeTab, isReady, user?.id, loadModerationParts]);
 
   useEffect(() => {
-    if (activeTab === 'drafts' && user?.id) {
-      dispatch(fetchMyProductDrafts());
-    }
-  }, [activeTab, user?.id, dispatch]);
+    if (activeTab !== 'drafts' || !isReady || !user?.id) return;
+    dispatch(fetchMyProductDrafts());
+    draftsHydratedRef.current = true;
+  }, [activeTab, isReady, user?.id, dispatch]);
+
+  useEffect(() => {
+    if (pendingIdsNeedingCells.length === 0) return undefined;
+
+    let cancelled = false;
+    const loadPendingStorageCells = async () => {
+      const grouped = {};
+      const chunkSize = 100;
+
+      try {
+        for (let i = 0; i < pendingIdsNeedingCells.length; i += chunkSize) {
+          const chunk = pendingIdsNeedingCells.slice(i, i + chunkSize);
+          const links = await apiRequest('/pending-product-storage-cells/by-pending-products', {
+            method: 'POST',
+            body: JSON.stringify({ pending_product_ids: chunk }),
+          });
+          chunk.forEach((id) => {
+            grouped[id] = [];
+          });
+          (Array.isArray(links) ? links : []).forEach((link) => {
+            if (!grouped[link.pending_product_id]) {
+              grouped[link.pending_product_id] = [];
+            }
+            grouped[link.pending_product_id].push(link);
+          });
+        }
+      } catch {
+        pendingIdsNeedingCells.forEach((id) => {
+          grouped[id] = [];
+        });
+      }
+
+      if (cancelled) return;
+      setPendingStorageCellsByProduct((prev) => ({ ...prev, ...grouped }));
+    };
+
+    loadPendingStorageCells();
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingIdsNeedingCells]);
 
   const handleDeleteDraft = async (draft) => {
     if (!draft?.id) return;
@@ -1491,55 +1658,10 @@ function MyParts() {
     }
   };
 
-  const formatDraftUpdatedAt = (value) => {
-    if (!value) return '';
-    try {
-      return new Date(value).toLocaleString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return '';
-    }
+  const handleContinueDraft = (draft) => {
+    if (!draft?.id) return;
+    navigate(`/my-parts/drafts/${draft.id}/edit`);
   };
-
-  useEffect(() => {
-    if (activeTab !== 'pending' || !pendingItems?.length) return undefined;
-
-    let cancelled = false;
-    const loadPendingStorageCells = async () => {
-      const entries = await Promise.all(
-        pendingItems.map(async (part) => {
-          if (!part?.id) return null;
-          try {
-            const cells = await apiRequest(`/pending-product-storage-cells/?pending_product_id=${part.id}`);
-            return [part.id, Array.isArray(cells) ? cells : []];
-          } catch {
-            return [part.id, []];
-          }
-        })
-      );
-
-      if (cancelled) return;
-      setPendingStorageCellsByProduct((prev) => {
-        const next = { ...prev };
-        entries.forEach((entry) => {
-          if (!entry) return;
-          const [partId, cells] = entry;
-          next[partId] = cells;
-        });
-        return next;
-      });
-    };
-
-    loadPendingStorageCells();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab, pendingItems]);
 
   // Create memoized product IDs that need storage cell data
   const productIdsNeedingData = React.useMemo(() => {
@@ -1580,21 +1702,22 @@ function MyParts() {
   const hasPermission = user?.is_admin || user?.is_seller || 
     (user?.is_employee && permissionCodes && permissionCodes.includes('my-parts'));
 
-  // Check auth - wait for user data to load
-  useEffect(() => {
-    if (user === undefined || user === null) {
-      const token = localStorage.getItem('token');
-      if (token) return;
-    }
-    setAuthChecked(true);
-    if (!hasPermission) navigate('/', { replace: true });
-  }, [user, permissionCodes, hasPermission, navigate]);
-
-  // Show loading while auth data is loading
-  if (!authChecked) {
+  if (!isReady) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="mt-4 sm:mt-5 px-4 sm:px-0">
+        <div className="mb-6 h-8 w-48 animate-pulse rounded bg-gray-200" />
+        <div className="hidden md:block">
+          <div className="space-y-2">
+            {Array.from({ length: 4 }, (_, index) => (
+              <MyPartsRowSkeleton key={index} renderMode="table" />
+            ))}
+          </div>
+        </div>
+        <div className="space-y-3 md:hidden">
+          {Array.from({ length: 3 }, (_, index) => (
+            <MyPartsRowSkeleton key={index} renderMode="card" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -2114,16 +2237,20 @@ function MyParts() {
       ))}
 
       {activeTab === 'pending' && (
-        moderationLoading ? (
-          <div className="mt-8 text-center py-16 px-6">
-            <div className="bg-gray-100 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-              <svg className="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+        isInitialModerationLoad ? (
+          <div className="mt-4">
+            <div className="hidden md:block">
+              <div className="space-y-2">
+                {Array.from({ length: 4 }, (_, index) => (
+                  <MyPartsRowSkeleton key={index} renderMode="table" />
+                ))}
+              </div>
             </div>
-            <h2 className="text-xl font-medium text-gray-900 mb-2">Загрузка запчастей на модерации...</h2>
-            <p className="text-gray-600 text-base">Пожалуйста, подождите</p>
+            <div className="space-y-3 md:hidden">
+              {Array.from({ length: 3 }, (_, index) => (
+                <MyPartsRowSkeleton key={index} renderMode="card" />
+              ))}
+            </div>
           </div>
         ) : moderationLoadError ? (
           <div className="mt-8 text-center py-16 px-6">
@@ -2228,10 +2355,20 @@ function MyParts() {
       )}
 
       {activeTab === 'drafts' && (
-        draftLoading ? (
-          <div className="mt-8 text-center py-16 px-6">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
-            <p className="mt-4 text-gray-600">Загрузка черновиков…</p>
+        isInitialDraftsLoad ? (
+          <div className="mt-4 space-y-3">
+            {Array.from({ length: 3 }, (_, index) => (
+              <div key={index} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm animate-pulse">
+                <div className="flex gap-4">
+                  <div className="h-16 w-16 rounded-xl bg-gray-200" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-2/3 rounded bg-gray-200" />
+                    <div className="h-3 w-1/2 rounded bg-gray-100" />
+                    <div className="h-3 w-1/3 rounded bg-gray-100" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : draftError ? (
           <div className="mt-8 text-center py-16 px-6">
@@ -2259,64 +2396,15 @@ function MyParts() {
           </div>
         ) : (
           <div className="space-y-3">
-            {draftItems.map((draft) => {
-              const firstPhoto = draft.photos?.[0];
-              const photoUrl = firstPhoto ? normalizeImageUrl(firstPhoto) : null;
-              return (
-                <div
-                  key={draft.id}
-                  className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"
-                >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 items-start gap-4">
-                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-gray-100">
-                        {photoUrl ? (
-                          <img src={photoUrl} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
-                            Нет фото
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="truncate text-base font-semibold text-gray-900">
-                          {formatDraftTitle(draft)}
-                        </h3>
-                        <p className="mt-1 text-sm text-gray-500">
-                          Обновлён: {formatDraftUpdatedAt(draft.updated_at)}
-                        </p>
-                        <p className="mt-1 text-sm text-gray-500">
-                          {draft.photos?.length || 0} фото · {draft.videos?.length || 0} видео
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/my-parts/drafts/${draft.id}/edit`)}
-                        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                      >
-                        Продолжить
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSubmitDraft(draft)}
-                        className="rounded-lg border border-indigo-200 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
-                      >
-                        На модерацию
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteDraft(draft)}
-                        className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {draftItems.map((draft) => (
+              <DraftCard
+                key={draft.id}
+                draft={draft}
+                onContinue={handleContinueDraft}
+                onSubmit={handleSubmitDraft}
+                onDelete={handleDeleteDraft}
+              />
+            ))}
           </div>
         )
       )}

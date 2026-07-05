@@ -2,6 +2,14 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiAxios } from '../../utils/apiClient';
 import {
+    getOutageMessage,
+    getRetryDelayMs,
+    isApiOutage,
+    isRetryableStatus,
+    registerApiFailure,
+    registerApiSuccess,
+} from '../../utils/apiOutageGuard';
+import {
     computeCartSummary,
     loadCartSummaryCache,
     saveCartSummaryCache,
@@ -127,27 +135,32 @@ export const createCardPayment = createAsyncThunk(
 export const fetchCart = createAsyncThunk(
     'cart/fetchCart',
     async (_, { rejectWithValue }) => {
-        const retryableStatuses = new Set([502, 503, 504]);
+        if (isApiOutage()) {
+            return rejectWithValue(getOutageMessage());
+        }
+
         let lastError = null;
 
-        for (let attempt = 1; attempt <= 3; attempt += 1) {
+        for (let attempt = 1; attempt <= 2; attempt += 1) {
             try {
                 const response = await apiAxios.get('/cart/');
+                registerApiSuccess();
                 return response.data;
             } catch (error) {
                 lastError = error;
                 const status = error.response?.status;
-                if (!retryableStatuses.has(status) || attempt === 3) {
+                if (!isRetryableStatus(status) || attempt === 2) {
                     break;
                 }
+                registerApiFailure(status);
                 await new Promise((resolve) => {
-                    setTimeout(resolve, 400 * attempt);
+                    setTimeout(resolve, getRetryDelayMs(attempt - 1));
                 });
             }
         }
 
         return rejectWithValue(
-            lastError?.response?.data?.detail || 'Ошибка загрузки корзины'
+            lastError?.response?.data?.detail || getOutageMessage(),
         );
     }
 );

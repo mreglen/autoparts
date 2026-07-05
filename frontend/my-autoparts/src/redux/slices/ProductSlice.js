@@ -1527,8 +1527,10 @@ const productSlice = createSlice({
                 state.error = action.payload;
             })
             .addCase(fetchMyProductDrafts.pending, (state) => {
-                state.draftLoading = true;
                 state.draftError = null;
+                if (state.draftItems.length === 0) {
+                    state.draftLoading = true;
+                }
             })
             .addCase(fetchMyProductDrafts.fulfilled, (state, action) => {
                 state.draftLoading = false;

@@ -1,4 +1,12 @@
 import axios from 'axios';
+import {
+    getOutageMessage,
+    getRetryDelayMs,
+    isApiOutage,
+    isRetryableStatus,
+    registerApiFailure,
+    registerApiSuccess,
+} from './apiOutageGuard';
 
 
 const normalizeBaseUrl = (url) => {
@@ -239,6 +247,10 @@ const clearRequestTimeout = (timeoutId) => {
 };
 
 export const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
+    if (isApiOutage() && retryCount === 0) {
+        throw new Error(getOutageMessage());
+    }
+
     const url = `${API_BASE}${endpoint}`;
     const timed = withRequestTimeout(options);
     const defaultOptions = {
@@ -270,15 +282,20 @@ export const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
     }
 
     if (!response.ok) {
-        if (retryCount < 1 && [502, 503, 504].includes(response.status)) {
-            await new Promise((resolve) => setTimeout(resolve, 400 * (retryCount + 1)));
+        if (retryCount < 1 && isRetryableStatus(response.status)) {
+            registerApiFailure(response.status);
+            await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(retryCount)));
             return apiRequest(endpoint, options, retryCount + 1);
+        }
+        if (isRetryableStatus(response.status)) {
+            registerApiFailure(response.status);
         }
         const errorData = await response.json().catch(() => ({}));
         const msg = formatApiDetail(errorData.detail) || `HTTP ${response.status}: ${response.statusText}`;
         throw new Error(msg);
     }
 
+    registerApiSuccess();
 
     if (response.status === 204) {
         return { status: 204, message: 'No Content' };
@@ -351,15 +368,20 @@ export const apiRequestFormData = async (endpoint, formData, options = {}, retry
     clearRequestTimeout(timed.timeoutId);
 
     if (!response.ok) {
-        if (retryCount < 1 && [502, 503, 504].includes(response.status)) {
-            await new Promise((resolve) => setTimeout(resolve, 400 * (retryCount + 1)));
+        if (retryCount < 1 && isRetryableStatus(response.status)) {
+            registerApiFailure(response.status);
+            await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(retryCount)));
             return apiRequestFormData(endpoint, formData, options, retryCount + 1);
+        }
+        if (isRetryableStatus(response.status)) {
+            registerApiFailure(response.status);
         }
         const errorData = await response.json().catch(() => ({}));
         const msg = formatApiDetail(errorData.detail) || `HTTP ${response.status}: ${response.statusText}`;
         throw new Error(msg);
     }
 
+    registerApiSuccess();
     return response.json();
 };
 
@@ -385,13 +407,23 @@ apiAxios.interceptors.request.use((config) => {
     return config;
 });
 
-apiAxios.interceptors.response.use((response) => {
-    const guestTokenFromResponse = response.headers?.['x-guest-cart-token'];
-    if (guestTokenFromResponse) {
-        setGuestCartToken(guestTokenFromResponse);
-    }
-    return response;
-});
+apiAxios.interceptors.response.use(
+    (response) => {
+        registerApiSuccess();
+        const guestTokenFromResponse = response.headers?.['x-guest-cart-token'];
+        if (guestTokenFromResponse) {
+            setGuestCartToken(guestTokenFromResponse);
+        }
+        return response;
+    },
+    (error) => {
+        const status = error.response?.status;
+        if (isRetryableStatus(status)) {
+            registerApiFailure(status);
+        }
+        return Promise.reject(error);
+    },
+);
 
 
 export const apiAxiosUnauth = axios.create({

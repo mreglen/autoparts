@@ -1,6 +1,9 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { fetchCart } from '../redux/slices/CartSlice';
+import { isApiOutage } from '../utils/apiOutageGuard';
+
+const MIN_REFRESH_MS = 45000;
 
 /**
  * Держит корзину актуальной: загрузка при старте и обновление после простоя/возврата на вкладку.
@@ -8,15 +11,24 @@ import { fetchCart } from '../redux/slices/CartSlice';
  */
 export default function useCartSync() {
     const dispatch = useDispatch();
+    const lastFetchAtRef = useRef(0);
 
-    useEffect(() => {
+    const refreshCart = useCallback((force = false) => {
+        if (!force && isApiOutage()) return;
+        const now = Date.now();
+        if (!force && now - lastFetchAtRef.current < MIN_REFRESH_MS) return;
+        lastFetchAtRef.current = now;
         dispatch(fetchCart());
     }, [dispatch]);
 
     useEffect(() => {
+        refreshCart(true);
+    }, [refreshCart]);
+
+    useEffect(() => {
         const refresh = () => {
             if (document.visibilityState === 'visible') {
-                dispatch(fetchCart());
+                refreshCart(false);
             }
         };
 
@@ -26,5 +38,5 @@ export default function useCartSync() {
             window.removeEventListener('focus', refresh);
             document.removeEventListener('visibilitychange', refresh);
         };
-    }, [dispatch]);
+    }, [refreshCart]);
 }
