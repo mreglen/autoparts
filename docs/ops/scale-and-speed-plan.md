@@ -402,7 +402,6 @@ update
 - Sitemap warm-up при старте → Celery `countdown=60`, не блокирует uvicorn
 - `NEW_PARTS_SEO_SYNC_USE_CELERY=true` на prod (`ensure_scheduler_env` в update)
 - Поиск: Redis cache 120 с на `/search`, `/resolve`, `/search-combined`; инвалидация в stock_ins
-- Следующий шаг — **этап 5** (проверка frontend)
 
 **После этапа 5 (2026-07-05):**
 - Lazy chunks: `UsedPartsList`, `NewPartsResults` в `AutoParts.jsx`; prefetch в `9435.*.chunk.js`
