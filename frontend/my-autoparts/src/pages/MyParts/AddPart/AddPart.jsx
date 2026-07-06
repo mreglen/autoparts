@@ -928,24 +928,28 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
     }
 
     try {
-      // Create new storage cell
       const newCellData = {
         name: newCellName,
         storage_location_id: parseInt(formData.storage_location_id, 10),
       };
-      
-      const result = await dispatch(createStorageCell(newCellData));
-      
-      // Add the new cell to locationCells
-      setLocationCells(prev => [...prev, result]);
-      
-      // Initialize quantity for the new cell
-      setCellQuantities(prev => ({
+
+      const action = await dispatch(createStorageCell(newCellData));
+      if (!createStorageCell.fulfilled.match(action)) {
+        const message = action.payload || 'Ошибка при создании ячейки';
+        alert(typeof message === 'string' ? message : 'Ошибка при создании ячейки');
+        return;
+      }
+
+      const newCell = action.payload;
+      setLocationCells((prev) => {
+        if (prev.some((cell) => cell.id === newCell.id)) return prev;
+        return [...prev, newCell];
+      });
+      setCellQuantities((prev) => ({
         ...prev,
-        [result.id]: newCellValue
+        [newCell.id]: newCellValue,
       }));
-      
-      // Reset form
+
       setNewCellName('');
       setNewCellValue('');
       setShowNewCellForm(false);
@@ -1139,20 +1143,22 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
 
         const storageCellAssignments = [];
         Object.entries(cellQuantities).forEach(([cellId, value]) => {
-          if (value && value.trim()) {
-            storageCellAssignments.push({
-              pending_product_id: Number(editPendingId, 10),
-              storage_cell_id: parseInt(cellId, 10),
-              value: value.trim(),
-            });
-          }
+          if (!value || !String(value).trim()) return;
+          const storageCellId = parseInt(cellId, 10);
+          if (!Number.isFinite(storageCellId)) return;
+          storageCellAssignments.push({
+            pending_product_id: Number(editPendingId, 10),
+            storage_cell_id: storageCellId,
+            value: String(value).trim(),
+          });
         });
 
         if (storageCellAssignments.length > 0) {
           try {
-            await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments));
+            await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments)).unwrap();
           } catch (storageError) {
             console.error('Error creating storage cell assignments:', storageError);
+            alert(typeof storageError === 'string' ? storageError : 'Запчасть создана, но не удалось сохранить адресное хранение');
           }
         }
 
@@ -1172,20 +1178,22 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         const pendingProductId = resubmitAction.payload.pendingProduct.id;
         const storageCellAssignments = [];
         Object.entries(cellQuantities).forEach(([cellId, value]) => {
-          if (value && value.trim()) {
-            storageCellAssignments.push({
-              pending_product_id: pendingProductId,
-              storage_cell_id: parseInt(cellId, 10),
-              value: value.trim(),
-            });
-          }
+          if (!value || !String(value).trim()) return;
+          const storageCellId = parseInt(cellId, 10);
+          if (!Number.isFinite(storageCellId)) return;
+          storageCellAssignments.push({
+            pending_product_id: pendingProductId,
+            storage_cell_id: storageCellId,
+            value: String(value).trim(),
+          });
         });
 
         if (storageCellAssignments.length > 0) {
           try {
-            await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments));
+            await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments)).unwrap();
           } catch (storageError) {
             console.error('Error creating storage cell assignments:', storageError);
+            alert(typeof storageError === 'string' ? storageError : 'Запчасть отправлена, но не удалось сохранить адресное хранение');
           }
         }
 
@@ -1204,22 +1212,23 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
       // Handle storage cell assignments
       const storageCellAssignments = [];
       Object.entries(cellQuantities).forEach(([cellId, value]) => {
-        if (value && value.trim()) {
-          storageCellAssignments.push({
-            pending_product_id: pendingProductId,
-            storage_cell_id: parseInt(cellId, 10),
-            value: value.trim()
-          });
-        }
+        if (!value || !String(value).trim()) return;
+        const storageCellId = parseInt(cellId, 10);
+        if (!Number.isFinite(storageCellId)) return;
+        storageCellAssignments.push({
+          pending_product_id: pendingProductId,
+          storage_cell_id: storageCellId,
+          value: String(value).trim(),
+        });
       });
 
       // Create storage cell links if any assignments exist
       if (storageCellAssignments.length > 0) {
         try {
-          await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments));
+          await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments)).unwrap();
         } catch (storageError) {
           console.error('Error creating storage cell assignments:', storageError);
-          // Don't fail the whole operation if storage cell creation fails
+          alert(typeof storageError === 'string' ? storageError : 'Запчасть создана, но не удалось сохранить адресное хранение');
         }
       }
 

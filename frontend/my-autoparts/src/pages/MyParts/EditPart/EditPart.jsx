@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateProduct, uploadPhotos, uploadMedia, clearProductError, resetProducts, fetchProduct, deleteProductPhotos, deleteProductVideos, deleteProductVideo } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
-import { fetchStorageCells, fetchProductStorageCells, linkProductToCell, deleteProductCellLink, invalidateProductStorageCells } from '../../../redux/slices/StorageCellsSlice';
+import { fetchStorageCells, fetchProductStorageCells, linkProductToCell, deleteProductCellLink, invalidateProductStorageCells, createStorageCell } from '../../../redux/slices/StorageCellsSlice';
 import { fetchPartTypes } from '../../../redux/slices/PartTypeSlice';
 import VehicleModal from '../AddPart/VehicleModal';
 import PhotoGallery from '../../../components/PhotoGallery/PhotoGallery';
@@ -806,35 +806,47 @@ const EditPart = () => {
     }));
   };
 
-  const handleAddNewCell = () => {
-   if (!newCellName.trim()) {
+  const handleAddNewCell = async () => {
+    if (!newCellName.trim()) {
       alert('Введите название ячейки');
-     return;
+      return;
     }
-    
-    // Create a new cell object
-   const newCell = {
-      id: `temp_${Date.now()}`,
-      name: newCellName.trim(),
-      description: '',
-      storage_location_id: parseInt(formData.storage_location_id, 10)
-    };
-    
-    // Add to location cells
-    setLocationCells(prev => [...prev, newCell]);
-    
-    // Initialize value for the new cell
-   if (newCellValue.trim()) {
-      setCellValues(prev => ({
-        ...prev,
-        [newCell.id]: newCellValue.trim()
+
+    if (!formData.storage_location_id) {
+      alert('Пожалуйста, выберите склад');
+      return;
+    }
+
+    try {
+      const action = await dispatch(createStorageCell({
+        name: newCellName.trim(),
+        storage_location_id: parseInt(formData.storage_location_id, 10),
       }));
+      if (!createStorageCell.fulfilled.match(action)) {
+        const message = action.payload || 'Ошибка при создании ячейки';
+        alert(typeof message === 'string' ? message : 'Ошибка при создании ячейки');
+        return;
+      }
+
+      const newCell = action.payload;
+      setLocationCells((prev) => {
+        if (prev.some((cell) => cell.id === newCell.id)) return prev;
+        return [...prev, newCell];
+      });
+      if (newCellValue.trim()) {
+        setCellValues((prev) => ({
+          ...prev,
+          [newCell.id]: newCellValue.trim(),
+        }));
+      }
+
+      setNewCellName('');
+      setNewCellValue('');
+      setShowNewCellForm(false);
+    } catch (error) {
+      console.error('Error creating storage cell:', error);
+      alert('Ошибка при создании ячейки');
     }
-    
-    // Reset form
-    setNewCellName('');
-    setNewCellValue('');
-    setShowNewCellForm(false);
   };
 
   const handleSubmit = async (e) => {
