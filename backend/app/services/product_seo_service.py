@@ -30,9 +30,11 @@ from app.utils.product_json_ld import (
     split_graph_json_ld_for_yandex,
 )
 from app.utils.product_search_seo import (
+    build_product_page_h1,
     build_product_search_description,
     build_product_search_title,
     build_product_seo_summary,
+    product_schema_name_from_title,
     resolve_product_city,
 )
 from app.utils.product_urls import build_product_page_url, build_product_used_catalog_url
@@ -50,6 +52,7 @@ class ProductSeoMeta:
     in_stock: bool
     json_ld: str
     json_ld_graph: str
+    schema_name: str = ""
     keywords: str = ""
     seo_summary: str = ""
     body_description: str | None = None
@@ -132,6 +135,8 @@ def build_product_seo_meta(
         city=city,
         is_new=bool(product.is_new),
     )
+    page_h1 = build_product_page_h1(brand=brand, article=article, fallback_display_name=name)
+    schema_name = product_schema_name_from_title(title)
 
     unique_desc = _strip_html(product.description)
     in_stock = (product.quantity or 0) > 0
@@ -223,12 +228,13 @@ def build_product_seo_meta(
         site_origin=origin,
         canonical_url=canonical_url,
         city=city,
+        schema_name=schema_name,
     )
     json_ld = dumps_json_ld(product_json_ld)
     json_ld_graph = build_product_json_ld_graph(
         json_ld=json_ld,
         canonical_url=canonical_url,
-        h1=name,
+        h1=page_h1,
         title=title,
         description=description,
         brand=brand,
@@ -277,7 +283,8 @@ def build_product_seo_meta(
         title=title,
         description=description,
         canonical_url=canonical_url,
-        h1=name,
+        h1=page_h1,
+        schema_name=schema_name,
         image_url=image_url,
         price=price,
         in_stock=in_stock,
@@ -334,6 +341,9 @@ def build_product_json_ld_graph(
             product_obj = None
 
     site_origin = canonical_url.split("/part/")[0]
+    is_new_product = bool(is_new)
+    catalog_label = "Новые запчасти" if is_new_product else "Б/у запчасти"
+    catalog_url = f"{site_origin}/autoparts/new" if is_new_product else f"{site_origin}/autoparts/used"
     breadcrumb_obj = {
         "@type": "BreadcrumbList",
         "@id": f"{canonical_url}#breadcrumb",
@@ -341,14 +351,14 @@ def build_product_json_ld_graph(
             {
                 "@type": "ListItem",
                 "position": 1,
-                "name": "Свой Гараж",
+                "name": "Главная",
                 "item": site_origin,
             },
             {
                 "@type": "ListItem",
                 "position": 2,
-                "name": "Б/у запчасти",
-                "item": f"{site_origin}/autoparts/used",
+                "name": catalog_label,
+                "item": catalog_url,
             },
             {
                 "@type": "ListItem",
@@ -480,8 +490,16 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
         )
     )
     product_og_meta = build_product_og_meta_tags(price=meta.price, in_stock=meta.in_stock)
+    schema_product_name = meta.schema_name or meta.title
+    if meta.json_ld:
+        try:
+            parsed_product = json.loads(meta.json_ld)
+            if isinstance(parsed_product, dict) and parsed_product.get("name"):
+                schema_product_name = str(parsed_product["name"])
+        except Exception:
+            pass
     article_microdata = build_product_article_microdata_prefix(
-        name=meta.h1,
+        name=schema_product_name,
         description=meta.body_description or meta.description,
         brand=meta.brand,
         article=meta.article,
@@ -616,10 +634,13 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
         )
         faq_html = f"    <h2>Частые вопросы</h2>\n    <section>\n{faq_entries}    </section>\n"
 
+    is_new = meta.condition_label == "Новая"
+    catalog_label = "Новые запчасти" if is_new else "Б/у запчасти"
+    catalog_href = f"{site_origin}/autoparts/new" if is_new else f"{site_origin}/autoparts/used"
     breadcrumb_html = (
         "  <nav aria-label=\"Хлебные крошки\">\n"
         f'    <a href="{html.escape(site_origin, quote=True)}">Главная</a> ›\n'
-        f'    <a href="{html.escape(site_origin, quote=True)}/autoparts/used">Б/у запчасти</a> ›\n'
+        f'    <a href="{html.escape(catalog_href, quote=True)}">{html.escape(catalog_label)}</a> ›\n'
         f"    <span>{h1}</span>\n"
         "  </nav>\n"
     )

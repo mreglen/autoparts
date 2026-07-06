@@ -26,7 +26,9 @@ from app.utils.product_search_seo import (
     build_new_part_h1,
     build_new_part_search_description,
     build_new_part_search_title,
+    product_schema_name_from_title,
 )
+from app.utils.product_part_faq import build_product_faq_items, build_product_faq_json_ld
 from app.utils.new_part_price_utils import min_stock_base_price, min_stock_price_with_markup
 from app.utils.org_markup import global_markup_percent
 from app.utils.seo_constants import HTML_OG_PRODUCT_PREFIX, resolve_product_placeholder_image_url
@@ -47,6 +49,7 @@ class NewPartSeoMeta:
     in_stock: bool
     json_ld: str
     json_ld_graph: str = ""
+    schema_name: str = ""
     keywords: str = ""
     product_description: str | None = None
     brand: str = ""
@@ -520,6 +523,9 @@ def build_new_part_json_ld_graph(
     h1: str,
     title: str | None = None,
     description: str | None = None,
+    brand: str | None = None,
+    article: str | None = None,
+    in_stock: bool = True,
 ) -> str:
     """Product + BreadcrumbList + WebPage для JSON-LD Rossko-карточек."""
     product_obj = None
@@ -541,7 +547,7 @@ def build_new_part_json_ld_graph(
             {
                 "@type": "ListItem",
                 "position": 1,
-                "name": "Свой Гараж",
+                "name": "Главная",
                 "item": site_origin,
             },
             {
@@ -580,6 +586,15 @@ def build_new_part_json_ld_graph(
                 "mainEntity": {"@id": f"{canonical_url}#product"},
             }
         )
+        graph.append(
+            build_product_faq_json_ld(
+                canonical_url=canonical_url,
+                brand=brand,
+                article=article,
+                is_new=True,
+                in_stock=in_stock,
+            )
+        )
 
     if len(graph) == 1:
         graph_obj = {"@context": "https://schema.org", **graph[0]}
@@ -613,6 +628,7 @@ def build_new_part_seo_meta(
         article=card.article,
         raw_name=_safe_text(card.name),
     )
+    schema_name = product_schema_name_from_title(title)
     description = build_new_part_search_description(
         brand=card.brand,
         article=card.article,
@@ -631,6 +647,7 @@ def build_new_part_seo_meta(
         site_origin=origin,
         canonical_url=canonical,
         display_price=display_price,
+        schema_name=schema_name,
     )
     json_ld = dumps_json_ld(product_json_ld)
     json_ld_graph = build_new_part_json_ld_graph(
@@ -639,6 +656,9 @@ def build_new_part_seo_meta(
         h1=h1,
         title=title,
         description=description,
+        brand=str(card.brand or "").strip(),
+        article=str(card.article or "").strip(),
+        in_stock=in_stock,
     )
     body_description = product_body_description(
         brand=str(card.brand or "").strip(),
@@ -653,6 +673,7 @@ def build_new_part_seo_meta(
         description=description,
         canonical_url=canonical,
         h1=h1,
+        schema_name=schema_name,
         image_url=image_url,
         price=price_text,
         in_stock=in_stock,
@@ -714,6 +735,9 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
         h1=meta.h1,
         title=meta.title,
         description=meta.description,
+        brand=meta.brand,
+        article=meta.article,
+        in_stock=meta.in_stock,
     )
     json_ld_scripts = build_json_ld_script_tags(
         *split_graph_json_ld_for_yandex(
@@ -722,8 +746,16 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
         )
     )
     product_og_meta = build_product_og_meta_tags(price=meta.price, in_stock=meta.in_stock)
+    schema_product_name = meta.schema_name or meta.title
+    if meta.json_ld:
+        try:
+            parsed_product = json.loads(meta.json_ld)
+            if isinstance(parsed_product, dict) and parsed_product.get("name"):
+                schema_product_name = str(parsed_product["name"])
+        except Exception:
+            pass
     article_microdata = build_product_article_microdata_prefix(
-        name=meta.h1,
+        name=schema_product_name,
         description=meta.product_description or meta.description,
         brand=meta.brand,
         article=meta.article,
@@ -757,6 +789,20 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
             else ""
         )
         details_html = f"    <dl>{brand_row}{article_row}{price_row}</dl>\n"
+    faq_items = build_product_faq_items(
+        brand=meta.brand,
+        article=meta.article,
+        is_new=True,
+        in_stock=meta.in_stock,
+    )
+    faq_html = ""
+    if faq_items:
+        faq_entries = "".join(
+            f"      <details><summary>{html.escape(item['question'])}</summary>"
+            f"<p>{html.escape(item['answer'])}</p></details>\n"
+            for item in faq_items
+        )
+        faq_html = f"    <h2>Частые вопросы</h2>\n    <section>\n{faq_entries}    </section>\n"
     breadcrumb_html = (
         "  <nav aria-label=\"Хлебные крошки\">\n"
         f'    <a href="{html.escape(site_origin, quote=True)}">Главная</a> ›\n'
@@ -787,7 +833,7 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
 <body>
 {breadcrumb_html}{article_microdata}    <h1>{h1}</h1>{image_block}
     <p>{body_desc}</p>
-{details_html}  </article>
+{details_html}{faq_html}  </article>
 </body>
 </html>
 """

@@ -79,6 +79,55 @@
 
 ---
 
+## Этап 10. Карточки товаров — SEO и микроразметка
+
+Проверка после стабилизации h1/title/schema, FAQ и breadcrumbs на б/у и новых карточках.
+
+### 10.1 Правило имён (h1 vs title vs Product.name)
+
+| Поле | Ожидание |
+|------|----------|
+| `<h1>` (видимый) | `бренд артикул` (например `MANN IF1009`) |
+| `<title>`, `og:title` | расширенный SEO-title из API (`buildProductSearchTitle` / `build_product_search_title`) |
+| JSON-LD / microdata `Product.name` | core title **без** суффикса `\| Свой Гараж` (≠ короткий h1) |
+
+**Как проверить:** DevTools → сравнить h1, title и `application/ld+json` → `Product.name` на:
+
+- `/part/{id}-…` (б/у и `is_new=true`)
+- `/autoparts/new/part/{id}-…`
+
+Источник для SPA: `GET /public/part-meta`, `GET /public/new-part-meta`.
+
+### 10.2 Breadcrumbs
+
+- Видимые крошки на обеих карточках (SPA)
+- JSON-LD `BreadcrumbList`: `Главная` → `Новые запчасти` / `Б/у запчасти` → leaf = короткий h1
+- Для `/part/…` с `is_new=true` — ветка «Новые запчасти», не «Б/у»
+
+### 10.3 FAQ
+
+- UI-блок «Частые вопросы» на used и new card
+- `FAQPage` в JSON-LD (отдельный script или в graph prerender)
+- Prerender used card: `<details>` в HTML (`GET /public/part-prerender?path=…`)
+
+### 10.4 Microdata + JSON-LD
+
+- Оба формата сохранены (conservative)
+- `name`, `sku`/`mpn`, `price`, `availability`, `url` совпадают между microdata и JSON-LD
+- [Google Rich Results Test](https://search.google.com/test/rich-results) — без **критичных** ошибок на 2 эталонных URL (used + new, prerender и SPA)
+- При «duplicate Product» после выравнивания — зафиксировать в issue; точечное удаление microdata только из prerender — отдельный commit
+
+### 10.5 Sitemap (8 child sitemaps)
+
+После `seo.rebuild_sitemaps_cache` в return value Celery:
+
+- `products_url_count`, `new_parts_url_count`, `new_brands_url_count`, `new_categories_url_count`
+- `used_brands_url_count`, `used_categories_url_count`, `used_geo_url_count`
+
+`https://svoygarage.ru/sitemap.xml` → все 8 дочерних файлов отдают **200**.
+
+---
+
 ## 2. Контент и UX (день 0–3)
 
 ### 2.1 Посадочные

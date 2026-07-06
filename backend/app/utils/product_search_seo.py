@@ -177,6 +177,27 @@ def build_product_search_title(
     return re.sub(r"\s+", " ", title).strip()
 
 
+def build_product_page_h1(
+    *,
+    brand: str | None,
+    article: str | None,
+    fallback_display_name: str | None = None,
+) -> str:
+    brand_str = (brand or "").strip()
+    article_str = (article or "").strip()
+    if brand_str or article_str:
+        return f"{brand_str} {article_str}".strip()
+    fallback = (fallback_display_name or "").strip()
+    return fallback or "Автозапчасть"
+
+
+def product_schema_name_from_title(title: str) -> str:
+    text = re.sub(r"\s+", " ", (title or "")).strip()
+    if text.endswith(_TITLE_SUFFIX):
+        return text[: -len(_TITLE_SUFFIX)].strip()
+    return text
+
+
 def build_new_part_h1(
     *,
     brand: str | None,

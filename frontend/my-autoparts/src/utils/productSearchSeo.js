@@ -128,6 +128,24 @@ export function buildProductSearchTitle({
   return `${coreWithSuffix}${TITLE_SUFFIX}`.replace(/\s+/g, ' ').trim();
 }
 
+export function buildProductPageH1({ brand, article, fallbackDisplayName } = {}) {
+  const brandStr = String(brand || '').trim();
+  const articleStr = String(article || '').trim();
+  if (brandStr || articleStr) {
+    return [brandStr, articleStr].filter(Boolean).join(' ');
+  }
+  const fallback = String(fallbackDisplayName || '').trim();
+  return fallback || 'Автозапчасть';
+}
+
+export function productSchemaNameFromTitle(title) {
+  const text = String(title || '').replace(/\s+/g, ' ').trim();
+  if (text.endsWith(TITLE_SUFFIX)) {
+    return text.slice(0, -TITLE_SUFFIX.length).trim();
+  }
+  return text;
+}
+
 export function buildNewPartH1({ brand, article, rawName }) {
   const brandStr = String(brand || '').trim();
   const articleStr = String(article || '').trim();

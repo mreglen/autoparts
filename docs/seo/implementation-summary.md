@@ -203,6 +203,46 @@ flowchart TB
 
 ---
 
+## Этап 10. SEO карточек — стабилизация микроразметки
+
+**Цель:** выровнять h1/title/Product.name между SPA, prerender и API meta; FAQ single source; parity new-part card с used.
+
+### Принятые правила
+
+- **h1** = «бренд артикул»; **title/og/schema.name** = расширенный SEO-title (schema без `| Свой Гараж`)
+- Microdata **не удаляется**; значения полей выравниваются с JSON-LD
+- FAQ: backend `product_part_faq.py` → `/public/part-meta` и `/public/new-part-meta` (`faq_items`, `faq_json_ld`); SPA fallback — `partDetailFaq.js`
+
+### Backend
+
+| Компонент | Изменения |
+|-----------|-----------|
+| `product_search_seo.py` | `build_product_page_h1`, `product_schema_name_from_title` |
+| `product_seo_service.py` | короткий h1, schema_name, breadcrumb «Главная» + is_new, FAQ в prerender |
+| `new_parts_seo_card_service.py` | те же правила + FAQ в graph/prerender |
+| `public_product_seo.py` | `faq_items`, `faq_json_ld`, `schema_name`, `is_new` в meta |
+| `seo_tasks.py` | counts для used-brands/categories/geo sitemap |
+
+### Frontend
+
+| Компонент | Изменения |
+|-----------|-----------|
+| `PartDetail.jsx` | meta-first JSON-LD/FAQ, breadcrumb `isNew` |
+| `NewPartDetailPage.jsx` | видимые breadcrumbs, product OG, FAQ UI + JSON-LD |
+| `productSeo.js` | `seoFromPartMetaResponse`, `seoFromNewPartMetaResponse` |
+| `pageSeo.js` | `product:availability` при `ogType=product` |
+| `breadcrumbs.js` | `/part/` → «Новые/Б/у запчасти» по `is_new` |
+
+### Критерии приёмки этапа 10
+
+- [ ] Rich Results Test без критичных ошибок на эталонных used/new карточках
+- [ ] Breadcrumb корректен для новых и б/у (включая `is_new` на `/part/`)
+- [ ] microdata и JSON-LD не противоречат по `name`/price/availability
+- [ ] [`verification-checklist.md`](verification-checklist.md) § «Этап 10» актуален
+- [ ] `backend/tests/test_product_json_ld.py` покрывает h1 vs schema.name, is_new breadcrumb, FAQ prerender
+
+---
+
 ## Связанные документы
 
 - [SEO Master Plan](../.cursor/plans/seo_master_plan_1a249a04.plan.md)

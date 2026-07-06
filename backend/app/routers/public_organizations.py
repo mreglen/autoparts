@@ -12,7 +12,9 @@ from app.schemas.public_organization import (
     PublicOrganizationDetail,
     PublicOrganizationListItem,
     PublicOrganizationBrandSummary,
+    PublicOrganizationTrustStats,
 )
+from app.services.organization_trust_service import get_organization_trust_stats
 from app.utils.slug_utils import slugify_brand
 
 logger = logging.getLogger(__name__)
@@ -160,3 +162,37 @@ def get_public_organization_catalog_summary(org_id: str, db: Session = Depends(g
     except Exception:
         logger.exception("get_public_organization_catalog_summary failed org_id=%s", org_id)
         raise HTTPException(status_code=500, detail="Не удалось загрузить каталог организации")
+
+
+@router.get(
+    "/public/organizations/{org_id}/trust-stats",
+    response_model=PublicOrganizationTrustStats,
+)
+def get_public_organization_trust_stats(org_id: str, db: Session = Depends(get_db)):
+    try:
+        org = (
+            _public_org_filter(db.query(OrganizationModel))
+            .filter(OrganizationModel.id == org_id)
+            .first()
+        )
+        if not org:
+            raise HTTPException(status_code=404, detail="Организация не найдена")
+
+        stats = get_organization_trust_stats(db, org_id)
+        if not stats:
+            raise HTTPException(status_code=404, detail="Организация не найдена")
+
+        return PublicOrganizationTrustStats(
+            organization_id=stats.organization_id,
+            completed_sales_count=stats.completed_sales_count,
+            catalog_products_count=stats.catalog_products_count,
+            avg_response_minutes=stats.avg_response_minutes,
+            is_verified_seller=stats.is_verified_seller,
+            profile_complete=stats.profile_complete,
+            has_moderated_products=stats.has_moderated_products,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("get_public_organization_trust_stats failed org_id=%s", org_id)
+        raise HTTPException(status_code=500, detail="Не удалось загрузить данные продавца")

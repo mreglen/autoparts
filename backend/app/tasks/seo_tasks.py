@@ -43,7 +43,12 @@ def run_new_parts_seo_sync_batch_task(self):
 @celery_app.task(bind=True, max_retries=1, name="seo.rebuild_sitemaps_cache")
 def rebuild_sitemaps_cache_task(self):
     try:
-        from app.services.sitemap_service import rebuild_all_sitemaps_cache
+        from app.services.sitemap_service import (
+            get_used_brands_sitemap_cache_row,
+            get_used_categories_sitemap_cache_row,
+            get_used_geo_sitemap_cache_row,
+            rebuild_all_sitemaps_cache,
+        )
         from app.utils.yandex_integration_db import get_or_create_yandex_integration
 
         def _rebuild(db):
@@ -51,12 +56,18 @@ def rebuild_sitemaps_cache_task(self):
             products_snapshot, new_parts_snapshot, new_brands_snapshot, new_categories_snapshot = (
                 rebuild_all_sitemaps_cache(db, preferred_host_url=integration.host_url)
             )
+            used_brands_row = get_used_brands_sitemap_cache_row(db)
+            used_categories_row = get_used_categories_sitemap_cache_row(db)
+            used_geo_row = get_used_geo_sitemap_cache_row(db)
             return {
                 "ok": True,
                 "products_url_count": products_snapshot.url_count,
                 "new_parts_url_count": new_parts_snapshot.url_count,
                 "new_brands_url_count": new_brands_snapshot.url_count,
                 "new_categories_url_count": new_categories_snapshot.url_count,
+                "used_brands_url_count": int(used_brands_row.url_count or 0) if used_brands_row else 0,
+                "used_categories_url_count": int(used_categories_row.url_count or 0) if used_categories_row else 0,
+                "used_geo_url_count": int(used_geo_row.url_count or 0) if used_geo_row else 0,
             }
 
         result = _run_with_session_sync(_rebuild)

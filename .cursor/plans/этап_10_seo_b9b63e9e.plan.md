@@ -4,19 +4,19 @@ overview: "Стабилизировать SEO карточек товаров (�
 todos:
   - id: backend-name-canonical
     content: Выровнять h1/title/Product.name/microdata в product_seo_service.py + product_json_ld.py; is_new breadcrumbs в graph
-    status: pending
+    status: completed
   - id: used-spa-alignment
     content: "PartDetail: meta-first SEO, breadcrumb is_new, согласовать productSeo/productJsonLd с backend"
-    status: pending
+    status: completed
   - id: new-part-parity
     content: "NewPartDetailPage: видимые breadcrumbs, product OG tags, FAQ UI + FAQPage JSON-LD; backend new-part meta/prerender"
-    status: pending
+    status: completed
   - id: faq-single-source
     content: FAQ через part-meta/new-part-meta API; синхронизировать product_part_faq.py и partDetailFaq.js
-    status: pending
+    status: completed
   - id: sitemap-docs-tests
     content: seo_tasks counts, обновить docs/seo чеклисты, расширить test_product_json_ld.py + smoke Rich Results
-    status: pending
+    status: completed
 isProject: false
 ---
 

@@ -9,16 +9,19 @@ export default function PartDetailFaqBlock({
   city,
   fitmentText,
   inStock = true,
+  items: itemsProp = null,
 }) {
-  const items = buildProductFaqItems({
-    brand,
-    article,
-    partTypeName,
-    isNew,
-    city,
-    fitmentText,
-    inStock,
-  });
+  const items = itemsProp?.length
+    ? itemsProp
+    : buildProductFaqItems({
+        brand,
+        article,
+        partTypeName,
+        isNew,
+        city,
+        fitmentText,
+        inStock,
+      });
   const [openIndex, setOpenIndex] = useState(0);
 
   if (!items.length) return null;

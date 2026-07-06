@@ -275,6 +275,12 @@ export function PageSeoHelmet({ seo }) {
           <meta property="product:price:currency" content="RUB" />
         </>
       ) : null}
+      {ogType === 'product' && seo.inStock != null ? (
+        <meta
+          property="product:availability"
+          content={seo.inStock ? 'in stock' : 'out of stock'}
+        />
+      ) : null}
     </Helmet>
   );
 }

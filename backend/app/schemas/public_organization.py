@@ -28,3 +28,13 @@ class PublicOrganizationBrandSummary(BaseModel):
 class PublicOrganizationCatalogSummary(BaseModel):
     total_count: int
     brands: list[PublicOrganizationBrandSummary]
+
+
+class PublicOrganizationTrustStats(BaseModel):
+    organization_id: str
+    completed_sales_count: int
+    catalog_products_count: int
+    avg_response_minutes: Optional[int] = None
+    is_verified_seller: bool = False
+    profile_complete: bool = False
+    has_moderated_products: bool = False

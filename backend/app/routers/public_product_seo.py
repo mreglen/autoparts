@@ -18,8 +18,15 @@ from app.services.new_parts_seo_card_service import (
     render_new_part_prerender_html,
 )
 from app.services.spa_page_check_service import render_not_found_html
+from app.utils.product_json_ld import dumps_json_ld
+from app.utils.product_part_faq import build_product_faq_items, build_product_faq_json_ld
 
 router = APIRouter(tags=["Public product SEO"])
+
+
+class ProductFaqItemOut(BaseModel):
+    question: str
+    answer: str
 
 
 class ProductSeoMetaResponse(BaseModel):
@@ -27,10 +34,13 @@ class ProductSeoMetaResponse(BaseModel):
     description: str
     canonical_url: str
     h1: str
+    schema_name: str = ""
     image_url: str | None = None
     price: str | None = None
     in_stock: bool = True
     json_ld: str | None = None
+    faq_items: list[ProductFaqItemOut] = []
+    faq_json_ld: str | None = None
     keywords: str = ""
     seo_summary: str = ""
     body_description: str | None = None
@@ -39,6 +49,7 @@ class ProductSeoMetaResponse(BaseModel):
     seller_name: str = ""
     seller_url: str = ""
     fitment_text: str = ""
+    is_new: bool = False
 
 
 class PartReferenceFitmentVehicleOut(BaseModel):
@@ -57,10 +68,13 @@ class NewPartSeoMetaResponse(BaseModel):
     description: str
     canonical_url: str
     h1: str
+    schema_name: str = ""
     image_url: str | None = None
     price: str | None = None
     in_stock: bool = True
     json_ld: str | None = None
+    faq_items: list[ProductFaqItemOut] = []
+    faq_json_ld: str | None = None
     keywords: str = ""
 
 
@@ -73,15 +87,38 @@ def public_part_meta(
     meta = get_product_seo_for_path(db, path)
     if meta is None:
         raise HTTPException(status_code=404, detail="Product not found")
+    is_new = meta.condition_label == "Новая"
+    faq_items = build_product_faq_items(
+        brand=meta.brand,
+        article=meta.article,
+        part_type_name=meta.part_type_name,
+        is_new=is_new,
+        city=meta.city,
+        fitment_text=meta.fitment_text,
+        in_stock=meta.in_stock,
+    )
+    faq_json_ld = build_product_faq_json_ld(
+        canonical_url=meta.canonical_url,
+        brand=meta.brand,
+        article=meta.article,
+        part_type_name=meta.part_type_name,
+        is_new=is_new,
+        city=meta.city,
+        fitment_text=meta.fitment_text,
+        in_stock=meta.in_stock,
+    )
     return ProductSeoMetaResponse(
         title=meta.title,
         description=meta.description,
         canonical_url=meta.canonical_url,
         h1=meta.h1,
+        schema_name=meta.schema_name,
         image_url=meta.image_url,
         price=meta.price,
         in_stock=meta.in_stock,
         json_ld=meta.json_ld or None,
+        faq_items=[ProductFaqItemOut(**item) for item in faq_items],
+        faq_json_ld=dumps_json_ld(faq_json_ld),
         keywords=meta.keywords,
         seo_summary=meta.seo_summary,
         body_description=meta.body_description,
@@ -90,6 +127,7 @@ def public_part_meta(
         seller_name=meta.seller_name,
         seller_url=meta.seller_url,
         fitment_text=meta.fitment_text,
+        is_new=is_new,
     )
 
 
@@ -154,15 +192,31 @@ def public_new_part_meta(
     meta = get_new_part_seo_for_path(db, path)
     if meta is None:
         raise HTTPException(status_code=404, detail="New part card not found")
+    faq_items = build_product_faq_items(
+        brand=meta.brand,
+        article=meta.article,
+        is_new=True,
+        in_stock=meta.in_stock,
+    )
+    faq_json_ld = build_product_faq_json_ld(
+        canonical_url=meta.canonical_url,
+        brand=meta.brand,
+        article=meta.article,
+        is_new=True,
+        in_stock=meta.in_stock,
+    )
     return NewPartSeoMetaResponse(
         title=meta.title,
         description=meta.description,
         canonical_url=meta.canonical_url,
         h1=meta.h1,
+        schema_name=meta.schema_name,
         image_url=meta.image_url,
         price=meta.price,
         in_stock=meta.in_stock,
         json_ld=meta.json_ld or meta.json_ld_graph or None,
+        faq_items=[ProductFaqItemOut(**item) for item in faq_items],
+        faq_json_ld=dumps_json_ld(faq_json_ld),
         keywords=meta.keywords,
     )
 

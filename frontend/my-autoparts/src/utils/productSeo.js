@@ -7,6 +7,8 @@ import { SITE_ORIGIN, buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from './b
 import {
   buildProductSearchDescription,
   buildProductSearchTitle,
+  buildProductPageH1,
+  productSchemaNameFromTitle,
   formatCityInPrepositional,
   resolveProductCity,
 } from './productSearchSeo';
@@ -175,6 +177,12 @@ export function buildProductSeo(product) {
     city: resolveProductCity(organization),
     isNew: Boolean(product?.is_new),
   });
+  const pageH1 = buildProductPageH1({
+    brand,
+    article,
+    fallbackDisplayName: name,
+  });
+  const schemaName = productSchemaNameFromTitle(title);
   const city = resolveProductCity(organization);
   const inStock = (product?.quantity || 0) > 0;
 
@@ -195,7 +203,7 @@ export function buildProductSeo(product) {
 
   const firstPhoto = product?.photos?.[0]?.photo_url;
   const imageUrl = resolveOgImageUrl(firstPhoto ? normalizeImageUrl(firstPhoto) : null);
-  const jsonLd = buildCatalogProductJsonLd(product, { canonicalUrl });
+  const jsonLd = buildCatalogProductJsonLd(product, { canonicalUrl, schemaName });
   const ogImageAlt = buildProductPhotoAlt({ brand, article, name, isMain: true });
   const seoSummary = buildProductSeoSummary({
     brand,
@@ -224,6 +232,8 @@ export function buildProductSeo(product) {
     title,
     description,
     canonicalUrl,
+    h1: pageH1,
+    schemaName,
     imageUrl,
     ogImageAlt,
     jsonLd,
@@ -237,15 +247,76 @@ export function buildProductSeo(product) {
 
 export function seoFromPartMetaResponse(meta) {
   if (!meta?.title || !meta?.description || !meta?.canonical_url) return null;
+  let jsonLd = null;
+  if (meta.json_ld) {
+    try {
+      jsonLd = typeof meta.json_ld === 'string' ? JSON.parse(meta.json_ld) : meta.json_ld;
+    } catch {
+      jsonLd = null;
+    }
+  }
+  let faqJsonLd = null;
+  if (meta.faq_json_ld) {
+    try {
+      faqJsonLd = typeof meta.faq_json_ld === 'string' ? JSON.parse(meta.faq_json_ld) : meta.faq_json_ld;
+    } catch {
+      faqJsonLd = null;
+    }
+  }
   return {
     title: meta.title,
     description: meta.description,
     canonicalUrl: meta.canonical_url,
+    h1: meta.h1 || '',
+    schemaName: meta.schema_name || productSchemaNameFromTitle(meta.title),
     imageUrl: meta.image_url || resolveOgImageUrl(null),
     robots: 'index, follow',
     keywords: meta.keywords || '',
     seoSummary: meta.seo_summary || '',
     bodyDescription: meta.body_description || '',
     usedCatalogPath: meta.used_catalog_path || '',
+    jsonLd,
+    faqJsonLd,
+    faqItems: Array.isArray(meta.faq_items) ? meta.faq_items : null,
+    isNew: Boolean(meta.is_new),
+    inStock: meta.in_stock !== false,
+    price: meta.price,
+  };
+}
+
+export function seoFromNewPartMetaResponse(meta) {
+  if (!meta?.title || !meta?.description || !meta?.canonical_url) return null;
+  let jsonLd = null;
+  if (meta.json_ld) {
+    try {
+      jsonLd = typeof meta.json_ld === 'string' ? JSON.parse(meta.json_ld) : meta.json_ld;
+    } catch {
+      jsonLd = null;
+    }
+  }
+  let faqJsonLd = null;
+  if (meta.faq_json_ld) {
+    try {
+      faqJsonLd = typeof meta.faq_json_ld === 'string' ? JSON.parse(meta.faq_json_ld) : meta.faq_json_ld;
+    } catch {
+      faqJsonLd = null;
+    }
+  }
+  return {
+    title: meta.title,
+    description: meta.description,
+    canonicalUrl: meta.canonical_url,
+    h1: meta.h1 || '',
+    schemaName: meta.schema_name || productSchemaNameFromTitle(meta.title),
+    imageUrl: meta.image_url || resolveOgImageUrl(null),
+    robots: 'index, follow',
+    keywords: meta.keywords || '',
+    jsonLd,
+    faqJsonLd,
+    faqItems: Array.isArray(meta.faq_items) ? meta.faq_items : null,
+    inStock: meta.in_stock !== false,
+    price: meta.price,
+    ogType: 'product',
+    ogImage: meta.image_url || resolveOgImageUrl(null),
   };
 }

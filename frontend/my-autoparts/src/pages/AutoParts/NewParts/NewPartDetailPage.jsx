@@ -8,12 +8,15 @@ import { SITE_ORIGIN, buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../
 import { resolveOgImageUrl } from '../../../utils/seoConstants';
 import { buildNewPartDetailPath, parseNewPartDetailParam } from '../../../utils/partRoutes';
 import { extractProductDescription, formatProductDisplayTitle } from '../../../utils/productDisplayName';
+import Breadcrumbs from '../../../components/Breadcrumbs/Breadcrumbs';
+import PartDetailFaqBlock from '../../PartDetail/PartDetailFaqBlock';
 import NewPartProductCard from './NewPartProductCard';
 import NewPartDeliveryStockBlock from './NewPartDeliveryStockBlock';
 import NewPartAnalogsTable from './NewPartAnalogsTable';
 import NewPartUsedMatchesBlock from './NewPartUsedMatchesBlock';
-import { buildNewPartCardJsonLd, parseJsonLdString } from '../../../utils/productJsonLd';
-import { buildProductStructuredDataBlocks } from '../../../utils/productSeo';
+import { buildNewPartCardJsonLd } from '../../../utils/productJsonLd';
+import { buildProductStructuredDataBlocks, seoFromNewPartMetaResponse } from '../../../utils/productSeo';
+import { buildProductFaqJsonLd } from '../../../utils/partDetailFaq';
 import { buildNewPartCardKeywords } from '../../../utils/pageKeywords';
 import {
   buildNewPartH1,
@@ -125,8 +128,7 @@ export default function NewPartDetailPage() {
   const [usedMatches, setUsedMatches] = useState([]);
   const [usedMatchError, setUsedMatchError] = useState('');
   const [usedMatchLoading, setUsedMatchLoading] = useState(false);
-  const [seoMeta, setSeoMeta] = useState(null);
-  const [seoJsonLd, setSeoJsonLd] = useState(null);
+  const [apiSeo, setApiSeo] = useState(null);
 
   useEffect(() => {
     if (!numericCardId || Number.isNaN(numericCardId)) {
@@ -227,8 +229,7 @@ export default function NewPartDetailPage() {
 
   useEffect(() => {
     if (!card?.id) {
-      setSeoMeta(null);
-      setSeoJsonLd(null);
+      setApiSeo(null);
       return;
     }
     const path = buildNewPartDetailPath(card);
@@ -237,25 +238,9 @@ export default function NewPartDetailPage() {
     const run = async () => {
       try {
         const response = await apiAxiosUnauth.get('/public/new-part-meta', { params: { path } });
-        const data = response?.data || null;
-        if (data?.title && data?.description && data?.canonical_url) {
-          setSeoMeta({
-            title: data.title,
-            description: data.description,
-            canonicalUrl: data.canonical_url,
-            robots: 'index, follow',
-            ogType: 'product',
-            ogImage: data.image_url || resolveOgImageUrl(card?.image_url),
-            price: data.price,
-            keywords: data.keywords || '',
-          });
-        } else {
-          setSeoMeta(null);
-        }
-        setSeoJsonLd(parseJsonLdString(data?.json_ld));
+        setApiSeo(seoFromNewPartMetaResponse(response?.data));
       } catch (_e) {
-        setSeoMeta(null);
-        setSeoJsonLd(null);
+        setApiSeo(null);
       }
     };
     run();
@@ -306,7 +291,7 @@ export default function NewPartDetailPage() {
   const canonicalPath = card ? buildNewPartDetailPath(card) : `/autoparts/new/part/${cardIdParam || ''}`;
 
   const seo = useMemo(() => {
-    if (seoMeta) return seoMeta;
+    if (apiSeo) return apiSeo;
     if (!card) return null;
     const brand = safeText(card?.brand);
     const article = safeText(card?.article);
@@ -314,6 +299,7 @@ export default function NewPartDetailPage() {
     const ogImage = ogImageRaw
       ? (ogImageRaw.startsWith('http') ? ogImageRaw : resolveOgImageUrl(ogImageRaw.startsWith('/') ? ogImageRaw : `/${ogImageRaw}`))
       : resolveOgImageUrl(null);
+    const inStock = (card?.stock_count || 0) > 0;
     return {
       title: buildNewPartSearchTitle({
         brand,
@@ -328,7 +314,7 @@ export default function NewPartDetailPage() {
         rawName: card?.name,
         cardId: card.id,
         price: seoPrice,
-        inStock: (card?.stock_count || 0) > 0,
+        inStock,
         uniqueDescription: card?.description,
       }),
       canonicalUrl: `${SITE_ORIGIN}${canonicalPath}`,
@@ -336,9 +322,10 @@ export default function NewPartDetailPage() {
       ogType: 'product',
       ogImage,
       price: displayPrice,
+      inStock,
       keywords: buildNewPartCardKeywords({ brand, article }),
     };
-  }, [seoMeta, card, canonicalPath, displayPrice, seoPrice]);
+  }, [apiSeo, card, canonicalPath, displayPrice, seoPrice]);
 
   const handleAnalogNavigateCreate = useCallback(async (part) => {
     const brand = safeText(part?.brand);
@@ -415,22 +402,37 @@ export default function NewPartDetailPage() {
 
   const brand = safeText(card?.brand, '—');
   const article = safeText(card?.article, '—');
-  const pageH1 = buildNewPartH1({ brand, article, rawName: card?.name });
+  const pageH1 = apiSeo?.h1 || buildNewPartH1({ brand, article, rawName: card?.name });
   const canonicalUrl = `${SITE_ORIGIN}${canonicalPath}`;
+  const inStock = (card?.stock_count || 0) > 0;
+  const partTypeName = extractProductDescription(card?.name, brand, article);
 
-  const parsedApiJsonLd = seoJsonLd;
+  const parsedApiJsonLd = apiSeo?.jsonLd;
   const productJsonLd = parsedApiJsonLd?.['@graph']
     ? parsedApiJsonLd['@graph'].find((node) => node?.['@type'] === 'Product')
     : parsedApiJsonLd?.['@type'] === 'Product'
       ? parsedApiJsonLd
-      : buildNewPartCardJsonLd(card, { canonicalUrl, displayPrice });
+      : buildNewPartCardJsonLd(card, {
+          canonicalUrl,
+          displayPrice,
+          schemaName: apiSeo?.schemaName,
+        });
 
-  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
-    buildBreadcrumbsForPath(canonicalPath, { brand, article, cardName: card?.name }),
-  );
+  const breadcrumbItems = buildBreadcrumbsForPath(canonicalPath, { brand, article, cardName: card?.name });
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
+  const faqJsonLd = apiSeo?.faqJsonLd || buildProductFaqJsonLd({
+    canonicalUrl,
+    brand,
+    article,
+    partTypeName,
+    isNew: true,
+    inStock,
+  });
+  const faqItems = apiSeo?.faqItems || null;
   const structuredDataBlocks = buildProductStructuredDataBlocks({
     productJsonLd,
     breadcrumbJsonLd,
+    faqJsonLd,
   });
 
   const analogsLoading = rosskoStatus === 'loading' && analogParts.length === 0;
@@ -462,6 +464,8 @@ export default function NewPartDetailPage() {
           </script>
         ))}
       </Helmet>
+
+      <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
 
       <section className="mb-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-4 shadow-sm sm:mb-6 sm:p-6">
         <button
@@ -502,6 +506,17 @@ export default function NewPartDetailPage() {
         loading={usedMatchLoading}
         error={usedMatchError}
       />
+
+      <div className="mt-6">
+        <PartDetailFaqBlock
+          brand={brand}
+          article={article}
+          partTypeName={partTypeName}
+          isNew
+          inStock={inStock}
+          items={faqItems}
+        />
+      </div>
 
       <section className="mt-8">
         <div className="mb-4 flex items-center justify-between">

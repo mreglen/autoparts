@@ -20,6 +20,9 @@ import PartDetailFitmentBlock from './PartDetailFitmentBlock';
 import PartDetailAboutBlock from './PartDetailAboutBlock';
 import PartDetailFaqBlock from './PartDetailFaqBlock';
 import PartDetailTrustRow from './PartDetailTrustRow';
+import PartDetailSellerTrust from './PartDetailSellerTrust';
+import PartDetailInspectionBlock from './PartDetailInspectionBlock';
+import PartDetailReturnPolicyBlock from './PartDetailReturnPolicyBlock';
 import PartArticleMatchesBlock from '../../components/PartArticleMatchesBlock/PartArticleMatchesBlock';
 import ShareButton from '../../components/ShareButton/ShareButton';
 import Breadcrumbs from '../../components/Breadcrumbs/Breadcrumbs';
@@ -130,6 +133,8 @@ const PartDetail = () => {
   const [referenceFitmentLoading, setReferenceFitmentLoading] = useState(false);
   const [soldOutAlternates, setSoldOutAlternates] = useState([]);
   const [soldOutAlternatesLoading, setSoldOutAlternatesLoading] = useState(false);
+  const [sellerTrustStats, setSellerTrustStats] = useState(null);
+  const [sellerTrustLoading, setSellerTrustLoading] = useState(false);
   const fetchedProductIdRef = useRef(null);
   const searchedBrandArticleRef = useRef(null);
   const trackedPartViewRef = useRef(null);
@@ -162,6 +167,31 @@ const PartDetail = () => {
     fetchedProductIdRef.current = null;
     searchedBrandArticleRef.current = null;
   }, [combinedParam]);
+
+  useEffect(() => {
+    const orgId = currentProduct?.organization?.id;
+    if (!orgId || !showProduct) {
+      setSellerTrustStats(null);
+      setSellerTrustLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSellerTrustLoading(true);
+    apiAxiosUnauth
+      .get(`/public/organizations/${orgId}/trust-stats`)
+      .then((response) => {
+        if (!cancelled) setSellerTrustStats(response?.data || null);
+      })
+      .catch(() => {
+        if (!cancelled) setSellerTrustStats(null);
+      })
+      .finally(() => {
+        if (!cancelled) setSellerTrustLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentProduct?.organization?.id, showProduct]);
 
   useEffect(() => {
     const path = location.pathname;
@@ -721,9 +751,16 @@ const PartDetail = () => {
     : null;
   const localSeo = buildProductSeo(currentProduct);
   const seo = apiSeo
-    ? { ...localSeo, ...apiSeo, jsonLd: localSeo.jsonLd }
+    ? {
+        ...localSeo,
+        ...apiSeo,
+        jsonLd: apiSeo.jsonLd || localSeo.jsonLd,
+      }
     : localSeo;
-  const breadcrumbItems = buildBreadcrumbsForPath(location.pathname, { product: currentProduct });
+  const breadcrumbItems = buildBreadcrumbsForPath(location.pathname, {
+    product: currentProduct,
+    isNew: apiSeo?.isNew ?? currentProduct.is_new,
+  });
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
   const partBrand = (currentProduct.brand || '').trim();
   const partArticle = (currentProduct.article || '').trim();
@@ -739,7 +776,7 @@ const PartDetail = () => {
     .join(', ');
   const inStock = (currentProduct.quantity || 0) > 0;
   const bodyDescription = seo.bodyDescription || localSeo.bodyDescription;
-  const faqJsonLd = buildProductFaqJsonLd({
+  const faqJsonLd = apiSeo?.faqJsonLd || buildProductFaqJsonLd({
     canonicalUrl: seo.canonicalUrl,
     brand: partBrand,
     article: partArticle,
@@ -749,6 +786,7 @@ const PartDetail = () => {
     fitmentText,
     inStock,
   });
+  const faqItems = apiSeo?.faqItems || null;
   const structuredDataBlocks = buildProductStructuredDataBlocks({
     productJsonLd: seo.jsonLd,
     breadcrumbJsonLd,
@@ -761,9 +799,9 @@ const PartDetail = () => {
     name: currentProduct.name,
     isMain: true,
   });
-  const h1Primary =
-    [partBrand, partArticle].filter(Boolean).join(' ') ||
-    formatProductDisplayTitle(partBrand, partArticle, currentProduct.name);
+  const h1Primary = apiSeo?.h1
+    || [partBrand, partArticle].filter(Boolean).join(' ')
+    || formatProductDisplayTitle(partBrand, partArticle, currentProduct.name);
   const h1Subtitle = extractProductDescription(
     currentProduct.name,
     partBrand,
@@ -1153,8 +1191,15 @@ const PartDetail = () => {
                     ) : null}
                   </div>
                 </div>
+
+                <PartDetailSellerTrust
+                  trustStats={sellerTrustStats}
+                  organizationId={sellerOrg?.id}
+                  organizationName={sellerOrg?.name}
+                  loading={sellerTrustLoading}
+                />
                 
-                <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 {sellerOrg?.phone && (
                     <button
                       type="button"
@@ -1198,6 +1243,10 @@ const PartDetail = () => {
         currentProductId={currentProduct.id}
       />
 
+      <PartDetailInspectionBlock isNew={Boolean(currentProduct.is_new)} />
+
+      <PartDetailReturnPolicyBlock isNew={Boolean(currentProduct.is_new)} />
+
       <PartDetailFaqBlock
         brand={partBrand}
         article={partArticle}
@@ -1206,6 +1255,7 @@ const PartDetail = () => {
         city={productCity}
         fitmentText={fitmentText}
         inStock={inStock}
+        items={faqItems}
       />
         </div>
       </div>

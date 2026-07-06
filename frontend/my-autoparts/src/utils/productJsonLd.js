@@ -139,12 +139,13 @@ export function isCatalogProductJsonLdEligible(product) {
   return true;
 }
 
-export function buildCatalogProductJsonLd(product, { siteOrigin = SITE_ORIGIN, canonicalUrl } = {}) {
+export function buildCatalogProductJsonLd(product, { siteOrigin = SITE_ORIGIN, canonicalUrl, schemaName } = {}) {
   if (!isCatalogProductJsonLdEligible(product)) return null;
 
   const brand = String(product.brand || '').trim();
   const article = String(product.article || '').trim();
-  const name = formatProductDisplayTitle(brand, article, product.name);
+  const displayName = formatProductDisplayTitle(brand, article, product.name);
+  const name = String(schemaName || '').trim() || displayName;
   const shortName = extractProductDescription(product.name, brand, article);
   const path = buildPartDetailPath(product);
   const url = canonicalUrl || `${siteOrigin}${path}`;
@@ -160,7 +161,7 @@ export function buildCatalogProductJsonLd(product, { siteOrigin = SITE_ORIGIN, c
   const description = productBodyDescription({
     brand,
     article,
-    name,
+    name: displayName,
     uniqueDescription: uniqueDesc,
     shortName,
     isNew: Boolean(product.is_new),
@@ -207,12 +208,16 @@ export function isNewPartJsonLdEligible(card) {
   return true;
 }
 
-export function buildNewPartCardJsonLd(card, { siteOrigin = SITE_ORIGIN, canonicalUrl, displayPrice } = {}) {
+export function buildNewPartCardJsonLd(
+  card,
+  { siteOrigin = SITE_ORIGIN, canonicalUrl, displayPrice, schemaName } = {},
+) {
   if (!isNewPartJsonLdEligible(card)) return null;
 
   const brand = String(card.brand || '').trim();
   const article = String(card.article || '').trim();
   const displayName = String(card.name || '').trim() || `${brand} ${article}`.trim();
+  const productName = (schemaName || '').trim() || displayName;
   const path = buildNewPartDetailPath(card);
   const url = canonicalUrl || `${siteOrigin}${path}`;
   const uniqueDesc = String(card.description || '').trim();
@@ -249,7 +254,7 @@ export function buildNewPartCardJsonLd(card, { siteOrigin = SITE_ORIGIN, canonic
     '@type': 'Product',
     '@id': `${url}#product`,
     url,
-    name: displayName,
+    name: productName,
     description,
     sku: article,
     mpn: article,

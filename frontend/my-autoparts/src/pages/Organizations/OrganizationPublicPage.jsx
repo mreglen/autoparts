@@ -11,6 +11,7 @@ import {
 } from './organizationPublicUtils';
 import { buildOrganizationDetailSeo, buildOrganizationLoadingSeo } from './organizationSeo';
 import { PageSeoHelmet } from '../../utils/pageSeo';
+import OrganizationTrustStatsPanel from './OrganizationTrustStatsPanel';
 
 function DetailSkeleton() {
   return (
@@ -28,6 +29,8 @@ export default function OrganizationPublicPage() {
   const { orgId } = useParams();
   const [organization, setOrganization] = useState(null);
   const [catalogSummary, setCatalogSummary] = useState(null);
+  const [trustStats, setTrustStats] = useState(null);
+  const [trustLoading, setTrustLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -56,6 +59,15 @@ export default function OrganizationPublicPage() {
           }
         } else if (!cancelled) {
           setCatalogSummary(null);
+        }
+        try {
+          setTrustLoading(true);
+          const trustRes = await apiAxiosUnauth.get(`/public/organizations/${orgId}/trust-stats`);
+          if (!cancelled) setTrustStats(trustRes?.data || null);
+        } catch (_trustError) {
+          if (!cancelled) setTrustStats(null);
+        } finally {
+          if (!cancelled) setTrustLoading(false);
         }
       } catch (e) {
         if (!cancelled) {
@@ -203,6 +215,10 @@ export default function OrganizationPublicPage() {
               )}
             </div>
           </div>
+
+          <section className="border-t border-slate-100 px-6 py-8 sm:px-8">
+            <OrganizationTrustStatsPanel trustStats={trustStats} loading={trustLoading} />
+          </section>
 
           {catalogSummary?.brands?.length ? (
             <section className="border-t border-slate-100 px-6 py-8 sm:px-8">

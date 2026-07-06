@@ -247,13 +247,15 @@ def build_catalog_product_json_ld(
     site_origin: str,
     canonical_url: str,
     city: str | None = None,
+    schema_name: str | None = None,
 ) -> dict[str, Any] | None:
     if not is_catalog_product_json_ld_eligible(product):
         return None
 
     brand = (product.brand or "").strip()
     article = (product.article or "").strip()
-    name = format_product_display_title(brand, article, product.name)
+    display_name = format_product_display_title(brand, article, product.name)
+    name = (schema_name or "").strip() or display_name
     short_name = extract_product_description(product.name, brand, article)
     unique_desc = _strip_html(product.description)
     image_urls = _catalog_product_image_urls(product, site_origin)
@@ -279,7 +281,7 @@ def build_catalog_product_json_ld(
     description = product_body_description(
         brand=brand,
         article=article,
-        name=name,
+        name=display_name,
         unique_description=unique_desc,
         short_name=short_name,
         part_type_name=category_name or None,
@@ -335,6 +337,7 @@ def build_new_part_card_json_ld(
     site_origin: str,
     canonical_url: str,
     display_price: float | int | str | None = None,
+    schema_name: str | None = None,
 ) -> dict[str, Any] | None:
     if not is_new_part_json_ld_eligible(card):
         return None
@@ -344,6 +347,7 @@ def build_new_part_card_json_ld(
     brand = str(card.brand or "").strip()
     article = str(card.article or "").strip()
     display_name = str(card.name or "").strip() or f"{brand} {article}".strip()
+    product_name = (schema_name or "").strip() or display_name
     unique_desc = str(card.description or "").strip()
     description = product_body_description(
         brand=brand,
@@ -402,7 +406,7 @@ def build_new_part_card_json_ld(
         "@type": "Product",
         "@id": f"{canonical_url}#product",
         "url": canonical_url,
-        "name": display_name,
+        "name": product_name,
         "description": description,
         "sku": article,
         "mpn": article,

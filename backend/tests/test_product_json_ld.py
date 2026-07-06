@@ -7,11 +7,17 @@ from app.services.product_seo_service import build_product_seo_meta, render_prod
 from app.utils.product_json_ld import (
     build_catalog_product_json_ld,
     build_new_part_card_json_ld,
+    build_product_article_microdata_prefix,
     format_price_ld,
     is_catalog_product_json_ld_eligible,
     is_new_part_json_ld_eligible,
     product_body_description,
     split_graph_json_ld_for_yandex,
+)
+from app.utils.product_search_seo import (
+    build_product_page_h1,
+    build_product_search_title,
+    product_schema_name_from_title,
 )
 
 
@@ -150,6 +156,7 @@ class ProductSeoServiceJsonLdIntegrationTests(unittest.TestCase):
             phone="+79990000000",
             address="620907, г. Екатеринбург, ул. Фруктовая, 17",
         )
+        product.part_type = None
         return product
 
     def test_build_product_seo_meta_json_ld_when_eligible(self):
@@ -183,6 +190,95 @@ class ProductSeoServiceJsonLdIntegrationTests(unittest.TestCase):
         self.assertIn('itemscope itemtype="https://schema.org/Product"', html)
         self.assertIn('product:price:amount', html)
         self.assertIn("<img ", html)
+
+    def test_h1_is_brand_article(self):
+        meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
+        self.assertEqual(meta.h1, "MANN IF1009")
+
+    def test_schema_name_differs_from_h1(self):
+        meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
+        self.assertNotEqual(meta.schema_name, meta.h1)
+        self.assertEqual(meta.schema_name, product_schema_name_from_title(meta.title))
+        json_ld = json.loads(meta.json_ld)
+        self.assertEqual(json_ld["name"], meta.schema_name)
+
+    def test_is_new_breadcrumb_graph_uses_new_parts(self):
+        meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
+        graph = json.loads(meta.json_ld_graph)
+        breadcrumb = next(node for node in graph["@graph"] if node["@type"] == "BreadcrumbList")
+        catalog_item = breadcrumb["itemListElement"][1]
+        self.assertEqual(catalog_item["name"], "Новые запчасти")
+        self.assertIn("/autoparts/new", catalog_item["item"])
+
+    def test_microdata_name_matches_json_ld(self):
+        import html as html_module
+
+        meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
+        json_ld = json.loads(meta.json_ld)
+        microdata = build_product_article_microdata_prefix(
+            name=meta.schema_name,
+            description=meta.body_description or meta.description,
+            brand=meta.brand,
+            article=meta.article,
+            image_url=meta.image_url,
+            price=meta.price,
+            in_stock=meta.in_stock,
+            canonical_url=meta.canonical_url,
+        )
+        self.assertIn(
+            f'itemprop="name" content="{html_module.escape(meta.schema_name, quote=True)}"',
+            microdata,
+        )
+        self.assertEqual(json_ld["name"], meta.schema_name)
+
+    def test_prerender_html_contains_faq_details(self):
+        meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
+        html = render_product_prerender_html(meta)
+        self.assertIn("<details>", html)
+        self.assertIn("Частые вопросы", html)
+
+
+class ProductPageH1Tests(unittest.TestCase):
+    def test_build_product_page_h1_brand_article(self):
+        self.assertEqual(
+            build_product_page_h1(brand="MANN", article="IF1009"),
+            "MANN IF1009",
+        )
+
+    def test_build_product_page_h1_fallback(self):
+        self.assertEqual(
+            build_product_page_h1(brand="", article="", fallback_display_name="Fallback name"),
+            "Fallback name",
+        )
+
+
+class CatalogProductSchemaNameTests(unittest.TestCase):
+    def test_schema_name_used_when_provided(self):
+        product = MagicMock()
+        product.brand = "MANN"
+        product.article = "IF1009"
+        product.name = "MANN / IF1009 Масляный фильтр"
+        product.description = "Описание."
+        product.is_new = False
+        product.price = 1200
+        product.quantity = 2
+        photo = MagicMock()
+        photo.photo_url = "/uploads/pictures/test.jpg"
+        product.photos = [photo]
+        product.organization = MagicMock(
+            name="Авторазбор",
+            phone="+79990000000",
+            address="620907, г. Екатеринбург, ул. Фруктовая, 17",
+        )
+        schema_name = "MANN IF1009 Масляный фильтр — Екатеринбург"
+        json_ld = build_catalog_product_json_ld(
+            product,
+            site_origin="https://svoygarage.ru",
+            canonical_url="https://svoygarage.ru/part/16-MANN-IF1009",
+            schema_name=schema_name,
+        )
+        self.assertEqual(json_ld["name"], schema_name)
+        self.assertNotEqual(json_ld["name"], "MANN IF1009")
 
 
 class NewPartSeoServiceJsonLdIntegrationTests(unittest.TestCase):
