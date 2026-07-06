@@ -39,6 +39,7 @@ class UsedPartsOrderResponse(BaseModel):
     buyer_name: str
     buyer_phone: str
     buyer_email: str
+    buyer_comment: Optional[str] = None
     buyer_avatar_url: Optional[str] = None
     buyer_user_id: Optional[int] = None
     delivery_type: str
@@ -172,6 +173,7 @@ class PurchasedUsedOrderResponse(BaseModel):
     buyer_name: str
     buyer_phone: str
     buyer_email: str
+    buyer_comment: Optional[str] = None
     delivery_type: str
     delivery_address: Optional[str] = None
     transport_company: Optional[str] = None

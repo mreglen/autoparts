@@ -15,6 +15,7 @@ from app.services.marketplace_used_order import (
     UsedOrderItemInput,
     create_used_orders_from_payload,
 )
+from app.utils.client_buyers import order_visible_to_buyer
 from app.utils.internal_code import build_internal_code
 
 
@@ -48,6 +49,7 @@ class MarketplaceUsedOrderTests(unittest.TestCase):
                         is_director BOOLEAN,
                         is_employee BOOLEAN,
                         hashed_password VARCHAR,
+                        avatar_url VARCHAR(512),
                         organization_id VARCHAR(10)
                     )
                     """
@@ -112,10 +114,14 @@ class MarketplaceUsedOrderTests(unittest.TestCase):
                         buyer_name VARCHAR(255) NOT NULL DEFAULT '',
                         buyer_phone VARCHAR(50) NOT NULL DEFAULT '',
                         buyer_email VARCHAR(255) NOT NULL DEFAULT '',
+                        user_id INTEGER,
+                        buyer_comment TEXT,
                         delivery_type VARCHAR(50) NOT NULL DEFAULT 'transport',
                         delivery_address TEXT,
                         transport_company VARCHAR(255),
                         pickup_address TEXT,
+                        delivery_region_id INTEGER,
+                        delivery_region_name VARCHAR(255),
                         total_amount FLOAT NOT NULL DEFAULT 0.0,
                         is_paid BOOLEAN NOT NULL DEFAULT 0,
                         status_code VARCHAR(50) NOT NULL DEFAULT 'pending',
@@ -366,6 +372,62 @@ class MarketplaceUsedOrderTests(unittest.TestCase):
             text("SELECT COUNT(*) FROM used_parts_cart WHERE id = 10")
         ).scalar()
         self.assertEqual(remaining, 0)
+
+    def test_order_saves_user_id_and_buyer_comment(self):
+        buyer = self._buyer_without_org()
+        self._product(product_id=1, organization_id="ORG_SELLER")
+
+        delivery = UsedOrderDeliveryInput(
+            buyer_name="Иван Покупатель",
+            buyer_phone="+79001112233",
+            buyer_email="buyer@test.ru",
+            delivery_type="pickup",
+            delivery_address=None,
+            transport_company=None,
+            pickup_address="г. Москва",
+            buyer_comment="Можно после 18:00",
+        )
+
+        create_used_orders_from_payload(
+            self.db,
+            current_user=buyer,
+            items=[self._item(product_id=1)],
+            delivery=delivery,
+            used_cart_item_ids=[],
+        )
+        self.db.commit()
+
+        order = self.db.query(GarageUsedOrder).one()
+        self.assertEqual(order.user_id, buyer.id)
+        self.assertEqual(order.buyer_comment, "Можно после 18:00")
+
+    def test_order_visible_to_buyer_by_user_id_without_contact_match(self):
+        order = GarageUsedOrder(
+            organization_id="ORG_A",
+            buyer_name="Иван",
+            buyer_phone="+79999999999",
+            buyer_email="other@test.ru",
+            user_id=1,
+            delivery_type="pickup",
+            total_amount=100.0,
+            status_code="pending",
+        )
+        self.assertTrue(order_visible_to_buyer(order, 1, "buyer@test.ru", "+79001112233"))
+        self.assertFalse(order_visible_to_buyer(order, 2, "buyer@test.ru", "+79001112233"))
+
+    def test_order_visible_to_buyer_legacy_contact_match(self):
+        order = GarageUsedOrder(
+            organization_id="ORG_A",
+            buyer_name="Иван",
+            buyer_phone="+79001112233",
+            buyer_email="buyer@test.ru",
+            user_id=None,
+            delivery_type="pickup",
+            total_amount=100.0,
+            status_code="pending",
+        )
+        self.assertTrue(order_visible_to_buyer(order, 1, "buyer@test.ru", "+79001112233"))
+        self.assertFalse(order_visible_to_buyer(order, 1, "wrong@test.ru", "+79001112233"))
 
 
 if __name__ == "__main__":

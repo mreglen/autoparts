@@ -53,7 +53,7 @@ from app.services.marketplace_used_fulfillment import (
     fulfill_used_order_item_on_status_change,
 )
 from app.services.audit_service import log_audit
-from app.utils.client_buyers import order_matches_buyer
+from app.utils.client_buyers import order_matches_buyer, order_visible_to_buyer
 from app.utils.user_avatar import avatar_public_url, resolve_user_by_contact
 from app.schemas.avito_orders import AvitoCheckConfirmationCodeRequest, AvitoOrderTransitionRequest
 from app.services.avito_pro_status_service import ensure_avito_pro_active
@@ -958,7 +958,7 @@ def list_purchased_used_orders(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Заказы б/у текущего покупателя (по email и телефону из профиля)."""
+    """Заказы б/у текущего покупателя (по user_id или email+телефону для legacy)."""
     target_email = current_user.email or ""
     target_phone = current_user.phone or ""
 
@@ -971,7 +971,7 @@ def list_purchased_used_orders(
 
     result = []
     for order in orders:
-        if not order_matches_buyer(order, target_email, target_phone):
+        if not order_visible_to_buyer(order, current_user.id, target_email, target_phone):
             continue
         org = db.query(Organization).filter(Organization.id == order.organization_id).first()
         order_dict = {
@@ -982,6 +982,7 @@ def list_purchased_used_orders(
             "buyer_name": order.buyer_name,
             "buyer_phone": order.buyer_phone,
             "buyer_email": order.buyer_email,
+            "buyer_comment": order.buyer_comment,
             "delivery_type": order.delivery_type,
             "delivery_address": order.delivery_address,
             "transport_company": order.transport_company,

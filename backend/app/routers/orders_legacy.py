@@ -52,6 +52,7 @@ class LegacyCreateOrderIn(BaseModel):
     delivery_region_name: Optional[str] = None
     delivery_option_id: Optional[int] = None
     total_amount: float = Field(default=0, ge=0)
+    buyer_comment: Optional[str] = Field(default=None, max_length=1000)
 
 
 class CreatedUsedOrderOut(BaseModel):
@@ -92,6 +93,7 @@ def _delivery_from_payload(payload: LegacyCreateOrderIn) -> UsedOrderDeliveryInp
         pickup_address=payload.pickup_address,
         delivery_region_id=payload.delivery_region_id,
         delivery_region_name=payload.delivery_region_name,
+        buyer_comment=(payload.buyer_comment or "").strip() or None,
     )
 
 

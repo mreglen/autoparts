@@ -15,6 +15,8 @@ class GarageUsedOrder(Base):
     buyer_name = Column(String(255), nullable=False, default="")
     buyer_phone = Column(String(50), nullable=False, default="")
     buyer_email = Column(String(255), nullable=False, default="")
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    buyer_comment = Column(Text, nullable=True)
 
     delivery_type = Column(String(50), nullable=False, default="transport")
     delivery_address = Column(Text, nullable=True)

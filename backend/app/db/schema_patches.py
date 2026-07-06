@@ -1319,6 +1319,58 @@ def ensure_garage_new_order_user_id_column() -> None:
     logger.info("Applied garage_new_orders.user_id column patch")
 
 
+def ensure_garage_used_order_user_id_column() -> None:
+    """Add user_id column to garage_used_orders for buyer linkage."""
+    inspector = inspect(engine)
+    if "garage_used_orders" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("garage_used_orders")}
+    if "user_id" in columns:
+        return
+
+    with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            conn.execute(
+                text(
+                    "ALTER TABLE garage_used_orders "
+                    "ADD COLUMN user_id INTEGER REFERENCES users(id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_garage_used_orders_user_id "
+                    "ON garage_used_orders (user_id)"
+                )
+            )
+        else:
+            conn.execute(text("ALTER TABLE garage_used_orders ADD COLUMN user_id INTEGER"))
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_garage_used_orders_user_id "
+                    "ON garage_used_orders (user_id)"
+                )
+            )
+
+    logger.info("Applied garage_used_orders.user_id column patch")
+
+
+def ensure_garage_used_order_buyer_comment_column() -> None:
+    """Add buyer_comment column to garage_used_orders."""
+    inspector = inspect(engine)
+    if "garage_used_orders" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("garage_used_orders")}
+    if "buyer_comment" in columns:
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE garage_used_orders ADD COLUMN buyer_comment TEXT"))
+
+    logger.info("Applied garage_used_orders.buyer_comment column patch")
+
+
 def ensure_cart_max_quantity_columns() -> None:
     """Add max_quantity to new-parts cart tables for stock limits."""
     inspector = inspect(engine)

@@ -15,7 +15,7 @@ def get_order_statuses():
         {"code": "confirmed", "name": "Подтверждён"},
         {"code": "rejected", "name": "Не подтверждён"},
         {"code": "assembled", "name": "Сформирован"},
-        {"code": "shipped", "name": "Передан в доставку"},
+        {"code": "shipped", "name": "В доставке"},
         {"code": "delivered", "name": "Получен"},
         {"code": "closed", "name": "Закрыт"},
     ]

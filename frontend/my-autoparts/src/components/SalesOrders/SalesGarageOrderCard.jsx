@@ -221,6 +221,12 @@ export default function SalesGarageOrderCard({
               </div>
             </div>
             <p className="mt-1 text-sm text-gray-600 line-clamp-2">{deliveryText}</p>
+            {isUsed && order.buyer_comment ? (
+              <p className="mt-2 rounded-lg bg-amber-50/80 px-3 py-2 text-sm text-gray-700 ring-1 ring-amber-100">
+                <span className="font-medium text-gray-900">Комментарий покупателя: </span>
+                {order.buyer_comment}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-end gap-3 lg:flex-col lg:items-end">

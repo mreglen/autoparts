@@ -34,6 +34,7 @@ class UsedOrderDeliveryInput:
     pickup_address: Optional[str]
     delivery_region_id: Optional[int] = None
     delivery_region_name: Optional[str] = None
+    buyer_comment: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -153,6 +154,8 @@ def create_used_orders_from_payload(
             buyer_name=delivery.buyer_name,
             buyer_phone=delivery.buyer_phone,
             buyer_email=delivery.buyer_email or "",
+            user_id=current_user.id,
+            buyer_comment=(delivery.buyer_comment or "").strip() or None,
             delivery_type=delivery.delivery_type,
             delivery_address=delivery.delivery_address,
             transport_company=delivery.transport_company,

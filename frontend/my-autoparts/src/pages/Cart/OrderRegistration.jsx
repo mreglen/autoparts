@@ -150,6 +150,7 @@ export default function OrderRegistration() {
   const [itemsExpanded, setItemsExpanded] = useState(false);
   const [acceptedOffer, setAcceptedOffer] = useState(false);
   const [showOfferError, setShowOfferError] = useState(false);
+  const [buyerComment, setBuyerComment] = useState('');
 
   const hasUsedItems = selectedItems.length > 0;
 
@@ -426,6 +427,7 @@ export default function OrderRegistration() {
           delivery_address: deliveryAddress.trim(),
         }),
         total_amount: calculateTotal(),
+        buyer_comment: buyerComment.trim() || undefined,
       };
 
       const response = await apiAxios.post('/orders/', orderPayload, {
@@ -438,10 +440,6 @@ export default function OrderRegistration() {
       setOrderSuccess({
         message: buildSuccessMessage(response.data),
         usedOrders: response.data?.used_orders || [],
-      });
-      setNotification({
-        type: 'success',
-        message: buildSuccessMessage(response.data),
       });
       trackConversion(CONVERSION_EVENTS.ORDER_PLACED, { path: '/order-reg' });
     } catch (error) {
@@ -456,7 +454,57 @@ export default function OrderRegistration() {
     }
   };
 
-  const handleSuccessDismiss = () => navigate('/cart');
+  const handleContinueShopping = () => navigate('/autoparts/used');
+
+  const successScreen = orderSuccess ? (
+    <div className="mx-auto max-w-2xl">
+      <div className="overflow-hidden rounded-2xl border border-green-200 bg-white shadow-sm">
+        <div className="border-b border-green-100 bg-gradient-to-r from-green-50 to-white px-6 py-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-700">
+            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Заказ оформлен</h2>
+          <p className="mt-2 text-sm text-gray-600">{orderSuccess.message}</p>
+        </div>
+        <div className="space-y-5 px-6 py-6">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Что дальше</h3>
+            <ol className="mt-3 space-y-3">
+              <li className="flex gap-3 text-sm text-gray-700">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">1</span>
+                <span>Продавец подтвердит наличие товара</span>
+              </li>
+              <li className="flex gap-3 text-sm text-gray-700">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">2</span>
+                <span>Статус заказа можно отслеживать в разделе «Мои покупки»</span>
+              </li>
+              <li className="flex gap-3 text-sm text-gray-700">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">3</span>
+                <span>При вопросах напишите продавцу в чат со страницы заказа</span>
+              </li>
+            </ol>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              to="/purchases/orders"
+              className="inline-flex flex-1 items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Перейти в мои покупки
+            </Link>
+            <button
+              type="button"
+              onClick={handleContinueShopping}
+              className="inline-flex flex-1 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Продолжить покупки
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   const checklist = [
     { label: 'Контактные данные', done: recipientValid },
@@ -550,6 +598,7 @@ export default function OrderRegistration() {
 
   return (
     <div className="max-md:mt-0 mt-5 pb-28 md:pb-8">
+      {!orderSuccess && (
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm font-medium text-indigo-600">Оформление заказа</p>
@@ -572,22 +621,15 @@ export default function OrderRegistration() {
           В корзину
         </button>
       </div>
+      )}
 
-      {notification && (
+      {notification && notification.type === 'error' && (
         <div
-          className={`mb-6 rounded-xl border p-4 ${
-            notification.type === 'success'
-              ? 'border-green-200 bg-green-50'
-              : 'border-red-200 bg-red-50'
-          }`}
+          className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4"
           role="alert"
         >
           <div className="flex gap-3">
-            <p
-              className={`flex-1 text-sm font-medium ${
-                notification.type === 'success' ? 'text-green-800' : 'text-red-800'
-              }`}
-            >
+            <p className="flex-1 text-sm font-medium text-red-800">
               {notification.message}
             </p>
             <button
@@ -599,26 +641,12 @@ export default function OrderRegistration() {
               ×
             </button>
           </div>
-          {notification.type === 'success' && orderSuccess && (
-            <div className="mt-3 flex flex-wrap gap-4">
-              <Link
-                to="/purchases/orders"
-                className="text-sm font-medium text-green-700 underline hover:text-green-900"
-              >
-                Мои покупки
-              </Link>
-              <button
-                type="button"
-                onClick={handleSuccessDismiss}
-                className="text-sm font-medium text-green-700 underline hover:text-green-900"
-              >
-                Вернуться в корзину
-              </button>
-            </div>
-          )}
         </div>
       )}
 
+      {successScreen}
+
+      {!orderSuccess && (
       <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start">
         <div className="space-y-6 lg:col-span-8">
           <SectionCard
@@ -730,6 +758,23 @@ export default function OrderRegistration() {
                   onBlur={handleEmailBlur}
                   className={inputClass(showError('email'))}
                   placeholder="name@mail.ru"
+                />
+              </MobileFormField>
+
+              <MobileFormField
+                className="sm:col-span-2"
+                label="Комментарий к заказу"
+                htmlFor="buyer-comment"
+                hint="Необязательно: пожелания, удобное время связи"
+              >
+                <textarea
+                  id="buyer-comment"
+                  rows={3}
+                  maxLength={1000}
+                  value={buyerComment}
+                  onChange={(e) => setBuyerComment(e.target.value)}
+                  className={inputClass(false)}
+                  placeholder="Например: можно забрать после 18:00"
                 />
               </MobileFormField>
             </div>
@@ -868,6 +913,7 @@ export default function OrderRegistration() {
           </div>
         </aside>
       </div>
+      )}
 
       {!orderSuccess && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur md:hidden pb-safe-bottom">

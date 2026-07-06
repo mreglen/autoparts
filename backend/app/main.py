@@ -34,6 +34,8 @@ from app.db.schema_patches import (
     ensure_garage_new_order_rossko_columns,
     ensure_garage_new_order_item_seo_card_column,
     ensure_garage_new_order_user_id_column,
+    ensure_garage_used_order_user_id_column,
+    ensure_garage_used_order_buyer_comment_column,
     ensure_cart_max_quantity_columns,
     ensure_yookassa_payment_tables,
     ensure_yookassa_refund_columns,
@@ -174,6 +176,8 @@ try:
     ensure_garage_new_order_rossko_columns()
     ensure_garage_new_order_item_seo_card_column()
     ensure_garage_new_order_user_id_column()
+    ensure_garage_used_order_user_id_column()
+    ensure_garage_used_order_buyer_comment_column()
     ensure_cart_max_quantity_columns()
     ensure_yookassa_payment_tables()
     ensure_yookassa_refund_columns()

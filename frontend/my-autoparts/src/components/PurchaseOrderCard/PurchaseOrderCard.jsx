@@ -87,6 +87,7 @@ export default function PurchaseOrderCard({
   formatPrice,
   getStatusColor,
   getStatusName,
+  getBuyerHint,
   getDeliveryInfo,
   onProductClick,
 }) {
@@ -100,6 +101,7 @@ export default function PurchaseOrderCard({
     || (isUsed ? 'Продавец не указан' : `Заказ новых запчастей №${order.id}`);
   const statusCode = order.status_code || 'pending';
   const statusIcon = STATUS_ICONS[statusCode] || STATUS_ICONS.pending;
+  const buyerHint = isUsed && getBuyerHint ? getBuyerHint(statusCode) : null;
 
   return (
     <article
@@ -142,23 +144,34 @@ export default function PurchaseOrderCard({
               <div className="text-xs text-gray-500">Сумма заказа</div>
               <div className="text-xl font-bold tabular-nums text-gray-900">{formatPrice(order.total_amount)}</div>
             </div>
-            <div
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(statusCode)}`}
-            >
-              {statusIcon}
-              {getStatusName(statusCode)}
+            <div className="flex flex-col items-end gap-1.5">
+              <div
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(statusCode)}`}
+              >
+                {statusIcon}
+                {getStatusName(statusCode)}
+              </div>
+              {buyerHint ? (
+                <p className="max-w-xs text-right text-xs text-gray-500">{buyerHint}</p>
+              ) : null}
             </div>
           </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span
-            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-              order.is_paid ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-100'
-            }`}
-          >
-            {order.is_paid ? 'Оплачен' : 'Ожидает оплаты'}
-          </span>
+          {isUsed ? (
+            <span className="inline-flex rounded-full bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-100">
+              Оплата при получении
+            </span>
+          ) : (
+            <span
+              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                order.is_paid ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-100'
+              }`}
+            >
+              {order.is_paid ? 'Оплачен' : 'Ожидает оплаты'}
+            </span>
+          )}
           <span className="text-xs text-gray-500">
             {items.length} {items.length === 1 ? 'позиция' : items.length < 5 ? 'позиции' : 'позиций'}
           </span>
@@ -188,6 +201,12 @@ export default function PurchaseOrderCard({
 
       {isExpanded && items.length > 0 && (
         <div className="border-t border-gray-100 bg-gradient-to-b from-gray-50/80 to-white px-4 py-4 sm:px-5">
+          {isUsed && order.buyer_comment ? (
+            <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-700">
+              <span className="font-medium text-gray-900">Ваш комментарий: </span>
+              {order.buyer_comment}
+            </div>
+          ) : null}
           <ul className="space-y-3">
             {items.map((item, idx) => {
               const lineTotal = (item.price || 0) * (item.quantity || 0);

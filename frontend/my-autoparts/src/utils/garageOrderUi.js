@@ -103,6 +103,29 @@ export const GARAGE_ACTIVE_STATUSES = new Set([
 
 export const GARAGE_COMPLETED_STATUSES = new Set(['delivered', 'closed', 'new_received']);
 
+export const USED_ORDER_BUYER_HINTS = {
+  pending: 'Продавец проверяет наличие. Обычно отвечает в течение рабочего дня.',
+  confirmed: 'Заказ подтверждён. Продавец готовит товар.',
+  assembled: 'Заказ собран. Ожидайте передачи или доставки.',
+  shipped: 'Товар передан в доставку или курьеру.',
+  delivered: 'Заказ получен. Спасибо за покупку!',
+  rejected: 'Продавец не подтвердил заказ. Напишите ему в чат.',
+  closed: 'Заказ закрыт.',
+};
+
+export function getUsedOrderBuyerHint(statusCode) {
+  const code = statusCode || 'pending';
+  return USED_ORDER_BUYER_HINTS[code] || USED_ORDER_BUYER_HINTS.pending;
+}
+
+export function getGarageStatusName(statusCode) {
+  return GARAGE_STATUS_NAMES[statusCode] || statusCode || 'В ожидании';
+}
+
+export function getGarageStatusColor(statusCode) {
+  return GARAGE_STATUS_COLORS[statusCode] || 'bg-gray-100 text-gray-700 ring-1 ring-gray-200';
+}
+
 /** Статус для покупателя по умолчанию (новые запчасти), меняется только вручную. */
 export const DEFAULT_NEW_PARTS_CUSTOMER_STATUS = 'new_waiting_confirmation';
 

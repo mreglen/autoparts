@@ -35,6 +35,13 @@ def order_matches_buyer(order, email: str, phone: str) -> bool:
     return order_phone == target_phone
 
 
+def order_visible_to_buyer(order, user_id: int | None, email: str, phone: str) -> bool:
+    """Заказ виден покупателю по user_id (новые) или по совпадению email+phone (legacy)."""
+    if getattr(order, "user_id", None) and user_id:
+        return order.user_id == user_id
+    return order_matches_buyer(order, email, phone)
+
+
 def merge_buyer_from_order(buyers: dict[tuple[str, str], dict[str, Any]], order) -> None:
     key = buyer_key(order.buyer_email, order.buyer_phone)
     if not key:

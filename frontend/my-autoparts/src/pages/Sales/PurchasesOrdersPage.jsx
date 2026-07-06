@@ -6,7 +6,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import PurchaseOrderCard, { PurchaseOrdersEmptyState } from '../../components/PurchaseOrderCard/PurchaseOrderCard';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
-import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus } from '../../utils/garageOrderUi';
+import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus, getGarageStatusColor, getGarageStatusName, getUsedOrderBuyerHint } from '../../utils/garageOrderUi';
 import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
 import { openOrderItemProductFlow } from '../../utils/avitoProductFlow';
 
@@ -40,44 +40,6 @@ function formatDate(dateString) {
 
 function formatPrice(amount) {
   return `${Number(amount || 0).toLocaleString('ru-RU')} ₽`;
-}
-
-function getGarageStatusColor(statusCode) {
-  const colorMap = {
-    pending: 'bg-amber-50 text-amber-800 ring-1 ring-amber-100',
-    confirmed: 'bg-blue-50 text-blue-800 ring-1 ring-blue-100',
-    rejected: 'bg-red-50 text-red-800 ring-1 ring-red-100',
-    assembled: 'bg-indigo-50 text-indigo-800 ring-1 ring-indigo-100',
-    shipped: 'bg-violet-50 text-violet-800 ring-1 ring-violet-100',
-    delivered: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100',
-    closed: 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
-
-    new_waiting_confirmation: 'bg-amber-50 text-amber-800 ring-1 ring-amber-100',
-    new_assembling: 'bg-indigo-50 text-indigo-800 ring-1 ring-indigo-100',
-    new_shipped: 'bg-violet-50 text-violet-800 ring-1 ring-violet-100',
-    new_awaiting_arrival: 'bg-sky-50 text-sky-800 ring-1 ring-sky-100',
-    new_received: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100',
-  };
-  return colorMap[statusCode] || 'bg-gray-100 text-gray-700 ring-1 ring-gray-200';
-}
-
-function getGarageStatusName(statusCode) {
-  const statusMap = {
-    pending: 'В ожидании',
-    confirmed: 'Подтверждён',
-    rejected: 'Не подтверждён',
-    assembled: 'Сформирован',
-    shipped: 'В доставке',
-    delivered: 'Получен',
-    closed: 'Закрыт',
-
-    new_waiting_confirmation: 'Ждёт подтверждения',
-    new_assembling: 'Комплектуется',
-    new_shipped: 'Отгружено',
-    new_awaiting_arrival: 'Ожидает поступления',
-    new_received: 'Получен',
-  };
-  return statusMap[statusCode] || statusCode || 'В ожидании';
 }
 
 function matchesStatusFilter(order, filterId, source = 'used') {
@@ -373,6 +335,7 @@ export default function PurchasesOrdersPage() {
                   formatPrice={formatPrice}
                   getStatusColor={getGarageStatusColor}
                   getStatusName={getGarageStatusName}
+                  getBuyerHint={isUsed ? getUsedOrderBuyerHint : undefined}
                   getDeliveryInfo={getGarageDeliveryInfo}
                   onProductClick={handleProductClick}
                 />
