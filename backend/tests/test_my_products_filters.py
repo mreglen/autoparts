@@ -76,10 +76,10 @@ class MyProductsFiltersTests(unittest.TestCase):
             storage_location_id=20,
         )
         self.db.add(
-            ProductStorageCell(product_id=1, storage_cell_id=101, value="1")
+            ProductStorageCell(product_id=1, storage_cell_id=101, value="A-1")
         )
         self.db.add(
-            ProductStorageCell(product_id=2, storage_cell_id=102, value="1")
+            ProductStorageCell(product_id=2, storage_cell_id=102, value="B-2")
         )
         self.db.add(
             ProductStorageCell(product_id=3, storage_cell_id=201, value="1")
@@ -114,27 +114,27 @@ class MyProductsFiltersTests(unittest.TestCase):
         )
 
     def test_storage_cell_filter_returns_only_linked_products(self):
-        query = apply_my_products_filters(self._base_query(), None, 101, "")
+        query = apply_my_products_filters(self._base_query(), None, 101, None, "")
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [1])
 
     def test_storage_location_and_cell_filters_combine(self):
-        query = apply_my_products_filters(self._base_query(), 10, 102, "")
+        query = apply_my_products_filters(self._base_query(), 10, 102, None, "")
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [2])
 
     def test_search_with_cell_filter(self):
-        query = apply_my_products_filters(self._base_query(), 10, None, "beta")
+        query = apply_my_products_filters(self._base_query(), 10, None, None, "beta")
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [2])
 
     def test_ids_query_matches_filtered_products(self):
-        filtered_query = apply_my_products_filters(self._base_query(), 10, None, "")
+        filtered_query = apply_my_products_filters(self._base_query(), 10, None, None, "")
         ids = [row.id for row in apply_my_products_sort(filtered_query, "date_desc").all()]
         self.assertEqual(ids, [2, 1])
 
     def test_price_sort_asc(self):
-        query = apply_my_products_filters(self._base_query(), None, None, "")
+        query = apply_my_products_filters(self._base_query(), None, None, None, "")
         ids = [
             row.id
             for row in apply_my_products_sort(query, "price_asc").all()
@@ -142,12 +142,23 @@ class MyProductsFiltersTests(unittest.TestCase):
         self.assertEqual(ids, [2, 3, 1])
 
     def test_price_sort_desc(self):
-        query = apply_my_products_filters(self._base_query(), None, None, "")
+        query = apply_my_products_filters(self._base_query(), None, None, None, "")
         ids = [
             row.id
             for row in apply_my_products_sort(query, "price_desc").all()
         ]
         self.assertEqual(ids, [1, 3, 2])
+
+
+    def test_storage_cell_value_filter(self):
+        query = apply_my_products_filters(self._base_query(), None, 101, "A-1", "")
+        ids = [row.id for row in query.all()]
+        self.assertEqual(ids, [1])
+
+    def test_storage_cell_without_value_returns_all_in_cell(self):
+        query = apply_my_products_filters(self._base_query(), None, 101, None, "")
+        ids = [row.id for row in query.all()]
+        self.assertEqual(ids, [1])
 
 
 if __name__ == "__main__":

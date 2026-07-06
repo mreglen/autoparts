@@ -824,8 +824,8 @@ const DraftCard = ({ draft, onContinue, onSubmit, onDelete }) => {
   );
 };
 
-const DEFAULT_IN_STOCK_FILTERS = { storage: '', cell: '', sort: 'date_desc' };
-const DEFAULT_MODERATION_FILTERS = { storage: '', cell: '', sort: 'date_desc', hideRejected: false };
+const DEFAULT_IN_STOCK_FILTERS = { storage: '', cell: '', cellValue: '', sort: 'date_desc' };
+const DEFAULT_MODERATION_FILTERS = { storage: '', cell: '', cellValue: '', sort: 'date_desc', hideRejected: false };
 const MY_PARTS_SORT_OPTIONS = [
   { value: 'date_desc', label: 'Сначала новые' },
   { value: 'date_asc', label: 'Сначала старые' },
@@ -838,12 +838,13 @@ const MY_PARTS_SORT_LABELS = Object.fromEntries(
 const URL_SEARCH_DEBOUNCE_MS = 400;
 const MY_PRODUCTS_PAGE_SIZE = 30;
 
-const buildMyProductsRequest = ({ page = 1, storage, cell, q, sort, append = false } = {}) => ({
+const buildMyProductsRequest = ({ page = 1, storage, cell, cellValue, q, sort, append = false } = {}) => ({
   page,
   page_size: MY_PRODUCTS_PAGE_SIZE,
   sort: sort || 'date_desc',
   ...(storage ? { storage_location_id: storage } : {}),
   ...(cell ? { storage_cell_id: cell } : {}),
+  ...(cell && cellValue ? { storage_cell_value: cellValue } : {}),
   ...(q?.trim() ? { q: q.trim() } : {}),
   append,
 });
@@ -895,13 +896,17 @@ function MyParts() {
     ...DEFAULT_IN_STOCK_FILTERS,
     storage: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('storage') || ''),
     cell: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('cell') || ''),
+    cellValue: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('cell_value') || ''),
   }));
   const [moderationFilters, setModerationFilters] = useState(() => ({
     ...DEFAULT_MODERATION_FILTERS,
     storage: searchParams.get('tab') === 'pending' ? (searchParams.get('storage') || '') : '',
     cell: searchParams.get('tab') === 'pending' ? (searchParams.get('cell') || '') : '',
+    cellValue: searchParams.get('tab') === 'pending' ? (searchParams.get('cell_value') || '') : '',
     hideRejected: searchParams.get('hide_rejected') === '1',
   }));
+  const [cellValueOptions, setCellValueOptions] = useState([]);
+  const [cellValueOptionsLoading, setCellValueOptionsLoading] = useState(false);
   const [inStockSearchDraft, setInStockSearchDraft] = useState(
     searchParams.get('tab') === 'pending' ? '' : initialUrlSearch,
   );
@@ -945,6 +950,10 @@ function MyParts() {
         const next = { ...prev, ...patch };
         if ('storage' in patch && String(patch.storage) !== String(prev.storage)) {
           next.cell = '';
+          next.cellValue = '';
+        }
+        if ('cell' in patch && String(patch.cell) !== String(prev.cell)) {
+          next.cellValue = '';
         }
         return next;
       });
@@ -953,6 +962,10 @@ function MyParts() {
         const next = { ...prev, ...patch };
         if ('storage' in patch && String(patch.storage) !== String(prev.storage)) {
           next.cell = '';
+          next.cellValue = '';
+        }
+        if ('cell' in patch && String(patch.cell) !== String(prev.cell)) {
+          next.cellValue = '';
         }
         return next;
       });
@@ -982,10 +995,11 @@ function MyParts() {
     () => JSON.stringify({
       storage: inStockFilters.storage || '',
       cell: inStockFilters.cell || '',
+      cellValue: inStockFilters.cellValue || '',
       q: inStockDebouncedSearch.trim(),
       sort: inStockFilters.sort || 'date_desc',
     }),
-    [inStockFilters.storage, inStockFilters.cell, inStockDebouncedSearch, inStockFilters.sort],
+    [inStockFilters.storage, inStockFilters.cell, inStockFilters.cellValue, inStockDebouncedSearch, inStockFilters.sort],
   );
 
   const selectionResetKey = useMemo(
@@ -993,9 +1007,10 @@ function MyParts() {
       tab: activeTab,
       storage: activeFilters.storage || '',
       cell: activeFilters.cell || '',
+      cellValue: activeFilters.cellValue || '',
       q: debouncedSearch.trim(),
     }),
-    [activeTab, activeFilters.storage, activeFilters.cell, debouncedSearch],
+    [activeTab, activeFilters.storage, activeFilters.cell, activeFilters.cellValue, debouncedSearch],
   );
 
   const availableStorageCells = useMemo(() => {
@@ -1003,6 +1018,27 @@ function MyParts() {
     if (!storageId) return [];
     return storageCells.filter((cell) => String(cell.storage_location_id) === String(storageId));
   }, [activeFilters.storage, storageCells]);
+
+  const selectedCellName = useMemo(() => {
+    if (!activeFilters.cell) return '';
+    const cell = storageCells.find((item) => String(item.id) === String(activeFilters.cell));
+    return cell?.name || '';
+  }, [activeFilters.cell, storageCells]);
+
+  const moderationCellValueOptions = useMemo(() => {
+    if (!moderationFilters.cell) return [];
+    const values = new Set();
+    [...(pendingItems || []), ...(rejectedItems || [])].forEach((part) => {
+      (pendingStorageCellsByProduct[part.id] || []).forEach((link) => {
+        if (String(link.storage_cell_id) !== String(moderationFilters.cell)) return;
+        const value = String(link.value || '').trim();
+        if (value) values.add(value);
+      });
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [moderationFilters.cell, pendingItems, rejectedItems, pendingStorageCellsByProduct]);
+
+  const activeCellValueOptions = isModerationTab ? moderationCellValueOptions : cellValueOptions;
 
   const loadMoreMyProducts = useCallback(() => {
     if (
@@ -1018,6 +1054,7 @@ function MyParts() {
       page: myProductsPage + 1,
       storage: inStockFilters.storage,
       cell: inStockFilters.cell,
+      cellValue: inStockFilters.cellValue,
       q: inStockDebouncedSearch,
       sort: inStockFilters.sort,
       append: true,
@@ -1033,6 +1070,7 @@ function MyParts() {
     myProductsPage,
     inStockFilters.storage,
     inStockFilters.cell,
+    inStockFilters.cellValue,
     inStockFilters.sort,
     inStockDebouncedSearch,
   ]);
@@ -1089,7 +1127,11 @@ function MyParts() {
     if (moderationFilters.cell) {
       items = items.filter((part) => {
         const links = pendingStorageCellsByProduct[part.id] || [];
-        return links.some((link) => String(link.storage_cell_id) === String(moderationFilters.cell));
+        return links.some((link) => {
+          if (String(link.storage_cell_id) !== String(moderationFilters.cell)) return false;
+          if (!moderationFilters.cellValue) return true;
+          return String(link.value || '').trim() === String(moderationFilters.cellValue).trim();
+        });
       });
     }
 
@@ -1101,7 +1143,7 @@ function MyParts() {
       (normalizeInternalCodeForSearch(part.internal_code).toLowerCase().replace(/\s+/g, '').includes(query)) ||
       (part.name && part.name.toLowerCase().includes(moderationDebouncedSearch.toLowerCase()))
     );
-  }, [pendingItems, rejectedItems, moderationFilters.hideRejected, moderationFilters.storage, moderationFilters.cell, moderationDebouncedSearch, pendingStorageCellsByProduct]);
+  }, [pendingItems, rejectedItems, moderationFilters.hideRejected, moderationFilters.storage, moderationFilters.cell, moderationFilters.cellValue, moderationDebouncedSearch, pendingStorageCellsByProduct]);
 
   const sortedModerationParts = React.useMemo(() => {
     const items = [...displayModerationParts];
@@ -1309,6 +1351,9 @@ function MyParts() {
       const params = new URLSearchParams();
       if (inStockFilters.storage) params.set('storage_location_id', inStockFilters.storage);
       if (inStockFilters.cell) params.set('storage_cell_id', inStockFilters.cell);
+      if (inStockFilters.cell && inStockFilters.cellValue) {
+        params.set('storage_cell_value', inStockFilters.cellValue);
+      }
       if (inStockDebouncedSearch.trim()) params.set('q', inStockDebouncedSearch.trim());
       params.set('sort', inStockFilters.sort || 'date_desc');
       const qs = params.toString();
@@ -1546,6 +1591,7 @@ function MyParts() {
     const params = new URLSearchParams();
     const storage = isModerationTab ? moderationFilters.storage : inStockFilters.storage;
     const cell = isModerationTab ? moderationFilters.cell : inStockFilters.cell;
+    const cellValue = isModerationTab ? moderationFilters.cellValue : inStockFilters.cellValue;
 
     if (debouncedSearch) {
       params.set('q', debouncedSearch);
@@ -1557,6 +1603,10 @@ function MyParts() {
 
     if (cell) {
       params.set('cell', cell);
+    }
+
+    if (cellValue) {
+      params.set('cell_value', cellValue);
     }
 
     if (isModerationTab) {
@@ -1580,8 +1630,10 @@ function MyParts() {
     debouncedSearch,
     inStockFilters.storage,
     inStockFilters.cell,
+    inStockFilters.cellValue,
     moderationFilters.storage,
     moderationFilters.cell,
+    moderationFilters.cellValue,
     moderationFilters.hideRejected,
     isModerationTab,
     isDraftsTab,
@@ -1600,6 +1652,47 @@ function MyParts() {
   }, [dispatch, activeFilters.storage]);
 
   useEffect(() => {
+    if (isModerationTab || !activeFilters.cell) {
+      if (!isModerationTab && !activeFilters.cell) {
+        setCellValueOptions([]);
+        setCellValueOptionsLoading(false);
+      }
+      return undefined;
+    }
+
+    let cancelled = false;
+    setCellValueOptionsLoading(true);
+
+    const params = new URLSearchParams({ storage_cell_id: String(activeFilters.cell) });
+    if (activeFilters.storage) {
+      params.set('storage_location_id', String(activeFilters.storage));
+    }
+
+    apiRequest(`/products/storage-cell-values?${params.toString()}`)
+      .then((values) => {
+        if (cancelled) return;
+        setCellValueOptions(Array.isArray(values) ? values : []);
+      })
+      .catch(() => {
+        if (!cancelled) setCellValueOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCellValueOptionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isModerationTab, activeFilters.cell, activeFilters.storage]);
+
+  useEffect(() => {
+    if (!activeFilters.cellValue || activeCellValueOptions.length === 0) return;
+    if (!activeCellValueOptions.includes(activeFilters.cellValue)) {
+      updateActiveFilters({ cellValue: '' });
+    }
+  }, [activeFilters.cellValue, activeCellValueOptions]);
+
+  useEffect(() => {
     if (activeTab !== 'in-stock' || !isReady || !user?.organization_id) return;
 
     const alreadyLoaded =
@@ -1611,6 +1704,7 @@ function MyParts() {
         page: 1,
         storage: inStockFilters.storage,
         cell: inStockFilters.cell,
+        cellValue: inStockFilters.cellValue,
         q: inStockDebouncedSearch,
         sort: inStockFilters.sort,
       })));
@@ -1624,6 +1718,7 @@ function MyParts() {
     myProductsFilterKey,
     inStockFilters.storage,
     inStockFilters.cell,
+    inStockFilters.cellValue,
     inStockFilters.sort,
     inStockDebouncedSearch,
     products.length,
@@ -1918,6 +2013,33 @@ function MyParts() {
             ))}
           </select>
         </div>
+
+        <div className="md:w-64">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {selectedCellName ? `Позиция: ${selectedCellName}` : 'Позиция'}
+          </label>
+          <select
+            value={activeFilters.cellValue}
+            onChange={(e) => updateActiveFilters({ cellValue: e.target.value })}
+            disabled={!activeFilters.cell || (!isModerationTab && cellValueOptionsLoading)}
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500"
+          >
+            <option value="">
+              {!activeFilters.cell
+                ? 'Сначала выберите ячейку'
+                : (!isModerationTab && cellValueOptionsLoading)
+                  ? 'Загрузка…'
+                  : activeCellValueOptions.length > 0
+                    ? 'Все позиции'
+                    : 'Нет заполненных позиций'}
+            </option>
+            {activeCellValueOptions.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </div>
         
         {/* Поисковое поле */}
         <div className="flex-1 max-w-md">
@@ -2150,6 +2272,7 @@ function MyParts() {
                 page: 1,
                 storage: inStockFilters.storage,
                 cell: inStockFilters.cell,
+                cellValue: inStockFilters.cellValue,
                 q: inStockDebouncedSearch,
                 sort: inStockFilters.sort,
               })));

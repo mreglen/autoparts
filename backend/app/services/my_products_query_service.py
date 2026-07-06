@@ -27,6 +27,7 @@ def apply_my_products_filters(
     query,
     storage_location_id: Optional[int] = None,
     storage_cell_id: Optional[int] = None,
+    storage_cell_value: Optional[str] = None,
     q: str = "",
 ):
     if storage_location_id is not None:
@@ -36,6 +37,11 @@ def apply_my_products_filters(
             query.session.query(ProductStorageCellModel.product_id)
             .filter(ProductStorageCellModel.storage_cell_id == storage_cell_id)
         )
+        trimmed_value = (storage_cell_value or "").strip()
+        if trimmed_value:
+            cell_product_ids = cell_product_ids.filter(
+                func.trim(ProductStorageCellModel.value) == trimmed_value
+            )
         query = query.filter(ProductModel.id.in_(cell_product_ids))
     return apply_my_products_search(query, q)
 

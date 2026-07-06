@@ -25,11 +25,13 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
-function buildLabelPrintPayload(selectedPart, productStorageCells, cellCatalog = []) {
+function buildLabelPrintPayload(selectedPart, productStorageCells, cellCatalog = [], copies = 1) {
   const storageCells = buildStorageCellsForLabel(productStorageCells, cellCatalog).map((cell) => ({
     name_short: cell.nameShort,
     value: cell.value,
   }));
+
+  const safeCopies = Math.max(1, parseInt(copies, 10) || 1);
 
   const base = {
     brand: selectedPart?.brand || '—',
@@ -41,7 +43,7 @@ function buildLabelPrintPayload(selectedPart, productStorageCells, cellCatalog =
       : '—',
     width_mm: 58,
     height_mm: 38,
-    copies: 1,
+    copies: safeCopies,
   };
 
   if (storageCells.length) {
@@ -260,6 +262,7 @@ const PrintReceiptModal = ({
 
   const [printers, setPrinters] = useState([]);
   const [selectedPrinterId, setSelectedPrinterId] = useState('');
+  const [printCopies, setPrintCopies] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [agentWaiting, setAgentWaiting] = useState(false);
@@ -271,6 +274,7 @@ const PrintReceiptModal = ({
 
   const labelWidthMm = Number(selectedPrinter?.label_width_mm || 58);
   const labelHeightMm = Number(selectedPrinter?.label_height_mm || 38);
+  const partQuantity = Math.max(0, Number(selectedPart?.quantity) || 0);
 
   const hasOnlinePrinter = printers.some((p) => p.is_online);
 
@@ -338,9 +342,12 @@ const PrintReceiptModal = ({
       setPrinters([]);
       setLoadError(null);
       setAgentWaiting(false);
+      setPrintCopies(1);
       return undefined;
     }
 
+    const defaultCopies = Math.max(1, Number(selectedPart?.quantity) || 1);
+    setPrintCopies(defaultCopies);
     loadPrinters({ silent: false });
 
     const pollId = setInterval(() => {
@@ -351,7 +358,7 @@ const PrintReceiptModal = ({
       clearInterval(pollId);
       dispatch(clearError());
     };
-  }, [isOpen, loadPrinters, dispatch]);
+  }, [isOpen, loadPrinters, dispatch, selectedPart?.id, selectedPart?.quantity]);
 
   const handleSelectPrinter = async (printerId) => {
     setSelectedPrinterId(printerId);
@@ -381,7 +388,12 @@ const PrintReceiptModal = ({
       return;
     }
 
-    const productData = buildLabelPrintPayload(selectedPart, productStorageCells, storageCellCatalog);
+    const productData = buildLabelPrintPayload(
+      selectedPart,
+      productStorageCells,
+      storageCellCatalog,
+      printCopies,
+    );
     productData.width_mm = labelWidthMm;
     productData.height_mm = labelHeightMm;
 
@@ -507,6 +519,27 @@ const PrintReceiptModal = ({
               )}
             </div>
 
+            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/70">
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Количество этикеток
+              </label>
+              <p className="text-sm text-gray-500 mb-3">
+                Остаток товара: {partQuantity.toLocaleString('ru-RU')} шт.
+              </p>
+              <input
+                type="number"
+                min={1}
+                max={9999}
+                step={1}
+                value={printCopies}
+                onChange={(e) => {
+                  const next = parseInt(e.target.value, 10);
+                  setPrintCopies(Number.isFinite(next) && next > 0 ? next : 1);
+                }}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
             <div className="p-3 rounded-xl bg-white border border-gray-200">
               <div className="flex justify-center items-center w-full">
                 <LabelPreview
@@ -528,7 +561,7 @@ const PrintReceiptModal = ({
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                   }`}
               >
-                {printing ? 'Отправка...' : 'Распечатать'}
+                {printing ? 'Отправка...' : `Распечатать (${printCopies} шт.)`}
               </button>
             </div>
           </div>

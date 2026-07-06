@@ -1374,6 +1374,7 @@ const productSlice = createSlice({
                     state.myProductsFilterKey = JSON.stringify({
                         storage: String(arg.storage_location_id || ''),
                         cell: String(arg.storage_cell_id || ''),
+                        cellValue: String(arg.storage_cell_value || ''),
                         q: (arg.q || '').trim(),
                         sort: arg.sort || 'date_desc',
                     });

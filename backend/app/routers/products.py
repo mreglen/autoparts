@@ -343,6 +343,7 @@ def create_product(
 def get_my_product_ids(
     storage_location_id: Optional[int] = None,
     storage_cell_id: Optional[int] = None,
+    storage_cell_value: Optional[str] = None,
     q: Optional[str] = None,
     sort: str = Query("date_desc", pattern="^(date_desc|date_asc|name_asc|name_desc|price_asc|price_desc)$"),
     db: Session = Depends(get_db),
@@ -356,7 +357,9 @@ def get_my_product_ids(
         ProductModel.organization_id == current_user.organization_id,
         ProductModel.quantity > 0,
     )
-    query = _apply_my_products_filters(query, storage_location_id, storage_cell_id, q or "")
+    query = _apply_my_products_filters(
+        query, storage_location_id, storage_cell_id, storage_cell_value, q or ""
+    )
 
     total = query.order_by(None).count()
     id_rows = (
@@ -367,6 +370,35 @@ def get_my_product_ids(
     )
     ids = [int(row[0]) for row in id_rows]
     return MyProductIdsResponse(ids=ids, total=total, truncated=total > len(ids))
+
+
+@router.get("/storage-cell-values", response_model=List[str])
+def get_my_product_storage_cell_values(
+    storage_cell_id: int = Query(..., ge=1),
+    storage_location_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Уникальные значения адресного хранения для выбранной ячейки (Мои запчасти)."""
+    if not current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Организация не указана")
+
+    query = (
+        db.query(func.trim(ProductStorageCellModel.value))
+        .join(ProductModel, ProductModel.id == ProductStorageCellModel.product_id)
+        .filter(
+            ProductModel.organization_id == current_user.organization_id,
+            ProductModel.quantity > 0,
+            ProductStorageCellModel.storage_cell_id == storage_cell_id,
+            ProductStorageCellModel.value.isnot(None),
+            func.trim(ProductStorageCellModel.value) != "",
+        )
+    )
+    if storage_location_id is not None:
+        query = query.filter(ProductModel.storage_location_id == storage_location_id)
+
+    rows = query.distinct().order_by(func.trim(ProductStorageCellModel.value).asc()).all()
+    return [str(row[0]).strip() for row in rows if row[0] is not None and str(row[0]).strip()]
 
 
 @router.get("/{product_id}", response_model=ProductSchema)
@@ -1194,6 +1226,7 @@ def _my_products_load_options():
 def get_products(
     storage_location_id: Optional[int] = None,
     storage_cell_id: Optional[int] = None,
+    storage_cell_value: Optional[str] = None,
     q: Optional[str] = None,
     sort: str = Query(
         "date_desc",
@@ -1214,7 +1247,9 @@ def get_products(
         ProductModel.quantity > 0,
     )
 
-    query = _apply_my_products_filters(query, storage_location_id, storage_cell_id, q or "")
+    query = _apply_my_products_filters(
+        query, storage_location_id, storage_cell_id, storage_cell_value, q or ""
+    )
     stats_query = query.order_by(None)
     total = stats_query.count()
     agg = stats_query.with_entities(
