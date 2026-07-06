@@ -660,6 +660,7 @@ def get_public_site_config(
         "organization_phone": org_phone,
         "show_new_autoparts": settings_row.show_new_autoparts,
         "show_site_reviews": getattr(settings_row, "show_site_reviews", True) is not False,
+        "show_yandex_badge": getattr(settings_row, "show_yandex_badge", True) is not False,
         "new_parts_markup_percent": markup,
         "used_parts_purchase_mode": purchase_mode,
         "round_product_prices": getattr(settings_row, "round_product_prices", False) is True,

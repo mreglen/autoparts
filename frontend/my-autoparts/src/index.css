@@ -1,7 +1,12 @@
 /* Onest подключается в public/index.html (без блокирующего @import) */
 :root {
-  --sg-mobile-header-h: calc(3.75rem + env(safe-area-inset-top, 0px));
-  --sg-desktop-header-h: calc(2.25rem + 4.25rem + 2px);
+  --sg-yandex-badge-h: 0px;
+  --sg-mobile-header-h: calc(3.75rem + var(--sg-yandex-badge-h) + env(safe-area-inset-top, 0px));
+  --sg-desktop-header-h: calc(2.25rem + 4.25rem + 2px + var(--sg-yandex-badge-h));
+}
+
+html.sg-yandex-badge-on {
+  --sg-yandex-badge-h: 2.125rem;
 }
 
 html {

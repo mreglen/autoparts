@@ -6,7 +6,8 @@ import { selectCartSummary } from '../../redux/slices/CartSlice';
 import { fetchAdminOrganizationPhone } from '../../redux/slices/PublicInfoSlice';
 import { fetchUnreadCount } from '../../redux/slices/ChatSlice';
 import Search from './Search/Search';
-import { useShowSiteReviews } from '../../utils/siteReviewsPublic';
+import { useShowSiteReviews, useShowYandexBadge } from '../../utils/siteReviewsPublic';
+import HeaderYandexBadge from '../../components/Seo/HeaderYandexBadge';
 
 const formatPhoneNumber = (phone) => {
   if (!phone) return '';
@@ -72,6 +73,7 @@ export default function Navigation() {
   const { chats: avitoChats } = useSelector((state) => state.avitoChats);
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
   const showSiteReviews = useShowSiteReviews();
+  const showYandexBadge = useShowYandexBadge();
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [closeTimeout, setCloseTimeout] = useState(null);
@@ -140,6 +142,7 @@ export default function Navigation() {
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-200 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
+      {showYandexBadge ? <HeaderYandexBadge /> : null}
       {/* Верхняя полоска: контакты и навигация */}
       <div className="border-b border-gray-100 bg-gray-50/90">
         <div className="mx-auto flex h-9 max-w-7xl items-center justify-between gap-4 px-4 lg:px-6">

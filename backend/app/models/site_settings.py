@@ -9,6 +9,7 @@ class SiteSettings(Base):
     id = Column(Integer, primary_key=True)
     show_new_autoparts = Column(Boolean, nullable=False, default=True)
     show_site_reviews = Column(Boolean, nullable=False, default=True)
+    show_yandex_badge = Column(Boolean, nullable=False, default=True)
     new_parts_markup_percent = Column(Float, nullable=False, default=15.0)
     used_parts_purchase_mode = Column(String(20), nullable=False, default="both")
     round_product_prices = Column(Boolean, nullable=False, default=False)

@@ -8,6 +8,7 @@ import {
   fetchPublicSiteConfig,
   setShowNewAutoparts,
   setShowSiteReviews,
+  setShowYandexBadge,
   setNewPartsMarkupPercent,
   setRoundProductPrices,
 } from '../../redux/slices/PublicInfoSlice';
@@ -20,6 +21,7 @@ function AdminPanelPage() {
   const { isReady, user, isAuthenticated } = useAuthReady();
   const [showNewAutoparts, setShowNewLocal] = useState(true);
   const [showSiteReviews, setShowSiteReviewsLocal] = useState(true);
+  const [showYandexBadge, setShowYandexBadgeLocal] = useState(true);
   const [roundProductPrices, setRoundProductPricesLocal] = useState(false);
   const [markupPercent, setMarkupPercent] = useState('15');
   const [loadingSettings, setLoadingSettings] = useState(true);
@@ -62,6 +64,7 @@ function AdminPanelPage() {
         if (!cancelled) {
           setShowNewLocal(data.show_new_autoparts !== false);
           setShowSiteReviewsLocal(data.show_site_reviews !== false);
+          setShowYandexBadgeLocal(data.show_yandex_badge !== false);
           setRoundProductPricesLocal(data.round_product_prices === true);
           const m = Number(data.new_parts_markup_percent);
           setMarkupPercent(String(Number.isFinite(m) && m >= 0 ? m : 15));
@@ -138,6 +141,24 @@ function AdminPanelPage() {
       });
       setShowSiteReviewsLocal(checked);
       dispatch(setShowSiteReviews(checked));
+      dispatch(fetchPublicSiteConfig());
+    } catch (e) {
+      setError(e?.message || 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleShowYandexBadge = async (checked) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest('/admin/site-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ show_yandex_badge: checked }),
+      });
+      setShowYandexBadgeLocal(checked);
+      dispatch(setShowYandexBadge(checked));
       dispatch(fetchPublicSiteConfig());
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения');
@@ -745,6 +766,24 @@ function AdminPanelPage() {
             )}
           </div>
         )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
+        <label className="flex items-start gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            checked={showYandexBadge}
+            disabled={loadingSettings || saving}
+            onChange={(e) => handleToggleShowYandexBadge(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium text-gray-900 block">Значок Яндекс.Вебмастер в шапке</span>
+            <span className="text-sm text-gray-500 block mt-1">
+              Показывать счётчик Яндекса в верхней части шапки сайта (десктоп и мобильная версия).
+            </span>
+          </span>
+        </label>
       </div>
 
       {markupDialogOpen && (

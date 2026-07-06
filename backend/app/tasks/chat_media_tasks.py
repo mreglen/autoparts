@@ -393,20 +393,29 @@ def _send_media_ready_notification(message_id: int, db):
         ]
     }
     
-    # Отправляем ВСЕМ участникам чата (включая отправителя)
-    # Отправитель тоже должен получить обновление чтобы заменить временное сообщение
-    print(f"📤 [WS] Sending media ready notification for message {message_id}")
-    print(f"   - Chat: {chat.id}, Sender: {message.sender_id}")
-    print(f"   - Media count: {len(media_list)}")
-    
-    # Отправляем покупателю (если подключен)
-    if manager.active_connections.get(chat.buyer_id):
-        print(f"   - Sending to buyer: {chat.buyer_id}")
-        asyncio.run(manager.send_personal_message(message_response, chat.buyer_id))
-    
-    # Отправляем продавцу (если подключен)
-    if manager.active_connections.get(chat.seller_id):
-        print(f"   - Sending to seller: {chat.seller_id}")
-        asyncio.run(manager.send_personal_message(message_response, chat.seller_id))
-    
-    print(f"✅ [WS] Media ready notification sent successfully")
+    # Отправляем ВСЕМ участникам чата (включая отправителя).
+    # Celery-процесс не имеет локальных WS-соединений — доставка через Redis pub/sub.
+    logger.info(
+        "Sending media ready notification for message %s (chat=%s, media=%s)",
+        message_id,
+        chat.id,
+        len(media_list),
+    )
+
+    async def _broadcast() -> None:
+        await manager.broadcast_to_chat(
+            message_response,
+            chat.id,
+            db,
+            exclude_user_id=None,
+        )
+
+    try:
+        asyncio.run(_broadcast())
+        logger.info("Media ready notification sent for message %s", message_id)
+    except Exception as exc:
+        logger.exception(
+            "Failed to send media ready notification for message %s: %s",
+            message_id,
+            exc,
+        )

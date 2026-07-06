@@ -3,6 +3,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
 import { updateProfile } from './UserSlice';
 import { clearCart } from './CartSlice';
+import { disconnectWebSocket, unsubscribeFromPushNotifications } from './ChatSlice';
 
 // Helper function to decode JWT token
 const decodeToken = (token) => {
@@ -119,6 +120,8 @@ export const fetchProfile = createAsyncThunk(
 );
 
 export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
+    await dispatch(unsubscribeFromPushNotifications());
+    dispatch(disconnectWebSocket());
     localStorage.removeItem('token');
     dispatch(clearCart());
 });

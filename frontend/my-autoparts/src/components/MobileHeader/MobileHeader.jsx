@@ -3,6 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { getPageTitle } from '../../hooks/useMobileMenuShell';
 import { selectCartSummary } from '../../redux/slices/CartSlice';
+import { useShowYandexBadge } from '../../utils/siteReviewsPublic';
+import HeaderYandexBadge from '../Seo/HeaderYandexBadge';
 
 function HeaderIconButton({ onClick, to, label, children, accent, badge = 0 }) {
     const className = `relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-[0.97] ${
@@ -91,6 +93,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
 
     const firstName = user?.first_name || user?.name?.split?.(' ')?.[0] || 'П';
     const profilePath = '/profile';
+    const showYandexBadge = useShowYandexBadge();
 
     const handleBack = () => {
         if (window.history.length > 1) {
@@ -102,6 +105,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
 
     return (
         <header className={`lg:hidden fixed inset-x-0 top-0 z-40 border-b border-gray-200/90 bg-white/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-white/85 pt-safe-top ${hidden ? 'hidden' : ''}`}>
+            {showYandexBadge ? <HeaderYandexBadge /> : null}
             <div className="flex h-[3.75rem] items-center gap-2.5 px-3 sm:px-4">
                 {showBack ? (
                     <HeaderIconButton onClick={handleBack} label="Назад">

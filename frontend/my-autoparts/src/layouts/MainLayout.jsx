@@ -12,6 +12,7 @@ import { usePageBreadcrumbs } from '../hooks/usePageBreadcrumbs';
 import AvitoProExpiredBanner from '../components/AvitoProExpiredBanner/AvitoProExpiredBanner';
 import { useAvitoAccountStatus } from '../hooks/useAvitoAccountStatus';
 import useCartSync from '../hooks/useCartSync';
+import HeaderBadgeHeightSync from '../components/Seo/HeaderBadgeHeightSync';
 
 export default function MainLayout() {
     const location = useLocation();
@@ -53,6 +54,7 @@ export default function MainLayout() {
 
     return (
         <div className="min-h-screen max-w-full overflow-x-hidden bg-gray-50 pb-[4.5rem] lg:pb-0">
+            <HeaderBadgeHeightSync />
             <div className="hidden lg:block">
                 <Navigation />
             </div>

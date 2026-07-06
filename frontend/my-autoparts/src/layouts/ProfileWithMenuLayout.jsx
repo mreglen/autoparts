@@ -14,6 +14,7 @@ import { useMobileMenuShell } from '../hooks/useMobileMenuShell';
 import AuthLoadingScreen from '../components/AuthLoadingScreen/AuthLoadingScreen';
 import useCartSync from '../hooks/useCartSync';
 import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
+import HeaderBadgeHeightSync from '../components/Seo/HeaderBadgeHeightSync';
 
 export default function ProfileWithMenuLayout() {
     const dispatch = useDispatch();
@@ -67,6 +68,7 @@ export default function ProfileWithMenuLayout() {
 
     return (
         <div className="min-h-screen max-w-full overflow-x-hidden bg-gray-50 pb-[4.5rem] lg:pb-0">
+            <HeaderBadgeHeightSync />
             <div className="hidden lg:block">
                 <Navigation />
             </div>

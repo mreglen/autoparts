@@ -70,6 +70,7 @@ const publicInfoSlice = createSlice({
         adminOrganizationPhone: null,
         showNewAutoparts: true,
         showSiteReviews: true,
+        showYandexBadge: true,
         newPartsMarkupPercent: 15,
         usedPartsPurchaseMode: 'both',
         roundProductPrices: false,
@@ -84,6 +85,7 @@ const publicInfoSlice = createSlice({
       state.adminOrganizationPhone = null;
       state.showNewAutoparts = true;
       state.showSiteReviews = true;
+      state.showYandexBadge = true;
       state.newPartsMarkupPercent = 15;
       state.usedPartsPurchaseMode = 'both';
       state.roundProductPrices = false;
@@ -94,6 +96,9 @@ const publicInfoSlice = createSlice({
     },
     setShowSiteReviews: (state, action) => {
       state.showSiteReviews = action.payload !== false;
+    },
+    setShowYandexBadge: (state, action) => {
+      state.showYandexBadge = action.payload !== false;
     },
     setNewPartsMarkupPercent: (state, action) => {
       const n = Number(action.payload);
@@ -118,6 +123,7 @@ const publicInfoSlice = createSlice({
         const p = action.payload;
         state.showNewAutoparts = p?.show_new_autoparts !== false;
         state.showSiteReviews = p?.show_site_reviews !== false;
+        state.showYandexBadge = p?.show_yandex_badge !== false;
         const m = Number(p?.new_parts_markup_percent);
         state.newPartsMarkupPercent =
           Number.isFinite(m) && m >= 0 ? m : 15;
@@ -139,6 +145,7 @@ const publicInfoSlice = createSlice({
         state.error = action.payload;
         state.showNewAutoparts = true;
         state.showSiteReviews = true;
+        state.showYandexBadge = true;
         state.newPartsMarkupPercent = 15;
       })
       .addCase(fetchSiteQuickLinks.pending, (state) => {
@@ -159,6 +166,7 @@ export const {
   clearPublicInfo,
   setShowNewAutoparts,
   setShowSiteReviews,
+  setShowYandexBadge,
   setNewPartsMarkupPercent,
   setRoundProductPrices,
   setAdminSellerMarkupContext,

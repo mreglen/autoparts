@@ -477,6 +477,27 @@ def ensure_site_settings_show_site_reviews_column() -> None:
     logger.info("Applied site_settings show_site_reviews column patch")
 
 
+def ensure_site_settings_show_yandex_badge_column() -> None:
+    """Add show_yandex_badge toggle to site_settings."""
+    inspector = inspect(engine)
+    if "site_settings" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("site_settings")}
+    if "show_yandex_badge" in columns:
+        return
+
+    if engine.dialect.name == "postgresql":
+        stmt = "ALTER TABLE site_settings ADD COLUMN show_yandex_badge BOOLEAN NOT NULL DEFAULT TRUE"
+    else:
+        stmt = "ALTER TABLE site_settings ADD COLUMN show_yandex_badge BOOLEAN NOT NULL DEFAULT 1"
+
+    with engine.begin() as conn:
+        conn.execute(text(stmt))
+
+    logger.info("Applied site_settings show_yandex_badge column patch")
+
+
 def ensure_site_settings_used_parts_purchase_mode_column() -> None:
     """Add used_parts_purchase_mode to site_settings."""
     inspector = inspect(engine)

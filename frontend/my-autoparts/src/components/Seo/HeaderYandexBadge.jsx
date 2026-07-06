@@ -1,11 +1,9 @@
 import { YANDEX_WEBMASTER_COUNTER_HTML } from './yandexWebmasterBadge';
 
-export { YANDEX_WEBMASTER_COUNTER_HTML };
-
-export default function YandexWebmasterCounter() {
+export default function HeaderYandexBadge() {
   return (
     <div
-      className="flex justify-center py-6"
+      className="flex items-center justify-center border-b border-gray-100 bg-gray-50/90 py-0.5"
       dangerouslySetInnerHTML={{ __html: YANDEX_WEBMASTER_COUNTER_HTML }}
     />
   );

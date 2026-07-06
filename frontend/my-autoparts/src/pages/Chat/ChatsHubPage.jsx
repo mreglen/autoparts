@@ -13,6 +13,7 @@ import {
   sendChatMedia,
   addOptimisticMessage,
   setReplyToMessage,
+  clearIncomingChatAlert,
 } from '../../redux/slices/ChatSlice';
 import { fetchAvitoMessengerEnabled, setSelectedAvitoChatId, fetchAvitoMessages, fetchAvitoChatDetail, sendAvitoMessage, fetchAvitoChats, fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
 import MediaLightbox from './MediaLightbox';
@@ -199,7 +200,7 @@ const ChatsHubPage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useSelector((state) => state.auth);
-  const { chats: garageChats, currentChat, loading: garageLoading, error: garageError } = useSelector((state) => state.chats);
+  const { chats: garageChats, currentChat, loading: garageLoading, error: garageError, incomingChatAlert } = useSelector((state) => state.chats);
   const { 
     chats: avitoChats, 
     selectedChatId: selectedAvitoChatId,
@@ -237,6 +238,12 @@ const ChatsHubPage = () => {
       dispatch(disconnectWebSocket());
     };
   }, [dispatch, user?.id]);
+
+  useEffect(() => {
+    if (!incomingChatAlert) return undefined;
+    const timer = window.setTimeout(() => dispatch(clearIncomingChatAlert()), 5000);
+    return () => window.clearTimeout(timer);
+  }, [incomingChatAlert, dispatch]);
 
   useEffect(() => {
     if (!user) return;
@@ -410,6 +417,20 @@ const ChatsHubPage = () => {
     setSearchParams(next);
   }, [dispatch, searchParams, setSearchParams]);
 
+  const handleOpenIncomingChat = useCallback(() => {
+    if (!incomingChatAlert?.chatId) return;
+    const chat = garageChats.find((c) => c.id === incomingChatAlert.chatId);
+    if (chat) {
+      handleSelectChat({ ...chat, _source: getGarageChatListSource(chat) });
+    } else {
+      const next = new URLSearchParams(searchParams);
+      next.set('source', 'garage');
+      next.set('chatId', String(incomingChatAlert.chatId));
+      setSearchParams(next);
+    }
+    dispatch(clearIncomingChatAlert());
+  }, [incomingChatAlert, garageChats, handleSelectChat, searchParams, setSearchParams, dispatch]);
+
   const handleBackToList = useCallback(() => {
     const next = new URLSearchParams(searchParams);
     next.delete('source');
@@ -458,6 +479,26 @@ const ChatsHubPage = () => {
         onCreated={handleChatCreated}
         user={user}
       />
+
+      {incomingChatAlert ? (
+        <div className="mx-3 mt-2 flex items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900 shadow-sm">
+          <button
+            type="button"
+            onClick={handleOpenIncomingChat}
+            className="min-w-0 flex-1 truncate text-left hover:underline"
+          >
+            Новое сообщение: {incomingChatAlert.preview}
+          </button>
+          <button
+            type="button"
+            onClick={() => dispatch(clearIncomingChatAlert())}
+            className="flex-shrink-0 rounded p-1 text-indigo-600 hover:bg-indigo-100"
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 w-full flex-1 flex-col max-md:h-full max-md:pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] md:h-0 md:overflow-hidden">
         <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden bg-white max-md:h-full md:h-full md:max-h-full md:rounded-2xl md:border md:border-gray-200/80 md:shadow-lg md:shadow-gray-200/50">
@@ -845,7 +886,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
-  const { messages, currentChat, wsConnected } = useSelector((state) => state.chats);
+  const { messages, currentChat, wsConnected, typingByChatId } = useSelector((state) => state.chats);
   const replyToMessage = useSelector(state => state.chats.replyToMessage);
   const [newMessage, setNewMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -1048,6 +1089,11 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
     ? (chat?.participants_count ? `${chat.participants_count} участников` : null)
     : (chat?.product_name ? `${chat.product_name}${chat.product_article ? ` · ${chat.product_article}` : ''}` : null);
 
+  const typingUserId = chatId ? typingByChatId[parseInt(chatId, 10)] : null;
+  const panelSubtitleDisplay = typingUserId && typingUserId !== user?.id
+    ? 'печатает…'
+    : panelSubtitle;
+
   const counterpartyAvatar = !isGroupChat
     ? (user?.id === chat?.seller_id ? chat?.buyer_avatar_url : chat?.seller_avatar_url)
     : null;
@@ -1158,7 +1204,7 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
           )
         }
         title={title}
-        subtitle={panelSubtitle}
+        subtitle={panelSubtitleDisplay}
         subtitleAction={
           isGroupChat && chat?.participants_count
             ? () => setShowParticipants(true)

@@ -7,8 +7,13 @@ let ws = null;
 let wsReconnectTimer = null;
 let wsReconnectAttempts = 0;
 let pingInterval = null;
+let lastPongAt = 0;
+let wsActiveUserId = null;
+let wsRecoveryListenersAttached = false;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BASE_RECONNECT_DELAY = 1000; // 1 секунда
+const PING_INTERVAL_MS = 30000;
+const PONG_TIMEOUT_MS = 70000;
 
 const mergeMessageWithTempReply = (serverMessage, tempMessage) => {
     if (!tempMessage) return serverMessage;
@@ -257,7 +262,9 @@ const initialState = {
     unreadCount: 0,
     wsConnected: false,
     totalChats: 0,
-    replyToMessage: null  // Message being replied to
+    replyToMessage: null,
+    typingByChatId: {},
+    incomingChatAlert: null,
 };
 
 const chatSlice = createSlice({
@@ -393,6 +400,26 @@ const chatSlice = createSlice({
         // WebSocket подключен
         setWsConnected: (state, action) => {
             state.wsConnected = action.payload;
+        },
+
+        setTypingUser: (state, action) => {
+            const { chat_id, user_id } = action.payload;
+            if (!chat_id || !user_id) return;
+            state.typingByChatId[chat_id] = user_id;
+        },
+
+        clearTypingUser: (state, action) => {
+            const chatId = action.payload;
+            if (chatId == null) return;
+            delete state.typingByChatId[chatId];
+        },
+
+        setIncomingChatAlert: (state, action) => {
+            state.incomingChatAlert = action.payload;
+        },
+
+        clearIncomingChatAlert: (state) => {
+            state.incomingChatAlert = null;
         },
 
         // Пометить сообщения как прочитанные по realtime-событию
@@ -597,11 +624,74 @@ const chatSlice = createSlice({
 });
 
 // WebSocket helpers
-export const connectWebSocket = (userId) => (dispatch, getState) => {
-    // Проверяем, есть ли уже активное подключение
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        console.log('[WS] Already connected, skipping');
+const playChatNotificationSound = () => {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.value = 880;
+        gain.gain.value = 0.04;
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.start();
+        oscillator.stop(ctx.currentTime + 0.12);
+        oscillator.onended = () => ctx.close();
+    } catch (error) {
+        console.warn('[WS] Failed to play notification sound', error);
+    }
+};
+
+const notifyIncomingMessage = (dispatch, getState, message) => {
+    const state = getState();
+    const currentUserId = state.auth?.user?.id;
+    const currentChatId = state.chats?.currentChat?.id;
+
+    if (!message?.chat_id || message.sender_id === currentUserId) return;
+    if (currentChatId === message.chat_id) return;
+
+    playChatNotificationSound();
+    dispatch(setIncomingChatAlert({
+        chatId: message.chat_id,
+        senderId: message.sender_id,
+        preview: (message.message || 'Новое сообщение').slice(0, 120),
+        at: Date.now(),
+    }));
+};
+
+const attachWsRecoveryListeners = (dispatch) => {
+    if (wsRecoveryListenersAttached || typeof window === 'undefined') return;
+    wsRecoveryListenersAttached = true;
+
+    const tryResumeConnection = () => {
+        if (!wsActiveUserId) return;
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+        if (!localStorage.getItem('token')) return;
+        console.log('[WS] Resuming connection after network/tab recovery');
         wsReconnectAttempts = 0;
+        dispatch(connectWebSocket(wsActiveUserId));
+    };
+
+    window.addEventListener('online', tryResumeConnection);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            tryResumeConnection();
+        }
+    });
+};
+
+export const connectWebSocket = (userId) => (dispatch, getState) => {
+    wsActiveUserId = userId;
+    attachWsRecoveryListeners(dispatch);
+
+    // Проверяем, есть ли уже активное или устанавливающееся подключение
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        console.log('[WS] Already connected or connecting, skipping');
+        if (ws.readyState === WebSocket.OPEN) {
+            wsReconnectAttempts = 0;
+        }
         return;
     }
     
@@ -642,8 +732,9 @@ export const connectWebSocket = (userId) => (dispatch, getState) => {
     ws.onopen = () => {
         console.log('[WS] ✅ WebSocket connected successfully');
         wsReconnectAttempts = 0; // Reset on successful connection
+        lastPongAt = Date.now();
         dispatch(setWsConnected(true));
-        startPingInterval();
+        startPingInterval(dispatch);
     };
     
     ws.onmessage = (event) => {
@@ -657,11 +748,22 @@ export const connectWebSocket = (userId) => (dispatch, getState) => {
         
         if (data.type === 'message') {
             dispatch(addWebSocketMessage(data));
-            // Обновляем счетчик непрочитанных
+            notifyIncomingMessage(dispatch, getState, data);
             dispatch(fetchUnreadCount());
         } else if (data.type === 'messages_read') {
             dispatch(markMessagesAsRead(data));
             dispatch(fetchUserChats({ skip: 0, limit: 50 }));
+        } else if (data.type === 'typing') {
+            if (data.chat_id && data.user_id) {
+                dispatch(setTypingUser({ chat_id: data.chat_id, user_id: data.user_id }));
+                const chatId = data.chat_id;
+                setTimeout(() => {
+                    const typingUser = getState().chats?.typingByChatId?.[chatId];
+                    if (typingUser === data.user_id) {
+                        dispatch(clearTypingUser(chatId));
+                    }
+                }, 4000);
+            }
         } else if (data.type === 'avito_messenger_refresh') {
             const cid = data.avito_chat_id != null ? String(data.avito_chat_id) : null;
             dispatch(fetchAvitoChats({ silent: true }));
@@ -673,6 +775,7 @@ export const connectWebSocket = (userId) => (dispatch, getState) => {
                 }
             }
         } else if (data.type === 'pong') {
+            lastPongAt = Date.now();
             console.log('[WS] 🏓 Pong received');
         }
     };
@@ -690,6 +793,13 @@ export const connectWebSocket = (userId) => (dispatch, getState) => {
         // Don't reconnect if intentionally closed (code 1000 = normal close)
         if (event.code === 1000) {
             console.log('[WS] Normal closure, not reconnecting');
+            wsReconnectAttempts = 0;
+            return;
+        }
+
+        // Policy violation: invalid token, user mismatch, too many connections
+        if (event.code === 1008) {
+            console.warn('[WS] Non-recoverable close (1008), falling back to HTTP polling');
             wsReconnectAttempts = 0;
             return;
         }
@@ -729,19 +839,29 @@ const scheduleReconnect = (dispatch, userId) => {
 };
 
 // Ping interval to keep connection alive
-const startPingInterval = () => {
+const startPingInterval = (dispatch) => {
     stopPingInterval(); // Clear any existing interval
     
     pingInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+        if (lastPongAt && Date.now() - lastPongAt > PONG_TIMEOUT_MS) {
+            console.warn('[WS] Pong timeout, forcing reconnect');
             try {
-                ws.send(JSON.stringify({ type: 'ping' }));
-                console.log('[WS] 🏓 Ping sent');
+                ws.close();
             } catch (error) {
-                console.error('[WS] Failed to send ping:', error);
+                console.error('[WS] Failed to close stale connection', error);
             }
+            return;
         }
-    }, 30000); // Ping every 30 seconds
+
+        try {
+            ws.send(JSON.stringify({ type: 'ping' }));
+            console.log('[WS] 🏓 Ping sent');
+        } catch (error) {
+            console.error('[WS] Failed to send ping:', error);
+        }
+    }, PING_INTERVAL_MS);
 };
 
 const stopPingInterval = () => {
@@ -796,9 +916,6 @@ const sendMessageViaHTTP = (chatId, senderId, message, replyToId) => async (disp
         // Обновляем список чатов чтобы показать новое сообщение
         dispatch(fetchUserChats({ skip: 0, limit: 50 }));
         
-        // Перезагружаем сообщения чата
-        dispatch(fetchChatMessages({ chatId, skip: 0, limit: 100 }));
-        
         return result;
     } catch (error) {
         console.error('[HTTP] ❌ Failed to send message:', error);
@@ -807,6 +924,8 @@ const sendMessageViaHTTP = (chatId, senderId, message, replyToId) => async (disp
 };
 
 export const disconnectWebSocket = () => (dispatch) => {
+    wsActiveUserId = null;
+
     if (wsReconnectTimer) {
         clearTimeout(wsReconnectTimer);
         wsReconnectTimer = null;
@@ -874,7 +993,7 @@ export const subscribeToPushNotifications = ({ prompt = true } = {}) => async (d
         const token = getState().auth.token;
         if (!token) return;
 
-        await fetch(`${API_BASE}/notifications/subscribe`, {
+        const subscribeResponse = await fetch(`${API_BASE}/notifications/subscribe`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -888,9 +1007,46 @@ export const subscribeToPushNotifications = ({ prompt = true } = {}) => async (d
             }),
         });
 
+        if (!subscribeResponse.ok) {
+            console.error('[Push] Backend subscription failed:', subscribeResponse.status);
+            return;
+        }
+
         console.log('[Push] Subscription sent to backend');
     } catch (error) {
         console.error('[Push] Subscription failed:', error);
+    }
+};
+
+export const unsubscribeFromPushNotifications = () => async (dispatch, getState) => {
+    try {
+        if (!('serviceWorker' in navigator)) return;
+
+        const token = getState().auth?.token || localStorage.getItem('token');
+        if (!token) return;
+
+        const registration = await navigator.serviceWorker.getRegistration('/');
+        const subscription = await registration?.pushManager?.getSubscription();
+        if (!subscription) return;
+
+        const response = await fetch(
+            `${API_BASE}/notifications/unsubscribe?endpoint=${encodeURIComponent(subscription.endpoint)}`,
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            },
+        );
+
+        if (!response.ok) {
+            console.warn('[Push] Backend unsubscribe failed:', response.status);
+        }
+
+        await subscription.unsubscribe();
+        console.log('[Push] Unsubscribed from push notifications');
+    } catch (error) {
+        console.warn('[Push] Unsubscribe failed:', error);
     }
 };
 
@@ -906,6 +1062,20 @@ function urlBase64ToUint8Array(base64String) {
     return outputArray;
 }
 
-export const { setCurrentChat, addWebSocketMessage, addOptimisticMessage, updateMediaProcessingStatus, updateMediaFailedStatus, resetChat, setReplyToMessage, setWsConnected, markMessagesAsRead } = chatSlice.actions;
+export const {
+    setCurrentChat,
+    addWebSocketMessage,
+    addOptimisticMessage,
+    updateMediaProcessingStatus,
+    updateMediaFailedStatus,
+    resetChat,
+    setReplyToMessage,
+    setWsConnected,
+    markMessagesAsRead,
+    setTypingUser,
+    clearTypingUser,
+    setIncomingChatAlert,
+    clearIncomingChatAlert,
+} = chatSlice.actions;
 
 export default chatSlice.reducer;

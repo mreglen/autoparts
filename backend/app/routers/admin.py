@@ -98,6 +98,7 @@ def _new_parts_markup_percent_value(row) -> float:
 class SiteSettingsResponse(BaseModel):
     show_new_autoparts: bool
     show_site_reviews: bool = True
+    show_yandex_badge: bool = True
     new_parts_markup_percent: float
     used_parts_purchase_mode: str = "both"
     round_product_prices: bool = False
@@ -106,6 +107,7 @@ class SiteSettingsResponse(BaseModel):
 class SiteSettingsPatch(BaseModel):
     show_new_autoparts: Optional[bool] = None
     show_site_reviews: Optional[bool] = None
+    show_yandex_badge: Optional[bool] = None
     new_parts_markup_percent: Optional[float] = Field(None, ge=0, le=500)
     used_parts_purchase_mode: Optional[str] = None
     round_product_prices: Optional[bool] = None
@@ -227,6 +229,7 @@ def get_site_settings_admin(
     return SiteSettingsResponse(
         show_new_autoparts=row.show_new_autoparts,
         show_site_reviews=getattr(row, "show_site_reviews", True) is not False,
+        show_yandex_badge=getattr(row, "show_yandex_badge", True) is not False,
         new_parts_markup_percent=_new_parts_markup_percent_value(row),
         used_parts_purchase_mode=mode,
         round_product_prices=getattr(row, "round_product_prices", False) is True,
@@ -250,6 +253,8 @@ def patch_site_settings_admin(
         row.show_new_autoparts = data["show_new_autoparts"]
     if "show_site_reviews" in data:
         row.show_site_reviews = data["show_site_reviews"]
+    if "show_yandex_badge" in data:
+        row.show_yandex_badge = data["show_yandex_badge"]
     apply_mode = data.pop("global_markup_apply_mode", None)
     if "new_parts_markup_percent" in data:
         new_global = float(data["new_parts_markup_percent"])
@@ -284,6 +289,7 @@ def patch_site_settings_admin(
     return SiteSettingsResponse(
         show_new_autoparts=row.show_new_autoparts,
         show_site_reviews=getattr(row, "show_site_reviews", True) is not False,
+        show_yandex_badge=getattr(row, "show_yandex_badge", True) is not False,
         new_parts_markup_percent=_new_parts_markup_percent_value(row),
         used_parts_purchase_mode=mode,
         round_product_prices=getattr(row, "round_product_prices", False) is True,
