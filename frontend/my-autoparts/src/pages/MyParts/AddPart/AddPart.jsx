@@ -43,6 +43,7 @@ import {
 } from '../../AutoParts/NewParts/rosskoHelpers';
 import {
   buildProductDraftPayload,
+  buildStorageCellsFromQuantities,
   draftPayloadHasContent,
   draftToFormSnapshot,
   readDraftSessionCache,
@@ -204,7 +205,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
             const cells = Array.isArray(result.payload) ? result.payload : [];
             setLocationCells(cells);
 
-            if (editPendingMode || resubmitMode || draftMode) {
+            if (editPendingMode || resubmitMode || isDraftFlow) {
               // Не затираем значения, загруженные из pending/rejected/черновика — только добавляем ключи для новых ячеек
               setCellQuantities((prev) => {
                 const next = { ...prev };
@@ -229,11 +230,11 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         });
     } else {
       setLocationCells([]);
-      if (!editPendingMode && !resubmitMode && !draftMode) {
+      if (!editPendingMode && !resubmitMode && !isDraftFlow) {
         setCellQuantities({});
       }
     }
-  }, [dispatch, formData.storage_location_id, editPendingMode, resubmitMode, draftMode]);
+  }, [dispatch, formData.storage_location_id, editPendingMode, resubmitMode, isDraftFlow]);
   
   // Refresh storage cells when they are modified elsewhere (e.g. new cell created)
   useEffect(() => {
@@ -529,9 +530,16 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         } else {
           const created = await dispatch(createProductDraft(draftPayload)).unwrap();
           draftIdRef.current = created.id;
-          writeDraftSessionCache(created.id, draftToFormSnapshot(created));
+          writeDraftSessionCache(created.id, {
+            formData,
+            photos,
+            videos,
+            cellQuantities,
+            vehicle: selectedVehicle,
+            vehicleId: selectedVehicle?.id ?? null,
+          });
           if (!draftMode) {
-            window.history.replaceState(null, '', `/my-parts/drafts/${created.id}/edit`);
+            navigate(`/my-parts/drafts/${created.id}/edit`, { replace: true });
           }
         }
         setDraftSaveStatus('saved');
@@ -554,6 +562,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
     videos,
     cellQuantities,
     selectedVehicle,
+    navigate,
   ]);
 
   useEffect(() => {
@@ -1074,7 +1083,11 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
           payload: draftPayload,
         })).unwrap();
 
-        const action = await dispatch(submitProductDraft(draftIdRef.current));
+        const storageCellsForSubmit = buildStorageCellsFromQuantities(cellQuantities);
+        const action = await dispatch(submitProductDraft({
+          draftId: draftIdRef.current,
+          storageCells: storageCellsForSubmit,
+        }));
         if (submitProductDraft.rejected.match(action)) {
           return;
         }

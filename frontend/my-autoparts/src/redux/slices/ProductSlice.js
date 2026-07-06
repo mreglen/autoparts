@@ -289,9 +289,12 @@ export const deleteProductDraft = createAsyncThunk(
 
 export const submitProductDraft = createAsyncThunk(
     'products/submitProductDraft',
-    async (draftId, { rejectWithValue }) => {
+    async ({ draftId, storageCells = null }, { rejectWithValue }) => {
         try {
-            const response = await apiAxios.post(`/product-drafts/${draftId}/submit`);
+            const body = Array.isArray(storageCells) && storageCells.length
+                ? { storage_cells: storageCells }
+                : {};
+            const response = await apiAxios.post(`/product-drafts/${draftId}/submit`, body);
             return response.data;
         } catch (error) {
             return rejectWithValue(
@@ -1595,7 +1598,10 @@ const productSlice = createSlice({
                 }
             })
             .addCase(submitProductDraft.fulfilled, (state, action) => {
-                const draftId = action.meta?.arg;
+                const draftArg = action.meta?.arg;
+                const draftId = typeof draftArg === 'object' && draftArg != null
+                    ? draftArg.draftId
+                    : draftArg;
                 if (draftId) {
                     state.draftItems = state.draftItems.filter((item) => item.id !== draftId);
                 }

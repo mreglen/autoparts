@@ -1869,7 +1869,10 @@ function MyParts() {
   const handleSubmitDraft = async (draft) => {
     if (!draft?.id) return;
     try {
-      await dispatch(submitProductDraft(draft.id)).unwrap();
+      await dispatch(submitProductDraft({
+        draftId: draft.id,
+        storageCells: draft.storage_cells || [],
+      })).unwrap();
       await dispatch(fetchMyPendingProducts());
     } catch (err) {
       alert(typeof err === 'string' ? err : 'Не удалось отправить черновик на модерацию');

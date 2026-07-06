@@ -1,3 +1,13 @@
+export function buildStorageCellsFromQuantities(cellQuantities) {
+  return Object.entries(cellQuantities || {})
+    .filter(([, value]) => value && String(value).trim())
+    .map(([cellId, value]) => ({
+      storage_cell_id: parseInt(cellId, 10),
+      value: String(value).trim(),
+    }))
+    .filter((item) => Number.isFinite(item.storage_cell_id));
+}
+
 export function buildProductDraftPayload({
   formData,
   photos,
@@ -29,13 +39,7 @@ export function buildProductDraftPayload({
     })
     .filter(Boolean);
 
-  const storageCells = Object.entries(cellQuantities || {})
-    .filter(([, value]) => value && String(value).trim())
-    .map(([cellId, value]) => ({
-      storage_cell_id: parseInt(cellId, 10),
-      value: String(value).trim(),
-    }))
-    .filter((item) => Number.isFinite(item.storage_cell_id));
+  const storageCells = buildStorageCellsFromQuantities(cellQuantities);
 
   const priceRaw = formData?.sale_price;
   const quantityRaw = formData?.quantity;

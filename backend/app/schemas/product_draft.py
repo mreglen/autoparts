@@ -33,6 +33,10 @@ class ProductDraftUpdate(ProductDraftBase):
     pass
 
 
+class ProductDraftSubmitRequest(BaseModel):
+    storage_cells: Optional[List[StorageCellDraftItem]] = None
+
+
 class ProductDraft(ProductDraftBase):
     id: int
     organization_id: str

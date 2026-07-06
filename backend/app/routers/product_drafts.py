@@ -5,13 +5,15 @@ from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.product_draft import ProductDraft as ProductDraftModel
 from app.models.user import User
-from app.schemas.product_draft import ProductDraft, ProductDraftCreate, ProductDraftUpdate
+from app.schemas.product_draft import ProductDraft, ProductDraftCreate, ProductDraftSubmitRequest, ProductDraftUpdate
 from app.services.audit_service import log_audit
+from app.services.pending_product_storage_cell_service import attach_storage_cells_to_pending_product
 from app.services.product_draft_service import (
     apply_draft_payload,
     build_pending_payload,
     cleanup_draft_temp_media,
     draft_has_content,
+    dump_storage_cells,
     get_owned_draft,
     parse_storage_cells,
     require_organization,
@@ -122,16 +124,25 @@ def delete_product_draft(
 @router.post("/{draft_id}/submit")
 def submit_product_draft(
     draft_id: int,
+    payload: ProductDraftSubmitRequest | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from app.routers.pending_product_storage_cells import (
-        PendingProductStorageCellCreate,
-        create_pending_product_storage_cells_batch,
-    )
     from app.routers.pending_products import create_pending_product
 
     draft = get_owned_draft(db, draft_id, current_user)
+
+    if payload and payload.storage_cells is not None:
+        storage_cells = [
+            {"storage_cell_id": item.storage_cell_id, "value": item.value}
+            for item in payload.storage_cells
+        ]
+        draft.storage_cells_json = dump_storage_cells(storage_cells)
+        db.commit()
+        db.refresh(draft)
+    else:
+        storage_cells = parse_storage_cells(draft.storage_cells_json)
+
     pending_payload = build_pending_payload(draft)
 
     pending_product = create_pending_product(
@@ -140,23 +151,13 @@ def submit_product_draft(
         current_user=current_user,
     )
 
-    storage_cells = parse_storage_cells(draft.storage_cells_json)
     if storage_cells:
-        cells_payload = [
-            PendingProductStorageCellCreate(
-                pending_product_id=pending_product["id"],
-                storage_cell_id=int(item["storage_cell_id"]),
-                value=str(item.get("value") or ""),
-            )
-            for item in storage_cells
-            if item.get("storage_cell_id") is not None and str(item.get("value") or "").strip()
-        ]
-        if cells_payload:
-            create_pending_product_storage_cells_batch(
-                cells_data=cells_payload,
-                db=db,
-                current_user=current_user,
-            )
+        attach_storage_cells_to_pending_product(
+            db,
+            pending_product_id=int(pending_product["id"]),
+            organization_id=current_user.organization_id,
+            storage_cells=storage_cells,
+        )
 
     draft_id_value = draft.id
     db.delete(draft)
