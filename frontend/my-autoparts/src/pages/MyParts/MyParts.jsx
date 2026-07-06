@@ -826,6 +826,15 @@ const DraftCard = ({ draft, onContinue, onSubmit, onDelete }) => {
 
 const DEFAULT_IN_STOCK_FILTERS = { storage: '', cell: '', sort: 'date_desc' };
 const DEFAULT_MODERATION_FILTERS = { storage: '', cell: '', sort: 'date_desc', hideRejected: false };
+const MY_PARTS_SORT_OPTIONS = [
+  { value: 'date_desc', label: 'Сначала новые' },
+  { value: 'date_asc', label: 'Сначала старые' },
+  { value: 'price_asc', label: 'Цена: по возрастанию' },
+  { value: 'price_desc', label: 'Цена: по убыванию' },
+];
+const MY_PARTS_SORT_LABELS = Object.fromEntries(
+  MY_PARTS_SORT_OPTIONS.map(({ value, label }) => [value, label]),
+);
 const URL_SEARCH_DEBOUNCE_MS = 400;
 const MY_PRODUCTS_PAGE_SIZE = 30;
 
@@ -1336,6 +1345,23 @@ function MyParts() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [mobileActionsOpen]);
+
+  // Закрытие dropdown сортировки при клике вне
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.sort-dropdown')) {
+        setShowSortDropdown(false);
+      }
+    };
+
+    if (showSortDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSortDropdown]);
 
   // Закрытие dropdown массовых действий при клике вне
   useEffect(() => {
@@ -1949,80 +1975,49 @@ function MyParts() {
         )}
 
         {/* Сортировка */}
-        <div className="md:w-64 relative">
+        <div className="md:w-64 relative sort-dropdown">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Сортировка
           </label>
           <button
+            type="button"
             onClick={() => setShowSortDropdown(!showSortDropdown)}
             className="w-full px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-between gap-2 bg-gray-200 text-gray-700 hover:bg-gray-300 min-h-[40px]"
             title="Сортировка"
+            aria-expanded={showSortDropdown}
           >
-            <span className="flex items-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="flex items-center gap-2 min-w-0">
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
               </svg>
-              <span>Выбор порядка</span>
+              <span className="truncate">
+                {MY_PARTS_SORT_LABELS[activeFilters.sort] || 'Сначала новые'}
+              </span>
             </span>
-            <svg className={`w-4 h-4 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-4 h-4 shrink-0 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
 
           {showSortDropdown && (
             <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-30">
-              <button
-                onClick={() => { updateActiveFilters({ sort: 'date_desc' }); setShowSortDropdown(false); }}
-                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'date_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span>Сначала новые</span>
-                  {activeFilters.sort === 'date_desc' && (
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-              </button>
-              <button
-                onClick={() => { updateActiveFilters({ sort: 'date_asc' }); setShowSortDropdown(false); }}
-                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'date_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span>Сначала старые</span>
-                  {activeFilters.sort === 'date_asc' && (
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-              </button>
-              <button
-                onClick={() => { updateActiveFilters({ sort: 'price_asc' }); setShowSortDropdown(false); }}
-                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'price_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span>Цена: по возрастанию</span>
-                  {activeFilters.sort === 'price_asc' && (
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-              </button>
-              <button
-                onClick={() => { updateActiveFilters({ sort: 'price_desc' }); setShowSortDropdown(false); }}
-                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'price_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span>Цена: по убыванию</span>
-                  {activeFilters.sort === 'price_desc' && (
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-              </button>
+              {MY_PARTS_SORT_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => { updateActiveFilters({ sort: value }); setShowSortDropdown(false); }}
+                  className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === value ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>{label}</span>
+                    {activeFilters.sort === value && (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </div>
