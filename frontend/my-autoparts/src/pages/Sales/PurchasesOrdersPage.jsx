@@ -8,7 +8,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
 import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus, getGarageStatusColor, getGarageStatusName, getUsedOrderBuyerHint } from '../../utils/garageOrderUi';
 import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
-import { openOrderItemProductFlow } from '../../utils/avitoProductFlow';
+import { isUsedOrderReturnEligible, TERMINAL_RETURN_STATUSES } from '../../utils/returnStatusUi';
 
 const ACTIVE_STATUSES = new Set([
   'pending',
@@ -67,6 +67,7 @@ export default function PurchasesOrdersPage() {
   const [newOrdersLoadFailed, setNewOrdersLoadFailed] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeReturnOrderIds, setActiveReturnOrderIds] = useState(new Set());
 
   useEffect(() => {
     if (!isReady) return;
@@ -87,9 +88,10 @@ export default function PurchasesOrdersPage() {
       const results = await Promise.allSettled([
         apiAxios.get('/sales/purchases/used-orders'),
         apiAxios.get('/sales/purchases/new-orders'),
+        apiAxios.get('/sales/purchases/returns'),
       ]);
 
-      const [usedRes, newRes] = results;
+      const [usedRes, newRes, returnsRes] = results;
 
       if (usedRes.status === 'fulfilled') {
         setUsedOrders(Array.isArray(usedRes.value.data) ? usedRes.value.data : []);
@@ -103,6 +105,14 @@ export default function PurchasesOrdersPage() {
       } else {
         setNewOrders([]);
         setNewOrdersLoadFailed(true);
+      }
+
+      if (returnsRes.status === 'fulfilled') {
+        const ids = new Set();
+        (returnsRes.value.data || []).forEach((r) => {
+          if (!TERMINAL_RETURN_STATUSES.has(r.status_code)) ids.add(r.order_id);
+        });
+        setActiveReturnOrderIds(ids);
       }
     } catch (e) {
       setError(e?.response?.data?.detail || e.message || 'Не удалось загрузить заказы');
@@ -338,6 +348,12 @@ export default function PurchasesOrdersPage() {
                   getBuyerHint={isUsed ? getUsedOrderBuyerHint : undefined}
                   getDeliveryInfo={getGarageDeliveryInfo}
                   onProductClick={handleProductClick}
+                  canRequestReturn={
+                    isUsed
+                    && isUsedOrderReturnEligible(order)
+                    && !activeReturnOrderIds.has(order.id)
+                  }
+                  onReturnRequest={(o) => navigate(`/purchases/returns?create=1&orderId=${o.id}`)}
                 />
               );
             })}

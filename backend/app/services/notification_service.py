@@ -17,6 +17,8 @@ EVENT_CHAT_MESSAGE = "chat_message"
 EVENT_MODERATION_APPROVED = "moderation_approved"
 EVENT_MODERATION_REJECTED = "moderation_rejected"
 EVENT_STOCK_LOW = "stock_low"
+EVENT_RETURN_REQUEST_SELLER = "return_request_seller"
+EVENT_RETURN_STATUS_BUYER = "return_status_buyer"
 
 ORDER_STATUS_LABELS: dict[str, str] = {
     "pending": "В ожидании",
@@ -207,3 +209,75 @@ def maybe_notify_stock_level(db: Session, product, previous_quantity: int | None
             email_subject=f"Склад: {event_label} — {product.name}",
             email_body=email_body,
         )
+
+
+def notify_return_request_seller(
+    db: Session,
+    *,
+    organization_id: str | None,
+    return_id: int,
+    order_id: int,
+    reason_label: str,
+) -> None:
+    title = f"Новая заявка на возврат №{return_id}"
+    body = f"По заказу №{order_id}: {reason_label}."
+    push_data = {
+        "type": "return_request",
+        "returnId": return_id,
+        "orderId": order_id,
+        "title": title,
+        "body": body,
+        "url": "/sales/returns",
+    }
+    email_body = (
+        f"{body}\n\n"
+        f"Откройте раздел возвратов: https://svoygarage.ru/sales/returns\n\n"
+        f"С уважением,\nСвой Гараж"
+    )
+    dispatch_org_sales_notification(
+        db,
+        organization_id,
+        event_type=EVENT_RETURN_REQUEST_SELLER,
+        push_data=push_data,
+        email_subject=title,
+        email_body=email_body,
+    )
+
+
+def notify_return_status_buyer(
+    *,
+    user_id: int | None,
+    return_id: int,
+    order_id: int,
+    status_code: str,
+    previous_status_code: str | None = None,
+) -> None:
+    if not user_id or status_code == previous_status_code:
+        return
+
+    from app.services.order_return_service import return_status_label
+
+    status_label = return_status_label(status_code)
+    title = f"Возврат №{return_id}: {status_label}"
+    body = f"Статус заявки на возврат по заказу №{order_id} изменён на «{status_label}»."
+    push_data = {
+        "type": "return_status",
+        "returnId": return_id,
+        "orderId": order_id,
+        "statusCode": status_code,
+        "title": title,
+        "body": body,
+        "url": "/purchases/returns",
+    }
+    email_body = (
+        f"{body}\n\n"
+        f"Подробности: https://svoygarage.ru/purchases/returns\n\n"
+        f"С уважением,\nСвой Гараж"
+    )
+    dispatch_user_notification(
+        user_id,
+        event_type=EVENT_RETURN_STATUS_BUYER,
+        push_data=push_data,
+        email_subject=title,
+        email_body=email_body,
+    )

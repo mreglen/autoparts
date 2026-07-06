@@ -63,7 +63,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sales", tags=["Sales"])
 
-ALLOWED_AVITO_TRANSITIONS = {"confirm", "reject", "perform", "receive"}
+ALLOWED_AVITO_TRANSITIONS = {
+    "confirm", "reject", "perform", "receive",
+    "in_transit_return", "on_delivery_return", "returned",
+}
 
 USED_ORDER_STATUS_CODES = frozenset({
     "pending",

@@ -4,7 +4,9 @@ export const TAB_PATH_MAP = {
     profile: '/profile',
     'settings-notifications': '/profile/notifications',
     'purchases-orders': '/purchases/orders',
+    'purchases-returns': '/purchases/returns',
     'sales-orders': '/sales/orders',
+    'sales-returns': '/sales/returns',
     'warehouse-sales': '/warehouse-sales',
     finance: '/finance',
     parts: '/my-parts',
@@ -62,6 +64,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
                 label: 'Покупки',
                 submenu: [
                     { id: 'purchases-orders', label: 'Заказы' },
+                    { id: 'purchases-returns', label: 'Возвраты' },
                 ],
             },
         ];
@@ -75,6 +78,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
                 label: 'Покупки',
                 submenu: [
                     { id: 'purchases-orders', label: 'Заказы' },
+                    { id: 'purchases-returns', label: 'Возвраты' },
                 ],
             },
         ];
@@ -85,6 +89,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
                 label: 'Покупки',
                 submenu: [
                     { id: 'purchases-orders', label: 'Заказы' },
+                    { id: 'purchases-returns', label: 'Возвраты' },
                 ],
             },
             { id: 'chats', label: 'Сообщения' },
@@ -104,6 +109,9 @@ export const getAvailableTabs = (user, permissionCodes) => {
 
         if (user.is_seller || user.is_admin || hasPermission('sales.orders')) {
             salesSubmenu.push({ id: 'sales-orders', label: 'Заказы покупателей' });
+        }
+        if (user.is_seller || user.is_admin || hasPermission('sales.returns')) {
+            salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты' });
         }
         if (user.is_seller || user.is_admin || hasPermission('warehouse-sales')) {
             salesSubmenu.push({ id: 'warehouse-sales', label: 'Продажи со склада' });
@@ -153,6 +161,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
                 label: 'Покупки',
                 submenu: [
                     { id: 'purchases-orders', label: 'Заказы' },
+                    { id: 'purchases-returns', label: 'Возвраты' },
                 ],
             },
         ];
@@ -160,6 +169,9 @@ export const getAvailableTabs = (user, permissionCodes) => {
         const salesSubmenu = [];
         if (hasPermission('sales.orders')) {
             salesSubmenu.push({ id: 'sales-orders', label: 'Заказы покупателей' });
+        }
+        if (hasPermission('sales.returns')) {
+            salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты' });
         }
         if (hasPermission('warehouse-sales')) {
             salesSubmenu.push({ id: 'warehouse-sales', label: 'Продажи со склада' });

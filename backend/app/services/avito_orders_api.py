@@ -243,7 +243,9 @@ async def get_available_transitions(
         'canceled': [],
         'closed': [],
         'in_dispute': [],
-        'on_return': [],
+        'on_return': ['in_transit_return'],
+        'in_transit_return': ['on_delivery_return'],
+        'on_delivery_return': ['returned'],
     }
     
     transitions = transitions_map.get(status, [])
@@ -349,3 +351,51 @@ async def raw_fetch_avito_orders(
     except Exception as e:
         logger.exception("Ошибка в сыром запросе к API заказов Авито")
         raise AvitoOrdersError(f"Ошибка выполнения запроса: {str(e)}")
+
+
+async def accept_return_order(
+    access_token: str,
+    *,
+    order_id: int,
+    terminal_number: str,
+    recipient: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """
+    Принять возврат — указать отделение Почты России для получения товара.
+
+    POST https://api.avito.ru/order-management/1/order/acceptReturnOrder
+    """
+    url = f"{AVITO_BASE}/order-management/1/order/acceptReturnOrder"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+    body: dict[str, Any] = {
+        "orderId": str(order_id),
+        "terminalNumber": str(terminal_number),
+    }
+    if recipient:
+        body["recipient"] = recipient
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, json=body, headers=headers)
+            response.raise_for_status()
+            if response.content:
+                return response.json()
+            return {"ok": True}
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            "HTTP error accepting return for order %s: %s - %s",
+            order_id,
+            e.response.status_code,
+            e.response.text,
+        )
+        raise AvitoOrdersError(
+            f"Ошибка API Авито: {e.response.status_code}",
+            status_code=e.response.status_code,
+            response_body=e.response.text,
+        )
+    except Exception as e:
+        logger.exception("Error accepting return for order %s", order_id)
+        raise AvitoOrdersError(f"Ошибка принятия возврата: {str(e)}")

@@ -48,6 +48,7 @@ from app.db.schema_patches import (
     ensure_analytics_query_review_tables,
     ensure_public_catalog_indexes,
     ensure_product_drafts_table,
+    ensure_order_return_tables,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
@@ -191,6 +192,7 @@ try:
     ensure_analytics_query_review_tables()
     ensure_public_catalog_indexes()
     ensure_product_drafts_table()
+    ensure_order_return_tables()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise

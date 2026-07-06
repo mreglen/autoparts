@@ -2064,3 +2064,80 @@ def ensure_product_drafts_table() -> None:
 
     logger.info("Applied product_drafts table patch")
 
+
+def ensure_order_return_tables() -> None:
+    """Create order return request tables."""
+    inspector = inspect(engine)
+    if "order_return_requests" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl_requests = """
+        CREATE TABLE order_return_requests (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            order_id INTEGER NOT NULL REFERENCES garage_used_orders(id),
+            buyer_user_id INTEGER REFERENCES users(id),
+            reason VARCHAR(50) NOT NULL,
+            comment TEXT,
+            status_code VARCHAR(50) NOT NULL DEFAULT 'requested',
+            seller_note TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            status_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+        ddl_attachments = """
+        CREATE TABLE order_return_attachments (
+            id SERIAL PRIMARY KEY,
+            return_request_id INTEGER NOT NULL REFERENCES order_return_requests(id) ON DELETE CASCADE,
+            file_url VARCHAR(512) NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS ix_order_return_requests_org ON order_return_requests (organization_id)",
+            "CREATE INDEX IF NOT EXISTS ix_order_return_requests_order ON order_return_requests (order_id)",
+            "CREATE INDEX IF NOT EXISTS ix_order_return_requests_status ON order_return_requests (status_code)",
+            "CREATE INDEX IF NOT EXISTS ix_order_return_attachments_return ON order_return_attachments (return_request_id)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_order_return_active ON order_return_requests (order_id) WHERE status_code NOT IN ('rejected', 'closed')",
+        ]
+    else:
+        ddl_requests = """
+        CREATE TABLE order_return_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            order_id INTEGER NOT NULL REFERENCES garage_used_orders(id),
+            buyer_user_id INTEGER REFERENCES users(id),
+            reason VARCHAR(50) NOT NULL,
+            comment TEXT,
+            status_code VARCHAR(50) NOT NULL DEFAULT 'requested',
+            seller_note TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            status_changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        ddl_attachments = """
+        CREATE TABLE order_return_attachments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            return_request_id INTEGER NOT NULL REFERENCES order_return_requests(id) ON DELETE CASCADE,
+            file_url VARCHAR(512) NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS ix_order_return_requests_org ON order_return_requests (organization_id)",
+            "CREATE INDEX IF NOT EXISTS ix_order_return_requests_order ON order_return_requests (order_id)",
+            "CREATE INDEX IF NOT EXISTS ix_order_return_requests_status ON order_return_requests (status_code)",
+            "CREATE INDEX IF NOT EXISTS ix_order_return_attachments_return ON order_return_attachments (return_request_id)",
+        ]
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl_requests))
+        conn.execute(text(ddl_attachments))
+        for stmt in indexes:
+            conn.execute(text(stmt))
+
+    logger.info("Applied order_return tables patch")
+

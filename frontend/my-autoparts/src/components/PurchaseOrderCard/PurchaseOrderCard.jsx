@@ -90,6 +90,8 @@ export default function PurchaseOrderCard({
   getBuyerHint,
   getDeliveryInfo,
   onProductClick,
+  onReturnRequest,
+  canRequestReturn,
 }) {
   const items = order.items || [];
   const isUsed = orderType === 'used';
@@ -129,12 +131,21 @@ export default function PurchaseOrderCard({
             <div>
               <h3 className="text-base font-semibold text-gray-900 truncate">{sellerLabel}</h3>
               <p className="mt-1 text-sm text-gray-600 line-clamp-2">{getDeliveryInfo(order)}</p>
-              <div className="mt-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <OrderWriteMessageButton
                   label="Написать продавцу"
                   targetUserId={order.seller_user_id}
                   productId={fallbackProductId}
                 />
+                {canRequestReturn && onReturnRequest ? (
+                  <button
+                    type="button"
+                    onClick={() => onReturnRequest(order)}
+                    className="inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                  >
+                    Запросить возврат
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>

@@ -56,6 +56,7 @@ def _ensure_default_permissions(db: Session) -> None:
         {"code": "settings.printers", "name": "Печать"},
         {"code": "vehicles", "name": "Автомобили"},
         {"code": "sales.orders", "name": "Заказы"},
+        {"code": "sales.returns", "name": "Возвраты"},
         {"code": "finance.reports", "name": "Финансовые отчёты"},
         {
             "code": SETTINGS_INTEGRATION_AVITO_PERMISSION_CODE,
