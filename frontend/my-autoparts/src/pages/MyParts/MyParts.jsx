@@ -824,16 +824,17 @@ const DraftCard = ({ draft, onContinue, onSubmit, onDelete }) => {
   );
 };
 
-const DEFAULT_IN_STOCK_FILTERS = { storage: '', sort: 'date_desc' };
-const DEFAULT_MODERATION_FILTERS = { storage: '', sort: 'date_desc', hideRejected: false };
+const DEFAULT_IN_STOCK_FILTERS = { storage: '', cell: '', sort: 'date_desc' };
+const DEFAULT_MODERATION_FILTERS = { storage: '', cell: '', sort: 'date_desc', hideRejected: false };
 const URL_SEARCH_DEBOUNCE_MS = 400;
 const MY_PRODUCTS_PAGE_SIZE = 30;
 
-const buildMyProductsRequest = ({ page = 1, storage, q, sort, append = false } = {}) => ({
+const buildMyProductsRequest = ({ page = 1, storage, cell, q, sort, append = false } = {}) => ({
   page,
   page_size: MY_PRODUCTS_PAGE_SIZE,
   sort: sort || 'date_desc',
   ...(storage ? { storage_location_id: storage } : {}),
+  ...(cell ? { storage_cell_id: cell } : {}),
   ...(q?.trim() ? { q: q.trim() } : {}),
   append,
 });
@@ -872,6 +873,9 @@ function MyParts() {
   const [operationType, setOperationType] = useState(null);
   const [expandedPartId, setExpandedPartId] = useState(null);
   const [selectedParts, setSelectedParts] = useState(new Set());
+  const [selectAllLoading, setSelectAllLoading] = useState(false);
+  const selectAllCheckboxRef = useRef(null);
+  const selectAllCheckboxMobileRef = useRef(null);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(null); // ID запчасти с открытым меню действий
   const [showBulkActions, setShowBulkActions] = useState(false);
   const bulkActionsPlacement = useActionsDropdownPlacement(showBulkActions, 130);
@@ -881,10 +885,12 @@ function MyParts() {
   const [inStockFilters, setInStockFilters] = useState(() => ({
     ...DEFAULT_IN_STOCK_FILTERS,
     storage: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('storage') || ''),
+    cell: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('cell') || ''),
   }));
   const [moderationFilters, setModerationFilters] = useState(() => ({
     ...DEFAULT_MODERATION_FILTERS,
     storage: searchParams.get('tab') === 'pending' ? (searchParams.get('storage') || '') : '',
+    cell: searchParams.get('tab') === 'pending' ? (searchParams.get('cell') || '') : '',
     hideRejected: searchParams.get('hide_rejected') === '1',
   }));
   const [inStockSearchDraft, setInStockSearchDraft] = useState(
@@ -926,9 +932,21 @@ function MyParts() {
   }, [moderationSearchDraft]);
   const updateActiveFilters = (patch) => {
     if (isModerationTab) {
-      setModerationFilters((prev) => ({ ...prev, ...patch }));
+      setModerationFilters((prev) => {
+        const next = { ...prev, ...patch };
+        if ('storage' in patch && String(patch.storage) !== String(prev.storage)) {
+          next.cell = '';
+        }
+        return next;
+      });
     } else {
-      setInStockFilters((prev) => ({ ...prev, ...patch }));
+      setInStockFilters((prev) => {
+        const next = { ...prev, ...patch };
+        if ('storage' in patch && String(patch.storage) !== String(prev.storage)) {
+          next.cell = '';
+        }
+        return next;
+      });
     }
   };
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
@@ -954,11 +972,28 @@ function MyParts() {
   const inStockFilterKey = useMemo(
     () => JSON.stringify({
       storage: inStockFilters.storage || '',
+      cell: inStockFilters.cell || '',
       q: inStockDebouncedSearch.trim(),
       sort: inStockFilters.sort || 'date_desc',
     }),
-    [inStockFilters.storage, inStockDebouncedSearch, inStockFilters.sort],
+    [inStockFilters.storage, inStockFilters.cell, inStockDebouncedSearch, inStockFilters.sort],
   );
+
+  const selectionResetKey = useMemo(
+    () => JSON.stringify({
+      tab: activeTab,
+      storage: activeFilters.storage || '',
+      cell: activeFilters.cell || '',
+      q: debouncedSearch.trim(),
+    }),
+    [activeTab, activeFilters.storage, activeFilters.cell, debouncedSearch],
+  );
+
+  const availableStorageCells = useMemo(() => {
+    const storageId = activeFilters.storage;
+    if (!storageId) return [];
+    return storageCells.filter((cell) => String(cell.storage_location_id) === String(storageId));
+  }, [activeFilters.storage, storageCells]);
 
   const loadMoreMyProducts = useCallback(() => {
     if (
@@ -973,6 +1008,7 @@ function MyParts() {
     dispatch(fetchMyProducts(buildMyProductsRequest({
       page: myProductsPage + 1,
       storage: inStockFilters.storage,
+      cell: inStockFilters.cell,
       q: inStockDebouncedSearch,
       sort: inStockFilters.sort,
       append: true,
@@ -987,6 +1023,7 @@ function MyParts() {
     dispatch,
     myProductsPage,
     inStockFilters.storage,
+    inStockFilters.cell,
     inStockFilters.sort,
     inStockDebouncedSearch,
   ]);
@@ -1040,6 +1077,13 @@ function MyParts() {
       items = items.filter((part) => String(part.storage_location_id) === String(moderationFilters.storage));
     }
 
+    if (moderationFilters.cell) {
+      items = items.filter((part) => {
+        const links = pendingStorageCellsByProduct[part.id] || [];
+        return links.some((link) => String(link.storage_cell_id) === String(moderationFilters.cell));
+      });
+    }
+
     if (!moderationDebouncedSearch.trim()) return items;
 
     const query = moderationDebouncedSearch.toLowerCase().replace(/\s+/g, '');
@@ -1048,7 +1092,7 @@ function MyParts() {
       (normalizeInternalCodeForSearch(part.internal_code).toLowerCase().replace(/\s+/g, '').includes(query)) ||
       (part.name && part.name.toLowerCase().includes(moderationDebouncedSearch.toLowerCase()))
     );
-  }, [pendingItems, rejectedItems, moderationFilters.hideRejected, moderationFilters.storage, moderationDebouncedSearch]);
+  }, [pendingItems, rejectedItems, moderationFilters.hideRejected, moderationFilters.storage, moderationFilters.cell, moderationDebouncedSearch, pendingStorageCellsByProduct]);
 
   const sortedModerationParts = React.useMemo(() => {
     const items = [...displayModerationParts];
@@ -1066,12 +1110,12 @@ function MyParts() {
         const bDate = b.moderationKind === 'rejected' ? (b.rejected_at || b.created_at) : b.created_at;
         return new Date(aDate || 0) - new Date(bDate || 0);
       });
-    } else if (sortOrder === 'name_asc' || sortOrder === 'name_desc') {
+    } else if (sortOrder === 'price_asc' || sortOrder === 'price_desc') {
       items.sort((a, b) => {
-        const aName = (a.name || a.brand || a.article || '').toString().toLowerCase();
-        const bName = (b.name || b.brand || b.article || '').toString().toLowerCase();
-        if (aName < bName) return sortOrder === 'name_asc' ? -1 : 1;
-        if (aName > bName) return sortOrder === 'name_asc' ? 1 : -1;
+        const aPrice = Number(a.price) || 0;
+        const bPrice = Number(b.price) || 0;
+        if (aPrice < bPrice) return sortOrder === 'price_asc' ? -1 : 1;
+        if (aPrice > bPrice) return sortOrder === 'price_asc' ? 1 : -1;
         return 0;
       });
     }
@@ -1230,19 +1274,45 @@ function MyParts() {
     });
   };
 
-  const allDisplayedSelected = displayParts.length > 0
-    && displayParts.every((part) => selectedParts.has(part.id));
+  const allFilteredSelected = myProductsTotal > 0 && selectedParts.size === myProductsTotal;
+  const someSelected = selectedParts.size > 0 && selectedParts.size < myProductsTotal;
 
-  const handleToggleSelectAllDisplayed = () => {
-    if (allDisplayedSelected) {
-      const newSelected = new Set(selectedParts);
-      displayParts.forEach((part) => newSelected.delete(part.id));
-      setSelectedParts(newSelected);
+  useEffect(() => {
+    [selectAllCheckboxRef, selectAllCheckboxMobileRef].forEach((ref) => {
+      if (ref.current) {
+        ref.current.indeterminate = someSelected;
+      }
+    });
+  }, [someSelected]);
+
+  useEffect(() => {
+    setSelectedParts(new Set());
+  }, [selectionResetKey]);
+
+  const handleToggleSelectAll = async () => {
+    if (selectAllLoading) return;
+    if (allFilteredSelected) {
+      setSelectedParts(new Set());
       return;
     }
-    const newSelected = new Set(selectedParts);
-    displayParts.forEach((part) => newSelected.add(part.id));
-    setSelectedParts(newSelected);
+    setSelectAllLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (inStockFilters.storage) params.set('storage_location_id', inStockFilters.storage);
+      if (inStockFilters.cell) params.set('storage_cell_id', inStockFilters.cell);
+      if (inStockDebouncedSearch.trim()) params.set('q', inStockDebouncedSearch.trim());
+      params.set('sort', inStockFilters.sort || 'date_desc');
+      const qs = params.toString();
+      const data = await apiRequest(`/products/ids${qs ? `?${qs}` : ''}`);
+      setSelectedParts(new Set(data.ids || []));
+      if (data.truncated) {
+        alert(`Выбрано ${(data.ids || []).length} из ${data.total}. Уточните фильтр для выбора всех позиций.`);
+      }
+    } catch (err) {
+      alert(err.message || 'Не удалось выбрать все позиции');
+    } finally {
+      setSelectAllLoading(false);
+    }
   };
 
   // Функция для переключения мобильного меню действий
@@ -1449,6 +1519,7 @@ function MyParts() {
 
     const params = new URLSearchParams();
     const storage = isModerationTab ? moderationFilters.storage : inStockFilters.storage;
+    const cell = isModerationTab ? moderationFilters.cell : inStockFilters.cell;
 
     if (debouncedSearch) {
       params.set('q', debouncedSearch);
@@ -1456,6 +1527,10 @@ function MyParts() {
 
     if (storage) {
       params.set('storage', storage);
+    }
+
+    if (cell) {
+      params.set('cell', cell);
     }
 
     if (isModerationTab) {
@@ -1478,7 +1553,9 @@ function MyParts() {
     location.pathname,
     debouncedSearch,
     inStockFilters.storage,
+    inStockFilters.cell,
     moderationFilters.storage,
+    moderationFilters.cell,
     moderationFilters.hideRejected,
     isModerationTab,
     isDraftsTab,
@@ -1488,10 +1565,13 @@ function MyParts() {
   useEffect(() => {
     if (!isReady || !user?.organization_id) return;
     dispatch(fetchStorageLocations(user.organization_id));
-    if (storageCells.length === 0) {
-      dispatch(fetchStorageCells());
-    }
-  }, [dispatch, isReady, user?.organization_id, storageCells.length]);
+  }, [dispatch, isReady, user?.organization_id]);
+
+  useEffect(() => {
+    const storageId = activeFilters.storage;
+    if (!storageId) return;
+    dispatch(fetchStorageCells(storageId));
+  }, [dispatch, activeFilters.storage]);
 
   useEffect(() => {
     if (activeTab !== 'in-stock' || !isReady || !user?.organization_id) return;
@@ -1504,6 +1584,7 @@ function MyParts() {
       dispatch(fetchMyProducts(buildMyProductsRequest({
         page: 1,
         storage: inStockFilters.storage,
+        cell: inStockFilters.cell,
         q: inStockDebouncedSearch,
         sort: inStockFilters.sort,
       })));
@@ -1516,6 +1597,7 @@ function MyParts() {
     inStockFilterKey,
     myProductsFilterKey,
     inStockFilters.storage,
+    inStockFilters.cell,
     inStockFilters.sort,
     inStockDebouncedSearch,
     products.length,
@@ -1693,8 +1775,8 @@ function MyParts() {
       dispatch(fetchProductStorageCellsBatch(productIds));
     }
 
-    dispatch(fetchStorageCells());
-  }, [dispatch, lastModified, displayParts]);
+    dispatch(fetchStorageCells(activeFilters.storage || undefined));
+  }, [dispatch, lastModified, displayParts, activeFilters.storage]);
 
   // Check if user has permission to view this page
   // Admin and sellers always have access
@@ -1789,6 +1871,23 @@ function MyParts() {
             {storageLocations.map((location) => (
               <option key={location.id} value={location.id}>
                 {location.address}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="md:w-64">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Ячейка</label>
+          <select
+            value={activeFilters.cell}
+            onChange={(e) => updateActiveFilters({ cell: e.target.value })}
+            disabled={!activeFilters.storage}
+            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500"
+          >
+            <option value="">{activeFilters.storage ? 'Все ячейки' : 'Сначала выберите склад'}</option>
+            {availableStorageCells.map((cell) => (
+              <option key={cell.id} value={cell.id}>
+                {cell.name}
               </option>
             ))}
           </select>
@@ -1899,12 +1998,12 @@ function MyParts() {
                 </div>
               </button>
               <button
-                onClick={() => { updateActiveFilters({ sort: 'name_asc' }); setShowSortDropdown(false); }}
-                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'name_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                onClick={() => { updateActiveFilters({ sort: 'price_asc' }); setShowSortDropdown(false); }}
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'price_asc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
               >
                 <div className="flex items-center justify-between">
-                  <span>По алфавиту (А–Я)</span>
-                  {activeFilters.sort === 'name_asc' && (
+                  <span>Цена: по возрастанию</span>
+                  {activeFilters.sort === 'price_asc' && (
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -1912,12 +2011,12 @@ function MyParts() {
                 </div>
               </button>
               <button
-                onClick={() => { updateActiveFilters({ sort: 'name_desc' }); setShowSortDropdown(false); }}
-                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'name_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                onClick={() => { updateActiveFilters({ sort: 'price_desc' }); setShowSortDropdown(false); }}
+                className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === 'price_desc' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
               >
                 <div className="flex items-center justify-between">
-                  <span>По алфавиту (Я–А)</span>
-                  {activeFilters.sort === 'name_desc' && (
+                  <span>Цена: по убыванию</span>
+                  {activeFilters.sort === 'price_desc' && (
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -2055,6 +2154,7 @@ function MyParts() {
               dispatch(fetchMyProducts(buildMyProductsRequest({
                 page: 1,
                 storage: inStockFilters.storage,
+                cell: inStockFilters.cell,
                 q: inStockDebouncedSearch,
                 sort: inStockFilters.sort,
               })));
@@ -2099,9 +2199,9 @@ function MyParts() {
               <div className="mb-3 flex items-center justify-between py-2 border-b border-gray-200">
                 <span className="text-sm text-gray-500">
                   <span className="ml-2">Выбрано: {selectedParts.size}</span>
-                  {inStockDebouncedSearch && selectedParts.size > 0 && (
+                  {allFilteredSelected && myProductsTotal > 0 && (
                     <span className="ml-2 text-indigo-600">
-                      (из {displayParts.length} найденных)
+                      (все {myProductsTotal.toLocaleString('ru-RU')} по фильтру)
                     </span>
                   )}
                 </span>
@@ -2128,10 +2228,12 @@ function MyParts() {
                 <tr>
                   <th className="px-4 py-3 text-left">
                     <input
+                      ref={selectAllCheckboxRef}
                       type="checkbox"
-                      checked={allDisplayedSelected}
-                      onChange={handleToggleSelectAllDisplayed}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      checked={allFilteredSelected}
+                      disabled={selectAllLoading || myProductsTotal === 0}
+                      onChange={handleToggleSelectAll}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded disabled:opacity-50"
                     />
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider" colSpan={4}>Запчасть</th>
@@ -2174,17 +2276,19 @@ function MyParts() {
               <div className="flex items-center justify-between gap-2">
                 <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
                   <input
+                    ref={selectAllCheckboxMobileRef}
                     type="checkbox"
-                    checked={allDisplayedSelected}
-                    onChange={handleToggleSelectAllDisplayed}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    checked={allFilteredSelected}
+                    disabled={selectAllLoading || myProductsTotal === 0}
+                    onChange={handleToggleSelectAll}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded disabled:opacity-50"
                   />
-                  <span>Выбрать всё</span>
+                  <span>{selectAllLoading ? 'Выбор…' : 'Выбрать всё'}</span>
                 </label>
                 <span className="text-sm text-gray-500 whitespace-nowrap">
                   Выбрано: {selectedParts.size}
-                  {inStockDebouncedSearch && selectedParts.size > 0 && (
-                    <span className="text-indigo-600"> / {displayParts.length}</span>
+                  {allFilteredSelected && myProductsTotal > 0 && (
+                    <span className="text-indigo-600"> / {myProductsTotal.toLocaleString('ru-RU')}</span>
                   )}
                 </span>
               </div>

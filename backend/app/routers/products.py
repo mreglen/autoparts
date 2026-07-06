@@ -8,6 +8,10 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from app.models.product import ProductPhoto, ProductVideo, Product as ProductModel
 from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
+from app.services.my_products_query_service import (
+    apply_my_products_filters as _apply_my_products_filters,
+    apply_my_products_sort as _apply_my_products_sort,
+)
 from app.models.product_vehicle import ProductVehicleAssociation
 from app.schemas.product import (
     Product as ProductSchema,
@@ -61,15 +65,6 @@ class MyProductsListResponse(PublicProductsResponse):
     """Список «Мои запчасти» с агрегатами по всему фильтру (не только текущая страница)."""
     total_quantity: int = 0
     total_value: float = 0
-
-
-class MyProductIdsResponse(BaseModel):
-    ids: List[int]
-    total: int
-    truncated: bool = False
-
-
-_MAX_MY_PRODUCT_IDS = 10000
 
 
 class MyProductIdsResponse(BaseModel):
@@ -347,6 +342,7 @@ def create_product(
 @router.get("/ids", response_model=MyProductIdsResponse)
 def get_my_product_ids(
     storage_location_id: Optional[int] = None,
+    storage_cell_id: Optional[int] = None,
     q: Optional[str] = None,
     sort: str = Query("date_desc", pattern="^(date_desc|date_asc|name_asc|name_desc|price_asc|price_desc)$"),
     db: Session = Depends(get_db),
@@ -360,9 +356,7 @@ def get_my_product_ids(
         ProductModel.organization_id == current_user.organization_id,
         ProductModel.quantity > 0,
     )
-    if storage_location_id is not None:
-        query = query.filter(ProductModel.storage_location_id == storage_location_id)
-    query = _apply_my_products_search(query, q or "")
+    query = _apply_my_products_filters(query, storage_location_id, storage_cell_id, q or "")
 
     total = query.order_by(None).count()
     id_rows = (
@@ -1196,40 +1190,10 @@ def _my_products_load_options():
     ]
 
 
-def _apply_my_products_search(query, q: str):
-    trimmed = (q or "").strip()
-    if not trimmed:
-        return query
-    compact = trimmed.lower().replace(" ", "")
-    pattern = f"%{trimmed.lower()}%"
-    compact_pattern = f"%{compact}%"
-    return query.filter(
-        or_(
-            func.lower(ProductModel.name).like(pattern),
-            func.lower(func.coalesce(ProductModel.article, "")).like(pattern),
-            func.replace(func.lower(func.coalesce(ProductModel.article, "")), " ", "").like(compact_pattern),
-            func.replace(func.lower(func.coalesce(ProductModel.internal_code, "")), " ", "").like(compact_pattern),
-        )
-    )
-
-
-def _apply_my_products_sort(query, sort: str):
-    if sort == "date_asc":
-        return query.order_by(ProductModel.id.asc())
-    if sort == "name_asc":
-        return query.order_by(ProductModel.name.asc(), ProductModel.id.asc())
-    if sort == "name_desc":
-        return query.order_by(ProductModel.name.desc(), ProductModel.id.desc())
-    if sort == "price_asc":
-        return query.order_by(ProductModel.price.asc().nulls_last(), ProductModel.id.asc())
-    if sort == "price_desc":
-        return query.order_by(ProductModel.price.desc().nulls_first(), ProductModel.id.desc())
-    return query.order_by(ProductModel.id.desc())
-
-
 @router.get("/", response_model=MyProductsListResponse)
 def get_products(
     storage_location_id: Optional[int] = None,
+    storage_cell_id: Optional[int] = None,
     q: Optional[str] = None,
     sort: str = Query(
         "date_desc",
@@ -1250,10 +1214,7 @@ def get_products(
         ProductModel.quantity > 0,
     )
 
-    if storage_location_id is not None:
-        query = query.filter(ProductModel.storage_location_id == storage_location_id)
-
-    query = _apply_my_products_search(query, q or "")
+    query = _apply_my_products_filters(query, storage_location_id, storage_cell_id, q or "")
     stats_query = query.order_by(None)
     total = stats_query.count()
     agg = stats_query.with_entities(
