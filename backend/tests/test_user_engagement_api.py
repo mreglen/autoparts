@@ -220,6 +220,34 @@ class UserEngagementServiceTests(unittest.TestCase):
         "app.utils.product_list_item.display_product_price",
         side_effect=lambda price, db=None: float(price or 0),
     )
+    def test_favorite_new_product_allowed(self, _price):
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO products (
+                        id, article, name, brand, internal_code, is_new, price, quantity,
+                        organization_id, created_by, part_type_id
+                    ) VALUES (
+                        100, 'N100', 'New part', 'TEST', 'INT-100', 1, 500, 1, 'ORG1', 1, 1
+                    )
+                    """
+                )
+            )
+        engagement.add_favorite(self.db, 1, 100)
+        self.assertTrue(engagement.is_favorite(self.db, 1, 100))
+        items = engagement.list_favorites(self.db, 1)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].id, 100)
+        engagement.record_product_view(self.db, 1, 100)
+        history = engagement.list_view_history(self.db, 1)
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[0].id, 100)
+
+    @patch(
+        "app.utils.product_list_item.display_product_price",
+        side_effect=lambda price, db=None: float(price or 0),
+    )
     def test_view_history_upsert_and_trim(self, _price):
         for product_id in range(1, 55):
             engagement.record_product_view(self.db, 1, product_id)

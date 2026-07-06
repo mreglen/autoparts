@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchOrganization, clearOrganization } from '../../redux/slices/OrganizationSlice';
 import { normalizeImageUrl } from '../../utils/apiClient';
+import { ChevronRight, ProfileBlock } from './profileUi';
 
 const formatPhoneNumber = (value) => {
   if (!value) return '';
@@ -17,17 +19,7 @@ const formatPhoneNumber = (value) => {
   return formatted;
 };
 
-function OrgField({ label, value }) {
-  if (!value) return null;
-  return (
-    <div className="flex items-baseline justify-between gap-4 py-2 text-sm">
-      <span className="shrink-0 text-gray-500">{label}</span>
-      <span className="text-right text-gray-900">{value}</span>
-    </div>
-  );
-}
-
-export default function OrganizationCard({ orgId, className = '' }) {
+export default function OrganizationCard({ orgId }) {
   const dispatch = useDispatch();
   const { data: org, loading, error } = useSelector((state) => state.organization);
 
@@ -41,51 +33,55 @@ export default function OrganizationCard({ orgId, className = '' }) {
 
   if (loading) {
     return (
-      <section className={`animate-pulse rounded-xl border border-gray-200 bg-white p-5 sm:p-6 ${className}`.trim()}>
-        <div className="flex gap-3">
-          <div className="h-12 w-12 rounded-lg bg-gray-100" />
-          <div className="flex-1 space-y-2 pt-1">
+      <ProfileBlock title="Организация">
+        <div className="flex animate-pulse items-center gap-3 px-4 py-4">
+          <div className="h-11 w-11 rounded-full bg-gray-100" />
+          <div className="flex-1 space-y-2">
             <div className="h-4 w-32 rounded bg-gray-100" />
             <div className="h-3 w-20 rounded bg-gray-50" />
           </div>
         </div>
-      </section>
+      </ProfileBlock>
     );
   }
 
   if (error || !org) {
     return (
-      <section className={`rounded-xl border border-gray-200 bg-white p-5 sm:p-6 ${className}`.trim()}>
-        <p className="text-sm text-gray-500">{error || 'Организация не найдена'}</p>
-      </section>
+      <ProfileBlock title="Организация">
+        <p className="px-4 py-4 text-sm text-gray-500">{error || 'Организация не найдена'}</p>
+      </ProfileBlock>
     );
   }
 
   const logoUrl = org.logo_organization ? normalizeImageUrl(org.logo_organization) : null;
   const orgInitials = (org.name || 'Ор').slice(0, 2).toUpperCase();
+  const phone = org.phone ? formatPhoneNumber(org.phone) : null;
 
   return (
-    <section className={`rounded-xl border border-gray-200 bg-white p-5 sm:p-6 ${className}`.trim()}>
-      <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+    <ProfileBlock title="Организация">
+      <Link
+        to={`/organizations/${org.id}`}
+        className="flex items-center gap-3 border-b border-gray-100 px-4 py-3.5 hover:bg-gray-50"
+      >
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-100">
           {logoUrl ? (
             <img src={logoUrl} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="text-sm font-semibold text-gray-500">{orgInitials}</span>
+            <span className="text-sm font-medium text-gray-500">{orgInitials}</span>
           )}
         </div>
-        <div className="min-w-0">
-          <p className="truncate font-medium text-gray-900">{org.name || 'Организация'}</p>
-          <p className="font-mono text-xs text-gray-400">{org.id}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[15px] font-medium text-gray-900">{org.name || 'Организация'}</p>
+          {phone ? <p className="truncate text-sm text-gray-400">{phone}</p> : null}
         </div>
-      </div>
-
-      {(org.address || org.phone) && (
-        <div className="mt-4 border-t border-gray-100 pt-1">
-          <OrgField label="Адрес" value={org.address} />
-          <OrgField label="Телефон" value={org.phone ? formatPhoneNumber(org.phone) : null} />
+        <ChevronRight />
+      </Link>
+      {org.address ? (
+        <div className="px-4 py-3.5">
+          <p className="text-sm text-gray-400">Адрес</p>
+          <p className="mt-0.5 text-[15px] text-gray-900">{org.address}</p>
         </div>
-      )}
-    </section>
+      ) : null}
+    </ProfileBlock>
   );
 }

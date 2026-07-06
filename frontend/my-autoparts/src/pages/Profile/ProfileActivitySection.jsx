@@ -9,6 +9,7 @@ import {
   fetchSearchSubscriptions,
   fetchViewHistory,
 } from '../../redux/slices/UserEngagementSlice';
+import { ProfileBlock } from './profileUi';
 
 function formatDate(value) {
   if (!value) return null;
@@ -16,10 +17,6 @@ function formatDate(value) {
     day: 'numeric',
     month: 'short',
   });
-}
-
-function EmptyHint({ children }) {
-  return <p className="py-8 text-center text-sm text-gray-400">{children}</p>;
 }
 
 export default function ProfileActivitySection() {
@@ -35,63 +32,63 @@ export default function ProfileActivitySection() {
   }, [dispatch]);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <div className="px-5 py-4 sm:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-gray-900">Просмотры</h3>
+    <>
+      <ProfileBlock title="Недавно смотрели">
+        <div className="px-4 py-3">
           {views.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => dispatch(clearViewHistory())}
-              className="text-xs text-gray-400 transition-colors hover:text-gray-600"
-            >
-              Очистить
-            </button>
+            <div className="mb-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => dispatch(clearViewHistory())}
+                className="text-sm text-gray-400 hover:text-gray-600"
+              >
+                Очистить
+              </button>
+            </div>
           ) : null}
+
+          {viewsLoading ? (
+            <ProductCardSkeletonGrid count={3} />
+          ) : views.length === 0 ? (
+            <p className="py-6 text-center text-sm text-gray-400">
+              <Link to="/autoparts/used" className="text-[#0099f7] hover:underline">
+                Перейти в каталог
+              </Link>
+            </p>
+          ) : (
+            <div className="-mx-1 flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+              {views.map((part) => (
+                <div key={part.id} className="w-[9.5rem] shrink-0 sm:w-[10.5rem]">
+                  <ProductCard part={part} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+      </ProfileBlock>
 
-        {viewsLoading ? (
-          <div className="mt-3">
-            <ProductCardSkeletonGrid count={4} />
-          </div>
-        ) : views.length === 0 ? (
-          <EmptyHint>
-            Пока ничего нет.{' '}
-            <Link to="/autoparts/used" className="text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline">
-              Каталог б/у
-            </Link>
-          </EmptyHint>
-        ) : (
-          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-            {views.map((part) => (
-              <ProductCard key={part.id} part={part} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="border-t border-gray-100 px-5 py-4 sm:px-6">
-        <h3 className="text-sm font-semibold text-gray-900">Подписки на поиск</h3>
-
+      <ProfileBlock title="Подписки на поиск">
         {subsLoading ? (
-          <div className="mt-3 space-y-2">
-            <div className="h-11 animate-pulse rounded-lg bg-gray-50" />
-            <div className="h-11 animate-pulse rounded-lg bg-gray-50" />
+          <div className="space-y-0">
+            <div className="mx-4 my-3 h-12 animate-pulse rounded bg-gray-50" />
+            <div className="mx-4 mb-3 h-12 animate-pulse rounded bg-gray-50" />
           </div>
         ) : subscriptions.length === 0 ? (
-          <EmptyHint>
-            Нет подписок.{' '}
-            <Link to="/autoparts/used" className="text-gray-600 underline-offset-2 hover:text-gray-900 hover:underline">
-              Найти в каталоге
+          <p className="px-4 py-6 text-center text-sm text-gray-400">
+            <Link to="/autoparts/used" className="text-[#0099f7] hover:underline">
+              Подписаться в каталоге
             </Link>
-          </EmptyHint>
+          </p>
         ) : (
-          <ul className="mt-3 divide-y divide-gray-100">
+          <ul>
             {subscriptions.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 py-3 first:pt-0">
+              <li
+                key={item.id}
+                className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3.5 last:border-b-0"
+              >
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-gray-900">{item.query_text}</p>
-                  <p className="mt-0.5 text-xs text-gray-400">
+                  <p className="truncate text-[15px] text-gray-900">{item.query_text}</p>
+                  <p className="mt-0.5 text-sm text-gray-400">
                     {formatDate(item.created_at)}
                     {item.last_notified_at ? ` · ${formatDate(item.last_notified_at)}` : ''}
                   </p>
@@ -99,7 +96,7 @@ export default function ProfileActivitySection() {
                 <button
                   type="button"
                   onClick={() => dispatch(deleteSearchSubscription(item.id))}
-                  className="shrink-0 text-xs text-gray-400 transition-colors hover:text-red-600"
+                  className="shrink-0 text-sm text-gray-400 hover:text-red-600"
                 >
                   Убрать
                 </button>
@@ -107,7 +104,7 @@ export default function ProfileActivitySection() {
             ))}
           </ul>
         )}
-      </div>
-    </section>
+      </ProfileBlock>
+    </>
   );
 }

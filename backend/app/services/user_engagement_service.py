@@ -20,20 +20,17 @@ _PRODUCT_LOAD = (
 )
 
 
-def _load_used_product(db: Session, product_id: int) -> ProductModel | None:
+def _load_product(db: Session, product_id: int) -> ProductModel | None:
     return (
         db.query(ProductModel)
         .options(*_PRODUCT_LOAD)
-        .filter(
-            ProductModel.id == product_id,
-            ProductModel.is_new.is_(False),
-        )
+        .filter(ProductModel.id == product_id)
         .first()
     )
 
 
-def _ensure_used_product(db: Session, product_id: int) -> ProductModel:
-    product = _load_used_product(db, product_id)
+def _ensure_product(db: Session, product_id: int) -> ProductModel:
+    product = _load_product(db, product_id)
     if not product:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -55,7 +52,7 @@ def is_favorite(db: Session, user_id: int, product_id: int) -> bool:
 
 
 def add_favorite(db: Session, user_id: int, product_id: int) -> None:
-    _ensure_used_product(db, product_id)
+    _ensure_product(db, product_id)
     existing = (
         db.query(UserFavorite)
         .filter(
@@ -95,14 +92,14 @@ def list_favorites(db: Session, user_id: int) -> list[ProductListItem]:
     items: list[ProductListItem] = []
     for row in rows:
         product = row.product
-        if not product or product.is_new:
+        if not product:
             continue
         items.append(map_product_to_list_item(product, db=db))
     return items
 
 
 def record_product_view(db: Session, user_id: int, product_id: int) -> None:
-    _ensure_used_product(db, product_id)
+    _ensure_product(db, product_id)
     now = datetime.now(timezone.utc)
     row = (
         db.query(UserProductView)
@@ -156,7 +153,7 @@ def list_view_history(db: Session, user_id: int) -> list[ProductListItem]:
     items: list[ProductListItem] = []
     for row in rows:
         product = row.product
-        if not product or product.is_new:
+        if not product:
             continue
         items.append(map_product_to_list_item(product, db=db))
     return items

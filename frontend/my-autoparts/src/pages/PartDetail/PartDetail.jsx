@@ -20,7 +20,6 @@ import PartDetailFitmentBlock from './PartDetailFitmentBlock';
 import PartDetailAboutBlock from './PartDetailAboutBlock';
 import PartDetailFaqBlock from './PartDetailFaqBlock';
 import PartDetailTrustRow from './PartDetailTrustRow';
-import PartDetailSellerTrust from './PartDetailSellerTrust';
 import PartDetailInspectionBlock from './PartDetailInspectionBlock';
 import PartDetailReturnPolicyBlock from './PartDetailReturnPolicyBlock';
 import PartArticleMatchesBlock from '../../components/PartArticleMatchesBlock/PartArticleMatchesBlock';
@@ -135,8 +134,6 @@ const PartDetail = () => {
   const [referenceFitmentLoading, setReferenceFitmentLoading] = useState(false);
   const [soldOutAlternates, setSoldOutAlternates] = useState([]);
   const [soldOutAlternatesLoading, setSoldOutAlternatesLoading] = useState(false);
-  const [sellerTrustStats, setSellerTrustStats] = useState(null);
-  const [sellerTrustLoading, setSellerTrustLoading] = useState(false);
   const fetchedProductIdRef = useRef(null);
   const searchedBrandArticleRef = useRef(null);
   const trackedPartViewRef = useRef(null);
@@ -170,31 +167,6 @@ const PartDetail = () => {
     fetchedProductIdRef.current = null;
     searchedBrandArticleRef.current = null;
   }, [combinedParam]);
-
-  useEffect(() => {
-    const orgId = currentProduct?.organization?.id;
-    if (!orgId || !showProduct) {
-      setSellerTrustStats(null);
-      setSellerTrustLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setSellerTrustLoading(true);
-    apiAxiosUnauth
-      .get(`/public/organizations/${orgId}/trust-stats`)
-      .then((response) => {
-        if (!cancelled) setSellerTrustStats(response?.data || null);
-      })
-      .catch(() => {
-        if (!cancelled) setSellerTrustStats(null);
-      })
-      .finally(() => {
-        if (!cancelled) setSellerTrustLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [currentProduct?.organization?.id, showProduct]);
 
   useEffect(() => {
     const path = location.pathname;
@@ -1205,14 +1177,7 @@ const PartDetail = () => {
                   </div>
                 </div>
 
-                <PartDetailSellerTrust
-                  trustStats={sellerTrustStats}
-                  organizationId={sellerOrg?.id}
-                  organizationName={sellerOrg?.name}
-                  loading={sellerTrustLoading}
-                />
-                
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <div className="flex flex-col gap-2 sm:flex-row">
                 {sellerOrg?.phone && (
                     <button
                       type="button"
