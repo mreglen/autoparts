@@ -114,6 +114,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const loadMoreSentinelRef = useRef(null);
   const catalogHasMore = isCatalogMode && catalogHasMoreFromStore;
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
+  const user = useSelector((state) => state.auth.user);
   const [organizationFilterName, setOrganizationFilterName] = useState('');
 
   useEffect(() => {
