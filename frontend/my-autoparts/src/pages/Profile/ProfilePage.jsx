@@ -15,6 +15,7 @@ import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationMo
 
 import ChangePasswordModal from './ChangePasswordModal';
 import OrganizationCard from './OrganizationCard';
+import ProfileActivitySection from './ProfileActivitySection';
 import { useAuthReady } from '../../hooks/useAuthReady';
 
 function ProfilePageSkeleton() {
@@ -78,80 +79,35 @@ function ProfilePageSkeleton() {
 
 
 
-function getInitials(user) {
-
-    const l = user?.last_name?.[0] || '';
-
-    const f = user?.first_name?.[0] || '';
-
-    return (l + f).toUpperCase() || '?';
-
-}
-
-
-
 function getRoleMeta(user) {
 
     if (user?.is_admin) {
-
-        return { label: 'Администратор', badge: 'bg-purple-100 text-purple-800', ring: 'ring-purple-200' };
-
+        return { label: 'Администратор', badge: 'bg-gray-100 text-gray-700' };
     }
-
     if (user?.is_seller) {
-
-        return { label: 'Продавец', badge: 'bg-rose-100 text-rose-800', ring: 'ring-rose-200' };
-
+        return { label: 'Продавец', badge: 'bg-gray-100 text-gray-700' };
     }
-
     if (user?.is_employee) {
-
-        return { label: 'Сотрудник', badge: 'bg-emerald-100 text-emerald-800', ring: 'ring-emerald-200' };
-
+        return { label: 'Сотрудник', badge: 'bg-gray-100 text-gray-700' };
     }
-
-    return { label: 'Покупатель', badge: 'bg-blue-100 text-blue-800', ring: 'ring-blue-200' };
-
+    return { label: 'Покупатель', badge: 'bg-gray-100 text-gray-700' };
 }
 
-
-
-function InfoRow({ icon, label, value, mono }) {
-
+function ProfileField({ label, value, mono }) {
     return (
-
-        <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3">
-
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-indigo-600 shadow-sm ring-1 ring-gray-100">
-
-                {icon}
-
-            </div>
-
-            <div className="min-w-0 flex-1">
-
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
-
-                <p className={`mt-0.5 text-sm font-medium text-gray-900 break-words ${mono ? 'font-mono' : ''}`}>
-
-                    {value || '—'}
-
-                </p>
-
-            </div>
-
+        <div className="flex items-baseline justify-between gap-4 py-2.5 text-sm">
+            <span className="text-gray-500">{label}</span>
+            <span className={`text-right text-gray-900 ${mono ? 'font-mono text-xs' : 'font-medium'}`}>
+                {value || '—'}
+            </span>
         </div>
-
     );
-
 }
-
-
 
 function HeroIconButton({ onClick, title, children, variant = 'default' }) {
     const variants = {
-        default: 'border border-gray-200 bg-white text-gray-600 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600',
-        danger: 'border border-red-200 bg-red-50 text-red-600 hover:bg-red-100',
+        default: 'text-gray-400 hover:bg-gray-50 hover:text-gray-700',
+        danger: 'text-gray-400 hover:bg-red-50 hover:text-red-600',
     };
     return (
         <button
@@ -159,7 +115,7 @@ function HeroIconButton({ onClick, title, children, variant = 'default' }) {
             onClick={onClick}
             title={title}
             aria-label={title}
-            className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-sm transition-colors ${variants[variant]}`}
+            className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${variants[variant]}`}
         >
             {children}
         </button>
@@ -222,18 +178,6 @@ export default function ProfilePage() {
 
     const roleMeta = useMemo(() => (user ? getRoleMeta(user) : null), [user]);
 
-
-
-    const fullName = useMemo(() => {
-
-        const parts = [user?.last_name, user?.first_name, user?.patronymic].filter(Boolean);
-
-        return parts.join(' ').trim();
-
-    }, [user?.last_name, user?.first_name, user?.patronymic]);
-
-
-
     const displayName = useMemo(() => {
 
         if (!user) return '';
@@ -267,9 +211,7 @@ export default function ProfilePage() {
 
                     </div>
 
-                    <h2 className="text-xl font-bold text-gray-800">Войдите в аккаунт</h2>
-
-                    <p className="mt-2 text-sm text-gray-500">Чтобы просматривать и редактировать профиль</p>
+                    <h2 className="text-lg font-semibold text-gray-900">Войдите в аккаунт</h2>
 
                     <Link
 
@@ -388,21 +330,22 @@ export default function ProfilePage() {
 
 
     const showOrganization = Boolean(user.organization_id && (user.is_seller || user.is_director || user.is_employee));
+    const showContactsCard = isEditing || Boolean(user.phone);
+    const showDetailsRow = showContactsCard || showOrganization;
 
 
 
     return (
 
-        <div className="mt-4 sm:mt-5 space-y-6 px-4 sm:px-0">
-            {/* Hero */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-                <div className="flex items-start gap-3 sm:items-center sm:gap-4">
-                    <div className="flex shrink-0 flex-col items-center sm:items-start">
+        <div className="mt-4 sm:mt-5 space-y-5 px-4 sm:px-0">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+                <div className="flex items-start gap-4">
+                    <div className="shrink-0">
                         <button
                             type="button"
                             onClick={() => avatarInputRef.current?.click()}
                             disabled={avatarLoading}
-                            className={`group relative block rounded-2xl shadow-md ring-4 ring-white ${roleMeta.ring} focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60`}
+                            className="group relative block overflow-hidden rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-60"
                             title="Изменить фото"
                             aria-label="Изменить фото профиля"
                         >
@@ -412,9 +355,9 @@ export default function ProfilePage() {
                                 lastName={user.last_name}
                                 size="xl"
                             />
-                            <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl bg-black/0 transition-colors group-hover:bg-black/40">
+                            <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/35">
                                 <svg
-                                    className="h-7 w-7 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                    className="h-6 w-6 text-white opacity-0 transition-opacity group-hover:opacity-100"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -430,8 +373,8 @@ export default function ProfilePage() {
                                 </svg>
                             </span>
                             {avatarLoading && (
-                                <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 text-xs font-medium text-white">
-                                    Загрузка…
+                                <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs text-white">
+                                    …
                                 </span>
                             )}
                         </button>
@@ -442,34 +385,32 @@ export default function ProfilePage() {
                             className="hidden"
                             onChange={handleAvatarFileChange}
                         />
-                        {user.avatar_url && (
+                        {isEditing && user.avatar_url && (
                             <button
                                 type="button"
                                 onClick={handleDeleteAvatar}
                                 disabled={avatarLoading}
-                                className="mt-2 text-xs text-gray-500 transition-colors hover:text-red-600 disabled:opacity-50"
+                                className="mt-2 block w-full text-center text-xs text-gray-400 hover:text-red-600 disabled:opacity-50"
                             >
-                                Удалить фото
+                                Удалить
                             </button>
                         )}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                        <h2 className="truncate text-xl font-bold text-gray-900 sm:text-2xl">{displayName}</h2>
+                        <h1 className="truncate text-lg font-semibold text-gray-900">{displayName}</h1>
                         <p className="truncate text-sm text-gray-500">{user.email}</p>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${roleMeta.badge}`}>
+                            <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${roleMeta.badge}`}>
                                 {roleMeta.label}
                             </span>
                             {user.public_code && (
-                                <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 font-mono text-xs text-gray-600">
-                                    ID {user.public_code}
-                                </span>
+                                <span className="font-mono text-xs text-gray-400">{user.public_code}</span>
                             )}
                         </div>
                     </div>
 
-                    <div className="flex shrink-0 flex-col gap-2 max-lg:items-end lg:flex-row lg:items-center lg:gap-2 lg:self-center">
+                    <div className="flex shrink-0 gap-0.5">
                         {!isEditing && (
                             <HeroIconButton onClick={handleEdit} title="Редактировать профиль">
                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -495,10 +436,12 @@ export default function ProfilePage() {
                 </div>
             </div>
 
-            <div className={`grid grid-cols-1 gap-6 ${showOrganization ? 'lg:grid-cols-2 lg:items-start' : ''}`}>
+            {showDetailsRow ? (
+            <div className={`grid grid-cols-1 gap-5 ${showOrganization && showContactsCard ? 'lg:grid-cols-2 lg:items-start' : ''}`}>
+            {showContactsCard ? (
             <section
-                className={`h-full space-y-3 rounded-2xl border bg-white p-5 shadow-sm sm:p-6 ${
-                    isEditing ? 'border-indigo-200 ring-1 ring-indigo-100' : 'border-gray-200'
+                className={`rounded-xl border bg-white p-4 sm:p-5 ${
+                    isEditing ? 'border-gray-300' : 'border-gray-200'
                 }`}
             >
                 {saveError && (
@@ -507,14 +450,7 @@ export default function ProfilePage() {
 
                 {isEditing ? (
                     <div className="space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <h3 className="text-base font-semibold text-gray-900">Личные данные</h3>
-                            <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
-                                Редактирование
-                            </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
 
                             <div>
 
@@ -596,73 +532,19 @@ export default function ProfilePage() {
                         </div>
                     </div>
                 ) : (
-                    <div className="space-y-3">
-                        <h3 className="text-base font-semibold text-gray-900">Личные данные</h3>
-
-                        <InfoRow
-
-                            label="ФИО"
-
-                            value={fullName || '—'}
-
-                            icon={
-
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-
-                                </svg>
-
-                            }
-
-                        />
-
-                        <InfoRow
-
-                            label="Email"
-
-                            value={user.email}
-
-                            icon={
-
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-
-                                </svg>
-
-                            }
-
-                        />
-
-                        <InfoRow
-
-                            label="Телефон"
-
-                            value={user.phone}
-
-                            icon={
-
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-
-                                </svg>
-
-                            }
-
-                        />
-
-                    </div>
-
+                    <ProfileField label="Телефон" value={user.phone} />
                 )}
 
             </section>
+            ) : null}
 
             {showOrganization && (
                 <OrganizationCard orgId={user.organization_id} className="h-full" />
             )}
             </div>
+            ) : null}
+
+            <ProfileActivitySection />
 
             <ChangePasswordModal isOpen={showPasswordModal} onClose={() => setShowPasswordModal(false)} />
 

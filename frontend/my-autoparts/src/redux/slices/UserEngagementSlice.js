@@ -117,6 +117,8 @@ export const deleteSearchSubscription = createAsyncThunk(
   },
 );
 
+const normalizeProductId = (productId) => Number(productId);
+
 const initialState = {
   favoriteByProductId: {},
   favorites: [],
@@ -141,17 +143,25 @@ const userEngagementSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchFavoriteStatus.fulfilled, (state, action) => {
-        state.favoriteByProductId[action.payload.productId] = action.payload.isFavorite;
+        const productId = normalizeProductId(action.payload.productId);
+        state.favoriteByProductId[productId] = action.payload.isFavorite;
       })
-      .addCase(toggleFavorite.pending, (state) => {
+      .addCase(toggleFavorite.pending, (state, action) => {
         state.favoriteToggleLoading = true;
+        const productId = normalizeProductId(action.meta.arg.productId);
+        const { isFavorite } = action.meta.arg;
+        state.favoriteByProductId[productId] = !isFavorite;
       })
       .addCase(toggleFavorite.fulfilled, (state, action) => {
         state.favoriteToggleLoading = false;
-        state.favoriteByProductId[action.payload.productId] = action.payload.isFavorite;
+        const productId = normalizeProductId(action.payload.productId);
+        state.favoriteByProductId[productId] = action.payload.isFavorite;
       })
       .addCase(toggleFavorite.rejected, (state, action) => {
         state.favoriteToggleLoading = false;
+        const productId = normalizeProductId(action.meta.arg.productId);
+        const { isFavorite } = action.meta.arg;
+        state.favoriteByProductId[productId] = isFavorite;
         state.error = action.payload;
       })
       .addCase(fetchFavorites.pending, (state) => {

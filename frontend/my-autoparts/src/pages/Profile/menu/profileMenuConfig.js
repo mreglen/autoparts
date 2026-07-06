@@ -6,8 +6,6 @@ export const TAB_PATH_MAP = {
     'purchases-orders': '/purchases/orders',
     'purchases-returns': '/purchases/returns',
     'purchases-favorites': '/purchases/favorites',
-    'purchases-history': '/purchases/history',
-    'purchases-subscriptions': '/purchases/subscriptions',
     'sales-orders': '/sales/orders',
     'sales-returns': '/sales/returns',
     'warehouse-sales': '/warehouse-sales',
@@ -38,8 +36,6 @@ const PURCHASES_ENGAGEMENT_SUBMENU = [
     { id: 'purchases-orders', label: 'Заказы' },
     { id: 'purchases-returns', label: 'Возвраты' },
     { id: 'purchases-favorites', label: 'Избранное' },
-    { id: 'purchases-history', label: 'История просмотров' },
-    { id: 'purchases-subscriptions', label: 'Подписки на поиск' },
 ];
 
 const PATH_TAB_MAP = Object.fromEntries(

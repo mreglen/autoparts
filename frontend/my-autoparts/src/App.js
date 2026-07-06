@@ -64,8 +64,6 @@ const PurchasesOrdersPage = lazy(() => import('./pages/Sales/PurchasesOrdersPage
 const SalesReturnsPage = lazy(() => import('./pages/Sales/SalesReturnsPage'));
 const PurchasesReturnsPage = lazy(() => import('./pages/Sales/PurchasesReturnsPage'));
 const FavoritesPage = lazy(() => import('./pages/Profile/FavoritesPage'));
-const ViewHistoryPage = lazy(() => import('./pages/Profile/ViewHistoryPage'));
-const SearchSubscriptionsPage = lazy(() => import('./pages/Profile/SearchSubscriptionsPage'));
 const WarehouseSalesPage = lazy(() => import('./pages/Sales/WarehouseSalesPage'));
 const FinancePage = lazy(() => import('./pages/Finance/FinancePage'));
 const DashboardPage = lazy(() => import('./pages/Dashboard/DashboardPage'));
@@ -491,19 +489,11 @@ function App() {
           />
           <Route
             path="/purchases/history"
-            element={(
-              <LazyRoute>
-                <ViewHistoryPage />
-              </LazyRoute>
-            )}
+            element={<Navigate to="/profile" replace />}
           />
           <Route
             path="/purchases/subscriptions"
-            element={(
-              <LazyRoute>
-                <SearchSubscriptionsPage />
-              </LazyRoute>
-            )}
+            element={<Navigate to="/profile" replace />}
           />
           <Route
             path="/sales/orders"
