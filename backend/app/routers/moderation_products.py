@@ -13,6 +13,7 @@ from app.models.stock_in import StockIn as StockInModel
 from app.models.user import User
 
 from app.models.part_type import PartType as PartTypeModel
+from app.utils.product_price import normalize_product_price_for_save
 from app.models.product_storage_cell import ProductStorageCell
 from app.models.pending_product_storage_cell import PendingProductStorageCell
 from app.schemas.moderation import ModerateProductRequest, ModerateProductResponse
@@ -300,6 +301,10 @@ def approve_product(
     if approved_quantity is None or approved_quantity < 1:
         approved_quantity = 1
 
+    product_price = pending_product.price
+    if product_price is not None:
+        product_price = normalize_product_price_for_save(product_price, db=db)
+
     # Создать запись в products (без vehicle_ids и photos)
     db_product = ProductModel(
         article=pending_product.article,
@@ -308,7 +313,7 @@ def approve_product(
         internal_code=internal_code,
         description=pending_product.description,
         is_new=pending_product.is_new,
-        price=pending_product.price,
+        price=product_price,
         quantity=approved_quantity,
         organization_id=pending_product.organization_id,
         storage_location_id=pending_product.storage_location_id,

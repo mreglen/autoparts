@@ -38,6 +38,7 @@ from app.utils.public_catalog_cache import (
     invalidate_public_catalog_cache,
     invalidate_public_product_detail,
 )
+from app.utils.product_price import display_product_price, normalize_product_price_for_save
 
 
 def _invalidate_public_product_cache(product_id: int | None = None) -> None:
@@ -60,6 +61,24 @@ class MyProductsListResponse(PublicProductsResponse):
     """Список «Мои запчасти» с агрегатами по всему фильтру (не только текущая страница)."""
     total_quantity: int = 0
     total_value: float = 0
+
+
+class MyProductIdsResponse(BaseModel):
+    ids: List[int]
+    total: int
+    truncated: bool = False
+
+
+_MAX_MY_PRODUCT_IDS = 10000
+
+
+class MyProductIdsResponse(BaseModel):
+    ids: List[int]
+    total: int
+    truncated: bool = False
+
+
+_MAX_MY_PRODUCT_IDS = 10000
 
 
 def _public_list_load_options():
@@ -160,6 +179,14 @@ def create_product(
 
     # Подготавливаем данные продукта
     product_data = product.dict(exclude={"vehicle_ids", "photos", "videos"})
+    if product_data.get("price") is not None:
+        normalized_price = normalize_product_price_for_save(product_data["price"], db=db)
+        if normalized_price is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Некорректная цена товара",
+            )
+        product_data["price"] = normalized_price
 
     if not product_data.get("internal_code"):
         product_data["internal_code"] = next_internal_code(db, current_user.organization_id)
@@ -316,6 +343,38 @@ def create_product(
     _invalidate_public_product_cache(db_product.id)
     return db_product
 
+
+@router.get("/ids", response_model=MyProductIdsResponse)
+def get_my_product_ids(
+    storage_location_id: Optional[int] = None,
+    q: Optional[str] = None,
+    sort: str = Query("date_desc", pattern="^(date_desc|date_asc|name_asc|name_desc|price_asc|price_desc)$"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """ID всех товаров по текущему фильтру (для «выбрать всё» в «Мои запчасти»)."""
+    if not current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Организация не указана")
+
+    query = db.query(ProductModel).filter(
+        ProductModel.organization_id == current_user.organization_id,
+        ProductModel.quantity > 0,
+    )
+    if storage_location_id is not None:
+        query = query.filter(ProductModel.storage_location_id == storage_location_id)
+    query = _apply_my_products_search(query, q or "")
+
+    total = query.order_by(None).count()
+    id_rows = (
+        _apply_my_products_sort(query, sort)
+        .with_entities(ProductModel.id)
+        .limit(_MAX_MY_PRODUCT_IDS)
+        .all()
+    )
+    ids = [int(row[0]) for row in id_rows]
+    return MyProductIdsResponse(ids=ids, total=total, truncated=total > len(ids))
+
+
 @router.get("/{product_id}", response_model=ProductSchema)
 def read_product(
     product_id: int,
@@ -422,7 +481,7 @@ def find_public_used_product_match(
                 brand=product.brand,
                 article=product.article,
                 name=product.name,
-                price=float(product.price) if product.price is not None else None,
+                price=display_product_price(product.price, db=db),
                 quantity=int(product.quantity or 0),
                 photo_url=_photo_url(product),
                 organization_name=str(org_name).strip() if org_name else None,
@@ -587,6 +646,15 @@ def update_product(
     # Исключаем internal_code, если он пустой или null
     if not update_data.get("internal_code"):
         del update_data["internal_code"]
+
+    if "price" in update_data and update_data["price"] is not None:
+        normalized_price = normalize_product_price_for_save(update_data["price"], db=db)
+        if normalized_price is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Некорректная цена товара",
+            )
+        update_data["price"] = normalized_price
 
     for key, value in update_data.items():
         setattr(db_product, key, value)
@@ -1146,13 +1214,16 @@ def _apply_my_products_search(query, q: str):
 
 
 def _apply_my_products_sort(query, sort: str):
-    # products.id монотонно растёт — используем как прокси даты создания
     if sort == "date_asc":
         return query.order_by(ProductModel.id.asc())
     if sort == "name_asc":
         return query.order_by(ProductModel.name.asc(), ProductModel.id.asc())
     if sort == "name_desc":
         return query.order_by(ProductModel.name.desc(), ProductModel.id.desc())
+    if sort == "price_asc":
+        return query.order_by(ProductModel.price.asc().nulls_last(), ProductModel.id.asc())
+    if sort == "price_desc":
+        return query.order_by(ProductModel.price.desc().nulls_first(), ProductModel.id.desc())
     return query.order_by(ProductModel.id.desc())
 
 
@@ -1160,7 +1231,10 @@ def _apply_my_products_sort(query, sort: str):
 def get_products(
     storage_location_id: Optional[int] = None,
     q: Optional[str] = None,
-    sort: str = Query("date_desc", pattern="^(date_desc|date_asc|name_asc|name_desc)$"),
+    sort: str = Query(
+        "date_desc",
+        pattern="^(date_desc|date_asc|name_asc|name_desc|price_asc|price_desc)$",
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=100),
     db: Session = Depends(get_db),

@@ -9,6 +9,7 @@ import {
   setShowNewAutoparts,
   setShowSiteReviews,
   setNewPartsMarkupPercent,
+  setRoundProductPrices,
 } from '../../redux/slices/PublicInfoSlice';
 import ServerStatsPanel from './ServerStatsPanel';
 import OpenRouterSection from './OpenRouterSection';
@@ -19,6 +20,7 @@ function AdminPanelPage() {
   const { isReady, user, isAuthenticated } = useAuthReady();
   const [showNewAutoparts, setShowNewLocal] = useState(true);
   const [showSiteReviews, setShowSiteReviewsLocal] = useState(true);
+  const [roundProductPrices, setRoundProductPricesLocal] = useState(false);
   const [markupPercent, setMarkupPercent] = useState('15');
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,6 +35,9 @@ function AdminPanelPage() {
   const [internalCodeMigrationBusy, setInternalCodeMigrationBusy] = useState(false);
   const [internalCodeMigrationResult, setInternalCodeMigrationResult] = useState(null);
   const [internalCodeMigrationOrgId, setInternalCodeMigrationOrgId] = useState('');
+  const [priceRoundingMigrationBusy, setPriceRoundingMigrationBusy] = useState(false);
+  const [priceRoundingMigrationResult, setPriceRoundingMigrationResult] = useState(null);
+  const [priceRoundingMigrationOrgId, setPriceRoundingMigrationOrgId] = useState('');
 
   const [siteQuickLinks, setSiteQuickLinks] = useState([]);
   const [siteQuickLinksLoading, setSiteQuickLinksLoading] = useState(true);
@@ -57,6 +62,7 @@ function AdminPanelPage() {
         if (!cancelled) {
           setShowNewLocal(data.show_new_autoparts !== false);
           setShowSiteReviewsLocal(data.show_site_reviews !== false);
+          setRoundProductPricesLocal(data.round_product_prices === true);
           const m = Number(data.new_parts_markup_percent);
           setMarkupPercent(String(Number.isFinite(m) && m >= 0 ? m : 15));
         }
@@ -140,6 +146,24 @@ function AdminPanelPage() {
     }
   };
 
+  const handleToggleRoundProductPrices = async (checked) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest('/admin/site-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ round_product_prices: checked }),
+      });
+      setRoundProductPricesLocal(checked);
+      dispatch(setRoundProductPrices(checked));
+      dispatch(fetchPublicSiteConfig());
+    } catch (e) {
+      setError(e?.message || 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const requestSaveMarkup = () => {
     const n = parseFloat(String(markupPercent).replace(',', '.'));
     if (!Number.isFinite(n) || n < 0 || n > 500) {
@@ -199,6 +223,32 @@ function AdminPanelPage() {
       setError(e?.message || 'Не удалось запустить локализацию фото');
     } finally {
       setPhotoMigrationBusy(false);
+    }
+  };
+
+  const runPriceRoundingMigration = async ({ dryRun }) => {
+    if (!dryRun) {
+      const ok = window.confirm(
+        'Округлить цены всех товаров до целых рублей (убрать копейки)? Изменения сохраняются в базе.'
+      );
+      if (!ok) return;
+    }
+    setPriceRoundingMigrationBusy(true);
+    setError(null);
+    try {
+      const payload = { dry_run: dryRun };
+      const trimmedOrgId = priceRoundingMigrationOrgId.trim();
+      if (trimmedOrgId) payload.org_id = trimmedOrgId;
+
+      const res = await apiRequest('/admin/products/round-prices', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setPriceRoundingMigrationResult(res);
+    } catch (e) {
+      setError(e?.message || 'Не удалось запустить округление цен');
+    } finally {
+      setPriceRoundingMigrationBusy(false);
     }
   };
 
@@ -330,6 +380,22 @@ function AdminPanelPage() {
             <span className="font-medium text-gray-900 block">Отображать отзывы на сайте</span>
             <span className="text-sm text-gray-500 block mt-1">
               Если выключено, скрываются страница «Отзывы», блок на главной, ссылки в меню и форма отправки отзывов.
+            </span>
+          </span>
+        </label>
+        <label className="mt-6 flex items-start gap-3 cursor-pointer select-none border-t border-gray-100 pt-6">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            checked={roundProductPrices}
+            disabled={loadingSettings || saving}
+            onChange={(e) => handleToggleRoundProductPrices(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium text-gray-900 block">Цены товаров без копеек</span>
+            <span className="text-sm text-gray-500 block mt-1">
+              Если включено, на сайте и при сохранении товаров цены округляются до целых рублей.
+              Для уже существующих товаров запустите миграцию ниже.
             </span>
           </span>
         </label>
@@ -595,6 +661,83 @@ function AdminPanelPage() {
                   {internalCodeMigrationResult.failures.map((row) => (
                     <li key={`${row.entity_type}-${row.entity_id}-${row.reason}`}>
                       {row.entity_type} #{row.entity_id}: {row.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Округление цен существующих товаров</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Убирает копейки у уже добавленных товаров: цена сохраняется в базе как целое число рублей.
+          Сначала нажмите «Проверить», затем «Округлить цены».
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label htmlFor="price-rounding-migration-org-id" className="block text-sm font-medium text-gray-700 mb-1">
+              Организация (опционально)
+            </label>
+            <input
+              id="price-rounding-migration-org-id"
+              type="text"
+              placeholder="например qMHbBIoD51"
+              className="block w-52 rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              value={priceRoundingMigrationOrgId}
+              disabled={priceRoundingMigrationBusy}
+              onChange={(e) => setPriceRoundingMigrationOrgId(e.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => runPriceRoundingMigration({ dryRun: true })}
+            disabled={priceRoundingMigrationBusy}
+            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+          >
+            {priceRoundingMigrationBusy ? 'Выполняется…' : 'Проверить'}
+          </button>
+          <button
+            type="button"
+            onClick={() => runPriceRoundingMigration({ dryRun: false })}
+            disabled={priceRoundingMigrationBusy}
+            className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {priceRoundingMigrationBusy ? 'Выполняется…' : 'Округлить цены'}
+          </button>
+        </div>
+        {priceRoundingMigrationResult && (
+          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 space-y-3">
+            <p className="font-medium text-gray-900">
+              Результат: {priceRoundingMigrationResult.dry_run ? 'dry-run' : 'выполнение'}
+            </p>
+            <p>
+              Проверено: <span className="font-semibold">{priceRoundingMigrationResult.scanned}</span>, изменено:{' '}
+              <span className="font-semibold">{priceRoundingMigrationResult.migrated}</span>, пропущено:{' '}
+              <span className="font-semibold">{priceRoundingMigrationResult.skipped}</span>, ошибок:{' '}
+              <span className="font-semibold">{priceRoundingMigrationResult.failed}</span>
+            </p>
+            {Array.isArray(priceRoundingMigrationResult.changes) && priceRoundingMigrationResult.changes.length > 0 && (
+              <div>
+                <p className="font-medium text-gray-900 mb-1">Примеры изменений:</p>
+                <ul className="space-y-1 max-h-44 overflow-auto pr-1 font-mono text-xs">
+                  {priceRoundingMigrationResult.changes.map((row) => (
+                    <li key={row.product_id}>
+                      #{row.product_id}: {row.old_price} → {row.new_price}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {Array.isArray(priceRoundingMigrationResult.failures) && priceRoundingMigrationResult.failures.length > 0 && (
+              <div>
+                <p className="font-medium text-gray-900 mb-1">Ошибки:</p>
+                <ul className="space-y-1 max-h-44 overflow-auto pr-1 text-xs text-red-700">
+                  {priceRoundingMigrationResult.failures.map((row) => (
+                    <li key={`${row.product_id}-${row.reason}`}>
+                      #{row.product_id}: {row.reason}
                     </li>
                   ))}
                 </ul>

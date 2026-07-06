@@ -72,6 +72,7 @@ const publicInfoSlice = createSlice({
         showSiteReviews: true,
         newPartsMarkupPercent: 15,
         usedPartsPurchaseMode: 'both',
+        roundProductPrices: false,
         adminSellerMarkupContext: null,
         quickLinks: [],
         quickLinksLoading: false,
@@ -85,6 +86,7 @@ const publicInfoSlice = createSlice({
       state.showSiteReviews = true;
       state.newPartsMarkupPercent = 15;
       state.usedPartsPurchaseMode = 'both';
+      state.roundProductPrices = false;
       state.error = null;
     },
     setShowNewAutoparts: (state, action) => {
@@ -97,6 +99,9 @@ const publicInfoSlice = createSlice({
       const n = Number(action.payload);
       state.newPartsMarkupPercent =
         Number.isFinite(n) && n >= 0 ? n : 15;
+    },
+    setRoundProductPrices: (state, action) => {
+      state.roundProductPrices = action.payload === true;
     },
     setAdminSellerMarkupContext: (state, action) => {
       state.adminSellerMarkupContext = action.payload;
@@ -119,6 +124,7 @@ const publicInfoSlice = createSlice({
         const mode = p?.used_parts_purchase_mode;
         state.usedPartsPurchaseMode =
           mode === 'cart_only' || mode === 'cta_only' || mode === 'both' ? mode : 'both';
+        state.roundProductPrices = p?.round_product_prices === true;
         if (p?.organization_phone) {
           state.adminOrganizationPhone = {
             organization_name: p.organization_name ?? null,
@@ -154,6 +160,7 @@ export const {
   setShowNewAutoparts,
   setShowSiteReviews,
   setNewPartsMarkupPercent,
+  setRoundProductPrices,
   setAdminSellerMarkupContext,
 } = publicInfoSlice.actions;
 export default publicInfoSlice.reducer;

@@ -53,6 +53,10 @@ from app.services.internal_code_migration import (
     format_changes_for_output,
     migrate_internal_codes,
 )
+from app.services.product_price_migration import (
+    format_price_changes_for_output,
+    migrate_product_prices,
+)
 from app.services.sitemap_service import (
     DEFAULT_PRODUCT_URLS_LIMIT,
     generate_latest_product_urls_download,
@@ -96,6 +100,7 @@ class SiteSettingsResponse(BaseModel):
     show_site_reviews: bool = True
     new_parts_markup_percent: float
     used_parts_purchase_mode: str = "both"
+    round_product_prices: bool = False
 
 
 class SiteSettingsPatch(BaseModel):
@@ -103,6 +108,7 @@ class SiteSettingsPatch(BaseModel):
     show_site_reviews: Optional[bool] = None
     new_parts_markup_percent: Optional[float] = Field(None, ge=0, le=500)
     used_parts_purchase_mode: Optional[str] = None
+    round_product_prices: Optional[bool] = None
     global_markup_apply_mode: Optional[str] = Field(
         None,
         description="all — применить глобальную наценку ко всем организациям; skip_manual — пропустить организации с ручной наценкой",
@@ -174,6 +180,35 @@ class InternalCodeMigrationResponse(BaseModel):
     failures: List[InternalCodeMigrationFailure]
 
 
+class ProductPriceMigrationRequest(BaseModel):
+    dry_run: bool = True
+    org_id: Optional[str] = None
+    limit: Optional[int] = Field(None, ge=1, le=50000)
+    change_limit: int = Field(50, ge=1, le=200)
+
+
+class ProductPriceMigrationChange(BaseModel):
+    product_id: int
+    organization_id: Optional[str] = None
+    old_price: float
+    new_price: float
+
+
+class ProductPriceMigrationFailure(BaseModel):
+    product_id: int
+    reason: str
+
+
+class ProductPriceMigrationResponse(BaseModel):
+    dry_run: bool
+    scanned: int
+    migrated: int
+    skipped: int
+    failed: int
+    changes: List[ProductPriceMigrationChange]
+    failures: List[ProductPriceMigrationFailure]
+
+
 @router.get("/server-stats", response_model=ServerStatsOut)
 def get_server_stats(
     current_user: User = Depends(get_current_admin_user),
@@ -194,6 +229,7 @@ def get_site_settings_admin(
         show_site_reviews=getattr(row, "show_site_reviews", True) is not False,
         new_parts_markup_percent=_new_parts_markup_percent_value(row),
         used_parts_purchase_mode=mode,
+        round_product_prices=getattr(row, "round_product_prices", False) is True,
     )
 
 
@@ -232,6 +268,8 @@ def patch_site_settings_admin(
                 detail="used_parts_purchase_mode must be cart_only, cta_only, or both",
             )
         row.used_parts_purchase_mode = mode
+    if "round_product_prices" in data:
+        row.round_product_prices = bool(data["round_product_prices"])
     db.commit()
     db.refresh(row)
     log_audit(
@@ -248,6 +286,7 @@ def patch_site_settings_admin(
         show_site_reviews=getattr(row, "show_site_reviews", True) is not False,
         new_parts_markup_percent=_new_parts_markup_percent_value(row),
         used_parts_purchase_mode=mode,
+        round_product_prices=getattr(row, "round_product_prices", False) is True,
     )
 
 
@@ -362,6 +401,53 @@ def migrate_product_internal_codes_admin(
         skipped=counters.skipped,
         failed=counters.failed,
         changes=[InternalCodeMigrationChange(**row) for row in changes],
+        failures=failures,
+    )
+
+
+@router.post("/products/round-prices", response_model=ProductPriceMigrationResponse)
+def round_product_prices_admin(
+    payload: ProductPriceMigrationRequest,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    result = migrate_product_prices(
+        db,
+        dry_run=payload.dry_run,
+        org_id=payload.org_id,
+        limit=payload.limit,
+        change_limit=payload.change_limit,
+    )
+    counters = result.counters
+    changes = format_price_changes_for_output(result.changes, limit=payload.change_limit)
+    failures = [
+        ProductPriceMigrationFailure(product_id=product_id, reason=reason)
+        for product_id, reason in result.failures[: payload.change_limit]
+    ]
+    log_audit(
+        db,
+        event_type="admin_product_price_rounding_run",
+        category="admin",
+        summary="Запущено округление цен товаров до целых рублей",
+        user=current_user,
+        details={
+            "dry_run": payload.dry_run,
+            "org_id": payload.org_id,
+            "limit": payload.limit,
+            "scanned": counters.scanned,
+            "migrated": counters.migrated,
+            "skipped": counters.skipped,
+            "failed": counters.failed,
+            "changes_preview": changes[:10],
+        },
+    )
+    return ProductPriceMigrationResponse(
+        dry_run=payload.dry_run,
+        scanned=counters.scanned,
+        migrated=counters.migrated,
+        skipped=counters.skipped,
+        failed=counters.failed,
+        changes=[ProductPriceMigrationChange(**row) for row in changes],
         failures=failures,
     )
 

@@ -26,7 +26,7 @@ import {
   isUsedCatalogBrowseMode,
 } from '../../../utils/autopartsPublic';
 import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
-import { prefetchUsedPartDetail } from '../../../utils/prefetchPartDetail';
+import { useProductPriceFormat } from '../../../hooks/useProductPriceFormat';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
@@ -95,6 +95,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const catalogError = useSelector((state) => state.products.error);
+  const { formatPrice: formatProductPriceDisplay } = useProductPriceFormat();
 
   const usedPartsData = useSelector(selectUsedPartsData);
   const catalogItems = useSelector(selectCatalogItems);
@@ -518,7 +519,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   </p>
                 </div>
                 <div className="shrink-0 text-base font-bold text-indigo-600 sm:text-right sm:text-xl lg:text-2xl">
-                  {part.price ? `${Number(part.price).toLocaleString('ru-RU')} ₽` : '—'}
+                  {part.price ? formatProductPriceDisplay(part.price) : '—'}
                 </div>
               </div>
               {part.description ? (

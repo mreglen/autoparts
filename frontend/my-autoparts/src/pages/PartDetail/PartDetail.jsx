@@ -28,11 +28,7 @@ import { mergeProductFitment } from '../../utils/mergeProductFitment';
 import { buildProductFaqJsonLd } from '../../utils/partDetailFaq';
 import { resolveProductCity } from '../../utils/productSearchSeo';
 import { buildProductUsedCatalogPath } from '../../utils/productSeo';
-import {
-  PART_DETAIL_CACHE,
-  readPartDetailCache,
-  writePartDetailCache,
-} from '../../utils/partDetailCache';
+import { useProductPriceFormat } from '../../hooks/useProductPriceFormat';
 
 const formatErrorText = (value) => {
   if (!value) return 'Ошибка загрузки товара';
@@ -111,6 +107,7 @@ const PartDetail = () => {
   const { currentProduct, error } = useSelector((state) => state.products);
   const { user } = useSelector((state) => state.auth);
   const cart = useSelector(selectCart);
+  const { formatPrice: formatProductPriceDisplay } = useProductPriceFormat();
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const [mediaItems, setMediaItems] = useState([]);
@@ -766,7 +763,7 @@ const PartDetail = () => {
     : 'Другие предложения с этим артикулом';
   const shareText = [
     h1Primary,
-    currentProduct.price ? `${currentProduct.price.toLocaleString('ru-RU')} ₽` : null,
+    currentProduct.price ? formatProductPriceDisplay(currentProduct.price) : null,
   ]
     .filter(Boolean)
     .join(' — ');
@@ -844,7 +841,7 @@ const PartDetail = () => {
                 <div className="text-right">
                   <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Цена</div>
                   <div className="text-2xl font-bold text-indigo-700 sm:text-3xl">
-                    {currentProduct.price ? `${currentProduct.price.toLocaleString('ru-RU')} ₽` : '—'}
+                    {currentProduct.price ? formatProductPriceDisplay(currentProduct.price) : '—'}
                   </div>
                 </div>
               </div>
@@ -1284,7 +1281,7 @@ const PartDetail = () => {
             <div className="min-w-0 flex-1">
               <div className="text-xs text-gray-500">Цена</div>
               <div className="truncate text-lg font-bold text-indigo-700">
-                {currentProduct.price ? `${currentProduct.price.toLocaleString('ru-RU')} ₽` : '—'}
+                {currentProduct.price ? formatProductPriceDisplay(currentProduct.price) : '—'}
               </div>
             </div>
             {(() => {

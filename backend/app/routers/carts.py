@@ -18,6 +18,7 @@ from app.utils.guest_cart import (
     get_or_create_user_cart,
 )
 from app.utils.phone import normalize_to_storage_format
+from app.utils.product_price import display_product_price
 
 router = APIRouter(prefix="/cart", tags=["Cart"])
 
@@ -71,8 +72,9 @@ def _new_parts_cart_item_response(cart_item) -> CartItemResponse:
     )
 
 
-def _used_parts_cart_item_response(cart_item, product: Product | None) -> CartItemResponse:
+def _used_parts_cart_item_response(cart_item, product: Product | None, db: Session) -> CartItemResponse:
     max_qty = _product_max_quantity(product)
+    raw_price = float(product.price) if product and product.price else (float(cart_item.price) if cart_item.price else 0)
     return CartItemResponse(
         id=cart_item.id,
         brand=product.brand if product else cart_item.brand,
@@ -80,7 +82,7 @@ def _used_parts_cart_item_response(cart_item, product: Product | None) -> CartIt
         name=product.name if product else "Б/У запчасть",
         quantity=cart_item.quantity,
         max_quantity=max_qty,
-        price=float(product.price) if product and product.price else (float(cart_item.price) if cart_item.price else 0),
+        price=display_product_price(raw_price, db=db) or 0,
         product_id=cart_item.product_id,
         seller=cart_item.seller,
         created_at=cart_item.created_at,
@@ -246,7 +248,7 @@ def add_used_parts_to_cart(
             existing_item.updated_at = datetime.utcnow()
             db.commit()
             db.refresh(existing_item)
-            return _used_parts_cart_item_response(existing_item, product)
+            return _used_parts_cart_item_response(existing_item, product, db)
 
         cart_item = UsedPartsCart(
             cart_id=cart.id, user_id=current_user.id, product_id=product.id, quantity=item.quantity,
@@ -264,7 +266,7 @@ def add_used_parts_to_cart(
             db.commit()
             touch_guest_cart(db, guest_cart)
             db.refresh(existing_item)
-            return _used_parts_cart_item_response(existing_item, product)
+            return _used_parts_cart_item_response(existing_item, product, db)
         cart_item = GuestUsedPartsCart(
             guest_cart_id=guest_cart.id, product_id=product.id, quantity=item.quantity,
             brand=product.brand, partnumber=product.article, price=product.price
@@ -275,7 +277,7 @@ def add_used_parts_to_cart(
     db.refresh(cart_item)
     if not current_user:
         touch_guest_cart(db, guest_cart)
-    return _used_parts_cart_item_response(cart_item, product)
+    return _used_parts_cart_item_response(cart_item, product, db)
 
 @router.get("/admin-org-address")
 def get_admin_org_address(db: Session = Depends(get_db)):
@@ -310,7 +312,7 @@ def get_cart(
             user_id=cart.user_id,
             new_parts_items=[_new_parts_cart_item_response(i) for i in cart.new_parts_items],
             used_parts_items=[
-                _used_parts_cart_item_response(i, i.product) for i in cart.used_parts_items
+                _used_parts_cart_item_response(i, i.product, db) for i in cart.used_parts_items
             ]
         )
 
@@ -323,7 +325,7 @@ def get_cart(
         user_id=None,
         new_parts_items=[_new_parts_cart_item_response(i) for i in guest_cart.new_parts_items],
         used_parts_items=[
-            _used_parts_cart_item_response(i, i.product) for i in guest_cart.used_parts_items
+            _used_parts_cart_item_response(i, i.product, db) for i in guest_cart.used_parts_items
         ]
     )
 
@@ -483,4 +485,4 @@ def update_used_parts_quantity(
     if not current_user:
         touch_guest_cart(db, guest_cart)
 
-    return _used_parts_cart_item_response(cart_item, product)
+    return _used_parts_cart_item_response(cart_item, product, db)

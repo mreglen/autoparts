@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import useIsNarrowMobile from './useIsNarrowMobile';
 import { isTouchAtScrollTop } from '../utils/scrollAtTop';
-import { HAPTIC_PULL_READY, HAPTIC_PULL_REFRESH, triggerHaptic } from '../utils/haptics';
+import { triggerPullReadyHaptic, triggerPullRefreshHaptic, waitForHaptic } from '../utils/haptics';
 
 const PULL_THRESHOLD = 64;
 const MAX_PULL = 96;
@@ -27,6 +27,9 @@ export default function usePullToRefresh({ enabled = true, onRefresh } = {}) {
   }, []);
 
   const refresh = useCallback(async () => {
+    triggerPullRefreshHaptic();
+    await waitForHaptic();
+
     if (onRefresh) {
       try {
         await onRefresh();
@@ -88,7 +91,7 @@ export default function usePullToRefresh({ enabled = true, onRefresh } = {}) {
 
       if (nextDistance >= PULL_THRESHOLD && !thresholdHapticFiredRef.current) {
         thresholdHapticFiredRef.current = true;
-        triggerHaptic(HAPTIC_PULL_READY);
+        triggerPullReadyHaptic();
       } else if (nextDistance < PULL_THRESHOLD) {
         thresholdHapticFiredRef.current = false;
       }
@@ -105,7 +108,6 @@ export default function usePullToRefresh({ enabled = true, onRefresh } = {}) {
       }
 
       if (pullDistanceRef.current >= PULL_THRESHOLD) {
-        triggerHaptic(HAPTIC_PULL_REFRESH);
         refreshingRef.current = true;
         setRefreshing(true);
         setDistance(PULL_THRESHOLD);

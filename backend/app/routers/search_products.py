@@ -369,8 +369,8 @@ async def search_used_parts(
             logger.warning("ROSSKO error in used search: %s", e)
 
     payload = jsonable_encoder({
-        "available_parts": [map_product_to_list_item(p) for p in available_parts],
-        "analog_parts": [map_product_to_list_item(p) for p in analog_parts],
+        "available_parts": [map_product_to_list_item(p, db=db) for p in available_parts],
+        "analog_parts": [map_product_to_list_item(p, db=db) for p in analog_parts],
         "rossko_data": rossko_response
     })
     await set_cached_json(cache_key, payload, _SEARCH_CACHE_TTL_SECONDS)

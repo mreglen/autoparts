@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from sqlalchemy.orm import Session
+
 from app.models.product import Product as ProductModel
 from app.schemas.product import (
     ProductListItem,
@@ -7,6 +9,7 @@ from app.schemas.product import (
     ProductListPhotoSummary,
     ProductListStorageSummary,
 )
+from app.utils.product_price import display_product_price
 
 
 def _first_list_photo(product: ProductModel) -> ProductListPhotoSummary | None:
@@ -31,16 +34,17 @@ def _first_list_photo(product: ProductModel) -> ProductListPhotoSummary | None:
     return None
 
 
-def map_product_to_list_item(product: ProductModel) -> ProductListItem:
+def map_product_to_list_item(product: ProductModel, *, db: Session | None = None) -> ProductListItem:
     first_photo = _first_list_photo(product)
     org = getattr(product, "organization", None)
     storage = getattr(product, "storage_location", None)
+    price = display_product_price(product.price, db=db) if db else float(product.price or 0)
     return ProductListItem(
         id=product.id,
         brand=product.brand or "",
         article=product.article or "",
         name=product.name or "",
-        price=float(product.price or 0),
+        price=float(price or 0),
         quantity=int(product.quantity or 0),
         is_new=bool(product.is_new),
         organization_id=str(product.organization_id or ""),

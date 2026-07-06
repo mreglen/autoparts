@@ -662,4 +662,5 @@ def get_public_site_config(
         "show_site_reviews": getattr(settings_row, "show_site_reviews", True) is not False,
         "new_parts_markup_percent": markup,
         "used_parts_purchase_mode": purchase_mode,
+        "round_product_prices": getattr(settings_row, "round_product_prices", False) is True,
     }

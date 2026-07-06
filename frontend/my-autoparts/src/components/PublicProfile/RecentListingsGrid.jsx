@@ -3,14 +3,10 @@ import { Link } from 'react-router-dom';
 import { buildImageUrlFallbackChain } from '../../utils/apiClient';
 import { buildPartDetailPath } from '../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
-
-function formatPrice(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return 'Цена по запросу';
-  return `${n.toLocaleString('ru-RU')} ₽`;
-}
+import { useProductPriceFormat } from '../../hooks/useProductPriceFormat';
 
 function ListingCard({ product }) {
+  const { formatPrice } = useProductPriceFormat();
   const href = buildPartDetailPath(product);
   const title = formatProductDisplayTitle(product.brand, product.article, product.title);
 
@@ -45,7 +41,9 @@ function ListingCard({ product }) {
         )}
       </div>
       <div className="flex flex-1 flex-col p-3">
-        <p className="text-lg font-bold tabular-nums text-gray-900">{formatPrice(product.price)}</p>
+        <p className="text-lg font-bold tabular-nums text-gray-900">
+          {product.price ? formatPrice(product.price) : 'Цена по запросу'}
+        </p>
         <p className="mt-1 line-clamp-2 text-sm text-gray-700">{title}</p>
         {product.brand ? (
           <p className="mt-1 text-xs text-gray-500">{product.brand}</p>

@@ -4,14 +4,9 @@ import { buildPartDetailPath } from '../../utils/partRoutes';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import { extractCityFromAddress } from '../../utils/organizationCity';
 import NewPartVehicleCompatibilityStrip from '../../pages/AutoParts/NewParts/NewPartVehicleCompatibilityStrip';
+import { useProductPriceFormat } from '../../hooks/useProductPriceFormat';
 
-function formatPrice(price) {
-  const amount = Number(price);
-  if (!Number.isFinite(amount) || amount <= 0) return '—';
-  return `${amount.toLocaleString('ru-RU')} ₽`;
-}
-
-function UsedMatchMobileCard({ item }) {
+function UsedMatchMobileCard({ item, formatPrice }) {
   const brand = item?.brand || '—';
   const article = item?.article || '—';
   const path = buildPartDetailPath({ id: item.id, brand, article });
@@ -53,7 +48,7 @@ function UsedMatchMobileCard({ item }) {
   );
 }
 
-function UsedMatchRow({ item }) {
+function UsedMatchRow({ item, formatPrice }) {
   const brand = item?.brand || '—';
   const article = item?.article || '—';
   const path = buildPartDetailPath({ id: item.id, brand, article });
@@ -92,6 +87,7 @@ export default function PartArticleMatchesBlock({
   error = '',
   currentProductId = null,
 }) {
+  const { formatPrice } = useProductPriceFormat();
   const visibleItems = useMemo(
     () => (Array.isArray(items) ? items : []).filter(
       (item) => item?.id != null && Number(item.id) !== Number(currentProductId),
@@ -128,7 +124,7 @@ export default function PartArticleMatchesBlock({
 
       <div className="space-y-3 md:hidden">
         {visibleItems.map((item) => (
-          <UsedMatchMobileCard key={`used-mobile-${item.id}`} item={item} />
+          <UsedMatchMobileCard key={`used-mobile-${item.id}`} item={item} formatPrice={formatPrice} />
         ))}
       </div>
 
@@ -149,7 +145,7 @@ export default function PartArticleMatchesBlock({
             </thead>
             <tbody>
               {visibleItems.map((item) => (
-                <UsedMatchRow key={`used-row-${item.id}`} item={item} />
+                <UsedMatchRow key={`used-row-${item.id}`} item={item} formatPrice={formatPrice} />
               ))}
             </tbody>
           </table>
