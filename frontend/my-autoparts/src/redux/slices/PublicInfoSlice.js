@@ -29,14 +29,43 @@ function writeSessionCache(key, data) {
   }
 }
 
+export function clearPublicSiteConfigCache() {
+  try {
+    sessionStorage.removeItem(SITE_CONFIG_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+export function patchPublicSiteConfigCache(patch) {
+  try {
+    const raw = sessionStorage.getItem(SITE_CONFIG_CACHE_KEY);
+    if (!raw) {
+      writeSessionCache(SITE_CONFIG_CACHE_KEY, patch);
+      return;
+    }
+    const parsed = JSON.parse(raw);
+    parsed.data = { ...(parsed.data || {}), ...patch };
+    parsed.ts = Date.now();
+    sessionStorage.setItem(SITE_CONFIG_CACHE_KEY, JSON.stringify(parsed));
+  } catch {
+    // ignore
+  }
+}
+
 /** Публичный конфиг: телефон админ-орг., флаг «новые запчасти», наценка на новые (всегда 200). */
 export const fetchPublicSiteConfig = createAsyncThunk(
   'publicInfo/fetchPublicSiteConfig',
-  async (_, { rejectWithValue }) => {
-    const cached = readSessionCache(SITE_CONFIG_CACHE_KEY);
-    if (cached) return cached;
+  async (forceRefresh = false, { rejectWithValue }) => {
+    if (!forceRefresh) {
+      const cached = readSessionCache(SITE_CONFIG_CACHE_KEY);
+      if (cached) return cached;
+    } else {
+      clearPublicSiteConfigCache();
+    }
     try {
-      const result = await apiRequestUnauth('/auth/public-site-config');
+      const suffix = forceRefresh ? `?_nc=${Date.now()}` : '';
+      const result = await apiRequestUnauth(`/auth/public-site-config${suffix}`);
       writeSessionCache(SITE_CONFIG_CACHE_KEY, result);
       return result;
     } catch (err) {

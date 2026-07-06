@@ -11,6 +11,7 @@ import {
   setShowYandexBadge,
   setNewPartsMarkupPercent,
   setRoundProductPrices,
+  patchPublicSiteConfigCache,
 } from '../../redux/slices/PublicInfoSlice';
 import ServerStatsPanel from './ServerStatsPanel';
 import OpenRouterSection from './OpenRouterSection';
@@ -123,7 +124,8 @@ function AdminPanelPage() {
       });
       setShowNewLocal(checked);
       dispatch(setShowNewAutoparts(checked));
-      dispatch(fetchPublicSiteConfig());
+      patchPublicSiteConfigCache({ show_new_autoparts: checked });
+      dispatch(fetchPublicSiteConfig(true));
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения');
     } finally {
@@ -141,7 +143,8 @@ function AdminPanelPage() {
       });
       setShowSiteReviewsLocal(checked);
       dispatch(setShowSiteReviews(checked));
-      dispatch(fetchPublicSiteConfig());
+      patchPublicSiteConfigCache({ show_site_reviews: checked });
+      dispatch(fetchPublicSiteConfig(true));
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения');
     } finally {
@@ -159,7 +162,8 @@ function AdminPanelPage() {
       });
       setShowYandexBadgeLocal(checked);
       dispatch(setShowYandexBadge(checked));
-      dispatch(fetchPublicSiteConfig());
+      patchPublicSiteConfigCache({ show_yandex_badge: checked });
+      dispatch(fetchPublicSiteConfig(true));
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения');
     } finally {
@@ -177,7 +181,8 @@ function AdminPanelPage() {
       });
       setRoundProductPricesLocal(checked);
       dispatch(setRoundProductPrices(checked));
-      dispatch(fetchPublicSiteConfig());
+      patchPublicSiteConfigCache({ round_product_prices: checked });
+      dispatch(fetchPublicSiteConfig(true));
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения');
     } finally {
@@ -209,7 +214,7 @@ function AdminPanelPage() {
         }),
       });
       dispatch(setNewPartsMarkupPercent(pendingMarkupValue));
-      dispatch(fetchPublicSiteConfig());
+      dispatch(fetchPublicSiteConfig(true));
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения наценки');
     } finally {
