@@ -61,6 +61,27 @@ const SUGGEST_ITEM =
 
 const DRAFT_AUTOSAVE_MS = 1000;
 
+function buildStorageCellAssignments(pendingProductId, cellQuantities) {
+  const assignments = [];
+  Object.entries(cellQuantities || {}).forEach(([cellId, value]) => {
+    if (!value || !String(value).trim()) return;
+    const storageCellId = parseInt(cellId, 10);
+    if (!Number.isFinite(storageCellId)) return;
+    assignments.push({
+      pending_product_id: pendingProductId,
+      storage_cell_id: storageCellId,
+      value: String(value).trim(),
+    });
+  });
+  return assignments;
+}
+
+async function savePendingProductStorageCells(dispatch, pendingProductId, cellQuantities) {
+  const assignments = buildStorageCellAssignments(pendingProductId, cellQuantities);
+  if (assignments.length === 0) return;
+  await dispatch(createPendingProductStorageCellsBatch(assignments)).unwrap();
+}
+
 const EMPTY_FORM_DATA = {
   article: '',
   name: '',
@@ -197,11 +218,13 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
               return;
             }
 
-            const initialQuantities = {};
-            cells.forEach((cell) => {
-              initialQuantities[cell.id] = '';
+            setCellQuantities((prev) => {
+              const next = {};
+              cells.forEach((cell) => {
+                next[cell.id] = prev[cell.id] ?? '';
+              });
+              return next;
             });
-            setCellQuantities(initialQuantities);
           }
         });
     } else {
@@ -212,23 +235,37 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
     }
   }, [dispatch, formData.storage_location_id, editPendingMode, resubmitMode, draftMode]);
   
-  // Refresh storage cells when they are modified elsewhere
+  // Refresh storage cells when they are modified elsewhere (e.g. new cell created)
   useEffect(() => {
-    if (lastModified && formData.storage_location_id) {
-      dispatch(fetchStorageCells(formData.storage_location_id))
-        .then((result) => {
-          if (fetchStorageCells.fulfilled.match(result)) {
-            setLocationCells(Array.isArray(result.payload) ? result.payload : []);
-            // Re-initialize cell quantities preserving existing values
-            const initialQuantities = {};
-            (Array.isArray(result.payload) ? result.payload : []).forEach(cell => {
-              initialQuantities[cell.id] = cellQuantities[cell.id] || '';
-            });
-            setCellQuantities(initialQuantities);
-          }
+    if (!lastModified || !formData.storage_location_id) return undefined;
+
+    let cancelled = false;
+    dispatch(fetchStorageCells(formData.storage_location_id))
+      .then((result) => {
+        if (cancelled || !fetchStorageCells.fulfilled.match(result)) return;
+        const cells = Array.isArray(result.payload) ? result.payload : [];
+        setLocationCells(cells);
+        setCellQuantities((prev) => {
+          const next = { ...prev };
+          const cellIds = new Set(cells.map((cell) => String(cell.id)));
+          cells.forEach((cell) => {
+            if (next[cell.id] === undefined) {
+              next[cell.id] = '';
+            }
+          });
+          Object.keys(next).forEach((key) => {
+            if (!cellIds.has(String(key))) {
+              delete next[key];
+            }
+          });
+          return next;
         });
-    }
-  }, [lastModified]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [lastModified, dispatch, formData.storage_location_id]);
 
   useEffect(() => {
     if (productError || stockInError) {
@@ -1031,10 +1068,27 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
 
     if (isDraftFlow && draftIdRef.current) {
       try {
+        skipAutosaveRef.current = true;
+        await dispatch(updateProductDraft({
+          id: draftIdRef.current,
+          payload: draftPayload,
+        })).unwrap();
+
         const action = await dispatch(submitProductDraft(draftIdRef.current));
         if (submitProductDraft.rejected.match(action)) {
           return;
         }
+
+        const pendingProductId = action.payload?.pending_product?.id;
+        if (pendingProductId) {
+          try {
+            await savePendingProductStorageCells(dispatch, pendingProductId, cellQuantities);
+          } catch (storageError) {
+            console.error('Error creating storage cell assignments:', storageError);
+            alert(typeof storageError === 'string' ? storageError : 'Запчасть создана, но не удалось сохранить адресное хранение');
+          }
+        }
+
         const submittedDraftId = draftIdRef.current;
         draftIdRef.current = null;
         clearDraftSessionCache(submittedDraftId);
@@ -1042,7 +1096,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         return;
       } catch (err) {
         console.error(err);
-        alert('Не удалось отправить черновик на модерацию');
+        alert(typeof err === 'string' ? err : 'Не удалось отправить черновик на модерацию');
         return;
       }
     }
@@ -1141,25 +1195,11 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
           )
         );
 
-        const storageCellAssignments = [];
-        Object.entries(cellQuantities).forEach(([cellId, value]) => {
-          if (!value || !String(value).trim()) return;
-          const storageCellId = parseInt(cellId, 10);
-          if (!Number.isFinite(storageCellId)) return;
-          storageCellAssignments.push({
-            pending_product_id: Number(editPendingId, 10),
-            storage_cell_id: storageCellId,
-            value: String(value).trim(),
-          });
-        });
-
-        if (storageCellAssignments.length > 0) {
-          try {
-            await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments)).unwrap();
-          } catch (storageError) {
-            console.error('Error creating storage cell assignments:', storageError);
-            alert(typeof storageError === 'string' ? storageError : 'Запчасть создана, но не удалось сохранить адресное хранение');
-          }
+        try {
+          await savePendingProductStorageCells(dispatch, Number(editPendingId, 10), cellQuantities);
+        } catch (storageError) {
+          console.error('Error creating storage cell assignments:', storageError);
+          alert(typeof storageError === 'string' ? storageError : 'Запчасть создана, но не удалось сохранить адресное хранение');
         }
 
         navigate('/my-parts?tab=pending');
@@ -1176,25 +1216,11 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         }
 
         const pendingProductId = resubmitAction.payload.pendingProduct.id;
-        const storageCellAssignments = [];
-        Object.entries(cellQuantities).forEach(([cellId, value]) => {
-          if (!value || !String(value).trim()) return;
-          const storageCellId = parseInt(cellId, 10);
-          if (!Number.isFinite(storageCellId)) return;
-          storageCellAssignments.push({
-            pending_product_id: pendingProductId,
-            storage_cell_id: storageCellId,
-            value: String(value).trim(),
-          });
-        });
-
-        if (storageCellAssignments.length > 0) {
-          try {
-            await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments)).unwrap();
-          } catch (storageError) {
-            console.error('Error creating storage cell assignments:', storageError);
-            alert(typeof storageError === 'string' ? storageError : 'Запчасть отправлена, но не удалось сохранить адресное хранение');
-          }
+        try {
+          await savePendingProductStorageCells(dispatch, pendingProductId, cellQuantities);
+        } catch (storageError) {
+          console.error('Error creating storage cell assignments:', storageError);
+          alert(typeof storageError === 'string' ? storageError : 'Запчасть отправлена, но не удалось сохранить адресное хранение');
         }
 
         navigate('/my-parts?tab=pending');
@@ -1209,27 +1235,11 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
       // Get the created pending product ID
       const pendingProductId = productAction.payload.id;
 
-      // Handle storage cell assignments
-      const storageCellAssignments = [];
-      Object.entries(cellQuantities).forEach(([cellId, value]) => {
-        if (!value || !String(value).trim()) return;
-        const storageCellId = parseInt(cellId, 10);
-        if (!Number.isFinite(storageCellId)) return;
-        storageCellAssignments.push({
-          pending_product_id: pendingProductId,
-          storage_cell_id: storageCellId,
-          value: String(value).trim(),
-        });
-      });
-
-      // Create storage cell links if any assignments exist
-      if (storageCellAssignments.length > 0) {
-        try {
-          await dispatch(createPendingProductStorageCellsBatch(storageCellAssignments)).unwrap();
-        } catch (storageError) {
-          console.error('Error creating storage cell assignments:', storageError);
-          alert(typeof storageError === 'string' ? storageError : 'Запчасть создана, но не удалось сохранить адресное хранение');
-        }
+      try {
+        await savePendingProductStorageCells(dispatch, pendingProductId, cellQuantities);
+      } catch (storageError) {
+        console.error('Error creating storage cell assignments:', storageError);
+        alert(typeof storageError === 'string' ? storageError : 'Запчасть создана, но не удалось сохранить адресное хранение');
       }
 
       // Успешно создано в pending_products, переходим к списку
