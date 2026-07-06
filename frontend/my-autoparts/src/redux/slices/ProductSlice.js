@@ -1377,6 +1377,8 @@ const productSlice = createSlice({
                         cellValue: String(arg.storage_cell_value || ''),
                         q: (arg.q || '').trim(),
                         sort: arg.sort || 'date_desc',
+                        stock: arg.stock || '',
+                        no_photo: Boolean(arg.no_photo),
                     });
                 }
             })

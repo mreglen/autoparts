@@ -838,7 +838,7 @@ const MY_PARTS_SORT_LABELS = Object.fromEntries(
 const URL_SEARCH_DEBOUNCE_MS = 400;
 const MY_PRODUCTS_PAGE_SIZE = 30;
 
-const buildMyProductsRequest = ({ page = 1, storage, cell, cellValue, q, sort, append = false } = {}) => ({
+const buildMyProductsRequest = ({ page = 1, storage, cell, cellValue, q, sort, stock, noPhoto, append = false } = {}) => ({
   page,
   page_size: MY_PRODUCTS_PAGE_SIZE,
   sort: sort || 'date_desc',
@@ -846,6 +846,8 @@ const buildMyProductsRequest = ({ page = 1, storage, cell, cellValue, q, sort, a
   ...(cell ? { storage_cell_id: cell } : {}),
   ...(cell && cellValue ? { storage_cell_value: cellValue } : {}),
   ...(q?.trim() ? { q: q.trim() } : {}),
+  ...(stock ? { stock } : {}),
+  ...(noPhoto ? { no_photo: true } : {}),
   append,
 });
 
@@ -991,6 +993,9 @@ function MyParts() {
   const displayParts = products;
   const sortedDisplayParts = products;
 
+  const stockFilter = searchParams.get('stock') || '';
+  const noPhotoFilter = searchParams.get('no_photo') === '1';
+
   const inStockFilterKey = useMemo(
     () => JSON.stringify({
       storage: inStockFilters.storage || '',
@@ -998,8 +1003,10 @@ function MyParts() {
       cellValue: inStockFilters.cellValue || '',
       q: inStockDebouncedSearch.trim(),
       sort: inStockFilters.sort || 'date_desc',
+      stock: stockFilter,
+      no_photo: noPhotoFilter,
     }),
-    [inStockFilters.storage, inStockFilters.cell, inStockFilters.cellValue, inStockDebouncedSearch, inStockFilters.sort],
+    [inStockFilters.storage, inStockFilters.cell, inStockFilters.cellValue, inStockDebouncedSearch, inStockFilters.sort, stockFilter, noPhotoFilter],
   );
 
   const selectionResetKey = useMemo(
@@ -1057,6 +1064,8 @@ function MyParts() {
       cellValue: inStockFilters.cellValue,
       q: inStockDebouncedSearch,
       sort: inStockFilters.sort,
+      stock: stockFilter,
+      noPhoto: noPhotoFilter,
       append: true,
     })));
   }, [
@@ -1073,6 +1082,8 @@ function MyParts() {
     inStockFilters.cellValue,
     inStockFilters.sort,
     inStockDebouncedSearch,
+    stockFilter,
+    noPhotoFilter,
   ]);
 
   useEffect(() => {
@@ -1706,6 +1717,8 @@ function MyParts() {
         cellValue: inStockFilters.cellValue,
         q: inStockDebouncedSearch,
         sort: inStockFilters.sort,
+        stock: stockFilter,
+        noPhoto: noPhotoFilter,
       })));
     }
   }, [
@@ -1720,6 +1733,8 @@ function MyParts() {
     inStockFilters.cellValue,
     inStockFilters.sort,
     inStockDebouncedSearch,
+    stockFilter,
+    noPhotoFilter,
     products.length,
     myProductsTotal,
   ]);
@@ -2225,6 +2240,29 @@ function MyParts() {
         </div>
       </div>
 
+      {activeTab === 'in-stock' && (stockFilter || noPhotoFilter) && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span>
+            {stockFilter === 'zero' && 'Показаны товары с нулевым остатком'}
+            {stockFilter === 'low' && 'Показаны товары с низким остатком (1–2 шт.)'}
+            {noPhotoFilter && !stockFilter && 'Показаны товары без фото'}
+            {noPhotoFilter && stockFilter && ' · без фото'}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete('stock');
+              next.delete('no_photo');
+              setSearchParams(next, { replace: true });
+            }}
+            className="font-medium text-amber-800 hover:underline"
+          >
+            Сбросить фильтр
+          </button>
+        </div>
+      )}
+
       {activeTab === 'in-stock' && (
         isInitialMyProductsLoad ? (
         <div className="mt-4">
@@ -2270,6 +2308,8 @@ function MyParts() {
                 cellValue: inStockFilters.cellValue,
                 q: inStockDebouncedSearch,
                 sort: inStockFilters.sort,
+                stock: stockFilter,
+                noPhoto: noPhotoFilter,
               })));
             }}
             className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 min-h-[48px]"

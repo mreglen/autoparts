@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -76,14 +77,88 @@ function Section({ title, icon, children, action }) {
   );
 }
 
+const TASK_SEVERITY_STYLES = {
+  high: 'border-red-200 bg-red-50 hover:bg-red-100/80',
+  medium: 'border-amber-200 bg-amber-50 hover:bg-amber-100/80',
+  low: 'border-gray-200 bg-gray-50 hover:bg-gray-100/80',
+};
+
+const TASK_BADGE_STYLES = {
+  high: 'bg-red-600 text-white',
+  medium: 'bg-amber-600 text-white',
+  low: 'bg-gray-600 text-white',
+};
+
+function AttentionTasksSection({ tasks, loading, onNavigate }) {
+  if (loading) {
+    return (
+      <Section title="Требует внимания">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 rounded-xl bg-gray-100 animate-pulse" />
+          ))}
+        </div>
+      </Section>
+    );
+  }
+
+  if (!tasks?.length) {
+    return (
+      <Section title="Требует внимания">
+        <p className="text-sm text-gray-600 py-2">
+          Срочных задач нет — можно заняться продажами или пополнить склад.
+        </p>
+      </Section>
+    );
+  }
+
+  return (
+    <Section
+      title="Требует внимания"
+      icon={
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        </svg>
+      }
+    >
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {tasks.map((task) => (
+          <button
+            key={task.id}
+            type="button"
+            onClick={() => onNavigate(task.url)}
+            className={`flex items-start justify-between gap-3 rounded-xl border p-4 text-left transition-colors ${TASK_SEVERITY_STYLES[task.severity] || TASK_SEVERITY_STYLES.low}`}
+          >
+            <div className="min-w-0">
+              <p className="font-semibold text-gray-900">{task.title}</p>
+              {task.hint ? <p className="mt-1 text-xs text-gray-600">{task.hint}</p> : null}
+            </div>
+            <span className={`shrink-0 inline-flex min-w-[2rem] justify-center rounded-full px-2.5 py-1 text-sm font-bold ${TASK_BADGE_STYLES[task.severity] || TASK_BADGE_STYLES.low}`}>
+              {task.count}
+            </span>
+          </button>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { isReady, user } = useAuthReady();
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const [loading, setLoading] = useState(true);
+  const [tasksLoading, setTasksLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [tasks, setTasks] = useState([]);
 
   const canAccess = Boolean(user?.is_admin || user?.is_seller || user?.is_employee);
+  const canViewFinance = Boolean(
+    user?.is_admin
+    || user?.is_seller
+    || (user?.is_employee && permissionCodes?.includes('finance.reports'))
+  );
 
   useEffect(() => {
     if (!isReady) return;
@@ -93,6 +168,7 @@ export default function DashboardPage() {
   const loadDashboard = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    setTasksLoading(true);
     setError(null);
 
     try {
@@ -101,6 +177,7 @@ export default function DashboardPage() {
         apiAxios.get('/stock-outs/sales'),
         apiAxios.get('/stock-outs/'),
         apiAxios.get('/stock-ins/'),
+        apiAxios.get('/dashboard/tasks'),
       ]);
 
       const pick = (idx, fallback = []) =>
@@ -110,6 +187,14 @@ export default function DashboardPage() {
       const sales = pick(1);
       const stockOuts = pick(2);
       const stockIns = pick(3);
+      const tasksResult = results[4];
+
+      if (tasksResult.status === 'fulfilled') {
+        setTasks(tasksResult.value.data?.tasks || []);
+      } else {
+        setTasks([]);
+      }
+      setTasksLoading(false);
 
       setData({
         products,
@@ -121,6 +206,8 @@ export default function DashboardPage() {
     } catch (e) {
       console.error(e);
       setError('Не удалось загрузить данные дашборда');
+      setTasks([]);
+      setTasksLoading(false);
     } finally {
       setLoading(false);
     }
@@ -170,7 +257,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Обзор</h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">
-            Склад и фактические продажи
+            {canViewFinance ? 'Задачи, склад и продажи' : 'Задачи и склад'}
           </p>
         </div>
         <button
@@ -182,7 +269,13 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* KPI */}
+      <AttentionTasksSection
+        tasks={tasks}
+        loading={tasksLoading}
+        onNavigate={(url) => navigate(url)}
+      />
+
+      {canViewFinance && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <KpiCard
           label="Выручка, всего"
@@ -205,7 +298,9 @@ export default function DashboardPage() {
           onClick={() => navigate('/my-parts')}
         />
       </div>
+      )}
 
+      {canViewFinance ? (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Продажи по каналам */}
         <div className="lg:col-span-2">
@@ -333,6 +428,28 @@ export default function DashboardPage() {
           </div>
         </Section>
       </div>
+      ) : (
+        <Section
+          title="Склад"
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          }
+          action={
+            <Link to="/my-parts" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+              Мои запчасти →
+            </Link>
+          }
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <MetricTile label="Позиций" value={data.totalProducts} color="gray" />
+            <MetricTile label="На складе" value={data.totalWarehouseQuantity.toLocaleString('ru-RU')} color="green" />
+            <MetricTile label="Поступления 30д" value={stockIns.count30d} hint={`${stockIns.qty30d} шт.`} color="blue" />
+            <MetricTile label="Низкий остаток" value={data.lowStock} hint="1–2 шт." color="amber" />
+          </div>
+        </Section>
+      )}
     </div>
   );
 }

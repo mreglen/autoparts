@@ -1231,6 +1231,8 @@ def get_products(
     storage_cell_id: Optional[int] = None,
     storage_cell_value: Optional[str] = None,
     q: Optional[str] = None,
+    stock: Optional[str] = Query(None, pattern="^(zero|low|in_stock)$"),
+    no_photo: bool = Query(False),
     sort: str = Query(
         "date_desc",
         pattern="^(date_desc|date_asc|name_asc|name_desc|price_asc|price_desc)$",
@@ -1247,8 +1249,19 @@ def get_products(
         *_my_products_load_options()
     ).filter(
         ProductModel.organization_id == current_user.organization_id,
-        ProductModel.quantity > 0,
     )
+
+    if stock == "zero":
+        query = query.filter(func.coalesce(ProductModel.quantity, 0) <= 0)
+    elif stock == "low":
+        query = query.filter(ProductModel.quantity > 0, ProductModel.quantity <= 2)
+    else:
+        query = query.filter(ProductModel.quantity > 0)
+
+    if no_photo:
+        query = query.outerjoin(ProductPhoto, ProductPhoto.product_id == ProductModel.id).filter(
+            ProductPhoto.id.is_(None)
+        )
 
     query = _apply_my_products_filters(
         query, storage_location_id, storage_cell_id, storage_cell_value, q or ""
