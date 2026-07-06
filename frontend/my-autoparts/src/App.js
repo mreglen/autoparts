@@ -12,7 +12,7 @@ import CookieBanner from './components/Legal/CookieBanner';
 import PullToRefresh from './components/PullToRefresh/PullToRefresh';
 import MainLayout from './layouts/MainLayout';
 import ProfileWithMenuLayout from './layouts/ProfileWithMenuLayout';
-import { useShowSiteReviews } from './utils/siteReviewsPublic';
+import { useShowSiteReviews, useShowWarehouseInventory } from './utils/siteReviewsPublic';
 import { buildAutopartsRedirectSeo, PageSeoHelmet } from './utils/pageSeo';
 import useSiteAnalytics from './hooks/useSiteAnalytics';
 
@@ -180,6 +180,18 @@ function ReviewsRoute() {
   return (
     <LazyRoute>
       <ReviewsPage />
+    </LazyRoute>
+  );
+}
+
+function WarehouseInventoryRoute() {
+  const showWarehouseInventory = useShowWarehouseInventory();
+  if (!showWarehouseInventory) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return (
+    <LazyRoute>
+      <WmsStoragesPage />
     </LazyRoute>
   );
 }
@@ -594,11 +606,7 @@ function App() {
           />
           <Route
             path="/warehouse/inventory"
-            element={(
-              <LazyRoute>
-                <WmsStoragesPage />
-              </LazyRoute>
-            )}
+            element={<WarehouseInventoryRoute />}
           />
           <Route
             path="/warehouse/scan"

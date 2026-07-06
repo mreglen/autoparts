@@ -16,6 +16,7 @@ from app.db.schema_patches import (
     ensure_site_settings_show_yandex_badge_column,
     ensure_site_settings_used_parts_purchase_mode_column,
     ensure_site_settings_round_product_prices_column,
+    ensure_site_settings_show_warehouse_inventory_column,
     ensure_group_chat_columns,
     ensure_chat_created_by_column,
     ensure_seo_product_url_exports_table,
@@ -164,6 +165,7 @@ try:
     ensure_site_settings_show_yandex_badge_column()
     ensure_site_settings_used_parts_purchase_mode_column()
     ensure_site_settings_round_product_prices_column()
+    ensure_site_settings_show_warehouse_inventory_column()
     ensure_event_log_audit_columns()
     ensure_user_public_code()
     ensure_group_chat_columns()

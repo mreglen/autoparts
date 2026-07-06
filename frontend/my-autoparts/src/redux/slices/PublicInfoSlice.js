@@ -100,6 +100,7 @@ const publicInfoSlice = createSlice({
         showNewAutoparts: true,
         showSiteReviews: true,
         showYandexBadge: true,
+        showWarehouseInventory: false,
         newPartsMarkupPercent: 15,
         usedPartsPurchaseMode: 'both',
         roundProductPrices: false,
@@ -115,6 +116,7 @@ const publicInfoSlice = createSlice({
       state.showNewAutoparts = true;
       state.showSiteReviews = true;
       state.showYandexBadge = true;
+      state.showWarehouseInventory = false;
       state.newPartsMarkupPercent = 15;
       state.usedPartsPurchaseMode = 'both';
       state.roundProductPrices = false;
@@ -128,6 +130,9 @@ const publicInfoSlice = createSlice({
     },
     setShowYandexBadge: (state, action) => {
       state.showYandexBadge = action.payload !== false;
+    },
+    setShowWarehouseInventory: (state, action) => {
+      state.showWarehouseInventory = action.payload === true;
     },
     setNewPartsMarkupPercent: (state, action) => {
       const n = Number(action.payload);
@@ -158,6 +163,7 @@ const publicInfoSlice = createSlice({
         state.showNewAutoparts = p?.show_new_autoparts !== false;
         state.showSiteReviews = p?.show_site_reviews !== false;
         state.showYandexBadge = p?.show_yandex_badge !== false;
+        state.showWarehouseInventory = p?.show_warehouse_inventory === true;
         const m = Number(p?.new_parts_markup_percent);
         state.newPartsMarkupPercent =
           Number.isFinite(m) && m >= 0 ? m : 15;
@@ -201,6 +207,7 @@ export const {
   setShowNewAutoparts,
   setShowSiteReviews,
   setShowYandexBadge,
+  setShowWarehouseInventory,
   setNewPartsMarkupPercent,
   setRoundProductPrices,
   setUsedPartsPurchaseMode,

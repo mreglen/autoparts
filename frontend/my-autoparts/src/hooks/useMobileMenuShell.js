@@ -6,16 +6,18 @@ import {
     getAvailableTabs,
     getPathForTab,
 } from '../pages/Profile/menu/profileMenuConfig';
+import { selectShowWarehouseInventory } from '../utils/siteReviewsPublic';
 
 export function useMobileMenuShell(userOverride) {
     const location = useLocation();
     const navigate = useNavigate();
     const { user: authUser, token, permissionCodes } = useSelector((state) => state.auth);
+    const showWarehouseInventory = useSelector(selectShowWarehouseInventory);
     const user = userOverride ?? authUser;
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const activeTab = getActiveTabFromPath(location.pathname, user);
-    const tabs = getAvailableTabs(user, permissionCodes);
+    const tabs = getAvailableTabs(user, permissionCodes, { showWarehouseInventory });
 
     useEffect(() => {
         setIsMobileMenuOpen(false);

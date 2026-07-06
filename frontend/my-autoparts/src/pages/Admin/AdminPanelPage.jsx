@@ -9,6 +9,7 @@ import {
   setShowNewAutoparts,
   setShowSiteReviews,
   setShowYandexBadge,
+  setShowWarehouseInventory,
   setNewPartsMarkupPercent,
   setRoundProductPrices,
   setUsedPartsPurchaseMode,
@@ -25,6 +26,7 @@ function AdminPanelPage() {
   const [showNewAutoparts, setShowNewLocal] = useState(true);
   const [showSiteReviews, setShowSiteReviewsLocal] = useState(true);
   const [showYandexBadge, setShowYandexBadgeLocal] = useState(true);
+  const [showWarehouseInventory, setShowWarehouseInventoryLocal] = useState(false);
   const [roundProductPrices, setRoundProductPricesLocal] = useState(false);
   const [usedPartsPurchaseMode, setUsedPartsPurchaseModeLocal] = useState('both');
   const [markupPercent, setMarkupPercent] = useState('15');
@@ -69,6 +71,7 @@ function AdminPanelPage() {
           setShowNewLocal(data.show_new_autoparts !== false);
           setShowSiteReviewsLocal(data.show_site_reviews !== false);
           setShowYandexBadgeLocal(data.show_yandex_badge !== false);
+          setShowWarehouseInventoryLocal(data.show_warehouse_inventory === true);
           setRoundProductPricesLocal(data.round_product_prices === true);
           const mode = data.used_parts_purchase_mode;
           setUsedPartsPurchaseModeLocal(
@@ -170,6 +173,25 @@ function AdminPanelPage() {
       setShowYandexBadgeLocal(checked);
       dispatch(setShowYandexBadge(checked));
       patchPublicSiteConfigCache({ show_yandex_badge: checked });
+      dispatch(fetchPublicSiteConfig(true));
+    } catch (e) {
+      setError(e?.message || 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleShowWarehouseInventory = async (checked) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest('/admin/site-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ show_warehouse_inventory: checked }),
+      });
+      setShowWarehouseInventoryLocal(checked);
+      dispatch(setShowWarehouseInventory(checked));
+      patchPublicSiteConfigCache({ show_warehouse_inventory: checked });
       dispatch(fetchPublicSiteConfig(true));
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения');
@@ -433,6 +455,22 @@ function AdminPanelPage() {
             <span className="font-medium text-gray-900 block">Отображать отзывы на сайте</span>
             <span className="text-sm text-gray-500 block mt-1">
               Если выключено, скрываются страница «Отзывы», блок на главной, ссылки в меню и форма отправки отзывов.
+            </span>
+          </span>
+        </label>
+        <label className="mt-6 flex items-start gap-3 cursor-pointer select-none border-t border-gray-100 pt-6">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            checked={showWarehouseInventory}
+            disabled={loadingSettings || saving}
+            onChange={(e) => handleToggleShowWarehouseInventory(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium text-gray-900 block">Инвентаризация склада</span>
+            <span className="text-sm text-gray-500 block mt-1">
+              Если включено, в меню «Склад» появится раздел «Инвентаризация» (/warehouse/inventory).
+              Страница и API остаются доступны только при включённом переключателе.
             </span>
           </span>
         </label>

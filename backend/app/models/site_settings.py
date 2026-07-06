@@ -13,3 +13,4 @@ class SiteSettings(Base):
     new_parts_markup_percent = Column(Float, nullable=False, default=15.0)
     used_parts_purchase_mode = Column(String(20), nullable=False, default="both")
     round_product_prices = Column(Boolean, nullable=False, default=False)
+    show_warehouse_inventory = Column(Boolean, nullable=False, default=False)

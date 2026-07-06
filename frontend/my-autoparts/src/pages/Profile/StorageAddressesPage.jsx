@@ -13,6 +13,7 @@ import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchMyProducts } from '../../redux/slices/ProductSlice';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import { canViewInventory } from '../../utils/inventoryAccess';
+import { useShowWarehouseInventory } from '../../utils/siteReviewsPublic';
 
 const StorageAddressesPage = () => {
   // All hooks must be called at the top level
@@ -51,7 +52,8 @@ const StorageAddressesPage = () => {
   // Employees need 'storage-addresses' permission code
   const hasPermission = user?.is_admin || user?.is_seller ||
     (user?.is_employee && permissionCodes && permissionCodes.includes('storage-addresses'));
-  const canOpenInventory = canViewInventory(user, permissionCodes);
+  const showWarehouseInventory = useShowWarehouseInventory();
+  const canOpenInventory = showWarehouseInventory && canViewInventory(user, permissionCodes);
 
   // Fetch data - must be before any early returns
   useEffect(() => {

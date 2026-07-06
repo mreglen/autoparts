@@ -59,8 +59,9 @@ export const getActiveTabFromPath = (path, user) => {
     return PATH_TAB_MAP[path] || (user?.is_seller ? 'dashboard' : 'profile');
 };
 
-export const getAvailableTabs = (user, permissionCodes) => {
+export const getAvailableTabs = (user, permissionCodes, options = {}) => {
     const hasPermission = (code) => permissionCodes && permissionCodes.includes(code);
+    const showWarehouseInventory = options.showWarehouseInventory === true;
 
     if (!user) return [];
 
@@ -151,7 +152,10 @@ export const getAvailableTabs = (user, permissionCodes) => {
         if (user.is_seller || user.is_admin || hasPermission('stock-out')) {
             warehouseSubmenu.push({ id: 'expenses', label: 'Расходы' });
         }
-        if (user.is_seller || user.is_admin || user.is_director || hasPermission('inventory.view')) {
+        if (
+            showWarehouseInventory &&
+            (user.is_seller || user.is_admin || user.is_director || hasPermission('inventory.view'))
+        ) {
             warehouseSubmenu.push({ id: 'warehouse-inventory', label: 'Инвентаризация' });
         }
 
@@ -197,7 +201,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
         if (hasPermission('stock-out')) {
             warehouseSubmenu.push({ id: 'expenses', label: 'Расходы' });
         }
-        if (hasPermission('inventory.view')) {
+        if (showWarehouseInventory && hasPermission('inventory.view')) {
             warehouseSubmenu.push({ id: 'warehouse-inventory', label: 'Инвентаризация' });
         }
         if (warehouseSubmenu.length > 0) {

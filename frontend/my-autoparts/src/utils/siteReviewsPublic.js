@@ -15,3 +15,11 @@ export function selectShowYandexBadge(state) {
 export function useShowYandexBadge() {
   return useSelector(selectShowYandexBadge);
 }
+
+export function selectShowWarehouseInventory(state) {
+  return state.publicInfo.showWarehouseInventory === true;
+}
+
+export function useShowWarehouseInventory() {
+  return useSelector(selectShowWarehouseInventory);
+}

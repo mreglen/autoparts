@@ -546,6 +546,27 @@ def ensure_site_settings_round_product_prices_column() -> None:
     logger.info("Applied site_settings round_product_prices column patch")
 
 
+def ensure_site_settings_show_warehouse_inventory_column() -> None:
+    """Add show_warehouse_inventory toggle to site_settings."""
+    inspector = inspect(engine)
+    if "site_settings" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("site_settings")}
+    if "show_warehouse_inventory" in columns:
+        return
+
+    if engine.dialect.name == "postgresql":
+        stmt = "ALTER TABLE site_settings ADD COLUMN show_warehouse_inventory BOOLEAN NOT NULL DEFAULT FALSE"
+    else:
+        stmt = "ALTER TABLE site_settings ADD COLUMN show_warehouse_inventory BOOLEAN NOT NULL DEFAULT 0"
+
+    with engine.begin() as conn:
+        conn.execute(text(stmt))
+
+    logger.info("Applied site_settings show_warehouse_inventory column patch")
+
+
 def ensure_group_chat_columns() -> None:
     """Add group chat columns to chats and create chat_participants table."""
     inspector = inspect(engine)

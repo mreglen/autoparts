@@ -8,19 +8,21 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { apiRequest } from '../../utils/apiClient';
 import { canCreateInventory, canViewInventory } from '../../utils/inventoryAccess';
+import { useShowWarehouseInventory } from '../../utils/siteReviewsPublic';
 
 export default function WmsStoragesPage() {
   const dispatch = useDispatch();
   const { isReady, user } = useAuthReady();
   const permissionCodes = useSelector((state) => state.auth.permissionCodes);
+  const showWarehouseInventory = useShowWarehouseInventory();
 
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [wizardOpen, setWizardOpen] = useState(false);
 
-  const canView = canViewInventory(user, permissionCodes);
-  const canCreate = canCreateInventory(user, permissionCodes);
+  const canView = showWarehouseInventory && canViewInventory(user, permissionCodes);
+  const canCreate = showWarehouseInventory && canCreateInventory(user, permissionCodes);
 
   const loadSessions = useCallback(async () => {
     if (!canView) return;
