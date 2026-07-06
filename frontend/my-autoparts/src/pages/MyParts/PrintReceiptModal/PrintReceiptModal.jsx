@@ -144,7 +144,7 @@ function LabelPreview({ widthMm, heightMm, selectedPart, storageCellsForLabel })
   return (
     <div
       ref={frameRef}
-      className="w-full h-[250px] flex justify-center items-center bg-gradient-to-b from-gray-50 to-gray-100 rounded-xl"
+      className="w-full h-[180px] flex justify-center items-center bg-gradient-to-b from-gray-50 to-gray-100 rounded-xl"
     >
       <div
         className="bg-white border border-gray-300 box-border shadow-sm"
@@ -265,7 +265,6 @@ const PrintReceiptModal = ({
   const [printCopies, setPrintCopies] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
-  const [agentWaiting, setAgentWaiting] = useState(false);
 
   const selectedPrinter = useMemo(
     () => printers.find((p) => String(p.id) === String(selectedPrinterId)),
@@ -275,8 +274,6 @@ const PrintReceiptModal = ({
   const labelWidthMm = Number(selectedPrinter?.label_width_mm || 58);
   const labelHeightMm = Number(selectedPrinter?.label_height_mm || 38);
   const partQuantity = Math.max(0, Number(selectedPart?.quantity) || 0);
-
-  const hasOnlinePrinter = printers.some((p) => p.is_online);
 
   const fetchPrintersList = useCallback(async () => {
     let list = [];
@@ -299,7 +296,6 @@ const PrintReceiptModal = ({
     try {
       const list = await fetchPrintersList();
       setPrinters(list);
-      setAgentWaiting(list.length > 0 && !list.some((p) => p.is_online));
 
       let nextId = '';
       setSelectedPrinterId((prev) => {
@@ -316,7 +312,6 @@ const PrintReceiptModal = ({
           const refreshed = await apiAxios.get('/printers/me/label-print');
           const refreshedList = refreshed.data || [];
           setPrinters(refreshedList);
-          setAgentWaiting(refreshedList.length > 0 && !refreshedList.some((p) => p.is_online));
           setSelectedPrinterId((prev) => pickDefaultPrinterId(refreshedList, prev));
         } catch {
           /* grant optional */
@@ -328,7 +323,6 @@ const PrintReceiptModal = ({
         setSelectedPrinterId('');
       }
       setLoadError(e?.response?.data?.detail || 'Ошибка загрузки принтеров');
-      setAgentWaiting(false);
     } finally {
       if (!silent) {
         setLoading(false);
@@ -341,7 +335,6 @@ const PrintReceiptModal = ({
       setSelectedPrinterId('');
       setPrinters([]);
       setLoadError(null);
-      setAgentWaiting(false);
       setPrintCopies(1);
       return undefined;
     }
@@ -370,7 +363,6 @@ const PrintReceiptModal = ({
       const res = await apiAxios.get('/printers/me/label-print');
       const list = res.data || [];
       setPrinters(list);
-      setAgentWaiting(list.length > 0 && !list.some((p) => p.is_online));
     } catch (e) {
       setLoadError(e?.response?.data?.detail || 'Не удалось назначить принтер');
     }
@@ -415,31 +407,24 @@ const PrintReceiptModal = ({
   return (
     <div className="fixed inset-0 bg-black/55 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border border-gray-100"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-xl border border-gray-100 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6 sm:p-7 relative">
+        <div className="p-4 sm:p-5 relative">
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10 rounded-full p-1.5 hover:bg-gray-100"
+            className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors z-10 rounded-full p-1.5 hover:bg-gray-100"
             aria-label="Закрыть"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
 
-          <h2 className="text-2xl font-bold text-gray-900 mb-1 text-center">
-            Печать этикетки
-          </h2>
-          <p className="text-sm text-gray-500 text-center mb-6">
-            Проверьте параметры перед отправкой на принтер
-          </p>
-
-          <div className="space-y-5 flex flex-col justify-start">
-            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/70">
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
+          <div className="space-y-3 flex flex-col justify-start pr-8">
+            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50/70">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Принтер
               </label>
               {loading ? (
@@ -478,54 +463,36 @@ const PrintReceiptModal = ({
                   </div>
                 </div>
               ) : (
-                <>
-                  {agentWaiting && (
-                    <p className="text-sm text-amber-700 mb-2">
-                      Агент печати не в сети. Ожидаем подключение… (обновление каждые несколько секунд)
-                    </p>
-                  )}
-                  <select
-                    value={selectedPrinterId}
-                    onChange={(e) => handleSelectPrinter(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="">Выберите принтер</option>
-                    {printers.map((printer) => (
-                      <option
-                        key={printer.id}
-                        value={printer.id}
-                        disabled={!printer.is_online}
-                      >
-                        {printer.name}
-                        {printer.is_default ? ' (По умолчанию)' : ''}
-                        {printer.is_current ? ' · текущий' : ''}
-                        {!printer.is_online ? ' · офлайн' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {!hasOnlinePrinter && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      Запустите AutoParts Printer Agent и нажмите «Обновить».
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => loadPrinters({ silent: false })}
-                    className="mt-2 text-sm text-indigo-600 underline hover:text-indigo-800"
-                  >
-                    Обновить список
-                  </button>
-                </>
+                <select
+                  value={selectedPrinterId}
+                  onChange={(e) => handleSelectPrinter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="">Выберите принтер</option>
+                  {printers.map((printer) => (
+                    <option
+                      key={printer.id}
+                      value={printer.id}
+                      disabled={!printer.is_online}
+                    >
+                      {printer.name}
+                      {printer.is_default ? ' (По умолчанию)' : ''}
+                      {printer.is_current ? ' · текущий' : ''}
+                      {!printer.is_online ? ' · офлайн' : ''}
+                    </option>
+                  ))}
+                </select>
               )}
             </div>
 
-            <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/70">
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
+            <div className="p-3 rounded-xl border border-gray-200 bg-gray-50/70">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Количество этикеток
+                <span className="font-normal text-gray-500">
+                  {' '}
+                  · остаток {partQuantity.toLocaleString('ru-RU')} шт.
+                </span>
               </label>
-              <p className="text-sm text-gray-500 mb-3">
-                Остаток товара: {partQuantity.toLocaleString('ru-RU')} шт.
-              </p>
               <input
                 type="number"
                 min={1}
@@ -536,11 +503,11 @@ const PrintReceiptModal = ({
                   const next = parseInt(e.target.value, 10);
                   setPrintCopies(Number.isFinite(next) && next > 0 ? next : 1);
                 }}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
 
-            <div className="p-3 rounded-xl bg-white border border-gray-200">
+            <div className="p-2 rounded-xl bg-white border border-gray-200">
               <div className="flex justify-center items-center w-full">
                 <LabelPreview
                   widthMm={labelWidthMm}
@@ -551,19 +518,17 @@ const PrintReceiptModal = ({
               </div>
             </div>
 
-            <div className="pt-1">
-              <button
+            <button
                 type="button"
                 onClick={handlePrint}
                 disabled={!canPrint}
-                className={`w-full px-4 py-3 rounded-lg font-semibold transition-colors ${!canPrint
+                className={`w-full px-4 py-2.5 rounded-lg font-semibold transition-colors ${!canPrint
                   ? 'bg-indigo-400 text-white cursor-not-allowed'
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                   }`}
               >
                 {printing ? 'Отправка...' : `Распечатать (${printCopies} шт.)`}
               </button>
-            </div>
           </div>
         </div>
       </div>
