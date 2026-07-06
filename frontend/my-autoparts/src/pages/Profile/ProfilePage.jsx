@@ -9,7 +9,7 @@ import UserAvatar from '../../components/UserAvatar/UserAvatar';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
 import ChangePasswordModal from './ChangePasswordModal';
 import OrganizationCard from './OrganizationCard';
-import ProfileActivitySection from './ProfileActivitySection';
+import ProfileEngagementPreview from './ProfileEngagementPreview';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import {
   ChevronRight,
@@ -50,12 +50,6 @@ function getRoleLabel(user) {
   if (user?.is_employee) return 'Сотрудник';
   return 'Покупатель';
 }
-
-const IconHeart = () => (
-  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-  </svg>
-);
 
 const IconBag = () => (
   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -233,7 +227,7 @@ export default function ProfilePage() {
                 type="button"
                 onClick={() => avatarInputRef.current?.click()}
                 disabled={avatarLoading}
-                className="relative shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-[#00aaff] disabled:opacity-60"
+                className="relative shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
               >
                 <UserAvatar
                   avatarUrl={user.avatar_url}
@@ -252,7 +246,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => avatarInputRef.current?.click()}
-                  className="font-medium text-[#0099f7] hover:underline"
+                  className="font-medium text-indigo-600 hover:text-indigo-700"
                 >
                   Изменить фото
                 </button>
@@ -321,14 +315,13 @@ export default function ProfilePage() {
       )}
 
       <ProfileBlock title="Покупки">
-        <ProfileRow to="/purchases/favorites" label="Избранное" icon={<IconHeart />} />
         <ProfileRow to="/purchases/orders" label="Заказы" icon={<IconBag />} />
         <ProfileRow to="/profile/notifications" label="Уведомления" icon={<IconBell />} />
       </ProfileBlock>
 
       {showOrganization ? <OrganizationCard orgId={user.organization_id} /> : null}
 
-      <ProfileActivitySection />
+      <ProfileEngagementPreview />
 
       <ProfileBlock>
         <ProfileRow label="Сменить пароль" onClick={() => setShowPasswordModal(true)} />

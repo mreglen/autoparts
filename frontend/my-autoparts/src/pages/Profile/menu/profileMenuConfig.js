@@ -5,7 +5,6 @@ export const TAB_PATH_MAP = {
     'settings-notifications': '/profile/notifications',
     'purchases-orders': '/purchases/orders',
     'purchases-returns': '/purchases/returns',
-    'purchases-favorites': '/purchases/favorites',
     'sales-orders': '/sales/orders',
     'sales-returns': '/sales/returns',
     'warehouse-sales': '/warehouse-sales',
@@ -35,7 +34,6 @@ export const TAB_PATH_MAP = {
 const PURCHASES_ENGAGEMENT_SUBMENU = [
     { id: 'purchases-orders', label: 'Заказы' },
     { id: 'purchases-returns', label: 'Возвраты' },
-    { id: 'purchases-favorites', label: 'Избранное' },
 ];
 
 const PATH_TAB_MAP = Object.fromEntries(
@@ -45,6 +43,13 @@ const PATH_TAB_MAP = Object.fromEntries(
 export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/my-parts') || path.startsWith('/warehouse/scan')) return 'parts';
     if (path.startsWith('/profile/notifications')) return 'settings-notifications';
+    if (
+        path.startsWith('/profile/favorites') ||
+        path.startsWith('/profile/views') ||
+        path.startsWith('/profile/subscriptions')
+    ) {
+        return 'profile';
+    }
     if (path.startsWith('/vehicles/edit')) return 'vehicles';
     if (path.startsWith('/sellers')) return 'sellers';
     if (path.startsWith('/moderation/products')) return 'product-moderation';

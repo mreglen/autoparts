@@ -63,7 +63,9 @@ const SalesOrdersPage = lazy(() => import('./pages/Sales/SalesOrdersPage'));
 const PurchasesOrdersPage = lazy(() => import('./pages/Sales/PurchasesOrdersPage'));
 const SalesReturnsPage = lazy(() => import('./pages/Sales/SalesReturnsPage'));
 const PurchasesReturnsPage = lazy(() => import('./pages/Sales/PurchasesReturnsPage'));
-const FavoritesPage = lazy(() => import('./pages/Profile/FavoritesPage'));
+const ProfileFavoritesPage = lazy(() => import('./pages/Profile/ProfileFavoritesPage'));
+const ProfileViewsPage = lazy(() => import('./pages/Profile/ProfileViewsPage'));
+const ProfileSubscriptionsPage = lazy(() => import('./pages/Profile/ProfileSubscriptionsPage'));
 const WarehouseSalesPage = lazy(() => import('./pages/Sales/WarehouseSalesPage'));
 const FinancePage = lazy(() => import('./pages/Finance/FinancePage'));
 const DashboardPage = lazy(() => import('./pages/Dashboard/DashboardPage'));
@@ -392,6 +394,30 @@ function App() {
             )}
           />
           <Route
+            path="/profile/favorites"
+            element={(
+              <LazyRoute>
+                <ProfileFavoritesPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/profile/views"
+            element={(
+              <LazyRoute>
+                <ProfileViewsPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/profile/subscriptions"
+            element={(
+              <LazyRoute>
+                <ProfileSubscriptionsPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
             path="/my-parts"
             element={(
               <LazyRoute>
@@ -479,22 +505,9 @@ function App() {
               </LazyRoute>
             )}
           />
-          <Route
-            path="/purchases/favorites"
-            element={(
-              <LazyRoute>
-                <FavoritesPage />
-              </LazyRoute>
-            )}
-          />
-          <Route
-            path="/purchases/history"
-            element={<Navigate to="/profile" replace />}
-          />
-          <Route
-            path="/purchases/subscriptions"
-            element={<Navigate to="/profile" replace />}
-          />
+          <Route path="/purchases/favorites" element={<Navigate to="/profile/favorites" replace />} />
+          <Route path="/purchases/history" element={<Navigate to="/profile/views" replace />} />
+          <Route path="/purchases/subscriptions" element={<Navigate to="/profile/subscriptions" replace />} />
           <Route
             path="/sales/orders"
             element={(
