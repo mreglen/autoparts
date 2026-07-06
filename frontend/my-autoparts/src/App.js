@@ -59,9 +59,7 @@ const OrderRegistration = lazy(() => import('./pages/Cart/OrderRegistration'));
 const NewPartsOrderRegistration = lazy(() => import('./pages/Cart/NewPartsOrderRegistration'));
 const NewPartsPaymentPage = lazy(() => import('./pages/Cart/NewPartsPaymentPage'));
 const SalesOrdersPage = lazy(() => import('./pages/Sales/SalesOrdersPage'));
-const SalesReturnsPage = lazy(() => import('./pages/Sales/SalesReturnsPage'));
 const PurchasesOrdersPage = lazy(() => import('./pages/Sales/PurchasesOrdersPage'));
-const PurchasesReturnsPage = lazy(() => import('./pages/Sales/PurchasesReturnsPage'));
 const WarehouseSalesPage = lazy(() => import('./pages/Sales/WarehouseSalesPage'));
 const FinancePage = lazy(() => import('./pages/Finance/FinancePage'));
 const DashboardPage = lazy(() => import('./pages/Dashboard/DashboardPage'));
@@ -413,11 +411,7 @@ function App() {
           />
           <Route
             path="/purchases/returns"
-            element={(
-              <LazyRoute>
-                <PurchasesReturnsPage />
-              </LazyRoute>
-            )}
+            element={<Navigate to="/purchases/orders" replace />}
           />
           <Route
             path="/sales/orders"
@@ -429,11 +423,7 @@ function App() {
           />
           <Route
             path="/sales/returns"
-            element={(
-              <LazyRoute>
-                <SalesReturnsPage />
-              </LazyRoute>
-            )}
+            element={<Navigate to="/sales/orders" replace />}
           />
           <Route
             path="/stock-in"
