@@ -47,16 +47,34 @@ def dump_json_list(value: list | None) -> str | None:
     return json.dumps(value, ensure_ascii=False)
 
 
+def _storage_cell_item_fields(item) -> tuple[int | None, str]:
+    if isinstance(item, dict):
+        cell_id = item.get("storage_cell_id")
+        cell_value = str(item.get("value") or "")
+    else:
+        cell_id = getattr(item, "storage_cell_id", None)
+        cell_value = str(getattr(item, "value", None) or "")
+    try:
+        parsed_id = int(cell_id) if cell_id is not None else None
+    except (TypeError, ValueError):
+        parsed_id = None
+    return parsed_id, cell_value
+
+
 def dump_storage_cells(value: list | None) -> str | None:
     if value is None:
         return None
-    payload = [
-        {
-            "storage_cell_id": item.storage_cell_id,
-            "value": item.value or "",
-        }
-        for item in value
-    ]
+    payload = []
+    for item in value:
+        cell_id, cell_value = _storage_cell_item_fields(item)
+        if cell_id is None:
+            continue
+        payload.append(
+            {
+                "storage_cell_id": cell_id,
+                "value": cell_value,
+            }
+        )
     return json.dumps(payload, ensure_ascii=False)
 
 
