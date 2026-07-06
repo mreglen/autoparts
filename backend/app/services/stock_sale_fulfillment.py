@@ -124,6 +124,7 @@ def fulfill_stock_out(
     if (product.quantity or 0) < request.quantity:
         raise HTTPException(status_code=400, detail="Недостаточно товара на складе")
 
+    previous_quantity = int(product.quantity or 0)
     stock_out = StockOut(
         organization_id=request.organization_id,
         product_id=request.product_id,
@@ -180,5 +181,9 @@ def fulfill_stock_out(
 
     invalidate_public_catalog_cache()
     invalidate_public_product_detail(request.product_id)
+
+    from app.services.notification_service import maybe_notify_stock_level
+
+    maybe_notify_stock_level(db, product, previous_quantity)
 
     return FulfillStockOutResult(stock_out=stock_out, created=True)

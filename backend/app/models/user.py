@@ -19,6 +19,8 @@ class User(Base):
     is_employee = Column(Boolean, default=False)
     hashed_password = Column(String)
     avatar_url = Column(String(512), nullable=True)
+    notify_push_enabled = Column(Boolean, default=True, nullable=False)
+    notify_email_enabled = Column(Boolean, default=True, nullable=False)
 
     organization_id = Column(String(10), ForeignKey("organizations.id"))
 

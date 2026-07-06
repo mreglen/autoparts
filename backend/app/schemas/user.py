@@ -53,6 +53,8 @@ class UserResponse(BaseModel):
     organization_id: Optional[str] = None
     organization_name: Optional[str] = None
     organization_phone: Optional[str] = None
+    notify_push_enabled: bool = True
+    notify_email_enabled: bool = True
 
     class Config:
         from_attributes = True

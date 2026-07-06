@@ -2,6 +2,7 @@ export const TAB_PATH_MAP = {
     dashboard: '/dashboard',
     'admin-panel': '/admin-settings',
     profile: '/profile',
+    'settings-notifications': '/profile/notifications',
     'purchases-orders': '/purchases/orders',
     'sales-orders': '/sales/orders',
     'warehouse-sales': '/warehouse-sales',
@@ -33,6 +34,7 @@ const PATH_TAB_MAP = Object.fromEntries(
 
 export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/my-parts')) return 'parts';
+    if (path.startsWith('/profile/notifications')) return 'settings-notifications';
     if (path.startsWith('/vehicles/edit')) return 'vehicles';
     if (path.startsWith('/sellers')) return 'sellers';
     if (path.startsWith('/moderation/products')) return 'product-moderation';
@@ -89,7 +91,10 @@ export const getAvailableTabs = (user, permissionCodes) => {
             {
                 id: 'settings',
                 label: 'Настройки',
-                submenu: [{ id: 'profile', label: 'Профиль' }],
+                submenu: [
+                    { id: 'profile', label: 'Профиль' },
+                    { id: 'settings-notifications', label: 'Уведомления' },
+                ],
             },
         ];
     }
@@ -180,7 +185,10 @@ export const getAvailableTabs = (user, permissionCodes) => {
             baseTabs.push({ id: 'warehouse', label: 'Склад', submenu: warehouseSubmenu });
         }
 
-        const settingsSubmenu = [{ id: 'profile', label: 'Профиль' }];
+        const settingsSubmenu = [
+            { id: 'profile', label: 'Профиль' },
+            { id: 'settings-notifications', label: 'Уведомления' },
+        ];
         if (hasPermission('storage-addresses')) {
             settingsSubmenu.push({ id: 'settings-storage-addresses', label: 'Адресное хранение' });
         }
@@ -198,6 +206,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
             label: 'Настройки',
             submenu: [
                 { id: 'profile', label: 'Профиль' },
+                { id: 'settings-notifications', label: 'Уведомления' },
                 { id: 'settings-employees', label: 'Сотрудники' },
                 { id: 'settings-storage-addresses', label: 'Адресное хранение' },
                 { id: 'settings-organization', label: 'Организация' },
@@ -206,7 +215,10 @@ export const getAvailableTabs = (user, permissionCodes) => {
             ],
         });
     } else if (user.is_seller) {
-        const settingsSubmenu = [{ id: 'profile', label: 'Профиль' }];
+        const settingsSubmenu = [
+            { id: 'profile', label: 'Профиль' },
+            { id: 'settings-notifications', label: 'Уведомления' },
+        ];
         if (user.organization_id) {
             settingsSubmenu.push({ id: 'settings-organization', label: 'Организация' });
             settingsSubmenu.push({ id: 'settings-printers', label: 'Печать' });
@@ -217,7 +229,10 @@ export const getAvailableTabs = (user, permissionCodes) => {
         baseTabs.push({
             id: 'settings',
             label: 'Настройки',
-            submenu: [{ id: 'profile', label: 'Профиль' }],
+            submenu: [
+                { id: 'profile', label: 'Профиль' },
+                { id: 'settings-notifications', label: 'Уведомления' },
+            ],
         });
     }
 

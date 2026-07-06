@@ -18,6 +18,7 @@ from app.models.permission import Permission
 from app.models.user import User as UserModel
 from app.models.user_permission import UserPermission
 from app.utils.org_access import org_has_admin_director
+from app.services.notification_service import notify_order_status_buyer
 from app.schemas.sales_orders import (
     AvitoOrderResponseV2,
     AvitoRetryWarehouseResponse,
@@ -367,6 +368,14 @@ def update_used_parts_order_status(
         db.rollback()
         raise
 
+    notify_order_status_buyer(
+        user_id=order.user_id,
+        order_id=order_id,
+        order_kind="used",
+        status_code=payload.status_code,
+        previous_status_code=previous_status_code,
+    )
+
     return UpdateUsedOrderStatusResponse(
         status="ok",
         fulfilled_items=[
@@ -474,6 +483,13 @@ def update_new_parts_order_status(
         entity_type="garage_new_order",
         entity_id=order_id,
     )
+    notify_order_status_buyer(
+        user_id=order.user_id,
+        order_id=order_id,
+        order_kind="new",
+        status_code=payload.status_code,
+        previous_status_code=previous_status_code,
+    )
     return {"status": "ok"}
 
 
@@ -512,6 +528,7 @@ def update_new_parts_order_item_status(
         raise HTTPException(status_code=404, detail="Позиция заказа не найдена")
 
     previous_status_code = item.status_code
+    previous_order_status = order.status_code
     item.status_code = payload.status_code
     order.status_code = _aggregate_order_status_from_items(
         order.items,
@@ -534,6 +551,13 @@ def update_new_parts_order_item_status(
         },
         entity_type="garage_new_order_item",
         entity_id=item_id,
+    )
+    notify_order_status_buyer(
+        user_id=order.user_id,
+        order_id=order_id,
+        order_kind="new",
+        status_code=order.status_code,
+        previous_status_code=previous_order_status,
     )
     return {"status": "ok", "order_status_code": order.status_code}
 
@@ -569,6 +593,7 @@ def update_used_parts_order_item_status(
         raise HTTPException(status_code=404, detail="Позиция заказа не найдена")
 
     previous_item_status = item.status_code
+    previous_order_status = order.status_code
     try:
         summary = fulfill_used_order_item_on_status_change(
             db,
@@ -613,6 +638,14 @@ def update_used_parts_order_item_status(
             },
             entity_type="garage_used_order_item",
             entity_id=item_id,
+        )
+
+        notify_order_status_buyer(
+            user_id=order.user_id,
+            order_id=order_id,
+            order_kind="used",
+            status_code=order.status_code,
+            previous_status_code=previous_order_status,
         )
 
         return UpdateUsedOrderStatusResponse(status="ok", fulfilled_items=fulfilled_out)

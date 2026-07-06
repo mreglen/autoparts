@@ -846,11 +846,14 @@ def update_product_quantity(
     if not db_product:
         raise HTTPException(status_code=404, detail="Продукт не найден или недоступен")
 
-    # Обновляем только количество
+    previous_quantity = int(db_product.quantity or 0)
     db_product.quantity = quantity_update.quantity
 
     db.commit()
     db.refresh(db_product)
+    from app.services.notification_service import maybe_notify_stock_level
+
+    maybe_notify_stock_level(db, db_product, previous_quantity)
     log_audit(
         db,
         event_type="product_quantity_changed",

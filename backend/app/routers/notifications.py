@@ -3,7 +3,12 @@ from sqlalchemy.orm import Session
 from pywebpush import webpush, WebPushException
 from app.db.database import get_db
 from app.models.notification import PushSubscription
-from app.schemas.notification import PushSubscriptionCreate, PushSubscriptionResponse
+from app.schemas.notification import (
+    PushSubscriptionCreate,
+    PushSubscriptionResponse,
+    NotificationPreferencesResponse,
+    NotificationPreferencesUpdate,
+)
 from app.core.auth import get_current_user
 from app.models.user import User
 from app.core.config import settings
@@ -77,6 +82,53 @@ def unsubscribe_from_push(
 def get_vapid_public_key():
     """Return VAPID public key for client subscription"""
     return {"public_key": settings.VAPID_PUBLIC_KEY}
+
+
+def _user_has_push_subscription(db: Session, user_id: int) -> bool:
+    return (
+        db.query(PushSubscription.id)
+        .filter(
+            PushSubscription.user_id == user_id,
+            PushSubscription.is_active.is_(True),
+        )
+        .first()
+        is not None
+    )
+
+
+@router.get("/preferences", response_model=NotificationPreferencesResponse)
+def get_notification_preferences(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return NotificationPreferencesResponse(
+        notify_push_enabled=current_user.notify_push_enabled
+        if current_user.notify_push_enabled is not None
+        else True,
+        notify_email_enabled=current_user.notify_email_enabled
+        if current_user.notify_email_enabled is not None
+        else True,
+        has_push_subscription=_user_has_push_subscription(db, current_user.id),
+    )
+
+
+@router.patch("/preferences", response_model=NotificationPreferencesResponse)
+def update_notification_preferences(
+    payload: NotificationPreferencesUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if payload.notify_push_enabled is not None:
+        current_user.notify_push_enabled = payload.notify_push_enabled
+    if payload.notify_email_enabled is not None:
+        current_user.notify_email_enabled = payload.notify_email_enabled
+    db.commit()
+    db.refresh(current_user)
+    return NotificationPreferencesResponse(
+        notify_push_enabled=current_user.notify_push_enabled,
+        notify_email_enabled=current_user.notify_email_enabled,
+        has_push_subscription=_user_has_push_subscription(db, current_user.id),
+    )
 
 
 def send_push_notification(user_id: int, message_data: dict, db: Session):

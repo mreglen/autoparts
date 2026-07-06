@@ -199,9 +199,9 @@ class ConnectionManager:
                 )
 
     async def broadcast_to_chat(self, message: dict, chat_id: int, db: Session, exclude_user_id: int = None):
-        """Отправить сообщение всем участникам чата + push notification если offline"""
-        from app.routers.notifications import send_push_notification
+        """Отправить сообщение всем участникам чата + push/email если offline"""
         from app.models.user import User
+        from app.services.notification_service import EVENT_CHAT_MESSAGE, dispatch_user_notification
         
         chat = db.query(Chat).filter(Chat.id == chat_id).first()
         if not chat:
@@ -228,16 +228,33 @@ class ConnectionManager:
             if await self.is_user_online_globally(recipient_id):
                 await self.send_personal_message(message, recipient_id)
             else:
+                push_title = (
+                    f"{sender_name} — {chat_title}"
+                    if is_group_chat(chat)
+                    else f"Новое сообщение от {sender_name}"
+                )
+                message_preview = (message.get("message") or "")[:100]
                 push_data = {
                     "type": "message",
-                    "title": f"{sender_name} — {chat_title}" if is_group_chat(chat) else f"Новое сообщение от {sender_name}",
-                    "body": message.get("message", "")[:100],
+                    "title": push_title,
+                    "body": message_preview,
                     "chatId": chat_id,
                     "senderId": message.get("sender_id"),
                     "senderName": sender_name,
                     "url": push_url,
                 }
-                send_push_notification(recipient_id, push_data, db)
+                email_body = (
+                    f"{push_title}\n\n{message_preview}\n\n"
+                    f"Ответьте в чате: https://svoygarage.ru{push_url}\n\n"
+                    f"С уважением,\nСвой Гараж"
+                )
+                dispatch_user_notification(
+                    recipient_id,
+                    event_type=EVENT_CHAT_MESSAGE,
+                    push_data=push_data,
+                    email_subject=push_title,
+                    email_body=email_body,
+                )
 
 
 manager = ConnectionManager()

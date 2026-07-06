@@ -973,7 +973,7 @@ export const subscribeToPushNotifications = ({ prompt = true } = {}) => async (d
     try {
         if (!('Notification' in window) || !('serviceWorker' in navigator)) {
             console.log('[Push] Push notifications not supported');
-            return;
+            return { success: false, reason: 'unsupported' };
         }
 
         let permission = Notification.permission;
@@ -982,20 +982,20 @@ export const subscribeToPushNotifications = ({ prompt = true } = {}) => async (d
         }
         if (permission !== 'granted') {
             console.log('[Push] Notification permission not granted');
-            return;
+            return { success: false, reason: 'denied' };
         }
 
         const response = await fetch(`${API_BASE}/notifications/vapid-public-key`);
         const contentType = response.headers.get('content-type') || '';
         if (!response.ok || !contentType.includes('application/json')) {
             console.log('[Push] VAPID endpoint returned non-JSON response');
-            return;
+            return { success: false, reason: 'vapid' };
         }
         const { public_key } = await response.json();
 
         if (!public_key) {
             console.log('[Push] VAPID public key not configured');
-            return;
+            return { success: false, reason: 'vapid' };
         }
 
         let registration = await navigator.serviceWorker.getRegistration('/');
@@ -1014,7 +1014,7 @@ export const subscribeToPushNotifications = ({ prompt = true } = {}) => async (d
         }
 
         const token = getState().auth.token;
-        if (!token) return;
+        if (!token) return { success: false, reason: 'auth' };
 
         const subscribeResponse = await fetch(`${API_BASE}/notifications/subscribe`, {
             method: 'POST',
@@ -1032,12 +1032,14 @@ export const subscribeToPushNotifications = ({ prompt = true } = {}) => async (d
 
         if (!subscribeResponse.ok) {
             console.error('[Push] Backend subscription failed:', subscribeResponse.status);
-            return;
+            return { success: false, reason: 'backend' };
         }
 
         console.log('[Push] Subscription sent to backend');
+        return { success: true };
     } catch (error) {
         console.error('[Push] Subscription failed:', error);
+        return { success: false, reason: 'error' };
     }
 };
 

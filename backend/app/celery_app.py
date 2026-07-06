@@ -17,6 +17,7 @@ celery_app = Celery(
         'app.tasks.yandex_feed_tasks',
         'app.tasks.seo_tasks',
         'app.tasks.analytics_tasks',
+        'app.tasks.notification_tasks',
     ]
 )
 

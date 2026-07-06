@@ -61,6 +61,8 @@ def build_user_profile_response(user: User) -> dict:
         "organization_id": user.organization_id,
         "organization_name": user.organization.name if user.organization_id and user.organization else None,
         "organization_phone": user.organization.phone if user.organization_id and user.organization else None,
+        "notify_push_enabled": user.notify_push_enabled if user.notify_push_enabled is not None else True,
+        "notify_email_enabled": user.notify_email_enabled if user.notify_email_enabled is not None else True,
     }
 
 

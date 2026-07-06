@@ -52,12 +52,8 @@ def notify_sellers_new_order(
     buyer_name: str | None = None,
     total_amount: float | None = None,
 ) -> None:
-    """Push-уведомление продавцам организации о новом заказе."""
-    from app.core.config import settings
-    from app.routers.notifications import send_push_notification
-
-    if not settings.VAPID_PRIVATE_KEY or not settings.VAPID_PUBLIC_KEY:
-        return
+    """Push + email продавцам организации о новом заказе."""
+    from app.services.notification_service import EVENT_NEW_ORDER_SELLER, dispatch_org_sales_notification
 
     recipient_ids = get_sales_order_recipient_user_ids(db, organization_id)
     if not recipient_ids:
@@ -66,6 +62,7 @@ def notify_sellers_new_order(
     buyer = (buyer_name or "Покупатель").strip() or "Покупатель"
     title = f"Новый заказ №{order_id}"
     body = f"{buyer}{_format_amount(total_amount)}"
+    kind_label = "новых запчастей" if order_kind == "new" else "б/у"
 
     push_data = {
         "type": "order",
@@ -75,9 +72,21 @@ def notify_sellers_new_order(
         "body": body,
         "url": "/sales/orders",
     }
+    email_body = (
+        f"Поступил новый заказ {kind_label} №{order_id}.\n"
+        f"Покупатель: {buyer}{_format_amount(total_amount)}\n\n"
+        f"Откройте раздел заказов: https://svoygarage.ru/sales/orders\n\n"
+        f"С уважением,\nСвой Гараж"
+    )
 
-    for user_id in recipient_ids:
-        send_push_notification(user_id, push_data, db)
+    dispatch_org_sales_notification(
+        db,
+        organization_id,
+        event_type=EVENT_NEW_ORDER_SELLER,
+        push_data=push_data,
+        email_subject=title,
+        email_body=email_body,
+    )
 
 
 def notify_sellers_new_orders_batch(

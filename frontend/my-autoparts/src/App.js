@@ -1,5 +1,5 @@
 // src/App.jsx
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
@@ -48,6 +48,7 @@ const ProductNotFound = lazy(() => import('./pages/Chat/ProductNotFound'));
 
 // Lazy: кабинет продавца
 const ProfilePage = lazy(() => import('./pages/Profile/ProfilePage'));
+const NotificationSettingsPage = lazy(() => import('./pages/Profile/NotificationSettingsPage'));
 const MyParts = lazy(() => import('./pages/MyParts/MyParts'));
 const AddPart = lazy(() => import('./pages/MyParts/AddPart/AddPart'));
 const EditPart = lazy(() => import('./pages/MyParts/EditPart/EditPart'));
@@ -181,6 +182,53 @@ function RedirectLegacyProfileRoute() {
   return <Navigate to={`/users/${encodeURIComponent(publicCode || '')}`} replace />;
 }
 
+function NotificationsBanner() {
+  const { token, user } = useSelector((state) => state.auth);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!token || !user) {
+      setVisible(false);
+      return;
+    }
+    if (localStorage.getItem('notifications_banner_dismissed') === '1') {
+      setVisible(false);
+      return;
+    }
+    if (!('Notification' in window) || Notification.permission === 'granted') {
+      setVisible(false);
+      return;
+    }
+    setVisible(true);
+  }, [token, user]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="border-b border-indigo-100 bg-indigo-50 px-4 py-2.5 text-sm text-indigo-900">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
+        <span>Включите уведомления, чтобы не пропустить заказы и сообщения.</span>
+        <div className="flex items-center gap-3">
+          <a href="/profile/notifications" className="font-medium text-indigo-700 hover:underline">
+            Настроить
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.setItem('notifications_banner_dismissed', '1');
+              setVisible(false);
+            }}
+            className="text-indigo-600 hover:text-indigo-800"
+            aria-label="Закрыть"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const dispatch = useDispatch();
   const { token, user } = useSelector((state) => state.auth);
@@ -209,6 +257,7 @@ function App() {
     <BrowserRouter>
       <PullToRefresh />
       <CookieBanner />
+      <NotificationsBanner />
       <ServiceWorkerNavigationHandler />
       <SiteAnalyticsTracker />
       <Routes>
@@ -326,6 +375,14 @@ function App() {
             element={(
               <LazyRoute>
                 <ProfilePage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/profile/notifications"
+            element={(
+              <LazyRoute>
+                <NotificationSettingsPage />
               </LazyRoute>
             )}
           />

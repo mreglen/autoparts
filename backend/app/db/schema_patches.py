@@ -1100,6 +1100,29 @@ def ensure_user_avatar_column() -> None:
     logger.info("Applied users.avatar_url column patch")
 
 
+def ensure_user_notification_preference_columns() -> None:
+    """Add notification preference columns to users if missing."""
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("users")}
+    patches: list[str] = []
+    if "notify_push_enabled" not in columns:
+        patches.append("ALTER TABLE users ADD COLUMN notify_push_enabled BOOLEAN NOT NULL DEFAULT TRUE")
+    if "notify_email_enabled" not in columns:
+        patches.append("ALTER TABLE users ADD COLUMN notify_email_enabled BOOLEAN NOT NULL DEFAULT TRUE")
+
+    if not patches:
+        return
+
+    with engine.begin() as conn:
+        for stmt in patches:
+            conn.execute(text(stmt))
+
+    logger.info("Applied users notification preference columns patch")
+
+
 def ensure_product_photo_thumb_url_column() -> None:
     """Add thumb_url column to product_photos if missing."""
     inspector = inspect(engine)

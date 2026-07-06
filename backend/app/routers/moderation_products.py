@@ -427,6 +427,34 @@ def approve_product(
     mark_yandex_feed_dirty_for_used_product(db, db_product, "product_moderation_approved")
     invalidate_public_catalog_cache()
     invalidate_public_product_detail(db_product.id)
+
+    from app.services.notification_service import (
+        EVENT_MODERATION_APPROVED,
+        dispatch_user_notification,
+    )
+
+    if pending_product.created_by:
+        product_name = db_product.name or "Запчасть"
+        push_data = {
+            "type": "moderation",
+            "title": "Запчасть одобрена",
+            "body": f"«{product_name}» добавлена в каталог",
+            "productId": db_product.id,
+            "url": "/my-parts",
+        }
+        email_body = (
+            f"Ваша запчасть «{product_name}» прошла модерацию и опубликована в каталоге.\n\n"
+            f"https://svoygarage.ru/my-parts\n\n"
+            f"С уважением,\nСвой Гараж"
+        )
+        dispatch_user_notification(
+            pending_product.created_by,
+            event_type=EVENT_MODERATION_APPROVED,
+            push_data=push_data,
+            email_subject="Запчасть одобрена модерацией",
+            email_body=email_body,
+        )
+
     return ModerateProductResponse(
         message="Запчасть одобрена и добавлена в каталог",
         product_id=db_product.id
@@ -475,6 +503,8 @@ def reject_product(
     )
     db.add(db_rejected)
     pending_org_id = pending_product.organization_id
+    author_id = pending_product.created_by
+    product_name = pending_product.name or "Запчасть"
 
     # Удалить из pending
     db.delete(pending_product)
@@ -490,6 +520,33 @@ def reject_product(
         organization_id=pending_org_id,
         details={"pending_product_id": product_id, "reason": rejection_reason or None},
     )
+
+    from app.services.notification_service import (
+        EVENT_MODERATION_REJECTED,
+        dispatch_user_notification,
+    )
+
+    if author_id:
+        reason_line = f"\nПричина: {rejection_reason}" if rejection_reason else ""
+        push_data = {
+            "type": "moderation",
+            "title": "Запчасть отклонена",
+            "body": f"«{product_name}» не прошла модерацию",
+            "url": "/my-parts?tab=rejected",
+        }
+        email_body = (
+            f"Запчасть «{product_name}» отклонена модератором.{reason_line}\n\n"
+            f"https://svoygarage.ru/my-parts?tab=rejected\n\n"
+            f"С уважением,\nСвой Гараж"
+        )
+        dispatch_user_notification(
+            author_id,
+            event_type=EVENT_MODERATION_REJECTED,
+            push_data=push_data,
+            email_subject="Запчасть отклонена модерацией",
+            email_body=email_body,
+        )
+
     return ModerateProductResponse(
         message="Запчасть отклонена",
         product_id=db_rejected.id
