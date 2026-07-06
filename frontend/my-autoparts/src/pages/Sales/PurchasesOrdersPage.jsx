@@ -9,6 +9,7 @@ import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceM
 import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus, getGarageStatusColor, getGarageStatusName, getUsedOrderBuyerHint } from '../../utils/garageOrderUi';
 import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
 import { isUsedOrderReturnEligible, TERMINAL_RETURN_STATUSES } from '../../utils/returnStatusUi';
+import { openOrderItemProductFlow } from '../../utils/avitoProductFlow';
 
 const ACTIVE_STATUSES = new Set([
   'pending',

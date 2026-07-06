@@ -270,6 +270,9 @@ async def startup_event():
     global scheduler, _scheduler_leader, _scheduler_renew_task
 
     await websocket_router.manager.start_pubsub_bridge()
+    from app.services.printer_agent_hub import printer_hub
+
+    await printer_hub.start()
 
     _scheduler_leader = try_acquire_scheduler_lock()
     if not _scheduler_leader:
@@ -429,6 +432,9 @@ async def shutdown_event():
     global scheduler, _scheduler_leader, _scheduler_renew_task
 
     await websocket_router.manager.stop_pubsub_bridge()
+    from app.services.printer_agent_hub import printer_hub
+
+    await printer_hub.stop()
 
     if _scheduler_renew_task:
         _scheduler_renew_task.cancel()

@@ -25,6 +25,7 @@ from app.models.pending_product_storage_cell import PendingProductStorageCell as
 from app.models.storage_cell import StorageCell as StorageCellModel
 from app.db.database import get_db
 from app.services.audit_service import log_audit
+from app.services.printer_agent_hub import printer_hub
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 import asyncio
@@ -34,11 +35,12 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 router = APIRouter(prefix="/printers", tags=["printers"])
 
-# Store active WebSocket connections and their printers in memory
-# Key: agent_id, Value: {websocket, last_seen}
-active_connections: Dict[int, dict] = {}
+AGENT_OFFLINE_DETAIL = (
+    "Агент печати не подключён к серверу. "
+    "Убедитесь, что AutoParts Printer Agent запущен на компьютере с принтером."
+)
 
-# Store print jobs in memory (for demo purposes)
+# Print jobs in memory (status polling is best-effort across workers)
 print_jobs: Dict[int, dict] = {}
 job_counter = 0
 
@@ -46,7 +48,6 @@ job_counter = 0
 MAX_CONCURRENT_LABEL_PDF_RENDERS = max(2, min(8, (os.cpu_count() or 4)))
 _pdf_render_semaphore: asyncio.Semaphore | None = None
 _job_counter_lock = asyncio.Lock()
-_agent_send_locks: Dict[int, asyncio.Lock] = {}
 
 _templates_env = Environment(
     loader=FileSystemLoader(str(Path(__file__).resolve().parents[1] / "templates" / "printing")),
@@ -285,28 +286,24 @@ async def _render_label_pdf_bytes(html: str, width_mm: int, height_mm: int) -> b
         return await asyncio.to_thread(_html_to_pdf_bytes, html, width_mm, height_mm)
 
 
+async def _ensure_agent_online(agent_id: int) -> None:
+    if not await printer_hub.is_online(agent_id):
+        raise HTTPException(status_code=400, detail=AGENT_OFFLINE_DETAIL)
+
+
+async def _online_agent_ids(db: Session, org_id: str | None = None) -> list[int]:
+    q = db.query(PrinterAgent.id).filter(PrinterAgent.is_active.is_(True))
+    if org_id:
+        q = q.filter(PrinterAgent.organization_id == org_id)
+    ids = [row.id for row in q.all()]
+    return await printer_hub.filter_online(ids)
+
+
 async def _next_job_id() -> int:
     global job_counter
     async with _job_counter_lock:
         job_counter += 1
         return job_counter
-
-
-def _get_agent_send_lock(agent_id: int) -> asyncio.Lock:
-    lock = _agent_send_locks.get(agent_id)
-    if lock is None:
-        lock = asyncio.Lock()
-        _agent_send_locks[agent_id] = lock
-    return lock
-
-
-async def _send_agent_json(agent_id: int, websocket, payload: dict) -> None:
-    async with _get_agent_send_lock(agent_id):
-        await websocket.send_json(payload)
-
-
-def _clear_agent_send_lock(agent_id: int) -> None:
-    _agent_send_locks.pop(agent_id, None)
 
 
 def generate_printer_token() -> str:
@@ -340,13 +337,13 @@ async def get_all_printers(
     Get all registered printers from active connections
     If user is not admin, only show printers from their organization
     """
-    agent_ids_online = list(active_connections.keys())
-    if not agent_ids_online:
-        return []
-
     user_org_id = None
     if not current_user.is_admin and hasattr(current_user, "organization_id"):
         user_org_id = current_user.organization_id
+
+    agent_ids_online = await _online_agent_ids(db, user_org_id)
+    if not agent_ids_online:
+        return []
 
     q = (
         db.query(PrinterAgentPrinter)
@@ -382,13 +379,13 @@ async def get_available_printers(
     Get list of currently available printers (active agents)
     Filtered by organization for non-admin users
     """
-    agent_ids_online = list(active_connections.keys())
-    if not agent_ids_online:
-        return []
-
     user_org_id = None
     if not current_user.is_admin and hasattr(current_user, "organization_id"):
         user_org_id = current_user.organization_id
+
+    agent_ids_online = await _online_agent_ids(db, user_org_id)
+    if not agent_ids_online:
+        return []
 
     q = (
         db.query(PrinterAgentPrinter)
@@ -475,7 +472,7 @@ async def get_printer(
         "is_default": p.is_default,
         "agent_hostname": agent.hostname,
         "organization_id": agent.organization_id,
-        "is_active": agent.id in active_connections,
+        "is_active": await printer_hub.is_online(agent.id),
     }
 
 
@@ -520,14 +517,7 @@ async def print_to_printer(
         if not has_perm:
             raise HTTPException(status_code=403, detail="Not enough permissions for this printer")
 
-    websocket_data = active_connections.get(p.agent_id)
-    if not websocket_data or not websocket_data.get("websocket"):
-        raise HTTPException(
-            status_code=400,
-            detail="Printer agent is not connected. Please ensure the agent is running.",
-        )
-
-    websocket = websocket_data["websocket"]
+    await _ensure_agent_online(p.agent_id)
 
     # Create print job in memory
     job_id = await _next_job_id()
@@ -558,7 +548,7 @@ async def print_to_printer(
     }
 
     try:
-        await _send_agent_json(p.agent_id, websocket, print_command)
+        await printer_hub.send_command(p.agent_id, print_command)
 
         print_job["status"] = "printing"
         print_job["started_at"] = datetime.utcnow().isoformat()
@@ -610,9 +600,7 @@ async def print_test_label(
     if not perm and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Not enough permissions for this printer")
 
-    websocket_data = active_connections.get(p.agent_id)
-    if not websocket_data or not websocket_data.get("websocket"):
-        raise HTTPException(status_code=400, detail="Printer agent is not connected. Please ensure the agent is running.")
+    await _ensure_agent_online(p.agent_id)
 
     width_mm = int(getattr(perm, "label_width_mm", 58) if perm else 58)
     height_mm = int(getattr(perm, "label_height_mm", 38) if perm else 38)
@@ -661,7 +649,7 @@ async def print_test_label(
     }
 
     try:
-        await _send_agent_json(p.agent_id, websocket_data["websocket"], print_command)
+        await printer_hub.send_command(p.agent_id, print_command)
         print_jobs[job_id]["status"] = "printing"
         print_jobs[job_id]["started_at"] = datetime.utcnow().isoformat()
         return {"status": "success", "message": "Test label sent", "job_id": job_id}
@@ -770,9 +758,7 @@ async def print_product_label(
     if not perm and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Not enough permissions for this printer")
 
-    websocket_data = active_connections.get(p.agent_id)
-    if not websocket_data or not websocket_data.get("websocket"):
-        raise HTTPException(status_code=400, detail="Printer agent is not connected. Please ensure the agent is running.")
+    await _ensure_agent_online(p.agent_id)
 
     # Get label settings from permission or use defaults
     width_mm = int(getattr(perm, "label_width_mm", payload.get("width_mm", 58)))
@@ -829,7 +815,7 @@ async def print_product_label(
     }
 
     try:
-        await _send_agent_json(p.agent_id, websocket_data["websocket"], print_command)
+        await printer_hub.send_command(p.agent_id, print_command)
         print_jobs[job_id]["status"] = "printing"
         print_jobs[job_id]["started_at"] = datetime.utcnow().isoformat()
         return {"status": "success", "message": "Label sent to printer", "job_id": job_id}
@@ -971,7 +957,7 @@ async def get_connected_printers(
     Список подключенных принтеров в организации (без фильтра прав).
     Используется, чтобы сотрудник мог выбрать принтер в настройках.
     """
-    agent_ids_online = list(active_connections.keys())
+    agent_ids_online = await _online_agent_ids(db, current_user.organization_id)
     if not agent_ids_online:
         return []
 
@@ -1039,7 +1025,7 @@ async def get_my_printers_for_label_print(
     if not current_user.organization_id:
         return []
 
-    agent_ids_online = set(active_connections.keys())
+    agent_ids_online = set(await _online_agent_ids(db, current_user.organization_id))
     by_id: Dict[int, dict] = {}
 
     perm_rows = (
@@ -1127,8 +1113,7 @@ async def grant_printer_permission(
     if not current_user.is_admin and current_user.organization_id != agent.organization_id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    if not active_connections.get(p.agent_id):
-        raise HTTPException(status_code=400, detail="Printer agent is not connected")
+    await _ensure_agent_online(p.agent_id)
 
     # Один текущий принтер, но сохраняем остальные разрешения и их настройки.
     db.query(PrinterPermission).filter(PrinterPermission.user_id == current_user.id).update(
@@ -1239,11 +1224,7 @@ async def printer_websocket_endpoint(
     hostname = None
 
     try:
-        # Поднимаем “онлайн” состояние агента для роутинга print job
-        active_connections[agent_id] = {
-            "websocket": websocket,
-            "last_seen": datetime.utcnow().isoformat(),
-        }
+        await printer_hub.register(agent_id, websocket)
 
         while True:
             data = await websocket.receive_text()
@@ -1314,6 +1295,7 @@ async def printer_websocket_endpoint(
                                 db.add(PrinterPermission(user_id=director_user_id, printer_id=row.id))
 
                     db.commit()
+                    await printer_hub.touch(agent_id)
 
                     # Send acknowledgment
                     await websocket.send_json(
@@ -1345,21 +1327,15 @@ async def printer_websocket_endpoint(
                 elif msg_type == "pong":
                     agent.last_seen = datetime.utcnow()
                     db.commit()
-                    # обновляем last_seen в памяти тоже
-                    if agent_id in active_connections:
-                        active_connections[agent_id]["last_seen"] = datetime.utcnow().isoformat()
+                    await printer_hub.touch(agent_id)
 
             except json.JSONDecodeError:
                 await websocket.send_json({"type": "error", "message": "Invalid JSON format"})
 
     except WebSocketDisconnect:
-        if agent_id in active_connections:
-            del active_connections[agent_id]
-        _clear_agent_send_lock(agent_id)
+        await printer_hub.unregister(agent_id)
         print(f"WebSocket disconnected for agent_id={agent_id} hostname={hostname}")
 
     except Exception as e:
-        if agent_id in active_connections:
-            del active_connections[agent_id]
-        _clear_agent_send_lock(agent_id)
+        await printer_hub.unregister(agent_id)
         print(f"WebSocket error: {e}")
