@@ -336,6 +336,10 @@ def create_product(
     if db_product.is_new is False:
         mark_yandex_feed_dirty(db, "product_created_used")
     _invalidate_public_product_cache(db_product.id)
+    from app.services.search_subscription_service import maybe_notify_search_subscribers
+
+    if not db_product.is_new and int(db_product.quantity or 0) > 0:
+        maybe_notify_search_subscribers(db_product.id, previous_quantity=0)
     return db_product
 
 
@@ -635,6 +639,8 @@ def update_product(
     if not db_product:
         raise HTTPException(status_code=404, detail="Продукт не найден или недоступен")
 
+    previous_quantity = int(db_product.quantity or 0)
+
     # Validate media limits
     if product.photos is not None:
         if len(product.photos) > 5:
@@ -830,6 +836,10 @@ def update_product(
     if db_product.is_new is False or ("is_new" in update_data):
         mark_yandex_feed_dirty(db, "product_updated")
     _invalidate_public_product_cache(db_product.id)
+    from app.services.search_subscription_service import maybe_notify_search_subscribers
+
+    if not db_product.is_new and int(db_product.quantity or 0) > 0:
+        maybe_notify_search_subscribers(db_product.id, previous_quantity=previous_quantity)
     return db_product
 
 @router.patch("/{product_id}/quantity", response_model=ProductSchema)
@@ -854,6 +864,10 @@ def update_product_quantity(
     from app.services.notification_service import maybe_notify_stock_level
 
     maybe_notify_stock_level(db, db_product, previous_quantity)
+    from app.services.search_subscription_service import maybe_notify_search_subscribers
+
+    if not db_product.is_new and int(db_product.quantity or 0) > 0:
+        maybe_notify_search_subscribers(db_product.id, previous_quantity=previous_quantity)
     log_audit(
         db,
         event_type="product_quantity_changed",

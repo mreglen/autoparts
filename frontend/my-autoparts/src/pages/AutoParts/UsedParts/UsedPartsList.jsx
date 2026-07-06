@@ -25,6 +25,8 @@ import {
   getUsedPartsUrlQuery,
   isUsedCatalogBrowseMode,
 } from '../../../utils/autopartsPublic';
+import SubscribeSearchButton from '../../../components/SubscribeSearchButton/SubscribeSearchButton';
+import { fetchSearchSubscriptions } from '../../../redux/slices/UserEngagementSlice';
 import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
 import { useProductPriceFormat } from '../../../hooks/useProductPriceFormat';
 import { prefetchUsedPartDetail } from '../../../utils/prefetchPartDetail';
@@ -114,6 +116,12 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
   const [organizationFilterName, setOrganizationFilterName] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      dispatch(fetchSearchSubscriptions());
+    }
+  }, [dispatch, user]);
 
   useEffect(() => {
     if (!organizationFilterId) {
@@ -600,12 +608,15 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
       ) : null}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0">
         <p className="text-sm text-gray-600">Найдено: <span className="font-semibold text-gray-900">{visibleTotal}</span></p>
-        <Link
-          to={{ pathname: '/autoparts/used/filters', search: location.search }}
-          className="rounded-full bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 lg:hidden"
-        >
-          Фильтры
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {urlQ ? <SubscribeSearchButton query={urlQ} variant="secondary" /> : null}
+          <Link
+            to={{ pathname: '/autoparts/used/filters', search: location.search }}
+            className="rounded-full bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 lg:hidden"
+          >
+            Фильтры
+          </Link>
+        </div>
       </div>
       <div className="flex flex-col gap-4 px-3 sm:gap-6 sm:px-0 lg:flex-row lg:items-start">
         <UsedPartsFiltersAside updateCatalogUrl={updateCatalogUrl} />
@@ -644,6 +655,11 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             </p>
           )}
           <p className="text-sm text-gray-500 mt-4">Попробуйте изменить поисковый запрос или фильтры.</p>
+          {urlQ ? (
+            <div className="mt-6">
+              <SubscribeSearchButton query={urlQ} />
+            </div>
+          ) : null}
           {(urlQ || usedHasActiveFilters(searchParams)) && updateCatalogUrl && (
             <button
               type="button"

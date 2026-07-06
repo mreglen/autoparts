@@ -455,6 +455,11 @@ def approve_product(
             email_body=email_body,
         )
 
+    from app.services.search_subscription_service import maybe_notify_search_subscribers
+
+    if not db_product.is_new and int(db_product.quantity or 0) > 0:
+        maybe_notify_search_subscribers(db_product.id, previous_quantity=0)
+
     return ModerateProductResponse(
         message="Запчасть одобрена и добавлена в каталог",
         product_id=db_product.id

@@ -50,6 +50,7 @@ from app.db.schema_patches import (
     ensure_product_drafts_table,
     ensure_order_return_tables,
     ensure_inventory_tables,
+    ensure_user_engagement_tables,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
@@ -104,6 +105,7 @@ import app.models.seo_landing_page  # noqa: F401 — SEO landing pages registry
 import app.models.site_openrouter_integration  # noqa: F401 — OpenRouter integration
 import app.models.organization_ai_description_access  # noqa: F401 — AI description org allowlist
 import app.models.product_draft  # noqa: F401 — product drafts
+import app.models.user_engagement  # noqa: F401 — favorites, views, subscriptions
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings
@@ -197,6 +199,7 @@ try:
     ensure_product_drafts_table()
     ensure_order_return_tables()
     ensure_inventory_tables()
+    ensure_user_engagement_tables()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise

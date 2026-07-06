@@ -43,6 +43,12 @@ from app.models.yandex_oauth_state import YandexOAuthState
 from app.models.chat import Chat, Message, ChatParticipant
 from app.models.part_type import PartType
 from app.models.new_parts_seo_card import NewPartsSeoCard
+from app.models.user_engagement import (
+    UserFavorite,
+    UserProductView,
+    SearchSubscription,
+    SearchSubscriptionNotification,
+)
 
 
 from sqlalchemy.orm import relationship

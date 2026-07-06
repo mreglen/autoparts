@@ -61,6 +61,7 @@ from app.routers.dadata import router as dadata_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.public_new_parts_cards import router as public_new_parts_cards_router
 from app.routers.seo_landing_pages import router as seo_landing_pages_router
+from app.routers.user_engagement import router as user_engagement_router
 
 
 
@@ -131,4 +132,4 @@ api_router.include_router(site_analytics_public_router)
 api_router.include_router(admin_analytics_router)
 api_router.include_router(dadata_router)
 api_router.include_router(dashboard_router)
-
+api_router.include_router(user_engagement_router)

@@ -2266,3 +2266,109 @@ def ensure_inventory_tables() -> None:
 
     logger.info("Applied inventory tables patch")
 
+
+def ensure_user_engagement_tables() -> None:
+    """Create favorites, view history, and search subscription tables."""
+    inspector = inspect(engine)
+    if "user_favorites" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl_favorites = """
+        CREATE TABLE user_favorites (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+        ddl_views = """
+        CREATE TABLE user_product_views (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            viewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+        ddl_subscriptions = """
+        CREATE TABLE search_subscriptions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            query_text TEXT NOT NULL,
+            query_normalized VARCHAR(512) NOT NULL,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            unsubscribe_token VARCHAR(64) NOT NULL UNIQUE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            last_notified_at TIMESTAMPTZ
+        )
+        """
+        ddl_notifications = """
+        CREATE TABLE search_subscription_notifications (
+            id SERIAL PRIMARY KEY,
+            subscription_id INTEGER NOT NULL REFERENCES search_subscriptions(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            notified_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl_favorites = """
+        CREATE TABLE user_favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        ddl_views = """
+        CREATE TABLE user_product_views (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            viewed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        ddl_subscriptions = """
+        CREATE TABLE search_subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            query_text TEXT NOT NULL,
+            query_normalized VARCHAR(512) NOT NULL,
+            is_active BOOLEAN NOT NULL DEFAULT 1,
+            unsubscribe_token VARCHAR(64) NOT NULL UNIQUE,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_notified_at DATETIME
+        )
+        """
+        ddl_notifications = """
+        CREATE TABLE search_subscription_notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subscription_id INTEGER NOT NULL REFERENCES search_subscriptions(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            notified_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS ix_user_favorites_user ON user_favorites (user_id)",
+        "CREATE INDEX IF NOT EXISTS ix_user_favorites_product ON user_favorites (product_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_favorites_user_product ON user_favorites (user_id, product_id)",
+        "CREATE INDEX IF NOT EXISTS ix_user_product_views_user ON user_product_views (user_id)",
+        "CREATE INDEX IF NOT EXISTS ix_user_product_views_viewed ON user_product_views (user_id, viewed_at DESC)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_product_views_user_product ON user_product_views (user_id, product_id)",
+        "CREATE INDEX IF NOT EXISTS ix_search_subscriptions_user ON search_subscriptions (user_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_search_subscriptions_user_query ON search_subscriptions (user_id, query_normalized)",
+        "CREATE INDEX IF NOT EXISTS ix_search_subscriptions_token ON search_subscriptions (unsubscribe_token)",
+        "CREATE INDEX IF NOT EXISTS ix_search_subscription_notifications_sub ON search_subscription_notifications (subscription_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_search_subscription_notifications_sub_product ON search_subscription_notifications (subscription_id, product_id)",
+    ]
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl_favorites))
+        conn.execute(text(ddl_views))
+        conn.execute(text(ddl_subscriptions))
+        conn.execute(text(ddl_notifications))
+        for stmt in indexes:
+            conn.execute(text(stmt))
+
+    logger.info("Applied user_engagement tables patch")
+

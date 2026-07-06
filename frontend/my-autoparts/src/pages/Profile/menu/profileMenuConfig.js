@@ -5,6 +5,9 @@ export const TAB_PATH_MAP = {
     'settings-notifications': '/profile/notifications',
     'purchases-orders': '/purchases/orders',
     'purchases-returns': '/purchases/returns',
+    'purchases-favorites': '/purchases/favorites',
+    'purchases-history': '/purchases/history',
+    'purchases-subscriptions': '/purchases/subscriptions',
     'sales-orders': '/sales/orders',
     'sales-returns': '/sales/returns',
     'warehouse-sales': '/warehouse-sales',
@@ -31,8 +34,16 @@ export const TAB_PATH_MAP = {
     chats: '/chats',
 };
 
+const PURCHASES_ENGAGEMENT_SUBMENU = [
+    { id: 'purchases-orders', label: 'Заказы' },
+    { id: 'purchases-returns', label: 'Возвраты' },
+    { id: 'purchases-favorites', label: 'Избранное' },
+    { id: 'purchases-history', label: 'История просмотров' },
+    { id: 'purchases-subscriptions', label: 'Подписки на поиск' },
+];
+
 const PATH_TAB_MAP = Object.fromEntries(
-    Object.entries(TAB_PATH_MAP).map(([tabId, path]) => [path, tabId])
+    Object.entries(TAB_PATH_MAP).map(([tabId, path]) => [path, tabId]),
 );
 
 export const getActiveTabFromPath = (path, user) => {
@@ -63,10 +74,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
             {
                 id: 'purchases',
                 label: 'Покупки',
-                submenu: [
-                    { id: 'purchases-orders', label: 'Заказы' },
-                    { id: 'purchases-returns', label: 'Возвраты' },
-                ],
+                submenu: [...PURCHASES_ENGAGEMENT_SUBMENU],
             },
         ];
     } else if (user.is_seller) {
@@ -77,10 +85,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
             {
                 id: 'purchases',
                 label: 'Покупки',
-                submenu: [
-                    { id: 'purchases-orders', label: 'Заказы' },
-                    { id: 'purchases-returns', label: 'Возвраты' },
-                ],
+                submenu: [...PURCHASES_ENGAGEMENT_SUBMENU],
             },
         ];
     } else {
@@ -88,10 +93,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
             {
                 id: 'purchases',
                 label: 'Покупки',
-                submenu: [
-                    { id: 'purchases-orders', label: 'Заказы' },
-                    { id: 'purchases-returns', label: 'Возвраты' },
-                ],
+                submenu: [...PURCHASES_ENGAGEMENT_SUBMENU],
             },
             { id: 'chats', label: 'Сообщения' },
             {
@@ -163,10 +165,7 @@ export const getAvailableTabs = (user, permissionCodes) => {
             {
                 id: 'purchases',
                 label: 'Покупки',
-                submenu: [
-                    { id: 'purchases-orders', label: 'Заказы' },
-                    { id: 'purchases-returns', label: 'Возвраты' },
-                ],
+                submenu: [...PURCHASES_ENGAGEMENT_SUBMENU],
             },
         ];
 

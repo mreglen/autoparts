@@ -19,6 +19,7 @@ EVENT_MODERATION_REJECTED = "moderation_rejected"
 EVENT_STOCK_LOW = "stock_low"
 EVENT_RETURN_REQUEST_SELLER = "return_request_seller"
 EVENT_RETURN_STATUS_BUYER = "return_status_buyer"
+EVENT_SEARCH_SUBSCRIPTION_MATCH = "search_subscription_match"
 
 ORDER_STATUS_LABELS: dict[str, str] = {
     "pending": "В ожидании",

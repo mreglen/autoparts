@@ -18,6 +18,7 @@ celery_app = Celery(
         'app.tasks.seo_tasks',
         'app.tasks.analytics_tasks',
         'app.tasks.notification_tasks',
+        'app.tasks.search_subscription_tasks',
     ]
 )
 

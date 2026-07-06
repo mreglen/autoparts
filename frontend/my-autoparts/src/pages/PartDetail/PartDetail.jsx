@@ -25,8 +25,10 @@ import PartDetailInspectionBlock from './PartDetailInspectionBlock';
 import PartDetailReturnPolicyBlock from './PartDetailReturnPolicyBlock';
 import PartArticleMatchesBlock from '../../components/PartArticleMatchesBlock/PartArticleMatchesBlock';
 import ShareButton from '../../components/ShareButton/ShareButton';
+import FavoriteButton from '../../components/FavoriteButton/FavoriteButton';
 import Breadcrumbs from '../../components/Breadcrumbs/Breadcrumbs';
 import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
+import { recordProductView } from '../../redux/slices/UserEngagementSlice';
 import { mergeProductFitment } from '../../utils/mergeProductFitment';
 import { buildProductFaqJsonLd } from '../../utils/partDetailFaq';
 import { resolveProductCity } from '../../utils/productSearchSeo';
@@ -138,6 +140,7 @@ const PartDetail = () => {
   const fetchedProductIdRef = useRef(null);
   const searchedBrandArticleRef = useRef(null);
   const trackedPartViewRef = useRef(null);
+  const recordedEngagementViewRef = useRef(null);
 
   const productMatchesRoute = useMemo(() => {
     if (!currentProduct?.id) return false;
@@ -360,6 +363,13 @@ const PartDetail = () => {
       section: 'used',
     });
   }, [showProduct, currentProduct, location.pathname]);
+
+  useEffect(() => {
+    if (!showProduct || !currentProduct?.id || !user) return;
+    if (recordedEngagementViewRef.current === currentProduct.id) return;
+    recordedEngagementViewRef.current = currentProduct.id;
+    dispatch(recordProductView(currentProduct.id));
+  }, [showProduct, currentProduct, user, dispatch]);
 
   useEffect(() => {
     if (!currentProduct?.id) return;
@@ -881,12 +891,15 @@ const PartDetail = () => {
                 />
               </div>
               <div className="flex shrink-0 flex-row items-center justify-between gap-4 sm:flex-col sm:items-end lg:min-w-[180px]">
-                <ShareButton
-                  url={seo.canonicalUrl}
-                  title={h1Primary}
-                  text={shareText}
-                  size="sm"
-                />
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <FavoriteButton productId={currentProduct.id} size="sm" />
+                  <ShareButton
+                    url={seo.canonicalUrl}
+                    title={h1Primary}
+                    text={shareText}
+                    size="sm"
+                  />
+                </div>
                 <div className="text-right">
                   <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Цена</div>
                   <div className="text-2xl font-bold text-indigo-700 sm:text-3xl">
