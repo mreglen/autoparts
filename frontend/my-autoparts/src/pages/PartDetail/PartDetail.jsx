@@ -34,6 +34,7 @@ import {
   writePartDetailCache,
 } from '../../utils/partDetailCache';
 import { useProductPriceFormat } from '../../hooks/useProductPriceFormat';
+import { getUsedPurchaseActions } from '../../utils/usedPurchaseMode';
 
 const formatErrorText = (value) => {
   if (!value) return 'Ошибка загрузки товара';
@@ -112,6 +113,7 @@ const PartDetail = () => {
   const { currentProduct, error } = useSelector((state) => state.products);
   const { user } = useSelector((state) => state.auth);
   const cart = useSelector(selectCart);
+  const purchaseMode = useSelector((state) => state.publicInfo.usedPartsPurchaseMode);
   const { formatPrice: formatProductPriceDisplay } = useProductPriceFormat();
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
@@ -710,6 +712,10 @@ const PartDetail = () => {
   }
 
   const sellerOrg = currentProduct.organization;
+  const { showCart, showSellerContact } = getUsedPurchaseActions(
+    purchaseMode,
+    Boolean(currentProduct?.is_new),
+  );
   const sellerLogoUrl = sellerOrg?.logo_organization
     ? normalizeImageUrl(sellerOrg.logo_organization)
     : null;
@@ -1050,7 +1056,7 @@ const PartDetail = () => {
             )}
 
             {/* Add to Cart */}
-            {currentProduct && (
+            {currentProduct && showCart && (
             <div className="hidden md:block">
               {(() => {
                 const cartQuantity = getCartQuantity(currentProduct.id);
@@ -1114,7 +1120,7 @@ const PartDetail = () => {
             )}
 
             {/* Seller */}
-            {(sellerOrg?.phone || sellerOrg?.contact_person) && (
+            {showSellerContact && (sellerOrg?.phone || sellerOrg?.contact_person) && (
               <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <h2 className="mb-3 text-sm font-semibold text-gray-900">Продавец</h2>
 
@@ -1289,7 +1295,7 @@ const PartDetail = () => {
                 {currentProduct.price ? formatProductPriceDisplay(currentProduct.price) : '—'}
               </div>
             </div>
-            {(() => {
+            {showCart && (() => {
               const cartQuantity = getCartQuantity(currentProduct.id);
               const stockInfo = getStockAvailability(currentProduct);
               const isAdding = addingToCartId === currentProduct.id;
@@ -1327,7 +1333,7 @@ const PartDetail = () => {
                 </button>
               );
             })()}
-            {(sellerOrg?.phone || sellerOrg?.contact_person) ? (
+            {showSellerContact && (sellerOrg?.phone || sellerOrg?.contact_person) ? (
               <button
                 type="button"
                 onClick={handleWriteToSeller}

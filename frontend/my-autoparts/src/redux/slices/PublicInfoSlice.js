@@ -137,6 +137,11 @@ const publicInfoSlice = createSlice({
     setRoundProductPrices: (state, action) => {
       state.roundProductPrices = action.payload === true;
     },
+    setUsedPartsPurchaseMode: (state, action) => {
+      const mode = action.payload;
+      state.usedPartsPurchaseMode =
+        mode === 'cart_only' || mode === 'cta_only' || mode === 'both' ? mode : 'both';
+    },
     setAdminSellerMarkupContext: (state, action) => {
       state.adminSellerMarkupContext = action.payload;
     },
@@ -198,6 +203,7 @@ export const {
   setShowYandexBadge,
   setNewPartsMarkupPercent,
   setRoundProductPrices,
+  setUsedPartsPurchaseMode,
   setAdminSellerMarkupContext,
 } = publicInfoSlice.actions;
 export default publicInfoSlice.reducer;

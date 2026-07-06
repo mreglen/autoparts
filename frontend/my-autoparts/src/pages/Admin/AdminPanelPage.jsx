@@ -11,8 +11,10 @@ import {
   setShowYandexBadge,
   setNewPartsMarkupPercent,
   setRoundProductPrices,
+  setUsedPartsPurchaseMode,
   patchPublicSiteConfigCache,
 } from '../../redux/slices/PublicInfoSlice';
+import { USED_PURCHASE_MODE_OPTIONS } from '../../utils/usedPurchaseMode';
 import ServerStatsPanel from './ServerStatsPanel';
 import OpenRouterSection from './OpenRouterSection';
 import BackupSection from './BackupSection';
@@ -24,6 +26,7 @@ function AdminPanelPage() {
   const [showSiteReviews, setShowSiteReviewsLocal] = useState(true);
   const [showYandexBadge, setShowYandexBadgeLocal] = useState(true);
   const [roundProductPrices, setRoundProductPricesLocal] = useState(false);
+  const [usedPartsPurchaseMode, setUsedPartsPurchaseModeLocal] = useState('both');
   const [markupPercent, setMarkupPercent] = useState('15');
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -67,6 +70,10 @@ function AdminPanelPage() {
           setShowSiteReviewsLocal(data.show_site_reviews !== false);
           setShowYandexBadgeLocal(data.show_yandex_badge !== false);
           setRoundProductPricesLocal(data.round_product_prices === true);
+          const mode = data.used_parts_purchase_mode;
+          setUsedPartsPurchaseModeLocal(
+            mode === 'cart_only' || mode === 'cta_only' || mode === 'both' ? mode : 'both',
+          );
           const m = Number(data.new_parts_markup_percent);
           setMarkupPercent(String(Number.isFinite(m) && m >= 0 ? m : 15));
         }
@@ -182,6 +189,26 @@ function AdminPanelPage() {
       setRoundProductPricesLocal(checked);
       dispatch(setRoundProductPrices(checked));
       patchPublicSiteConfigCache({ round_product_prices: checked });
+      dispatch(fetchPublicSiteConfig(true));
+    } catch (e) {
+      setError(e?.message || 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleChangePurchaseMode = async (value) => {
+    if (value === usedPartsPurchaseMode) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest('/admin/site-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ used_parts_purchase_mode: value }),
+      });
+      setUsedPartsPurchaseModeLocal(value);
+      dispatch(setUsedPartsPurchaseMode(value));
+      patchPublicSiteConfigCache({ used_parts_purchase_mode: value });
       dispatch(fetchPublicSiteConfig(true));
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения');
@@ -425,6 +452,33 @@ function AdminPanelPage() {
             </span>
           </span>
         </label>
+        <fieldset className="mt-6 border-t border-gray-100 pt-6">
+          <legend className="font-medium text-gray-900">Покупка б/у запчастей на сайте</legend>
+          <p className="text-sm text-gray-500 mt-1 mb-3">
+            Что видит покупатель на карточке б/у товара. На новые запчасти не влияет.
+          </p>
+          <div className="space-y-3">
+            {USED_PURCHASE_MODE_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className="flex items-start gap-3 cursor-pointer select-none rounded-lg border border-gray-200 px-3 py-2.5 hover:bg-gray-50"
+              >
+                <input
+                  type="radio"
+                  name="used-parts-purchase-mode"
+                  className="mt-1 h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  checked={usedPartsPurchaseMode === option.value}
+                  disabled={loadingSettings || saving}
+                  onChange={() => handleChangePurchaseMode(option.value)}
+                />
+                <span>
+                  <span className="font-medium text-gray-900 block">{option.label}</span>
+                  <span className="text-sm text-gray-500 block mt-0.5">{option.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
         {loadingSettings && <p className="text-sm text-gray-500 mt-4">Загрузка…</p>}
         {saving && <p className="text-sm text-indigo-600 mt-4">Сохранение…</p>}
       </div>
