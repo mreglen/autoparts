@@ -100,7 +100,7 @@ export default function PurchaseOrderCard({
     return itemWithProduct?.product_id ?? null;
   }, [items]);
   const sellerLabel = order.organization_name
-    || (isUsed ? 'Продавец не указан' : `Заказ новых запчастей №${order.id}`);
+    || (isUsed ? 'Продавец не указан' : 'Новые запчасти от поставщика');
   const statusCode = order.status_code || 'pending';
   const statusIcon = STATUS_ICONS[statusCode] || STATUS_ICONS.pending;
   const buyerHint = isUsed && getBuyerHint ? getBuyerHint(statusCode) : null;

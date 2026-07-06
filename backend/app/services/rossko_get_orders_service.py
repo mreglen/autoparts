@@ -8,7 +8,6 @@ from typing import Any
 from zeep.helpers import serialize_object
 
 from app.core.config import Settings
-from app.routers.rossko_api.rossko_api import get_orders_client
 
 logger = logging.getLogger(__name__)
 settings = Settings()
@@ -201,6 +200,8 @@ def fetch_orders_by_ids(order_ids: list[int]) -> dict[str, RosskoOrderSnapshot]:
         return {}
 
     merged: dict[str, RosskoOrderSnapshot] = {}
+    from app.routers.rossko_api.rossko_api import get_orders_client
+
     client = get_orders_client()
 
     for offset in range(0, len(unique_ids), BATCH_SIZE):

@@ -310,9 +310,9 @@ export default function PurchasesOrdersPage() {
       )}
 
       {!loading && !error && newOrdersLoadFailed && (
-        <p className="text-sm text-amber-700">
-          Не удалось загрузить заказы новых запчастей. Попробуйте обновить страницу.
-        </p>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Не удалось загрузить заказы новых запчастей. Показаны только заказы б/у — попробуйте обновить страницу.
+        </div>
       )}
 
       {!loading && !error && (

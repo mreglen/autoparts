@@ -94,6 +94,7 @@ export default function SalesOrdersPage() {
   const [availableStatuses, setAvailableStatuses] = useState([]);
   const [transitionLoadingByOrderId, setTransitionLoadingByOrderId] = useState({});
   const [warehouseRetryLoadingByOrderId, setWarehouseRetryLoadingByOrderId] = useState({});
+  const [supplierRefreshLoadingByOrderId, setSupplierRefreshLoadingByOrderId] = useState({});
   const [transitionError, setTransitionError] = useState('');
   const [avitoWarehouseMessage, setAvitoWarehouseMessage] = useState(null);
   const [usedOrderStatusMessage, setUsedOrderStatusMessage] = useState(null);
@@ -377,6 +378,32 @@ export default function SalesOrdersPage() {
         type: 'error',
         text: formatStatusErrorDetail(error?.response?.data?.detail),
       });
+    }
+  };
+
+  const refreshSupplierStatus = async (orderId) => {
+    setSupplierRefreshLoadingByOrderId((prev) => ({ ...prev, [orderId]: true }));
+    try {
+      const response = await apiAxios.post(
+        `/sales/new-parts-orders/${orderId}/refresh-supplier-status`
+      );
+      const updated = response.data;
+      setNewOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, ...updated } : o))
+      );
+      setUsedOrderStatusMessage({
+        type: updated.rossko_sync_error ? 'error' : 'success',
+        text: updated.rossko_sync_error
+          ? 'Статус поставщика временно недоступен. Показаны данные из базы.'
+          : 'Статус поставщика обновлён.',
+      });
+    } catch (error) {
+      setUsedOrderStatusMessage({
+        type: 'error',
+        text: formatStatusErrorDetail(error?.response?.data?.detail),
+      });
+    } finally {
+      setSupplierRefreshLoadingByOrderId((prev) => ({ ...prev, [orderId]: false }));
     }
   };
 
@@ -1009,6 +1036,8 @@ export default function SalesOrdersPage() {
                   orderStatusOptions={isUsed ? usedOrderStatusOptions : newOrderStatusOptions}
                   formatDate={formatDate}
                   formatPrice={formatPrice}
+                  onRefreshSupplierStatus={!isUsed ? refreshSupplierStatus : undefined}
+                  supplierRefreshLoading={Boolean(supplierRefreshLoadingByOrderId[o.id])}
                 />
               );
             })}

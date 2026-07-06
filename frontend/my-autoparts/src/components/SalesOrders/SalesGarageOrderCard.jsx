@@ -124,6 +124,8 @@ export default function SalesGarageOrderCard({
   orderStatusOptions = [],
   formatDate,
   formatPrice,
+  onRefreshSupplierStatus,
+  supplierRefreshLoading = false,
 }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -197,8 +199,21 @@ export default function SalesGarageOrderCard({
               )}
               {isNew && rosskoSyncError && (
                 <span className="inline-flex items-center rounded-lg bg-orange-50 px-2.5 py-1 text-xs font-medium text-orange-800 ring-1 ring-orange-100">
-                  Данные Rossko недоступны
+                  Статус поставщика временно недоступен
                 </span>
+              )}
+              {isNew && rosskoOrderId && onRefreshSupplierStatus && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRefreshSupplierStatus(order.id);
+                  }}
+                  disabled={supplierRefreshLoading}
+                  className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {supplierRefreshLoading ? 'Обновление…' : 'Обновить статус поставщика'}
+                </button>
               )}
               <span className="text-sm text-gray-500">{formatDate(order.created_at)}</span>
             </div>
@@ -261,7 +276,7 @@ export default function SalesGarageOrderCard({
               {isNew && rosskoStatus && (
                 <span
                   className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800 ring-1 ring-sky-100"
-                  title="Статус Rossko (только просмотр)"
+                  title="Статус у поставщика (только просмотр)"
                 >
                   {rosskoStatus}
                 </span>

@@ -15,7 +15,7 @@ from app.schemas.rossko_settings import (
     NewPartsOrderCreateOut,
     RosskoSettingsResponse,
 )
-from app.utils.rossko_settings_db import rossko_settings_configured
+from app.utils.rossko_settings_db import get_rossko_settings, rossko_settings_configured
 from app.services.new_parts_order_fulfillment import fulfill_new_parts_order
 from app.services.push_notifications import notify_sellers_new_order
 from app.services.rossko_order_service import extract_rossko_notice_message

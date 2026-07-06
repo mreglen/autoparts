@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, selectinload
@@ -34,15 +34,16 @@ from app.schemas.sales_orders import (
     PurchasedNewOrderResponse,
     PurchasedNewOrderItemResponse,
 )
-from app.services.rossko_get_orders_service import (
-    RosskoOrderLine,
-    RosskoOrderSnapshot,
-    fetch_orders_by_ids_safe,
+from app.services.new_parts_order_enrichment import (
+    build_buyer_new_parts_order_response,
+    build_seller_new_parts_order_response,
+    fetch_rossko_snapshots_for_orders,
 )
+if TYPE_CHECKING:
+    from app.services.rossko_get_orders_service import RosskoOrderSnapshot
 from app.services.rossko_status_labels import (
     NEW_PARTS_STATUS_CODES,
     NEW_PARTS_STATUS_PRIORITY,
-    format_rossko_status,
 )
 from app.services.avito_warehouse_fulfillment import (
     compute_warehouse_fulfillment,
@@ -201,10 +202,6 @@ def _can_view_new_parts_orders(db: Session, user: UserModel) -> bool:
     return _org_has_admin_director(db, user.organization_id)
 
 
-def _item_match_key(brand: str | None, partnumber: str | None) -> tuple[str, str]:
-    return ((partnumber or "").strip().lower(), (brand or "").strip().lower())
-
-
 def _resolve_new_part_seo_card_id(db: Session, item: GarageNewOrderItem) -> int | None:
     stored = getattr(item, "seo_card_id", None)
     if stored:
@@ -215,36 +212,6 @@ def _resolve_new_part_seo_card_id(db: Session, item: GarageNewOrderItem) -> int 
     return int(card.id) if card else None
 
 
-def _merge_db_items_with_rossko(
-    db: Session,
-    order: GarageNewOrder,
-    snapshot: RosskoOrderSnapshot | None,
-) -> list[NewPartsOrderItemResponse]:
-    """Локальные статусы позиций (status_code) + статус Rossko отдельным полем."""
-    rossko_by_key: dict[tuple[str, str], RosskoOrderLine] = {}
-    if snapshot and snapshot.lines:
-        for line in snapshot.lines:
-            rossko_by_key[_item_match_key(line.brand, line.partnumber)] = line
-
-    merged: list[NewPartsOrderItemResponse] = []
-    for item in order.items:
-        line = rossko_by_key.get(_item_match_key(item.brand, item.partnumber))
-        merged.append(
-            NewPartsOrderItemResponse(
-                id=item.id,
-                name=item.name,
-                brand=item.brand,
-                partnumber=item.partnumber,
-                quantity=int(item.quantity),
-                price=float(item.price),
-                status_code=item.status_code,
-                rossko_status=format_rossko_status(line.status_code) if line else None,
-                seo_card_id=_resolve_new_part_seo_card_id(db, item),
-            )
-        )
-    return merged
-
-
 def _new_order_response(
     db: Session,
     order: GarageNewOrder,
@@ -252,33 +219,15 @@ def _new_order_response(
     rossko_by_id: dict[str, RosskoOrderSnapshot] | None = None,
     rossko_sync_error: str | None = None,
 ) -> NewPartsOrderResponse:
-    base = NewPartsOrderResponse.model_validate(order)
-    result = base.model_copy(
-        update={
-            "buyer_avatar_url": _buyer_avatar_for_order(db, order),
-            "buyer_user_id": _buyer_user_id_for_order(db, order),
-        }
+    return build_seller_new_parts_order_response(
+        db,
+        order,
+        rossko_by_id=rossko_by_id,
+        rossko_sync_error=rossko_sync_error,
+        buyer_avatar_url=_buyer_avatar_for_order(db, order),
+        buyer_user_id=_buyer_user_id_for_order(db, order),
+        resolve_seo_card_id=_resolve_new_part_seo_card_id,
     )
-    rossko_id = order.rossko_order_id
-    snapshot = (rossko_by_id or {}).get(str(rossko_id)) if rossko_id else None
-    per_order_error: str | None = None
-    items = _merge_db_items_with_rossko(db, order, snapshot)
-
-    if snapshot and not snapshot.lines:
-        per_order_error = "Позиции Rossko не найдены"
-    elif rossko_sync_error:
-        per_order_error = rossko_sync_error
-
-    update: dict = {"items": items}
-    if rossko_id:
-        update.update(
-            {
-                "rossko_order_id": rossko_id,
-                "rossko_status": format_rossko_status(snapshot.status) if snapshot else None,
-                "rossko_sync_error": per_order_error,
-            }
-        )
-    return result.model_copy(update=update)
 
 
 @router.get("/used-parts-orders", response_model=list[UsedPartsOrderResponse])
@@ -422,20 +371,39 @@ def list_new_parts_orders(
         q = q.filter(GarageNewOrder.organization_id == org_id)
     orders = q.all()
 
-    rossko_ids: list[int] = []
-    for order in orders:
-        if order.rossko_order_id:
-            try:
-                rossko_ids.append(int(str(order.rossko_order_id).strip()))
-            except ValueError:
-                continue
-
-    rossko_by_id, rossko_sync_error = fetch_orders_by_ids_safe(rossko_ids)
+    rossko_by_id, rossko_sync_error = fetch_rossko_snapshots_for_orders(orders)
 
     return [
         _new_order_response(db, o, rossko_by_id=rossko_by_id, rossko_sync_error=rossko_sync_error)
         for o in orders
     ]
+
+
+@router.post("/new-parts-orders/{order_id}/refresh-supplier-status", response_model=NewPartsOrderResponse)
+def refresh_new_parts_supplier_status(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Повторно запросить статус у поставщика (Rossko GetOrders) для одного заказа."""
+    _require_sales_orders_access(db, current_user)
+    org_id = current_user.organization_id
+    if not _can_view_new_parts_orders(db, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Новые заказы недоступны для организации")
+
+    order = (
+        db.query(GarageNewOrder)
+        .options(selectinload(GarageNewOrder.items))
+        .filter(GarageNewOrder.id == order_id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    if not current_user.is_admin and order.organization_id != org_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к заказу")
+
+    rossko_by_id, rossko_sync_error = fetch_rossko_snapshots_for_orders([order])
+    return _new_order_response(db, order, rossko_by_id=rossko_by_id, rossko_sync_error=rossko_sync_error)
 
 
 @router.put("/new-parts-orders/{order_id}/status")
@@ -1048,45 +1016,22 @@ def list_purchased_new_orders(
         .all()
     )
 
+    rossko_by_id, rossko_sync_error = fetch_rossko_snapshots_for_orders(orders)
+
     result = []
     for order in orders:
-        enriched_items = [
-            PurchasedNewOrderItemResponse(
-                id=item.id,
-                name=item.name,
-                brand=item.brand,
-                partnumber=item.partnumber,
-                quantity=int(item.quantity),
-                price=float(item.price),
-                status_code=item.status_code,
-                seo_card_id=_resolve_new_part_seo_card_id(db, item),
-            )
-            for item in order.items
-        ]
         org = db.query(Organization).filter(Organization.id == order.organization_id).first()
-        order_dict = {
-            "id": order.id,
-            "organization_id": order.organization_id,
-            "organization_name": org.name if org else None,
-            "seller_user_id": _seller_user_id_for_org(db, order.organization_id),
-            "buyer_name": order.buyer_name,
-            "buyer_phone": order.buyer_phone,
-            "buyer_email": order.buyer_email,
-            "delivery_type": order.delivery_type,
-            "delivery_address": order.delivery_address,
-            "transport_company": order.transport_company,
-            "pickup_address": order.pickup_address,
-            "delivery_region_id": order.delivery_region_id,
-            "delivery_region_name": order.delivery_region_name,
-            "total_amount": order.total_amount,
-            "is_paid": order.is_paid,
-            "status_code": order.status_code,
-            "seller": order.seller,
-            "deliver_in_parts": order.deliver_in_parts,
-            "created_at": order.created_at,
-            "items": enriched_items,
-        }
-        result.append(order_dict)
+        result.append(
+            build_buyer_new_parts_order_response(
+                db,
+                order,
+                rossko_by_id=rossko_by_id,
+                rossko_sync_error=rossko_sync_error,
+                organization_name=org.name if org else None,
+                seller_user_id=_seller_user_id_for_org(db, order.organization_id),
+                resolve_seo_card_id=_resolve_new_part_seo_card_id,
+            )
+        )
 
     return result
 
