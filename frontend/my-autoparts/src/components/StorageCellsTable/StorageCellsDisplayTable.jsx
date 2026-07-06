@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { shortStorageCellText } from '../../utils/labelPrintDisplay';
+import { resolveStorageCellName, shortStorageCellText } from '../../utils/labelPrintDisplay';
 
-export function buildStorageCellsForDisplay(productStorageCells, getCellName) {
+export function buildStorageCellsForDisplay(productStorageCells, cellCatalog = []) {
   if (!productStorageCells?.length) return [];
 
   return productStorageCells
@@ -9,11 +9,7 @@ export function buildStorageCellsForDisplay(productStorageCells, getCellName) {
       const value = link.value;
       if (value == null || String(value).trim() === '') return null;
       const cellId = link.storage_cell_id ?? link.id;
-      const name =
-        link.name
-        || link.storage_cell_name
-        || link.cell_name
-        || (typeof getCellName === 'function' ? getCellName(cellId) : '');
+      const name = resolveStorageCellName(link, cellCatalog);
       return {
         id: cellId,
         nameShort: shortStorageCellText(name),
@@ -27,13 +23,13 @@ export function buildStorageCellsForDisplay(productStorageCells, getCellName) {
 
 export default function StorageCellsDisplayTable({
   productStorageCells = [],
-  getCellName,
+  cellCatalog = [],
   compact = false,
   className = '',
 }) {
   const cells = useMemo(
-    () => buildStorageCellsForDisplay(productStorageCells, getCellName),
-    [productStorageCells, getCellName]
+    () => buildStorageCellsForDisplay(productStorageCells, cellCatalog),
+    [productStorageCells, cellCatalog]
   );
 
   if (!cells.length) return null;

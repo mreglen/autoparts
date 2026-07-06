@@ -407,22 +407,22 @@ const PrintReceiptModal = ({
   return (
     <div className="fixed inset-0 bg-black/55 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-xl border border-gray-100 overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-xl border border-gray-100 overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-4 sm:p-5 relative">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors z-10 rounded-full p-1.5 hover:bg-gray-100"
-            aria-label="Закрыть"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-1.5 right-1.5 text-gray-400 hover:text-gray-600 transition-colors z-20 rounded-full p-1 hover:bg-gray-100"
+          aria-label="Закрыть"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
 
-          <div className="space-y-3 flex flex-col justify-start pr-8">
+        <div className="p-4 sm:p-5 pt-3">
+          <div className="space-y-3 flex flex-col justify-start">
             <div className="p-3 rounded-xl border border-gray-200 bg-gray-50/70">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Принтер

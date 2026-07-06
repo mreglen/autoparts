@@ -13,6 +13,20 @@ export function shortCellName(name) {
   return shortStorageCellText(name, 4);
 }
 
+export function findStorageCellInCatalog(cellCatalog, cellId) {
+  if (cellId == null || !cellCatalog?.length) return null;
+  const id = String(cellId);
+  return cellCatalog.find((cell) => String(cell.id) === id) || null;
+}
+
+export function resolveStorageCellName(link, cellCatalog = []) {
+  const cellId = link?.storage_cell_id ?? link?.id;
+  const fromLink = link?.name || link?.storage_cell_name || link?.cell_name || '';
+  if (String(fromLink).trim()) return String(fromLink).trim();
+  const catalogCell = findStorageCellInCatalog(cellCatalog, cellId);
+  return catalogCell?.name?.trim() || '';
+}
+
 export function storageCellsPerRow(widthMm, { fullWidth = false } = {}) {
   if (fullWidth) {
     const usable = Math.max(24, Number(widthMm || 58) - 4);
@@ -37,13 +51,7 @@ export function buildStorageCellsForLabel(productStorageCells, cellCatalog = [])
 
   return productStorageCells
     .map((link) => {
-      const cellId = link.storage_cell_id ?? link.id;
-      const catalogCell = cellCatalog.find((cell) => cell.id === cellId);
-      const name = link.name
-        || link.storage_cell_name
-        || link.cell_name
-        || catalogCell?.name
-        || '';
+      const name = resolveStorageCellName(link, cellCatalog);
       const value = link.value;
       if (value == null || String(value).trim() === '') return null;
       return {

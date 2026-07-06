@@ -24,7 +24,7 @@ const CardPart = ({
   variant = 'stock',
   moderationKind = 'pending',
   getStorageAddress,
-  getCellName,
+  cellCatalog = [],
   onSale,
   onWriteoff,
   onPrint,
@@ -303,7 +303,7 @@ const CardPart = ({
                 </div>
                 <StorageCellsDisplayTable
                   productStorageCells={productStorageCells}
-                  getCellName={getCellName}
+                  cellCatalog={cellCatalog}
                   compact
                 />
               </div>
@@ -471,7 +471,7 @@ const CardPart = ({
                 </div>
                 <StorageCellsDisplayTable
                   productStorageCells={productStorageCells}
-                  getCellName={getCellName}
+                  cellCatalog={cellCatalog}
                   compact
                 />
               </div>
@@ -1646,10 +1646,9 @@ function MyParts() {
   }, [dispatch, isReady, user?.organization_id]);
 
   useEffect(() => {
-    const storageId = activeFilters.storage;
-    if (!storageId) return;
-    dispatch(fetchStorageCells(storageId));
-  }, [dispatch, activeFilters.storage]);
+    if (!isReady || !user?.organization_id) return;
+    dispatch(fetchStorageCells(activeFilters.storage || undefined));
+  }, [dispatch, isReady, user?.organization_id, activeFilters.storage]);
 
   useEffect(() => {
     if (isModerationTab || !activeFilters.cell) {
@@ -1934,64 +1933,62 @@ function MyParts() {
     return loc ? (loc.address || `Склад #${locationId}`) : `Склад #${locationId}`;
   };
 
-  const getCellName = (cellId) => {
-    if (!cellId) return `Ячейка #${cellId}`;
-    const cell = storageCells.find(c => c.id === cellId);
-    return cell ? cell.name : `Ячейка #${cellId}`;
-  };
-
 
 
   return (
     <div className="mt-4 sm:mt-5 px-4 sm:px-0">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
-        <h1 className="text-2xl sm:text-2xl font-bold text-gray-800">Мои запчасти</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800 shrink-0">Мои запчасти</h1>
         {!isDraftsTab && (
-        <div className="text-left sm:text-right">
-          <div className="text-xl sm:text-2xl font-bold text-gray-700">
-            {totalValue.toLocaleString('ru-RU')} ₽
-          </div>
-          <div className="text-sm text-gray-500">
-            {activeFilters.storage
-              ? (isModerationTab ? 'Стоимость по складу (модерация)' : 'Общая стоимость склада')
-              : (isModerationTab ? 'Стоимость на модерации' : 'Общая стоимость всех складов')}
-          </div>
-          <div className="text-lg font-semibold text-gray-700 mt-1">
-            {totalQuantity.toLocaleString('ru-RU')} шт.
-          </div>
-          <div className="text-sm text-gray-500">
-            {activeFilters.storage
-              ? (isModerationTab ? 'Количество по складу (модерация)' : 'Количество штук по складу')
-              : (isModerationTab ? 'Количество на модерации' : 'Количество штук на всех складах')}
-          </div>
-          {!isModerationTab && myProductsTotal > 0 && (
-            <>
-              <div className="text-lg font-semibold text-gray-700 mt-1">
-                {myProductsTotal.toLocaleString('ru-RU')} поз.
+          <div className="flex flex-wrap gap-x-6 gap-y-3 sm:justify-end">
+            <div className="min-w-[7rem]">
+              <div className="text-lg sm:text-xl font-bold text-gray-800 tabular-nums leading-tight">
+                {totalValue.toLocaleString('ru-RU')} ₽
               </div>
-              <div className="text-sm text-gray-500">
-                {activeFilters.storage ? 'Позиций на складе' : 'Позиций на всех складах'}
+              <div className="text-xs text-gray-500 mt-0.5">
+                {activeFilters.storage
+                  ? (isModerationTab ? 'Стоимость по складу' : 'Стоимость склада')
+                  : (isModerationTab ? 'Стоимость на модерации' : 'Стоимость всех складов')}
               </div>
-            </>
-          )}
-        </div>
+            </div>
+            <div className="min-w-[5rem]">
+              <div className="text-lg sm:text-xl font-bold text-gray-800 tabular-nums leading-tight">
+                {totalQuantity.toLocaleString('ru-RU')} шт.
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                {activeFilters.storage
+                  ? (isModerationTab ? 'Количество по складу' : 'Штук на складе')
+                  : (isModerationTab ? 'На модерации' : 'Штук на всех складах')}
+              </div>
+            </div>
+            {!isModerationTab && myProductsTotal > 0 && (
+              <div className="min-w-[5rem]">
+                <div className="text-lg sm:text-xl font-bold text-gray-800 tabular-nums leading-tight">
+                  {myProductsTotal.toLocaleString('ru-RU')} поз.
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  {activeFilters.storage ? 'Позиций на складе' : 'Позиций всего'}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
       {!isDraftsTab && (
-      <div className="mb-6 space-y-4">
-        {/* Поисковое поле */}
-        <div className="w-full">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Поиск {activeFilters.storage && '(в выбранном складе)'}
+      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+        <div>
+          <label htmlFor="my-parts-search" className="block text-xs font-medium text-gray-600 mb-1.5">
+            Поиск{activeFilters.storage ? ' в выбранном складе' : ''}
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
             <input
+              id="my-parts-search"
               ref={searchInputRef}
               type="text"
               inputMode="search"
@@ -2000,10 +1997,10 @@ function MyParts() {
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
-              placeholder="Поиск по номеру, внутр. коду или названию..."
+              placeholder="По номеру, внутр. коду или названию..."
               value={searchDraft}
               onChange={(e) => setSearchDraft(e.target.value)}
-              className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              className="block w-full h-10 pl-9 pr-9 border border-gray-300 rounded-lg bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             />
             <div className={`absolute inset-y-0 right-0 pr-3 flex items-center ${searchDraft ? '' : 'invisible pointer-events-none'}`}>
               <button
@@ -2013,7 +2010,7 @@ function MyParts() {
                 tabIndex={searchDraft ? 0 : -1}
                 aria-hidden={!searchDraft}
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -2021,51 +2018,50 @@ function MyParts() {
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 md:items-end">
-        {/* Фильтр по складу и сортировка */}
-        <div className="md:w-64">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Склад</label>
-          <select
-            value={activeFilters.storage}
-            onChange={(e) => updateActiveFilters({ storage: e.target.value })}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          >
+        <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${isModerationTab ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+          <div className="min-w-0">
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Склад</label>
+            <select
+              value={activeFilters.storage}
+              onChange={(e) => updateActiveFilters({ storage: e.target.value })}
+              className="block w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            >
             <option value="">Все склады</option>
             {storageLocations.map((location) => (
               <option key={location.id} value={location.id}>
                 {location.address}
               </option>
             ))}
-          </select>
-        </div>
+            </select>
+          </div>
 
-        <div className="md:w-64">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Ячейка</label>
-          <select
-            value={activeFilters.cell}
-            onChange={(e) => updateActiveFilters({ cell: e.target.value })}
-            disabled={!activeFilters.storage}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500"
-          >
+          <div className="min-w-0">
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Ячейка</label>
+            <select
+              value={activeFilters.cell}
+              onChange={(e) => updateActiveFilters({ cell: e.target.value })}
+              disabled={!activeFilters.storage}
+              className="block w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
+            >
             <option value="">{activeFilters.storage ? 'Все ячейки' : 'Сначала выберите склад'}</option>
             {availableStorageCells.map((cell) => (
               <option key={cell.id} value={cell.id}>
                 {cell.name}
               </option>
             ))}
-          </select>
-        </div>
+            </select>
+          </div>
 
-        <div className="md:w-64">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {selectedCellName ? `Позиция: ${selectedCellName}` : 'Позиция'}
-          </label>
-          <select
-            value={activeFilters.cellValue}
-            onChange={(e) => updateActiveFilters({ cellValue: e.target.value })}
-            disabled={!activeFilters.cell || (!isModerationTab && cellValueOptionsLoading)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:text-gray-500"
-          >
+          <div className="min-w-0">
+            <label className="block text-xs font-medium text-gray-600 mb-1.5 truncate" title={selectedCellName || undefined}>
+              {selectedCellName ? `Позиция · ${selectedCellName}` : 'Позиция'}
+            </label>
+            <select
+              value={activeFilters.cellValue}
+              onChange={(e) => updateActiveFilters({ cellValue: e.target.value })}
+              disabled={!activeFilters.cell || (!isModerationTab && cellValueOptionsLoading)}
+              className="block w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
+            >
             <option value="">
               {!activeFilters.cell
                 ? 'Сначала выберите ячейку'
@@ -2080,70 +2076,67 @@ function MyParts() {
                 {value}
               </option>
             ))}
-          </select>
-        </div>
-        
-        {isModerationTab && (
-          <div className="md:w-auto flex items-end">
-            <label className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md bg-white cursor-pointer min-h-[40px]">
-              <input
-                type="checkbox"
-                checked={moderationFilters.hideRejected}
-                onChange={(e) => updateActiveFilters({ hideRejected: e.target.checked })}
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-              />
-              <span className="text-sm text-gray-700 whitespace-nowrap">Скрыть отклонённые</span>
-            </label>
+            </select>
           </div>
-        )}
 
-        {/* Сортировка */}
-        <div className="md:w-64 relative sort-dropdown">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Сортировка
-          </label>
-          <button
-            type="button"
-            onClick={() => setShowSortDropdown(!showSortDropdown)}
-            className="w-full px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-between gap-2 bg-gray-200 text-gray-700 hover:bg-gray-300 min-h-[40px]"
-            title="Сортировка"
-            aria-expanded={showSortDropdown}
-          >
-            <span className="flex items-center gap-2 min-w-0">
-              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-              </svg>
-              <span className="truncate">
-                {MY_PARTS_SORT_LABELS[activeFilters.sort] || 'Сначала новые'}
+          <div className="min-w-0 relative sort-dropdown">
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Сортировка</label>
+            <button
+              type="button"
+              onClick={() => setShowSortDropdown(!showSortDropdown)}
+              className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm shadow-sm flex items-center justify-between gap-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              title="Сортировка"
+              aria-expanded={showSortDropdown}
+            >
+              <span className="flex items-center gap-2 min-w-0 text-gray-700">
+                <svg className="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                </svg>
+                <span className="truncate">
+                  {MY_PARTS_SORT_LABELS[activeFilters.sort] || 'Сначала новые'}
+                </span>
               </span>
-            </span>
-            <svg className={`w-4 h-4 shrink-0 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+              <svg className={`w-4 h-4 shrink-0 text-gray-400 transition-transform ${showSortDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
 
-          {showSortDropdown && (
-            <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-30">
-              {MY_PARTS_SORT_OPTIONS.map(({ value, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => { updateActiveFilters({ sort: value }); setShowSortDropdown(false); }}
-                  className={`w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors ${activeFilters.sort === value ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{label}</span>
-                    {activeFilters.sort === value && (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                </button>
-              ))}
+            {showSortDropdown && (
+              <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-30">
+                {MY_PARTS_SORT_OPTIONS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => { updateActiveFilters({ sort: value }); setShowSortDropdown(false); }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${activeFilters.sort === value ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{label}</span>
+                      {activeFilters.sort === value && (
+                        <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {isModerationTab && (
+            <div className="min-w-0 flex flex-col justify-end">
+              <label className="inline-flex items-center gap-2 h-10 px-3 border border-gray-300 rounded-lg bg-white cursor-pointer shadow-sm">
+                <input
+                  type="checkbox"
+                  checked={moderationFilters.hideRejected}
+                  onChange={(e) => updateActiveFilters({ hideRejected: e.target.checked })}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <span className="text-sm text-gray-700">Скрыть отклонённые</span>
+              </label>
             </div>
           )}
-        </div>
         </div>
       </div>
       )}
@@ -2368,7 +2361,7 @@ function MyParts() {
                     key={part.id}
                     part={part}
                     getStorageAddress={getStorageAddress}
-                    getCellName={getCellName}
+                    cellCatalog={storageCells}
                     onSale={(p) => handleOpenModal(p, 'sale')}
                     onWriteoff={(p) => handleOpenModal(p, 'writeoff')}
                     onPrint={(p) => handleOpenPrintModal(p)}
@@ -2437,7 +2430,7 @@ function MyParts() {
                 renderMode="card"
                 part={part}
                 getStorageAddress={getStorageAddress}
-                getCellName={getCellName}
+                cellCatalog={storageCells}
                 onSale={(p) => handleOpenModal(p, 'sale')}
                 onWriteoff={(p) => handleOpenModal(p, 'writeoff')}
                 onPrint={(p) => handleOpenPrintModal(p)}
@@ -2558,7 +2551,7 @@ function MyParts() {
                       moderationKind={part.moderationKind}
                       part={part}
                       getStorageAddress={getStorageAddress}
-                      getCellName={getCellName}
+                      cellCatalog={storageCells}
                       onPrint={handleOpenPrintModal}
                       onDelete={handleModerationDelete}
                       onEdit={handleModerationEdit}
@@ -2583,7 +2576,7 @@ function MyParts() {
                   moderationKind={part.moderationKind}
                   part={part}
                   getStorageAddress={getStorageAddress}
-                  getCellName={getCellName}
+                  cellCatalog={storageCells}
                   onPrint={handleOpenPrintModal}
                   onDelete={handleModerationDelete}
                   onEdit={handleModerationEdit}
