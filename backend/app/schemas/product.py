@@ -190,6 +190,7 @@ class QrPartCardResponse(BaseModel):
     quantity: int
     internal_code: Optional[str] = None
     price: Optional[float] = None
+    storage_location_id: Optional[int] = None
     storage_location_name: Optional[str] = None
     storage_addresses: List[str] = []
     product_storage_cells: List[QrProductStorageCellOut] = []

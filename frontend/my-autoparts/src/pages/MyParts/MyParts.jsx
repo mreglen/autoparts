@@ -18,6 +18,7 @@ import StorageCellsDisplayTable from '../../components/StorageCellsTable/Storage
 import { normalizeInternalCodeForSearch, INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../utils/internalCode';
 import MyPartsRowSkeleton from '../../components/skeletons/MyPartsRowSkeleton';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { formatDromExportMessage } from '../../utils/dromExport';
 
 const CardPart = ({
@@ -1957,7 +1958,21 @@ function MyParts() {
   return (
     <div className="mt-4 sm:mt-5 px-4 sm:px-0">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-5">
-        <h1 className="text-2xl font-bold text-gray-800 shrink-0">Мои запчасти</h1>
+        <div className="flex items-center gap-3 shrink-0">
+          <h1 className="text-2xl font-bold text-gray-800">Мои запчасти</h1>
+          {userHasWarehouseQrAccess(user, permissionCodes) && (
+            <Link
+              to="/warehouse/scan"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              title="Сканировать QR"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m14 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+              </svg>
+              <span className="hidden sm:inline">QR</span>
+            </Link>
+          )}
+        </div>
         {!isDraftsTab && (
           <div className="flex flex-wrap gap-x-6 gap-y-3 sm:justify-end">
             <div className="min-w-[7rem]">

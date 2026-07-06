@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import StockOutModal from '../MyParts/StockOutModal/StockOutModal';
 import PrintReceiptModal from '../MyParts/PrintReceiptModal/PrintReceiptModal';
+import StockInQuickModal from './StockInQuickModal';
+import StorageCellsQuickEditModal from './StorageCellsQuickEditModal';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
 import { updateProductQuantityAPI } from '../../redux/slices/ProductSlice';
 import StorageCellsDisplayTable from '../../components/StorageCellsTable/StorageCellsDisplayTable';
@@ -12,21 +14,50 @@ import { INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../utils/inte
 import { buildSellerPartCardSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import { resolveProductQrScan } from '../../utils/resolveProductQrScan';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { useWarehousePermissions } from '../../hooks/useWarehousePermissions';
+
+function ActionButton({ children, onClick, to, variant = 'default', disabled = false }) {
+  const base = 'flex min-h-12 flex-1 items-center justify-center rounded-xl px-3 py-3 text-sm font-semibold transition-colors disabled:opacity-50';
+  const variants = {
+    default: 'border border-gray-200 bg-white text-gray-800 hover:bg-gray-50',
+    primary: 'bg-indigo-600 text-white hover:bg-indigo-700',
+    danger: 'border border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100',
+  };
+  const className = `${base} ${variants[variant] || variants.default}`;
+
+  if (to) {
+    return (
+      <Link to={to} className={className}>
+        {children}
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className={className}>
+      {children}
+    </button>
+  );
+}
 
 const SellerPartCardPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { isReady, user } = useAuthReady();
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
+  const perms = useWarehousePermissions(user, permissionCodes);
 
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
   const [part, setPart] = useState(null);
-  const [showActions, setShowActions] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [operationType, setOperationType] = useState(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [stockInModalOpen, setStockInModalOpen] = useState(false);
+  const [cellsModalOpen, setCellsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ quantity: '', price: '', reason: '' });
 
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
@@ -49,14 +80,21 @@ const SellerPartCardPage = () => {
 
       setLoading(true);
       setNotFound(false);
+      setForbidden(false);
       setPart(null);
 
-      const result = await resolveProductQrScan(id, user);
+      const result = await resolveProductQrScan(id, user, permissionCodes);
 
       if (cancelled) return;
 
       if (result.mode === 'seller') {
         setPart(result.part);
+        setLoading(false);
+        return;
+      }
+
+      if (result.mode === 'forbidden') {
+        setForbidden(true);
         setLoading(false);
         return;
       }
@@ -75,19 +113,7 @@ const SellerPartCardPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [id, isReady, navigate, user]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.actions-dropdown')) {
-        setShowActions(false);
-      }
-    };
-    if (showActions) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showActions]);
+  }, [id, isReady, navigate, user, permissionCodes]);
 
   const mediaItems = useMemo(() => {
     if (!part) return [];
@@ -105,7 +131,6 @@ const SellerPartCardPage = () => {
   const handleOpenModal = (type) => {
     setOperationType(type);
     setModalOpen(true);
-    setShowActions(false);
   };
 
   const handleConfirm = async () => {
@@ -116,7 +141,7 @@ const SellerPartCardPage = () => {
     const stockOutData = {
       product_id: part.id,
       quantity,
-      storage_location_id: null,
+      storage_location_id: part.storage_location_id || null,
       organization_id: user.organization_id,
       user_id: user.id,
       acquired_product_id: null,
@@ -145,6 +170,17 @@ const SellerPartCardPage = () => {
   if (!isReady || loading) {
     return <div className="p-8 text-center text-gray-600">Загрузка...</div>;
   }
+
+  if (forbidden) {
+    return (
+      <div className="mx-auto max-w-lg p-8 text-center">
+        <h1 className="text-xl font-semibold text-gray-900">Нет доступа</h1>
+        <p className="mt-2 text-gray-600">Эта запчасть принадлежит другой организации.</p>
+        <Link to="/my-parts" className="mt-6 inline-block text-indigo-600 hover:underline">К моим запчастям</Link>
+      </div>
+    );
+  }
+
   if (notFound || !part) {
     return <div className="p-8 text-center text-gray-700 text-lg">404: Страница не найдена</div>;
   }
@@ -153,122 +189,119 @@ const SellerPartCardPage = () => {
   const previewMedia = mediaItems[0];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6">
+    <div className="min-h-screen bg-gray-50 pb-28">
       <PageSeoHelmet seo={seo} />
-      <div className="max-w-6xl mx-auto px-4 space-y-5">
+      <div className="mx-auto max-w-3xl space-y-4 px-4 py-4">
         <button
+          type="button"
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-indigo-600 transition-colors"
+          className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-indigo-600"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
           </svg>
           Назад
         </button>
 
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-gray-100 flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight break-words">
-                {part.name || '—'}
-              </h1>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <span className="px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">
-                  Бренд: {part.brand || '—'}
-                </span>
-                <span className="px-3 py-1 rounded-lg bg-gray-100 text-gray-700 text-sm font-medium">
-                  Артикул: {part.article || '—'}
-                </span>
-                <span className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium">
-                  В наличии: {part.quantity || 0} шт.
-                </span>
-              </div>
-            </div>
-            <div className="relative actions-dropdown shrink-0">
-              <button
-                onClick={() => setShowActions((v) => !v)}
-                className="text-gray-700 hover:text-gray-900 text-sm sm:text-sm font-semibold border border-gray-300 rounded-lg px-4 py-3 sm:px-3 sm:py-2 bg-white hover:bg-gray-50 transition-colors min-h-[48px] sm:min-h-0"
-              >
-                Действия
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div className="aspect-[4/3] bg-gray-100">
+            {previewMedia ? (
+              <button type="button" onClick={() => handleOpenMedia(0)} className="h-full w-full">
+                {previewMedia.type === 'video' ? (
+                  <video src={previewMedia.src} className="h-full w-full object-cover" controls />
+                ) : (
+                  <img src={previewMedia.src} alt="" className="h-full w-full object-cover" />
+                )}
               </button>
-              {showActions && (
-                <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                  <button onClick={() => { setPrintModalOpen(true); setShowActions(false); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50">Печать</button>
-                  <button onClick={() => handleOpenModal('sale')} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50">Продать</button>
-                  <button onClick={() => handleOpenModal('writeoff')} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50">Списать</button>
-                  <Link to={`/my-parts/edit/${part.id}`} className="block w-full px-3 py-2 text-sm hover:bg-gray-50">Редактировать</Link>
-                </div>
-              )}
-            </div>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-gray-400">Нет фото</div>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
-            <div className="lg:col-span-2 p-5 border-r border-gray-100">
-              <div className="aspect-[4/3] bg-gray-100 rounded-xl overflow-hidden border border-gray-200 mb-4">
-                {previewMedia ? (
-                  previewMedia.type === 'video' ? (
-                    <video src={previewMedia.src} className="w-full h-full object-cover" controls />
-                  ) : (
-                    <img src={previewMedia.src} alt="main media" className="w-full h-full object-cover" />
-                  )
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-                    Нет фото и видео
-                  </div>
-                )}
-              </div>
-
-              {mediaItems.length > 0 && (
-                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                  {mediaItems.map((m, idx) => (
-                    <button key={`${m.src}-${idx}`} onClick={() => handleOpenMedia(idx)} className="aspect-square border rounded-lg overflow-hidden bg-gray-100 hover:border-indigo-400 transition-colors">
-                      {m.type === 'video' ? (
-                        <video src={m.src} className="w-full h-full object-cover" muted />
-                      ) : (
-                        <img src={m.src} alt="" className="w-full h-full object-cover" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
+          <div className="space-y-3 p-4">
+            <h1 className="text-xl font-bold leading-tight text-gray-900">{part.name || '—'}</h1>
+            <div className="flex flex-wrap gap-2 text-sm">
+              <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-blue-700">{part.brand || '—'}</span>
+              <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-gray-700">{part.article || '—'}</span>
+              <span className="rounded-lg bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700">
+                {part.quantity || 0} шт.
+              </span>
             </div>
 
-            <div className="p-5 space-y-3">
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Склад</div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                <div className="text-xs uppercase tracking-wide text-gray-500">Склад</div>
                 <div className="text-sm font-medium text-gray-900">{part.storage_location_name || '—'}</div>
               </div>
-
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">{INTERNAL_CODE_LABEL}</div>
-                <div className="text-sm font-medium text-gray-900 font-mono">{formatInternalCodeDisplay(part.internal_code)}</div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                <div className="text-xs uppercase tracking-wide text-gray-500">{INTERNAL_CODE_LABEL}</div>
+                <div className="font-mono text-sm font-medium text-gray-900">{formatInternalCodeDisplay(part.internal_code)}</div>
               </div>
-
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="text-xs uppercase tracking-wide text-gray-500 mb-1">Цена</div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 sm:col-span-2">
+                <div className="text-xs uppercase tracking-wide text-gray-500">Цена</div>
                 <div className="text-base font-semibold text-gray-900">
                   {part.price != null ? `${Number(part.price).toLocaleString('ru-RU')} ₽` : '—'}
                 </div>
               </div>
-
-              {(part.product_storage_cells?.length > 0 || part.storage_addresses?.length > 0) && (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Адресное хранение</div>
-                  {part.product_storage_cells?.length > 0 ? (
-                    <StorageCellsDisplayTable
-                      productStorageCells={part.product_storage_cells}
-                      compact
-                    />
-                  ) : (
-                    <div className="text-sm text-gray-800 break-words">{part.storage_addresses.join('; ')}</div>
-                  )}
-                </div>
-              )}
             </div>
+
+            {(part.product_storage_cells?.length > 0 || part.storage_addresses?.length > 0) && (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                <div className="mb-2 text-xs uppercase tracking-wide text-gray-500">Адресное хранение</div>
+                {part.product_storage_cells?.length > 0 ? (
+                  <StorageCellsDisplayTable productStorageCells={part.product_storage_cells} compact />
+                ) : (
+                  <div className="break-words text-sm text-gray-800">{part.storage_addresses.join('; ')}</div>
+                )}
+              </div>
+            )}
+
+            {mediaItems.length > 1 && (
+              <div className="grid grid-cols-4 gap-2">
+                {mediaItems.map((m, idx) => (
+                  <button
+                    key={`${m.src}-${idx}`}
+                    type="button"
+                    onClick={() => handleOpenMedia(idx)}
+                    className="aspect-square overflow-hidden rounded-lg border bg-gray-100"
+                  >
+                    {m.type === 'video' ? (
+                      <video src={m.src} className="h-full w-full object-cover" muted />
+                    ) : (
+                      <img src={m.src} alt="" className="h-full w-full object-cover" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-
       </div>
+
+      {perms.isStaff && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-3 py-3 backdrop-blur">
+          <div className="mx-auto flex max-w-3xl flex-wrap gap-2">
+            {perms.canPrint && (
+              <ActionButton onClick={() => setPrintModalOpen(true)}>Печать</ActionButton>
+            )}
+            {perms.canSell && (
+              <ActionButton variant="primary" onClick={() => handleOpenModal('sale')}>Продать</ActionButton>
+            )}
+            {perms.canStockOut && (
+              <ActionButton variant="danger" onClick={() => handleOpenModal('writeoff')}>Списать</ActionButton>
+            )}
+            {perms.canStockIn && (
+              <ActionButton onClick={() => setStockInModalOpen(true)}>Приход</ActionButton>
+            )}
+            {perms.canEditCells && (
+              <ActionButton onClick={() => setCellsModalOpen(true)}>Ячейки</ActionButton>
+            )}
+            {perms.canEditParts && (
+              <ActionButton to={`/my-parts/edit/${part.id}`}>Изменить</ActionButton>
+            )}
+          </div>
+        </div>
+      )}
 
       <StockOutModal
         isOpen={modalOpen}
@@ -278,6 +311,26 @@ const SellerPartCardPage = () => {
         formData={formData}
         onFormChange={(field, value) => setFormData((prev) => ({ ...prev, [field]: value }))}
         onConfirm={handleConfirm}
+      />
+
+      <StockInQuickModal
+        isOpen={stockInModalOpen}
+        onClose={() => setStockInModalOpen(false)}
+        part={part}
+        onSuccess={(newQuantity) => setPart((prev) => ({ ...prev, quantity: newQuantity }))}
+      />
+
+      <StorageCellsQuickEditModal
+        isOpen={cellsModalOpen}
+        onClose={() => setCellsModalOpen(false)}
+        part={part}
+        onSuccess={(cells) => setPart((prev) => ({
+          ...prev,
+          product_storage_cells: cells,
+          storage_addresses: cells.map((c) => (
+            c.storage_cell_name ? `${c.storage_cell_name}: ${c.value}` : c.value
+          )),
+        }))}
       />
 
       <PrintReceiptModal

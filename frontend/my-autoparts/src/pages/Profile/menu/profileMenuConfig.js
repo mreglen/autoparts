@@ -17,6 +17,7 @@ export const TAB_PATH_MAP = {
     receipts: '/stock-in',
     expenses: '/stock-out',
     'warehouse-inventory': '/warehouse/inventory',
+    'warehouse-scan': '/warehouse/scan',
     'settings-storage-addresses': '/settings/storage-addresses',
     'settings-organization': '/settings/organization',
     'settings-printers': '/settings/printers',
@@ -48,6 +49,7 @@ const PATH_TAB_MAP = Object.fromEntries(
 
 export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/my-parts')) return 'parts';
+    if (path.startsWith('/warehouse/scan')) return 'warehouse-scan';
     if (path.startsWith('/profile/notifications')) return 'settings-notifications';
     if (path.startsWith('/vehicles/edit')) return 'vehicles';
     if (path.startsWith('/sellers')) return 'sellers';
@@ -138,6 +140,14 @@ export const getAvailableTabs = (user, permissionCodes) => {
         if (
             user.is_seller ||
             user.is_admin ||
+            hasPermission('my-parts') ||
+            hasPermission('stock-in')
+        ) {
+            warehouseSubmenu.push({ id: 'warehouse-scan', label: 'Сканировать QR' });
+        }
+        if (
+            user.is_seller ||
+            user.is_admin ||
             hasPermission('vehicles') ||
             hasPermission('my-parts') ||
             hasPermission('stock-in')
@@ -186,6 +196,9 @@ export const getAvailableTabs = (user, permissionCodes) => {
         const warehouseSubmenu = [];
         if (hasPermission('my-parts')) {
             warehouseSubmenu.push({ id: 'parts', label: 'Мои запчасти' });
+        }
+        if (hasPermission('my-parts') || hasPermission('stock-in')) {
+            warehouseSubmenu.push({ id: 'warehouse-scan', label: 'Сканировать QR' });
         }
         if (hasPermission('vehicles') || hasPermission('my-parts') || hasPermission('stock-in')) {
             warehouseSubmenu.push({ id: 'vehicles', label: 'Автомобили' });

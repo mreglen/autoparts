@@ -1,15 +1,16 @@
 import { apiAxios, apiAxiosUnauth } from './apiClient';
 import { buildPartDetailPath } from './partRoutes';
+import { userHasWarehouseQrAccess } from '../hooks/useWarehousePermissions';
 
 /**
  * Сканирование QR с /seller/part-card/{id} (URL в уже напечатанных этикетках не меняем):
- * — продавец своей организации → складская карточка;
+ * — продавец/сотрудник своей организации → складская карточка;
  * — остальные → публичная карточка /part/…, если товар доступен.
  */
-export async function fetchSellerQrPartCard(productId, user) {
+export async function fetchSellerQrPartCard(productId, user, permissionCodes = []) {
   const numericId = parseInt(String(productId), 10);
   if (!Number.isFinite(numericId) || numericId <= 0) return null;
-  if (!user?.is_seller || !user?.organization_id) return null;
+  if (!userHasWarehouseQrAccess(user, permissionCodes)) return null;
 
   try {
     const response = await apiAxios.get(`/products/qr-card/${numericId}`);
@@ -31,10 +32,14 @@ export async function resolvePublicPartPath(productId) {
   }
 }
 
-export async function resolveProductQrScan(productId, user) {
-  const sellerPart = await fetchSellerQrPartCard(productId, user);
+export async function resolveProductQrScan(productId, user, permissionCodes = []) {
+  const sellerPart = await fetchSellerQrPartCard(productId, user, permissionCodes);
   if (sellerPart) {
     return { mode: 'seller', part: sellerPart };
+  }
+
+  if (user && userHasWarehouseQrAccess(user, permissionCodes)) {
+    return { mode: 'forbidden' };
   }
 
   const publicPath = await resolvePublicPartPath(productId);

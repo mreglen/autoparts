@@ -562,8 +562,13 @@ def read_qr_part_card(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from app.utils.org_product_access import (
+        user_can_access_org_product,
+        user_can_access_qr_part_card,
+    )
+
     # Security requirement: always return 404 for any denied scenario.
-    if not current_user or not current_user.is_seller or not current_user.organization_id:
+    if not user_can_access_qr_part_card(db, current_user):
         raise HTTPException(status_code=404, detail="Not found")
 
     product = db.query(ProductModel).options(
@@ -576,7 +581,7 @@ def read_qr_part_card(
         ProductModel.organization_id == current_user.organization_id,
     ).first()
 
-    if not product:
+    if not product or not user_can_access_org_product(current_user, product):
         raise HTTPException(status_code=404, detail="Not found")
 
     product_storage_cells_out = []
@@ -607,6 +612,7 @@ def read_qr_part_card(
         quantity=product.quantity,
         internal_code=product.internal_code,
         price=float(product.price) if product.price is not None else None,
+        storage_location_id=product.storage_location_id,
         storage_location_name=(product.storage_location.address if product.storage_location else None),
         storage_addresses=storage_addresses,
         product_storage_cells=product_storage_cells_out,

@@ -46,10 +46,12 @@ def create_stock_in(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if not current_user.is_seller or not current_user.organization_id:
+    from app.utils.org_product_access import user_can_create_stock_in
+
+    if not user_can_create_stock_in(db, current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Только продавцы могут создавать поступления"
+            detail="Нет права создавать поступления",
         )
 
     product = db.query(ProductModel).filter(
@@ -59,15 +61,18 @@ def create_stock_in(
     if not product:
         raise HTTPException(status_code=400, detail="Продукт не найден или не принадлежит вашей организации")
 
-    
+    previous_quantity = int(product.quantity or 0)
+
     db_stock_in = StockInModel(
         **stock_in.dict(),
         organization_id=current_user.organization_id,
-        created_by=current_user.id  
+        created_by=current_user.id
     )
     db.add(db_stock_in)
+    product.quantity = previous_quantity + int(stock_in.quantity or 0)
     db.commit()
     db.refresh(db_stock_in)
+    db.refresh(product)
     log_audit(
         db,
         event_type="stock_in_created",
@@ -86,6 +91,10 @@ def create_stock_in(
     if product.is_new is False:
         mark_yandex_feed_dirty(db, "stock_in_created_used")
         invalidate_public_catalog_cache()
+        from app.services.search_subscription_service import maybe_notify_search_subscribers
+
+        if int(product.quantity or 0) > 0:
+            maybe_notify_search_subscribers(product.id, previous_quantity=previous_quantity)
     return db_stock_in
 
 @router.get("/{stock_in_id}", response_model=StockInSchema)
