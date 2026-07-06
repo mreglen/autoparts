@@ -45,6 +45,8 @@ EVENT_TYPE_LABELS: dict[str, str] = {
     "avito_sync": "Синхронизация Авито",
     "avito_export": "Экспорт в Авито",
     "drom_export": "Экспорт в Drom",
+    "inventory_session_created": "Инвентаризация создана",
+    "inventory_session_completed": "Инвентаризация завершена",
     "avito_warehouse_retry": "Повтор проведения Авито на склад",
     "product_moderation_approved": "Товар одобрен модерацией",
     "product_moderation_rejected": "Товар отклонён модерацией",

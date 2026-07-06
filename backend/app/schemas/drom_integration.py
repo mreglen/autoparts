@@ -41,14 +41,4 @@ class DromAutoloadUploadResponse(BaseModel):
     items: list = []
     local_validation_ok: bool = False
     local_errors: list = []
-    drom_upload_response: Optional[Any] = None
-    drom_upload_status: Optional[int] = None
-    drom_token_error: Optional[str] = None
     warnings: Optional[list] = None
-
-
-class DromAutoloadPublishResponse(BaseModel):
-    saved_path: Optional[str] = None
-    drom_upload_response: Optional[Any] = None
-    drom_upload_status: Optional[int] = None
-    drom_token_error: Optional[str] = None

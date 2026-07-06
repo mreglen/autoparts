@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { 
   fetchLocationsWithCells, 
   fetchStorageCells, 
@@ -12,6 +12,7 @@ import {
 import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
 import { fetchMyProducts } from '../../redux/slices/ProductSlice';
 import ConfirmationModal from '../../components/ConfirmationModal/ConfirmationModal';
+import { canViewInventory } from '../../utils/inventoryAccess';
 
 const StorageAddressesPage = () => {
   // All hooks must be called at the top level
@@ -48,8 +49,9 @@ const StorageAddressesPage = () => {
   // Check if user has permission to view this page
   // Admin and sellers always have access
   // Employees need 'storage-addresses' permission code
-  const hasPermission = user?.is_admin || user?.is_seller || 
+  const hasPermission = user?.is_admin || user?.is_seller ||
     (user?.is_employee && permissionCodes && permissionCodes.includes('storage-addresses'));
+  const canOpenInventory = canViewInventory(user, permissionCodes);
 
   // Fetch data - must be before any early returns
   useEffect(() => {
@@ -298,6 +300,14 @@ const StorageAddressesPage = () => {
             <p className="mt-1 text-gray-600">
               Управление складскими ячейками и адресным хранением
             </p>
+            {canOpenInventory && (
+              <Link
+                to="/warehouse/inventory"
+                className="inline-flex mt-3 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+              >
+                Перейти к инвентаризации →
+              </Link>
+            )}
           </div>
           <button
             onClick={() => setShowAddForm(!showAddForm)}

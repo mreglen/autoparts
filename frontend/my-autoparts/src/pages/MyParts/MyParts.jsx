@@ -18,6 +18,7 @@ import StorageCellsDisplayTable from '../../components/StorageCellsTable/Storage
 import { normalizeInternalCodeForSearch, INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../utils/internalCode';
 import MyPartsRowSkeleton from '../../components/skeletons/MyPartsRowSkeleton';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { formatDromExportMessage } from '../../utils/dromExport';
 
 const CardPart = ({
   part,
@@ -1452,11 +1453,11 @@ function MyParts() {
   const handleExportPartDrom = async (part) => {
     if (!user?.organization_id || !part?.id) return;
     try {
-      await apiRequest(`/organizations/${user.organization_id}/drom/autoload/export`, {
+      const data = await apiRequest(`/organizations/${user.organization_id}/drom/autoload/export`, {
         method: 'POST',
         body: JSON.stringify({ product_ids: [part.id] }),
       });
-      alert('Товар экспортирован в Drom');
+      alert(formatDromExportMessage(data));
     } catch (e) {
       alert(`Не удалось экспортировать в Drom: ${e.message || 'ошибка'}`);
     }
@@ -1478,11 +1479,11 @@ function MyParts() {
   const handleBulkExportDrom = async () => {
     if (!user?.organization_id || selectedParts.size === 0) return;
     try {
-      await apiRequest(`/organizations/${user.organization_id}/drom/autoload/export`, {
+      const data = await apiRequest(`/organizations/${user.organization_id}/drom/autoload/export`, {
         method: 'POST',
         body: JSON.stringify({ product_ids: Array.from(selectedParts) }),
       });
-      alert(`Экспорт в Drom выполнен. Товаров: ${selectedParts.size}`);
+      alert(formatDromExportMessage(data));
     } catch (e) {
       alert(`Не удалось выполнить экспорт в Drom: ${e.message || 'ошибка'}`);
     }

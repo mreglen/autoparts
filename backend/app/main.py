@@ -49,6 +49,7 @@ from app.db.schema_patches import (
     ensure_public_catalog_indexes,
     ensure_product_drafts_table,
     ensure_order_return_tables,
+    ensure_inventory_tables,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
@@ -72,7 +73,9 @@ from app.utils.yandex_integration_db import (
 from app.models import user, organization, product, pending_product, rejected_product, pending_user, pending_seller, password_reset_token, pending_product_storage_cell, carts
 from app.models import chat  # noqa: F401 — chat models в metadata
 import app.models.site_settings  # noqa: F401 — site_settings в metadata
-import app.models.organization_avito_integration  # noqa: F401 — avito integration
+import app.models.inventory_session  # noqa: F401 — inventory sessions
+import app.models.inventory_count_line  # noqa: F401
+import app.models.inventory_adjustment_line  # noqa: F401
 import app.models.organization_avito_autoload_cache  # noqa: F401 — avito autoload cache
 import app.models.transmission  # noqa: F401 — transmissions, vehicle_transmissions в metadata
 import app.models.site_yandex_integration  # noqa: F401 — yandex integration
@@ -193,6 +196,7 @@ try:
     ensure_public_catalog_indexes()
     ensure_product_drafts_table()
     ensure_order_return_tables()
+    ensure_inventory_tables()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise

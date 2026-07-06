@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
@@ -21,7 +22,6 @@ from app.schemas.drom_integration import (
     DromAutoloadExportRequest,
     DromAutoloadExportResponse,
     DromAutoloadUploadResponse,
-    DromAutoloadPublishResponse,
     DromCredentialsResponse,
     DromCredentialsUpdate,
     DromLastAutoloadSnapshot,
@@ -388,25 +388,40 @@ async def upload_drom_autoload_file(
     )
 
 
-@router.post("/{org_id}/drom/autoload/publish", response_model=DromAutoloadPublishResponse)
-async def publish_drom_autoload(
+@router.get("/{org_id}/drom/autoload/download")
+async def download_drom_autoload(
     org_id: str,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Публикация в Drom API (заглушка - не используется)"""
+    """Скачать XLSX-файл для загрузки на Drom.ru."""
     _ensure_org_access(current_user, org_id)
     _org_exists(db, org_id)
-    
-    # Проверяем интеграцию
-    row = db.query(OrganizationDromIntegration).filter(
-        OrganizationDromIntegration.organization_id == org_id
-    ).first()
-    
-    if not row or not row.is_enabled:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Интеграция Drom не включена")
-    
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Публикация через API пока не поддерживается")
+
+    cache = (
+        db.query(OrganizationDromAutoloadCache)
+        .filter(OrganizationDromAutoloadCache.organization_id == org_id)
+        .first()
+    )
+    if not cache or not cache.saved_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки не найден")
+
+    project_root = Path(__file__).resolve().parents[2]
+    xlsx_path = project_root / cache.saved_path.lstrip("/")
+
+    if not xlsx_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл автозагрузки на диске не найден")
+
+    return FileResponse(
+        path=str(xlsx_path),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename="drom-autoload.xlsx",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @router.get("/{org_id}/drom/autoload/file-link")

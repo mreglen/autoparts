@@ -69,6 +69,7 @@ const DashboardPage = lazy(() => import('./pages/Dashboard/DashboardPage'));
 const EmployeesPage = lazy(() => import('./pages/Profile/EmployeesPage'));
 const ClientsPage = lazy(() => import('./pages/Profile/ClientsPage'));
 const StorageAddressesPage = lazy(() => import('./pages/Profile/StorageAddressesPage'));
+const WmsStoragesPage = lazy(() => import('./pages/Warehouse/WmsStoragesPage'));
 const PendingSellersPage = lazy(() => import('./pages/Moderation/PendingSellersPage'));
 const ProductModeration = lazy(() => import('./pages/Moderation/ProductModeration/ProductModeration'));
 const OrganizationProductModerationPage = lazy(() => import('./pages/Moderation/ProductModeration/OrganizationProductModerationPage'));
@@ -557,6 +558,14 @@ function App() {
             element={(
               <LazyRoute>
                 <StorageAddressesPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/warehouse/inventory"
+            element={(
+              <LazyRoute>
+                <WmsStoragesPage />
               </LazyRoute>
             )}
           />

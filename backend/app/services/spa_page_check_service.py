@@ -89,6 +89,7 @@ _SPA_ROUTE_RULES: tuple[_RouteRule, ...] = (
     _RouteRule(re.compile(r"^/stock-in$")),
     _RouteRule(re.compile(r"^/stock-out$")),
     _RouteRule(re.compile(r"^/warehouse-sales$")),
+    _RouteRule(re.compile(r"^/warehouse/inventory$")),
     _RouteRule(re.compile(r"^/finance$")),
     _RouteRule(re.compile(r"^/settings/employees$")),
     _RouteRule(re.compile(r"^/chats$")),

@@ -17,130 +17,113 @@ import {
 import ResponsiveDataView from '../../components/ResponsiveDataView/ResponsiveDataView';
 import SellerOnboardingPanel from './SellerOnboardingPanel';
 
-function KpiCard({ label, value, sub, accent = 'indigo', onClick }) {
-  const accents = {
-    indigo: 'from-indigo-600 to-blue-700',
-    emerald: 'from-emerald-600 to-teal-700',
-    amber: 'from-amber-500 to-orange-600',
-    slate: 'from-slate-700 to-slate-900',
-  };
-  const inner = (
-    <div
-      className={`rounded-xl bg-gradient-to-br ${accents[accent] || accents.indigo} p-5 text-white shadow-lg ${
-        onClick ? 'cursor-pointer hover:shadow-xl transition-shadow' : ''
-      }`}
-    >
-      <p className="text-xs font-medium uppercase tracking-wide text-white/80">{label}</p>
-      <p className="mt-2 text-2xl sm:text-3xl font-bold leading-tight break-words">{value}</p>
-      {sub ? <p className="mt-2 text-sm text-white/75">{sub}</p> : null}
-    </div>
+function StatCard({ label, value, note, href, onClick }) {
+  const content = (
+    <>
+      <p className="text-[13px] text-gray-500">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight text-gray-900 tabular-nums">{value}</p>
+      {note ? <p className="mt-1.5 text-xs text-gray-400 leading-snug">{note}</p> : null}
+    </>
   );
+
+  const className =
+    'block rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:border-gray-300';
+
+  if (href) {
+    return (
+      <Link to={href} className={className}>
+        {content}
+      </Link>
+    );
+  }
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className="w-full text-left">
-        {inner}
+      <button type="button" onClick={onClick} className={`${className} w-full text-left`}>
+        {content}
       </button>
     );
   }
-  return inner;
+  return <div className={className}>{content}</div>;
 }
 
-function MetricTile({ label, value, hint, color = 'gray' }) {
-  const colors = {
-    blue: 'bg-blue-50 border-blue-100 text-blue-700',
-    yellow: 'bg-amber-50 border-amber-100 text-amber-800',
-    green: 'bg-green-50 border-green-100 text-green-800',
-    purple: 'bg-purple-50 border-purple-100 text-purple-800',
-    red: 'bg-red-50 border-red-100 text-red-800',
-    gray: 'bg-gray-50 border-gray-100 text-gray-700',
-  };
+function Panel({ title, action, children, className = '' }) {
   return (
-    <div className={`rounded-xl border p-4 ${colors[color] || colors.gray}`}>
-      <p className="text-xs font-semibold uppercase opacity-80">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
-      {hint ? <p className="mt-1 text-xs text-gray-600">{hint}</p> : null}
-    </div>
-  );
-}
-
-function Section({ title, icon, children, action }) {
-  return (
-    <section className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          {icon ? <div className="p-2 rounded-lg bg-gray-100 text-gray-600">{icon}</div> : null}
-          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+    <section className={`rounded-lg border border-gray-200 bg-white ${className}`}>
+      {(title || action) && (
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-gray-100">
+          {title ? <h2 className="text-sm font-semibold text-gray-900">{title}</h2> : <span />}
+          {action}
         </div>
-        {action}
-      </div>
+      )}
       <div className="p-5">{children}</div>
     </section>
   );
 }
 
-const TASK_SEVERITY_STYLES = {
-  high: 'border-red-200 bg-red-50 hover:bg-red-100/80',
-  medium: 'border-amber-200 bg-amber-50 hover:bg-amber-100/80',
-  low: 'border-gray-200 bg-gray-50 hover:bg-gray-100/80',
-};
+function MiniStat({ label, value }) {
+  return (
+    <div>
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold text-gray-900 tabular-nums">{value}</p>
+    </div>
+  );
+}
 
-const TASK_BADGE_STYLES = {
-  high: 'bg-red-600 text-white',
-  medium: 'bg-amber-600 text-white',
-  low: 'bg-gray-600 text-white',
+const TASK_DOT = {
+  high: 'bg-red-500',
+  medium: 'bg-amber-500',
+  low: 'bg-gray-300',
 };
 
 function AttentionTasksSection({ tasks, loading, onNavigate }) {
   if (loading) {
     return (
-      <Section title="Требует внимания">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 rounded-xl bg-gray-100 animate-pulse" />
+      <Panel title="Требует внимания">
+        <div className="space-y-2">
+          {[1, 2].map((i) => (
+            <div key={i} className="h-11 rounded-md bg-gray-50 animate-pulse" />
           ))}
         </div>
-      </Section>
+      </Panel>
     );
   }
 
   if (!tasks?.length) {
     return (
-      <Section title="Требует внимания">
-        <p className="text-sm text-gray-600 py-2">
-          Срочных задач нет — можно заняться продажами или пополнить склад.
-        </p>
-      </Section>
+      <Panel title="Требует внимания">
+        <p className="text-sm text-gray-500">Срочных задач нет.</p>
+      </Panel>
     );
   }
 
   return (
-    <Section
-      title="Требует внимания"
-      icon={
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-        </svg>
-      }
-    >
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+    <Panel title="Требует внимания">
+      <ul className="divide-y divide-gray-100">
         {tasks.map((task) => (
-          <button
-            key={task.id}
-            type="button"
-            onClick={() => onNavigate(task.url)}
-            className={`flex items-start justify-between gap-3 rounded-xl border p-4 text-left transition-colors ${TASK_SEVERITY_STYLES[task.severity] || TASK_SEVERITY_STYLES.low}`}
-          >
-            <div className="min-w-0">
-              <p className="font-semibold text-gray-900">{task.title}</p>
-              {task.hint ? <p className="mt-1 text-xs text-gray-600">{task.hint}</p> : null}
-            </div>
-            <span className={`shrink-0 inline-flex min-w-[2rem] justify-center rounded-full px-2.5 py-1 text-sm font-bold ${TASK_BADGE_STYLES[task.severity] || TASK_BADGE_STYLES.low}`}>
-              {task.count}
-            </span>
-          </button>
+          <li key={task.id}>
+            <button
+              type="button"
+              onClick={() => onNavigate(task.url)}
+              className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-gray-50 -mx-1 px-1 rounded-md"
+            >
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${TASK_DOT[task.severity] || TASK_DOT.low}`}
+                aria-hidden
+              />
+              <span className="min-w-0 flex-1">
+                <span className="text-sm text-gray-900">{task.title}</span>
+                {task.hint ? (
+                  <span className="ml-2 text-xs text-gray-400">{task.hint}</span>
+                ) : null}
+              </span>
+              <span className="shrink-0 text-sm font-medium tabular-nums text-gray-700">
+                {task.count}
+              </span>
+            </button>
+          </li>
         ))}
-      </div>
-    </Section>
+      </ul>
+    </Panel>
   );
 }
 
@@ -242,28 +225,28 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="mt-4 sm:mt-5 px-4 sm:px-0 space-y-6">
-        <div className="h-10 w-48 bg-gray-200 rounded-lg animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mt-4 sm:mt-6 px-4 sm:px-0 space-y-5 max-w-6xl">
+        <div className="h-8 w-32 bg-gray-100 rounded animate-pulse" />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-28 bg-gray-200 rounded-xl animate-pulse" />
+            <div key={i} className="h-24 bg-gray-100 rounded-lg animate-pulse" />
           ))}
         </div>
-        <div className="h-64 bg-gray-200 rounded-xl animate-pulse" />
+        <div className="h-56 bg-gray-100 rounded-lg animate-pulse" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="mt-8 text-center">
-        <p className="text-red-600 mb-4">{error || 'Нет данных'}</p>
+      <div className="mt-12 text-center max-w-md mx-auto px-4">
+        <p className="text-gray-600 mb-4">{error || 'Нет данных'}</p>
         <button
           type="button"
           onClick={loadDashboard}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
         >
-          Повторить
+          Попробовать снова
         </button>
       </div>
     );
@@ -272,25 +255,172 @@ export default function DashboardPage() {
   const { sales, stockOuts, stockIns } = data;
 
   return (
-    <div className="mt-4 sm:mt-5 px-4 sm:px-0 pb-10 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="mt-4 sm:mt-6 px-4 sm:px-0 pb-12 max-w-6xl space-y-5">
+      <header className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Обзор</h1>
-          <p className="text-gray-600 mt-1 text-sm sm:text-base">
-            {canViewFinance ? 'Задачи, склад и продажи' : 'Задачи и склад'}
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 tracking-tight">Обзор</h1>
+          <p className="mt-0.5 text-sm text-gray-500">
+            {canViewFinance ? 'Продажи и склад' : 'Склад и задачи'}
           </p>
         </div>
         <button
           type="button"
           onClick={loadDashboard}
-          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100"
+          className="text-sm text-gray-500 hover:text-gray-800 transition-colors shrink-0"
         >
           Обновить
         </button>
-      </div>
+      </header>
 
       {showOnboarding && (
         <SellerOnboardingPanel onboarding={onboarding} loading={onboardingLoading} />
+      )}
+
+      {canViewFinance && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <StatCard
+            label="Выручка"
+            value={formatCurrency(sales.totalSales)}
+            note={`${sales.warehouseSalesCount} продаж · Авито ${sales.avitoCount}`}
+            onClick={() => navigate('/warehouse-sales')}
+          />
+          <StatCard
+            label="За 30 дней"
+            value={formatCurrency(sales.revenue30d)}
+            note={`7 дней: ${formatCurrency(sales.revenue7d)}`}
+          />
+          <StatCard
+            label="Склад"
+            value={formatCurrency(data.totalWarehouseValue)}
+            note={`${data.totalWarehouseQuantity.toLocaleString('ru-RU')} шт. · ${data.totalProducts} поз.`}
+            href="/my-parts"
+          />
+        </div>
+      )}
+
+      {canViewFinance ? (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          <div className="lg:col-span-3">
+            <Panel
+              title="Последние продажи"
+              action={
+                <Link to="/warehouse-sales" className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                  Все →
+                </Link>
+              }
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5 pb-5 border-b border-gray-100">
+                <MiniStat label="Ручные" value={formatCurrency(sales.warehouseRevenue)} />
+                <MiniStat label="Авито" value={formatCurrency(sales.avitoRevenue)} />
+                <MiniStat label="7 дней" value={formatCurrency(sales.revenue7d)} />
+                <MiniStat label="Списания 30д" value={stockOuts.writeoffs30d} />
+              </div>
+
+              {sales.recentSales.length === 0 ? (
+                <p className="text-sm text-gray-500 py-6 text-center">Продаж пока нет</p>
+              ) : (
+                <ResponsiveDataView
+                  isEmpty={false}
+                  renderDesktop={() => (
+                    <div className="overflow-x-auto -mx-1">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+                            <th className="pb-2 pr-4 font-normal">Дата</th>
+                            <th className="pb-2 pr-4 font-normal">Запчасть</th>
+                            <th className="pb-2 pr-4 font-normal text-center">Кол.</th>
+                            <th className="pb-2 pr-4 font-normal">Канал</th>
+                            <th className="pb-2 font-normal text-right">Сумма</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sales.recentSales.map((sale) => (
+                            <tr key={sale.id} className="border-b border-gray-50 last:border-0">
+                              <td className="py-2.5 pr-4 text-gray-500 whitespace-nowrap tabular-nums">
+                                {formatShortDate(sale.movement_date)}
+                              </td>
+                              <td className="py-2.5 pr-4 text-gray-900">
+                                <span className="line-clamp-1">
+                                  {sale.product?.brand ? `${sale.product.brand} · ` : ''}
+                                  {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
+                                </span>
+                              </td>
+                              <td className="py-2.5 pr-4 text-center tabular-nums text-gray-600">
+                                {sale.quantity}
+                              </td>
+                              <td className="py-2.5 pr-4 text-xs text-gray-500">
+                                {isAvitoSale(sale) ? 'Авито' : 'Склад'}
+                              </td>
+                              <td className="py-2.5 text-right font-medium tabular-nums text-gray-900">
+                                {formatCurrency(saleLineTotal(sale))}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  renderMobile={() =>
+                    sales.recentSales.map((sale) => (
+                      <div
+                        key={sale.id}
+                        className="flex items-start justify-between gap-3 py-3 border-b border-gray-100 last:border-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-900 truncate">
+                            {sale.product?.brand ? `${sale.product.brand} · ` : ''}
+                            {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
+                          </p>
+                          <p className="mt-0.5 text-xs text-gray-400">
+                            {formatShortDate(sale.movement_date)} · {sale.quantity} шт. ·{' '}
+                            {isAvitoSale(sale) ? 'Авито' : 'Склад'}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-sm font-medium tabular-nums text-gray-900">
+                          {formatCurrency(saleLineTotal(sale))}
+                        </p>
+                      </div>
+                    ))
+                  }
+                />
+              )}
+            </Panel>
+          </div>
+
+          <div className="lg:col-span-2">
+            <Panel
+              title="Склад"
+              action={
+                <Link to="/stock-out" className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                  Расходы →
+                </Link>
+              }
+            >
+              <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+                <MiniStat label="Позиций" value={data.totalProducts} />
+                <MiniStat label="Единиц" value={data.totalWarehouseQuantity.toLocaleString('ru-RU')} />
+                <MiniStat label="Поступления 30д" value={stockIns.count30d} />
+                <MiniStat label="Нулевой остаток" value={data.zeroStock} />
+              </div>
+            </Panel>
+          </div>
+        </div>
+      ) : (
+        <Panel
+          title="Склад"
+          action={
+            <Link to="/my-parts" className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
+              Мои запчасти →
+            </Link>
+          }
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <MiniStat label="Позиций" value={data.totalProducts} />
+            <MiniStat label="На складе" value={data.totalWarehouseQuantity.toLocaleString('ru-RU')} />
+            <MiniStat label="Поступления 30д" value={stockIns.count30d} />
+            <MiniStat label="Низкий остаток" value={data.lowStock} />
+          </div>
+        </Panel>
       )}
 
       <AttentionTasksSection
@@ -298,182 +428,6 @@ export default function DashboardPage() {
         loading={tasksLoading}
         onNavigate={(url) => navigate(url)}
       />
-
-      {canViewFinance && (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <KpiCard
-          label="Выручка, всего"
-          value={formatCurrency(sales.totalSales)}
-          sub={`${sales.warehouseSalesCount} продаж · в т.ч. Авито ${sales.avitoCount}`}
-          accent="indigo"
-          onClick={() => navigate('/warehouse-sales')}
-        />
-        <KpiCard
-          label="За 30 дней"
-          value={formatCurrency(sales.revenue30d)}
-          sub={`За 7 дней: ${formatCurrency(sales.revenue7d)} (${sales.count7d} продаж)`}
-          accent="emerald"
-        />
-        <KpiCard
-          label="Склад"
-          value={formatCurrency(data.totalWarehouseValue)}
-          sub={`${data.totalWarehouseQuantity.toLocaleString('ru-RU')} шт. · ${data.totalProducts} позиций`}
-          accent="amber"
-          onClick={() => navigate('/my-parts')}
-        />
-      </div>
-      )}
-
-      {canViewFinance ? (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Продажи по каналам */}
-        <div className="lg:col-span-2">
-          <Section
-            title="Продажи со склада"
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-            }
-            action={
-              <Link to="/warehouse-sales" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-                Все продажи →
-              </Link>
-            }
-          >
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-              <MetricTile label="Ручные" value={formatCurrency(sales.warehouseRevenue)} hint={`${sales.warehouseCount} операций`} color="green" />
-              <MetricTile label="Авито" value={formatCurrency(sales.avitoRevenue)} hint={`${sales.avitoCount} в журнале`} color="blue" />
-              <MetricTile label="7 дней" value={formatCurrency(sales.revenue7d)} hint={`${sales.count7d} продаж`} color="purple" />
-              <MetricTile label="Списания 30д" value={stockOuts.writeoffs30d} hint="без продажи" color="red" />
-            </div>
-
-            {sales.recentSales.length === 0 ? (
-              <p className="text-gray-500 text-sm py-4 text-center">Пока нет зафиксированных продаж</p>
-            ) : (
-              <ResponsiveDataView
-                isEmpty={false}
-                renderDesktop={() => (
-              <div className="overflow-x-auto -mx-1">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs text-gray-500 uppercase border-b">
-                      <th className="pb-2 pr-3 font-semibold">Дата</th>
-                      <th className="pb-2 pr-3 font-semibold">Запчасть</th>
-                      <th className="pb-2 pr-3 font-semibold text-center">Кол-во</th>
-                      <th className="pb-2 pr-3 font-semibold">Канал</th>
-                      <th className="pb-2 font-semibold text-right">Сумма</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {sales.recentSales.map((sale) => (
-                      <tr key={sale.id} className="hover:bg-gray-50">
-                        <td className="py-2.5 pr-3 text-gray-600 whitespace-nowrap">{formatShortDate(sale.movement_date)}</td>
-                        <td className="py-2.5 pr-3">
-                          <div className="font-medium text-gray-900 line-clamp-1">
-                            {sale.product?.brand ? `${sale.product.brand} · ` : ''}
-                            {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
-                          </div>
-                        </td>
-                        <td className="py-2.5 pr-3 text-center">{sale.quantity}</td>
-                        <td className="py-2.5 pr-3">
-                          {isAvitoSale(sale) ? (
-                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Авито</span>
-                          ) : (
-                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Склад</span>
-                          )}
-                        </td>
-                        <td className="py-2.5 text-right font-semibold text-gray-900 whitespace-nowrap">
-                          {formatCurrency(saleLineTotal(sale))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-                )}
-                renderMobile={() =>
-                  sales.recentSales.map((sale) => (
-                    <div
-                      key={sale.id}
-                      className="rounded-xl border border-gray-100 bg-gray-50/80 p-4 shadow-sm"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-xs text-gray-500">{formatShortDate(sale.movement_date)}</p>
-                          <p className="mt-1 font-semibold text-gray-900">
-                            {sale.product?.brand ? `${sale.product.brand} · ` : ''}
-                            {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
-                          </p>
-                        </div>
-                        <p className="shrink-0 text-base font-bold text-gray-900">
-                          {formatCurrency(saleLineTotal(sale))}
-                        </p>
-                      </div>
-                      <div className="mt-3 flex items-center justify-between text-sm">
-                        <span className="text-gray-600">{sale.quantity} шт.</span>
-                        {isAvitoSale(sale) ? (
-                          <span className="inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                            Авито
-                          </span>
-                        ) : (
-                          <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
-                            Склад
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                }
-              />
-            )}
-          </Section>
-        </div>
-
-        {/* Склад */}
-        <Section
-          title="Склад"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-          }
-          action={
-            <Link to="/stock-out" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-              Расходы →
-            </Link>
-          }
-        >
-          <div className="space-y-3">
-            <MetricTile label="Позиций" value={data.totalProducts} color="gray" />
-            <MetricTile label="Единиц на складе" value={data.totalWarehouseQuantity.toLocaleString('ru-RU')} color="green" />
-            <MetricTile label="Поступления за 30 д" value={stockIns.count30d} hint={`${stockIns.qty30d} шт. принято`} color="blue" />
-            <MetricTile label="Нулевой остаток" value={data.zeroStock} hint="нужно пополнить или списать" color="red" />
-          </div>
-        </Section>
-      </div>
-      ) : (
-        <Section
-          title="Склад"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-          }
-          action={
-            <Link to="/my-parts" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
-              Мои запчасти →
-            </Link>
-          }
-        >
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <MetricTile label="Позиций" value={data.totalProducts} color="gray" />
-            <MetricTile label="На складе" value={data.totalWarehouseQuantity.toLocaleString('ru-RU')} color="green" />
-            <MetricTile label="Поступления 30д" value={stockIns.count30d} hint={`${stockIns.qty30d} шт.`} color="blue" />
-            <MetricTile label="Низкий остаток" value={data.lowStock} hint="1–2 шт." color="amber" />
-          </div>
-        </Section>
-      )}
     </div>
   );
 }

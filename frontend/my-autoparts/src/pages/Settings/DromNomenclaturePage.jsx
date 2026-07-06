@@ -55,8 +55,8 @@ export default function DromNomenclaturePage() {
         >
           ← Назад к интеграции
         </Link>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Номенклатура Drom</h1>
-        <p className="text-sm text-gray-600 mt-1">Товары, добавленные в экспорт для Drom.ru</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Номенклатура Drom XLSX</h1>
+        <p className="text-sm text-gray-600 mt-1">Товары в файле автозагрузки для Drom.ru</p>
       </div>
 
       {error && (

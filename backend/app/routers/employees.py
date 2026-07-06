@@ -63,6 +63,10 @@ def _ensure_default_permissions(db: Session) -> None:
             "name": "Интеграция Авито",
         },
         {"code": ADMIN_AUDIT_PERMISSION_CODE, "name": "Журнал событий"},
+        {"code": "inventory.view", "name": "Инвентаризация: просмотр"},
+        {"code": "inventory.create", "name": "Инвентаризация: создание"},
+        {"code": "inventory.adjust", "name": "Инвентаризация: подсчёт"},
+        {"code": "inventory.complete", "name": "Инвентаризация: завершение"},
     ]
     for perm in defaults:
         existing = db.query(Permission).filter(Permission.code == perm["code"]).first()

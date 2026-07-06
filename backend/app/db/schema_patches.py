@@ -2141,3 +2141,128 @@ def ensure_order_return_tables() -> None:
 
     logger.info("Applied order_return tables patch")
 
+
+def ensure_inventory_tables() -> None:
+    """Create inventory session tables for WMS stock-taking."""
+    inspector = inspect(engine)
+    if "inventory_sessions" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl_sessions = """
+        CREATE TABLE inventory_sessions (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+            storage_location_id INTEGER NOT NULL REFERENCES storage_locations(id) ON DELETE CASCADE,
+            status VARCHAR(32) NOT NULL DEFAULT 'draft',
+            scope_type VARCHAR(32) NOT NULL DEFAULT 'location_all',
+            scope_cell_ids_json TEXT,
+            scope_product_ids_json TEXT,
+            title VARCHAR(255),
+            notes TEXT,
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            completed_by INTEGER REFERENCES users(id),
+            started_at TIMESTAMP,
+            completed_at TIMESTAMP,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """
+        ddl_count_lines = """
+        CREATE TABLE inventory_count_lines (
+            id SERIAL PRIMARY KEY,
+            session_id INTEGER NOT NULL REFERENCES inventory_sessions(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            storage_location_id INTEGER NOT NULL REFERENCES storage_locations(id),
+            storage_cell_id INTEGER REFERENCES storage_cells(id),
+            expected_qty INTEGER NOT NULL DEFAULT 0,
+            counted_qty INTEGER,
+            line_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """
+        ddl_adjustment_lines = """
+        CREATE TABLE inventory_adjustment_lines (
+            id SERIAL PRIMARY KEY,
+            session_id INTEGER NOT NULL REFERENCES inventory_sessions(id) ON DELETE CASCADE,
+            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            storage_location_id INTEGER NOT NULL REFERENCES storage_locations(id),
+            expected_qty INTEGER NOT NULL DEFAULT 0,
+            counted_qty INTEGER NOT NULL DEFAULT 0,
+            delta_qty INTEGER NOT NULL DEFAULT 0,
+            adjustment_kind VARCHAR(32) NOT NULL,
+            stock_in_id INTEGER REFERENCES stock_in(id),
+            stock_out_id INTEGER REFERENCES stock_out(id),
+            applied_at TIMESTAMP,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl_sessions = """
+        CREATE TABLE inventory_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            storage_location_id INTEGER NOT NULL REFERENCES storage_locations(id),
+            status VARCHAR(32) NOT NULL DEFAULT 'draft',
+            scope_type VARCHAR(32) NOT NULL DEFAULT 'location_all',
+            scope_cell_ids_json TEXT,
+            scope_product_ids_json TEXT,
+            title VARCHAR(255),
+            notes TEXT,
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            completed_by INTEGER REFERENCES users(id),
+            started_at DATETIME,
+            completed_at DATETIME,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        ddl_count_lines = """
+        CREATE TABLE inventory_count_lines (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES inventory_sessions(id),
+            product_id INTEGER NOT NULL REFERENCES products(id),
+            storage_location_id INTEGER NOT NULL REFERENCES storage_locations(id),
+            storage_cell_id INTEGER REFERENCES storage_cells(id),
+            expected_qty INTEGER NOT NULL DEFAULT 0,
+            counted_qty INTEGER,
+            line_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        ddl_adjustment_lines = """
+        CREATE TABLE inventory_adjustment_lines (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES inventory_sessions(id),
+            product_id INTEGER NOT NULL REFERENCES products(id),
+            storage_location_id INTEGER NOT NULL REFERENCES storage_locations(id),
+            expected_qty INTEGER NOT NULL DEFAULT 0,
+            counted_qty INTEGER NOT NULL DEFAULT 0,
+            delta_qty INTEGER NOT NULL DEFAULT 0,
+            adjustment_kind VARCHAR(32) NOT NULL,
+            stock_in_id INTEGER REFERENCES stock_in(id),
+            stock_out_id INTEGER REFERENCES stock_out(id),
+            applied_at DATETIME,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS ix_inventory_sessions_org ON inventory_sessions (organization_id)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_sessions_storage ON inventory_sessions (storage_location_id)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_count_lines_session ON inventory_count_lines (session_id)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_count_lines_product ON inventory_count_lines (product_id)",
+        "CREATE INDEX IF NOT EXISTS ix_inventory_adjustment_lines_session ON inventory_adjustment_lines (session_id)",
+    ]
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl_sessions))
+        conn.execute(text(ddl_count_lines))
+        conn.execute(text(ddl_adjustment_lines))
+        for stmt in indexes:
+            conn.execute(text(stmt))
+
+    logger.info("Applied inventory tables patch")
+

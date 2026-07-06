@@ -1,7 +1,11 @@
+"""
+Drom API client (зарезервировано).
+
+Текущий этап интеграции — только XLSX-выгрузка (см. drom_autoload_xlsx.py).
+Этот модуль не используется в продакшен-потоке до подключения реального Drom API.
+"""
 import logging
 from typing import Any, Optional, Tuple
-
-import httpx
 
 logger = logging.getLogger(__name__)
 

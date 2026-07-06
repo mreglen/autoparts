@@ -95,6 +95,7 @@ export function getPageTitle(pathname) {
         '/stock-in': 'Поступление',
         '/stock-out': 'Расходы',
         '/warehouse-sales': 'Продажи со склада',
+        '/warehouse/inventory': 'Инвентаризация',
         '/finance': 'Финансы',
         '/clients': 'Клиенты',
         '/sellers': 'Продавцы',

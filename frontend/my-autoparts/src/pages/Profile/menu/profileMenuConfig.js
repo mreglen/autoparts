@@ -13,6 +13,7 @@ export const TAB_PATH_MAP = {
     vehicles: '/vehicles',
     receipts: '/stock-in',
     expenses: '/stock-out',
+    'warehouse-inventory': '/warehouse/inventory',
     'settings-storage-addresses': '/settings/storage-addresses',
     'settings-organization': '/settings/organization',
     'settings-printers': '/settings/printers',
@@ -147,6 +148,9 @@ export const getAvailableTabs = (user, permissionCodes) => {
         if (user.is_seller || user.is_admin || hasPermission('stock-out')) {
             warehouseSubmenu.push({ id: 'expenses', label: 'Расходы' });
         }
+        if (user.is_seller || user.is_admin || user.is_director || hasPermission('inventory.view')) {
+            warehouseSubmenu.push({ id: 'warehouse-inventory', label: 'Инвентаризация' });
+        }
 
         if (warehouseSubmenu.length > 0) {
             baseTabs.push({ id: 'warehouse', label: 'Склад', submenu: warehouseSubmenu });
@@ -192,6 +196,9 @@ export const getAvailableTabs = (user, permissionCodes) => {
         }
         if (hasPermission('stock-out')) {
             warehouseSubmenu.push({ id: 'expenses', label: 'Расходы' });
+        }
+        if (hasPermission('inventory.view')) {
+            warehouseSubmenu.push({ id: 'warehouse-inventory', label: 'Инвентаризация' });
         }
         if (warehouseSubmenu.length > 0) {
             baseTabs.push({ id: 'warehouse', label: 'Склад', submenu: warehouseSubmenu });

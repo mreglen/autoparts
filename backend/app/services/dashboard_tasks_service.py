@@ -10,6 +10,8 @@ from app.models.chat import Chat, Message
 from app.models.garage_new_orders import GarageNewOrder
 from app.models.garage_used_orders import GarageUsedOrder
 from app.models.organization_avito_autoload_cache import OrganizationAvitoAutoloadCache
+from app.models.organization_drom_autoload_cache import OrganizationDromAutoloadCache
+from app.models.organization_drom_integration import OrganizationDromIntegration
 from app.models.pending_product import PendingProduct
 from app.models.permission import Permission
 from app.models.product import Product, ProductPhoto
@@ -44,6 +46,37 @@ def _has_avito_integration_access(db: Session, user: User) -> bool:
     if user.is_admin or user.is_seller or user.is_director:
         return True
     return _has_permission(db, user, "settings.integration.avito")
+
+
+def _has_drom_integration_access(db: Session, user: User, organization_id: str) -> bool:
+    if not (user.is_admin or user.is_seller or user.is_director):
+        return False
+    row = (
+        db.query(OrganizationDromIntegration.is_enabled)
+        .filter(OrganizationDromIntegration.organization_id == organization_id)
+        .first()
+    )
+    return bool(row and row.is_enabled)
+
+
+def _count_drom_errors(db: Session, organization_id: str) -> int:
+    cache = (
+        db.query(OrganizationDromAutoloadCache)
+        .filter(OrganizationDromAutoloadCache.organization_id == organization_id)
+        .first()
+    )
+    if not cache:
+        return 0
+    total = 0
+    if cache.local_validation_ok is False:
+        total += 1
+    try:
+        local_errors = json.loads(cache.local_errors_json or "[]")
+        if isinstance(local_errors, list):
+            total += len(local_errors)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        pass
+    return total
 
 
 def _count_unread_messages(db: Session, user_id: int) -> int:
@@ -166,6 +199,18 @@ def get_dashboard_tasks(db: Session, user: User) -> DashboardTasksResponse:
             severity="high",
             url="/settings/integration/avito",
             hint="Проблемы выгрузки или токена",
+        )
+
+    if org_id and _has_drom_integration_access(db, user, org_id):
+        drom_errors = _count_drom_errors(db, org_id)
+        _append_task(
+            tasks,
+            task_id="drom_errors",
+            title="Ошибки Drom XLSX",
+            count=drom_errors,
+            severity="high",
+            url="/settings/integration/drom",
+            hint="Проблемы валидации файла выгрузки",
         )
 
     if org_id and _has_my_parts_access(db, user):
