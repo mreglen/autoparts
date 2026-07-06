@@ -28,6 +28,11 @@ import { mergeProductFitment } from '../../utils/mergeProductFitment';
 import { buildProductFaqJsonLd } from '../../utils/partDetailFaq';
 import { resolveProductCity } from '../../utils/productSearchSeo';
 import { buildProductUsedCatalogPath } from '../../utils/productSeo';
+import {
+  PART_DETAIL_CACHE,
+  readPartDetailCache,
+  writePartDetailCache,
+} from '../../utils/partDetailCache';
 import { useProductPriceFormat } from '../../hooks/useProductPriceFormat';
 
 const formatErrorText = (value) => {

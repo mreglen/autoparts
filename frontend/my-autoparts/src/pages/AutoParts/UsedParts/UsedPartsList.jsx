@@ -27,6 +27,7 @@ import {
 } from '../../../utils/autopartsPublic';
 import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
 import { useProductPriceFormat } from '../../../hooks/useProductPriceFormat';
+import { prefetchUsedPartDetail } from '../../../utils/prefetchPartDetail';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
