@@ -175,6 +175,8 @@ const initialState = {
   chatDetail: null,
   chatDetailLoading: false,
   selectedChatId: null,
+  /** ID чата Avito, для которого актуален state.messages. */
+  messagesChatId: null,
   loading: false,
   sending: false,
   error: null,
@@ -186,6 +188,7 @@ const avitoChatSlice = createSlice({
   reducers: {
     setSelectedAvitoChatId: (state, action) => {
       state.selectedChatId = action.payload;
+      state.messagesChatId = action.payload;
       state.messages = [];
       state.chatDetail = null;
     },
@@ -236,14 +239,22 @@ const avitoChatSlice = createSlice({
           state.loading = true;
         }
         state.error = null;
+        const chatId = typeof action.meta.arg === 'string'
+          ? action.meta.arg
+          : action.meta.arg?.chatId;
+        if (chatId != null) {
+          state.messagesChatId = chatId;
+        }
       })
       .addCase(fetchAvitoMessages.fulfilled, (state, action) => {
         if (!action.payload.silent) {
           state.loading = false;
         }
-        if (String(action.payload.chatId) === String(state.selectedChatId)) {
-          state.messages = action.payload.messages || [];
+        if (String(action.payload.chatId) !== String(state.messagesChatId)) {
+          return;
         }
+        state.messages = action.payload.messages || [];
+        state.selectedChatId = action.payload.chatId;
       })
       .addCase(fetchAvitoMessages.rejected, (state, action) => {
         if (!silentFromArg(action.meta.arg)) {
@@ -261,9 +272,10 @@ const avitoChatSlice = createSlice({
         if (!action.payload.silent) {
           state.chatDetailLoading = false;
         }
-        if (String(action.payload.chatId) === String(state.selectedChatId)) {
-          state.chatDetail = action.payload.chat;
+        if (String(action.payload.chatId) !== String(state.messagesChatId)) {
+          return;
         }
+        state.chatDetail = action.payload.chat;
       })
       .addCase(fetchAvitoChatDetail.rejected, (state, action) => {
         if (!silentFromArg(action.meta.arg)) {

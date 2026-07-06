@@ -271,16 +271,12 @@ const ChatsHubPage = () => {
     dispatch(fetchAvitoChats());
   }, [dispatch, user?.organization_id, avitoEnabled]);
 
-  // Fetch product links for Avito chats
+  // Синхронизация Avito-чата из URL (прямая ссылка / обновление страницы)
   useEffect(() => {
-    if (avitoChats.length > 0) {
-      avitoChats.forEach(chat => {
-        if (!chat.linked_product_id && chat.id) {
-          dispatch(fetchAvitoChatProductLink(chat.id));
-        }
-      });
+    if (activeChatSource === 'avito' && activeChatId) {
+      dispatch(setSelectedAvitoChatId(activeChatId));
     }
-  }, [avitoChats.length, dispatch]);
+  }, [activeChatSource, activeChatId, dispatch]);
 
   // Объединяем чаты из обоих источников и сортируем по дате последнего сообщения
   const unifiedChats = useMemo(() => {
@@ -904,10 +900,14 @@ function GarageChatPanel({ chat, chatId, isGroupChat = false, onBack, onChatDele
 
   // Загружаем сообщения при открытии чата
   useEffect(() => {
-    if (chatId) {
-      dispatch(setCurrentChat(chat));
-      dispatch(fetchChatMessages({ chatId: parseInt(chatId) }));
-    }
+    if (!chatId) return;
+    dispatch(fetchChatMessages({ chatId: parseInt(chatId, 10) }));
+  }, [dispatch, chatId]);
+
+  useEffect(() => {
+    if (!chatId || !chat) return;
+    if (String(chat.id) !== String(chatId)) return;
+    dispatch(setCurrentChat(chat));
   }, [dispatch, chatId, chat]);
 
   useEffect(() => {
@@ -1481,12 +1481,11 @@ function AvitoChatPanel({ chat, chatId, avitoUserId, onBack }) {
   const [lightboxMediaIndex, setLightboxMediaIndex] = useState(0);
 
   useEffect(() => {
-    if (chatId) {
-      dispatch(fetchAvitoMessages(chatId));
-      dispatch(fetchAvitoChatDetail(chatId));
-      // Fetch product link for this chat
-      dispatch(fetchAvitoChatProductLink(chatId));
-    }
+    if (!chatId) return;
+    dispatch(setSelectedAvitoChatId(chatId));
+    dispatch(fetchAvitoMessages(chatId));
+    dispatch(fetchAvitoChatDetail(chatId));
+    dispatch(fetchAvitoChatProductLink(chatId));
   }, [dispatch, chatId]);
 
   useEffect(() => {

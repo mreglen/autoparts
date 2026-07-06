@@ -11,7 +11,7 @@ WorkingDirectory=/home/fast/autoparts/backend
 EnvironmentFile=/home/fast/autoparts/backend/.env
 ExecStart=/home/fast/autoparts/backend/venv/bin/gunicorn app.main:app \
   -k uvicorn.workers.UvicornWorker \
-  -w 2 \
+  -w 3 \
   -b 127.0.0.1:8080 \
   --timeout 120 \
   --graceful-timeout 30 \

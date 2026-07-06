@@ -257,6 +257,8 @@ const initialState = {
     chats: [],
     currentChat: null,
     messages: [],
+    /** ID чата, для которого актуален state.messages (защита от гонки запросов). */
+    messagesChatId: null,
     loading: false,
     error: null,
     unreadCount: 0,
@@ -278,6 +280,7 @@ const chatSlice = createSlice({
             const nextId = next?.id ?? null;
             if (prevId !== nextId) {
                 state.messages = [];
+                state.messagesChatId = nextId;
             }
             state.currentChat = next;
         },
@@ -483,15 +486,26 @@ const chatSlice = createSlice({
             })
             
             // Fetch chat messages
-            .addCase(fetchChatMessages.pending, (state) => {
+            .addCase(fetchChatMessages.pending, (state, action) => {
                 state.loading = true;
                 state.error = null;
+                const chatId = action.meta?.arg?.chatId;
+                if (chatId != null) {
+                    state.messagesChatId = chatId;
+                }
             })
             .addCase(fetchChatMessages.fulfilled, (state, action) => {
                 state.loading = false;
-                console.log('📥 Received messages from backend:', action.payload.messages.length);
+                const { chatId, messages } = action.payload;
+                if (
+                    state.messagesChatId != null
+                    && Number(state.messagesChatId) !== Number(chatId)
+                ) {
+                    return;
+                }
+                console.log('📥 Received messages from backend:', messages.length);
                 // Логируем статус медиа в сообщениях
-                action.payload.messages.forEach(msg => {
+                messages.forEach(msg => {
                     if (msg.media && msg.media.length > 0) {
                         msg.media.forEach(m => {
                             console.log(`  📎 Media ${m.id}: is_processing=${m.is_processing}, type=${m.media_type}`);
@@ -505,13 +519,14 @@ const chatSlice = createSlice({
                 );
                 
                 // Заменяем сообщения из сервера, но сохраняем временные
-                const serverMessageIds = new Set(action.payload.messages.map(m => m.id));
+                const serverMessageIds = new Set(messages.map(m => m.id));
                 const remainingTempMessages = tempMessages.filter(m => 
                     !serverMessageIds.has(m.id)
                 );
                 
                 // Объединяем серверные сообщения с оставшимися временными
-                state.messages = [...action.payload.messages, ...remainingTempMessages];
+                state.messages = [...messages, ...remainingTempMessages];
+                state.messagesChatId = chatId;
                 
                 // Сортируем по created_at
                 state.messages.sort((a, b) => 
@@ -520,6 +535,14 @@ const chatSlice = createSlice({
             })
             .addCase(fetchChatMessages.rejected, (state, action) => {
                 state.loading = false;
+                const chatId = action.meta?.arg?.chatId;
+                if (
+                    chatId != null
+                    && state.messagesChatId != null
+                    && Number(state.messagesChatId) !== Number(chatId)
+                ) {
+                    return;
+                }
                 state.error = action.payload;
             })
             
