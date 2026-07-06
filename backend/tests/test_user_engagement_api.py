@@ -11,7 +11,8 @@ import app.models.organization_drom_integration  # noqa: F401
 
 from app.models.product import Product as ProductModel
 from app.models.user import User as UserModel
-from app.models.user_engagement import UserFavorite, UserProductView
+from app.models.user_engagement import UserFavorite, UserProductView, UserRosskoFavorite
+from app.schemas.user_engagement import RosskoFavoriteCreateIn
 from app.services import user_engagement_service as engagement
 from app.services import search_subscription_service as subscriptions
 
@@ -153,6 +154,25 @@ class UserEngagementServiceTests(unittest.TestCase):
             conn.execute(
                 text(
                     """
+                    CREATE TABLE user_rossko_favorites (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        rossko_guid VARCHAR(64),
+                        brand VARCHAR(100) NOT NULL,
+                        partnumber VARCHAR(64) NOT NULL,
+                        brand_normalized VARCHAR(100) NOT NULL,
+                        partnumber_normalized VARCHAR(64) NOT NULL,
+                        title TEXT,
+                        snapshot_json TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(user_id, brand_normalized, partnumber_normalized)
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
                     CREATE TABLE search_subscription_notifications (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         subscription_id INTEGER NOT NULL,
@@ -273,6 +293,44 @@ class UserEngagementServiceTests(unittest.TestCase):
         engagement.add_favorite(self.db, 1, 3)
         count = self.db.query(UserFavorite).filter(UserFavorite.user_id == 1).count()
         self.assertEqual(count, 2)
+
+    def test_rossko_favorite_add_remove_list_status(self):
+        payload = RosskoFavoriteCreateIn(
+            brand="Bosch",
+            partnumber="ABC123",
+            guid="guid-1",
+            title="Filter",
+            min_price=1500.0,
+        )
+        self.assertFalse(engagement.is_rossko_favorite(self.db, 1, "Bosch", "ABC123"))
+        engagement.add_rossko_favorite(self.db, 1, payload)
+        self.assertTrue(engagement.is_rossko_favorite(self.db, 1, "bosch", "abc123"))
+        items = engagement.list_favorites(self.db, 1)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].kind, "rossko")
+        self.assertTrue(items[0].is_rossko)
+        self.assertEqual(items[0].brand, "Bosch")
+        self.assertEqual(items[0].article, "ABC123")
+        self.assertEqual(items[0].price, 1500.0)
+        engagement.remove_rossko_favorite(self.db, 1, "Bosch", "ABC123")
+        self.assertFalse(engagement.is_rossko_favorite(self.db, 1, "Bosch", "ABC123"))
+        self.assertEqual(engagement.list_favorites(self.db, 1), [])
+
+    @patch(
+        "app.utils.product_list_item.display_product_price",
+        side_effect=lambda price, db=None: float(price or 0),
+    )
+    def test_merged_product_and_rossko_favorites(self, _price):
+        engagement.add_favorite(self.db, 1, 1)
+        engagement.add_rossko_favorite(
+            self.db,
+            1,
+            RosskoFavoriteCreateIn(brand="Mann", partnumber="W712", min_price=900),
+        )
+        items = engagement.list_favorites(self.db, 1)
+        self.assertEqual(len(items), 2)
+        kinds = {item.kind for item in items}
+        self.assertEqual(kinds, {"product", "rossko"})
 
 
 if __name__ == "__main__":

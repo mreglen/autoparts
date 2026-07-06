@@ -8,6 +8,11 @@ export default function useSiteAnalytics() {
   useEffect(() => initSiteAnalyticsLifecycle(), []);
 
   useEffect(() => {
-    trackPageView(`${location.pathname}${location.search || ''}`);
+    const path = `${location.pathname}${location.search || ''}`;
+    const timer = window.setTimeout(() => {
+      trackPageView(path);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
   }, [location.pathname, location.search]);
 }

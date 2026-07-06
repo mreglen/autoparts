@@ -22,6 +22,8 @@ let pageEnteredAt = null;
 let heartbeatTimer = null;
 let cachedAttribution = null;
 let analyticsPausedUntil = 0;
+const recentConversions = new Map();
+const CONVERSION_DEDUPE_MS = 30000;
 
 function generateId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -273,27 +275,41 @@ export function trackPageView(path) {
   startHeartbeat();
 }
 
+function shouldSkipDuplicateConversion(eventName, productId, path) {
+  const dedupeKey = `${eventName}:${productId || path}`;
+  const now = Date.now();
+  const lastSentAt = recentConversions.get(dedupeKey);
+  if (lastSentAt && now - lastSentAt < CONVERSION_DEDUPE_MS) {
+    return true;
+  }
+  recentConversions.set(dedupeKey, now);
+  return false;
+}
+
 export function trackConversion(eventName, options = {}) {
   if (!eventName) return;
 
   const path = options.path || currentPath || (typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search || ''}` : '/');
   const productId = options.productId != null ? Number(options.productId) : undefined;
   const section = options.section || undefined;
+  const normalizedProductId = Number.isFinite(productId) && productId > 0 ? productId : undefined;
+
+  if (shouldSkipDuplicateConversion(eventName, normalizedProductId, path)) {
+    return;
+  }
 
   enqueue({
     type: 'conversion',
     event_name: eventName,
     path,
-    product_id: Number.isFinite(productId) && productId > 0 ? productId : undefined,
+    product_id: normalizedProductId,
   });
 
   reachMetrikaGoal(eventName, {
-    product_id: productId,
+    product_id: normalizedProductId,
     path,
     section,
   });
-
-  flushEvents(false);
 }
 
 export const CONVERSION_EVENTS = METRIKA_GOALS;

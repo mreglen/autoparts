@@ -1420,10 +1420,12 @@ const productSlice = createSlice({
                     state.loading = false;
                     return;
                 }
-                state.loading = true;
-                if (state.currentProduct?.id !== nextId) {
-                    state.currentProduct = null;
+                if (state.currentProduct?.id === nextId) {
+                    state.loading = true;
+                    return;
                 }
+                state.loading = true;
+                state.currentProduct = null;
             })
             .addCase(fetchPublicProduct.fulfilled, (state, action) => {
                 state.loading = false;

@@ -2372,3 +2372,53 @@ def ensure_user_engagement_tables() -> None:
 
     logger.info("Applied user_engagement tables patch")
 
+
+def ensure_user_rossko_favorites_table() -> None:
+    """Create Rossko favorites table for new-parts catalog items."""
+    inspector = inspect(engine)
+    if "user_rossko_favorites" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE user_rossko_favorites (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            rossko_guid VARCHAR(64),
+            brand VARCHAR(100) NOT NULL,
+            partnumber VARCHAR(64) NOT NULL,
+            brand_normalized VARCHAR(100) NOT NULL,
+            partnumber_normalized VARCHAR(64) NOT NULL,
+            title TEXT,
+            snapshot_json TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE user_rossko_favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            rossko_guid VARCHAR(64),
+            brand VARCHAR(100) NOT NULL,
+            partnumber VARCHAR(64) NOT NULL,
+            brand_normalized VARCHAR(100) NOT NULL,
+            partnumber_normalized VARCHAR(64) NOT NULL,
+            title TEXT,
+            snapshot_json TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS ix_user_rossko_favorites_user ON user_rossko_favorites (user_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_rossko_favorites_user_part ON user_rossko_favorites (user_id, brand_normalized, partnumber_normalized)",
+    ]
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        for stmt in indexes:
+            conn.execute(text(stmt))
+
+    logger.info("Applied user_rossko_favorites table patch")
+

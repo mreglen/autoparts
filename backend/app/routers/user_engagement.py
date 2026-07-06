@@ -9,6 +9,7 @@ from app.schemas.user_engagement import (
     FavoriteStatusOut,
     FavoritesListOut,
     ProductViewsListOut,
+    RosskoFavoriteCreateIn,
     SearchSubscriptionCreateIn,
     SearchSubscriptionOut,
     SearchSubscriptionsListOut,
@@ -25,6 +26,39 @@ def list_favorites(
     current_user: User = Depends(get_current_user),
 ):
     return FavoritesListOut(items=engagement.list_favorites(db, current_user.id))
+
+
+@router.post("/user/favorites/rossko", status_code=status.HTTP_204_NO_CONTENT)
+def add_rossko_favorite(
+    payload: RosskoFavoriteCreateIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    engagement.add_rossko_favorite(db, current_user.id, payload)
+    return None
+
+
+@router.delete("/user/favorites/rossko", status_code=status.HTTP_204_NO_CONTENT)
+def remove_rossko_favorite(
+    brand: str = Query(..., min_length=1, max_length=100),
+    partnumber: str = Query(..., min_length=1, max_length=64),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    engagement.remove_rossko_favorite(db, current_user.id, brand, partnumber)
+    return None
+
+
+@router.get("/user/favorites/rossko/status", response_model=FavoriteStatusOut)
+def rossko_favorite_status(
+    brand: str = Query(..., min_length=1, max_length=100),
+    partnumber: str = Query(..., min_length=1, max_length=64),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return FavoriteStatusOut(
+        is_favorite=engagement.is_rossko_favorite(db, current_user.id, brand, partnumber)
+    )
 
 
 @router.post("/user/favorites/{product_id}", status_code=status.HTTP_204_NO_CONTENT)

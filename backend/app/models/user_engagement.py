@@ -21,6 +21,31 @@ class UserFavorite(Base):
     product = relationship("Product", foreign_keys=[product_id])
 
 
+class UserRosskoFavorite(Base):
+    __tablename__ = "user_rossko_favorites"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "brand_normalized",
+            "partnumber_normalized",
+            name="uq_user_rossko_favorites_user_part",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    rossko_guid = Column(String(64), nullable=True)
+    brand = Column(String(100), nullable=False)
+    partnumber = Column(String(64), nullable=False)
+    brand_normalized = Column(String(100), nullable=False)
+    partnumber_normalized = Column(String(64), nullable=False)
+    title = Column(Text, nullable=True)
+    snapshot_json = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    user = relationship("User", foreign_keys=[user_id])
+
+
 class UserProductView(Base):
     __tablename__ = "user_product_views"
     __table_args__ = (

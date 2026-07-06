@@ -51,6 +51,7 @@ from app.db.schema_patches import (
     ensure_order_return_tables,
     ensure_inventory_tables,
     ensure_user_engagement_tables,
+    ensure_user_rossko_favorites_table,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from app.middleware.rate_limit_middleware import RateLimitMiddleware
@@ -200,6 +201,7 @@ try:
     ensure_order_return_tables()
     ensure_inventory_tables()
     ensure_user_engagement_tables()
+    ensure_user_rossko_favorites_table()
 except Exception as e:
     logger.error(f"Error applying schema patches: {e}")
     raise

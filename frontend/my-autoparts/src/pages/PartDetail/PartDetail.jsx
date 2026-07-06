@@ -138,6 +138,15 @@ const PartDetail = () => {
   const searchedBrandArticleRef = useRef(null);
   const trackedPartViewRef = useRef(null);
   const recordedEngagementViewRef = useRef(null);
+  const canonicalRedirectRef = useRef(null);
+
+  const routeIdentityKey = useMemo(() => {
+    if (extractedProductId) return `id:${extractedProductId}`;
+    if (extractedBrand && extractedArticle) {
+      return `ba:${extractedBrand}|${extractedArticle}`;
+    }
+    return combinedParam || '';
+  }, [extractedProductId, extractedBrand, extractedArticle, combinedParam]);
 
   const productMatchesRoute = useMemo(() => {
     if (!currentProduct?.id) return false;
@@ -166,7 +175,10 @@ const PartDetail = () => {
   useEffect(() => {
     fetchedProductIdRef.current = null;
     searchedBrandArticleRef.current = null;
-  }, [combinedParam]);
+    trackedPartViewRef.current = null;
+    recordedEngagementViewRef.current = null;
+    canonicalRedirectRef.current = null;
+  }, [routeIdentityKey]);
 
   useEffect(() => {
     const path = location.pathname;
@@ -327,29 +339,34 @@ const PartDetail = () => {
 
   useEffect(() => {
     if (!showProduct || !currentProduct?.id) return;
+    const canonicalPath = buildPartDetailPath(currentProduct);
+    if (canonicalPath && location.pathname !== canonicalPath) return;
     if (trackedPartViewRef.current === currentProduct.id) return;
     trackedPartViewRef.current = currentProduct.id;
     trackConversion(CONVERSION_EVENTS.PART_VIEW, {
       productId: currentProduct.id,
-      path: buildPartDetailPath(currentProduct) || location.pathname,
+      path: canonicalPath || location.pathname,
       section: 'used',
     });
-  }, [showProduct, currentProduct, location.pathname]);
+  }, [showProduct, currentProduct?.id, location.pathname]);
 
   useEffect(() => {
     if (!showProduct || !currentProduct?.id || !user) return;
+    const canonicalPath = buildPartDetailPath(currentProduct);
+    if (canonicalPath && location.pathname !== canonicalPath) return;
     if (recordedEngagementViewRef.current === currentProduct.id) return;
     recordedEngagementViewRef.current = currentProduct.id;
     dispatch(recordProductView(currentProduct.id));
-  }, [showProduct, currentProduct, user, dispatch]);
+  }, [showProduct, currentProduct?.id, user, location.pathname, dispatch]);
 
   useEffect(() => {
     if (!currentProduct?.id) return;
     const canonicalPath = buildPartDetailPath(currentProduct);
-    if (canonicalPath && location.pathname !== canonicalPath) {
-      navigate(canonicalPath, { replace: true });
-    }
-  }, [currentProduct, location.pathname, navigate]);
+    if (!canonicalPath || location.pathname === canonicalPath) return;
+    if (canonicalRedirectRef.current === currentProduct.id) return;
+    canonicalRedirectRef.current = currentProduct.id;
+    navigate(canonicalPath, { replace: true });
+  }, [currentProduct?.id, currentProduct?.brand, currentProduct?.article, location.pathname, navigate]);
 
   useEffect(() => {
     if (extractedProductId) {

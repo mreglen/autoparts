@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { fetchFavorites } from '../../redux/slices/UserEngagementSlice';
-import { ProfileProductGrid, profileFullPageShell } from './profileUi';
+import ProfileEngagementProductsPage from './ProfileEngagementProductsPage';
 
 export default function ProfileFavoritesPage() {
   const dispatch = useDispatch();
@@ -26,9 +26,5 @@ export default function ProfileFavoritesPage() {
     return <AuthLoadingScreen />;
   }
 
-  return (
-    <div className={profileFullPageShell}>
-      <ProfileProductGrid items={items} loading={loading} />
-    </div>
-  );
+  return <ProfileEngagementProductsPage items={items} loading={loading} />;
 }

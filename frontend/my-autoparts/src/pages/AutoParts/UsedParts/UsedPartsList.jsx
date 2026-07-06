@@ -26,10 +26,10 @@ import {
   isUsedCatalogBrowseMode,
 } from '../../../utils/autopartsPublic';
 import SubscribeSearchButton from '../../../components/SubscribeSearchButton/SubscribeSearchButton';
-import { fetchSearchSubscriptions } from '../../../redux/slices/UserEngagementSlice';
 import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
 import { useProductPriceFormat } from '../../../hooks/useProductPriceFormat';
 import { prefetchUsedPartDetail } from '../../../utils/prefetchPartDetail';
+import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
@@ -114,14 +114,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const loadMoreSentinelRef = useRef(null);
   const catalogHasMore = isCatalogMode && catalogHasMoreFromStore;
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
-  const user = useSelector((state) => state.auth.user);
   const [organizationFilterName, setOrganizationFilterName] = useState('');
-
-  useEffect(() => {
-    if (user) {
-      dispatch(fetchSearchSubscriptions());
-    }
-  }, [dispatch, user]);
 
   useEffect(() => {
     if (!organizationFilterId) {
@@ -504,8 +497,9 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     return (
       <article
         key={listKey}
-        className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+        className="relative overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
       >
+        <FavoriteHeartOverlay productId={part.id} />
         <Link
           to={detailPath}
           className="block text-inherit no-underline"

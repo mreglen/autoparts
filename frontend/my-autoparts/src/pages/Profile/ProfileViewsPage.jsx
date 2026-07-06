@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { clearViewHistory, fetchViewHistory } from '../../redux/slices/UserEngagementSlice';
-import { ProfileProductGrid, profileFullPageShell } from './profileUi';
+import ProfileEngagementProductsPage from './ProfileEngagementProductsPage';
 
 export default function ProfileViewsPage() {
   const dispatch = useDispatch();
@@ -27,19 +27,18 @@ export default function ProfileViewsPage() {
   }
 
   return (
-    <div className={profileFullPageShell}>
-      {items.length > 0 ? (
-        <div className="mb-4 flex justify-end">
-          <button
-            type="button"
-            onClick={() => dispatch(clearViewHistory())}
-            className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-          >
-            Очистить
-          </button>
-        </div>
+    <ProfileEngagementProductsPage
+      items={items}
+      loading={loading}
+      headerAction={items.length > 0 ? (
+        <button
+          type="button"
+          onClick={() => dispatch(clearViewHistory())}
+          className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+        >
+          Очистить
+        </button>
       ) : null}
-      <ProfileProductGrid items={items} loading={loading} />
-    </div>
+    />
   );
 }

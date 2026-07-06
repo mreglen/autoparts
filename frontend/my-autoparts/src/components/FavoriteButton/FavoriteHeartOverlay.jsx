@@ -1,8 +1,13 @@
-import React, { useCallback, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { fetchFavoriteStatus, toggleFavorite } from '../../redux/slices/UserEngagementSlice';
-import { productFavoriteKey } from '../../utils/favoriteKeys';
+import {
+  fetchFavoriteStatus,
+  fetchRosskoFavoriteStatus,
+  toggleFavorite,
+  toggleRosskoFavorite,
+} from '../../redux/slices/UserEngagementSlice';
+import { productFavoriteKey, rosskoFavoriteKey } from '../../utils/favoriteKeys';
 
 function HeartIcon({ filled, className = 'h-5 w-5' }) {
   if (filled) {
@@ -24,42 +29,59 @@ function HeartIcon({ filled, className = 'h-5 w-5' }) {
   );
 }
 
-export default function FavoriteButton({
+export default function FavoriteHeartOverlay({
   productId,
-  size = 'sm',
+  rossko,
   className = '',
-  showLabel = true,
 }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state) => state.auth.user);
-  const normalizedProductId = Number(productId);
-  const favoriteKey = productFavoriteKey(normalizedProductId);
+  const loading = useSelector((state) => state.userEngagement?.favoriteToggleLoading);
+
+  const favoriteKey = rossko
+    ? rosskoFavoriteKey(rossko.brand, rossko.partnumber)
+    : productFavoriteKey(productId);
+
   const isFavorite = useSelector(
     (state) => Boolean(state.userEngagement?.favoriteByKey?.[favoriteKey]),
   );
-  const loading = useSelector((state) => state.userEngagement?.favoriteToggleLoading);
 
   useEffect(() => {
-    if (!user || !normalizedProductId) return;
-    dispatch(fetchFavoriteStatus(normalizedProductId));
-  }, [dispatch, user, normalizedProductId]);
+    if (!user || !favoriteKey) return;
+    if (rossko) {
+      dispatch(fetchRosskoFavoriteStatus({
+        brand: rossko.brand,
+        partnumber: rossko.partnumber,
+      }));
+      return;
+    }
+    dispatch(fetchFavoriteStatus(productId));
+  }, [dispatch, user, favoriteKey, productId, rossko?.brand, rossko?.partnumber]);
 
-  const handleClick = useCallback(async (e) => {
+  const handleClick = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!normalizedProductId) return;
     if (!user) {
       navigate('/auth', { state: { from: location.pathname } });
       return;
     }
-    dispatch(toggleFavorite({ productId: normalizedProductId, isFavorite }));
-  }, [dispatch, user, normalizedProductId, isFavorite, navigate, location.pathname]);
+    if (rossko) {
+      dispatch(toggleRosskoFavorite({
+        brand: rossko.brand,
+        partnumber: rossko.partnumber,
+        guid: rossko.guid,
+        title: rossko.title,
+        minPrice: rossko.minPrice,
+        isFavorite,
+      }));
+      return;
+    }
+    dispatch(toggleFavorite({ productId, isFavorite }));
+  }, [dispatch, user, isFavorite, productId, rossko, navigate, location.pathname]);
 
-  const sizeClasses = size === 'sm'
-    ? 'min-h-9 gap-1.5 px-2.5 py-1.5 text-xs'
-    : 'min-h-10 gap-2 px-3 py-2 text-sm';
+  if (!favoriteKey) return null;
 
   return (
     <button
@@ -68,14 +90,9 @@ export default function FavoriteButton({
       disabled={loading}
       aria-pressed={isFavorite}
       aria-label={isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
-      className={`inline-flex items-center justify-center rounded-lg border font-medium transition-colors disabled:opacity-50 ${
-        isFavorite
-          ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-          : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-      } ${sizeClasses} ${className}`}
+      className={`absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-gray-200/80 bg-white/90 shadow-sm backdrop-blur-sm transition-colors hover:bg-white disabled:opacity-50 ${className}`}
     >
-      <HeartIcon filled={isFavorite} className={`${size === 'sm' ? 'h-4 w-4' : 'h-5 w-5'} transition-transform ${isFavorite ? 'scale-110' : ''}`} />
-      {showLabel ? (isFavorite ? 'В избранном' : 'В избранное') : null}
+      <HeartIcon filled={isFavorite} className="h-4 w-4" />
     </button>
   );
 }

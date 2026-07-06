@@ -2,8 +2,8 @@ import { Link } from 'react-router-dom';
 import { ProfileEmptyLine } from './profileUi';
 
 export const PREVIEW_LIMIT = {
-  favorites: 6,
-  views: 6,
+  favorites: 3,
+  views: 3,
   subscriptions: 3,
 };
 

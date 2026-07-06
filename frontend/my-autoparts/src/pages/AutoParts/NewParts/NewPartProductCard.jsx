@@ -16,6 +16,8 @@ import {
   formatProductDisplayTitle,
 } from '../../../utils/productDisplayName';
 import { prefetchNewPartOpenChunk } from '../../../utils/prefetchPartDetail';
+import CatalogNewBadge from '../../../components/CatalogNewBadge/CatalogNewBadge';
+import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
 
 const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 const weekdays = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
@@ -281,9 +283,26 @@ function NewPartProductCard({
   const mainAvailableCount = toSafeInt(mainStock?.available_count, 0);
 
   return (
-    <article className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5" data-card-id={uniqueId}>
+    <article className="relative rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5" data-card-id={uniqueId}>
+      <CatalogNewBadge className="left-3 top-3" />
+      <FavoriteHeartOverlay
+        rossko={{
+          brand,
+          partnumber: number,
+          guid: part?.guid,
+          title: displayTitle,
+          minPrice: price,
+        }}
+        className="right-3 top-3"
+      />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
+          <div className="relative hidden h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-100 sm:flex sm:h-28 sm:w-28">
+            <svg className="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
           {!isDetailView ? (
             <Link
               to={detailHref}
@@ -318,6 +337,7 @@ function NewPartProductCard({
               <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-gray-600 sm:line-clamp-2">{title}</p>
             </>
           )}
+          </div>
         </div>
 
         <div className="w-full rounded-lg bg-gray-50 p-3 sm:p-4 lg:w-[280px] lg:flex-shrink-0">

@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { buildListImageUrlFallbackChain } from '../../utils/apiClient';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
-import { buildPartDetailPath } from '../../utils/partRoutes';
+import { buildNewPartOpenPath, buildPartDetailPath } from '../../utils/partRoutes';
 import { prefetchUsedPartDetail } from '../../utils/prefetchPartDetail';
+import { isRosskoFavoriteItem } from '../../utils/favoriteKeys';
+import CatalogNewBadge from '../../components/CatalogNewBadge/CatalogNewBadge';
+import FavoriteHeartOverlay from '../../components/FavoriteButton/FavoriteHeartOverlay';
 
 const isVideoUrl = (value) => {
   if (!value || typeof value !== 'string') return false;
@@ -36,26 +39,58 @@ const isVideoItem = (item) => {
   return false;
 };
 
+function PhotoPlaceholder() {
+  return (
+    <div className="text-gray-400">
+      <svg className="h-16 w-16 sm:h-20 sm:w-20" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.5}
+          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+        />
+      </svg>
+    </div>
+  );
+}
+
 const ProductCard = ({
   part,
   isTestOrganization = false,
   hideConditionAndQuantity = false,
   listPriority = false,
+  showFavorite = true,
+  showNewBadge,
 }) => {
   const dispatch = useDispatch();
-  const displayTitle = formatProductDisplayTitle(part.brand, part.article, part.title);
   const product = part;
-  const detailPath = buildPartDetailPath({
-    id: product.id,
-    brand: product.brand,
-    article: product.article,
-  });
+  const isRossko = isRosskoFavoriteItem(part);
+  const displayTitle = formatProductDisplayTitle(
+    part.brand,
+    part.article,
+    part.title || part.name,
+  );
+  const shouldShowNewBadge = showNewBadge ?? isRossko;
+
+  const detailPath = useMemo(() => {
+    if (isRossko) {
+      return buildNewPartOpenPath({ brand: part.brand, article: part.article });
+    }
+    return buildPartDetailPath({
+      id: product.id,
+      brand: product.brand,
+      article: product.article,
+    });
+  }, [isRossko, part.brand, part.article, product.id, product.brand, product.article]);
 
   const prefetchDetail = useCallback(() => {
-    prefetchUsedPartDetail(product.id, dispatch);
-  }, [dispatch, product.id]);
+    if (!isRossko && product.id) {
+      prefetchUsedPartDetail(product.id, dispatch);
+    }
+  }, [dispatch, isRossko, product.id]);
 
   const listPreview = useMemo(() => {
+    if (isRossko) return null;
     const photos = part.photos || [];
     for (let i = 0; i < photos.length; i += 1) {
       const photo = photos[i];
@@ -71,7 +106,7 @@ const ProductCard = ({
       return { type: 'video', url: null };
     }
     return null;
-  }, [part.photos, part.videos]);
+  }, [isRossko, part.photos, part.videos]);
 
   const [photoSrc, setPhotoSrc] = useState(listPreview?.url || '');
   const [photoFallbackIndex, setPhotoFallbackIndex] = useState(0);
@@ -81,17 +116,44 @@ const ProductCard = ({
     setPhotoFallbackIndex(0);
   }, [listPreview?.url]);
 
+  const priceLabel = useMemo(() => {
+    const raw = product.price;
+    if (raw == null || raw === '') return '—';
+    if (typeof raw === 'number') {
+      return `${raw.toLocaleString('ru-RU')} ₽`;
+    }
+    return raw;
+  }, [product.price]);
+
+  const rosskoFavorite = isRossko
+    ? {
+        brand: part.brand,
+        partnumber: part.article,
+        guid: part.rossko_guid,
+        title: part.name || part.title,
+        minPrice: typeof part.price === 'number' ? part.price : undefined,
+      }
+    : null;
+
   return (
     <div className="w-full">
-      <div className="h-full flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <Link
           to={detailPath}
-          className="group flex flex-col flex-1 text-inherit no-underline"
+          className="group flex flex-1 flex-col text-inherit no-underline"
           onMouseEnter={prefetchDetail}
           onFocus={prefetchDetail}
           onTouchStart={prefetchDetail}
         >
-          <div className="bg-gray-50 aspect-[4/3] w-full flex items-center justify-center relative overflow-hidden cursor-pointer">
+          <div className="relative flex aspect-[4/3] w-full cursor-pointer items-center justify-center overflow-hidden bg-gray-50">
+            {shouldShowNewBadge ? <CatalogNewBadge /> : null}
+            {showFavorite ? (
+              isRossko ? (
+                <FavoriteHeartOverlay rossko={rosskoFavorite} />
+              ) : (
+                <FavoriteHeartOverlay productId={product.id} />
+              )
+            ) : null}
             {listPreview?.type === 'photo' && photoSrc ? (
               <img
                 src={photoSrc}
@@ -113,7 +175,7 @@ const ProductCard = ({
               />
             ) : listPreview?.type === 'video' ? (
               <div className="flex flex-col items-center text-gray-500" aria-label="Есть видео">
-                <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-14 w-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -127,73 +189,66 @@ const ProductCard = ({
                     d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <span className="text-xs mt-1">Видео</span>
+                <span className="mt-1 text-xs">Видео</span>
               </div>
             ) : (
-              <div className="text-gray-400">
-                <svg className="w-20 h-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-              </div>
+              <PhotoPlaceholder />
             )}
           </div>
 
-          <div className="flex flex-col flex-1">
-            <div className="p-2 space-y-0.5 flex-[2]">
+          <div className="flex flex-1 flex-col">
+            <div className="flex-[2] space-y-0.5 p-2">
               <div className="flex items-center gap-1">
-                <span className="text-[17px] font-bold text-gray-900">{product.price}</span>
-                {product.originalPrice && (
-                  <span className="text-gray-400 line-through text-[16px]">{product.originalPrice}</span>
-                )}
+                <span className="text-[17px] font-bold text-gray-900">{priceLabel}</span>
+                {product.originalPrice ? (
+                  <span className="text-[16px] text-gray-400 line-through">{product.originalPrice}</span>
+                ) : null}
               </div>
 
-              <div className="space-y-0.5 flex-1">
-                <p className="text-[15px] text-gray-900 line-clamp-2 cursor-pointer font-medium group-hover:text-indigo-600">
+              <div className="flex-1 space-y-0.5">
+                <p className="line-clamp-2 cursor-pointer text-[15px] font-medium text-gray-900 group-hover:text-indigo-600">
                   {displayTitle}
                 </p>
               </div>
 
-              <div className="flex items-center gap-0.5 text-[14px] text-gray-600">
-                <span>{product.location || 'Скл'}</span>
-                {product.stock && (
-                  <span
-                    className={`text-[14px] px-0.5 py-0.5 rounded-full ${
-                      product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}
-                  >
-                    {product.stock > 0 ? `В н: ${product.stock}` : 'Нет'}
-                  </span>
-                )}
-              </div>
+              {!isRossko ? (
+                <div className="flex items-center gap-0.5 text-[14px] text-gray-600">
+                  <span>{product.location || 'Скл'}</span>
+                  {product.stock ? (
+                    <span
+                      className={`rounded-full px-0.5 py-0.5 text-[14px] ${
+                        product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}
+                    >
+                      {product.stock > 0 ? `В н: ${product.stock}` : 'Нет'}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
 
-              {!hideConditionAndQuantity && (
-                <div className="flex gap-0.5 pt-0.5 flex-wrap">
-                  {product.isNew ? (
-                    <span className="bg-green-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
+              {!hideConditionAndQuantity && !isRossko ? (
+                <div className="flex flex-wrap gap-0.5 pt-0.5">
+                  {product.isNew || product.is_new ? (
+                    <span className="rounded-full bg-green-500 px-1 py-0.5 text-[14px] font-medium text-white">
                       Новое
                     </span>
                   ) : (
-                    <span className="bg-yellow-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
+                    <span className="rounded-full bg-yellow-500 px-1 py-0.5 text-[14px] font-medium text-white">
                       Б/у
                     </span>
                   )}
-                  {product.quantity !== undefined && (
-                    <span className="bg-blue-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
+                  {product.quantity !== undefined ? (
+                    <span className="rounded-full bg-blue-500 px-1 py-0.5 text-[14px] font-medium text-white">
                       {product.quantity} шт.
                     </span>
-                  )}
-                  {product.isDiscount && (
-                    <span className="bg-red-500 text-white px-1 py-0.5 rounded-full text-[14px] font-medium">
+                  ) : null}
+                  {product.isDiscount ? (
+                    <span className="rounded-full bg-red-500 px-1 py-0.5 text-[14px] font-medium text-white">
                       Скидка
                     </span>
-                  )}
+                  ) : null}
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </Link>

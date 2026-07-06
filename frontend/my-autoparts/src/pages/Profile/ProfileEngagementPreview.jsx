@@ -11,7 +11,18 @@ import {
   ProfileBlock,
   ProfilePreviewGrid,
   ProfileSectionHeader,
+  ProfileShowMoreButton,
 } from './profileUi';
+
+function EngagementPreviewSection({ title, items, loading, moreTo, previewItems, previewLimit }) {
+  return (
+    <ProfileBlock>
+      <ProfileSectionHeader title={title} />
+      <ProfilePreviewGrid items={previewItems} loading={loading} />
+      <ProfileShowMoreButton to={moreTo} visible={items.length > previewLimit} />
+    </ProfileBlock>
+  );
+}
 
 export default function ProfileEngagementPreview() {
   const dispatch = useDispatch();
@@ -34,27 +45,27 @@ export default function ProfileEngagementPreview() {
 
   return (
     <>
-      <ProfileBlock>
-        <ProfileSectionHeader
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <EngagementPreviewSection
           title="Избранное"
-          to={favorites.length > PREVIEW_LIMIT.favorites ? '/profile/favorites' : undefined}
+          items={favorites}
+          loading={favoritesLoading}
+          moreTo="/profile/favorites"
+          previewItems={favoritePreview}
+          previewLimit={PREVIEW_LIMIT.favorites}
         />
-        <ProfilePreviewGrid items={favoritePreview} loading={favoritesLoading} />
-      </ProfileBlock>
-
-      <ProfileBlock>
-        <ProfileSectionHeader
+        <EngagementPreviewSection
           title="Просмотры"
-          to={views.length > PREVIEW_LIMIT.views ? '/profile/views' : undefined}
+          items={views}
+          loading={viewsLoading}
+          moreTo="/profile/views"
+          previewItems={viewsPreview}
+          previewLimit={PREVIEW_LIMIT.views}
         />
-        <ProfilePreviewGrid items={viewsPreview} loading={viewsLoading} />
-      </ProfileBlock>
+      </div>
 
       <ProfileBlock>
-        <ProfileSectionHeader
-          title="Подписки"
-          to={subscriptions.length > PREVIEW_LIMIT.subscriptions ? '/profile/subscriptions' : undefined}
-        />
+        <ProfileSectionHeader title="Подписки" />
         {subsLoading ? (
           <div className="space-y-0 px-4 pb-4">
             <div className="my-3 h-12 animate-pulse rounded bg-gray-50" />
@@ -66,6 +77,10 @@ export default function ProfileEngagementPreview() {
             onDelete={(id) => dispatch(deleteSearchSubscription(id))}
           />
         )}
+        <ProfileShowMoreButton
+          to="/profile/subscriptions"
+          visible={subscriptions.length > PREVIEW_LIMIT.subscriptions}
+        />
       </ProfileBlock>
     </>
   );

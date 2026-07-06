@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import ProductCard from '../AutoParts/ProductCard';
 import { ProductCardSkeletonGrid } from '../../components/skeletons/ProductCardSkeleton';
+import { engagementItemKey } from '../../utils/favoriteKeys';
 
 export function ChevronRight({ className = 'h-4 w-4 text-gray-300' }) {
   return (
@@ -43,6 +44,20 @@ export function ProfileSectionHeader({ title, actionLabel, to, onAction }) {
   );
 }
 
+export function ProfileShowMoreButton({ to, visible = true }) {
+  if (!visible || !to) return null;
+  return (
+    <div className="border-t border-gray-100 px-4 py-3">
+      <Link
+        to={to}
+        className="flex w-full items-center justify-center rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50"
+      >
+        Показать больше
+      </Link>
+    </div>
+  );
+}
+
 export function ProfileEmptyLine({ children, catalogTo = '/autoparts/used' }) {
   return (
     <p className="px-4 py-8 text-center text-sm text-gray-500">
@@ -58,7 +73,7 @@ export function ProfileEmptyLine({ children, catalogTo = '/autoparts/used' }) {
   );
 }
 
-export function ProfilePreviewGrid({ items, loading, cardWidth = 'w-[9.5rem] sm:w-[10.5rem]' }) {
+export function ProfilePreviewGrid({ items, loading }) {
   if (loading) {
     return (
       <div className="px-4 pb-4">
@@ -72,10 +87,10 @@ export function ProfilePreviewGrid({ items, loading, cardWidth = 'w-[9.5rem] sm:
   }
 
   return (
-    <div className="flex gap-2 overflow-x-auto px-4 pb-4 pt-1">
+    <div className="grid grid-cols-3 gap-2 px-4 pb-4 pt-1">
       {items.map((part) => (
-        <div key={part.id} className={`${cardWidth} shrink-0`}>
-          <ProductCard part={part} />
+        <div key={engagementItemKey(part)} className="min-w-0">
+          <ProductCard part={part} showFavorite listPriority={false} />
         </div>
       ))}
     </div>
@@ -98,7 +113,7 @@ export function ProfileProductGrid({ items, loading }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {items.map((part) => (
-        <ProductCard key={part.id} part={part} />
+        <ProductCard key={engagementItemKey(part)} part={part} showFavorite />
       ))}
     </div>
   );
@@ -143,9 +158,9 @@ export function ProfileRow({
   );
 }
 
-export const profilePageShell = 'mx-auto max-w-2xl space-y-3 pb-6';
+export const profilePageShell = 'w-full space-y-3 pb-6';
 
-export const profileFullPageShell = 'mx-auto max-w-6xl px-4 py-4 sm:px-0 sm:py-5';
+export const profileFullPageShell = 'w-full pb-6';
 
 export const profileInputClass =
   'w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';

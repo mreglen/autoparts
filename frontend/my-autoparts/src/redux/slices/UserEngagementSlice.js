@@ -1,12 +1,32 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { apiRequest } from '../../utils/apiClient';
+import { favoriteKeyFromItem, productFavoriteKey, rosskoFavoriteKey } from '../../utils/favoriteKeys';
 
 export const fetchFavoriteStatus = createAsyncThunk(
   'userEngagement/fetchFavoriteStatus',
   async (productId, { rejectWithValue }) => {
     try {
       const data = await apiRequest(`/user/favorites/${productId}/status`);
-      return { productId, isFavorite: Boolean(data?.is_favorite) };
+      return { key: productFavoriteKey(productId), isFavorite: Boolean(data?.is_favorite) };
+    } catch (error) {
+      return rejectWithValue(error?.message || 'Не удалось загрузить избранное');
+    }
+  },
+);
+
+export const fetchRosskoFavoriteStatus = createAsyncThunk(
+  'userEngagement/fetchRosskoFavoriteStatus',
+  async ({ brand, partnumber }, { rejectWithValue }) => {
+    try {
+      const params = new URLSearchParams({
+        brand: String(brand || '').trim(),
+        partnumber: String(partnumber || '').trim(),
+      });
+      const data = await apiRequest(`/user/favorites/rossko/status?${params.toString()}`);
+      return {
+        key: rosskoFavoriteKey(brand, partnumber),
+        isFavorite: Boolean(data?.is_favorite),
+      };
     } catch (error) {
       return rejectWithValue(error?.message || 'Не удалось загрузить избранное');
     }
@@ -19,10 +39,41 @@ export const toggleFavorite = createAsyncThunk(
     try {
       if (isFavorite) {
         await apiRequest(`/user/favorites/${productId}`, { method: 'DELETE' });
-        return { productId, isFavorite: false };
+        return { key: productFavoriteKey(productId), isFavorite: false };
       }
       await apiRequest(`/user/favorites/${productId}`, { method: 'POST' });
-      return { productId, isFavorite: true };
+      return { key: productFavoriteKey(productId), isFavorite: true };
+    } catch (error) {
+      return rejectWithValue(error?.message || 'Не удалось обновить избранное');
+    }
+  },
+);
+
+export const toggleRosskoFavorite = createAsyncThunk(
+  'userEngagement/toggleRosskoFavorite',
+  async ({ brand, partnumber, guid, title, minPrice, isFavorite }, { rejectWithValue }) => {
+    try {
+      const key = rosskoFavoriteKey(brand, partnumber);
+      if (isFavorite) {
+        const params = new URLSearchParams({
+          brand: String(brand || '').trim(),
+          partnumber: String(partnumber || '').trim(),
+        });
+        await apiRequest(`/user/favorites/rossko?${params.toString()}`, { method: 'DELETE' });
+        return { key, isFavorite: false };
+      }
+      await apiRequest('/user/favorites/rossko', {
+        method: 'POST',
+        body: JSON.stringify({
+          brand: String(brand || '').trim(),
+          partnumber: String(partnumber || '').trim(),
+          guid: guid || undefined,
+          title: title || undefined,
+          min_price: minPrice != null ? Number(minPrice) : undefined,
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return { key, isFavorite: true };
     } catch (error) {
       return rejectWithValue(error?.message || 'Не удалось обновить избранное');
     }
@@ -87,6 +138,9 @@ export const fetchSearchSubscriptions = createAsyncThunk(
       return rejectWithValue(error?.message || 'Не удалось загрузить подписки');
     }
   },
+  {
+    condition: (_, { getState }) => Boolean(getState().auth?.token),
+  },
 );
 
 export const subscribeToSearch = createAsyncThunk(
@@ -103,6 +157,9 @@ export const subscribeToSearch = createAsyncThunk(
       return rejectWithValue(error?.message || 'Не удалось оформить подписку');
     }
   },
+  {
+    condition: (_, { getState }) => Boolean(getState().auth?.token),
+  },
 );
 
 export const deleteSearchSubscription = createAsyncThunk(
@@ -117,10 +174,17 @@ export const deleteSearchSubscription = createAsyncThunk(
   },
 );
 
-const normalizeProductId = (productId) => Number(productId);
+function syncFavoriteKeysFromItems(state, items) {
+  items.forEach((item) => {
+    const key = favoriteKeyFromItem(item);
+    if (key) {
+      state.favoriteByKey[key] = true;
+    }
+  });
+}
 
 const initialState = {
-  favoriteByProductId: {},
+  favoriteByKey: {},
   favorites: [],
   favoritesLoading: false,
   viewHistory: [],
@@ -143,25 +207,51 @@ const userEngagementSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchFavoriteStatus.fulfilled, (state, action) => {
-        const productId = normalizeProductId(action.payload.productId);
-        state.favoriteByProductId[productId] = action.payload.isFavorite;
+        if (action.payload.key) {
+          state.favoriteByKey[action.payload.key] = action.payload.isFavorite;
+        }
+      })
+      .addCase(fetchRosskoFavoriteStatus.fulfilled, (state, action) => {
+        if (action.payload.key) {
+          state.favoriteByKey[action.payload.key] = action.payload.isFavorite;
+        }
       })
       .addCase(toggleFavorite.pending, (state, action) => {
         state.favoriteToggleLoading = true;
-        const productId = normalizeProductId(action.meta.arg.productId);
+        const key = productFavoriteKey(action.meta.arg.productId);
         const { isFavorite } = action.meta.arg;
-        state.favoriteByProductId[productId] = !isFavorite;
+        if (key) state.favoriteByKey[key] = !isFavorite;
       })
       .addCase(toggleFavorite.fulfilled, (state, action) => {
         state.favoriteToggleLoading = false;
-        const productId = normalizeProductId(action.payload.productId);
-        state.favoriteByProductId[productId] = action.payload.isFavorite;
+        if (action.payload.key) {
+          state.favoriteByKey[action.payload.key] = action.payload.isFavorite;
+        }
       })
       .addCase(toggleFavorite.rejected, (state, action) => {
         state.favoriteToggleLoading = false;
-        const productId = normalizeProductId(action.meta.arg.productId);
+        const key = productFavoriteKey(action.meta.arg.productId);
         const { isFavorite } = action.meta.arg;
-        state.favoriteByProductId[productId] = isFavorite;
+        if (key) state.favoriteByKey[key] = isFavorite;
+        state.error = action.payload;
+      })
+      .addCase(toggleRosskoFavorite.pending, (state, action) => {
+        state.favoriteToggleLoading = true;
+        const { brand, partnumber, isFavorite } = action.meta.arg;
+        const key = rosskoFavoriteKey(brand, partnumber);
+        if (key) state.favoriteByKey[key] = !isFavorite;
+      })
+      .addCase(toggleRosskoFavorite.fulfilled, (state, action) => {
+        state.favoriteToggleLoading = false;
+        if (action.payload.key) {
+          state.favoriteByKey[action.payload.key] = action.payload.isFavorite;
+        }
+      })
+      .addCase(toggleRosskoFavorite.rejected, (state, action) => {
+        state.favoriteToggleLoading = false;
+        const { brand, partnumber, isFavorite } = action.meta.arg;
+        const key = rosskoFavoriteKey(brand, partnumber);
+        if (key) state.favoriteByKey[key] = isFavorite;
         state.error = action.payload;
       })
       .addCase(fetchFavorites.pending, (state) => {
@@ -170,6 +260,7 @@ const userEngagementSlice = createSlice({
       .addCase(fetchFavorites.fulfilled, (state, action) => {
         state.favoritesLoading = false;
         state.favorites = action.payload;
+        syncFavoriteKeysFromItems(state, action.payload);
       })
       .addCase(fetchFavorites.rejected, (state, action) => {
         state.favoritesLoading = false;
