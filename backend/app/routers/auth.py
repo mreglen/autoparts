@@ -530,7 +530,11 @@ def seller_register(data: SellerRegisterRequest, db: Session = Depends(get_db)):
     
     if db.query(PendingSeller).filter(PendingSeller.email == data.email).first():
         raise HTTPException(status_code=400, detail="Заявка с таким email уже существует")
-    
+
+    pending_user = db.query(PendingUser).filter(PendingUser.email == data.email.lower()).first()
+    if not pending_user or not pending_user.is_verified:
+        raise HTTPException(status_code=400, detail="Email не подтверждён")
+
     try:
         # Validate and normalize phone
         normalized_phone = _validate_and_normalize_phone(data.phone)

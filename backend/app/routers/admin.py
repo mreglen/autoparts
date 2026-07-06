@@ -813,7 +813,8 @@ def approve_pending_seller(
         organization = Organization(
             id=org_id,
             name=pending_seller.name_organization,
-            address=pending_seller.address_organization
+            address=pending_seller.address_organization,
+            description=pending_seller.description_organization,
         )
         db.add(organization)
         db.flush()

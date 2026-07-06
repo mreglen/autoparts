@@ -15,6 +15,7 @@ import {
   isAvitoSale,
 } from './dashboardUtils';
 import ResponsiveDataView from '../../components/ResponsiveDataView/ResponsiveDataView';
+import SellerOnboardingPanel from './SellerOnboardingPanel';
 
 function KpiCard({ label, value, sub, accent = 'indigo', onClick }) {
   const accents = {
@@ -152,8 +153,11 @@ export default function DashboardPage() {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
   const [tasks, setTasks] = useState([]);
+  const [onboarding, setOnboarding] = useState(null);
+  const [onboardingLoading, setOnboardingLoading] = useState(false);
 
   const canAccess = Boolean(user?.is_admin || user?.is_seller || user?.is_employee);
+  const showOnboarding = Boolean(user?.is_seller || user?.is_director);
   const canViewFinance = Boolean(
     user?.is_admin
     || user?.is_seller
@@ -169,16 +173,22 @@ export default function DashboardPage() {
     if (!user) return;
     setLoading(true);
     setTasksLoading(true);
+    setOnboardingLoading(showOnboarding);
     setError(null);
 
     try {
-      const results = await Promise.allSettled([
+      const requests = [
         apiAxios.get('/products/'),
         apiAxios.get('/stock-outs/sales'),
         apiAxios.get('/stock-outs/'),
         apiAxios.get('/stock-ins/'),
         apiAxios.get('/dashboard/tasks'),
-      ]);
+      ];
+      if (showOnboarding) {
+        requests.push(apiAxios.get('/dashboard/onboarding'));
+      }
+
+      const results = await Promise.allSettled(requests);
 
       const pick = (idx, fallback = []) =>
         results[idx].status === 'fulfilled' ? results[idx].value.data : fallback;
@@ -188,6 +198,7 @@ export default function DashboardPage() {
       const stockOuts = pick(2);
       const stockIns = pick(3);
       const tasksResult = results[4];
+      const onboardingResult = showOnboarding ? results[5] : null;
 
       if (tasksResult.status === 'fulfilled') {
         setTasks(tasksResult.value.data?.tasks || []);
@@ -195,6 +206,13 @@ export default function DashboardPage() {
         setTasks([]);
       }
       setTasksLoading(false);
+
+      if (onboardingResult?.status === 'fulfilled') {
+        setOnboarding(onboardingResult.value.data);
+      } else {
+        setOnboarding(null);
+      }
+      setOnboardingLoading(false);
 
       setData({
         products,
@@ -208,10 +226,12 @@ export default function DashboardPage() {
       setError('Не удалось загрузить данные дашборда');
       setTasks([]);
       setTasksLoading(false);
+      setOnboarding(null);
+      setOnboardingLoading(false);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, showOnboarding]);
 
   useEffect(() => {
     if (isReady && canAccess) loadDashboard();
@@ -268,6 +288,10 @@ export default function DashboardPage() {
           Обновить
         </button>
       </div>
+
+      {showOnboarding && (
+        <SellerOnboardingPanel onboarding={onboarding} loading={onboardingLoading} />
+      )}
 
       <AttentionTasksSection
         tasks={tasks}
