@@ -1979,8 +1979,50 @@ function MyParts() {
       </div>
 
       {!isDraftsTab && (
-      <div className="mb-6 flex flex-col md:flex-row gap-4 md:items-end">
-        {/* Фильтр по складу, поиск и сортировка */}
+      <div className="mb-6 space-y-4">
+        {/* Поисковое поле */}
+        <div className="w-full">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Поиск {activeFilters.storage && '(в выбранном складе)'}
+          </label>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              ref={searchInputRef}
+              type="text"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              placeholder="Поиск по номеру, внутр. коду или названию..."
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            />
+            <div className={`absolute inset-y-0 right-0 pr-3 flex items-center ${searchDraft ? '' : 'invisible pointer-events-none'}`}>
+              <button
+                type="button"
+                onClick={() => setSearchDraft('')}
+                className="text-gray-400 hover:text-gray-600 focus:outline-none"
+                tabIndex={searchDraft ? 0 : -1}
+                aria-hidden={!searchDraft}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-4 md:items-end">
+        {/* Фильтр по складу и сортировка */}
         <div className="md:w-64">
           <label className="block text-sm font-medium text-gray-700 mb-1">Склад</label>
           <select
@@ -2041,47 +2083,6 @@ function MyParts() {
           </select>
         </div>
         
-        {/* Поисковое поле */}
-        <div className="flex-1 max-w-md">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Поиск {activeFilters.storage && '(в выбранном складе)'}
-          </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <input
-              ref={searchInputRef}
-              type="text"
-              inputMode="search"
-              enterKeyHint="search"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              placeholder="Поиск по номеру, внутр. коду или названию..."
-              value={searchDraft}
-              onChange={(e) => setSearchDraft(e.target.value)}
-              className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            />
-            <div className={`absolute inset-y-0 right-0 pr-3 flex items-center ${searchDraft ? '' : 'invisible pointer-events-none'}`}>
-              <button
-                type="button"
-                onClick={() => setSearchDraft('')}
-                className="text-gray-400 hover:text-gray-600 focus:outline-none"
-                tabIndex={searchDraft ? 0 : -1}
-                aria-hidden={!searchDraft}
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
         {isModerationTab && (
           <div className="md:w-auto flex items-end">
             <label className="inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md bg-white cursor-pointer min-h-[40px]">
@@ -2142,6 +2143,7 @@ function MyParts() {
               ))}
             </div>
           )}
+        </div>
         </div>
       </div>
       )}
