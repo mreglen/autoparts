@@ -14,7 +14,10 @@ from app.services.spa_page_check_service import PART_PATH_RE, _normalize_path
 from app.services.yandex_feed_xml_service import _resolve_site_origin
 from app.utils.page_keywords import build_page_keywords
 from app.utils.product_display_name import format_product_display_title
-from app.utils.product_urls import build_product_page_url, build_product_used_catalog_url
+from app.utils.product_urls import (
+    build_product_page_url,
+    build_used_catalog_url_for_query,
+)
 from app.utils.seo_constants import resolve_default_og_image_url
 
 DEFAULT_SITE_ORIGIN = "https://svoygarage.ru"
@@ -188,7 +191,7 @@ def _build_used_parts_seo(
             brand = (product.brand or "").strip()
             article = (product.article or "").strip()
             name = format_product_display_title(brand, article, product.name)
-            canonical_url = build_product_used_catalog_url(product, site_origin)
+            canonical_url = build_used_catalog_url_for_query(site_origin, q)
             part_url = build_product_page_url(product, site_origin)
             condition = "новая" if product.is_new else "б/у"
             return StaticPageSeoMeta(

@@ -154,11 +154,15 @@ class BuildProductsSitemapXmlTests(unittest.TestCase):
         older = MagicMock()
         older.id = 1
         older.is_new = True
+        older.article = ""
+        older.name = ""
         older.updated_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
         older.created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
         newer = MagicMock()
         newer.id = 2
         newer.is_new = False
+        newer.article = ""
+        newer.name = ""
         newer.updated_at = datetime(2026, 5, 20, tzinfo=timezone.utc)
         newer.created_at = datetime(2026, 5, 1, tzinfo=timezone.utc)
         mock_iter.return_value = [older, newer]

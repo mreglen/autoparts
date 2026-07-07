@@ -9,14 +9,25 @@ import { userHasWarehouseQrAccess } from '../hooks/useWarehousePermissions';
  */
 export async function fetchSellerQrPartCard(productId, user, permissionCodes = []) {
   const numericId = parseInt(String(productId), 10);
-  if (!Number.isFinite(numericId) || numericId <= 0) return null;
-  if (!userHasWarehouseQrAccess(user, permissionCodes)) return null;
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    return { ok: false, reason: 'invalid' };
+  }
+  if (!userHasWarehouseQrAccess(user, permissionCodes)) {
+    return { ok: false, reason: 'no_access' };
+  }
 
   try {
     const response = await apiAxios.get(`/products/qr-card/${numericId}`);
-    return response.data;
-  } catch {
-    return null;
+    return { ok: true, data: response.data };
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status === 401 || status === 403) {
+      return { ok: false, reason: 'auth' };
+    }
+    if (status === 404) {
+      return { ok: false, reason: 'not_found' };
+    }
+    return { ok: false, reason: 'error', message: err?.message || 'Ошибка сети' };
   }
 }
 
@@ -33,13 +44,22 @@ export async function resolvePublicPartPath(productId) {
 }
 
 export async function resolveProductQrScan(productId, user, permissionCodes = []) {
-  const sellerPart = await fetchSellerQrPartCard(productId, user, permissionCodes);
-  if (sellerPart) {
-    return { mode: 'seller', part: sellerPart };
-  }
+  const hasWarehouseAccess = Boolean(user && userHasWarehouseQrAccess(user, permissionCodes));
 
-  if (user && userHasWarehouseQrAccess(user, permissionCodes)) {
-    return { mode: 'forbidden' };
+  if (hasWarehouseAccess) {
+    const sellerResult = await fetchSellerQrPartCard(productId, user, permissionCodes);
+    if (sellerResult?.ok) {
+      return { mode: 'seller', part: sellerResult.data };
+    }
+    if (sellerResult?.reason === 'auth') {
+      return { mode: 'auth_required' };
+    }
+    if (sellerResult?.reason === 'not_found') {
+      return { mode: 'forbidden' };
+    }
+    if (sellerResult?.reason === 'error') {
+      return { mode: 'error', message: sellerResult.message };
+    }
   }
 
   const publicPath = await resolvePublicPartPath(productId);

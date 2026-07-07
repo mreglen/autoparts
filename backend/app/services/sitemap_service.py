@@ -697,24 +697,31 @@ def build_products_sitemap_xml(db: Session, *, preferred_host_url: str | None = 
             priority=part_priority,
         ))
         url_count += 1
-        canonical_used_url = build_product_used_catalog_url(product, site_origin)
-        seen_urls.add(canonical_used_url)
-        lines.append(_product_sitemap_url_block(
-            canonical_used_url,
-            lastmod=lastmod,
-            priority="0.75",
-        ))
-        url_count += 1
 
         article_key = normalize_partnumber(product.article)
-        if article_key and article_counts.get(article_key) == 1:
+        has_unique_article = bool(article_key and article_counts.get(article_key) == 1)
+        added_search_url = False
+
+        if has_unique_article:
             article_url = build_used_catalog_url_for_query(site_origin, article_key)
             if article_url not in seen_urls:
                 seen_urls.add(article_url)
                 lines.append(_product_sitemap_url_block(
                     article_url,
                     lastmod=lastmod,
-                    priority="0.7",
+                    priority="0.75",
+                ))
+                url_count += 1
+                added_search_url = True
+
+        if not added_search_url:
+            canonical_used_url = build_product_used_catalog_url(product, site_origin)
+            if canonical_used_url not in seen_urls:
+                seen_urls.add(canonical_used_url)
+                lines.append(_product_sitemap_url_block(
+                    canonical_used_url,
+                    lastmod=lastmod,
+                    priority="0.75",
                 ))
                 url_count += 1
 

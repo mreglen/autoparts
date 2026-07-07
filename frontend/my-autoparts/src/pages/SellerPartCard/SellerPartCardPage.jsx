@@ -15,6 +15,7 @@ import { buildSellerPartCardSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import { resolveProductQrScan } from '../../utils/resolveProductQrScan';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { useWarehousePermissions } from '../../hooks/useWarehousePermissions';
+import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 
 function ActionButton({ children, onClick, to, variant = 'default', disabled = false }) {
   const base = 'flex min-h-12 flex-1 items-center justify-center rounded-xl px-3 py-3 text-sm font-semibold transition-colors disabled:opacity-50';
@@ -51,6 +52,8 @@ const SellerPartCardPage = () => {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [resolveError, setResolveError] = useState('');
+  const [redirectPath, setRedirectPath] = useState(null);
   const [part, setPart] = useState(null);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -63,6 +66,12 @@ const SellerPartCardPage = () => {
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
   const [currentMediaItems, setCurrentMediaItems] = useState([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+
+  useEffect(() => {
+    if (redirectPath) {
+      navigate(redirectPath, { replace: true });
+    }
+  }, [redirectPath, navigate]);
 
   useEffect(() => {
     if (!isReady) return undefined;
@@ -81,31 +90,51 @@ const SellerPartCardPage = () => {
       setLoading(true);
       setNotFound(false);
       setForbidden(false);
+      setResolveError('');
+      setRedirectPath(null);
       setPart(null);
 
-      const result = await resolveProductQrScan(id, user, permissionCodes);
+      try {
+        const result = await resolveProductQrScan(id, user, permissionCodes);
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      if (result.mode === 'seller') {
-        setPart(result.part);
+        if (result.mode === 'seller') {
+          setPart(result.part);
+          setLoading(false);
+          return;
+        }
+
+        if (result.mode === 'forbidden') {
+          setForbidden(true);
+          setLoading(false);
+          return;
+        }
+
+        if (result.mode === 'auth_required') {
+          navigate('/auth', { replace: true, state: { from: `/seller/part-card/${id}` } });
+          return;
+        }
+
+        if (result.mode === 'public') {
+          setRedirectPath(result.path);
+          return;
+        }
+
+        if (result.mode === 'error') {
+          setResolveError(result.message || 'Не удалось открыть карточку');
+          setLoading(false);
+          return;
+        }
+
+        setNotFound(true);
         setLoading(false);
-        return;
+      } catch (error) {
+        if (!cancelled) {
+          setResolveError(error?.message || 'Не удалось открыть карточку');
+          setLoading(false);
+        }
       }
-
-      if (result.mode === 'forbidden') {
-        setForbidden(true);
-        setLoading(false);
-        return;
-      }
-
-      if (result.mode === 'public') {
-        navigate(result.path, { replace: true });
-        return;
-      }
-
-      setNotFound(true);
-      setLoading(false);
     };
 
     resolveRoute();
@@ -167,8 +196,29 @@ const SellerPartCardPage = () => {
     setOperationType(null);
   };
 
-  if (!isReady || loading) {
-    return <div className="p-8 text-center text-gray-600">Загрузка...</div>;
+  if (!isReady || loading || redirectPath) {
+    return <AuthLoadingScreen className="min-h-[50vh]" />;
+  }
+
+  if (resolveError) {
+    return (
+      <div className="mx-auto max-w-lg p-8 text-center">
+        <h1 className="text-xl font-semibold text-gray-900">Не удалось открыть</h1>
+        <p className="mt-2 text-sm text-gray-600">{resolveError}</p>
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+          >
+            Повторить
+          </button>
+          <Link to="/my-parts" className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+            К запчастям
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   if (forbidden) {
@@ -182,7 +232,15 @@ const SellerPartCardPage = () => {
   }
 
   if (notFound || !part) {
-    return <div className="p-8 text-center text-gray-700 text-lg">404: Страница не найдена</div>;
+    return (
+      <div className="mx-auto max-w-lg p-8 text-center">
+        <h1 className="text-xl font-semibold text-gray-900">Не найдено</h1>
+        <p className="mt-2 text-sm text-gray-600">Запчасть недоступна или удалена.</p>
+        <Link to="/autoparts/used" className="mt-6 inline-block text-indigo-600 hover:underline">
+          В каталог
+        </Link>
+      </div>
+    );
   }
 
   const seo = buildSellerPartCardSeo(part);

@@ -43,12 +43,10 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertNotIn('name="keywords"', html)
 
     @patch("app.services.static_page_seo_service.build_product_page_url")
-    @patch("app.services.static_page_seo_service.build_product_used_catalog_url")
     @patch("app.services.used_catalog_service.find_indexable_used_catalog_product")
     def test_used_parts_canonical_product_query_is_indexable(
         self,
         mock_find_product,
-        mock_used_url,
         mock_part_url,
     ):
         product = MagicMock(
@@ -59,7 +57,6 @@ class StaticPageSeoTests(unittest.TestCase):
             is_new=False,
         )
         mock_find_product.return_value = (product, "canonical")
-        mock_used_url.return_value = "https://svoygarage.ru/autoparts/used?q=BOSCH%20A123"
         mock_part_url.return_value = "https://svoygarage.ru/part/42-BOSCH-A123"
 
         db = MagicMock()
@@ -75,12 +72,10 @@ class StaticPageSeoTests(unittest.TestCase):
         self.assertIn('name="keywords"', html)
 
     @patch("app.services.static_page_seo_service.build_product_page_url")
-    @patch("app.services.static_page_seo_service.build_product_used_catalog_url")
     @patch("app.services.used_catalog_service.find_indexable_used_catalog_product")
-    def test_used_parts_article_query_is_indexable_with_product_canonical(
+    def test_used_parts_article_query_is_indexable_with_self_canonical(
         self,
         mock_find_product,
-        mock_used_url,
         mock_part_url,
     ):
         product = MagicMock(
@@ -91,7 +86,6 @@ class StaticPageSeoTests(unittest.TestCase):
             is_new=False,
         )
         mock_find_product.return_value = (product, "article")
-        mock_used_url.return_value = "https://svoygarage.ru/autoparts/used?q=MANN%20IF1009"
         mock_part_url.return_value = "https://svoygarage.ru/part/16-MANN-IF1009"
 
         db = MagicMock()
@@ -99,8 +93,33 @@ class StaticPageSeoTests(unittest.TestCase):
 
         self.assertIsNotNone(meta)
         self.assertEqual(meta.robots, "index, follow")
-        self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/used?q=MANN%20IF1009")
+        self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/used?q=IF1009")
         self.assertIn("IF1009", meta.title)
+
+    @patch("app.services.static_page_seo_service.build_product_page_url")
+    @patch("app.services.used_catalog_service.find_indexable_used_catalog_product")
+    def test_used_parts_vag_article_query_self_canonical(
+        self,
+        mock_find_product,
+        mock_part_url,
+    ):
+        product = MagicMock(
+            id=99,
+            brand="VAG",
+            article="04C 103 085 C",
+            name="Уплотняющее кольцо",
+            is_new=False,
+        )
+        mock_find_product.return_value = (product, "article")
+        mock_part_url.return_value = "https://svoygarage.ru/part/99-VAG-04C103085C"
+
+        db = MagicMock()
+        meta = get_static_page_seo_for_path(db, "/autoparts/used?q=04C103085C")
+
+        self.assertIsNotNone(meta)
+        self.assertEqual(meta.robots, "index, follow")
+        self.assertEqual(meta.canonical_url, "https://svoygarage.ru/autoparts/used?q=04C103085C")
+        self.assertIn("04C", meta.title)
 
     def test_used_parts_single_brand_canonical_to_landing(self):
         meta = get_static_page_seo_for_path(None, "/autoparts/used?brand=BOSCH")

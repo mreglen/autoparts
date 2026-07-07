@@ -15,6 +15,7 @@ export default function WarehouseScanPage() {
   const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
   const scannerRef = useRef(null);
   const html5QrCodeRef = useRef(null);
+  const scanLockRef = useRef(false);
 
   const [cameraError, setCameraError] = useState('');
   const [manualId, setManualId] = useState('');
@@ -24,6 +25,7 @@ export default function WarehouseScanPage() {
 
   const navigateToParsed = useCallback((parsed) => {
     if (!parsed?.path) {
+      scanLockRef.current = false;
       setNotice('Не удалось распознать QR-код этикетки');
       return;
     }
@@ -31,16 +33,27 @@ export default function WarehouseScanPage() {
   }, [navigate]);
 
   const handleScanText = useCallback((text) => {
+    if (scanLockRef.current) return;
+
     const parsed = parseSellerPartCardQr(text);
     if (!parsed) {
       setNotice('QR не содержит ссылку на карточку запчасти');
       return;
     }
+
+    scanLockRef.current = true;
+    setNotice('');
+
     if (html5QrCodeRef.current) {
       html5QrCodeRef.current.stop().catch(() => {});
     }
+
     navigateToParsed(parsed);
   }, [navigateToParsed]);
+
+  useEffect(() => {
+    scanLockRef.current = false;
+  }, []);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated || !canScan) return undefined;
@@ -85,13 +98,17 @@ export default function WarehouseScanPage() {
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
+    if (scanLockRef.current) return;
+
     const parsed = parseSellerPartCardQr(manualId.trim());
     if (parsed) {
+      scanLockRef.current = true;
       navigateToParsed(parsed);
       return;
     }
     const numeric = parseInt(manualId.trim(), 10);
     if (Number.isFinite(numeric) && numeric > 0) {
+      scanLockRef.current = true;
       navigate(`/seller/part-card/${numeric}`);
       return;
     }
