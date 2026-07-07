@@ -42,11 +42,11 @@ const PATH_TAB_MAP = Object.fromEntries(
 
 export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/my-parts') || path.startsWith('/warehouse/scan')) return 'parts';
-    if (path.startsWith('/profile/notifications')) return 'settings-notifications';
     if (
         path.startsWith('/profile/favorites') ||
         path.startsWith('/profile/views') ||
-        path.startsWith('/profile/subscriptions')
+        path.startsWith('/profile/subscriptions') ||
+        path.startsWith('/profile/notifications')
     ) {
         return 'profile';
     }
@@ -103,7 +103,6 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
                 label: 'Настройки',
                 submenu: [
                     { id: 'profile', label: 'Профиль' },
-                    { id: 'settings-notifications', label: 'Уведомления' },
                 ],
             },
         ];
@@ -116,7 +115,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             salesSubmenu.push({ id: 'sales-orders', label: 'Заказы покупателей' });
         }
         if (user.is_seller || user.is_admin || hasPermission('sales.returns')) {
-            salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты' });
+            salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты покупателей' });
         }
         if (user.is_seller || user.is_admin || hasPermission('warehouse-sales')) {
             salesSubmenu.push({ id: 'warehouse-sales', label: 'Продажи со склада' });
@@ -179,7 +178,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             salesSubmenu.push({ id: 'sales-orders', label: 'Заказы покупателей' });
         }
         if (hasPermission('sales.returns')) {
-            salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты' });
+            salesSubmenu.push({ id: 'sales-returns', label: 'Возвраты покупателей' });
         }
         if (hasPermission('warehouse-sales')) {
             salesSubmenu.push({ id: 'warehouse-sales', label: 'Продажи со склада' });
@@ -210,7 +209,6 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
 
         const settingsSubmenu = [
             { id: 'profile', label: 'Профиль' },
-            { id: 'settings-notifications', label: 'Уведомления' },
         ];
         if (hasPermission('storage-addresses')) {
             settingsSubmenu.push({ id: 'settings-storage-addresses', label: 'Адресное хранение' });
@@ -229,7 +227,6 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             label: 'Настройки',
             submenu: [
                 { id: 'profile', label: 'Профиль' },
-                { id: 'settings-notifications', label: 'Уведомления' },
                 { id: 'settings-employees', label: 'Сотрудники' },
                 { id: 'settings-storage-addresses', label: 'Адресное хранение' },
                 { id: 'settings-organization', label: 'Организация' },
@@ -240,7 +237,6 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
     } else if (user.is_seller) {
         const settingsSubmenu = [
             { id: 'profile', label: 'Профиль' },
-            { id: 'settings-notifications', label: 'Уведомления' },
         ];
         if (user.organization_id) {
             settingsSubmenu.push({ id: 'settings-organization', label: 'Организация' });
@@ -254,7 +250,6 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             label: 'Настройки',
             submenu: [
                 { id: 'profile', label: 'Профиль' },
-                { id: 'settings-notifications', label: 'Уведомления' },
             ],
         });
     }
