@@ -33,9 +33,10 @@ import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHea
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
-const VIRTUALIZE_THRESHOLD = 48;
+const VIRTUALIZE_THRESHOLD = 24;
 const GRID_ROW_ESTIMATE_PX = 380;
 const LIST_ROW_ESTIMATE_PX = 220;
+const LOAD_MORE_ROOT_MARGIN = '350px';
 
 function getGridColumnCount(width) {
   if (width >= 1280) return 4;
@@ -92,6 +93,132 @@ const UsedPartsFiltersAside = React.memo(function UsedPartsFiltersAside({ update
   );
 });
 
+const MediaDisplay = React.memo(function MediaDisplay({ part }) {
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const [hoverSide, setHoverSide] = useState(null);
+  const [resolvedUrl, setResolvedUrl] = useState('');
+  const [urlFallbackIndex, setUrlFallbackIndex] = useState(0);
+
+  const allMedia = React.useMemo(() => {
+    const photos = (part.photos || []).slice(0, 1).map((photo) => {
+      const urlChain = buildListImageUrlFallbackChain(photo);
+      return {
+        type: 'photo',
+        url: urlChain[0] || '',
+        urlChain,
+        photo,
+      };
+    });
+    if (photos.length > 0) {
+      return photos;
+    }
+    if ((part.videos || []).length > 0) {
+      return [{ type: 'video', url: null }];
+    }
+    return [];
+  }, [part.photos, part.videos]);
+
+  React.useEffect(() => {
+    setResolvedUrl(allMedia[currentMediaIndex]?.url || '');
+    setUrlFallbackIndex(0);
+  }, [allMedia, currentMediaIndex]);
+
+  if (!allMedia || allMedia.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </div>
+    );
+  }
+
+  const currentMedia = allMedia[currentMediaIndex];
+  const isVideo = currentMedia.type === 'video';
+
+  const goToPrevious = () => {
+    setCurrentMediaIndex((prev) => (prev > 0 ? prev - 1 : allMedia.length - 1));
+  };
+
+  const goToNext = () => {
+    setCurrentMediaIndex((prev) => (prev < allMedia.length - 1 ? prev + 1 : 0));
+  };
+
+  return (
+    <div className="relative w-full h-full group">
+      {allMedia.length > 1 && (
+        <>
+          <button
+            className={`absolute left-0 top-1/2 transform -translate-y-1/2 z-20 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-r-md transition-opacity duration-200 ${hoverSide === 'left' ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              goToPrevious();
+            }}
+            onMouseEnter={() => setHoverSide('left')}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            className={`absolute right-0 top-1/2 transform -translate-y-1/2 z-20 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-l-md transition-opacity duration-200 ${hoverSide === 'right' ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              goToNext();
+            }}
+            onMouseEnter={() => setHoverSide('right')}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </>
+      )}
+
+      {isVideo ? (
+        <video
+          src={currentMedia.url}
+          className="w-full h-full object-cover rounded-lg"
+          muted
+          playsInline
+        />
+      ) : (
+        <img
+          src={resolvedUrl || currentMedia.url}
+          alt={part.name || part.article}
+          className="w-full h-full object-cover rounded-lg"
+          loading="lazy"
+          decoding="async"
+          onError={() => {
+            const chain = currentMedia.urlChain || [];
+            const nextIndex = urlFallbackIndex + 1;
+            if (nextIndex < chain.length && chain[nextIndex] !== resolvedUrl) {
+              setUrlFallbackIndex(nextIndex);
+              setResolvedUrl(chain[nextIndex]);
+            }
+          }}
+        />
+      )}
+
+      {isVideo && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg pointer-events-none">
+          <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+          </svg>
+        </div>
+      )}
+
+      {allMedia.length > 1 && (
+        <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
+          {currentMediaIndex + 1} / {allMedia.length}
+        </div>
+      )}
+    </div>
+  );
+});
+
 const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl }) => {
   const dispatch = useDispatch();
   const location = useLocation();
@@ -112,6 +239,28 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const catalogHasMoreFromStore = useSelector(selectCatalogHasMore);
   const analogsLoading = useSelector(selectAnalogsLoading);
   const loadMoreSentinelRef = useRef(null);
+  const loadMoreInFlightRef = useRef(false);
+  const catalogLoadingRef = useRef(catalogLoading);
+  const catalogLoadingMoreRef = useRef(catalogLoadingMore);
+  const catalogHasMoreRef = useRef(catalogHasMoreFromStore);
+  const catalogItemsLengthRef = useRef(catalogItems.length);
+  const catalogTotalRef = useRef(catalogTotal);
+  const catalogPageRef = useRef(catalogPage);
+  const searchParamsRef = useRef(searchParams);
+
+  useEffect(() => { catalogLoadingRef.current = catalogLoading; }, [catalogLoading]);
+  useEffect(() => { catalogLoadingMoreRef.current = catalogLoadingMore; }, [catalogLoadingMore]);
+  useEffect(() => { catalogHasMoreRef.current = catalogHasMoreFromStore; }, [catalogHasMoreFromStore]);
+  useEffect(() => { catalogItemsLengthRef.current = catalogItems.length; }, [catalogItems.length]);
+  useEffect(() => { catalogTotalRef.current = catalogTotal; }, [catalogTotal]);
+  useEffect(() => { catalogPageRef.current = catalogPage; }, [catalogPage]);
+  useEffect(() => { searchParamsRef.current = searchParams; }, [searchParams]);
+  useEffect(() => {
+    if (!catalogLoadingMore) {
+      loadMoreInFlightRef.current = false;
+    }
+  }, [catalogLoadingMore]);
+
   const catalogHasMore = isCatalogMode && catalogHasMoreFromStore;
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
@@ -156,31 +305,23 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const loadMoreCatalog = useCallback(() => {
     if (
       !isCatalogMode
-      || catalogLoading
-      || catalogLoadingMore
-      || !catalogHasMoreFromStore
-      || catalogItems.length >= catalogTotal
+      || loadMoreInFlightRef.current
+      || catalogLoadingRef.current
+      || catalogLoadingMoreRef.current
+      || !catalogHasMoreRef.current
+      || catalogItemsLengthRef.current >= catalogTotalRef.current
     ) {
       return;
     }
+    loadMoreInFlightRef.current = true;
     dispatch(fetchCatalogProducts({
-      ...buildUsedCatalogParams(searchParams, catalogPage + 1),
+      ...buildUsedCatalogParams(searchParamsRef.current, catalogPageRef.current + 1),
       append: true,
     }));
-  }, [
-    isCatalogMode,
-    catalogLoading,
-    catalogLoadingMore,
-    catalogHasMoreFromStore,
-    catalogItems.length,
-    catalogTotal,
-    dispatch,
-    searchParams,
-    catalogPage,
-  ]);
+  }, [isCatalogMode, dispatch]);
 
   useEffect(() => {
-    if (!isCatalogMode || !catalogHasMore || catalogLoading || catalogLoadingMore) {
+    if (!isCatalogMode || !catalogHasMore) {
       return undefined;
     }
     const sentinel = loadMoreSentinelRef.current;
@@ -188,15 +329,14 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) {
-          loadMoreCatalog();
-        }
+        if (!entries[0]?.isIntersecting) return;
+        loadMoreCatalog();
       },
-      { root: null, rootMargin: '120px', threshold: 0 }
+      { root: null, rootMargin: LOAD_MORE_ROOT_MARGIN, threshold: 0 }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [isCatalogMode, catalogHasMore, catalogLoading, catalogLoadingMore, loadMoreCatalog]);
+  }, [isCatalogMode, catalogHasMore, loadMoreCatalog]);
 
   const activeFilters = useMemo(() => ({
     partTypes: searchParams.getAll('part_type'),
@@ -305,14 +445,36 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const gridRowVirtualizer = useWindowVirtualizer({
     count: shouldVirtualize && viewMode === 'grid' ? gridRows.length : 0,
     estimateSize: () => GRID_ROW_ESTIMATE_PX,
-    overscan: 2,
+    overscan: 5,
   });
 
   const listRowVirtualizer = useWindowVirtualizer({
     count: shouldVirtualize && viewMode === 'list' ? sortedAvailableParts.length : 0,
     estimateSize: () => LIST_ROW_ESTIMATE_PX,
-    overscan: 3,
+    overscan: 5,
   });
+
+  const gridVirtualEndIndex = gridRowVirtualizer.range?.endIndex ?? -1;
+  const listVirtualEndIndex = listRowVirtualizer.range?.endIndex ?? -1;
+
+  useEffect(() => {
+    if (!shouldVirtualize || !isCatalogMode || !catalogHasMore) return;
+    const lastVisibleIndex = viewMode === 'grid' ? gridVirtualEndIndex : listVirtualEndIndex;
+    const totalCount = viewMode === 'grid' ? gridRows.length : sortedAvailableParts.length;
+    if (totalCount > 0 && lastVisibleIndex >= totalCount - 2) {
+      loadMoreCatalog();
+    }
+  }, [
+    shouldVirtualize,
+    isCatalogMode,
+    catalogHasMore,
+    viewMode,
+    gridVirtualEndIndex,
+    listVirtualEndIndex,
+    gridRows.length,
+    sortedAvailableParts.length,
+    loadMoreCatalog,
+  ]);
 
   const buildProductCardPart = useCallback((part) => ({
     id: part.id,
@@ -340,6 +502,14 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     sellerLogo: organization?.name?.substring(0, 4).toUpperCase() || 'SELL',
     phone: organization?.phone || part.organization?.phone || '+7 (999) 123-45-67',
   }), [organization]);
+
+  const productCardPartsMap = useMemo(() => {
+    const map = new Map();
+    [...sortedAvailableParts, ...sortedAnalogParts].forEach((part) => {
+      map.set(part.id, buildProductCardPart(part));
+    });
+    return map;
+  }, [sortedAvailableParts, sortedAnalogParts, buildProductCardPart]);
   
   useEffect(() => {
     // Загружаем информацию об организации только для авторизованных продавцов и сотрудников
@@ -354,140 +524,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     if (!locationId) return '—';
     const loc = storageLocations.find(l => l.id === locationId);
     return loc ? (loc.address || `Склад #${locationId}`) : `Склад #${locationId}`;
-  };
-
-  // Component for displaying media with navigation
-  const MediaDisplay = ({ part }) => {
-    const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
-    const [hoverSide, setHoverSide] = useState(null);
-    const [resolvedUrl, setResolvedUrl] = useState('');
-    const [urlFallbackIndex, setUrlFallbackIndex] = useState(0);
-
-    // Combine photos and videos
-    const allMedia = React.useMemo(() => {
-      const photos = (part.photos || []).slice(0, 1).map((photo) => {
-        const urlChain = buildListImageUrlFallbackChain(photo);
-        return {
-          type: 'photo',
-          url: urlChain[0] || '',
-          urlChain,
-          photo,
-        };
-      });
-      if (photos.length > 0) {
-        return photos;
-      }
-      if ((part.videos || []).length > 0) {
-        return [{ type: 'video', url: null }];
-      }
-      return [];
-    }, [part.photos, part.videos]);
-
-    React.useEffect(() => {
-      setResolvedUrl(allMedia[currentMediaIndex]?.url || '');
-      setUrlFallbackIndex(0);
-    }, [allMedia, currentMediaIndex]);
-
-    if (!allMedia || allMedia.length === 0) {
-      return (
-        <div className="w-full h-full flex items-center justify-center">
-          <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        </div>
-      );
-    }
-
-    const currentMedia = allMedia[currentMediaIndex];
-    const isVideo = currentMedia.type === 'video';
-
-    const goToPrevious = () => {
-      setCurrentMediaIndex(prev => prev > 0 ? prev - 1 : allMedia.length - 1);
-    };
-
-    const goToNext = () => {
-      setCurrentMediaIndex(prev => prev < allMedia.length - 1 ? prev + 1 : 0);
-    };
-
-    return (
-      <div className="relative w-full h-full group">
-        {/* Navigation arrows */}
-        {allMedia.length > 1 && (
-          <>
-            {/* Left arrow */}
-            <button
-              className={`absolute left-0 top-1/2 transform -translate-y-1/2 z-20 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-r-md transition-opacity duration-200 ${hoverSide === 'left' ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                goToPrevious();
-              }}
-              onMouseEnter={() => setHoverSide('left')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            {/* Right arrow */}
-            <button
-              className={`absolute right-0 top-1/2 transform -translate-y-1/2 z-20 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-l-md transition-opacity duration-200 ${hoverSide === 'right' ? 'opacity-100' : 'opacity-0 hover:opacity-100'}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                goToNext();
-              }}
-              onMouseEnter={() => setHoverSide('right')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </>
-        )}
-
-        {/* Media content */}
-        {isVideo ? (
-          <video
-            src={currentMedia.url}
-            className="w-full h-full object-cover rounded-lg"
-            muted
-            playsInline
-          />
-        ) : (
-          <img
-            src={resolvedUrl || currentMedia.url}
-            alt={part.name || part.article}
-            className="w-full h-full object-cover rounded-lg"
-            loading="lazy"
-            decoding="async"
-            onError={() => {
-              const chain = currentMedia.urlChain || [];
-              const nextIndex = urlFallbackIndex + 1;
-              if (nextIndex < chain.length && chain[nextIndex] !== resolvedUrl) {
-                setUrlFallbackIndex(nextIndex);
-                setResolvedUrl(chain[nextIndex]);
-              }
-            }}
-          />
-        )}
-
-        {/* Video indicator overlay */}
-        {isVideo && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 rounded-lg pointer-events-none">
-            <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-            </svg>
-          </div>
-        )}
-
-        {/* Media counter */}
-        {allMedia.length > 1 && (
-          <div className="absolute bottom-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
-            {currentMediaIndex + 1} / {allMedia.length}
-          </div>
-        )}
-      </div>
-    );
   };
 
   const renderPartListCard = (part, listKey) => {
@@ -692,7 +728,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                 <ProductCard
                   key={part.id}
                   listPriority={index < 2}
-                  part={buildProductCardPart(part)}
+                  part={productCardPartsMap.get(part.id)}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
                 />
@@ -710,7 +746,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   <div
                     key={virtualRow.key}
                     data-index={virtualRow.index}
-                    ref={gridRowVirtualizer.measureElement}
                     className="absolute left-0 top-0 w-full grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
                     style={{ transform: `translateY(${virtualRow.start}px)` }}
                   >
@@ -718,7 +753,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                       <ProductCard
                         key={part.id}
                         listPriority={virtualRow.index === 0 && colIndex < 2}
-                        part={buildProductCardPart(part)}
+                        part={productCardPartsMap.get(part.id)}
                         isTestOrganization={true}
                         hideConditionAndQuantity={true}
                       />
@@ -747,7 +782,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   <div
                     key={virtualRow.key}
                     data-index={virtualRow.index}
-                    ref={listRowVirtualizer.measureElement}
                     className="absolute left-0 top-0 w-full pb-3"
                     style={{ transform: `translateY(${virtualRow.start}px)` }}
                   >
@@ -758,7 +792,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             </div>
           )}
 
-          {isCatalogMode && catalogHasMore && (
+          {isCatalogMode && catalogHasMore && !shouldVirtualize && (
             <div ref={loadMoreSentinelRef} className="mt-6 min-h-4" aria-hidden="true">
               {catalogLoadingMore && (
                 viewMode === 'list'
@@ -789,7 +823,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                 <ProductCard
                   key={`analog-${part.id}`}
                   listPriority={index < 2}
-                  part={buildProductCardPart(part)}
+                  part={productCardPartsMap.get(part.id)}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
                 />

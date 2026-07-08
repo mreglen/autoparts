@@ -31,6 +31,24 @@ export function getUsedPartsUrlQuery(searchParams) {
   return (searchParams.get('q') || '').trim();
 }
 
+/** Убрать пустой ?q= из параметров URL (пробелы и пустая строка). */
+export function stripEmptyUsedQueryParam(searchParams) {
+  const params = new URLSearchParams(searchParams);
+  if (!params.has('q')) {
+    return { params, stripped: false };
+  }
+  const trimmed = (params.get('q') || '').trim();
+  if (trimmed) {
+    if (trimmed !== params.get('q')) {
+      params.set('q', trimmed);
+      return { params, stripped: false, normalized: true };
+    }
+    return { params, stripped: false };
+  }
+  params.delete('q');
+  return { params, stripped: true };
+}
+
 /** Страница /autoparts/used только с параметром ?q= (без других фильтров). */
 export function isUsedCatalogQueryOnlyPage(searchParams) {
   if (!searchParams) return false;

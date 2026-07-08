@@ -27,6 +27,7 @@ import ShareButton from '../../components/ShareButton/ShareButton';
 import FavoriteButton from '../../components/FavoriteButton/FavoriteButton';
 import Breadcrumbs from '../../components/Breadcrumbs/Breadcrumbs';
 import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
+import useHistoryBack from '../../hooks/useHistoryBack';
 import { recordProductView } from '../../redux/slices/UserEngagementSlice';
 import { mergeProductFitment } from '../../utils/mergeProductFitment';
 import { buildProductFaqJsonLd } from '../../utils/partDetailFaq';
@@ -640,21 +641,7 @@ const PartDetail = () => {
     setIsPhoneModalOpen(false);
   };
 
-  const handleBackToList = useCallback(() => {
-    const explicitBack = location.state?.backTo;
-    if (typeof explicitBack === 'string' && explicitBack.startsWith('/')) {
-      navigate(explicitBack);
-      return;
-    }
-
-    const historyIdx = window.history.state?.idx;
-    if (typeof historyIdx === 'number' && historyIdx > 0) {
-      navigate(-1);
-      return;
-    }
-
-    navigate('/autoparts/used');
-  }, [location.state, navigate]);
+  const handleBackToList = useHistoryBack('/autoparts/used');
 
   useEffect(() => {
     if (!isPhoneModalOpen) return undefined;
@@ -909,8 +896,6 @@ const PartDetail = () => {
     ...(currentProduct.photos || []),
     ...(currentProduct.videos || []),
   ];
-  const stockQuantity = currentProduct.quantity || 0;
-  const showLowStockBadge = inStock && stockQuantity > 0 && stockQuantity <= 5;
   const hasSellerContact = showSellerContact && (sellerOrg?.phone || sellerOrg?.contact_person);
   const stockInfo = getStockAvailability(currentProduct);
   const canShowBuyNow = showCart && inStock && !stockInfo.noStock;
@@ -1199,31 +1184,25 @@ const PartDetail = () => {
               </svg>
             </button>
             <div className="pointer-events-auto flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur">
-                <FavoriteButton productId={currentProduct.id} size="sm" />
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur">
-                <ShareButton
-                  url={seo.canonicalUrl}
-                  title={h1Primary}
-                  text={shareText}
-                  showLabel={false}
-                  size="sm"
-                />
-              </div>
+              <FavoriteButton
+                productId={currentProduct.id}
+                size="sm"
+                showLabel={false}
+                className="h-10 w-10 min-h-0 rounded-full border-0 bg-white/80 p-0 shadow-sm backdrop-blur"
+              />
+              <ShareButton
+                url={seo.canonicalUrl}
+                title={h1Primary}
+                text={shareText}
+                showLabel={false}
+                size="sm"
+                className="h-10 w-10 min-h-0 rounded-full border-0 bg-white/80 p-0 shadow-sm backdrop-blur"
+              />
             </div>
           </div>
         </div>
 
         <div className="border-b border-gray-100 bg-white px-4 py-3">
-          {showLowStockBadge ? (
-            <div className="mb-2 inline-flex items-center gap-1.5 rounded-md bg-gray-900 px-2.5 py-1 text-xs font-semibold text-white">
-              <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M11.3 1.046a1 1 0 01.7.954v3.5a1 1 0 01-1 1H9a1 1 0 01-1-1V2a1 1 0 01.7-.954l2-.667a1 1 0 01.6 0l2 .667zM5 8a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm-1 4a1 1 0 011-1h6a1 1 0 110 2H5a1 1 0 01-1-1z" clipRule="evenodd" />
-              </svg>
-              Осталась {stockQuantity} шт
-            </div>
-          ) : null}
           <div className="text-2xl font-bold text-gray-900">
             {currentProduct.price ? formatProductPriceDisplay(currentProduct.price) : '—'}
           </div>
@@ -1245,18 +1224,8 @@ const PartDetail = () => {
           </button>
         </div>
 
-        <div className="mb-4 flex flex-col gap-2 px-4 pt-3 md:hidden">
+        <div className="mb-4 px-4 pt-3 md:hidden">
           <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
-          <button
-            type="button"
-            onClick={handleBackToList}
-            className="inline-flex items-center self-start rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:border-indigo-200 hover:text-indigo-600"
-          >
-            <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-            </svg>
-            Назад к списку
-          </button>
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm max-md:rounded-none max-md:border-x-0 max-md:shadow-none">
@@ -1331,10 +1300,6 @@ const PartDetail = () => {
               <div className="space-y-3 md:hidden">{renderMobileTitleBlock()}</div>
               {renderMediaThumbnails('md:hidden')}
 
-              <PartDetailAboutBlock
-                bodyDescription={bodyDescription}
-                isNew={Boolean(currentProduct.is_new)}
-              />
               <PartDetailSpecsBlock product={currentProduct} />
             </div>
 
@@ -1493,6 +1458,11 @@ const PartDetail = () => {
                 </div>
               </div>
             )}
+
+            <PartDetailAboutBlock
+              bodyDescription={bodyDescription}
+              isNew={Boolean(currentProduct.is_new)}
+            />
           </div>
         </div>
       </div>

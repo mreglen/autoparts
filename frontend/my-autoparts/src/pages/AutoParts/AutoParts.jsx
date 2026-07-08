@@ -18,6 +18,7 @@ import {
   clearUsedPartsSearch,
   selectCatalogFilterKey,
   selectCatalogLoading,
+  selectCatalogItems,
 } from '../../redux/slices/ProductSlice';
 import NewPartsLanding from './NewParts/NewPartsLanding';
 import MobileCompactSearch from '../../components/MobileCompactSearch/MobileCompactSearch';
@@ -27,6 +28,7 @@ import {
   buildUsedCatalogFilterParams,
   getUsedPartsUrlQuery,
   isUsedCatalogQueryOnlyPage,
+  stripEmptyUsedQueryParam,
   apiSortToUi,
   uiSortToApi,
   getNewUiSort,
@@ -51,6 +53,7 @@ function AutoParts() {
   
   const catalogFilterKey = useSelector(selectCatalogFilterKey);
   const catalogLoading = useSelector(selectCatalogLoading);
+  const catalogItems = useSelector(selectCatalogItems);
   const catalogError = useSelector((state) => state.products.error);
   
   // Determine active tab from URL path
@@ -241,6 +244,18 @@ function AutoParts() {
   );
 
   useEffect(() => {
+    if (!location.pathname.includes('/autoparts/used')) return;
+    const { params, stripped, normalized } = stripEmptyUsedQueryParam(searchParams);
+    if (stripped || normalized) {
+      const qs = params.toString();
+      navigate(`${location.pathname}${qs ? `?${qs}` : ''}`, { replace: true });
+      if (stripped) {
+        dispatch(setSearchQuery(''));
+      }
+    }
+  }, [location.pathname, searchParams, navigate, dispatch]);
+
+  useEffect(() => {
     if (activeTab !== 'my') return;
 
     dispatch(fetchCatalogFacets({}));
@@ -255,11 +270,12 @@ function AutoParts() {
     }
 
     const catalogAlreadyLoaded = catalogFilterKey === usedCatalogFilterKey
-      && catalogFilterKey !== null;
+      && catalogFilterKey !== null
+      && catalogItems.length > 0;
     if (!catalogAlreadyLoaded) {
       dispatch(fetchCatalogProducts(buildUsedCatalogParams(searchParams, 1)));
     }
-  }, [searchQuery, activeTab, usedCatalogFilterKey, searchParams, dispatch, catalogFilterKey]);
+  }, [searchQuery, activeTab, usedCatalogFilterKey, searchParams, dispatch, catalogFilterKey, catalogItems.length]);
 
   useEffect(() => {
     if (activeTab !== 'my') return;

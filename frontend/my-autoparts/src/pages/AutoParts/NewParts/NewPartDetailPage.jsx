@@ -33,6 +33,7 @@ import {
 import { extractCityFromAddress } from '../../../utils/organizationCity';
 import { slugifyBrand } from '../../../utils/slugUtils';
 import NewPartHorizontalScroll from './NewPartHorizontalScroll';
+import useHistoryBack from '../../../hooks/useHistoryBack';
 
 const safeText = (value, fallback = '') => {
   if (typeof value === 'string') return value.trim() || fallback;
@@ -288,6 +289,7 @@ export default function NewPartDetailPage() {
   }, [livePart, rosskoData]);
 
   const backToListPath = location.state?.backTo || '/autoparts/new';
+  const handleBackToList = useHistoryBack('/autoparts/new');
   const canonicalPath = card ? buildNewPartDetailPath(card) : `/autoparts/new/part/${cardIdParam || ''}`;
 
   const seo = useMemo(() => {
@@ -391,7 +393,7 @@ export default function NewPartDetailPage() {
         <p className="text-red-600">{error}</p>
         <button
           type="button"
-          onClick={() => navigate('/autoparts/new')}
+          onClick={handleBackToList}
           className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
         >
           К новым запчастям
@@ -470,7 +472,7 @@ export default function NewPartDetailPage() {
       <section className="mb-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-4 shadow-sm sm:mb-6 sm:p-6">
         <button
           type="button"
-          onClick={() => navigate(backToListPath)}
+          onClick={handleBackToList}
           className="mb-3 min-h-[44px] text-sm font-medium text-indigo-600 hover:text-indigo-800"
         >
           ← К поиску новых запчастей

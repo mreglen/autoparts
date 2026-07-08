@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { getPageTitle } from '../../hooks/useMobileMenuShell';
+import useHistoryBack from '../../hooks/useHistoryBack';
 import { selectCartSummary } from '../../redux/slices/CartSlice';
 import { useShowYandexBadge } from '../../utils/siteReviewsPublic';
 import HeaderYandexBadge from '../Seo/HeaderYandexBadge';
@@ -95,13 +96,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
     const profilePath = '/profile';
     const showYandexBadge = useShowYandexBadge();
 
-    const handleBack = () => {
-        if (window.history.length > 1) {
-            navigate(-1);
-        } else {
-            navigate('/');
-        }
-    };
+    const handleBack = useHistoryBack('/');
 
     return (
         <header className={`lg:hidden fixed inset-x-0 top-0 z-40 border-b border-gray-200/90 bg-white/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-white/85 pt-safe-top ${hidden ? 'hidden' : ''}`}>
