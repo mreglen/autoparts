@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { resolveProductCity } from '../../utils/productSearchSeo';
 
-function SpecRow({ label, children }) {
+function SpecRowCard({ label, children }) {
   return (
     <div className="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-1 border-b border-gray-100 py-3 last:border-b-0 sm:grid-cols-[8.5rem_1fr]">
       <dt className="text-sm text-gray-500">{label}</dt>
@@ -11,9 +11,16 @@ function SpecRow({ label, children }) {
   );
 }
 
-export default function PartDetailSpecsBlock({ product }) {
-  if (!product) return null;
+function SpecRowInline({ label, children }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-dotted border-gray-200 py-2.5 last:border-b-0">
+      <dt className="shrink-0 text-sm text-gray-500">{label}</dt>
+      <dd className="min-w-0 text-right text-sm font-medium text-gray-900">{children}</dd>
+    </div>
+  );
+}
 
+function PartDetailSpecsContent({ product, SpecRow }) {
   const brand = (product.brand || '').trim();
   const article = (product.article || '').trim();
   const partTypeName = (product.part_type?.name || '').trim();
@@ -25,45 +32,68 @@ export default function PartDetailSpecsBlock({ product }) {
   const stockLabel = inStock ? `${product.quantity} шт.` : 'Нет в наличии';
 
   return (
+    <>
+      {partTypeName ? <SpecRow label="Тип детали">{partTypeName}</SpecRow> : null}
+      <SpecRow label="Состояние">{conditionLabel}</SpecRow>
+      {brand ? <SpecRow label="Бренд">{brand}</SpecRow> : null}
+      {article ? <SpecRow label="Артикул">{article}</SpecRow> : null}
+      {(product.internal_code || '').trim() ? (
+        <SpecRow label="Код товара">
+          <span className="font-mono text-gray-800">{String(product.internal_code).trim()}</span>
+        </SpecRow>
+      ) : null}
+      <SpecRow label="Наличие">
+        <span className={inStock ? 'text-emerald-700' : 'text-amber-700'}>{stockLabel}</span>
+      </SpecRow>
+      <SpecRow label="Город">{city}</SpecRow>
+      <SpecRow label="Доставка">
+        <span>
+          Доставка по России, самовывоз — у продавца.{' '}
+          <Link to="/delivery" className="font-medium text-indigo-600 hover:text-indigo-800">
+            Подробнее
+          </Link>
+        </span>
+      </SpecRow>
+      <SpecRow label={product.is_new ? 'Гарантия' : 'Осмотр'}>
+        {product.is_new
+          ? 'Новая деталь. Комплектацию и гарантию уточняйте у продавца.'
+          : 'Рекомендуем осмотреть деталь или запросить фото/видео у продавца.'}
+      </SpecRow>
+      {seller?.id && sellerName ? (
+        <SpecRow label="Продавец">
+          <Link
+            to={`/organizations/${seller.id}`}
+            className="font-medium text-indigo-600 hover:text-indigo-800"
+          >
+            {sellerName}
+          </Link>
+        </SpecRow>
+      ) : null}
+    </>
+  );
+}
+
+export default function PartDetailSpecsBlock({ product, variant = 'card' }) {
+  if (!product) return null;
+
+  const SpecRow = variant === 'inline' ? SpecRowInline : SpecRowCard;
+
+  if (variant === 'inline') {
+    return (
+      <section className="mt-4">
+        <h2 className="text-base font-semibold text-gray-900">Характеристики</h2>
+        <dl className="mt-2">
+          <PartDetailSpecsContent product={product} SpecRow={SpecRow} />
+        </dl>
+      </section>
+    );
+  }
+
+  return (
     <section className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
       <h2 className="text-base font-semibold text-gray-900">Характеристики</h2>
       <dl className="mt-2">
-        {partTypeName ? <SpecRow label="Тип детали">{partTypeName}</SpecRow> : null}
-        <SpecRow label="Состояние">{conditionLabel}</SpecRow>
-        {brand ? <SpecRow label="Бренд">{brand}</SpecRow> : null}
-        {article ? <SpecRow label="Артикул">{article}</SpecRow> : null}
-        {(product.internal_code || '').trim() ? (
-          <SpecRow label="Код товара">
-            <span className="font-mono text-gray-800">{String(product.internal_code).trim()}</span>
-          </SpecRow>
-        ) : null}
-        <SpecRow label="Наличие">
-          <span className={inStock ? 'text-emerald-700' : 'text-amber-700'}>{stockLabel}</span>
-        </SpecRow>
-        <SpecRow label="Город">{city}</SpecRow>
-        <SpecRow label="Доставка">
-          <span>
-            Доставка по России, самовывоз — у продавца.{' '}
-            <Link to="/delivery" className="font-medium text-indigo-600 hover:text-indigo-800">
-              Подробнее
-            </Link>
-          </span>
-        </SpecRow>
-        <SpecRow label={product.is_new ? 'Гарантия' : 'Осмотр'}>
-          {product.is_new
-            ? 'Новая деталь. Комплектацию и гарантию уточняйте у продавца.'
-            : 'Рекомендуем осмотреть деталь или запросить фото/видео у продавца.'}
-        </SpecRow>
-        {seller?.id && sellerName ? (
-          <SpecRow label="Продавец">
-            <Link
-              to={`/organizations/${seller.id}`}
-              className="font-medium text-indigo-600 hover:text-indigo-800"
-            >
-              {sellerName}
-            </Link>
-          </SpecRow>
-        ) : null}
+        <PartDetailSpecsContent product={product} SpecRow={SpecRow} />
       </dl>
     </section>
   );

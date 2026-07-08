@@ -16,6 +16,9 @@ import MediaModal from '../../components/MediaModal/MediaModal';
 import PartDetailSeoCrossLinks from './PartDetailSeoCrossLinks';
 import PartDetailSeoSummary from './PartDetailSeoSummary';
 import PartDetailSpecsBlock from './PartDetailSpecsBlock';
+import PartDetailDesktopGallery from './PartDetailDesktopGallery';
+import PartDetailOrganizationSidebar from './PartDetailOrganizationSidebar';
+import PartDetailPurchaseSidebar from './PartDetailPurchaseSidebar';
 import PartDetailFitmentBlock from './PartDetailFitmentBlock';
 import PartDetailAboutBlock from './PartDetailAboutBlock';
 import PartDetailFaqBlock from './PartDetailFaqBlock';
@@ -955,93 +958,6 @@ const PartDetail = () => {
     );
   };
 
-  const renderMainGallery = () => {
-    if (allMediaItems.length === 0) {
-      return (
-        <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50">
-          <p className="text-sm text-gray-400">Нет фотографий или видео</p>
-        </div>
-      );
-    }
-
-    const firstItem = allMediaItems[currentMainMediaIndex];
-    const mediaUrl = normalizeImageUrl(getMediaUrl(firstItem));
-    const isVideoItem = isVideo(firstItem);
-
-    return (
-      <div>
-        <div className="relative">
-          <div
-            className="group relative mb-3 aspect-[4/3] cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-inner"
-            onClick={() => handleOpenMediaModal(currentMainMediaIndex)}
-          >
-            {isVideoItem ? (
-              <div className="relative h-full w-full">
-                <video
-                  src={mediaUrl}
-                  className="h-full w-full object-contain"
-                  muted
-                  playsInline
-                  preload="metadata"
-                />
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/30">
-                  <div className="rounded-full bg-white/90 p-4">
-                    <svg className="ml-0.5 h-10 w-10 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="absolute bottom-3 right-3 rounded bg-black/70 px-3 py-1.5 text-sm font-medium text-white">
-                  Видео
-                </div>
-              </div>
-            ) : (
-              <img
-                src={mediaUrl}
-                alt={photoAltMain}
-                className="h-full w-full object-contain"
-                loading="eager"
-              />
-            )}
-          </div>
-
-          {allMediaItems.length > 1 && (
-            <>
-              <button
-                type="button"
-                className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 text-gray-600 hover:text-indigo-600"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentMainMediaIndex((prev) => (prev > 0 ? prev - 1 : allMediaItems.length - 1));
-                }}
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 text-gray-600 hover:text-indigo-600"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentMainMediaIndex((prev) => (prev < allMediaItems.length - 1 ? prev + 1 : 0));
-                }}
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-              <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-1 text-xs font-medium text-white">
-                {currentMainMediaIndex + 1} / {allMediaItems.length}
-              </div>
-            </>
-          )}
-        </div>
-        {renderMediaThumbnails()}
-      </div>
-    );
-  };
-
   const renderMobileTitleBlock = () => (
     <>
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -1227,9 +1143,124 @@ const PartDetail = () => {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm max-md:rounded-none max-md:border-x-0 max-md:shadow-none">
-          <div className="hidden border-b border-gray-100 bg-gradient-to-r from-white to-slate-50/80 px-4 py-5 sm:px-6 md:block">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 flex-1">
+          <div className="md:hidden">
+            <div className="grid grid-cols-1">
+              <div className="space-y-4 p-4 max-md:px-4 max-md:pt-4">
+                <div className="space-y-3">{renderMobileTitleBlock()}</div>
+                {renderMediaThumbnails('')}
+                <PartDetailSpecsBlock product={currentProduct} />
+              </div>
+
+              <div className="flex flex-col gap-4 bg-slate-50/70 p-4 max-md:px-4">
+                <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <dl className="space-y-2.5 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-gray-500">В наличии</dt>
+                      <dd className={`font-semibold ${inStock ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        {currentProduct.quantity || 0} шт.
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-gray-500">Адрес</dt>
+                      <dd className="mt-1 font-medium leading-snug text-gray-900 break-words">
+                        {currentProduct.storage_location?.address
+                          || currentProduct.storage_location?.name
+                          || '—'}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+
+                {currentProduct.description ? (
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <h2 className="mb-2 text-sm font-semibold text-gray-900">Описание от продавца</h2>
+                    <div className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">
+                      {stripHtmlTags(currentProduct.description)}
+                    </div>
+                  </div>
+                ) : null}
+
+                {showSellerContact && (sellerOrg?.phone || sellerOrg?.contact_person) ? (
+                  <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <h2 className="mb-3 text-sm font-semibold text-gray-900">Продавец</h2>
+                    <div className="mb-3 flex items-center gap-2.5">
+                      <div
+                        className={`flex h-9 w-9 shrink-0 overflow-hidden rounded-full ${
+                          sellerLogoUrl ? 'border border-gray-200 bg-white' : 'bg-indigo-600'
+                        }`}
+                      >
+                        {sellerLogoUrl ? (
+                          <img
+                            src={sellerLogoUrl}
+                            alt={sellerOrg?.name || 'Логотип продавца'}
+                            className="h-full w-full object-contain p-0.5"
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
+                            {(sellerOrg?.name || 'П').substring(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        {sellerOrg?.name ? (
+                          <p className="truncate text-sm font-medium text-gray-900">{sellerOrg.name}</p>
+                        ) : null}
+                        {sellerOrg?.contact_person ? (
+                          <p className="truncate text-xs text-gray-500">{sellerOrg.contact_person}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      {sellerOrg?.phone ? (
+                        <button
+                          type="button"
+                          onClick={handleOpenPhoneModal}
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 py-2.5 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
+                        >
+                          Позвонить
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={handleWriteToSeller}
+                        disabled={creatingChat}
+                        className="flex flex-1 items-center justify-center rounded-md bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-indigo-400"
+                      >
+                        {creatingChat ? 'Создание чата…' : 'Написать'}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="space-y-3">
+                  <PartDetailSeoSummary summary={seo.seoSummary} />
+                  <PartDetailTrustRow />
+                </div>
+
+                <PartDetailAboutBlock
+                  bodyDescription={bodyDescription}
+                  isNew={Boolean(currentProduct.is_new)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden md:block p-5 sm:p-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              <div className="lg:col-span-5">
+                <PartDetailDesktopGallery
+                  items={allMediaItems}
+                  currentIndex={currentMainMediaIndex}
+                  onIndexChange={setCurrentMainMediaIndex}
+                  onOpenModal={handleOpenMediaModal}
+                  brand={partBrand}
+                  article={partArticle}
+                  name={currentProduct.name}
+                  mainAlt={photoAltMain}
+                />
+              </div>
+
+              <div className="min-w-0 lg:col-span-4">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
                     {currentProduct.brand || '—'}
@@ -1252,16 +1283,25 @@ const PartDetail = () => {
                     </span>
                   ) : null}
                 </div>
-                <h1 className="text-xl font-bold leading-snug text-gray-900 sm:text-2xl lg:text-[1.65rem]">
-                  <span className="block">{h1Primary}</span>
-                  {h1Subtitle ? (
-                    <span className="mt-1 block text-base font-medium text-gray-600">
-                      {h1Subtitle}
-                    </span>
-                  ) : null}
-                </h1>
-                <PartDetailSeoSummary summary={seo.seoSummary} />
-                <PartDetailTrustRow />
+
+                <div className="flex items-start justify-between gap-3">
+                  <h1 className="min-w-0 flex-1 text-xl font-bold leading-snug text-gray-900 lg:text-[1.65rem]">
+                    <span className="block">{h1Primary}</span>
+                    {h1Subtitle ? (
+                      <span className="mt-1 block text-base font-medium text-gray-600">{h1Subtitle}</span>
+                    ) : null}
+                  </h1>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <FavoriteButton productId={currentProduct.id} size="sm" />
+                    <ShareButton
+                      url={seo.canonicalUrl}
+                      title={h1Primary}
+                      text={shareText}
+                      size="sm"
+                    />
+                  </div>
+                </div>
+
                 <PartDetailSeoCrossLinks
                   brand={partBrand}
                   article={partArticle}
@@ -1270,205 +1310,57 @@ const PartDetail = () => {
                   organizationName={sellerOrg?.name}
                   usedCatalogPath={seo.usedCatalogPath}
                 />
+
+                <PartDetailSpecsBlock product={currentProduct} variant="inline" />
+
+                {currentProduct.description ? (
+                  <section className="mt-4">
+                    <h2 className="text-base font-semibold text-gray-900">Описание от продавца</h2>
+                    <div className="mt-2 text-sm leading-relaxed text-gray-700 whitespace-pre-line">
+                      {stripHtmlTags(currentProduct.description)}
+                    </div>
+                  </section>
+                ) : null}
               </div>
-              <div className="flex shrink-0 flex-row items-center justify-between gap-4 sm:flex-col sm:items-end lg:min-w-[180px]">
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <FavoriteButton productId={currentProduct.id} size="sm" />
-                  <ShareButton
-                    url={seo.canonicalUrl}
-                    title={h1Primary}
-                    text={shareText}
-                    size="sm"
+
+              <div className="lg:col-span-3">
+                <div className="space-y-4 lg:sticky lg:top-4">
+                  <PartDetailPurchaseSidebar
+                    product={currentProduct}
+                    inStock={inStock}
+                    formatPrice={formatProductPriceDisplay}
+                    showCart={showCart}
+                    cartQuantity={getCartQuantity(currentProduct.id)}
+                    stockNoStock={stockInfo.noStock}
+                    isAdding={addingToCartId === currentProduct.id}
+                    buyingNow={buyingNow}
+                    canShowBuyNow={canShowBuyNow}
+                    onAddToCart={() => handleAddToCart(currentProduct)}
+                    onRemoveFromCart={() => handleRemoveFromCart(currentProduct)}
+                    onBuyNow={handleBuyNow}
+                  />
+                  <PartDetailOrganizationSidebar
+                    organization={sellerOrg}
+                    logoUrl={sellerLogoUrl}
+                    showSellerContact={showSellerContact}
+                    onPhoneClick={handleOpenPhoneModal}
+                    onWriteClick={handleWriteToSeller}
+                    creatingChat={creatingChat}
                   />
                 </div>
-                <div className="text-right">
-                  <div className="text-xs font-medium uppercase tracking-wide text-gray-500">Цена</div>
-                  <div className="text-2xl font-bold text-indigo-700 sm:text-3xl">
-                    {currentProduct.price ? formatProductPriceDisplay(currentProduct.price) : '—'}
-                  </div>
-                </div>
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-5">
-            <div className="space-y-4 border-gray-100 p-4 sm:p-5 lg:col-span-3 lg:border-r max-md:px-4 max-md:pt-4">
-              <div className="hidden md:block">{renderMainGallery()}</div>
-
-              <div className="space-y-3 md:hidden">{renderMobileTitleBlock()}</div>
-              {renderMediaThumbnails('md:hidden')}
-
-              <PartDetailSpecsBlock product={currentProduct} />
-            </div>
-
-          {/* Right - Info & Actions */}
-          <div className="flex flex-col gap-4 bg-slate-50/70 p-4 sm:p-5 lg:col-span-2 max-md:px-4">
-            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <dl className="space-y-2.5 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-gray-500">В наличии</dt>
-                  <dd className={`font-semibold ${inStock ? 'text-emerald-700' : 'text-amber-700'}`}>
-                    {currentProduct.quantity || 0} шт.
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-gray-500">Адрес</dt>
-                  <dd className="mt-1 font-medium leading-snug text-gray-900 break-words">
-                    {currentProduct.storage_location?.address
-                      || currentProduct.storage_location?.name
-                      || '—'}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-
-            {/* Description */}
-            {currentProduct.description && (
-              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                <h2 className="mb-2 text-sm font-semibold text-gray-900">Описание от продавца</h2>
-                <div className="text-sm leading-relaxed text-gray-700 whitespace-pre-line">
-                  {stripHtmlTags(currentProduct.description)}
-                </div>
-              </div>
-            )}
-
-            {/* Add to Cart */}
-            {currentProduct && showCart && (
-            <div className="hidden md:block">
-              {(() => {
-                const cartQuantity = getCartQuantity(currentProduct.id);
-                const stockInfo = getStockAvailability(currentProduct);
-                const isAdding = addingToCartId === currentProduct.id;
-
-                return (
-                  <>
-                    {cartQuantity > 0 ? (
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <button
-                            onClick={() => handleRemoveFromCart(currentProduct)}
-                            disabled={isAdding}
-                            className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-300 bg-white text-xl font-bold hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                          >
-                            −
-                          </button>
-                          <span className="text-xl font-bold w-14 text-center text-gray-900">
-                            {cartQuantity}
-                          </span>
-                          <button
-                            onClick={() => handleAddToCart(currentProduct)}
-                            disabled={isAdding || stockInfo.noStock}
-                            className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-300 bg-white text-xl font-bold hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                          >
-                            +
-                          </button>
-                        </div>
-                        {stockInfo.noStock && (
-                          <div className="text-xs text-orange-600 font-medium bg-orange-50 px-2 py-1 rounded-md">
-                            Нет в наличии
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleAddToCart(currentProduct)}
-                        disabled={isAdding || stockInfo.noStock}
-                        className="w-full rounded-md bg-indigo-600 py-3 text-base font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {isAdding ? (
-                          <svg className="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        ) : (
-                          <span className="flex items-center justify-center">
-                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            В корзину
-                          </span>
-                        )}
-                      </button>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-            )}
-
-            {/* Seller */}
-            {showSellerContact && (sellerOrg?.phone || sellerOrg?.contact_person) && (
-              <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                <h2 className="mb-3 text-sm font-semibold text-gray-900">Продавец</h2>
-
-                <div className="mb-3 flex items-center gap-2.5">
-                  <div
-                    className={`flex h-9 w-9 shrink-0 overflow-hidden rounded-full ${
-                      sellerLogoUrl
-                        ? 'border border-gray-200 bg-white'
-                        : 'bg-indigo-600'
-                    }`}
-                  >
-                    {sellerLogoUrl ? (
-                      <img
-                        src={sellerLogoUrl}
-                        alt={sellerOrg?.name || 'Логотип продавца'}
-                        className="h-full w-full object-contain p-0.5"
-                      />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center text-xs font-bold text-white">
-                        {(sellerOrg?.name || 'П').substring(0, 2).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    {sellerOrg?.name ? (
-                      <p className="truncate text-sm font-medium text-gray-900">{sellerOrg.name}</p>
-                    ) : null}
-                    {sellerOrg?.contact_person ? (
-                      <p className="truncate text-xs text-gray-500">{sellerOrg.contact_person}</p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2 sm:flex-row">
-                {sellerOrg?.phone && (
-                    <button
-                      type="button"
-                      onClick={handleOpenPhoneModal}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 py-2.5 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
-                    >
-                      <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                      Позвонить
-                    </button>
-                )}
-                
-                <button
-                  type="button"
-                  onClick={handleWriteToSeller}
-                  disabled={creatingChat}
-                  className="flex flex-1 items-center justify-center rounded-md bg-indigo-600 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-indigo-400"
-                >
-                  {creatingChat ? 'Создание чата…' : 'Написать'}
-                </button>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-3 md:hidden">
+            <div className="mt-6 space-y-4 border-t border-gray-100 pt-6">
               <PartDetailSeoSummary summary={seo.seoSummary} />
               <PartDetailTrustRow />
+              <PartDetailAboutBlock
+                bodyDescription={bodyDescription}
+                isNew={Boolean(currentProduct.is_new)}
+              />
             </div>
-
-            <PartDetailAboutBlock
-              bodyDescription={bodyDescription}
-              isNew={Boolean(currentProduct.is_new)}
-            />
           </div>
         </div>
-      </div>
 
         <div className="mt-6 space-y-4 max-md:px-4">
       <PartDetailFitmentBlock
