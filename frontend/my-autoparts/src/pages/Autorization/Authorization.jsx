@@ -1,15 +1,30 @@
 // Authorization.jsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { resetRegistration } from '../../redux/slices/AuthSlice'; 
+import { useLocation, useNavigate } from 'react-router-dom';
+import { resetRegistration } from '../../redux/slices/AuthSlice';
+import { useAuthReady } from '../../hooks/useAuthReady';
 import Login from './Login/Login';
 import Registration from './Registration/Registration';
+
+function resolveAuthRedirectPath(from) {
+  if (typeof from === 'string' && from.startsWith('/')) {
+    return from;
+  }
+  return '/';
+}
 
 export default function Authorization() {
   const [showRegister, setShowRegister] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated, isReady, token } = useAuthReady();
+
+  useEffect(() => {
+    if (!isReady || !token || !isAuthenticated) return;
+    navigate(resolveAuthRedirectPath(location.state?.from), { replace: true });
+  }, [isReady, token, isAuthenticated, location.state, navigate]);
 
   const handleSwitch = () => {
     dispatch(resetRegistration()); 

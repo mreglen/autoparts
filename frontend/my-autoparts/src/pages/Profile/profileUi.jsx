@@ -22,9 +22,15 @@ export function ProfileBlock({ title, children, className = '' }) {
   );
 }
 
-export function ProfileSectionHeader({ title, actionLabel, to, onAction }) {
+export function ProfileSectionHeader({
+  title,
+  actionLabel,
+  to,
+  onAction,
+  showChevron = true,
+}) {
   const actionClass =
-    'inline-flex items-center gap-0.5 text-sm font-medium text-indigo-600 hover:text-indigo-700';
+    'text-sm font-medium text-indigo-600 hover:text-indigo-700';
 
   return (
     <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
@@ -32,7 +38,7 @@ export function ProfileSectionHeader({ title, actionLabel, to, onAction }) {
       {to ? (
         <Link to={to} className={actionClass}>
           {actionLabel || 'Все'}
-          <ChevronRight className="h-4 w-4 text-indigo-400" />
+          {showChevron ? <ChevronRight className="h-4 w-4 text-indigo-400" /> : null}
         </Link>
       ) : null}
       {!to && onAction && actionLabel ? (
@@ -40,20 +46,6 @@ export function ProfileSectionHeader({ title, actionLabel, to, onAction }) {
           {actionLabel}
         </button>
       ) : null}
-    </div>
-  );
-}
-
-export function ProfileShowMoreButton({ to, visible = true }) {
-  if (!visible || !to) return null;
-  return (
-    <div className="border-t border-gray-100 px-4 py-3">
-      <Link
-        to={to}
-        className="flex w-full items-center justify-center rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50"
-      >
-        Показать больше
-      </Link>
     </div>
   );
 }

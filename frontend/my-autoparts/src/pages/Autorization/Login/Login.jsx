@@ -1,10 +1,17 @@
 // src/pages/Authorization/Login/Login.jsx
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { login as loginThunk } from '../../../redux/slices/AuthSlice';
 import { fetchCart } from '../../../redux/slices/CartSlice';
 import { trackFormField, trackFormSubmit } from '../../../utils/siteAnalytics';
+
+function resolveAuthRedirectPath(from) {
+    if (typeof from === 'string' && from.startsWith('/')) {
+        return from;
+    }
+    return '/';
+}
 
 export default function Login() {
     const [loginValue, setLoginValue] = useState('');
@@ -12,6 +19,7 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false); // <-- added
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
     const { loading, error } = useSelector((state) => state.auth);
 
     const handleSubmit = (e) => {
@@ -20,7 +28,7 @@ export default function Login() {
         dispatch(loginThunk({ login: loginValue, password }))
             .unwrap()
             .then(() => {
-                navigate('/', { replace: true });
+                navigate(resolveAuthRedirectPath(location.state?.from), { replace: true });
                 dispatch(fetchCart());
             })
             .catch(() => { });

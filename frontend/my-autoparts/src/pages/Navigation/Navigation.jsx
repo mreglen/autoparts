@@ -55,7 +55,7 @@ function HeaderIconLink({ to, label, badge, children }) {
     <Link
       to={to}
       aria-label={label}
-      className="relative flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition hover:bg-gray-100 hover:text-indigo-600"
+      className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-gray-600 transition hover:border-indigo-200 hover:bg-indigo-50/50 hover:text-indigo-600"
     >
       {children}
       <HeaderBadge count={badge} />

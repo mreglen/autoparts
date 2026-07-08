@@ -11,15 +11,20 @@ import {
   ProfileBlock,
   ProfilePreviewGrid,
   ProfileSectionHeader,
-  ProfileShowMoreButton,
 } from './profileUi';
 
 function EngagementPreviewSection({ title, items, loading, moreTo, previewItems, previewLimit }) {
+  const showMore = items.length > previewLimit;
+
   return (
     <ProfileBlock>
-      <ProfileSectionHeader title={title} />
+      <ProfileSectionHeader
+        title={title}
+        to={showMore ? moreTo : undefined}
+        actionLabel="Показать больше"
+        showChevron={false}
+      />
       <ProfilePreviewGrid items={previewItems} loading={loading} />
-      <ProfileShowMoreButton to={moreTo} visible={items.length > previewLimit} />
     </ProfileBlock>
   );
 }
@@ -65,7 +70,12 @@ export default function ProfileEngagementPreview() {
       </div>
 
       <ProfileBlock>
-        <ProfileSectionHeader title="Подписки" />
+        <ProfileSectionHeader
+          title="Подписки"
+          to={subscriptions.length > PREVIEW_LIMIT.subscriptions ? '/profile/subscriptions' : undefined}
+          actionLabel="Показать больше"
+          showChevron={false}
+        />
         {subsLoading ? (
           <div className="space-y-0 px-4 pb-4">
             <div className="my-3 h-12 animate-pulse rounded bg-gray-50" />
@@ -77,10 +87,6 @@ export default function ProfileEngagementPreview() {
             onDelete={(id) => dispatch(deleteSearchSubscription(id))}
           />
         )}
-        <ProfileShowMoreButton
-          to="/profile/subscriptions"
-          visible={subscriptions.length > PREVIEW_LIMIT.subscriptions}
-        />
       </ProfileBlock>
     </>
   );

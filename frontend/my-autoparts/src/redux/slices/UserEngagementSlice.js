@@ -16,7 +16,9 @@ export function isAuthEngagementError(message) {
 
 function hasAuthenticatedUser(getState) {
   const auth = getState().auth;
-  return Boolean(auth?.token && auth?.user);
+  if (auth?.token) return true;
+  if (typeof localStorage !== 'undefined' && localStorage.getItem('token')) return true;
+  return false;
 }
 
 export const fetchFavoriteStatus = createAsyncThunk(
