@@ -1,4 +1,11 @@
+import { useSelector } from 'react-redux';
+
 const WAREHOUSE_PERMISSIONS = ['my-parts', 'stock-in', 'stock-out', 'warehouse-sales'];
+const EMPTY_PERMISSION_CODES = Object.freeze([]);
+
+export function usePermissionCodes() {
+  return useSelector((state) => state.auth.permissionCodes ?? EMPTY_PERMISSION_CODES);
+}
 
 export function userHasWarehouseQrAccess(user, permissionCodes = []) {
   if (!user) return false;

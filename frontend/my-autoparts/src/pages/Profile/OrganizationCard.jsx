@@ -33,7 +33,7 @@ export default function OrganizationCard({ orgId }) {
 
   if (loading) {
     return (
-      <ProfileBlock title="Организация">
+      <ProfileBlock>
         <div className="flex animate-pulse items-center gap-3 px-4 py-4">
           <div className="h-11 w-11 rounded-full bg-gray-100" />
           <div className="flex-1 space-y-2">
@@ -47,7 +47,7 @@ export default function OrganizationCard({ orgId }) {
 
   if (error || !org) {
     return (
-      <ProfileBlock title="Организация">
+      <ProfileBlock>
         <p className="px-4 py-4 text-sm text-gray-500">{error || 'Организация не найдена'}</p>
       </ProfileBlock>
     );
@@ -58,10 +58,10 @@ export default function OrganizationCard({ orgId }) {
   const phone = org.phone ? formatPhoneNumber(org.phone) : null;
 
   return (
-    <ProfileBlock title="Организация">
+    <ProfileBlock>
       <Link
         to={`/organizations/${org.id}`}
-        className="flex items-center gap-3 border-b border-gray-100 px-4 py-3.5 hover:bg-gray-50"
+        className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50"
       >
         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-100">
           {logoUrl ? (
@@ -76,12 +76,6 @@ export default function OrganizationCard({ orgId }) {
         </div>
         <ChevronRight />
       </Link>
-      {org.address ? (
-        <div className="px-4 py-3.5">
-          <p className="text-sm text-gray-400">Адрес</p>
-          <p className="mt-0.5 text-[15px] text-gray-900">{org.address}</p>
-        </div>
-      ) : null}
     </ProfileBlock>
   );
 }

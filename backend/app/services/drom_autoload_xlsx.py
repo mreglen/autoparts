@@ -41,6 +41,16 @@ WAREHOUSE_ADDRESS_HEADER = "Адрес склада"
 DATA_WRITE_START_ROW = 2
 
 
+def _iter_sheet_data_rows(ws, start_row: int = DATA_WRITE_START_ROW):
+    max_row = ws.max_row or 0
+    if max_row < start_row:
+        return
+    for offset, row_values in enumerate(
+        ws.iter_rows(min_row=start_row, max_row=max_row, values_only=True),
+    ):
+        yield start_row + offset, row_values
+
+
 def _cell_str(v: Any) -> str:
     if v is None:
         return ""
@@ -112,17 +122,13 @@ def parse_and_validate_drom_autoload(xlsx_bytes: bytes) -> DromXlsxParseResult:
         out.local_errors.append({"error": "Не найдены обязательные колонки"})
         return out
     
-    max_row = ws.max_row or 0
-    for row_idx in range(DATA_WRITE_START_ROW, max_row + 1):
-        row_data = {}
-        row_values = list(ws.iter_rows(min_row=row_idx, max_row=row_idx, values_only=True))[0]
-        
+    for row_idx, row_values in _iter_sheet_data_rows(ws):
         # Проверяем, есть ли данные в строке
         article = _cell_str(row_values[article_col - 1] if article_col <= len(row_values) else None)
         if not article:
             continue  # Пропускаем пустые строки
-        
-        # Извлекаем все поля
+
+        row_data = {}
         for header, col_idx in col_map.items():
             if col_idx <= len(row_values):
                 row_data[header] = row_values[col_idx - 1]
@@ -192,18 +198,15 @@ def upsert_products_to_drom_autoload(
     
     # Читаем существующие данные для upsert логики
     existing_articles: dict[str, int] = {}  # article -> row_number
-    max_row = ws.max_row or 1
-    
-    for row_idx in range(DATA_WRITE_START_ROW, max_row + 1):
-        row_values = list(ws.iter_rows(min_row=row_idx, max_row=row_idx, values_only=True))[0]
-        article_col = col_map.get(ARTICLE_HEADER)
+    article_col = col_map.get(ARTICLE_HEADER)
+
+    for row_idx, row_values in _iter_sheet_data_rows(ws):
         if article_col and article_col <= len(row_values):
             article = _cell_str(row_values[article_col - 1])
             if article:
                 existing_articles[article] = row_idx
-    
-    # Добавляем/обновляем товары
-    next_row = max_row + 1
+
+    next_row = (ws.max_row or 1) + 1
     
     for export_row in export_rows:
         article = str(export_row.get("article", "")).strip()
@@ -298,21 +301,16 @@ def remove_product_from_drom_autoload(
     header_row = list(ws.iter_rows(min_row=1, max_row=1, values_only=True))[0]
     col_map = _find_col_map(header_row)
     
-    # Ищем колонку Артикул
     article_col = col_map.get(ARTICLE_HEADER)
     if article_col:
-        # Ищем строку с matching article
         row_to_delete = None
-        max_row = ws.max_row or 0
-        for row_idx in range(DATA_WRITE_START_ROW, max_row + 1):
-            row_values = list(ws.iter_rows(min_row=row_idx, max_row=row_idx, values_only=True))[0]
+        for row_idx, row_values in _iter_sheet_data_rows(ws):
             if article_col <= len(row_values):
                 cell_value = _cell_str(row_values[article_col - 1])
                 if cell_value == article:
                     row_to_delete = row_idx
                     break
-        
-        # Если нашли строку, удаляем её
+
         if row_to_delete:
             ws.delete_rows(row_to_delete, 1)
     

@@ -192,7 +192,7 @@ const initialState = {
   subscriptions: [],
   subscriptionsLoading: false,
   subscriptionActionLoading: false,
-  favoriteToggleLoading: false,
+  favoriteTogglingKey: null,
   error: null,
 };
 
@@ -217,38 +217,38 @@ const userEngagementSlice = createSlice({
         }
       })
       .addCase(toggleFavorite.pending, (state, action) => {
-        state.favoriteToggleLoading = true;
         const key = productFavoriteKey(action.meta.arg.productId);
+        state.favoriteTogglingKey = key;
         const { isFavorite } = action.meta.arg;
         if (key) state.favoriteByKey[key] = !isFavorite;
       })
       .addCase(toggleFavorite.fulfilled, (state, action) => {
-        state.favoriteToggleLoading = false;
+        state.favoriteTogglingKey = null;
         if (action.payload.key) {
           state.favoriteByKey[action.payload.key] = action.payload.isFavorite;
         }
       })
       .addCase(toggleFavorite.rejected, (state, action) => {
-        state.favoriteToggleLoading = false;
+        state.favoriteTogglingKey = null;
         const key = productFavoriteKey(action.meta.arg.productId);
         const { isFavorite } = action.meta.arg;
         if (key) state.favoriteByKey[key] = isFavorite;
         state.error = action.payload;
       })
       .addCase(toggleRosskoFavorite.pending, (state, action) => {
-        state.favoriteToggleLoading = true;
         const { brand, partnumber, isFavorite } = action.meta.arg;
         const key = rosskoFavoriteKey(brand, partnumber);
+        state.favoriteTogglingKey = key;
         if (key) state.favoriteByKey[key] = !isFavorite;
       })
       .addCase(toggleRosskoFavorite.fulfilled, (state, action) => {
-        state.favoriteToggleLoading = false;
+        state.favoriteTogglingKey = null;
         if (action.payload.key) {
           state.favoriteByKey[action.payload.key] = action.payload.isFavorite;
         }
       })
       .addCase(toggleRosskoFavorite.rejected, (state, action) => {
-        state.favoriteToggleLoading = false;
+        state.favoriteTogglingKey = null;
         const { brand, partnumber, isFavorite } = action.meta.arg;
         const key = rosskoFavoriteKey(brand, partnumber);
         if (key) state.favoriteByKey[key] = isFavorite;

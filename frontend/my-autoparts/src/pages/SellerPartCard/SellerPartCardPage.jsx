@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { normalizeImageUrl } from '../../utils/apiClient';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import StockOutModal from '../MyParts/StockOutModal/StockOutModal';
@@ -14,7 +14,7 @@ import { INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../utils/inte
 import { buildSellerPartCardSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import { resolveProductQrScan } from '../../utils/resolveProductQrScan';
 import { useAuthReady } from '../../hooks/useAuthReady';
-import { useWarehousePermissions } from '../../hooks/useWarehousePermissions';
+import { useWarehousePermissions, usePermissionCodes } from '../../hooks/useWarehousePermissions';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 
 function ActionButton({ children, onClick, to, variant = 'default', disabled = false }) {
@@ -45,16 +45,20 @@ const SellerPartCardPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { isReady, user } = useAuthReady();
-  const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
+  const { isReady, user, token } = useAuthReady();
+  const permissionCodes = usePermissionCodes();
   const perms = useWarehousePermissions(user, permissionCodes);
+  const permissionCodesKey = useMemo(
+    () => (permissionCodes.length ? permissionCodes.join('|') : ''),
+    [permissionCodes],
+  );
 
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const [resolveError, setResolveError] = useState('');
-  const [redirectPath, setRedirectPath] = useState(null);
   const [part, setPart] = useState(null);
+  const resolveRequestRef = useRef(0);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [operationType, setOperationType] = useState(null);
@@ -68,15 +72,12 @@ const SellerPartCardPage = () => {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
 
   useEffect(() => {
-    if (redirectPath) {
-      navigate(redirectPath, { replace: true });
-    }
-  }, [redirectPath, navigate]);
-
-  useEffect(() => {
     if (!isReady) return undefined;
+    if (token && !user) return undefined;
 
     let cancelled = false;
+    const requestId = resolveRequestRef.current + 1;
+    resolveRequestRef.current = requestId;
 
     const resolveRoute = async () => {
       if (!id) {
@@ -91,13 +92,11 @@ const SellerPartCardPage = () => {
       setNotFound(false);
       setForbidden(false);
       setResolveError('');
-      setRedirectPath(null);
-      setPart(null);
 
       try {
         const result = await resolveProductQrScan(id, user, permissionCodes);
 
-        if (cancelled) return;
+        if (cancelled || resolveRequestRef.current !== requestId) return;
 
         if (result.mode === 'seller') {
           setPart(result.part);
@@ -116,8 +115,13 @@ const SellerPartCardPage = () => {
           return;
         }
 
+        if (result.mode === 'moderation') {
+          navigate(result.path, { replace: true });
+          return;
+        }
+
         if (result.mode === 'public') {
-          setRedirectPath(result.path);
+          navigate(result.path, { replace: true });
           return;
         }
 
@@ -130,7 +134,7 @@ const SellerPartCardPage = () => {
         setNotFound(true);
         setLoading(false);
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && resolveRequestRef.current === requestId) {
           setResolveError(error?.message || 'Не удалось открыть карточку');
           setLoading(false);
         }
@@ -142,7 +146,7 @@ const SellerPartCardPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [id, isReady, navigate, user, permissionCodes]);
+  }, [id, isReady, token, user?.id, user?.is_admin, user?.is_seller, user?.is_employee, permissionCodesKey, navigate, permissionCodes]);
 
   const mediaItems = useMemo(() => {
     if (!part) return [];
@@ -196,7 +200,7 @@ const SellerPartCardPage = () => {
     setOperationType(null);
   };
 
-  if (!isReady || loading || redirectPath) {
+  if (!isReady || (token && !user) || loading) {
     return <AuthLoadingScreen className="min-h-[50vh]" />;
   }
 

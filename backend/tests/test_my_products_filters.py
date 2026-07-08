@@ -160,6 +160,32 @@ class MyProductsFiltersTests(unittest.TestCase):
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [1])
 
+    def test_search_finds_article_without_separators(self):
+        self._add_product(
+            product_id=4,
+            name="Hyphenated article",
+            article="130-901",
+            price=50,
+            storage_location_id=10,
+        )
+        self.db.commit()
+        query = apply_my_products_filters(self._base_query(), None, None, None, "130901")
+        ids = [row.id for row in query.all()]
+        self.assertEqual(ids, [4])
+
+    def test_search_finds_name_with_hyphenated_fragment(self):
+        self._add_product(
+            product_id=5,
+            name="Filter 130-901 OEM",
+            article="ZZ-1",
+            price=60,
+            storage_location_id=10,
+        )
+        self.db.commit()
+        query = apply_my_products_filters(self._base_query(), None, None, None, "130901")
+        ids = [row.id for row in query.all()]
+        self.assertEqual(ids, [5])
+
 
 if __name__ == "__main__":
     unittest.main()

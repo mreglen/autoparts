@@ -228,6 +228,7 @@ const setGuestCartToken = (token) => {
 const GUEST_CART_HEADER_NAME = 'X-Guest-Cart-Token';
 
 const API_REQUEST_TIMEOUT_MS = 20000;
+export const API_LONG_REQUEST_TIMEOUT_MS = 120000;
 
 const withRequestTimeout = (options = {}, timeoutMs = API_REQUEST_TIMEOUT_MS) => {
     if (options.signal) return { fetchOptions: options, timeoutId: null };
@@ -251,15 +252,16 @@ export const apiRequest = async (endpoint, options = {}, retryCount = 0) => {
         throw new Error(getOutageMessage());
     }
 
+    const { timeoutMs, ...requestOptions } = options;
     const url = `${API_BASE}${endpoint}`;
-    const timed = withRequestTimeout(options);
+    const timed = withRequestTimeout(requestOptions, timeoutMs ?? API_REQUEST_TIMEOUT_MS);
     const defaultOptions = {
         credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders(),
             [GUEST_CART_HEADER_NAME]: getGuestCartToken() || undefined,
-            ...options.headers
+            ...requestOptions.headers
         },
         ...timed.fetchOptions
     };

@@ -21,6 +21,7 @@ export default function MainLayout() {
     useCartSync();
     const breadcrumbItems = usePageBreadcrumbs();
     const isPartPage = location.pathname.startsWith('/part/');
+    const isNewPartDetailPage = /^\/autoparts\/new\/part\/[^/]+$/.test(location.pathname);
     const isSeoLandingPage = /^\/autoparts\/(new|used)\/(brand|category|geo)\/[^/]+$/.test(
         location.pathname,
     );
@@ -91,7 +92,7 @@ export default function MainLayout() {
                         : 'max-w-7xl max-lg:px-3 max-lg:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                 }`}
             >
-                {breadcrumbItems.length > 0 && !isSeoLandingPage && !isPartPage && !isChatsPage ? (
+                {breadcrumbItems.length > 0 && !isSeoLandingPage && !isPartPage && !isNewPartDetailPage && !isChatsPage ? (
                     <div className={isFullBleedAmbientPage ? 'mx-auto max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8' : undefined}>
                         <Breadcrumbs items={breadcrumbItems} includeJsonLd={!isPartPage} />
                     </div>

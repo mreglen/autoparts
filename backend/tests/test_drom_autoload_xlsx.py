@@ -70,7 +70,16 @@ class DromAutoloadXlsxTests(unittest.TestCase):
         self.assertEqual(len(parsed.items), 1)
         self.assertEqual(parsed.items[0]["article"], "A2")
 
-    def test_template_file_exists(self):
+    def test_upsert_handles_many_rows(self):
+        rows = [
+            self._sample_row(article=f"ART-{idx}", name=f"Деталь {idx}", price=1000 + idx)
+            for idx in range(1, 201)
+        ]
+        xlsx_bytes = upsert_products_to_drom_autoload(None, rows, public_base_url="")
+        parsed = parse_and_validate_drom_autoload(xlsx_bytes)
+        self.assertTrue(parsed.local_ok, parsed.local_errors)
+        self.assertEqual(len(parsed.items), 200)
+
         template_path = Path(__file__).resolve().parents[1] / "app" / "templates" / "drom" / "auto-parts-GT.xlsx"
         self.assertTrue(template_path.is_file(), f"Missing template: {template_path}")
 

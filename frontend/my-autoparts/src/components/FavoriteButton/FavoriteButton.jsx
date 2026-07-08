@@ -39,7 +39,9 @@ export default function FavoriteButton({
   const isFavorite = useSelector(
     (state) => Boolean(state.userEngagement?.favoriteByKey?.[favoriteKey]),
   );
-  const loading = useSelector((state) => state.userEngagement?.favoriteToggleLoading);
+  const loading = useSelector(
+    (state) => state.userEngagement?.favoriteTogglingKey === favoriteKey,
+  );
 
   useEffect(() => {
     if (!user || !normalizedProductId) return;

@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
-import { normalizeImageUrl, apiRequest } from '../../utils/apiClient';
+import { normalizeImageUrl, apiRequest, API_LONG_REQUEST_TIMEOUT_MS } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
 import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI, fetchMyProductDrafts, deleteProductDraft, submitProductDraft, selectMyProductsTotal, selectMyProductsTotalQuantity, selectMyProductsTotalValue, selectMyProductsPage, selectMyProductsHasMore, selectMyProductsLoadingMore, selectMyProductsFilterKey, selectDraftItems, selectDraftLoading, selectDraftError } from '../../redux/slices/ProductSlice';
 import { formatDraftTitle } from '../../utils/productDraftUtils';
@@ -16,6 +16,7 @@ import { useActionsDropdownPlacement } from '../../hooks/useActionsDropdownPlace
 import { buildActionsDropdownMenuClassName } from '../../utils/actionsDropdownPlacement';
 import StorageCellsDisplayTable from '../../components/StorageCellsTable/StorageCellsDisplayTable';
 import { normalizeInternalCodeForSearch, INTERNAL_CODE_LABEL, formatInternalCodeDisplay } from '../../utils/internalCode';
+import { normalizeArticle } from '../../utils/productDisplayName';
 import MyPartsRowSkeleton from '../../components/skeletons/MyPartsRowSkeleton';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
@@ -36,6 +37,7 @@ const CardPart = ({
   showExport,
   onExportDrom,
   showDromExport,
+  dromExporting = false,
   onToggleExpand,
   isExpanded,
   onImageClick,
@@ -148,10 +150,11 @@ const CardPart = ({
           {showDromExport && (
             <button
               onClick={(e) => { e.stopPropagation(); onExportDrom(part); setShowActions(false); }}
-              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              disabled={dromExporting}
+              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <img src="/logos/drom.png" alt="" className="w-4 h-4" />
-              Экспорт Drom
+              {dromExporting ? 'Экспорт Drom…' : 'Экспорт Drom'}
             </button>
           )}
           <div className="border-t border-gray-100 my-1"></div>
@@ -982,6 +985,7 @@ function MyParts() {
   const [avitoIntegrationReady, setAvitoIntegrationReady] = useState(false);
   const [avitoJob, setAvitoJob] = useState(null);
   const [dromIntegrationReady, setDromIntegrationReady] = useState(false);
+  const [dromExporting, setDromExporting] = useState(false);
   const [imageErrors, setImageErrors] = useState({}); // Track image errors by part ID
   const [formData, setFormData] = useState({
     quantity: '',
@@ -1150,12 +1154,19 @@ function MyParts() {
 
     if (!moderationDebouncedSearch.trim()) return items;
 
-    const query = moderationDebouncedSearch.toLowerCase().replace(/\s+/g, '');
-    return items.filter((part) =>
-      (part.article && part.article.toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (normalizeInternalCodeForSearch(part.internal_code).toLowerCase().replace(/\s+/g, '').includes(query)) ||
-      (part.name && part.name.toLowerCase().includes(moderationDebouncedSearch.toLowerCase()))
-    );
+    const queryNorm = normalizeArticle(moderationDebouncedSearch);
+    const queryLower = moderationDebouncedSearch.toLowerCase();
+    return items.filter((part) => {
+      const articleNorm = normalizeArticle(part.article || '');
+      const nameNorm = normalizeArticle(part.name || '');
+      const codeNorm = normalizeArticle(normalizeInternalCodeForSearch(part.internal_code));
+      return (
+        (queryNorm && articleNorm.includes(queryNorm))
+        || (queryNorm && codeNorm.includes(queryNorm))
+        || (queryNorm && nameNorm.includes(queryNorm))
+        || (part.name && part.name.toLowerCase().includes(queryLower))
+      );
+    });
   }, [pendingItems, rejectedItems, moderationFilters.hideRejected, moderationFilters.storage, moderationFilters.cell, moderationFilters.cellValue, moderationDebouncedSearch, pendingStorageCellsByProduct]);
 
   const sortedModerationParts = React.useMemo(() => {
@@ -1452,15 +1463,19 @@ function MyParts() {
   };
 
   const handleExportPartDrom = async (part) => {
-    if (!user?.organization_id || !part?.id) return;
+    if (!user?.organization_id || !part?.id || dromExporting) return;
+    setDromExporting(true);
     try {
       const data = await apiRequest(`/organizations/${user.organization_id}/drom/autoload/export`, {
         method: 'POST',
         body: JSON.stringify({ product_ids: [part.id] }),
+        timeoutMs: API_LONG_REQUEST_TIMEOUT_MS,
       });
       alert(formatDromExportMessage(data));
     } catch (e) {
       alert(`Не удалось экспортировать в Drom: ${e.message || 'ошибка'}`);
+    } finally {
+      setDromExporting(false);
     }
   };
 
@@ -1478,15 +1493,19 @@ function MyParts() {
   };
 
   const handleBulkExportDrom = async () => {
-    if (!user?.organization_id || selectedParts.size === 0) return;
+    if (!user?.organization_id || selectedParts.size === 0 || dromExporting) return;
+    setDromExporting(true);
     try {
       const data = await apiRequest(`/organizations/${user.organization_id}/drom/autoload/export`, {
         method: 'POST',
         body: JSON.stringify({ product_ids: Array.from(selectedParts) }),
+        timeoutMs: API_LONG_REQUEST_TIMEOUT_MS,
       });
       alert(formatDromExportMessage(data));
     } catch (e) {
       alert(`Не удалось выполнить экспорт в Drom: ${e.message || 'ошибка'}`);
+    } finally {
+      setDromExporting(false);
     }
   };
 
@@ -1504,11 +1523,11 @@ function MyParts() {
         {dromIntegrationReady && (
           <button
             onClick={(e) => { e.stopPropagation(); handleBulkExportDrom(); setShowBulkActions(false); }}
-            disabled={selectedParts.size === 0}
+            disabled={selectedParts.size === 0 || dromExporting}
             className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <img src="/logos/drom.png" alt="" className="w-4 h-4" />
-            Экспорт Drom
+            {dromExporting ? 'Экспорт Drom…' : 'Экспорт Drom'}
           </button>
         )}
       </div>
@@ -2428,6 +2447,7 @@ function MyParts() {
                     showExport={avitoIntegrationReady}
                     onExportDrom={(p) => handleExportPartDrom(p)}
                     showDromExport={dromIntegrationReady}
+                    dromExporting={dromExporting}
                     onToggleExpand={() => toggleExpand(part.id)}
                     isExpanded={expandedPartId === part.id}
                     isSelected={selectedParts.has(part.id)}
@@ -2497,6 +2517,7 @@ function MyParts() {
                 showExport={avitoIntegrationReady}
                 onExportDrom={(p) => handleExportPartDrom(p)}
                 showDromExport={dromIntegrationReady}
+                dromExporting={dromExporting}
                 onToggleExpand={() => toggleExpand(part.id)}
                 isExpanded={expandedPartId === part.id}
                 isSelected={selectedParts.has(part.id)}

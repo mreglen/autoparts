@@ -348,75 +348,76 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
 
   useEffect(() => {
     if (!editPendingMode || !editPendingId) return undefined;
+    if (!isReady || !token || !canAccess) return undefined;
 
     let cancelled = false;
     setLoadingFormData(true);
 
-    Promise.all([
-      dispatch(fetchMyPendingProduct(Number(editPendingId, 10))).unwrap(),
-      apiRequest(`/pending-product-storage-cells/?pending_product_id=${editPendingId}`),
-    ])
-      .then(([product, storageCellsResponse]) => {
+    const applyPendingProduct = (product) => {
+      setFormData({
+        article: product.article || '',
+        name: product.name || '',
+        brand: product.brand || '',
+        description: product.description || '',
+        condition: product.is_new ? 'новый' : 'б/у',
+        quantity: product.quantity != null ? String(product.quantity) : '',
+        sale_price: product.price != null ? String(product.price) : '',
+        storage_location_id: product.storage_location_id ? String(product.storage_location_id) : '',
+        part_type_id: product.part_type_id ? String(product.part_type_id) : '',
+      });
+
+      setPhotos(
+        (product.photos || []).map((url) => ({
+          finalPath: typeof url === 'string' ? url : (url.full_url || url.photo_url || url.url || ''),
+          name: 'photo',
+          isExisting: true,
+        })).filter((item) => item.finalPath)
+      );
+
+      setVideos(
+        (product.videos || []).map((url) => ({
+          finalPath: typeof url === 'string' ? url : (url.full_url || url.video_url || url.url || ''),
+          name: 'video',
+          isExisting: true,
+        })).filter((item) => item.finalPath)
+      );
+
+      if (product.vehicle_ids?.length) {
+        apiRequest(`/vehicles/${product.vehicle_ids[0]}`)
+          .then((vehicle) => {
+            if (!cancelled && vehicle) setSelectedVehicle(vehicle);
+          })
+          .catch(() => {});
+      }
+    };
+
+    dispatch(fetchMyPendingProduct(Number(editPendingId, 10)))
+      .unwrap()
+      .then(async (product) => {
         if (cancelled || !product) return;
 
-        setFormData({
-          article: product.article || '',
-          name: product.name || '',
-          brand: product.brand || '',
-          description: product.description || '',
-          condition: product.is_new ? 'новый' : 'б/у',
-          quantity: product.quantity != null ? String(product.quantity) : '',
-          sale_price: product.price != null ? String(product.price) : '',
-          storage_location_id: product.storage_location_id ? String(product.storage_location_id) : '',
-          part_type_id: product.part_type_id ? String(product.part_type_id) : '',
-        });
+        applyPendingProduct(product);
 
-        setPhotos(
-          (product.photos || []).map((url) => ({
-            finalPath: typeof url === 'string' ? url : (url.full_url || url.photo_url || url.url || ''),
-            name: 'photo',
-            isExisting: true,
-          })).filter((item) => item.finalPath)
-        );
-
-        setVideos(
-          (product.videos || []).map((url) => ({
-            finalPath: typeof url === 'string' ? url : (url.full_url || url.video_url || url.url || ''),
-            name: 'video',
-            isExisting: true,
-          })).filter((item) => item.finalPath)
-        );
-
-        const cells = Array.isArray(storageCellsResponse) ? storageCellsResponse : [];
-        setExistingPendingStorageCells(cells);
-        const initialQuantities = {};
-        cells.forEach((link) => {
-          if (link.storage_cell_id) {
-            initialQuantities[link.storage_cell_id] = link.value || '';
-          }
-        });
-        setCellQuantities(initialQuantities);
-
-        if (product.vehicle_ids?.length) {
-          apiRequest(`/vehicles/${product.vehicle_ids[0]}`)
-            .then((vehicle) => {
-              if (!cancelled && vehicle) setSelectedVehicle(vehicle);
-            })
-            .catch(() => {});
+        try {
+          const storageCellsResponse = await apiRequest(
+            `/pending-product-storage-cells/?pending_product_id=${editPendingId}`,
+          );
+          const cells = Array.isArray(storageCellsResponse) ? storageCellsResponse : [];
+          if (cancelled) return;
+          setExistingPendingStorageCells(cells);
+          const initialQuantities = {};
+          cells.forEach((link) => {
+            if (link.storage_cell_id) {
+              initialQuantities[link.storage_cell_id] = link.value || '';
+            }
+          });
+          setCellQuantities(initialQuantities);
+        } catch {
+          // Ячейки хранения не обязательны для открытия формы
         }
       })
-      .catch(async (err) => {
+      .catch((err) => {
         if (cancelled) return;
-        // Старые/ошибочные QR могли вести на edit-pending с id складского товара
-        try {
-          const card = await apiAxios.get(`/products/qr-card/${editPendingId}`);
-          if (card.data?.id) {
-            navigate(`/seller/part-card/${card.data.id}`, { replace: true });
-            return;
-          }
-        } catch {
-          // not a warehouse product for this seller
-        }
         alert(typeof err === 'string' ? err : 'Не удалось загрузить запчасть на модерации');
         navigate('/my-parts?tab=pending', { replace: true });
       })
@@ -427,7 +428,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
     return () => {
       cancelled = true;
     };
-  }, [dispatch, editPendingMode, editPendingId, navigate]);
+  }, [dispatch, editPendingMode, editPendingId, navigate, isReady, token, canAccess]);
 
   const applyDraftSnapshot = useCallback((snapshot, { skipAutosave = true, draftId } = {}) => {
     if (!snapshot) return;
@@ -1265,10 +1266,16 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
 
   useEffect(() => {
     if (!isReady) return;
+    if (!token || !user) {
+      if (editPendingMode && editPendingId) {
+        navigate('/auth', { replace: true, state: { from: `/my-parts/edit-pending/${editPendingId}` } });
+      }
+      return;
+    }
     if (!canAccess) {
       navigate('/', { replace: true });
     }
-  }, [isReady, canAccess, navigate]);
+  }, [isReady, token, user, canAccess, editPendingMode, editPendingId, navigate]);
 
   if (!isReady) {
     return (

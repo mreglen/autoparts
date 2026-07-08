@@ -1,11 +1,12 @@
 import json
 import logging
+import asyncio
 from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.auth import get_current_user
 from app.core.config import settings
@@ -209,6 +210,7 @@ async def export_products_to_drom_autoload(
     # Получаем товары
     products = (
         db.query(ProductModel)
+        .options(selectinload(ProductModel.photos))
         .filter(
             ProductModel.organization_id == org_id,
             ProductModel.id.in_(requested_ids),
@@ -258,20 +260,22 @@ async def export_products_to_drom_autoload(
     # Загружаем существующий файл или создаем новый
     xlsx_path, rel_path = _resolve_saved_drom_file(db, org_id)
     existing_bytes = xlsx_path.read_bytes() if xlsx_path.is_file() else None
-    
+    public_base_url = (settings.PUBLIC_BASE_URL or settings.BASE_URL or "").strip()
+
     try:
-        merged_bytes = upsert_products_to_drom_autoload(
+        merged_bytes = await asyncio.to_thread(
+            upsert_products_to_drom_autoload,
             existing_bytes,
             export_rows,
-            public_base_url=(settings.PUBLIC_BASE_URL or settings.BASE_URL or "").strip(),
+            public_base_url,
         )
         xlsx_path.write_bytes(merged_bytes)
     except Exception as e:
         logger.exception("Ошибка при создании XLSX файла Drom")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Ошибка генерации файла: {str(e)}")
-    
-    # Парсим и валидируем
-    parsed = parse_and_validate_drom_autoload(merged_bytes)
+
+    # Парсим и валидируем (тяжёлая операция — в отдельном потоке)
+    parsed = await asyncio.to_thread(parse_and_validate_drom_autoload, merged_bytes)
     
     # Сохраняем в кэш
     _save_autoload_cache(

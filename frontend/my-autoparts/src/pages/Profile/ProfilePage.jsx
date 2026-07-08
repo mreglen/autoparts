@@ -63,10 +63,17 @@ const IconBell = () => (
   </svg>
 );
 
+const IconParts = () => (
+  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+  </svg>
+);
+
 export default function ProfilePage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user, isLoading, isReady } = useAuthReady();
+  const permissionCodes = useSelector((state) => state.auth.permissionCodes);
   const { loading: saving, avatarLoading, error: saveError } = useSelector((state) => state.user);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -187,6 +194,12 @@ export default function ProfilePage() {
 
   const showOrganization = Boolean(
     user.organization_id && (user.is_seller || user.is_director || user.is_employee),
+  );
+
+  const showMyParts = Boolean(
+    user?.is_admin
+    || user?.is_seller
+    || (user?.is_employee && permissionCodes && permissionCodes.includes('my-parts')),
   );
 
   return (
@@ -314,7 +327,10 @@ export default function ProfilePage() {
         </ProfileBlock>
       )}
 
-      <ProfileBlock title="Покупки">
+      <ProfileBlock>
+        {showMyParts ? (
+          <ProfileRow to="/my-parts" label="Мои запчасти" icon={<IconParts />} />
+        ) : null}
         <ProfileRow to="/purchases/orders" label="Заказы" icon={<IconBag />} />
         <ProfileRow to="/profile/notifications" label="Уведомления" icon={<IconBell />} />
       </ProfileBlock>

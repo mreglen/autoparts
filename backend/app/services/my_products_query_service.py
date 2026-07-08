@@ -4,6 +4,8 @@ from sqlalchemy import func, or_
 
 from app.models.product import Product as ProductModel
 from app.models.product_storage_cell import ProductStorageCell as ProductStorageCellModel
+from app.utils.partnumber import normalize_partnumber
+from app.utils.search_sql import get_sql_normalize
 
 
 def apply_my_products_search(query, q: str):
@@ -13,14 +15,25 @@ def apply_my_products_search(query, q: str):
     compact = trimmed.lower().replace(" ", "")
     pattern = f"%{trimmed.lower()}%"
     compact_pattern = f"%{compact}%"
-    return query.filter(
-        or_(
-            func.lower(ProductModel.name).like(pattern),
-            func.lower(func.coalesce(ProductModel.article, "")).like(pattern),
-            func.replace(func.lower(func.coalesce(ProductModel.article, "")), " ", "").like(compact_pattern),
-            func.replace(func.lower(func.coalesce(ProductModel.internal_code, "")), " ", "").like(compact_pattern),
+    query_norm = normalize_partnumber(trimmed)
+
+    conditions = [
+        func.lower(ProductModel.name).like(pattern),
+        func.lower(func.coalesce(ProductModel.article, "")).like(pattern),
+        func.replace(func.lower(func.coalesce(ProductModel.article, "")), " ", "").like(compact_pattern),
+        func.replace(func.lower(func.coalesce(ProductModel.internal_code, "")), " ", "").like(compact_pattern),
+    ]
+
+    if query_norm and len(query_norm) >= 2:
+        conditions.extend(
+            [
+                get_sql_normalize(func.coalesce(ProductModel.article, "")).like(f"%{query_norm}%"),
+                get_sql_normalize(func.coalesce(ProductModel.name, "")).like(f"%{query_norm}%"),
+                get_sql_normalize(func.coalesce(ProductModel.internal_code, "")).like(f"%{query_norm}%"),
+            ]
         )
-    )
+
+    return query.filter(or_(*conditions))
 
 
 def apply_my_products_filters(

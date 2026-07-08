@@ -38,11 +38,14 @@ export default function FavoriteHeartOverlay({
   const navigate = useNavigate();
   const location = useLocation();
   const user = useSelector((state) => state.auth.user);
-  const loading = useSelector((state) => state.userEngagement?.favoriteToggleLoading);
 
   const favoriteKey = rossko
     ? rosskoFavoriteKey(rossko.brand, rossko.partnumber)
     : productFavoriteKey(productId);
+
+  const loading = useSelector(
+    (state) => state.userEngagement?.favoriteTogglingKey === favoriteKey,
+  );
 
   const isFavorite = useSelector(
     (state) => Boolean(state.userEngagement?.favoriteByKey?.[favoriteKey]),

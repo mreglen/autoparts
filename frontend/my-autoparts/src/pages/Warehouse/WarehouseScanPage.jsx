@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
-import { useSelector } from 'react-redux';
 import { parseSellerPartCardQr } from '../../utils/parseSellerPartCardQr';
 import { useAuthReady } from '../../hooks/useAuthReady';
-import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
+import { userHasWarehouseQrAccess, usePermissionCodes } from '../../hooks/useWarehousePermissions';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 
 const SCANNER_ID = 'warehouse-qr-reader';
@@ -12,7 +11,7 @@ const SCANNER_ID = 'warehouse-qr-reader';
 export default function WarehouseScanPage() {
   const navigate = useNavigate();
   const { isReady, user, isAuthenticated } = useAuthReady();
-  const permissionCodes = useSelector((state) => state.auth.permissionCodes || []);
+  const permissionCodes = usePermissionCodes();
   const scannerRef = useRef(null);
   const html5QrCodeRef = useRef(null);
   const scanLockRef = useRef(false);

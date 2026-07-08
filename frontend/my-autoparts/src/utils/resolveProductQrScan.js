@@ -43,6 +43,29 @@ export async function resolvePublicPartPath(productId) {
   }
 }
 
+/** Запчасть на модерации / отклонённая — по id из QR (ещё нет складской карточки). */
+export async function fetchModerationQrPath(productId) {
+  const numericId = parseInt(String(productId), 10);
+  if (!Number.isFinite(numericId) || numericId <= 0) return null;
+
+  try {
+    await apiAxios.get(`/pending-products/${numericId}`);
+    return `/my-parts/edit-pending/${numericId}`;
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status === 401 || status === 403) {
+      return null;
+    }
+  }
+
+  try {
+    await apiAxios.get(`/moderation/products/rejected/my/${numericId}`);
+    return `/my-parts/resubmit/${numericId}`;
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveProductQrScan(productId, user, permissionCodes = []) {
   const hasWarehouseAccess = Boolean(user && userHasWarehouseQrAccess(user, permissionCodes));
 
@@ -55,6 +78,10 @@ export async function resolveProductQrScan(productId, user, permissionCodes = []
       return { mode: 'auth_required' };
     }
     if (sellerResult?.reason === 'not_found') {
+      const moderationPath = await fetchModerationQrPath(productId);
+      if (moderationPath) {
+        return { mode: 'moderation', path: moderationPath };
+      }
       return { mode: 'forbidden' };
     }
     if (sellerResult?.reason === 'error') {
