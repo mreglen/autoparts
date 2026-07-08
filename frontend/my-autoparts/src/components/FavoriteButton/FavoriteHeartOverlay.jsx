@@ -1,9 +1,11 @@
 import { useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuthReady } from '../../hooks/useAuthReady';
 import {
   fetchFavoriteStatus,
   fetchRosskoFavoriteStatus,
+  isAuthEngagementError,
   toggleFavorite,
   toggleRosskoFavorite,
 } from '../../redux/slices/UserEngagementSlice';
@@ -37,7 +39,7 @@ export default function FavoriteHeartOverlay({
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const user = useSelector((state) => state.auth.user);
+  const { isAuthenticated, isLoading, isReady, token } = useAuthReady();
 
   const favoriteKey = rossko
     ? rosskoFavoriteKey(rossko.brand, rossko.partnumber)
@@ -51,8 +53,14 @@ export default function FavoriteHeartOverlay({
     (state) => Boolean(state.userEngagement?.favoriteByKey?.[favoriteKey]),
   );
 
+  const returnPath = `${location.pathname}${location.search}`;
+
+  const goToAuth = useCallback(() => {
+    navigate('/auth', { state: { from: returnPath } });
+  }, [navigate, returnPath]);
+
   useEffect(() => {
-    if (!user || !favoriteKey) return;
+    if (!isReady || !token || !isAuthenticated || !favoriteKey) return;
     if (rossko) {
       dispatch(fetchRosskoFavoriteStatus({
         brand: rossko.brand,
@@ -61,17 +69,26 @@ export default function FavoriteHeartOverlay({
       return;
     }
     dispatch(fetchFavoriteStatus(productId));
-  }, [dispatch, user, favoriteKey, productId, rossko?.brand, rossko?.partnumber]);
+  }, [
+    dispatch,
+    isReady,
+    token,
+    isAuthenticated,
+    favoriteKey,
+    productId,
+    rossko,
+  ]);
 
-  const handleClick = useCallback((e) => {
+  const handleClick = useCallback(async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!user) {
-      navigate('/auth', { state: { from: location.pathname } });
+    if (isLoading) return;
+    if (!isAuthenticated || !token) {
+      goToAuth();
       return;
     }
     if (rossko) {
-      dispatch(toggleRosskoFavorite({
+      const result = await dispatch(toggleRosskoFavorite({
         brand: rossko.brand,
         partnumber: rossko.partnumber,
         guid: rossko.guid,
@@ -79,10 +96,25 @@ export default function FavoriteHeartOverlay({
         minPrice: rossko.minPrice,
         isFavorite,
       }));
+      if (toggleRosskoFavorite.rejected.match(result) && isAuthEngagementError(result.payload)) {
+        goToAuth();
+      }
       return;
     }
-    dispatch(toggleFavorite({ productId, isFavorite }));
-  }, [dispatch, user, isFavorite, productId, rossko, navigate, location.pathname]);
+    const result = await dispatch(toggleFavorite({ productId, isFavorite }));
+    if (toggleFavorite.rejected.match(result) && isAuthEngagementError(result.payload)) {
+      goToAuth();
+    }
+  }, [
+    dispatch,
+    isAuthenticated,
+    isLoading,
+    token,
+    isFavorite,
+    productId,
+    rossko,
+    goToAuth,
+  ]);
 
   if (!favoriteKey) return null;
 

@@ -1072,8 +1072,6 @@ const PartDetail = () => {
           <span className="mt-1 block text-base font-medium text-gray-600">{h1Subtitle}</span>
         ) : null}
       </h1>
-      <PartDetailSeoSummary summary={seo.seoSummary} />
-      <PartDetailTrustRow />
       <PartDetailSeoCrossLinks
         brand={partBrand}
         article={partArticle}
@@ -1458,6 +1456,11 @@ const PartDetail = () => {
                 </div>
               </div>
             )}
+
+            <div className="space-y-3 md:hidden">
+              <PartDetailSeoSummary summary={seo.seoSummary} />
+              <PartDetailTrustRow />
+            </div>
 
             <PartDetailAboutBlock
               bodyDescription={bodyDescription}

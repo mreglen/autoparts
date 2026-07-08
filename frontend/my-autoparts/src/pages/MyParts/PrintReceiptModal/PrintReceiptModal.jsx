@@ -262,9 +262,16 @@ const PrintReceiptModal = ({
 
   const [printers, setPrinters] = useState([]);
   const [selectedPrinterId, setSelectedPrinterId] = useState('');
-  const [printCopies, setPrintCopies] = useState(1);
+  const [printCopiesInput, setPrintCopiesInput] = useState('1');
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
+
+  const parsedPrintCopies = useMemo(() => {
+    if (printCopiesInput === '') return null;
+    const next = parseInt(printCopiesInput, 10);
+    if (!Number.isFinite(next) || next < 1) return null;
+    return Math.min(next, 9999);
+  }, [printCopiesInput]);
 
   const selectedPrinter = useMemo(
     () => printers.find((p) => String(p.id) === String(selectedPrinterId)),
@@ -335,12 +342,12 @@ const PrintReceiptModal = ({
       setSelectedPrinterId('');
       setPrinters([]);
       setLoadError(null);
-      setPrintCopies(1);
+      setPrintCopiesInput('1');
       return undefined;
     }
 
     const defaultCopies = Math.max(1, Number(selectedPart?.quantity) || 1);
-    setPrintCopies(defaultCopies);
+    setPrintCopiesInput(String(defaultCopies));
     loadPrinters({ silent: false });
 
     const pollId = setInterval(() => {
@@ -379,12 +386,16 @@ const PrintReceiptModal = ({
       alert('Агент печати не подключён. Запустите агент на компьютере с принтером и нажмите «Обновить».');
       return;
     }
+    if (!parsedPrintCopies) {
+      alert('Укажите количество этикеток — целое число больше 0');
+      return;
+    }
 
     const productData = buildLabelPrintPayload(
       selectedPart,
       productStorageCells,
       storageCellCatalog,
-      printCopies,
+      parsedPrintCopies,
     );
     productData.width_mm = labelWidthMm;
     productData.height_mm = labelHeightMm;
@@ -402,7 +413,22 @@ const PrintReceiptModal = ({
     }
   };
 
-  const canPrint = Boolean(selectedPrinterId && selectedPrinter?.is_online && !printing);
+  const canPrint = Boolean(
+    selectedPrinterId && selectedPrinter?.is_online && !printing && parsedPrintCopies,
+  );
+
+  const handleCopiesChange = (event) => {
+    const next = event.target.value;
+    if (next === '') {
+      setPrintCopiesInput('');
+      return;
+    }
+    if (!/^\d+$/.test(next)) return;
+    if (next.startsWith('0')) return;
+    const value = parseInt(next, 10);
+    if (value > 9999) return;
+    setPrintCopiesInput(next);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/55 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
@@ -494,15 +520,11 @@ const PrintReceiptModal = ({
                 </span>
               </label>
               <input
-                type="number"
-                min={1}
-                max={9999}
-                step={1}
-                value={printCopies}
-                onChange={(e) => {
-                  const next = parseInt(e.target.value, 10);
-                  setPrintCopies(Number.isFinite(next) && next > 0 ? next : 1);
-                }}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                value={printCopiesInput}
+                onChange={handleCopiesChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
@@ -527,7 +549,11 @@ const PrintReceiptModal = ({
                   : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                   }`}
               >
-                {printing ? 'Отправка...' : `Распечатать (${printCopies} шт.)`}
+                {printing
+                  ? 'Отправка...'
+                  : parsedPrintCopies
+                    ? `Распечатать (${parsedPrintCopies} шт.)`
+                    : 'Распечатать'}
               </button>
           </div>
         </div>

@@ -4,6 +4,18 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { fetchSearchSubscriptions, subscribeToSearch } from '../../redux/slices/UserEngagementSlice';
 
+function isAuthErrorMessage(message) {
+  const text = String(message || '').toLowerCase();
+  return (
+    text.includes('401')
+    || text.includes('unauthorized')
+    || text.includes('not authenticated')
+    || text.includes('учетные данные')
+    || text.includes('учётные данные')
+    || text.includes('сессия')
+  );
+}
+
 export default function SubscribeSearchButton({
   query,
   className = '',
@@ -12,17 +24,22 @@ export default function SubscribeSearchButton({
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const { token, isAuthenticated, isLoading } = useAuthReady();
+  const { isAuthenticated, isLoading, isReady } = useAuthReady();
   const loading = useSelector((state) => state.userEngagement?.subscriptionActionLoading);
   const subscriptions = useSelector((state) => state.userEngagement?.subscriptions || []);
   const [notice, setNotice] = useState('');
 
   const normalizedQuery = useMemo(() => (query || '').trim(), [query]);
+  const returnPath = `${location.pathname}${location.search}`;
+
+  const goToAuth = useCallback(() => {
+    navigate('/auth', { state: { from: returnPath } });
+  }, [navigate, returnPath]);
 
   useEffect(() => {
-    if (!token || !isAuthenticated) return;
+    if (!isReady || !isAuthenticated) return;
     dispatch(fetchSearchSubscriptions());
-  }, [dispatch, token, isAuthenticated]);
+  }, [dispatch, isReady, isAuthenticated]);
 
   const alreadySubscribed = useMemo(() => {
     const norm = normalizedQuery.toLowerCase();
@@ -34,8 +51,8 @@ export default function SubscribeSearchButton({
   const handleClick = useCallback(async () => {
     if (!normalizedQuery || normalizedQuery.length < 2) return;
     if (isLoading) return;
-    if (!token || !isAuthenticated) {
-      navigate('/auth', { state: { from: location.pathname + location.search } });
+    if (!isAuthenticated) {
+      goToAuth();
       return;
     }
     const result = await dispatch(subscribeToSearch(normalizedQuery));
@@ -45,13 +62,13 @@ export default function SubscribeSearchButton({
       return;
     }
     const message = result.payload || 'Не удалось оформить подписку';
-    if (/401|учетные данные|сессия/i.test(String(message))) {
-      navigate('/auth', { state: { from: location.pathname + location.search } });
+    if (isAuthErrorMessage(message)) {
+      goToAuth();
       return;
     }
     setNotice(message);
     window.setTimeout(() => setNotice(''), 3500);
-  }, [dispatch, token, isAuthenticated, isLoading, normalizedQuery, navigate, location]);
+  }, [dispatch, isAuthenticated, isLoading, normalizedQuery, goToAuth]);
 
   if (!normalizedQuery) return null;
 

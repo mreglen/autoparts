@@ -58,6 +58,7 @@ const ProductCard = ({
   part,
   isTestOrganization = false,
   hideConditionAndQuantity = false,
+  hideWarehouse = false,
   listPriority = false,
   showFavorite = true,
   showNewBadge,
@@ -211,7 +212,7 @@ const ProductCard = ({
                 </p>
               </div>
 
-              {!isRossko ? (
+              {!hideWarehouse && !isRossko ? (
                 <div className="flex items-center gap-0.5 text-[14px] text-gray-600">
                   <span>{product.location || 'Скл'}</span>
                   {product.stock ? (

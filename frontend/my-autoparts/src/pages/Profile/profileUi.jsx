@@ -73,6 +73,13 @@ export function ProfileEmptyLine({ children, catalogTo = '/autoparts/used' }) {
   );
 }
 
+export const profileProductCardProps = {
+  showFavorite: true,
+  hideConditionAndQuantity: true,
+  hideWarehouse: true,
+  showNewBadge: false,
+};
+
 export function ProfilePreviewGrid({ items, loading }) {
   if (loading) {
     return (
@@ -90,7 +97,7 @@ export function ProfilePreviewGrid({ items, loading }) {
     <div className="grid grid-cols-3 gap-2 px-4 pb-4 pt-1">
       {items.map((part) => (
         <div key={engagementItemKey(part)} className="min-w-0">
-          <ProductCard part={part} showFavorite listPriority={false} />
+          <ProductCard part={part} listPriority={false} {...profileProductCardProps} />
         </div>
       ))}
     </div>
@@ -113,7 +120,7 @@ export function ProfileProductGrid({ items, loading }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {items.map((part) => (
-        <ProductCard key={engagementItemKey(part)} part={part} showFavorite />
+        <ProductCard key={engagementItemKey(part)} part={part} {...profileProductCardProps} />
       ))}
     </div>
   );

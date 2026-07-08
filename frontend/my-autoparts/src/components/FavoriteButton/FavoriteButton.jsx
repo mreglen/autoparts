@@ -1,7 +1,12 @@
 import React, { useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { fetchFavoriteStatus, toggleFavorite } from '../../redux/slices/UserEngagementSlice';
+import { useAuthReady } from '../../hooks/useAuthReady';
+import {
+  fetchFavoriteStatus,
+  isAuthEngagementError,
+  toggleFavorite,
+} from '../../redux/slices/UserEngagementSlice';
 import { productFavoriteKey } from '../../utils/favoriteKeys';
 
 function HeartIcon({ filled, className = 'h-5 w-5' }) {
@@ -33,7 +38,7 @@ export default function FavoriteButton({
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const user = useSelector((state) => state.auth.user);
+  const { isAuthenticated, isLoading, isReady, token } = useAuthReady();
   const normalizedProductId = Number(productId);
   const favoriteKey = productFavoriteKey(normalizedProductId);
   const isFavorite = useSelector(
@@ -43,21 +48,39 @@ export default function FavoriteButton({
     (state) => state.userEngagement?.favoriteTogglingKey === favoriteKey,
   );
 
+  const returnPath = `${location.pathname}${location.search}`;
+
+  const goToAuth = useCallback(() => {
+    navigate('/auth', { state: { from: returnPath } });
+  }, [navigate, returnPath]);
+
   useEffect(() => {
-    if (!user || !normalizedProductId) return;
+    if (!isReady || !token || !isAuthenticated || !normalizedProductId) return;
     dispatch(fetchFavoriteStatus(normalizedProductId));
-  }, [dispatch, user, normalizedProductId]);
+  }, [dispatch, isReady, token, isAuthenticated, normalizedProductId]);
 
   const handleClick = useCallback(async (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (!normalizedProductId) return;
-    if (!user) {
-      navigate('/auth', { state: { from: location.pathname } });
+    if (isLoading) return;
+    if (!isAuthenticated || !token) {
+      goToAuth();
       return;
     }
-    dispatch(toggleFavorite({ productId: normalizedProductId, isFavorite }));
-  }, [dispatch, user, normalizedProductId, isFavorite, navigate, location.pathname]);
+    const result = await dispatch(toggleFavorite({ productId: normalizedProductId, isFavorite }));
+    if (toggleFavorite.rejected.match(result) && isAuthEngagementError(result.payload)) {
+      goToAuth();
+    }
+  }, [
+    dispatch,
+    isAuthenticated,
+    isLoading,
+    token,
+    normalizedProductId,
+    isFavorite,
+    goToAuth,
+  ]);
 
   const sizeClasses = size === 'sm'
     ? 'min-h-9 gap-1.5 px-2.5 py-1.5 text-xs'

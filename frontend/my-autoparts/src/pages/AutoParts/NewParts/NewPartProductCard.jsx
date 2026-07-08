@@ -16,7 +16,6 @@ import {
   formatProductDisplayTitle,
 } from '../../../utils/productDisplayName';
 import { prefetchNewPartOpenChunk } from '../../../utils/prefetchPartDetail';
-import CatalogNewBadge from '../../../components/CatalogNewBadge/CatalogNewBadge';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
 
 const monthNames = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
@@ -284,7 +283,6 @@ function NewPartProductCard({
 
   return (
     <article className="relative rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-5" data-card-id={uniqueId}>
-      <CatalogNewBadge className="left-3 top-3" />
       <FavoriteHeartOverlay
         rossko={{
           brand,

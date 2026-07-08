@@ -70,7 +70,6 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
     if (user.is_admin) {
         baseTabs = [
             { id: 'dashboard', label: 'Главная' },
-            { id: 'sellers', label: 'Продавцы' },
             { id: 'clients', label: 'Клиенты' },
             { id: 'chats', label: 'Сообщения' },
             {
@@ -260,6 +259,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             id: 'administration',
             label: 'Админка',
             submenu: [
+                { id: 'sellers', label: 'Продавцы' },
                 { id: 'pending-sellers', label: 'Регистрация продавцов' },
                 { id: 'product-moderation', label: 'Проверка запчастей' },
                 { id: 'analytics', label: 'Аналитика' },

@@ -300,19 +300,6 @@ const CardPart = ({
                 </>
               )}
             </div>
-
-            {productStorageCells?.length > 0 && (
-              <div className="mt-2 max-w-lg" onClick={(e) => e.stopPropagation()}>
-                <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                  Адресное хранение
-                </div>
-                <StorageCellsDisplayTable
-                  productStorageCells={productStorageCells}
-                  cellCatalog={cellCatalog}
-                  compact
-                />
-              </div>
-            )}
           </div>
         </div>
       </td>
@@ -468,19 +455,6 @@ const CardPart = ({
                 </>
               )}
             </div>
-
-            {productStorageCells?.length > 0 && (
-              <div className="mt-3" onClick={(e) => e.stopPropagation()}>
-                <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                  Адресное хранение
-                </div>
-                <StorageCellsDisplayTable
-                  productStorageCells={productStorageCells}
-                  cellCatalog={cellCatalog}
-                  compact
-                />
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -533,6 +507,18 @@ const CardPart = ({
                 <p className="text-sm text-gray-900">
                   {part.storage_location_id ? getStorageAddress(part.storage_location_id) : '—'}
                 </p>
+                {productStorageCells?.length > 0 && (
+                  <div className="mt-2 max-w-lg">
+                    <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                      Адресное хранение
+                    </div>
+                    <StorageCellsDisplayTable
+                      productStorageCells={productStorageCells}
+                      cellCatalog={cellCatalog}
+                      compact
+                    />
+                  </div>
+                )}
               </div>
               <div>
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Ответственный</h4>
@@ -659,6 +645,18 @@ const CardPart = ({
                   <p className="text-sm text-gray-900">
                     {part.storage_location_id ? getStorageAddress(part.storage_location_id) : '—'}
                   </p>
+                  {productStorageCells?.length > 0 && (
+                    <div className="mt-2 max-w-lg">
+                      <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                        Адресное хранение
+                      </div>
+                      <StorageCellsDisplayTable
+                        productStorageCells={productStorageCells}
+                        cellCatalog={cellCatalog}
+                        compact
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Ответственный</h4>

@@ -2,6 +2,23 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { apiRequest } from '../../utils/apiClient';
 import { favoriteKeyFromItem, productFavoriteKey, rosskoFavoriteKey } from '../../utils/favoriteKeys';
 
+export function isAuthEngagementError(message) {
+  const text = String(message || '').toLowerCase();
+  return (
+    text.includes('401')
+    || text.includes('unauthorized')
+    || text.includes('not authenticated')
+    || text.includes('учетные данные')
+    || text.includes('учётные данные')
+    || text.includes('сессия')
+  );
+}
+
+function hasAuthenticatedUser(getState) {
+  const auth = getState().auth;
+  return Boolean(auth?.token && auth?.user);
+}
+
 export const fetchFavoriteStatus = createAsyncThunk(
   'userEngagement/fetchFavoriteStatus',
   async (productId, { rejectWithValue }) => {
@@ -11,6 +28,9 @@ export const fetchFavoriteStatus = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error?.message || 'Не удалось загрузить избранное');
     }
+  },
+  {
+    condition: (_, { getState }) => hasAuthenticatedUser(getState),
   },
 );
 
@@ -31,6 +51,9 @@ export const fetchRosskoFavoriteStatus = createAsyncThunk(
       return rejectWithValue(error?.message || 'Не удалось загрузить избранное');
     }
   },
+  {
+    condition: (_, { getState }) => hasAuthenticatedUser(getState),
+  },
 );
 
 export const toggleFavorite = createAsyncThunk(
@@ -46,6 +69,9 @@ export const toggleFavorite = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error?.message || 'Не удалось обновить избранное');
     }
+  },
+  {
+    condition: (_, { getState }) => hasAuthenticatedUser(getState),
   },
 );
 
@@ -77,6 +103,9 @@ export const toggleRosskoFavorite = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(error?.message || 'Не удалось обновить избранное');
     }
+  },
+  {
+    condition: (_, { getState }) => hasAuthenticatedUser(getState),
   },
 );
 
@@ -139,7 +168,7 @@ export const fetchSearchSubscriptions = createAsyncThunk(
     }
   },
   {
-    condition: (_, { getState }) => Boolean(getState().auth?.token),
+    condition: (_, { getState }) => hasAuthenticatedUser(getState),
   },
 );
 
@@ -158,7 +187,7 @@ export const subscribeToSearch = createAsyncThunk(
     }
   },
   {
-    condition: (_, { getState }) => Boolean(getState().auth?.token),
+    condition: (_, { getState }) => hasAuthenticatedUser(getState),
   },
 );
 
@@ -233,7 +262,9 @@ const userEngagementSlice = createSlice({
         const key = productFavoriteKey(action.meta.arg.productId);
         const { isFavorite } = action.meta.arg;
         if (key) state.favoriteByKey[key] = isFavorite;
-        state.error = action.payload;
+        if (!isAuthEngagementError(action.payload)) {
+          state.error = action.payload;
+        }
       })
       .addCase(toggleRosskoFavorite.pending, (state, action) => {
         const { brand, partnumber, isFavorite } = action.meta.arg;
@@ -252,7 +283,9 @@ const userEngagementSlice = createSlice({
         const { brand, partnumber, isFavorite } = action.meta.arg;
         const key = rosskoFavoriteKey(brand, partnumber);
         if (key) state.favoriteByKey[key] = isFavorite;
-        state.error = action.payload;
+        if (!isAuthEngagementError(action.payload)) {
+          state.error = action.payload;
+        }
       })
       .addCase(fetchFavorites.pending, (state) => {
         state.favoritesLoading = true;
@@ -264,6 +297,10 @@ const userEngagementSlice = createSlice({
       })
       .addCase(fetchFavorites.rejected, (state, action) => {
         state.favoritesLoading = false;
+        if (isAuthEngagementError(action.payload)) {
+          state.favorites = [];
+          return;
+        }
         state.error = action.payload;
       })
       .addCase(fetchViewHistory.pending, (state) => {
@@ -289,6 +326,10 @@ const userEngagementSlice = createSlice({
       })
       .addCase(fetchSearchSubscriptions.rejected, (state, action) => {
         state.subscriptionsLoading = false;
+        if (isAuthEngagementError(action.payload)) {
+          state.subscriptions = [];
+          return;
+        }
         state.error = action.payload;
       })
       .addCase(subscribeToSearch.pending, (state) => {
@@ -305,7 +346,9 @@ const userEngagementSlice = createSlice({
       })
       .addCase(subscribeToSearch.rejected, (state, action) => {
         state.subscriptionActionLoading = false;
-        state.error = action.payload;
+        if (!isAuthEngagementError(action.payload)) {
+          state.error = action.payload;
+        }
       })
       .addCase(deleteSearchSubscription.fulfilled, (state, action) => {
         state.subscriptions = state.subscriptions.filter((item) => item.id !== action.payload);
