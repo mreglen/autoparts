@@ -80,7 +80,7 @@ export default function PartDetailSpecsBlock({ product, variant = 'card' }) {
 
   if (variant === 'inline') {
     return (
-      <section className="mt-4">
+      <section className="mt-5">
         <h2 className="text-base font-semibold text-gray-900">Характеристики</h2>
         <dl className="mt-2">
           <PartDetailSpecsContent product={product} SpecRow={SpecRow} />

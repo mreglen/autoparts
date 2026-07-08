@@ -42,9 +42,9 @@ export default function PartDetailDesktopGallery({
   const alt = mainAlt || buildProductPhotoAlt({ brand, article, name, isMain: true });
 
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-3 lg:gap-4">
       {items.length > 1 ? (
-        <div className="flex max-h-[min(520px,60vh)] w-[4.5rem] shrink-0 flex-col gap-2 overflow-y-auto pr-0.5">
+        <div className="flex max-h-[min(680px,72vh)] w-[4.75rem] shrink-0 flex-col gap-2.5 overflow-y-auto pr-0.5 lg:w-20">
           {items.map((item, index) => {
             const thumbUrl = normalizeImageUrl(getMediaUrl(item));
             const thumbIsVideo = isVideoItem(item);
@@ -90,7 +90,7 @@ export default function PartDetailDesktopGallery({
 
       <div className="relative min-w-0 flex-1">
         <div
-          className="group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-gray-50"
+          className="group relative min-h-[420px] aspect-[4/5] cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-gray-50 lg:min-h-[520px] lg:aspect-[3/4]"
           onClick={() => onOpenModal(currentIndex)}
           role="button"
           tabIndex={0}

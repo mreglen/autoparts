@@ -1000,7 +1000,7 @@ const PartDetail = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-gray-50 to-gray-100 max-md:pb-28">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-gray-50 to-gray-100 max-md:pb-28 md:bg-white md:from-white md:via-white md:to-white">
       <PartProductSeoHelmet seo={seo} structuredDataBlocks={structuredDataBlocks} product={currentProduct} />
 
       <div className="md:hidden">
@@ -1123,26 +1123,42 @@ const PartDetail = () => {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-4 pb-8 pt-3 max-md:px-0 max-md:pb-32 max-md:pt-0">
-        <div className="mb-4 hidden flex-col gap-2 sm:flex-row sm:items-center sm:justify-between md:flex">
+      <div className="mx-auto max-w-[1380px] px-2 pb-8 pt-3 md:px-3 max-md:px-0 max-md:pb-32 max-md:pt-0">
+        <div className="mb-3 hidden md:block">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleBackToList}
+              className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:border-indigo-200 hover:text-indigo-600"
+            >
+              <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+              </svg>
+              Назад к списку
+            </button>
+            <FavoriteButton
+              productId={currentProduct.id}
+              size="sm"
+              showLabel={false}
+              className="h-9 w-9 min-h-0 gap-0 rounded-lg border border-gray-200 p-0 shadow-sm"
+            />
+            <ShareButton
+              url={seo.canonicalUrl}
+              title={h1Primary}
+              text={shareText}
+              showLabel={false}
+              size="sm"
+              className="h-9 w-9 min-h-0 gap-0 rounded-lg border border-gray-200 p-0 shadow-sm"
+            />
+          </div>
           <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
-          <button
-            type="button"
-            onClick={handleBackToList}
-            className="inline-flex items-center self-start rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:border-indigo-200 hover:text-indigo-600 sm:self-auto"
-          >
-            <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-            </svg>
-            Назад к списку
-          </button>
         </div>
 
         <div className="mb-4 px-4 pt-3 md:hidden">
           <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm max-md:rounded-none max-md:border-x-0 max-md:shadow-none">
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm max-md:rounded-none max-md:border-x-0 max-md:shadow-none md:border-0 md:shadow-none md:rounded-none">
           <div className="md:hidden">
             <div className="grid grid-cols-1">
               <div className="space-y-4 p-4 max-md:px-4 max-md:pt-4">
@@ -1245,8 +1261,8 @@ const PartDetail = () => {
             </div>
           </div>
 
-          <div className="hidden md:block p-5 sm:p-6">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="hidden md:block py-2 lg:py-4">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-10 xl:gap-12">
               <div className="lg:col-span-5">
                 <PartDetailDesktopGallery
                   items={allMediaItems}
@@ -1261,7 +1277,7 @@ const PartDetail = () => {
               </div>
 
               <div className="min-w-0 lg:col-span-4">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
                     {currentProduct.brand || '—'}
                   </span>
@@ -1284,32 +1300,23 @@ const PartDetail = () => {
                   ) : null}
                 </div>
 
-                <div className="flex items-start justify-between gap-3">
-                  <h1 className="min-w-0 flex-1 text-xl font-bold leading-snug text-gray-900 lg:text-[1.65rem]">
-                    <span className="block">{h1Primary}</span>
-                    {h1Subtitle ? (
-                      <span className="mt-1 block text-base font-medium text-gray-600">{h1Subtitle}</span>
-                    ) : null}
-                  </h1>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <FavoriteButton productId={currentProduct.id} size="sm" />
-                    <ShareButton
-                      url={seo.canonicalUrl}
-                      title={h1Primary}
-                      text={shareText}
-                      size="sm"
-                    />
-                  </div>
-                </div>
+                <h1 className="text-xl font-bold leading-snug text-gray-900 lg:text-[1.65rem]">
+                  <span className="block">{h1Primary}</span>
+                  {h1Subtitle ? (
+                    <span className="mt-1 block text-base font-medium text-gray-600">{h1Subtitle}</span>
+                  ) : null}
+                </h1>
 
-                <PartDetailSeoCrossLinks
+                <div className="mt-3">
+                  <PartDetailSeoCrossLinks
                   brand={partBrand}
                   article={partArticle}
                   isNew={Boolean(currentProduct.is_new)}
                   organizationId={sellerOrg?.id}
                   organizationName={sellerOrg?.name}
                   usedCatalogPath={seo.usedCatalogPath}
-                />
+                  />
+                </div>
 
                 <PartDetailSpecsBlock product={currentProduct} variant="inline" />
 
@@ -1324,7 +1331,7 @@ const PartDetail = () => {
               </div>
 
               <div className="lg:col-span-3">
-                <div className="space-y-4 lg:sticky lg:top-4">
+                <div className="space-y-5 lg:sticky lg:top-4">
                   <PartDetailPurchaseSidebar
                     product={currentProduct}
                     inStock={inStock}
@@ -1351,7 +1358,7 @@ const PartDetail = () => {
               </div>
             </div>
 
-            <div className="mt-6 space-y-4 border-t border-gray-100 pt-6">
+            <div className="mt-8 space-y-5 border-t border-gray-100 pt-8 lg:mt-10 lg:pt-10">
               <PartDetailSeoSummary summary={seo.seoSummary} />
               <PartDetailTrustRow />
               <PartDetailAboutBlock
@@ -1362,7 +1369,7 @@ const PartDetail = () => {
           </div>
         </div>
 
-        <div className="mt-6 space-y-4 max-md:px-4">
+        <div className="mt-8 space-y-5 max-md:px-4 md:mt-10 lg:space-y-6">
       <PartDetailFitmentBlock
         sellerVehicles={currentProduct.compatible_vehicles}
         referenceVehicles={referenceFitment}
