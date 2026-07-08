@@ -60,11 +60,11 @@ export default function MainLayout() {
                 <Navigation />
             </div>
 
-            <MobileHeader onMenuClick={openMenu} hidden={isMobileActiveChat} />
+            <MobileHeader onMenuClick={openMenu} hidden={isMobileActiveChat || isPartPage} />
 
             <div className="hidden lg:block h-[var(--sg-desktop-header-h)] shrink-0" aria-hidden="true" />
             <div
-                className={`lg:hidden h-[var(--sg-mobile-header-h)] shrink-0 ${isMobileActiveChat ? 'hidden' : ''}`}
+                className={`lg:hidden h-[var(--sg-mobile-header-h)] shrink-0 ${isMobileActiveChat || isPartPage ? 'hidden' : ''}`}
                 aria-hidden="true"
             />
 
@@ -87,6 +87,8 @@ export default function MainLayout() {
                               ? 'max-lg:h-[calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px))]'
                               : 'max-lg:h-[calc(100dvh-var(--sg-mobile-header-h)-4.5rem-env(safe-area-inset-bottom,0px))]'
                           } lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]`
+                        : isPartPage
+                        ? 'max-w-7xl max-lg:px-0 max-lg:py-0 px-3 sm:px-1 lg:px-2 py-6 sm:py-8 max-lg:min-h-[calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px))]'
                         : isAutopartsPage
                         ? 'max-w-7xl max-lg:px-0 max-lg:py-2 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                         : 'max-w-7xl max-lg:px-3 max-lg:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'

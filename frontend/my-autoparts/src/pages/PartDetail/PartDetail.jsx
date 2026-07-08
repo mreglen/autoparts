@@ -3,11 +3,11 @@ import { useParams, useNavigate, useSearchParams, useLocation } from 'react-rout
 import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
 import { fetchPublicProduct, searchAllProducts } from '../../redux/slices/ProductSlice';
-import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart } from '../../redux/slices/CartSlice';
+import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart, fetchCart } from '../../redux/slices/CartSlice';
 import { createOrGetChat } from '../../redux/slices/ChatSlice';
 import { normalizeImageUrl, apiAxiosUnauth } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
-import { buildPartDetailPath, parsePartDetailParam } from '../../utils/partRoutes';
+import { buildPartDetailPath, parsePartDetailParam, partDetailPathsMatch } from '../../utils/partRoutes';
 import { extractProductDescription, formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { buildProductSeo, seoFromPartMetaResponse, buildProductStructuredDataBlocks, buildProductPhotoAlt } from '../../utils/productSeo';
 import { DEFAULT_OG_IMAGE_URL } from '../../utils/seoConstants';
@@ -125,6 +125,7 @@ const PartDetail = () => {
   const [initialMediaIndex, setInitialMediaIndex] = useState(0);
   const [currentMainMediaIndex, setCurrentMainMediaIndex] = useState(0);
   const [creatingChat, setCreatingChat] = useState(false);
+  const [buyingNow, setBuyingNow] = useState(false);
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [apiSeo, setApiSeo] = useState(null);
   const [alternateOffers, setAlternateOffers] = useState([]);
@@ -141,21 +142,29 @@ const PartDetail = () => {
   const canonicalRedirectRef = useRef(null);
 
   const routeIdentityKey = useMemo(() => {
-    if (extractedProductId) return `id:${extractedProductId}`;
+    if (extractedProductId) {
+      const numericId = parseInt(extractedProductId, 10);
+      if (!Number.isNaN(numericId) && numericId > 0) {
+        return `id:${numericId}`;
+      }
+    }
     if (extractedBrand && extractedArticle) {
       return `ba:${extractedBrand}|${extractedArticle}`;
     }
     return combinedParam || '';
   }, [extractedProductId, extractedBrand, extractedArticle, combinedParam]);
 
+  const resolvedProductId = useMemo(() => {
+    if (!extractedProductId) return null;
+    const numericId = parseInt(extractedProductId, 10);
+    return !Number.isNaN(numericId) && numericId > 0 ? numericId : null;
+  }, [extractedProductId]);
+
   const productMatchesRoute = useMemo(() => {
     if (!currentProduct?.id) return false;
 
-    if (extractedProductId) {
-      const numericId = parseInt(extractedProductId, 10);
-      if (!Number.isNaN(numericId) && numericId > 0) {
-        return currentProduct.id === numericId;
-      }
+    if (resolvedProductId) {
+      return currentProduct.id === resolvedProductId;
     }
 
     if (extractedBrand && extractedArticle) {
@@ -168,17 +177,27 @@ const PartDetail = () => {
     }
 
     return true;
-  }, [currentProduct, extractedProductId, extractedBrand, extractedArticle]);
+  }, [currentProduct, resolvedProductId, extractedBrand, extractedArticle]);
 
-  const showProduct = Boolean(productMatchesRoute && currentProduct);
+  const displayProduct = useMemo(() => {
+    if (!currentProduct?.id) return null;
+    if (productMatchesRoute) return currentProduct;
+    if (resolvedProductId && currentProduct.id === resolvedProductId) return currentProduct;
+    return null;
+  }, [currentProduct, productMatchesRoute, resolvedProductId]);
+
+  const showProduct = Boolean(displayProduct);
 
   useEffect(() => {
     fetchedProductIdRef.current = null;
     searchedBrandArticleRef.current = null;
     trackedPartViewRef.current = null;
     recordedEngagementViewRef.current = null;
-    canonicalRedirectRef.current = null;
   }, [routeIdentityKey]);
+
+  useEffect(() => {
+    canonicalRedirectRef.current = null;
+  }, [resolvedProductId ?? routeIdentityKey]);
 
   useEffect(() => {
     const path = location.pathname;
@@ -213,14 +232,14 @@ const PartDetail = () => {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!showProduct || !currentProduct?.brand || !currentProduct?.article) {
+    if (!showProduct || !displayProduct?.brand || !displayProduct?.article) {
       setAlternateOffers([]);
       setAlternateOffersError('');
       return undefined;
     }
 
     let cancelled = false;
-    const cacheKey = `${currentProduct.brand}|${currentProduct.article}|${currentProduct.id}`;
+    const cacheKey = `${displayProduct.brand}|${displayProduct.article}|${displayProduct.id}`;
     const cachedOffers = readPartDetailCache(PART_DETAIL_CACHE.alternateOffers, cacheKey);
     if (cachedOffers) {
       setAlternateOffers(cachedOffers);
@@ -235,10 +254,10 @@ const PartDetail = () => {
       try {
         const response = await apiAxiosUnauth.get('/products/public/find-used-match', {
           params: {
-            brand: currentProduct.brand,
-            article: currentProduct.article,
+            brand: displayProduct.brand,
+            article: displayProduct.article,
             limit: 20,
-            exclude_product_id: currentProduct.id,
+            exclude_product_id: displayProduct.id,
           },
         });
         const items = Array.isArray(response?.data) ? response.data : [];
@@ -259,16 +278,16 @@ const PartDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [showProduct, currentProduct?.id, currentProduct?.brand, currentProduct?.article]);
+  }, [showProduct, displayProduct?.id, displayProduct?.brand, displayProduct?.article]);
 
   useEffect(() => {
-    if (!showProduct || !currentProduct?.brand || !currentProduct?.article) {
+    if (!showProduct || !displayProduct?.brand || !displayProduct?.article) {
       setReferenceFitment([]);
       return undefined;
     }
 
     let cancelled = false;
-    const fitmentKey = `${currentProduct.brand}|${currentProduct.article}|${currentProduct.id}`;
+    const fitmentKey = `${displayProduct.brand}|${displayProduct.article}|${displayProduct.id}`;
     const cachedFitment = readPartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey);
     if (cachedFitment) {
       setReferenceFitment(cachedFitment);
@@ -281,9 +300,9 @@ const PartDetail = () => {
       try {
         const response = await apiAxiosUnauth.get('/public/part-reference-fitment', {
           params: {
-            brand: currentProduct.brand,
-            article: currentProduct.article,
-            exclude_product_id: currentProduct.id,
+            brand: displayProduct.brand,
+            article: displayProduct.article,
+            exclude_product_id: displayProduct.id,
           },
         });
         const vehicles = Array.isArray(response?.data?.vehicles) ? response.data.vehicles : [];
@@ -301,7 +320,7 @@ const PartDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [showProduct, currentProduct?.id, currentProduct?.brand, currentProduct?.article]);
+  }, [showProduct, displayProduct?.id, displayProduct?.brand, displayProduct?.article]);
 
   useEffect(() => {
     if (showProduct || !error) {
@@ -360,25 +379,27 @@ const PartDetail = () => {
   }, [showProduct, currentProduct?.id, user, location.pathname, dispatch]);
 
   useEffect(() => {
-    if (!currentProduct?.id) return;
-    const canonicalPath = buildPartDetailPath(currentProduct);
+    if (!displayProduct?.id) return;
+    const canonicalPath = buildPartDetailPath(displayProduct);
     if (!canonicalPath || location.pathname === canonicalPath) return;
-    if (canonicalRedirectRef.current === currentProduct.id) return;
-    canonicalRedirectRef.current = currentProduct.id;
+    if (partDetailPathsMatch(location.pathname, canonicalPath)) return;
+    if (canonicalRedirectRef.current === displayProduct.id) return;
+    canonicalRedirectRef.current = displayProduct.id;
     navigate(canonicalPath, { replace: true });
-  }, [currentProduct?.id, currentProduct?.brand, currentProduct?.article, location.pathname, navigate]);
+  }, [displayProduct?.id, displayProduct?.brand, displayProduct?.article, location.pathname, navigate]);
 
   useEffect(() => {
-    if (extractedProductId) {
-      const numericId = parseInt(extractedProductId, 10);
-      if (!Number.isNaN(numericId) && numericId > 0) {
-        if (fetchedProductIdRef.current === numericId) {
-          return;
-        }
-        fetchedProductIdRef.current = numericId;
-        dispatch(fetchPublicProduct(numericId));
+    if (resolvedProductId) {
+      if (fetchedProductIdRef.current === resolvedProductId) {
         return;
       }
+      if (currentProduct?.id === resolvedProductId) {
+        fetchedProductIdRef.current = resolvedProductId;
+        return;
+      }
+      fetchedProductIdRef.current = resolvedProductId;
+      dispatch(fetchPublicProduct(resolvedProductId));
+      return;
     }
 
     if (extractedBrand && extractedArticle) {
@@ -421,7 +442,7 @@ const PartDetail = () => {
       
       fetchByBrandAndArticle();
     }
-  }, [dispatch, extractedProductId, extractedBrand, extractedArticle]);
+  }, [dispatch, resolvedProductId, extractedBrand, extractedArticle, currentProduct?.id]);
 
   const getCartQuantity = (partId) => {
     if (!cart?.used_parts_items) return 0;
@@ -481,6 +502,74 @@ const PartDetail = () => {
       console.error('Ошибка изменения количества в корзине:', error);
     } finally {
       setAddingToCartId(null);
+    }
+  };
+
+  const buildUsedOrderItem = (cartItem, sellerFallback) => ({
+    id: cartItem.id,
+    type: 'used',
+    seller: cartItem.seller || sellerFallback,
+    brand: cartItem.brand,
+    number: cartItem.partnumber,
+    internalCode: cartItem.partnumber,
+    name: `${cartItem.brand} ${cartItem.partnumber}`,
+    deliveryDate: cartItem.delivery,
+    price: cartItem.price,
+    quantity: cartItem.quantity,
+    maxQuantity: cartItem.max_quantity,
+    product_id: cartItem.product_id,
+    image: '/api/placeholder/80/80',
+  });
+
+  const handleBuyNow = async () => {
+    if (!user) {
+      navigate('/auth', { state: { from: window.location.pathname } });
+      return;
+    }
+    if (!currentProduct) return;
+
+    const stockInfo = getStockAvailability(currentProduct);
+    const { showCart: canBuy } = getUsedPurchaseActions(
+      purchaseMode,
+      Boolean(currentProduct?.is_new),
+    );
+    if (!canBuy || stockInfo.noStock) return;
+
+    setBuyingNow(true);
+    try {
+      const cartQuantity = getCartQuantity(currentProduct.id);
+      if (cartQuantity === 0) {
+        await dispatch(addUsedPartsToCart({ product_id: currentProduct.id, quantity: 1 })).unwrap();
+        trackConversion(CONVERSION_EVENTS.ADD_TO_CART, {
+          productId: currentProduct.id,
+          path: buildPartDetailPath(currentProduct) || location.pathname,
+          section: 'used',
+        });
+      }
+
+      const freshCart = await dispatch(fetchCart()).unwrap();
+      const cartItem = freshCart?.used_parts_items?.find(
+        (item) => item.product_id === currentProduct.id,
+      );
+      if (!cartItem) {
+        alert('Не удалось оформить заказ. Попробуйте ещё раз.');
+        return;
+      }
+
+      const seller = currentProduct.organization?.name || cartItem.seller || 'Продавец';
+      const orderData = {
+        items: [buildUsedOrderItem(cartItem, seller)],
+        seller,
+        deliverInParts: false,
+        checkoutType: 'used',
+      };
+      localStorage.setItem('orderData', JSON.stringify(orderData));
+      navigate('/order-reg');
+    } catch (error) {
+      console.error('Ошибка быстрого заказа:', error);
+      alert('Не удалось оформить заказ. Попробуйте ещё раз.');
+    } finally {
+      setBuyingNow(false);
     }
   };
 
@@ -816,11 +905,333 @@ const PartDetail = () => {
     .filter(Boolean)
     .join(' — ');
 
+  const allMediaItems = [
+    ...(currentProduct.photos || []),
+    ...(currentProduct.videos || []),
+  ];
+  const stockQuantity = currentProduct.quantity || 0;
+  const showLowStockBadge = inStock && stockQuantity > 0 && stockQuantity <= 5;
+  const hasSellerContact = showSellerContact && (sellerOrg?.phone || sellerOrg?.contact_person);
+  const stockInfo = getStockAvailability(currentProduct);
+  const canShowBuyNow = showCart && inStock && !stockInfo.noStock;
+  const canShowWrite = hasSellerContact;
+  const showMobileStickyCta = canShowBuyNow || canShowWrite;
+
+  const renderMediaThumbnails = (className = '') => {
+    if (allMediaItems.length <= 1) return null;
+    return (
+      <div className={`grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-4 lg:grid-cols-5 ${className}`}>
+        {allMediaItems.map((item, index) => {
+          const mediaUrl = normalizeImageUrl(getMediaUrl(item));
+          const isVideoItem = isVideo(item);
+
+          return (
+            <div
+              key={index}
+              className={`relative aspect-square cursor-pointer overflow-hidden rounded-md border bg-gray-50 ${
+                currentMainMediaIndex === index
+                  ? 'border-indigo-500'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+              onClick={() => setCurrentMainMediaIndex(index)}
+            >
+              {isVideoItem ? (
+                <>
+                  <video
+                    src={mediaUrl}
+                    className="h-full w-full object-cover"
+                    muted
+                    playsInline
+                    preload="metadata"
+                  />
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40">
+                    <svg className="h-6 w-6 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                    </svg>
+                  </div>
+                </>
+              ) : (
+                <img
+                  src={mediaUrl}
+                  alt={buildProductPhotoAlt({
+                    brand: partBrand,
+                    article: partArticle,
+                    name: currentProduct.name,
+                    index,
+                  })}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderMainGallery = () => {
+    if (allMediaItems.length === 0) {
+      return (
+        <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50">
+          <p className="text-sm text-gray-400">Нет фотографий или видео</p>
+        </div>
+      );
+    }
+
+    const firstItem = allMediaItems[currentMainMediaIndex];
+    const mediaUrl = normalizeImageUrl(getMediaUrl(firstItem));
+    const isVideoItem = isVideo(firstItem);
+
+    return (
+      <div>
+        <div className="relative">
+          <div
+            className="group relative mb-3 aspect-[4/3] cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-inner"
+            onClick={() => handleOpenMediaModal(currentMainMediaIndex)}
+          >
+            {isVideoItem ? (
+              <div className="relative h-full w-full">
+                <video
+                  src={mediaUrl}
+                  className="h-full w-full object-contain"
+                  muted
+                  playsInline
+                  preload="metadata"
+                />
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/30">
+                  <div className="rounded-full bg-white/90 p-4">
+                    <svg className="ml-0.5 h-10 w-10 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="absolute bottom-3 right-3 rounded bg-black/70 px-3 py-1.5 text-sm font-medium text-white">
+                  Видео
+                </div>
+              </div>
+            ) : (
+              <img
+                src={mediaUrl}
+                alt={photoAltMain}
+                className="h-full w-full object-contain"
+                loading="eager"
+              />
+            )}
+          </div>
+
+          {allMediaItems.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 text-gray-600 hover:text-indigo-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentMainMediaIndex((prev) => (prev > 0 ? prev - 1 : allMediaItems.length - 1));
+                }}
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 text-gray-600 hover:text-indigo-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentMainMediaIndex((prev) => (prev < allMediaItems.length - 1 ? prev + 1 : 0));
+                }}
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-1 text-xs font-medium text-white">
+                {currentMainMediaIndex + 1} / {allMediaItems.length}
+              </div>
+            </>
+          )}
+        </div>
+        {renderMediaThumbnails()}
+      </div>
+    );
+  };
+
+  const renderMobileTitleBlock = () => (
+    <>
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+          {currentProduct.brand || '—'}
+        </span>
+        <span className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+          Арт. {currentProduct.article || '—'}
+        </span>
+        {currentProduct.is_new ? (
+          <span className="rounded-md bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+            Новая
+          </span>
+        ) : (
+          <span className="rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">
+            Б/у
+          </span>
+        )}
+        {inStock ? (
+          <span className="rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+            В наличии
+          </span>
+        ) : null}
+      </div>
+      <h1 className="text-xl font-bold leading-snug text-gray-900">
+        <span className="block">{h1Primary}</span>
+        {h1Subtitle ? (
+          <span className="mt-1 block text-base font-medium text-gray-600">{h1Subtitle}</span>
+        ) : null}
+      </h1>
+      <PartDetailSeoSummary summary={seo.seoSummary} />
+      <PartDetailTrustRow />
+      <PartDetailSeoCrossLinks
+        brand={partBrand}
+        article={partArticle}
+        isNew={Boolean(currentProduct.is_new)}
+        organizationId={sellerOrg?.id}
+        organizationName={sellerOrg?.name}
+        usedCatalogPath={seo.usedCatalogPath}
+      />
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-gray-50 to-gray-100 max-md:pb-28">
       <PartProductSeoHelmet seo={seo} structuredDataBlocks={structuredDataBlocks} product={currentProduct} />
-      <div className="mx-auto max-w-6xl px-4 pb-8 pt-3 max-md:pb-32">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+
+      <div className="md:hidden">
+        <div className="relative min-h-[52dvh] max-h-[62dvh] bg-gray-100">
+          {allMediaItems.length > 0 ? (
+            <div
+              className="relative h-full min-h-[52dvh] max-h-[62dvh] cursor-pointer"
+              onClick={() => handleOpenMediaModal(currentMainMediaIndex)}
+            >
+              {(() => {
+                const firstItem = allMediaItems[currentMainMediaIndex];
+                const mediaUrl = normalizeImageUrl(getMediaUrl(firstItem));
+                const isVideoItem = isVideo(firstItem);
+                if (isVideoItem) {
+                  return (
+                    <div className="relative h-full min-h-[52dvh] max-h-[62dvh]">
+                      <video
+                        src={mediaUrl}
+                        className="h-full w-full object-contain"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+                        <div className="rounded-full bg-white/90 p-3">
+                          <svg className="ml-0.5 h-8 w-8 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <img
+                    src={mediaUrl}
+                    alt={photoAltMain}
+                    className="h-full min-h-[52dvh] max-h-[62dvh] w-full object-contain"
+                    loading="eager"
+                  />
+                );
+              })()}
+
+              {allMediaItems.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentMainMediaIndex((prev) => (prev > 0 ? prev - 1 : allMediaItems.length - 1));
+                    }}
+                    aria-label="Предыдущее фото"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 text-gray-700 shadow-sm backdrop-blur"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentMainMediaIndex((prev) => (prev < allMediaItems.length - 1 ? prev + 1 : 0));
+                    }}
+                    aria-label="Следующее фото"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                  <div className="absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white">
+                    {currentMainMediaIndex + 1}/{allMediaItems.length}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="flex min-h-[52dvh] items-center justify-center bg-gray-100">
+              <p className="text-sm text-gray-400">Нет фотографий</p>
+            </div>
+          )}
+
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]"
+          >
+            <button
+              type="button"
+              onClick={handleBackToList}
+              className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-gray-800 shadow-sm backdrop-blur"
+              aria-label="Назад"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="pointer-events-auto flex items-center gap-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur">
+                <FavoriteButton productId={currentProduct.id} size="sm" />
+              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/80 shadow-sm backdrop-blur">
+                <ShareButton
+                  url={seo.canonicalUrl}
+                  title={h1Primary}
+                  text={shareText}
+                  showLabel={false}
+                  size="sm"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-b border-gray-100 bg-white px-4 py-3">
+          {showLowStockBadge ? (
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-md bg-gray-900 px-2.5 py-1 text-xs font-semibold text-white">
+              <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M11.3 1.046a1 1 0 01.7.954v3.5a1 1 0 01-1 1H9a1 1 0 01-1-1V2a1 1 0 01.7-.954l2-.667a1 1 0 01.6 0l2 .667zM5 8a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm-1 4a1 1 0 011-1h6a1 1 0 110 2H5a1 1 0 01-1-1z" clipRule="evenodd" />
+              </svg>
+              Осталась {stockQuantity} шт
+            </div>
+          ) : null}
+          <div className="text-2xl font-bold text-gray-900">
+            {currentProduct.price ? formatProductPriceDisplay(currentProduct.price) : '—'}
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-6xl px-4 pb-8 pt-3 max-md:px-0 max-md:pb-32 max-md:pt-0">
+        <div className="mb-4 hidden flex-col gap-2 sm:flex-row sm:items-center sm:justify-between md:flex">
           <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
           <button
             type="button"
@@ -834,8 +1245,22 @@ const PartDetail = () => {
           </button>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm max-md:rounded-xl max-md:border-x-0">
-          <div className="border-b border-gray-100 bg-gradient-to-r from-white to-slate-50/80 px-4 py-5 sm:px-6">
+        <div className="mb-4 flex flex-col gap-2 px-4 pt-3 md:hidden">
+          <Breadcrumbs items={breadcrumbItems} includeJsonLd={false} />
+          <button
+            type="button"
+            onClick={handleBackToList}
+            className="inline-flex items-center self-start rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:border-indigo-200 hover:text-indigo-600"
+          >
+            <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            Назад к списку
+          </button>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm max-md:rounded-none max-md:border-x-0 max-md:shadow-none">
+          <div className="hidden border-b border-gray-100 bg-gradient-to-r from-white to-slate-50/80 px-4 py-5 sm:px-6 md:block">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -900,162 +1325,11 @@ const PartDetail = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-5">
-            <div className="space-y-4 border-gray-100 p-4 sm:p-5 lg:col-span-3 lg:border-r">
-              {(currentProduct.photos && currentProduct.photos.length > 0) || (currentProduct.videos && currentProduct.videos.length > 0) ? (
-                <div>
-                  {(() => {
-                    // Combine photos and videos into one array
-                    const allMediaItems = [
-                      ...(currentProduct.photos || []),
-                      ...(currentProduct.videos || [])
-                    ];
-                    
-                    return (
-                      <>
-                        {/* Main Media - Large Display */}
-                <div className="relative">
-                  <div
-                    className="group relative mb-3 aspect-[4/3] cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-inner"
-                    onClick={() => handleOpenMediaModal(currentMainMediaIndex)}
-                  >
-                    {(() => {
-                      const firstItem = allMediaItems[currentMainMediaIndex];
-                      const mediaUrl = normalizeImageUrl(getMediaUrl(firstItem));
-                      const isVideoItem = isVideo(firstItem);
-                      
-                      return (
-                        <>
-                          {isVideoItem ? (
-                            <div className="relative w-full h-full">
-                              <video
-                                src={mediaUrl}
-                                className="w-full h-full object-contain"
-                                muted
-                                playsInline
-                                preload="metadata"
-                              />
-                              <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
-                                <div className="rounded-full bg-white/90 p-4">
-                                  <svg className="ml-0.5 h-10 w-10 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                                  </svg>
-                                </div>
-                              </div>
-                              <div className="absolute bottom-3 right-3 bg-black/70 text-white px-3 py-1.5 rounded text-sm font-medium">
-                                Видео
-                              </div>
-                            </div>
-                          ) : (
-                            <img
-                              src={mediaUrl}
-                              alt={photoAltMain}
-                              className="w-full h-full object-contain"
-                              loading="eager"
-                            />
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
+            <div className="space-y-4 border-gray-100 p-4 sm:p-5 lg:col-span-3 lg:border-r max-md:px-4 max-md:pt-4">
+              <div className="hidden md:block">{renderMainGallery()}</div>
 
-                  {/* Navigation Arrows */}
-                  {allMediaItems.length > 1 && (
-                    <>
-                      {/* Left Arrow */}
-                      <button
-                        type="button"
-                        className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 text-gray-600 hover:text-indigo-600"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentMainMediaIndex(prev => prev > 0 ? prev - 1 : allMediaItems.length - 1);
-                        }}
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                        </svg>
-                      </button>
-
-                      {/* Right Arrow */}
-                      <button
-                        type="button"
-                        className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-gray-200 bg-white p-2 text-gray-600 hover:text-indigo-600"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentMainMediaIndex(prev => prev < allMediaItems.length - 1 ? prev + 1 : 0);
-                        }}
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-
-                      {/* Media Counter */}
-                      <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-1 text-xs font-medium text-white">
-                        {currentMainMediaIndex + 1} / {allMediaItems.length}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Thumbnails Grid */}
-                {allMediaItems.length > 1 && (
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-4 lg:grid-cols-5">
-                    {allMediaItems.map((item, index) => {
-                      const mediaUrl = normalizeImageUrl(getMediaUrl(item));
-                      const isVideoItem = isVideo(item);
-                      
-                      return (
-                        <div 
-                          key={index}
-                          className={`relative aspect-square cursor-pointer overflow-hidden rounded-md border bg-gray-50 ${
-                            currentMainMediaIndex === index 
-                              ? 'border-indigo-500' 
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                          onClick={() => setCurrentMainMediaIndex(index)}
-                        >
-                          {isVideoItem ? (
-                            <>
-                              <video
-                                src={mediaUrl}
-                                className="w-full h-full object-cover"
-                                muted
-                                playsInline
-                                preload="metadata"
-                              />
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center pointer-events-none">
-                                <svg className="w-6 h-6 text-white drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
-                                  <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                                </svg>
-                              </div>
-                            </>
-                          ) : (
-                            <img
-                              src={mediaUrl}
-                              alt={buildProductPhotoAlt({
-                                brand: partBrand,
-                                article: partArticle,
-                                name: currentProduct.name,
-                                index,
-                              })}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          )}
-                        </div>
-                      );  
-                    })}
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      ) : (
-              <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50">
-                <p className="text-sm text-gray-400">Нет фотографий или видео</p>
-              </div>
-            )}
+              <div className="space-y-3 md:hidden">{renderMobileTitleBlock()}</div>
+              {renderMediaThumbnails('md:hidden')}
 
               <PartDetailAboutBlock
                 bodyDescription={bodyDescription}
@@ -1065,7 +1339,7 @@ const PartDetail = () => {
             </div>
 
           {/* Right - Info & Actions */}
-          <div className="flex flex-col gap-4 bg-slate-50/70 p-4 sm:p-5 lg:col-span-2">
+          <div className="flex flex-col gap-4 bg-slate-50/70 p-4 sm:p-5 lg:col-span-2 max-md:px-4">
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
               <dl className="space-y-2.5 text-sm">
                 <div className="flex items-center justify-between gap-3">
@@ -1223,7 +1497,7 @@ const PartDetail = () => {
         </div>
       </div>
 
-        <div className="mt-6 space-y-4">
+        <div className="mt-6 space-y-4 max-md:px-4">
       <PartDetailFitmentBlock
         sellerVehicles={currentProduct.compatible_vehicles}
         referenceVehicles={referenceFitment}
@@ -1328,74 +1602,36 @@ const PartDetail = () => {
         </div>
       )}
 
-      {currentProduct ? (
+      {showMobileStickyCta ? (
         <div
           className="md:hidden fixed inset-x-0 z-[44] border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/90 shadow-[0_-6px_24px_rgba(0,0,0,0.08)]"
           style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom, 0px))' }}
         >
-          <div className="mx-auto flex max-w-6xl items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="text-xs text-gray-500">Цена</div>
-              <div className="truncate text-lg font-bold text-indigo-700">
-                {currentProduct.price ? formatProductPriceDisplay(currentProduct.price) : '—'}
-              </div>
-            </div>
-            {showCart && (() => {
-              const cartQuantity = getCartQuantity(currentProduct.id);
-              const stockInfo = getStockAvailability(currentProduct);
-              const isAdding = addingToCartId === currentProduct.id;
-              if (cartQuantity > 0) {
-                return (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFromCart(currentProduct)}
-                      disabled={isAdding}
-                      className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 bg-white text-xl font-bold disabled:opacity-50"
-                    >
-                      −
-                    </button>
-                    <span className="w-10 text-center text-lg font-bold">{cartQuantity}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleAddToCart(currentProduct)}
-                      disabled={isAdding || stockInfo.noStock}
-                      className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 bg-white text-xl font-bold disabled:opacity-50"
-                    >
-                      +
-                    </button>
-                  </div>
-                );
-              }
-              return (
-                <button
-                  type="button"
-                  onClick={() => handleAddToCart(currentProduct)}
-                  disabled={isAdding || stockInfo.noStock}
-                  className="min-h-11 shrink-0 rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isAdding ? '…' : 'В корзину'}
-                </button>
-              );
-            })()}
-            {showSellerContact && (sellerOrg?.phone || sellerOrg?.contact_person) ? (
+          <div className="mx-auto flex max-w-6xl gap-2">
+            {canShowBuyNow ? (
+              <button
+                type="button"
+                onClick={handleBuyNow}
+                disabled={buyingNow}
+                className={`min-h-11 flex-1 rounded-xl bg-indigo-50 px-3 text-sm font-semibold text-indigo-800 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  !canShowWrite ? 'w-full' : ''
+                }`}
+              >
+                {buyingNow ? '…' : 'Купить сейчас'}
+              </button>
+            ) : null}
+            {canShowWrite ? (
               <button
                 type="button"
                 onClick={handleWriteToSeller}
                 disabled={creatingChat}
-                className="min-h-11 shrink-0 rounded-md border border-indigo-200 bg-indigo-50 px-3 text-sm font-semibold text-indigo-800 disabled:opacity-50"
+                className={`min-h-11 flex-1 rounded-xl bg-indigo-600 px-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  !canShowBuyNow ? 'w-full' : ''
+                }`}
               >
-                {creatingChat ? '…' : 'Чат'}
+                {creatingChat ? '…' : 'Написать'}
               </button>
             ) : null}
-            <ShareButton
-              url={seo.canonicalUrl}
-              title={h1Primary}
-              text={shareText}
-              showLabel={false}
-              size="sm"
-              className="min-h-11 min-w-11 shrink-0"
-            />
           </div>
         </div>
       ) : null}

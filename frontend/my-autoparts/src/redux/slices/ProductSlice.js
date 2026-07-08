@@ -1421,7 +1421,6 @@ const productSlice = createSlice({
                     return;
                 }
                 if (state.currentProduct?.id === nextId) {
-                    state.loading = true;
                     return;
                 }
                 state.loading = true;

@@ -40,6 +40,36 @@ export function buildPartDetailPath(product) {
   return '/autoparts/used';
 }
 
+/** Один и тот же товар в /part/{id}-… при разном slug (пробелы, кодировка). */
+export function partDetailPathsMatch(pathA, pathB) {
+  if (!pathA || !pathB) return pathA === pathB;
+  if (pathA === pathB) return true;
+
+  const paramA = String(pathA).replace(/^\/part\//, '');
+  const paramB = String(pathB).replace(/^\/part\//, '');
+  const parsedA = parsePartDetailParam(paramA);
+  const parsedB = parsePartDetailParam(paramB);
+
+  const idA = parseInt(parsedA.productId, 10);
+  const idB = parseInt(parsedB.productId, 10);
+  if (!Number.isNaN(idA) && idA > 0 && idA === idB) {
+    return true;
+  }
+
+  if (
+    parsedA.brand
+    && parsedA.article
+    && parsedB.brand
+    && parsedB.article
+    && parsedA.brand.toLowerCase() === parsedB.brand.toLowerCase()
+    && parsedA.article.toLowerCase() === parsedB.article.toLowerCase()
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 /** Разбор сегмента `/autoparts/new/part/:cardId` (id-brand-article или только id). */
 export function parseNewPartDetailParam(combinedParam) {
   return parsePartDetailParam(combinedParam);

@@ -50,11 +50,26 @@ const navItems = [
         label: 'Чаты',
         to: '/chats',
         match: (path) => path.startsWith('/chats'),
+        authOnly: true,
         icon: (
             <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+            />
+        ),
+    },
+    {
+        id: 'profile',
+        label: 'Профиль',
+        to: '/profile',
+        match: (path) => path.startsWith('/profile'),
+        authOnly: true,
+        icon: (
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
             />
         ),
     },
@@ -67,18 +82,18 @@ function NavItemButton({ item, isActive, onClick, badge }) {
             onClick={onClick}
             aria-label={item.label}
             aria-current={isActive ? 'page' : undefined}
-            className={`flex min-h-[52px] flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 transition-colors ${
+            className={`flex min-h-[48px] flex-1 items-center justify-center rounded-lg px-1 transition-colors ${
                 isActive ? 'text-indigo-600' : 'text-gray-500 active:text-indigo-600'
             }`}
         >
             <span
-                className={`relative flex h-7 w-7 items-center justify-center rounded-full ${
+                className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
                     isActive ? 'bg-indigo-50' : ''
                 }`}
             >
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-6 w-6"
+                    className="h-7 w-7"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -92,9 +107,6 @@ function NavItemButton({ item, isActive, onClick, badge }) {
                     </span>
                 )}
             </span>
-            <span className={`text-[10px] font-medium leading-tight ${isActive ? 'text-indigo-600' : 'text-gray-500'}`}>
-                {item.label}
-            </span>
         </button>
     );
 }
@@ -104,43 +116,34 @@ function NavItemLink({ item, isActive, badge }) {
         <NavLink
             to={item.to}
             aria-label={item.label}
-            className={`flex min-h-[52px] flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 transition-colors ${
+            className={`flex min-h-[48px] flex-1 items-center justify-center rounded-lg px-1 transition-colors ${
                 isActive ? 'text-indigo-600' : 'text-gray-500 active:text-indigo-600'
             }`}
         >
             {({ isActive: linkActive }) => {
                 const active = isActive || linkActive;
                 return (
-                    <>
-                        <span
-                            className={`relative flex h-7 w-7 items-center justify-center rounded-full ${
-                                active ? 'bg-indigo-50' : ''
-                            }`}
+                    <span
+                        className={`relative flex h-8 w-8 items-center justify-center rounded-full ${
+                            active ? 'bg-indigo-50' : ''
+                        }`}
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-7 w-7"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={active ? 2.25 : 2}
                         >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-6 w-6"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={active ? 2.25 : 2}
-                            >
-                                {item.icon}
-                            </svg>
-                            {badge > 0 && (
-                                <span className="absolute -right-1 -top-1 flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                                    {badge > 99 ? '99+' : badge}
-                                </span>
-                            )}
-                        </span>
-                        <span
-                            className={`text-[10px] font-medium leading-tight ${
-                                active ? 'text-indigo-600' : 'text-gray-500'
-                            }`}
-                        >
-                            {item.label}
-                        </span>
-                    </>
+                            {item.icon}
+                        </svg>
+                        {badge > 0 && (
+                            <span className="absolute -right-1 -top-1 flex min-h-[16px] min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                                {badge > 99 ? '99+' : badge}
+                            </span>
+                        )}
+                    </span>
                 );
             }}
         </NavLink>
@@ -157,7 +160,7 @@ export default function MobileBottomNav() {
     const location = useLocation();
 
     const visibleNavItems = React.useMemo(
-        () => (isAuthenticated ? navItems : navItems.filter((item) => item.id !== 'chats')),
+        () => (isAuthenticated ? navItems : navItems.filter((item) => !item.authOnly)),
         [isAuthenticated]
     );
 
@@ -189,16 +192,19 @@ export default function MobileBottomNav() {
         return 0;
     };
 
+    const gridColsClass =
+        visibleNavItems.length === 5
+            ? 'grid-cols-5'
+            : visibleNavItems.length === 4
+              ? 'grid-cols-4'
+              : 'grid-cols-3';
+
     return (
         <nav
             className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 pb-safe"
             aria-label="Основная навигация"
         >
-            <div
-                className={`grid gap-0 px-1 pt-1 ${
-                    visibleNavItems.length === 3 ? 'grid-cols-3' : 'grid-cols-4'
-                }`}
-            >
+            <div className={`grid gap-0 px-1 pt-1 ${gridColsClass}`}>
                 {visibleNavItems.map((item) => {
                     const isActive = item.match(location.pathname);
                     if (item.isButton) {
