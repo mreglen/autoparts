@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
-import { logout } from '../../redux/slices/AuthSlice';
+import { fetchProfile, logout } from '../../redux/slices/AuthSlice';
 import {
   fetchSearchSubscriptions,
   isAuthEngagementError,
+  isNetworkEngagementError,
   subscribeToSearch,
 } from '../../redux/slices/UserEngagementSlice';
 
@@ -30,6 +31,7 @@ export default function SubscribeSearchButton({
   const subscriptions = useSelector((state) => state.userEngagement?.subscriptions || []);
   const [notice, setNotice] = useState('');
   const pendingSubscribeRef = useRef(false);
+  const subscriptionsLoadedRef = useRef(false);
 
   const normalizedQuery = useMemo(() => (query || '').trim(), [query]);
   const returnPath = `${location.pathname}${location.search}`;
@@ -39,16 +41,97 @@ export default function SubscribeSearchButton({
     navigate('/auth', { state: { from: returnPath } });
   }, [navigate, returnPath, normalizedQuery]);
 
-  useEffect(() => {
-    if (!isReady || !token || isLoading) return;
+  const ensureSession = useCallback(async () => {
+    if (!isReady || isLoading) {
+      return { ok: false, reason: 'loading' };
+    }
+    if (!token) {
+      return { ok: false, reason: 'no_token' };
+    }
+    if (isAuthenticated) {
+      return { ok: true };
+    }
 
-    const pendingRaw = sessionStorage.getItem(PENDING_SEARCH_SUBSCRIPTION_KEY);
-    if (!pendingRaw) {
-      if (isAuthenticated) {
-        dispatch(fetchSearchSubscriptions());
+    const profileResult = await dispatch(fetchProfile());
+    if (fetchProfile.fulfilled.match(profileResult)) {
+      return { ok: true };
+    }
+
+    const message = profileResult.payload || '';
+    if (isAuthEngagementError(message)) {
+      return { ok: false, reason: 'auth' };
+    }
+    return {
+      ok: false,
+      reason: 'profile',
+      message: message || 'Не удалось проверить сессию',
+    };
+  }, [dispatch, isReady, isLoading, token, isAuthenticated]);
+
+  const handleAuthFailure = useCallback(async (pendingQuery) => {
+    storePendingSearchSubscription(pendingQuery || normalizedQuery);
+    await dispatch(logout());
+    navigate('/auth', { state: { from: returnPath } });
+  }, [dispatch, navigate, returnPath, normalizedQuery]);
+
+  const handleSubscribeResult = useCallback(async (result, pendingQuery) => {
+    if (subscribeToSearch.fulfilled.match(result)) {
+      setNotice('Подписка оформлена. Мы сообщим, когда появится запчасть.');
+      window.setTimeout(() => setNotice(''), 3500);
+      dispatch(fetchSearchSubscriptions());
+      return;
+    }
+
+    if (!subscribeToSearch.rejected.match(result)) return;
+
+    if (result.meta?.condition) {
+      const session = await ensureSession();
+      if (session.reason === 'no_token') {
+        goToAuth();
+      } else if (!session.ok) {
+        setNotice('Подождите, проверяем сессию…');
+        window.setTimeout(() => setNotice(''), 2500);
+      } else {
+        setNotice('Не удалось оформить подписку. Попробуйте ещё раз.');
+        window.setTimeout(() => setNotice(''), 3500);
       }
       return;
     }
+
+    const message = result.payload || 'Не удалось оформить подписку';
+    if (isNetworkEngagementError(message)) {
+      setNotice('Проверьте соединение и попробуйте снова.');
+      window.setTimeout(() => setNotice(''), 3500);
+      return;
+    }
+
+    if (isAuthEngagementError(message)) {
+      const profileResult = await dispatch(fetchProfile());
+      if (!fetchProfile.fulfilled.match(profileResult)) {
+        await handleAuthFailure(pendingQuery);
+        return;
+      }
+      setNotice('Не удалось оформить подписку. Попробуйте ещё раз.');
+      window.setTimeout(() => setNotice(''), 3500);
+      return;
+    }
+
+    setNotice(message);
+    window.setTimeout(() => setNotice(''), 3500);
+  }, [dispatch, ensureSession, goToAuth, handleAuthFailure]);
+
+  useEffect(() => {
+    if (!isReady || isLoading || !isAuthenticated) return;
+    if (subscriptionsLoadedRef.current) return;
+    subscriptionsLoadedRef.current = true;
+    dispatch(fetchSearchSubscriptions());
+  }, [dispatch, isReady, isLoading, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isReady || isLoading || !isAuthenticated) return;
+
+    const pendingRaw = sessionStorage.getItem(PENDING_SEARCH_SUBSCRIPTION_KEY);
+    if (!pendingRaw) return;
 
     const pending = pendingRaw.trim();
     if (pending.length < 2) {
@@ -64,30 +147,32 @@ export default function SubscribeSearchButton({
 
     if (pendingSubscribeRef.current) return;
     pendingSubscribeRef.current = true;
-    sessionStorage.removeItem(PENDING_SEARCH_SUBSCRIPTION_KEY);
 
     (async () => {
-      const result = await dispatch(subscribeToSearch(pending));
-      pendingSubscribeRef.current = false;
-
-      if (subscribeToSearch.fulfilled.match(result)) {
-        setNotice('Подписка оформлена. Мы сообщим, когда появится запчасть.');
-        window.setTimeout(() => setNotice(''), 3500);
-      } else if (subscribeToSearch.rejected.match(result)) {
-        const message = result.payload || 'Не удалось оформить подписку';
-        if (isAuthEngagementError(message)) {
-          storePendingSearchSubscription(pending);
-          await dispatch(logout());
-          navigate('/auth', { state: { from: returnPath } });
-        } else {
-          setNotice(message);
-          window.setTimeout(() => setNotice(''), 3500);
+      const session = await ensureSession();
+      if (!session.ok) {
+        pendingSubscribeRef.current = false;
+        if (session.reason === 'auth') {
+          await handleAuthFailure(pending);
         }
+        return;
       }
 
-      dispatch(fetchSearchSubscriptions());
+      sessionStorage.removeItem(PENDING_SEARCH_SUBSCRIPTION_KEY);
+      const result = await dispatch(subscribeToSearch(pending));
+      pendingSubscribeRef.current = false;
+      await handleSubscribeResult(result, pending);
     })();
-  }, [dispatch, isReady, token, isLoading, isAuthenticated, normalizedQuery, navigate, returnPath]);
+  }, [
+    dispatch,
+    isReady,
+    isLoading,
+    isAuthenticated,
+    normalizedQuery,
+    ensureSession,
+    handleAuthFailure,
+    handleSubscribeResult,
+  ]);
 
   const alreadySubscribed = useMemo(() => {
     const norm = normalizedQuery.toLowerCase();
@@ -100,49 +185,33 @@ export default function SubscribeSearchButton({
     if (!normalizedQuery || normalizedQuery.length < 2) return;
     if (!isReady || isLoading) return;
 
-    if (!token) {
+    const session = await ensureSession();
+    if (session.reason === 'loading') return;
+    if (session.reason === 'no_token') {
       goToAuth();
       return;
     }
-
-    const result = await dispatch(subscribeToSearch(normalizedQuery));
-
-    if (subscribeToSearch.fulfilled.match(result)) {
-      setNotice('Подписка оформлена. Мы сообщим, когда появится запчасть.');
-      window.setTimeout(() => setNotice(''), 3500);
-      dispatch(fetchSearchSubscriptions());
-      return;
-    }
-
-    if (subscribeToSearch.rejected.match(result) && result.meta?.condition) {
-      if (!token) {
-        goToAuth();
+    if (!session.ok) {
+      if (session.reason === 'auth') {
+        await handleAuthFailure();
       } else {
-        setNotice('Не удалось оформить подписку. Обновите страницу и попробуйте снова.');
+        setNotice(session.message || 'Не удалось проверить сессию');
         window.setTimeout(() => setNotice(''), 3500);
       }
       return;
     }
 
-    const message = result.payload || 'Не удалось оформить подписку';
-    if (isAuthEngagementError(message)) {
-      storePendingSearchSubscription(normalizedQuery);
-      await dispatch(logout());
-      navigate('/auth', { state: { from: returnPath } });
-      return;
-    }
-
-    setNotice(message);
-    window.setTimeout(() => setNotice(''), 3500);
+    const result = await dispatch(subscribeToSearch(normalizedQuery));
+    await handleSubscribeResult(result, normalizedQuery);
   }, [
     dispatch,
-    token,
     isReady,
     isLoading,
     normalizedQuery,
+    ensureSession,
     goToAuth,
-    navigate,
-    returnPath,
+    handleAuthFailure,
+    handleSubscribeResult,
   ]);
 
   if (!normalizedQuery) return null;

@@ -14,11 +14,23 @@ export function isAuthEngagementError(message) {
   );
 }
 
+export function isNetworkEngagementError(message) {
+  const text = String(message || '').toLowerCase();
+  return (
+    text.includes('failed to fetch')
+    || text.includes('networkerror')
+    || text.includes('network')
+    || text.includes('не отвечает')
+    || text.includes('name_not_resolved')
+    || text.includes('load failed')
+  );
+}
+
 function hasAuthenticatedUser(getState) {
   const auth = getState().auth;
-  if (auth?.token) return true;
-  if (typeof localStorage !== 'undefined' && localStorage.getItem('token')) return true;
-  return false;
+  const token = auth?.token
+    || (typeof localStorage !== 'undefined' && localStorage.getItem('token'));
+  return Boolean(token && auth?.user);
 }
 
 export const fetchFavoriteStatus = createAsyncThunk(
@@ -328,6 +340,7 @@ const userEngagementSlice = createSlice({
       })
       .addCase(fetchSearchSubscriptions.rejected, (state, action) => {
         state.subscriptionsLoading = false;
+        if (action.meta?.condition) return;
         if (isAuthEngagementError(action.payload)) {
           state.subscriptions = [];
           return;
@@ -348,6 +361,7 @@ const userEngagementSlice = createSlice({
       })
       .addCase(subscribeToSearch.rejected, (state, action) => {
         state.subscriptionActionLoading = false;
+        if (action.meta?.condition) return;
         if (!isAuthEngagementError(action.payload)) {
           state.error = action.payload;
         }

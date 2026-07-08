@@ -328,6 +328,7 @@ const authSlice = createSlice({
             })
             .addCase(login.fulfilled, (state, action) => {
                 state.loading = false;
+                state.profileLoading = false;
                 state.token = action.payload.access_token;
                 localStorage.setItem('token', action.payload.access_token);
                 if (action.payload.user) {

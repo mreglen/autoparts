@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, Link as RouterLink } from 'react-router-dom';
-import { login as loginThunk } from '../../../redux/slices/AuthSlice';
+import { login as loginThunk, fetchProfile } from '../../../redux/slices/AuthSlice';
 import { fetchCart } from '../../../redux/slices/CartSlice';
 import { trackFormField, trackFormSubmit } from '../../../utils/siteAnalytics';
 
@@ -27,6 +27,7 @@ export default function Login() {
         trackFormSubmit('auth_login', loginValue.trim() ? ['login'] : []);
         dispatch(loginThunk({ login: loginValue, password }))
             .unwrap()
+            .then(() => dispatch(fetchProfile()).unwrap())
             .then(() => {
                 navigate(resolveAuthRedirectPath(location.state?.from), { replace: true });
                 dispatch(fetchCart());
