@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProfile, logout } from './redux/slices/AuthSlice';
+import { setAuthToken } from './utils/apiClient';
 import { subscribeToPushNotifications } from './redux/slices/ChatSlice';
 import { fetchPublicSiteConfig, fetchSiteQuickLinks } from './redux/slices/PublicInfoSlice';
 
@@ -266,7 +267,7 @@ function App() {
       })
       .catch((error) => {
         if (error?.includes('401') || error?.includes('Unauthorized')) {
-          localStorage.removeItem('token');
+          setAuthToken(null);
           dispatch(logout());
         }
       });

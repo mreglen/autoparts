@@ -21,16 +21,17 @@ isProject: false
 
 ## 1. Мобильная карточка `/part/`
 
-**Файл:** [`PartDetail.jsx`](frontend/my-autoparts/src/pages/PartDetail/PartDetail.jsx)
+**Файл:** `[PartDetail.jsx](frontend/my-autoparts/src/pages/PartDetail/PartDetail.jsx)`
 
 ### 1.1 Кнопка «В избранное» — только иконка, как «Поделиться»
 
 Сейчас в hero-оверлее `FavoriteButton` рендерится с текстом «В избранное» и своими `border/padding`, из‑за чего кнопка шире share.
 
 **Сделать:**
+
 - В hero-оверлее (строки ~1201–1213) передать `showLabel={false}` и компактные классы: `h-10 w-10 min-h-0 rounded-full border-0 bg-transparent p-0 shadow-none`
 - Для `ShareButton` — аналогичные классы, чтобы обе кнопки были круглыми `h-10 w-10` внутри общих обёрток (или убрать лишние вложенные `div`, оставив сами кнопки с `rounded-full bg-white/80`)
-- Альтернатива: заменить `FavoriteButton` на [`FavoriteHeartOverlay`](frontend/my-autoparts/src/components/FavoriteButton/FavoriteHeartOverlay.jsx) со `className` под hero (без `absolute`, т.к. позиционирование уже в оверлее)
+- Альтернатива: заменить `FavoriteButton` на `[FavoriteHeartOverlay](frontend/my-autoparts/src/components/FavoriteButton/FavoriteHeartOverlay.jsx)` со `className` под hero (без `absolute`, т.к. позиционирование уже в оверлее)
 
 ### 1.2 Убрать бейдж «Осталась N шт»
 
@@ -40,6 +41,7 @@ isProject: false
 ### 1.3 Убрать кнопку «Назад к списку» на мобиле
 
 По вашему выбору: **убрать только мобильный блок** (строки ~1248–1260), оставить:
+
 - стрелку «Назад» на hero-фото
 - десктопную кнопку «Назад к списку» (`hidden md:flex`)
 
@@ -48,6 +50,7 @@ isProject: false
 Сейчас порядок в левой колонке: `PartDetailAboutBlock` → `PartDetailSpecsBlock`, продавец — в правой колонке. На мобиле левая колонка идёт раньше, поэтому «О запчасти» показывается до продавца.
 
 **Сделать:**
+
 - Убрать `PartDetailAboutBlock` из левой колонки (после миниатюр)
 - Вставить его **сразу после** блока «Продавец» (после закрывающего `</div>` seller-card, ~строка 1495)
 - На мобиле и десктопе порядок станет: галерея/заголовок → характеристики → наличие/описание → продавец → **О запчасти**
@@ -66,11 +69,13 @@ flowchart TB
   Hero --> Meta --> Specs --> Stock --> Seller --> About --> Rest
 ```
 
+
+
 ---
 
 ## 2. `/autoparts/used` — пустой поиск = полный каталог
 
-**Файлы:** [`AutoParts.jsx`](frontend/my-autoparts/src/pages/AutoParts/AutoParts.jsx), [`autopartsPublic.js`](frontend/my-autoparts/src/utils/autopartsPublic.js)
+**Файлы:** `[AutoParts.jsx](frontend/my-autoparts/src/pages/AutoParts/AutoParts.jsx)`, `[autopartsPublic.js](frontend/my-autoparts/src/utils/autopartsPublic.js)`
 
 ### Проблема
 
@@ -96,7 +101,7 @@ if (!catalogAlreadyLoaded) { fetch... }
 
 ## 3. `/autoparts/used` — зависание при длинном скролле
 
-**Файл:** [`UsedPartsList.jsx`](frontend/my-autoparts/src/pages/AutoParts/UsedParts/UsedPartsList.jsx)
+**Файл:** `[UsedPartsList.jsx](frontend/my-autoparts/src/pages/AutoParts/UsedParts/UsedPartsList.jsx)`
 
 Без искусственных лимитов на API. Оптимизация рендера и надёжности подгрузки.
 
@@ -105,6 +110,7 @@ if (!catalogAlreadyLoaded) { fetch... }
 **Проблема:** `IntersectionObserver` пересоздаётся при каждом `catalogLoadingMore` (effect выходит рано на строке ~183), из‑за чего при быстром скролле sentinel теряется и подгрузка «застревает».
 
 **Сделать:**
+
 - Не отключать observer во время `catalogLoadingMore`; проверять флаги внутри callback через `useRef` (`loadingMoreRef`, `hasMoreRef`)
 - Увеличить `rootMargin` до `300–400px` для более ранней подгрузки
 - Добавить второй триггер для virtualized-режима: в `useEffect` на `gridRowVirtualizer.getVirtualItems()` / `listRowVirtualizer` — если последний видимый индекс ≥ `length - 2`, вызывать `loadMoreCatalog()` (дублирует sentinel, но надёжнее при быстром скролле)
@@ -114,6 +120,7 @@ if (!catalogAlreadyLoaded) { fetch... }
 Сейчас при `> 48` товаров включается `@tanstack/react-virtual` с `measureElement` на каждой строке — при сотнях карточек это даёт layout thrashing.
 
 **Сделать:**
+
 - Убрать `ref={gridRowVirtualizer.measureElement}` / `listRowVirtualizer.measureElement` — использовать **фиксированный** `estimateSize` (`GRID_ROW_ESTIMATE_PX`, `LIST_ROW_ESTIMATE_PX`)
 - Понизить порог `VIRTUALIZE_THRESHOLD` с 48 до **24** (раньше включать virtual scroll)
 - Увеличить `overscan` до 4–5 для плавности
@@ -133,14 +140,17 @@ if (!catalogAlreadyLoaded) { fetch... }
 
 ## Чеклист проверки
 
-**`/part/` mobile (375px):**
+`**/part/` mobile (375px):**
+
 - Избранное и Поделиться — две одинаковые круглые иконки без текста
 - Нет бейджа «Осталась N шт»
 - Нет кнопки «Назад к списку» (стрелка на фото работает)
 - «О запчасти» идёт после «Продавец»
 
-**`/autoparts/used`:**
+`**/autoparts/used`:**
+
 - Первый заход без `?q=` — полный каталог, «Найдено: N» > 0
 - Очистка поиска возвращает полный каталог
 - Быстрый скролл вниз на 200+ карточках — подгрузка продолжается, UI не зависает
 - Десктоп `/part/` — без регрессий
+

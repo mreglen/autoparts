@@ -640,7 +640,9 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-0">
         <p className="text-sm text-gray-600">Найдено: <span className="font-semibold text-gray-900">{visibleTotal}</span></p>
         <div className="flex flex-wrap items-center gap-2">
-          {urlQ ? <SubscribeSearchButton query={urlQ} variant="secondary" /> : null}
+          {urlQ && (hasAvailableParts || hasAnalogParts) ? (
+            <SubscribeSearchButton query={urlQ} variant="secondary" />
+          ) : null}
           <Link
             to={{ pathname: '/autoparts/used/filters', search: location.search }}
             className="rounded-full bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-800 lg:hidden"

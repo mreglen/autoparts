@@ -72,8 +72,30 @@ export const getWebSocketBaseUrl = () => {
 };
 
 
+let authTokenCache = typeof localStorage !== 'undefined'
+    ? localStorage.getItem('token')
+    : null;
+
+export const getAuthToken = () => {
+    if (authTokenCache) return authTokenCache;
+    if (typeof localStorage === 'undefined') return null;
+    const stored = localStorage.getItem('token');
+    authTokenCache = stored;
+    return stored;
+};
+
+export const setAuthToken = (token) => {
+    authTokenCache = token || null;
+    if (typeof localStorage === 'undefined') return;
+    if (token) {
+        localStorage.setItem('token', token);
+    } else {
+        localStorage.removeItem('token');
+    }
+};
+
 export const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -398,7 +420,7 @@ export const apiAxios = axios.create({
 
 
 apiAxios.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
+    const token = getAuthToken();
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }

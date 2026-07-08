@@ -1,6 +1,6 @@
 // src/redux/slices/AuthSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { apiRequest, apiRequestFormData } from '../../utils/apiClient';
+import { apiRequest, apiRequestFormData, setAuthToken } from '../../utils/apiClient';
 import { updateProfile } from './UserSlice';
 import { clearCart } from './CartSlice';
 import { disconnectWebSocket, unsubscribeFromPushNotifications } from './ChatSlice';
@@ -62,6 +62,7 @@ export const completeRegistration = createAsyncThunk(
                 body: JSON.stringify(formData),
             });
             localStorage.setItem('token', result.access_token);
+            setAuthToken(result.access_token);
             return result;
         } catch (err) {
             return rejectWithValue(err?.response?.data?.detail || err?.message || 'An error occurred');
@@ -98,6 +99,7 @@ export const login = createAsyncThunk(
             });
 
             localStorage.setItem('token', result.access_token);
+            setAuthToken(result.access_token);
             return result;
         } catch (err) {
             return rejectWithValue(err?.response?.data?.detail || err?.message || 'Ошибка входа');
@@ -122,7 +124,7 @@ export const fetchProfile = createAsyncThunk(
 export const logout = createAsyncThunk('auth/logout', async (_, { dispatch }) => {
     await dispatch(unsubscribeFromPushNotifications());
     dispatch(disconnectWebSocket());
-    localStorage.removeItem('token');
+    setAuthToken(null);
     dispatch(clearCart());
 });
 
@@ -294,6 +296,7 @@ const authSlice = createSlice({
             .addCase(completeRegistration.fulfilled, (state, action) => {
                 state.loading = false;
                 state.token = action.payload.access_token;
+                setAuthToken(action.payload.access_token);
                 
                 // Decode token to extract user_permissions and permission_codes for employees
                 const decodedToken = decodeToken(action.payload.access_token);
@@ -330,7 +333,7 @@ const authSlice = createSlice({
                 state.loading = false;
                 state.profileLoading = false;
                 state.token = action.payload.access_token;
-                localStorage.setItem('token', action.payload.access_token);
+                setAuthToken(action.payload.access_token);
                 if (action.payload.user) {
                     state.user = action.payload.user;
                 }
@@ -373,7 +376,7 @@ const authSlice = createSlice({
                     state.token = null;
                     state.userPermissions = null;
                     state.permissionCodes = null;
-                    localStorage.removeItem('token');
+                    setAuthToken(null);
                 }
             })
             // logout

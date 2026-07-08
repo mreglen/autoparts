@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import { apiRequest } from '../../utils/apiClient';
+import { apiRequest, getAuthToken } from '../../utils/apiClient';
 import { favoriteKeyFromItem, productFavoriteKey, rosskoFavoriteKey } from '../../utils/favoriteKeys';
 
 export function isAuthEngagementError(message) {
@@ -28,9 +28,14 @@ export function isNetworkEngagementError(message) {
 
 function hasAuthenticatedUser(getState) {
   const auth = getState().auth;
-  const token = auth?.token
-    || (typeof localStorage !== 'undefined' && localStorage.getItem('token'));
+  const token = auth?.token || getAuthToken();
   return Boolean(token && auth?.user);
+}
+
+function authHeadersFromState(getState) {
+  const auth = getState().auth;
+  const token = auth?.token || getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export const fetchFavoriteStatus = createAsyncThunk(
@@ -173,9 +178,11 @@ export const clearViewHistory = createAsyncThunk(
 
 export const fetchSearchSubscriptions = createAsyncThunk(
   'userEngagement/fetchSearchSubscriptions',
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
-      const data = await apiRequest('/user/search-subscriptions');
+      const data = await apiRequest('/user/search-subscriptions', {
+        headers: authHeadersFromState(getState),
+      });
       return Array.isArray(data?.items) ? data.items : [];
     } catch (error) {
       return rejectWithValue(error?.message || 'Не удалось загрузить подписки');
@@ -188,12 +195,15 @@ export const fetchSearchSubscriptions = createAsyncThunk(
 
 export const subscribeToSearch = createAsyncThunk(
   'userEngagement/subscribeToSearch',
-  async (query, { rejectWithValue }) => {
+  async (query, { rejectWithValue, getState }) => {
     try {
       const data = await apiRequest('/user/search-subscriptions', {
         method: 'POST',
         body: JSON.stringify({ query }),
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeadersFromState(getState),
+        },
       });
       return data;
     } catch (error) {
