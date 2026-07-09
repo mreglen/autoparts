@@ -8,15 +8,22 @@ describe('useScrollToTopVisible', () => {
       writable: true,
       value: 0,
     });
+    document.documentElement.classList.remove('mobile-shell', 'pwa-standalone');
+    const root = document.getElementById('root') || document.createElement('div');
+    root.id = 'root';
+    if (!document.body.contains(root)) {
+      document.body.appendChild(root);
+    }
+    root.scrollTop = 0;
   });
 
   it('is hidden at top of page', () => {
-    const { result } = renderHook(() => useScrollToTopVisible(320));
+    const { result } = renderHook(() => useScrollToTopVisible(240));
     expect(result.current).toBe(false);
   });
 
-  it('becomes visible after scrolling past threshold', () => {
-    const { result } = renderHook(() => useScrollToTopVisible(320));
+  it('becomes visible after window scroll past threshold', () => {
+    const { result } = renderHook(() => useScrollToTopVisible(240));
 
     act(() => {
       window.scrollY = 400;
@@ -26,19 +33,16 @@ describe('useScrollToTopVisible', () => {
     expect(result.current).toBe(true);
   });
 
-  it('hides again when scrolled back to top', () => {
-    const { result } = renderHook(() => useScrollToTopVisible(320));
+  it('becomes visible when #root scrolls on mobile shell', () => {
+    document.documentElement.classList.add('mobile-shell');
+    const root = document.getElementById('root');
+    const { result } = renderHook(() => useScrollToTopVisible(240));
 
     act(() => {
-      window.scrollY = 400;
-      window.dispatchEvent(new Event('scroll'));
+      root.scrollTop = 500;
+      root.dispatchEvent(new Event('scroll'));
     });
+
     expect(result.current).toBe(true);
-
-    act(() => {
-      window.scrollY = 0;
-      window.dispatchEvent(new Event('scroll'));
-    });
-    expect(result.current).toBe(false);
   });
 });

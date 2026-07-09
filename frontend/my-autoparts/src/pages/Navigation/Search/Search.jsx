@@ -121,7 +121,9 @@ function Search() {
   return (
     <div className="relative w-full">
       <input
-        type="search"
+        type="text"
+        role="searchbox"
+        inputMode="search"
         value={searchTerm}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
