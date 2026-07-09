@@ -348,6 +348,7 @@ def get_my_product_ids(
     storage_location_id: Optional[int] = None,
     storage_cell_id: Optional[int] = None,
     storage_cell_value: Optional[str] = None,
+    created_by: Optional[int] = None,
     q: Optional[str] = None,
     sort: str = Query("date_desc", pattern="^(date_desc|date_asc|name_asc|name_desc|price_asc|price_desc)$"),
     db: Session = Depends(get_db),
@@ -362,7 +363,12 @@ def get_my_product_ids(
         ProductModel.quantity > 0,
     )
     query = _apply_my_products_filters(
-        query, storage_location_id, storage_cell_id, storage_cell_value, q or ""
+        query,
+        storage_location_id,
+        storage_cell_id,
+        storage_cell_value,
+        created_by,
+        q or "",
     )
 
     total = query.order_by(None).count()
@@ -523,6 +529,39 @@ def find_public_used_product_match(
     payload = [item.model_dump(mode="json") for item in results]
     set_cached_json_sync(cache_key, payload, settings.USED_MATCH_CACHE_TTL_SECONDS)
     return results
+
+
+class PublicProductResolveOut(BaseModel):
+    id: int
+    brand: Optional[str] = None
+    article: Optional[str] = None
+    quantity: int = 0
+    in_stock: bool = False
+    path: str
+
+
+@router.get("/public/resolve/{product_id}", response_model=PublicProductResolveOut)
+def resolve_public_product(product_id: int, db: Session = Depends(get_db)):
+    from app.services.product_seo_service import _load_product
+    from app.utils.product_urls import build_product_page_url
+
+    product = _load_product(db, product_id, require_stock=False)
+    if product is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Продукт не найден")
+
+    quantity = int(product.quantity or 0)
+    page_path = build_product_page_url(product, "")
+    if page_path and not page_path.startswith("/"):
+        page_path = f"/{page_path}"
+
+    return PublicProductResolveOut(
+        id=int(product.id),
+        brand=product.brand,
+        article=product.article,
+        quantity=quantity,
+        in_stock=quantity > 0,
+        path=page_path,
+    )
 
 
 @router.get("/public/{product_id}", response_model=ProductSchema)
@@ -1250,6 +1289,7 @@ def get_products(
     storage_location_id: Optional[int] = None,
     storage_cell_id: Optional[int] = None,
     storage_cell_value: Optional[str] = None,
+    created_by: Optional[int] = None,
     q: Optional[str] = None,
     stock: Optional[str] = Query(None, pattern="^(zero|low|in_stock)$"),
     no_photo: bool = Query(False),
@@ -1284,7 +1324,12 @@ def get_products(
         )
 
     query = _apply_my_products_filters(
-        query, storage_location_id, storage_cell_id, storage_cell_value, q or ""
+        query,
+        storage_location_id,
+        storage_cell_id,
+        storage_cell_value,
+        created_by,
+        q or "",
     )
     stats_query = query.order_by(None)
     total = stats_query.count()

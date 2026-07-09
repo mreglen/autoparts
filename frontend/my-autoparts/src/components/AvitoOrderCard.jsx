@@ -93,6 +93,7 @@ export function AvitoOrderCard({
       dispatch,
       navigate,
       fetchLinkThunk: fetchAvitoChatProductLink,
+      destination: 'seller',
     });
   };
 

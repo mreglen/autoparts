@@ -16,6 +16,39 @@ describe('parseSellerPartCardQr', () => {
     expect(result?.path).toBe('/seller/part-card/99');
   });
 
+  it('parses legacy /server/ prefix in path', () => {
+    const result = parseSellerPartCardQr('/server/seller/part-card/42');
+    expect(result).toEqual({
+      type: 'part-card',
+      productId: 42,
+      path: '/seller/part-card/42',
+    });
+  });
+
+  it('parses full URL with /server/ prefix', () => {
+    const result = parseSellerPartCardQr('https://svoygarage.ru/server/seller/part-card/99');
+    expect(result?.productId).toBe(99);
+    expect(result?.path).toBe('/seller/part-card/99');
+  });
+
+  it('parses public part SEO path', () => {
+    const result = parseSellerPartCardQr('/part/605-Jakoparts-J2883012');
+    expect(result).toEqual({
+      type: 'public-part',
+      productId: 605,
+      path: '/part/605-Jakoparts-J2883012',
+    });
+  });
+
+  it('parses public part id-only path', () => {
+    const result = parseSellerPartCardQr('/part/605');
+    expect(result).toEqual({
+      type: 'public-part',
+      productId: 605,
+      path: '/part/605',
+    });
+  });
+
   it('parses numeric id only', () => {
     const result = parseSellerPartCardQr('15');
     expect(result?.productId).toBe(15);

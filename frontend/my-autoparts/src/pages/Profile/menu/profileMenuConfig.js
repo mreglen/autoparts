@@ -102,6 +102,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
                 label: 'Настройки',
                 submenu: [
                     { id: 'profile', label: 'Профиль' },
+                    { id: 'settings-notifications', label: 'Уведомления' },
                 ],
             },
         ];
@@ -208,6 +209,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
 
         const settingsSubmenu = [
             { id: 'profile', label: 'Профиль' },
+            { id: 'settings-notifications', label: 'Уведомления' },
         ];
         if (hasPermission('storage-addresses')) {
             settingsSubmenu.push({ id: 'settings-storage-addresses', label: 'Адресное хранение' });
@@ -226,6 +228,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             label: 'Настройки',
             submenu: [
                 { id: 'profile', label: 'Профиль' },
+                { id: 'settings-notifications', label: 'Уведомления' },
                 { id: 'settings-employees', label: 'Сотрудники' },
                 { id: 'settings-storage-addresses', label: 'Адресное хранение' },
                 { id: 'settings-organization', label: 'Организация' },
@@ -236,6 +239,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
     } else if (user.is_seller) {
         const settingsSubmenu = [
             { id: 'profile', label: 'Профиль' },
+            { id: 'settings-notifications', label: 'Уведомления' },
         ];
         if (user.organization_id) {
             settingsSubmenu.push({ id: 'settings-organization', label: 'Организация' });

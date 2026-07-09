@@ -41,10 +41,13 @@ def apply_my_products_filters(
     storage_location_id: Optional[int] = None,
     storage_cell_id: Optional[int] = None,
     storage_cell_value: Optional[str] = None,
+    created_by: Optional[int] = None,
     q: str = "",
 ):
     if storage_location_id is not None:
         query = query.filter(ProductModel.storage_location_id == storage_location_id)
+    if created_by is not None:
+        query = query.filter(ProductModel.created_by == created_by)
     if storage_cell_id is not None:
         cell_product_ids = (
             query.session.query(ProductStorageCellModel.product_id)

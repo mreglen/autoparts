@@ -78,6 +78,18 @@ function navigateUsedProduct(navigate, item, productId) {
   navigate(`/part/${productId}`);
 }
 
+export function navigateSellerPartCard(navigate, productId) {
+  navigate(`/seller/part-card/${productId}`);
+}
+
+function navigateToProduct(navigate, item, productId, destination = 'public') {
+  if (destination === 'seller') {
+    navigateSellerPartCard(navigate, productId);
+    return;
+  }
+  navigateUsedProduct(navigate, item, productId);
+}
+
 function isGarageNewPartItem(item, orderType) {
   if (orderType === 'new') return true;
   const article = item?.partnumber || item?.article;
@@ -122,10 +134,11 @@ export async function openOrderItemProductFlow({
   dispatch,
   navigate,
   fetchLinkThunk,
+  destination = 'public',
 }) {
   const productId = getWarehouseProductId(item);
   if (productId) {
-    navigateUsedProduct(navigate, item, productId);
+    navigateToProduct(navigate, item, productId, destination);
     return;
   }
 
@@ -145,7 +158,12 @@ export async function openOrderItemProductFlow({
       fetchLinkThunk,
     });
     if (linkedProductId) {
-      navigateUsedProduct(navigate, { ...item, product_id: linkedProductId }, linkedProductId);
+      navigateToProduct(
+        navigate,
+        { ...item, product_id: linkedProductId },
+        linkedProductId,
+        destination,
+      );
       return;
     }
 

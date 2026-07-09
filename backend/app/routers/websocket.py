@@ -176,26 +176,38 @@ class ConnectionManager:
         push_title: str,
         push_body: str,
     ) -> None:
-        """Всем пользователям организации: WebSocket; если офлайн — Web Push."""
-        from app.routers.notifications import send_push_notification
+        """Всем пользователям организации: WebSocket; если офлайн — push/email."""
+        from app.services.notification_service import (
+            EVENT_AVITO_MESSENGER,
+            dispatch_user_notification,
+        )
 
         users = db.query(User).filter(User.organization_id == organization_id).all()
         chat_q = ws_payload.get("avito_chat_id")
         url_suffix = f"/chats?tab=avito&avitoChatId={chat_q}" if chat_q else "/chats?tab=avito"
+        body_preview = (push_body or "Новое сообщение")[:120]
         for u in users:
             uid = u.id
             if await self.is_user_online_globally(uid):
                 await self.send_personal_message(ws_payload, uid)
             else:
-                send_push_notification(
+                push_data = {
+                    "type": "avito_messenger",
+                    "title": push_title,
+                    "body": body_preview,
+                    "url": url_suffix,
+                }
+                email_body = (
+                    f"{push_title}\n\n{body_preview}\n\n"
+                    f"Откройте чат: https://svoygarage.ru{url_suffix}\n\n"
+                    f"С уважением,\nСвой Гараж"
+                )
+                dispatch_user_notification(
                     uid,
-                    {
-                        "type": "avito_messenger",
-                        "title": push_title,
-                        "body": (push_body or "Новое сообщение")[:120],
-                        "url": url_suffix,
-                    },
-                    db,
+                    event_type=EVENT_AVITO_MESSENGER,
+                    push_data=push_data,
+                    email_subject=push_title,
+                    email_body=email_body,
                 )
 
     async def broadcast_to_chat(self, message: dict, chat_id: int, db: Session, exclude_user_id: int = None):

@@ -139,7 +139,8 @@ function ServiceWorkerNavigationHandler() {
       const storedToken = localStorage.getItem('token');
       const { url } = event.detail;
       if (!url) return;
-      if (!storedToken && !url.startsWith('/')) {
+      const isPublicPath = url.startsWith('/part/') || url.startsWith('/autoparts');
+      if (!storedToken && !isPublicPath) {
         navigate('/auth', { replace: true });
         return;
       }

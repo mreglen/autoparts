@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { apiRequest } from '../../utils/apiClient';
-import { subscribeToPushNotifications } from '../../redux/slices/ChatSlice';
+import {
+  subscribeToPushNotifications,
+  unsubscribeFromPushNotifications,
+} from '../../redux/slices/ChatSlice';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import {
   ProfileBlock,
@@ -10,9 +13,23 @@ import {
   profilePrimaryBtn,
 } from './profileUi';
 
+const DEFAULT_PREFS = {
+  orders: { push: true, email: true },
+  messages: { push: true, email: true },
+  search: { push: true, email: true },
+  other: { push: true, email: true },
+};
+
+const CATEGORIES = [
+  { key: 'orders', label: 'Заказы' },
+  { key: 'messages', label: 'Сообщения' },
+  { key: 'search', label: 'Подписки' },
+  { key: 'other', label: 'Прочее' },
+];
+
 function IconPush() {
   return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
     </svg>
   );
@@ -20,13 +37,13 @@ function IconPush() {
 
 function IconEmail() {
   return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
     </svg>
   );
 }
 
-function Switch({ checked, disabled, onChange, label }) {
+function MiniSwitch({ checked, disabled, onChange, label }) {
   return (
     <button
       type="button"
@@ -35,30 +52,41 @@ function Switch({ checked, disabled, onChange, label }) {
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`relative inline-flex h-6 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
         checked ? 'bg-indigo-600' : 'bg-gray-200'
       }`}
     >
       <span
-        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow transition ${
-          checked ? 'translate-x-5' : 'translate-x-0'
+        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+          checked ? 'translate-x-4' : 'translate-x-0'
         }`}
       />
     </button>
   );
 }
 
-function ChannelRow({ icon, label, hint, checked, disabled, onChange }) {
+function CategoryRow({ label, prefs, disabled, onToggle }) {
   return (
-    <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-3.5 last:border-b-0">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-        {icon}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-medium text-gray-900">{label}</p>
-        {hint ? <p className="mt-0.5 truncate text-xs text-gray-400">{hint}</p> : null}
+    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1 border-b border-gray-100 px-4 py-3.5 last:border-b-0">
+      <p className="text-[15px] font-medium text-gray-900">{label}</p>
+      <div className="flex flex-col items-center gap-1">
+        <span className="text-indigo-500"><IconPush /></span>
+        <MiniSwitch
+          checked={prefs.push}
+          disabled={disabled}
+          onChange={(value) => onToggle('push', value)}
+          label={`Push: ${label}`}
+        />
       </div>
-      <Switch checked={checked} disabled={disabled} onChange={onChange} label={label} />
+      <div className="flex flex-col items-center gap-1">
+        <span className="text-indigo-500"><IconEmail /></span>
+        <MiniSwitch
+          checked={prefs.email}
+          disabled={disabled}
+          onChange={(value) => onToggle('email', value)}
+          label={`Email: ${label}`}
+        />
+      </div>
     </div>
   );
 }
@@ -67,19 +95,34 @@ function NotificationsSkeleton() {
   return (
     <div className={`${profilePageShell} animate-pulse`}>
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        {[1, 2].map((i) => (
+        {[1, 2, 3, 4].map((i) => (
           <div key={i} className="flex items-center gap-3 border-b border-gray-100 px-4 py-3.5 last:border-b-0">
-            <div className="h-10 w-10 rounded-xl bg-gray-100" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 w-24 rounded bg-gray-100" />
-              <div className="h-3 w-32 rounded bg-gray-50" />
-            </div>
-            <div className="h-7 w-12 rounded-full bg-gray-100" />
+            <div className="h-4 w-24 rounded bg-gray-100" />
+            <div className="ml-auto h-6 w-10 rounded-full bg-gray-100" />
+            <div className="h-6 w-10 rounded-full bg-gray-100" />
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function normalizePrefs(raw) {
+  const result = { ...DEFAULT_PREFS };
+  if (!raw || typeof raw !== 'object') return result;
+  CATEGORIES.forEach(({ key }) => {
+    const category = raw[key];
+    if (!category || typeof category !== 'object') return;
+    result[key] = {
+      push: category.push !== false,
+      email: category.email !== false,
+    };
+  });
+  return result;
+}
+
+function hasAnyPushEnabled(prefs) {
+  return CATEGORIES.some(({ key }) => prefs[key]?.push);
 }
 
 export default function NotificationSettingsPage() {
@@ -88,11 +131,8 @@ export default function NotificationSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pushSubscribing, setPushSubscribing] = useState(false);
-  const [prefs, setPrefs] = useState({
-    notify_push_enabled: true,
-    notify_email_enabled: true,
-    has_push_subscription: false,
-  });
+  const [prefs, setPrefs] = useState(DEFAULT_PREFS);
+  const [hasPushSubscription, setHasPushSubscription] = useState(false);
   const [toast, setToast] = useState(null);
 
   const showToast = useCallback((message, type = 'success') => {
@@ -104,11 +144,8 @@ export default function NotificationSettingsPage() {
     setLoading(true);
     try {
       const data = await apiRequest('/notifications/preferences');
-      setPrefs({
-        notify_push_enabled: data.notify_push_enabled !== false,
-        notify_email_enabled: data.notify_email_enabled !== false,
-        has_push_subscription: Boolean(data.has_push_subscription),
-      });
+      setPrefs(normalizePrefs(data.notification_prefs));
+      setHasPushSubscription(Boolean(data.has_push_subscription));
     } catch (error) {
       showToast(error?.message || 'Ошибка загрузки', 'error');
     } finally {
@@ -120,24 +157,39 @@ export default function NotificationSettingsPage() {
     if (user) loadPreferences();
   }, [user, loadPreferences]);
 
-  const savePreference = async (patch) => {
+  const savePreferences = async (nextPrefs) => {
     setSaving(true);
     try {
       const data = await apiRequest('/notifications/preferences', {
         method: 'PATCH',
-        body: JSON.stringify(patch),
+        body: JSON.stringify({ notification_prefs: nextPrefs }),
       });
-      setPrefs({
-        notify_push_enabled: data.notify_push_enabled !== false,
-        notify_email_enabled: data.notify_email_enabled !== false,
-        has_push_subscription: Boolean(data.has_push_subscription),
-      });
+      const normalized = normalizePrefs(data.notification_prefs);
+      setPrefs(normalized);
+      setHasPushSubscription(Boolean(data.has_push_subscription));
+
+      if (!hasAnyPushEnabled(normalized)) {
+        await dispatch(unsubscribeFromPushNotifications());
+      }
+
       showToast('Сохранено');
     } catch (error) {
       showToast(error?.message || 'Ошибка', 'error');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCategoryToggle = (categoryKey, channel, value) => {
+    const nextPrefs = {
+      ...prefs,
+      [categoryKey]: {
+        ...prefs[categoryKey],
+        [channel]: value,
+      },
+    };
+    setPrefs(nextPrefs);
+    savePreferences(nextPrefs);
   };
 
   const handleEnablePush = async () => {
@@ -154,6 +206,11 @@ export default function NotificationSettingsPage() {
       setPushSubscribing(false);
     }
   };
+
+  const needsPushSetup = useMemo(
+    () => hasAnyPushEnabled(prefs) && !hasPushSubscription,
+    [prefs, hasPushSubscription],
+  );
 
   if (!isReady) {
     return <NotificationsSkeleton />;
@@ -181,49 +238,44 @@ export default function NotificationSettingsPage() {
     return <NotificationsSkeleton />;
   }
 
-  const pushHint = prefs.notify_push_enabled
-    ? (prefs.has_push_subscription ? 'Подключено' : 'Нужно подключить')
-    : 'Выключено';
-  const emailHint = user.email || null;
-
-  const needsPushSetup = prefs.notify_push_enabled && !prefs.has_push_subscription;
+  const pushStatus = hasPushSubscription ? 'Подключено' : 'Не подключено';
 
   return (
     <div className={profilePageShell}>
       <ProfileBlock>
-        <ChannelRow
-          icon={<IconPush />}
-          label="Push"
-          hint={pushHint}
-          checked={prefs.notify_push_enabled}
-          disabled={saving}
-          onChange={(value) => savePreference({ notify_push_enabled: value })}
-        />
-        <ChannelRow
-          icon={<IconEmail />}
-          label="Email"
-          hint={emailHint}
-          checked={prefs.notify_email_enabled}
-          disabled={saving}
-          onChange={(value) => savePreference({ notify_email_enabled: value })}
-        />
-      </ProfileBlock>
-
-      {needsPushSetup ? (
-        <ProfileBlock>
-          <div className="flex flex-col items-stretch gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-600">Разрешите уведомления в этом браузере</p>
+        <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3.5">
+          <div>
+            <p className="text-[15px] font-medium text-gray-900">Push в браузере</p>
+            <p className="mt-0.5 text-xs text-gray-400">{pushStatus}</p>
+          </div>
+          {needsPushSetup ? (
             <button
               type="button"
               onClick={handleEnablePush}
-              disabled={pushSubscribing}
-              className={`${profilePrimaryBtn} w-full sm:w-auto`}
+              disabled={pushSubscribing || saving}
+              className={`${profilePrimaryBtn} shrink-0`}
             >
               {pushSubscribing ? '…' : 'Подключить'}
             </button>
-          </div>
-        </ProfileBlock>
-      ) : null}
+          ) : null}
+        </div>
+
+        <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 border-b border-gray-100 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+          <span />
+          <span className="text-center">Push</span>
+          <span className="text-center">Email</span>
+        </div>
+
+        {CATEGORIES.map(({ key, label }) => (
+          <CategoryRow
+            key={key}
+            label={label}
+            prefs={prefs[key]}
+            disabled={saving}
+            onToggle={(channel, value) => handleCategoryToggle(key, channel, value)}
+          />
+        ))}
+      </ProfileBlock>
 
       {toast ? (
         <div

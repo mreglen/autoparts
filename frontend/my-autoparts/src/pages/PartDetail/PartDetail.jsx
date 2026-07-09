@@ -139,6 +139,8 @@ const PartDetail = () => {
   const [referenceFitmentLoading, setReferenceFitmentLoading] = useState(false);
   const [soldOutAlternates, setSoldOutAlternates] = useState([]);
   const [soldOutAlternatesLoading, setSoldOutAlternatesLoading] = useState(false);
+  const [soldOutResolved, setSoldOutResolved] = useState(null);
+  const [soldOutResolveState, setSoldOutResolveState] = useState('idle');
   const fetchedProductIdRef = useRef(null);
   const searchedBrandArticleRef = useRef(null);
   const trackedPartViewRef = useRef(null);
@@ -328,17 +330,61 @@ const PartDetail = () => {
 
   useEffect(() => {
     if (showProduct || !error) {
+      setSoldOutResolved(null);
+      setSoldOutResolveState('idle');
+      return undefined;
+    }
+    if (!resolvedProductId || (extractedBrand && extractedArticle)) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      setSoldOutResolveState('loading');
+      try {
+        const response = await apiAxiosUnauth.get(`/products/public/resolve/${resolvedProductId}`);
+        const data = response?.data;
+        if (!cancelled) {
+          if (data && data.in_stock === false) {
+            setSoldOutResolved({
+              id: data.id,
+              brand: data.brand,
+              article: data.article,
+            });
+          } else {
+            setSoldOutResolved(null);
+          }
+          setSoldOutResolveState('done');
+        }
+      } catch (_err) {
+        if (!cancelled) {
+          setSoldOutResolved(null);
+          setSoldOutResolveState('done');
+        }
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [showProduct, error, resolvedProductId, extractedBrand, extractedArticle]);
+
+  useEffect(() => {
+    if (showProduct || !error) {
       setSoldOutAlternates([]);
       return undefined;
     }
-    if (!extractedBrand || !extractedArticle) return undefined;
+
+    const brandSource = soldOutResolved?.brand || extractedBrand;
+    const articleSource = soldOutResolved?.article || extractedArticle;
+    if (!brandSource || !articleSource) return undefined;
 
     let cancelled = false;
     const run = async () => {
       setSoldOutAlternatesLoading(true);
       try {
-        const decodedBrand = decodeURIComponent(extractedBrand);
-        const decodedArticle = decodeURIComponent(extractedArticle);
+        const decodedBrand = decodeURIComponent(brandSource);
+        const decodedArticle = decodeURIComponent(articleSource);
         const response = await apiAxiosUnauth.get('/products/public/find-used-match', {
           params: {
             brand: decodedBrand,
@@ -358,7 +404,7 @@ const PartDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [showProduct, error, extractedBrand, extractedArticle]);
+  }, [showProduct, error, extractedBrand, extractedArticle, soldOutResolved?.brand, soldOutResolved?.article]);
 
   useEffect(() => {
     if (!showProduct || !currentProduct?.id) return;
@@ -737,10 +783,24 @@ const PartDetail = () => {
   };
 
   if (!showProduct && error) {
-    const soldOutBrand = extractedBrand ? decodeURIComponent(extractedBrand) : '';
-    const soldOutArticle = extractedArticle ? decodeURIComponent(extractedArticle) : '';
+    const soldOutBrand = soldOutResolved?.brand
+      || (extractedBrand ? decodeURIComponent(extractedBrand) : '');
+    const soldOutArticle = soldOutResolved?.article
+      || (extractedArticle ? decodeURIComponent(extractedArticle) : '');
     const soldOutLabel = [soldOutBrand, soldOutArticle].filter(Boolean).join(' ');
     const catalogPath = buildProductUsedCatalogPath({ brand: soldOutBrand, article: soldOutArticle });
+
+    if (!soldOutLabel && soldOutResolveState === 'loading') {
+      return (
+        <div className="min-h-screen bg-gray-50 max-md:pb-28">
+          <div className="max-w-6xl mx-auto px-4 py-16">
+            <div className="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center shadow-sm">
+              <p className="text-lg text-gray-600">Загрузка информации о запчасти...</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     if (soldOutLabel) {
       return (

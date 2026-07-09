@@ -8,6 +8,7 @@ import {
   selectSearchQuery,
   fetchSearchResults,
   setSearchQuery,
+  clearSearch,
 } from '../../redux/slices/RosskoSlice';
 import {
   searchUsedAnalogs,
@@ -22,6 +23,7 @@ import {
 } from '../../redux/slices/ProductSlice';
 import NewPartsLanding from './NewParts/NewPartsLanding';
 import MobileCompactSearch from '../../components/MobileCompactSearch/MobileCompactSearch';
+import ScrollToTopButton from '../../components/ScrollToTopButton/ScrollToTopButton';
 import CatalogViewModeToggle from '../../components/CatalogViewModeToggle/CatalogViewModeToggle';
 import {
   buildUsedCatalogParams,
@@ -181,6 +183,19 @@ function AutoParts() {
   const handleUsedPartsSearch = useCallback((text) => {
     applyUsedQueryToUrl(text, { replace: true });
   }, [applyUsedQueryToUrl]);
+
+  const handleUsedPartsClear = useCallback(() => {
+    applyUsedQueryToUrl('', { replace: true });
+  }, [applyUsedQueryToUrl]);
+
+  const handleNewPartsClear = useCallback(() => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('q');
+    params.delete('page');
+    const qs = params.toString();
+    navigate(`/autoparts/new${qs ? `?${qs}` : ''}`, { replace: true });
+    dispatch(clearSearch());
+  }, [searchParams, navigate, dispatch]);
 
   const applyUsedSort = useCallback((uiSort) => {
     setUsedPartsSort(uiSort);
@@ -408,6 +423,7 @@ function AutoParts() {
           <MobileCompactSearch
             onSearch={handleUsedPartsSearch}
             onQueryChange={handleUsedLiveQueryChange}
+            onClear={handleUsedPartsClear}
             liveSearch
             sticky={false}
           />
@@ -415,6 +431,7 @@ function AutoParts() {
         {activeTab === 'rossko' && (
           <MobileCompactSearch
             onSearch={handleNewPartsSearch}
+            onClear={handleNewPartsClear}
             sticky={false}
             placeholder="Артикул, бренд или наименование"
           />
@@ -633,6 +650,7 @@ function AutoParts() {
         />
       )}
       </Suspense>
+      <ScrollToTopButton />
     </div>
   );
 }

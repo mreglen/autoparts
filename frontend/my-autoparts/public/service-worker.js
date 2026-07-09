@@ -12,36 +12,70 @@ self.addEventListener('activate', (event) => {
 
 function buildNotificationTag(data) {
   if (data.tag) return data.tag;
-  if (data.type === 'order' && data.orderId) return `order-${data.orderId}`;
+  if (data.orderId) return `order-${data.orderId}`;
   if (data.chatId) return `chat-${data.chatId}`;
+  if (data.productId) return `product-${data.productId}`;
+  if (data.returnId) return `return-${data.returnId}`;
   if (data.type) return `${data.type}-general`;
   return 'notification-general';
 }
 
 function buildNotificationActions(data) {
-  if (data.type === 'order') {
-    return [{ action: 'open', title: 'Открыть заказы' }];
+  return [{ action: 'open', title: 'Открыть' }];
+}
+
+function resolveNotificationUrl(data) {
+  if (data.url) {
+    return data.url.startsWith('/') ? data.url : `/${data.url}`;
   }
-  return [{ action: 'open', title: 'Открыть чат' }];
+  if (data.type === 'order' || data.type === 'return_request') {
+    return '/sales/orders';
+  }
+  if (data.type === 'order_status' || data.type === 'return_status') {
+    return '/purchases/orders';
+  }
+  if (data.type === 'search_subscription' && data.productId) {
+    return `/part/${data.productId}`;
+  }
+  if (data.chatId) {
+    return `/chats?chatId=${data.chatId}`;
+  }
+  return '/';
+}
+
+function pathsShareSection(targetPath, clientPath) {
+  const prefixes = [
+    '/sales/orders',
+    '/sales/returns',
+    '/purchases/orders',
+    '/purchases/returns',
+    '/chats',
+    '/my-parts',
+    '/profile/subscriptions',
+    '/part/',
+  ];
+  return prefixes.some((prefix) => targetPath.startsWith(prefix) && clientPath.startsWith(prefix));
 }
 
 self.addEventListener('push', (event) => {
   console.log('[SW] Push received:', event.data);
 
   const data = event.data ? event.data.json() : {};
-  const isOrder = data.type === 'order';
-  const title = data.title || (isOrder ? 'Новый заказ' : 'Новое сообщение');
+  const targetUrl = resolveNotificationUrl(data);
+  const title = data.title || 'Уведомление';
   const options = {
-    body: data.body || (isOrder ? 'Поступил новый заказ' : 'У вас новое сообщение в чате'),
+    body: data.body || '',
     icon: '/favicons/android-chrome-192x192.png',
     badge: '/favicons/favicon-32x32.png',
     data: {
-      type: data.type || 'message',
+      type: data.type || 'general',
       chatId: data.chatId,
       orderId: data.orderId,
+      productId: data.productId,
+      returnId: data.returnId,
       senderId: data.senderId,
       senderName: data.senderName,
-      url: data.url || (isOrder ? '/sales/orders' : '/chats'),
+      url: targetUrl,
     },
     actions: buildNotificationActions(data),
     tag: buildNotificationTag(data),
@@ -64,8 +98,7 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const data = event.notification.data || {};
-  const urlToOpen = data.url || '/chats';
-  const targetPath = urlToOpen.startsWith('/') ? urlToOpen : `/${urlToOpen}`;
+  const targetPath = data.url || resolveNotificationUrl(data);
   const chatId = data.chatId || extractChatIdFromUrl(targetPath);
 
   event.waitUntil(
@@ -75,9 +108,7 @@ self.addEventListener('notificationclick', (event) => {
           const clientUrl = new URL(client.url);
           const clientPath = clientUrl.pathname + clientUrl.search;
           const sameTarget = clientPath === targetPath;
-          const sameSection =
-            (targetPath.startsWith('/sales/orders') && clientUrl.pathname.startsWith('/sales/orders')) ||
-            (targetPath.startsWith('/chats') && clientUrl.pathname.startsWith('/chats'));
+          const sameSection = pathsShareSection(targetPath, clientPath);
 
           if (sameTarget || sameSection) {
             if (chatId && targetPath.startsWith('/chats')) {
@@ -86,7 +117,7 @@ self.addEventListener('notificationclick', (event) => {
                 chatId,
                 url: targetPath,
               });
-            } else if (targetPath.startsWith('/sales')) {
+            } else {
               client.postMessage({
                 type: 'NAVIGATE_TO_URL',
                 url: targetPath,

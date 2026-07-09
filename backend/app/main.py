@@ -30,6 +30,7 @@ from app.db.schema_patches import (
     ensure_seo_pipeline_state_table,
     ensure_user_avatar_column,
     ensure_user_notification_preference_columns,
+    ensure_user_notification_prefs_column,
     ensure_product_photo_thumb_url_column,
     ensure_rossko_settings_table,
     ensure_rossko_settings_row_defaults,
@@ -181,6 +182,7 @@ try:
     ensure_seo_pipeline_state_table()
     ensure_user_avatar_column()
     ensure_user_notification_preference_columns()
+    ensure_user_notification_prefs_column()
     ensure_product_photo_thumb_url_column()
     ensure_rossko_settings_table()
     ensure_rossko_settings_row_defaults()

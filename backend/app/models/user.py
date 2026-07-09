@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from ..db.database import Base
 
@@ -21,6 +22,7 @@ class User(Base):
     avatar_url = Column(String(512), nullable=True)
     notify_push_enabled = Column(Boolean, default=True, nullable=False)
     notify_email_enabled = Column(Boolean, default=True, nullable=False)
+    notification_prefs = Column(JSONB, nullable=True)
 
     organization_id = Column(String(10), ForeignKey("organizations.id"))
 

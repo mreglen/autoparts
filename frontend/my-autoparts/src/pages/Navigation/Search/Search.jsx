@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { fetchSearchResults, setSearchQuery as setGlobalSearchQuery } from '../../../redux/slices/RosskoSlice';
+import {
+  clearSearch,
+  fetchSearchResults,
+  setSearchQuery as setGlobalSearchQuery,
+} from '../../../redux/slices/RosskoSlice';
 import { useDebouncedCallback } from '../../../hooks/useDebouncedCallback';
 
 function Search() {
@@ -14,6 +18,8 @@ function Search() {
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
   const autopartsSearchPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
   const isOnUsedAutoparts = location.pathname.startsWith('/autoparts/used');
+  const isOnNewAutoparts = location.pathname.startsWith('/autoparts/new');
+  const showClear = Boolean(searchTerm.trim());
 
   useEffect(() => {
     setSearchTerm(searchParams.get('q') || '');
@@ -78,6 +84,40 @@ function Search() {
     if (e.key === 'Enter') handleSearch();
   };
 
+  const handleClear = useCallback(() => {
+    setSearchTerm('');
+    dispatch(setGlobalSearchQuery(''));
+
+    if (isOnUsedAutoparts) {
+      applyUsedQueryToUrl('');
+      return;
+    }
+
+    if (isOnNewAutoparts) {
+      const params = new URLSearchParams(searchParams);
+      params.delete('q');
+      params.delete('page');
+      const qs = params.toString();
+      navigate(`/autoparts/new${qs ? `?${qs}` : ''}`, { replace: true });
+      dispatch(clearSearch());
+      return;
+    }
+
+    navigate(autopartsSearchPath, { replace: true });
+    if (showNewAutoparts) {
+      dispatch(clearSearch());
+    }
+  }, [
+    applyUsedQueryToUrl,
+    autopartsSearchPath,
+    dispatch,
+    isOnNewAutoparts,
+    isOnUsedAutoparts,
+    navigate,
+    searchParams,
+    showNewAutoparts,
+  ]);
+
   return (
     <div className="relative w-full">
       <input
@@ -86,9 +126,22 @@ function Search() {
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
         placeholder="Поиск: бренд, артикул, название или комбинация"
-        className="block w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-4 pr-11 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
+        className={`block w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-4 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 ${showClear ? 'pr-20' : 'pr-11'}`}
         disabled={isSearching}
       />
+      {showClear ? (
+        <button
+          type="button"
+          onClick={handleClear}
+          disabled={isSearching}
+          className="absolute inset-y-0 right-10 flex items-center px-2 text-gray-400 transition hover:text-gray-600 disabled:opacity-50"
+          aria-label="Очистить поиск"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={handleSearch}

@@ -1378,6 +1378,7 @@ const productSlice = createSlice({
                         storage: String(arg.storage_location_id || ''),
                         cell: String(arg.storage_cell_id || ''),
                         cellValue: String(arg.storage_cell_value || ''),
+                        responsible: String(arg.created_by || ''),
                         q: (arg.q || '').trim(),
                         sort: arg.sort || 'date_desc',
                         stock: arg.stock || '',

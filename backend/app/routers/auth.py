@@ -26,6 +26,8 @@ from datetime import datetime, timedelta, timezone
 from jose import jwt
 from app.core.config import Settings
 from app.schemas.user import UserResponse
+from app.schemas.notification import NotificationPrefs
+from app.services.notification_service import get_user_notification_prefs
 from app.utils.email import generate_verification_code, send_verification_email, send_seller_application_confirmation, send_welcome_email
 from app.utils.event_logger import log_event
 from app.utils.id_generator import random_id
@@ -61,8 +63,9 @@ def build_user_profile_response(user: User) -> dict:
         "organization_id": user.organization_id,
         "organization_name": user.organization.name if user.organization_id and user.organization else None,
         "organization_phone": user.organization.phone if user.organization_id and user.organization else None,
-        "notify_push_enabled": user.notify_push_enabled if user.notify_push_enabled is not None else True,
-        "notify_email_enabled": user.notify_email_enabled if user.notify_email_enabled is not None else True,
+        "notification_prefs": NotificationPrefs.model_validate(
+            get_user_notification_prefs(user)
+        ).model_dump(),
     }
 
 

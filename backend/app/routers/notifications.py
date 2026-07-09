@@ -1,26 +1,43 @@
+import json
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from pywebpush import webpush, WebPushException
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.core.auth import get_current_user
+from app.core.config import settings
 from app.db.database import get_db
 from app.models.notification import PushSubscription
+from app.models.user import User
 from app.schemas.notification import (
-    PushSubscriptionCreate,
-    PushSubscriptionResponse,
     NotificationPreferencesResponse,
     NotificationPreferencesUpdate,
+    NotificationPrefs,
+    PushSubscriptionCreate,
 )
-from app.core.auth import get_current_user
-from app.models.user import User
-from app.core.config import settings
-import json
+from app.services.notification_service import (
+    get_user_notification_prefs,
+    merge_notification_prefs_patch,
+)
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+logger = logging.getLogger(__name__)
+
 
 def _vapid_claims() -> dict:
     email = (settings.EMAIL_FROM or "support@svoygarage.ru").strip()
     if not email.startswith("mailto:"):
         email = f"mailto:{email}"
     return {"sub": email}
+
+
+def _prefs_response(user: User, db: Session) -> NotificationPreferencesResponse:
+    return NotificationPreferencesResponse(
+        notification_prefs=NotificationPrefs.model_validate(get_user_notification_prefs(user)),
+        has_push_subscription=_user_has_push_subscription(db, user.id),
+    )
 
 
 @router.post("/subscribe")
@@ -101,15 +118,7 @@ def get_notification_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return NotificationPreferencesResponse(
-        notify_push_enabled=current_user.notify_push_enabled
-        if current_user.notify_push_enabled is not None
-        else True,
-        notify_email_enabled=current_user.notify_email_enabled
-        if current_user.notify_email_enabled is not None
-        else True,
-        has_push_subscription=_user_has_push_subscription(db, current_user.id),
-    )
+    return _prefs_response(current_user, db)
 
 
 @router.patch("/preferences", response_model=NotificationPreferencesResponse)
@@ -118,23 +127,18 @@ def update_notification_preferences(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if payload.notify_push_enabled is not None:
-        current_user.notify_push_enabled = payload.notify_push_enabled
-    if payload.notify_email_enabled is not None:
-        current_user.notify_email_enabled = payload.notify_email_enabled
+    if payload.notification_prefs is not None:
+        current_prefs = get_user_notification_prefs(current_user)
+        patch = payload.notification_prefs.model_dump(exclude_unset=True)
+        merged = merge_notification_prefs_patch(current_prefs, patch)
+        current_user.notification_prefs = merged
     db.commit()
     db.refresh(current_user)
-    return NotificationPreferencesResponse(
-        notify_push_enabled=current_user.notify_push_enabled,
-        notify_email_enabled=current_user.notify_email_enabled,
-        has_push_subscription=_user_has_push_subscription(db, current_user.id),
-    )
+    return _prefs_response(current_user, db)
 
 
 def send_push_notification(user_id: int, message_data: dict, db: Session):
     """Send push notification to all user's active subscriptions"""
-    from sqlalchemy import func
-
     if not settings.VAPID_PRIVATE_KEY or not settings.VAPID_PUBLIC_KEY:
         return
 
@@ -166,12 +170,12 @@ def send_push_notification(user_id: int, message_data: dict, db: Session):
             ).update({"last_used": func.now()})
             
         except WebPushException as e:
-            print(f"Push notification failed for user {user_id}: {e}")
+            logger.warning("Push notification failed for user %s: %s", user_id, e)
             # Mark subscription as inactive if it's expired
             if e.response and e.response.status_code in [404, 410]:
                 sub.is_active = False
                 db.commit()
         except Exception as e:
-            print(f"Unexpected error sending push: {e}")
+            logger.exception("Unexpected error sending push to user %s: %s", user_id, e)
     
     db.commit()

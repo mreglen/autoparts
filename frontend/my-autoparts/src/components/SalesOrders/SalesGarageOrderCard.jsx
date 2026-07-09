@@ -175,6 +175,7 @@ export default function SalesGarageOrderCard({
       dispatch,
       navigate,
       fetchLinkThunk: fetchAvitoChatProductLink,
+      destination: 'seller',
     });
   };
 

@@ -20,6 +20,32 @@ EVENT_STOCK_LOW = "stock_low"
 EVENT_RETURN_REQUEST_SELLER = "return_request_seller"
 EVENT_RETURN_STATUS_BUYER = "return_status_buyer"
 EVENT_SEARCH_SUBSCRIPTION_MATCH = "search_subscription_match"
+EVENT_AVITO_MESSENGER = "avito_messenger"
+
+CATEGORY_ORDERS = "orders"
+CATEGORY_MESSAGES = "messages"
+CATEGORY_SEARCH = "search"
+CATEGORY_OTHER = "other"
+
+DEFAULT_NOTIFICATION_PREFS: dict[str, dict[str, bool]] = {
+    CATEGORY_ORDERS: {"push": True, "email": True},
+    CATEGORY_MESSAGES: {"push": True, "email": True},
+    CATEGORY_SEARCH: {"push": True, "email": True},
+    CATEGORY_OTHER: {"push": True, "email": True},
+}
+
+EVENT_TO_CATEGORY: dict[str, str] = {
+    EVENT_NEW_ORDER_SELLER: CATEGORY_ORDERS,
+    EVENT_ORDER_STATUS_BUYER: CATEGORY_ORDERS,
+    EVENT_RETURN_REQUEST_SELLER: CATEGORY_ORDERS,
+    EVENT_RETURN_STATUS_BUYER: CATEGORY_ORDERS,
+    EVENT_CHAT_MESSAGE: CATEGORY_MESSAGES,
+    EVENT_AVITO_MESSENGER: CATEGORY_MESSAGES,
+    EVENT_SEARCH_SUBSCRIPTION_MATCH: CATEGORY_SEARCH,
+    EVENT_STOCK_LOW: CATEGORY_OTHER,
+    EVENT_MODERATION_APPROVED: CATEGORY_OTHER,
+    EVENT_MODERATION_REJECTED: CATEGORY_OTHER,
+}
 
 ORDER_STATUS_LABELS: dict[str, str] = {
     "pending": "В ожидании",
@@ -43,6 +69,88 @@ def order_status_label(status_code: str | None) -> str:
     if not status_code:
         return "Обновлён"
     return ORDER_STATUS_LABELS.get(status_code, status_code)
+
+
+def notification_prefs_from_legacy(user: User) -> dict[str, dict[str, bool]]:
+    push_enabled = user.notify_push_enabled if user.notify_push_enabled is not None else True
+    email_enabled = user.notify_email_enabled if user.notify_email_enabled is not None else True
+    channel = {"push": push_enabled, "email": email_enabled}
+    return {category: dict(channel) for category in DEFAULT_NOTIFICATION_PREFS}
+
+
+def normalize_notification_prefs(
+    raw: dict[str, Any] | None,
+    *,
+    user: User | None = None,
+) -> dict[str, dict[str, bool]]:
+    if not raw and user is not None:
+        if user.notification_prefs:
+            raw = user.notification_prefs
+        else:
+            return notification_prefs_from_legacy(user)
+
+    result = {
+        category: {
+            "push": bool(DEFAULT_NOTIFICATION_PREFS[category]["push"]),
+            "email": bool(DEFAULT_NOTIFICATION_PREFS[category]["email"]),
+        }
+        for category in DEFAULT_NOTIFICATION_PREFS
+    }
+    if not raw:
+        return result
+
+    for category in DEFAULT_NOTIFICATION_PREFS:
+        category_raw = raw.get(category)
+        if not isinstance(category_raw, dict):
+            continue
+        if "push" in category_raw:
+            result[category]["push"] = bool(category_raw["push"])
+        if "email" in category_raw:
+            result[category]["email"] = bool(category_raw["email"])
+    return result
+
+
+def get_user_notification_prefs(user: User) -> dict[str, dict[str, bool]]:
+    return normalize_notification_prefs(user.notification_prefs, user=user)
+
+
+def event_category(event_type: str) -> str:
+    return EVENT_TO_CATEGORY.get(event_type, CATEGORY_OTHER)
+
+
+def should_send_push_for_event(user: User, event_type: str) -> bool:
+    prefs = get_user_notification_prefs(user)
+    category = event_category(event_type)
+    return bool(prefs.get(category, {}).get("push", True))
+
+
+def should_send_email_for_event(user: User, event_type: str) -> bool:
+    prefs = get_user_notification_prefs(user)
+    category = event_category(event_type)
+    return bool(prefs.get(category, {}).get("email", True))
+
+
+def user_has_any_push_category_enabled(user: User) -> bool:
+    prefs = get_user_notification_prefs(user)
+    return any(category_prefs.get("push") for category_prefs in prefs.values())
+
+
+def merge_notification_prefs_patch(
+    current: dict[str, dict[str, bool]],
+    patch: dict[str, Any] | None,
+) -> dict[str, dict[str, bool]]:
+    if not patch:
+        return current
+    merged = normalize_notification_prefs(current)
+    for category in DEFAULT_NOTIFICATION_PREFS:
+        category_patch = patch.get(category)
+        if not isinstance(category_patch, dict):
+            continue
+        if "push" in category_patch:
+            merged[category]["push"] = bool(category_patch["push"])
+        if "email" in category_patch:
+            merged[category]["email"] = bool(category_patch["email"])
+    return merged
 
 
 def _enqueue_or_send(

@@ -841,7 +841,7 @@ def get_seller_part_card_redirect_url(db: Session, raw_path: str, *, site_origin
     product_id = int(seller_match.group("product_id"))
     product = (
         db.query(ProductModel)
-        .filter(ProductModel.id == product_id, ProductModel.quantity > 0)
+        .filter(ProductModel.id == product_id)
         .first()
     )
     if product is None:

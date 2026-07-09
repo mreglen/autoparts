@@ -22,12 +22,22 @@ class PushSubscriptionResponse(BaseModel):
         from_attributes = True
 
 
+class NotificationChannelPrefs(BaseModel):
+    push: bool = True
+    email: bool = True
+
+
+class NotificationPrefs(BaseModel):
+    orders: NotificationChannelPrefs = NotificationChannelPrefs()
+    messages: NotificationChannelPrefs = NotificationChannelPrefs()
+    search: NotificationChannelPrefs = NotificationChannelPrefs()
+    other: NotificationChannelPrefs = NotificationChannelPrefs()
+
+
 class NotificationPreferencesResponse(BaseModel):
-    notify_push_enabled: bool = True
-    notify_email_enabled: bool = True
+    notification_prefs: NotificationPrefs
     has_push_subscription: bool = False
 
 
 class NotificationPreferencesUpdate(BaseModel):
-    notify_push_enabled: Optional[bool] = None
-    notify_email_enabled: Optional[bool] = None
+    notification_prefs: Optional[NotificationPrefs] = None

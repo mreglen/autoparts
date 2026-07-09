@@ -1144,6 +1144,61 @@ def ensure_user_notification_preference_columns() -> None:
     logger.info("Applied users notification preference columns patch")
 
 
+def ensure_user_notification_prefs_column() -> None:
+    """Add per-category notification_prefs JSONB column and migrate legacy toggles."""
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("users")}
+    default_json = (
+        '{"orders":{"push":true,"email":true},'
+        '"messages":{"push":true,"email":true},'
+        '"search":{"push":true,"email":true},'
+        '"other":{"push":true,"email":true}}'
+    )
+
+    with engine.begin() as conn:
+        if "notification_prefs" not in columns:
+            conn.execute(
+                text(
+                    f"ALTER TABLE users ADD COLUMN notification_prefs JSONB "
+                    f"NOT NULL DEFAULT '{default_json}'::jsonb"
+                )
+            )
+            logger.info("Added users.notification_prefs column")
+
+        conn.execute(
+            text(
+                """
+                UPDATE users
+                SET notification_prefs = jsonb_build_object(
+                    'orders', jsonb_build_object(
+                        'push', COALESCE(notify_push_enabled, TRUE),
+                        'email', COALESCE(notify_email_enabled, TRUE)
+                    ),
+                    'messages', jsonb_build_object(
+                        'push', COALESCE(notify_push_enabled, TRUE),
+                        'email', COALESCE(notify_email_enabled, TRUE)
+                    ),
+                    'search', jsonb_build_object(
+                        'push', COALESCE(notify_push_enabled, TRUE),
+                        'email', COALESCE(notify_email_enabled, TRUE)
+                    ),
+                    'other', jsonb_build_object(
+                        'push', COALESCE(notify_push_enabled, TRUE),
+                        'email', COALESCE(notify_email_enabled, TRUE)
+                    )
+                )
+                WHERE notification_prefs IS NULL
+                   OR notification_prefs = '{}'::jsonb
+                """
+            )
+        )
+
+    logger.info("Applied users notification_prefs migration patch")
+
+
 def ensure_product_photo_thumb_url_column() -> None:
     """Add thumb_url column to product_photos if missing."""
     inspector = inspect(engine)

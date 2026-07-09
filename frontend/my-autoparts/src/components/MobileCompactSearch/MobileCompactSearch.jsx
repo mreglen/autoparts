@@ -5,6 +5,7 @@ import { useDebouncedCallback } from '../../hooks/useDebouncedCallback';
 export default function MobileCompactSearch({
     onSearch,
     onQueryChange,
+    onClear,
     liveSearch = false,
     debounceMs = 320,
     placeholder = 'Поиск по названию, артикулу или VIN',
@@ -15,6 +16,7 @@ export default function MobileCompactSearch({
     const [searchParams] = useSearchParams();
     const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
     const [isSearching, setIsSearching] = useState(false);
+    const showClear = Boolean(searchTerm.trim());
 
     const debouncedLiveSearch = useDebouncedCallback((value) => {
         if (onQueryChange) onQueryChange(value);
@@ -48,6 +50,21 @@ export default function MobileCompactSearch({
         }
     };
 
+    const handleClear = () => {
+        setSearchTerm('');
+        if (onClear) {
+            onClear();
+            return;
+        }
+        if (onQueryChange) {
+            onQueryChange('');
+            return;
+        }
+        if (onSearch) {
+            onSearch('');
+        }
+    };
+
     return (
         <div className={`lg:hidden ${sticky ? 'sticky top-[var(--sg-mobile-header-h)] z-30' : ''} bg-gray-50 px-3 py-2 ${className}`}>
             <div className="relative">
@@ -67,8 +84,21 @@ export default function MobileCompactSearch({
                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                     placeholder={placeholder}
                     disabled={isSearching}
-                    className={`h-9 w-full rounded-full border border-gray-200 bg-white pl-9 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${inputClassName}`}
+                    className={`h-9 w-full rounded-full border border-gray-200 bg-white pl-9 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${showClear ? 'pr-16' : 'pr-10'} ${inputClassName}`}
                 />
+                {showClear ? (
+                    <button
+                        type="button"
+                        onClick={handleClear}
+                        disabled={isSearching}
+                        className="absolute right-9 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:text-gray-600 disabled:opacity-40"
+                        aria-label="Очистить поиск"
+                    >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                ) : null}
                 <button
                     type="button"
                     onClick={handleSearch}

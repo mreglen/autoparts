@@ -90,7 +90,7 @@ class MyProductsFiltersTests(unittest.TestCase):
         self.db.close()
         self.engine.dispose()
 
-    def _add_product(self, *, product_id, name, article, price, storage_location_id):
+    def _add_product(self, *, product_id, name, article, price, storage_location_id, created_by=1):
         self.db.add(
             Product(
                 id=product_id,
@@ -102,7 +102,7 @@ class MyProductsFiltersTests(unittest.TestCase):
                 quantity=5,
                 organization_id="org1",
                 storage_location_id=storage_location_id,
-                created_by=1,
+                created_by=created_by,
                 part_type_id=1,
             )
         )
@@ -114,27 +114,27 @@ class MyProductsFiltersTests(unittest.TestCase):
         )
 
     def test_storage_cell_filter_returns_only_linked_products(self):
-        query = apply_my_products_filters(self._base_query(), None, 101, None, "")
+        query = apply_my_products_filters(self._base_query(), None, 101, None, None, "")
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [1])
 
     def test_storage_location_and_cell_filters_combine(self):
-        query = apply_my_products_filters(self._base_query(), 10, 102, None, "")
+        query = apply_my_products_filters(self._base_query(), 10, 102, None, None, "")
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [2])
 
     def test_search_with_cell_filter(self):
-        query = apply_my_products_filters(self._base_query(), 10, None, None, "beta")
+        query = apply_my_products_filters(self._base_query(), 10, None, None, None, "beta")
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [2])
 
     def test_ids_query_matches_filtered_products(self):
-        filtered_query = apply_my_products_filters(self._base_query(), 10, None, None, "")
+        filtered_query = apply_my_products_filters(self._base_query(), 10, None, None, None, "")
         ids = [row.id for row in apply_my_products_sort(filtered_query, "date_desc").all()]
         self.assertEqual(ids, [2, 1])
 
     def test_price_sort_asc(self):
-        query = apply_my_products_filters(self._base_query(), None, None, None, "")
+        query = apply_my_products_filters(self._base_query(), None, None, None, None, "")
         ids = [
             row.id
             for row in apply_my_products_sort(query, "price_asc").all()
@@ -142,7 +142,7 @@ class MyProductsFiltersTests(unittest.TestCase):
         self.assertEqual(ids, [2, 3, 1])
 
     def test_price_sort_desc(self):
-        query = apply_my_products_filters(self._base_query(), None, None, None, "")
+        query = apply_my_products_filters(self._base_query(), None, None, None, None, "")
         ids = [
             row.id
             for row in apply_my_products_sort(query, "price_desc").all()
@@ -151,12 +151,12 @@ class MyProductsFiltersTests(unittest.TestCase):
 
 
     def test_storage_cell_value_filter(self):
-        query = apply_my_products_filters(self._base_query(), None, 101, "A-1", "")
+        query = apply_my_products_filters(self._base_query(), None, 101, "A-1", None, "")
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [1])
 
     def test_storage_cell_without_value_returns_all_in_cell(self):
-        query = apply_my_products_filters(self._base_query(), None, 101, None, "")
+        query = apply_my_products_filters(self._base_query(), None, 101, None, None, "")
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [1])
 
@@ -169,7 +169,7 @@ class MyProductsFiltersTests(unittest.TestCase):
             storage_location_id=10,
         )
         self.db.commit()
-        query = apply_my_products_filters(self._base_query(), None, None, None, "130901")
+        query = apply_my_products_filters(self._base_query(), None, None, None, None, "130901")
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [4])
 
@@ -182,9 +182,23 @@ class MyProductsFiltersTests(unittest.TestCase):
             storage_location_id=10,
         )
         self.db.commit()
-        query = apply_my_products_filters(self._base_query(), None, None, None, "130901")
+        query = apply_my_products_filters(self._base_query(), None, None, None, None, "130901")
         ids = [row.id for row in query.all()]
         self.assertEqual(ids, [5])
+
+    def test_created_by_filter(self):
+        self._add_product(
+            product_id=6,
+            name="User two part",
+            article="U2-1",
+            price=80,
+            storage_location_id=10,
+            created_by=2,
+        )
+        self.db.commit()
+        query = apply_my_products_filters(self._base_query(), None, None, None, 2, "")
+        ids = [row.id for row in query.all()]
+        self.assertEqual(ids, [6])
 
 
 if __name__ == "__main__":

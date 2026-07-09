@@ -8,7 +8,7 @@ import { stripHtmlTags } from '../../utils/text';
 import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI, fetchMyProductDrafts, deleteProductDraft, submitProductDraft, selectMyProductsTotal, selectMyProductsTotalQuantity, selectMyProductsTotalValue, selectMyProductsPage, selectMyProductsHasMore, selectMyProductsLoadingMore, selectMyProductsFilterKey, selectDraftItems, selectDraftLoading, selectDraftError } from '../../redux/slices/ProductSlice';
 import { formatDraftTitle } from '../../utils/productDraftUtils';
 import { createStockOut } from '../../redux/slices/StockOutSlice';
-import { fetchStorageLocations } from '../../redux/slices/OrganizationSlice';
+import { fetchStorageLocations, fetchEmployees } from '../../redux/slices/OrganizationSlice';
 import { fetchProductStorageCellsBatch, fetchStorageCells, invalidateProductStorageCells } from '../../redux/slices/StorageCellsSlice';
 import StockOutModal from './StockOutModal/StockOutModal';
 import PrintReceiptModal from './PrintReceiptModal/PrintReceiptModal';
@@ -21,6 +21,7 @@ import MyPartsRowSkeleton from '../../components/skeletons/MyPartsRowSkeleton';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasWarehouseQrAccess } from '../../hooks/useWarehousePermissions';
 import { formatDromExportMessage } from '../../utils/dromExport';
+import ScrollToTopButton from '../../components/ScrollToTopButton/ScrollToTopButton';
 
 const CardPart = ({
   part,
@@ -827,8 +828,8 @@ const DraftCard = ({ draft, onContinue, onSubmit, onDelete }) => {
   );
 };
 
-const DEFAULT_IN_STOCK_FILTERS = { storage: '', cell: '', cellValue: '', sort: 'date_desc' };
-const DEFAULT_MODERATION_FILTERS = { storage: '', cell: '', cellValue: '', sort: 'date_desc', hideRejected: false };
+const DEFAULT_IN_STOCK_FILTERS = { storage: '', cell: '', cellValue: '', responsible: '', sort: 'date_desc' };
+const DEFAULT_MODERATION_FILTERS = { storage: '', cell: '', cellValue: '', responsible: '', sort: 'date_desc', hideRejected: false };
 const MY_PARTS_SORT_OPTIONS = [
   { value: 'date_desc', label: 'Сначала новые' },
   { value: 'date_asc', label: 'Сначала старые' },
@@ -841,18 +842,26 @@ const MY_PARTS_SORT_LABELS = Object.fromEntries(
 const URL_SEARCH_DEBOUNCE_MS = 400;
 const MY_PRODUCTS_PAGE_SIZE = 30;
 
-const buildMyProductsRequest = ({ page = 1, storage, cell, cellValue, q, sort, stock, noPhoto, append = false } = {}) => ({
+const buildMyProductsRequest = ({ page = 1, storage, cell, cellValue, responsible, q, sort, stock, noPhoto, append = false } = {}) => ({
   page,
   page_size: MY_PRODUCTS_PAGE_SIZE,
   sort: sort || 'date_desc',
   ...(storage ? { storage_location_id: storage } : {}),
   ...(cell ? { storage_cell_id: cell } : {}),
   ...(cell && cellValue ? { storage_cell_value: cellValue } : {}),
+  ...(responsible ? { created_by: responsible } : {}),
   ...(q?.trim() ? { q: q.trim() } : {}),
   ...(stock ? { stock } : {}),
   ...(noPhoto ? { no_photo: true } : {}),
   append,
 });
+
+const formatResponsibleLabel = (person) => {
+  if (!person) return '';
+  const initials = person.first_name ? `${person.first_name[0]}.` : '';
+  const patronymic = person.patronymic ? `${person.patronymic[0]}.` : '';
+  return `${person.last_name || ''} ${initials}${patronymic}`.trim();
+};
 
 const getModerationPartKey = (part) => `${part.moderationKind || 'pending'}-${part.id}`;
 
@@ -881,7 +890,7 @@ function MyParts() {
   const [moderationLoadError, setModerationLoadError] = useState(null);
   const [pendingStorageCellsByProduct, setPendingStorageCellsByProduct] = useState({});
 
-  const { storageLocations } = useSelector((state) => state.organization);
+  const { storageLocations, employees } = useSelector((state) => state.organization);
   const { productStorageCells, storageCells, lastModified } = useSelector((state) => state.storageCells);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState(null);
@@ -902,12 +911,14 @@ function MyParts() {
     storage: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('storage') || ''),
     cell: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('cell') || ''),
     cellValue: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('cell_value') || ''),
+    responsible: searchParams.get('tab') === 'pending' ? '' : (searchParams.get('responsible') || ''),
   }));
   const [moderationFilters, setModerationFilters] = useState(() => ({
     ...DEFAULT_MODERATION_FILTERS,
     storage: searchParams.get('tab') === 'pending' ? (searchParams.get('storage') || '') : '',
     cell: searchParams.get('tab') === 'pending' ? (searchParams.get('cell') || '') : '',
     cellValue: searchParams.get('tab') === 'pending' ? (searchParams.get('cell_value') || '') : '',
+    responsible: searchParams.get('tab') === 'pending' ? (searchParams.get('responsible') || '') : '',
     hideRejected: searchParams.get('hide_rejected') === '1',
   }));
   const [cellValueOptions, setCellValueOptions] = useState([]);
@@ -1005,12 +1016,13 @@ function MyParts() {
       storage: inStockFilters.storage || '',
       cell: inStockFilters.cell || '',
       cellValue: inStockFilters.cellValue || '',
+      responsible: inStockFilters.responsible || '',
       q: inStockDebouncedSearch.trim(),
       sort: inStockFilters.sort || 'date_desc',
       stock: stockFilter,
       no_photo: noPhotoFilter,
     }),
-    [inStockFilters.storage, inStockFilters.cell, inStockFilters.cellValue, inStockDebouncedSearch, inStockFilters.sort, stockFilter, noPhotoFilter],
+    [inStockFilters.storage, inStockFilters.cell, inStockFilters.cellValue, inStockFilters.responsible, inStockDebouncedSearch, inStockFilters.sort, stockFilter, noPhotoFilter],
   );
 
   const selectionResetKey = useMemo(
@@ -1019,10 +1031,16 @@ function MyParts() {
       storage: activeFilters.storage || '',
       cell: activeFilters.cell || '',
       cellValue: activeFilters.cellValue || '',
+      responsible: activeFilters.responsible || '',
       q: debouncedSearch.trim(),
     }),
-    [activeTab, activeFilters.storage, activeFilters.cell, activeFilters.cellValue, debouncedSearch],
+    [activeTab, activeFilters.storage, activeFilters.cell, activeFilters.cellValue, activeFilters.responsible, debouncedSearch],
   );
+
+  const responsibleOptions = useMemo(() => {
+    return [...(employees || [])]
+      .sort((a, b) => formatResponsibleLabel(a).localeCompare(formatResponsibleLabel(b), 'ru'));
+  }, [employees]);
 
   const availableStorageCells = useMemo(() => {
     const storageId = activeFilters.storage;
@@ -1066,6 +1084,7 @@ function MyParts() {
       storage: inStockFilters.storage,
       cell: inStockFilters.cell,
       cellValue: inStockFilters.cellValue,
+      responsible: inStockFilters.responsible,
       q: inStockDebouncedSearch,
       sort: inStockFilters.sort,
       stock: stockFilter,
@@ -1084,6 +1103,7 @@ function MyParts() {
     inStockFilters.storage,
     inStockFilters.cell,
     inStockFilters.cellValue,
+    inStockFilters.responsible,
     inStockFilters.sort,
     inStockDebouncedSearch,
     stockFilter,
@@ -1150,6 +1170,10 @@ function MyParts() {
       });
     }
 
+    if (moderationFilters.responsible) {
+      items = items.filter((part) => String(part.created_by) === String(moderationFilters.responsible));
+    }
+
     if (!moderationDebouncedSearch.trim()) return items;
 
     const queryNorm = normalizeArticle(moderationDebouncedSearch);
@@ -1165,7 +1189,7 @@ function MyParts() {
         || (part.name && part.name.toLowerCase().includes(queryLower))
       );
     });
-  }, [pendingItems, rejectedItems, moderationFilters.hideRejected, moderationFilters.storage, moderationFilters.cell, moderationFilters.cellValue, moderationDebouncedSearch, pendingStorageCellsByProduct]);
+  }, [pendingItems, rejectedItems, moderationFilters.hideRejected, moderationFilters.storage, moderationFilters.cell, moderationFilters.cellValue, moderationFilters.responsible, moderationDebouncedSearch, pendingStorageCellsByProduct]);
 
   const sortedModerationParts = React.useMemo(() => {
     const items = [...displayModerationParts];
@@ -1376,6 +1400,7 @@ function MyParts() {
       if (inStockFilters.cell && inStockFilters.cellValue) {
         params.set('storage_cell_value', inStockFilters.cellValue);
       }
+      if (inStockFilters.responsible) params.set('created_by', inStockFilters.responsible);
       if (inStockDebouncedSearch.trim()) params.set('q', inStockDebouncedSearch.trim());
       params.set('sort', inStockFilters.sort || 'date_desc');
       const qs = params.toString();
@@ -1622,6 +1647,7 @@ function MyParts() {
     const storage = isModerationTab ? moderationFilters.storage : inStockFilters.storage;
     const cell = isModerationTab ? moderationFilters.cell : inStockFilters.cell;
     const cellValue = isModerationTab ? moderationFilters.cellValue : inStockFilters.cellValue;
+    const responsible = isModerationTab ? moderationFilters.responsible : inStockFilters.responsible;
 
     if (debouncedSearch) {
       params.set('q', debouncedSearch);
@@ -1637,6 +1663,10 @@ function MyParts() {
 
     if (cellValue) {
       params.set('cell_value', cellValue);
+    }
+
+    if (responsible) {
+      params.set('responsible', responsible);
     }
 
     if (isModerationTab) {
@@ -1661,9 +1691,11 @@ function MyParts() {
     inStockFilters.storage,
     inStockFilters.cell,
     inStockFilters.cellValue,
+    inStockFilters.responsible,
     moderationFilters.storage,
     moderationFilters.cell,
     moderationFilters.cellValue,
+    moderationFilters.responsible,
     moderationFilters.hideRejected,
     isModerationTab,
     isDraftsTab,
@@ -1673,6 +1705,7 @@ function MyParts() {
   useEffect(() => {
     if (!isReady || !user?.organization_id) return;
     dispatch(fetchStorageLocations(user.organization_id));
+    dispatch(fetchEmployees(user.organization_id));
   }, [dispatch, isReady, user?.organization_id]);
 
   useEffect(() => {
@@ -1734,6 +1767,7 @@ function MyParts() {
         storage: inStockFilters.storage,
         cell: inStockFilters.cell,
         cellValue: inStockFilters.cellValue,
+        responsible: inStockFilters.responsible,
         q: inStockDebouncedSearch,
         sort: inStockFilters.sort,
         stock: stockFilter,
@@ -1750,6 +1784,7 @@ function MyParts() {
     inStockFilters.storage,
     inStockFilters.cell,
     inStockFilters.cellValue,
+    inStockFilters.responsible,
     inStockFilters.sort,
     inStockDebouncedSearch,
     stockFilter,
@@ -2069,7 +2104,7 @@ function MyParts() {
           </div>
         </div>
 
-        <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${isModerationTab ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
+        <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${isModerationTab ? 'lg:grid-cols-6' : 'lg:grid-cols-5'}`}>
           <div className="min-w-0">
             <label className="block text-xs font-medium text-gray-600 mb-1.5">Склад</label>
             <select
@@ -2127,6 +2162,22 @@ function MyParts() {
                 {value}
               </option>
             ))}
+            </select>
+          </div>
+
+          <div className="min-w-0">
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Ответственный</label>
+            <select
+              value={activeFilters.responsible}
+              onChange={(e) => updateActiveFilters({ responsible: e.target.value })}
+              className="block w-full h-10 px-3 border border-gray-300 rounded-lg bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            >
+              <option value="">Все ответственные</option>
+              {responsibleOptions.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {formatResponsibleLabel(employee)}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -2342,6 +2393,7 @@ function MyParts() {
                 storage: inStockFilters.storage,
                 cell: inStockFilters.cell,
                 cellValue: inStockFilters.cellValue,
+                responsible: inStockFilters.responsible,
                 q: inStockDebouncedSearch,
                 sort: inStockFilters.sort,
                 stock: stockFilter,
@@ -2755,6 +2807,8 @@ function MyParts() {
             : []
         }
       />
+
+      <ScrollToTopButton />
     </div>
   );
 }

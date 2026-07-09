@@ -333,6 +333,16 @@ class StaticPageSeoTests(unittest.TestCase):
         url = get_seller_part_card_redirect_url(db, "/seller/part-card/16")
         self.assertEqual(url, "https://svoygarage.ru/part/16-brand-article")
 
+    @patch("app.services.static_page_seo_service.build_product_page_url")
+    def test_seller_part_card_redirect_for_sold_out_product(self, mock_build_url):
+        mock_build_url.return_value = "https://svoygarage.ru/part/16-brand-article"
+        product = MagicMock(id=16, brand="Brand", article="Article", name="Part", quantity=0)
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = product
+
+        url = get_seller_part_card_redirect_url(db, "/seller/part-card/16")
+        self.assertEqual(url, "https://svoygarage.ru/part/16-brand-article")
+
 
 if __name__ == "__main__":
     unittest.main()

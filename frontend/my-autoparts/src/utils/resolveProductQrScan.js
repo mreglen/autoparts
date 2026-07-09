@@ -36,10 +36,13 @@ export async function resolvePublicPartPath(productId) {
   if (!Number.isFinite(numericId) || numericId <= 0) return null;
 
   try {
-    const response = await apiAxiosUnauth.get(`/products/public/${numericId}`);
-    return buildPartDetailPath(response.data);
+    const response = await apiAxiosUnauth.get(`/products/public/resolve/${numericId}`);
+    const data = response.data;
+    if (data?.path) return data.path;
+    if (data?.id) return buildPartDetailPath(data);
+    return null;
   } catch {
-    return buildPartDetailPath(numericId);
+    return null;
   }
 }
 
@@ -82,9 +85,7 @@ export async function resolveProductQrScan(productId, user, permissionCodes = []
       if (moderationPath) {
         return { mode: 'moderation', path: moderationPath };
       }
-      return { mode: 'forbidden' };
-    }
-    if (sellerResult?.reason === 'error') {
+    } else if (sellerResult?.reason === 'error') {
       return { mode: 'error', message: sellerResult.message };
     }
   }

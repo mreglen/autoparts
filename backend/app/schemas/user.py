@@ -2,6 +2,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 from app.schemas.audit import AuditEventRow
+from app.schemas.notification import NotificationPrefs
 
 class UserBase(BaseModel):
     last_name: str
@@ -53,8 +54,7 @@ class UserResponse(BaseModel):
     organization_id: Optional[str] = None
     organization_name: Optional[str] = None
     organization_phone: Optional[str] = None
-    notify_push_enabled: bool = True
-    notify_email_enabled: bool = True
+    notification_prefs: NotificationPrefs = NotificationPrefs()
 
     class Config:
         from_attributes = True
