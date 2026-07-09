@@ -1162,9 +1162,10 @@ def ensure_user_notification_prefs_column() -> None:
         if "notification_prefs" not in columns:
             conn.execute(
                 text(
-                    f"ALTER TABLE users ADD COLUMN notification_prefs JSONB "
-                    f"NOT NULL DEFAULT '{default_json}'::jsonb"
-                )
+                    "ALTER TABLE users ADD COLUMN notification_prefs JSONB "
+                    "NOT NULL DEFAULT CAST(:default_json AS jsonb)"
+                ),
+                {"default_json": default_json},
             )
             logger.info("Added users.notification_prefs column")
 
