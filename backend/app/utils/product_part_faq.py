@@ -3,6 +3,20 @@ from __future__ import annotations
 from app.utils.organization_city import DEFAULT_CITY, format_city_in_prepositional
 
 
+def _format_price_phrase(price: float | int | str | None) -> str:
+    if price is None:
+        return ""
+    try:
+        amount = float(price)
+    except (TypeError, ValueError):
+        return ""
+    if amount <= 0:
+        return ""
+    if amount.is_integer():
+        return f"{int(amount)} ₽"
+    return f"{amount:.2f} ₽"
+
+
 def build_product_faq_items(
     *,
     brand: str | None = None,
@@ -12,6 +26,9 @@ def build_product_faq_items(
     city: str | None = None,
     fitment_text: str | None = None,
     in_stock: bool = True,
+    quantity: int | None = None,
+    price: float | int | str | None = None,
+    stock_summary: str | None = None,
 ) -> list[dict[str, str]]:
     brand_text = (brand or "").strip()
     article_text = (article or "").strip()
@@ -20,6 +37,14 @@ def build_product_faq_items(
     city_prep = format_city_in_prepositional(city or DEFAULT_CITY)
     condition = "новая" if is_new else "б/у"
     fitment = (fitment_text or "").strip().rstrip(".")
+    price_phrase = _format_price_phrase(price)
+    stock_text = (stock_summary or "").strip().rstrip(".")
+    qty: int | None = None
+    if quantity is not None:
+        try:
+            qty = max(0, int(quantity))
+        except (TypeError, ValueError):
+            qty = None
 
     items: list[dict[str, str]] = []
 
@@ -29,8 +54,8 @@ def build_product_faq_items(
                 "question": f"На какие автомобили подходит {label}?",
                 "answer": (
                     f"По справочным данным {label} ({part_type.lower()}) может подойти для: "
-                    f"{fitment}. Перед покупкой уточните совместимость у продавца — "
-                    f"это {condition} деталь, осмотр рекомендуется."
+                    f"{fitment}. Перед покупкой сверьте артикул {article_text or label} "
+                    f"и уточните совместимость у продавца."
                 ),
             }
         )
@@ -46,15 +71,24 @@ def build_product_faq_items(
             }
         )
 
-    stock_answer = (
-        f"Да, {label} сейчас в наличии в {city_prep}. Количество и актуальность уточняйте "
-        "на карточке или у продавца."
-        if in_stock
-        else (
-            f"Это предложение может быть недоступно. Посмотрите другие варианты "
+    if in_stock:
+        qty_part = f" ({qty} шт.)" if qty and qty > 1 else ""
+        price_part = f" Актуальная цена на карточке — {price_phrase}." if price_phrase else ""
+        stock_part = f" {stock_text}." if stock_text else ""
+        stock_answer = (
+            f"Да, {label} сейчас в наличии{qty_part} в {city_prep}.{price_part}{stock_part} "
+            "Количество и сроки доставки уточняйте на карточке перед заказом."
+        )
+    elif is_new:
+        stock_answer = (
+            f"Сейчас новых предложений {label} на складах нет. Посмотрите б/у варианты "
+            f"{label} в каталоге «Свой Гараж» или аналоги на этой странице."
+        )
+    else:
+        stock_answer = (
+            f"Это предложение сейчас недоступно. Посмотрите другие варианты "
             f"{label} в каталоге б/у запчастей «Свой Гараж»."
         )
-    )
     items.append(
         {
             "question": f"Есть ли {label} в наличии?",
@@ -64,10 +98,10 @@ def build_product_faq_items(
 
     items.append(
         {
-            "question": "Как оформить доставку и оплату?",
+            "question": f"Как оформить доставку и оплату для {label}?",
             "answer": (
-                f"Добавьте товар в корзину на svoygarage.ru или свяжитесь с продавцом. "
-                f"Доставка по России, самовывоз в {city_prep} — условия согласуются с продавцом. "
+                f"Добавьте {label} в корзину на svoygarage.ru или свяжитесь с продавцом. "
+                f"Доставка по России, самовывоз в {city_prep} — условия согласуются при заказе. "
                 "Подробнее — на странице «Доставка»."
             ),
         }
@@ -78,8 +112,8 @@ def build_product_faq_items(
             {
                 "question": f"Какое состояние у новой запчасти {label}?",
                 "answer": (
-                    f"Это новая {part_type.lower()} {label}. Состояние упаковки и комплектацию "
-                    "уточняйте у продавца перед покупкой."
+                    f"Это новая {part_type.lower()} {label} со склада поставщика. "
+                    "Состояние упаковки и комплектацию уточняйте у продавца перед покупкой."
                 ),
             }
         )
@@ -94,13 +128,14 @@ def build_product_faq_items(
             }
         )
 
+    price_hint = f" по цене {price_phrase}" if price_phrase and in_stock else ""
     items.append(
         {
-            "question": "Как купить запчасть на «Свой Гараж»?",
+            "question": f"Как купить {label} на «Свой Гараж»?",
             "answer": (
-                f"Откройте карточку {label}, добавьте товар в корзину или нажмите «Написать» / "
-                "«Позвонить» продавцу. Оформление заказа и оплата проходят через маркетплейс "
-                "или напрямую с продавцом — как указано на карточке."
+                f"Откройте карточку {label}{price_hint}, добавьте товар в корзину или нажмите "
+                "«Написать» / «Позвонить» продавцу. Оформление заказа и оплата проходят через "
+                "маркетплейс или напрямую с продавцом — как указано на карточке."
             ),
         }
     )
@@ -118,6 +153,9 @@ def build_product_faq_json_ld(
     city: str | None = None,
     fitment_text: str | None = None,
     in_stock: bool = True,
+    quantity: int | None = None,
+    price: float | int | str | None = None,
+    stock_summary: str | None = None,
 ) -> dict:
     items = build_product_faq_items(
         brand=brand,
@@ -127,6 +165,9 @@ def build_product_faq_json_ld(
         city=city,
         fitment_text=fitment_text,
         in_stock=in_stock,
+        quantity=quantity,
+        price=price,
+        stock_summary=stock_summary,
     )
     return {
         "@type": "FAQPage",

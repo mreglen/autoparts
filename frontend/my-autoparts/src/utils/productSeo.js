@@ -52,6 +52,10 @@ export function buildProductSeoSummary({
   inStock = true,
   shortName,
   uniqueDescription,
+  fitmentText,
+  quantity,
+  sellerName,
+  stockSummary,
 } = {}) {
   const brandText = String(brand || '').trim();
   const articleText = String(article || '').trim();
@@ -60,12 +64,31 @@ export function buildProductSeoSummary({
   const label = [brandText, articleText].filter(Boolean).join(' ')
     || String(name || '').trim()
     || 'автозапчасть';
-  const stock = inStock ? 'в наличии' : 'доступна';
+  let qty = null;
+  if (quantity != null && quantity !== '') {
+    const parsed = Number(quantity);
+    if (Number.isFinite(parsed)) qty = Math.max(0, Math.trunc(parsed));
+  }
+  let stock = 'сейчас недоступна';
+  if (inStock && qty && qty > 1) stock = `в наличии (${qty} шт.)`;
+  else if (inStock) stock = 'в наличии';
   const priceText = formatPriceRub(price);
   const pricePart = priceText ? ` Цена ${priceText} ₽.` : '';
+  const seller = String(sellerName || '').trim();
+  const sellerPart = seller ? ` Продавец: ${seller}.` : '';
+  const stockExtra = String(stockSummary || '').replace(/\s+/g, ' ').trim();
+  const stockPart = stockExtra && !stock.toLowerCase().includes(stockExtra.toLowerCase().slice(0, 20))
+    ? ` ${stockExtra.endsWith('.') ? stockExtra : `${stockExtra}.`}`
+    : '';
+  const fitment = String(fitmentText || '').replace(/\s+/g, ' ').trim().replace(/\.$/, '');
+  const fitmentPart = fitment
+    ? ` Подходит для: ${fitment.length > 70 ? `${fitment.slice(0, 69).trim()}…` : fitment}.`
+    : '';
   const snippet = String(shortName || uniqueDescription || '').replace(/\s+/g, ' ').trim();
   const detail = snippet.length >= 12 ? ` ${snippet.endsWith('.') ? snippet : `${snippet}.`}` : '';
-  return `${condition} автозапчасть ${label} ${stock} в ${cityPrep}.${pricePart}${detail}`.replace(/\s+/g, ' ').trim();
+  return `${condition} автозапчасть ${label} ${stock} в ${cityPrep}.${pricePart}${sellerPart}${stockPart}${fitmentPart}${detail}`
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function buildProductStructuredDataGraph({
@@ -215,6 +238,8 @@ export function buildProductSeo(product) {
     inStock,
     shortName,
     uniqueDescription: uniqueDesc,
+    quantity: product?.quantity,
+    sellerName,
   });
   const bodyDescription = productBodyDescription({
     brand,
@@ -226,6 +251,10 @@ export function buildProductSeo(product) {
     city,
     sellerName,
     isNew: Boolean(product?.is_new),
+    price: product?.price,
+    quantity: product?.quantity,
+    inStock,
+    listingId,
   });
 
   return {
@@ -302,6 +331,7 @@ export function seoFromNewPartMetaResponse(meta) {
       faqJsonLd = null;
     }
   }
+  const inStock = meta.in_stock !== false;
   return {
     title: meta.title,
     description: meta.description,
@@ -309,12 +339,21 @@ export function seoFromNewPartMetaResponse(meta) {
     h1: meta.h1 || '',
     schemaName: meta.schema_name || productSchemaNameFromTitle(meta.title),
     imageUrl: meta.image_url || resolveOgImageUrl(null),
-    robots: 'index, follow',
+    robots: meta.robots || (inStock ? 'index, follow' : 'noindex, follow'),
     keywords: meta.keywords || '',
+    seoSummary: meta.seo_summary || '',
+    bodyDescription: meta.body_description || '',
+    fitmentText: meta.fitment_text || '',
+    stockSummary: meta.stock_summary || '',
+    partTypeName: meta.part_type_name || '',
+    city: meta.city || '',
+    usedCatalogPath: meta.used_catalog_path || '',
+    warehouseCount: Number(meta.warehouse_count) || 0,
+    quantity: Number(meta.quantity) || 0,
     jsonLd,
     faqJsonLd,
     faqItems: Array.isArray(meta.faq_items) ? meta.faq_items : null,
-    inStock: meta.in_stock !== false,
+    inStock,
     price: meta.price,
     ogType: 'product',
     ogImage: meta.image_url || resolveOgImageUrl(null),

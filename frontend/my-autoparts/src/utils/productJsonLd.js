@@ -27,7 +27,12 @@ export function productBodyDescription({
   fitmentText,
   sellerName,
   isNew = false,
-  maxLen = 500,
+  price,
+  quantity,
+  inStock,
+  stockSummary,
+  listingId,
+  maxLen = 560,
 }) {
   const unique = stripHtmlTags(uniqueDescription || '').replace(/\s+/g, ' ').trim();
   const short = String(shortName || '').trim();
@@ -40,7 +45,19 @@ export function productBodyDescription({
   const condition = isNew ? 'Новая' : 'Б/у';
   const label = [brandText, articleText].filter(Boolean).join(' ') || display || 'автозапчасть';
   const fitment = String(fitmentText || '').replace(/\s+/g, ' ').trim().replace(/\.$/, '');
-  const fitmentShort = fitment.length > 80 ? `${fitment.slice(0, 79).trim()}…` : fitment;
+  const fitmentShort = fitment.length > 120 ? `${fitment.slice(0, 119).trim()}…` : fitment;
+  const stockText = String(stockSummary || '').replace(/\s+/g, ' ').trim();
+  const amount = Number(price);
+  let pricePhrase = '';
+  if (Number.isFinite(amount) && amount > 0) {
+    pricePhrase = Number.isInteger(amount) ? `${amount} ₽` : `${amount.toFixed(2)} ₽`;
+  }
+  let qty = null;
+  if (quantity != null && quantity !== '') {
+    const parsedQty = Number(quantity);
+    if (Number.isFinite(parsedQty)) qty = Math.max(0, Math.trunc(parsedQty));
+  }
+  const stockFlag = inStock != null ? Boolean(inStock) : (qty != null && qty > 0);
 
   const sentences = [];
 
@@ -48,15 +65,10 @@ export function productBodyDescription({
     sentences.push(unique.endsWith('.') ? unique : `${unique}.`);
   }
 
-  if (partType) {
-    sentences.push(
-      `${condition} ${partType.toLowerCase()} ${label} — предложение на маркетплейсе «Свой Гараж».`,
-    );
-  } else {
-    sentences.push(
-      `${condition} автозапчасть ${label} — предложение на маркетплейсе «Свой Гараж».`,
-    );
-  }
+  const typeLabel = partType ? partType.toLowerCase() : 'автозапчасть';
+  let identity = `${condition} ${typeLabel} ${label} на маркетплейсе «Свой Гараж»`;
+  if (pricePhrase) identity = `${identity}, цена ${pricePhrase}`;
+  sentences.push(`${identity}.`);
 
   if (short && !sentences.join(' ').toLowerCase().includes(short.toLowerCase())) {
     sentences.push(`Назначение: ${short}.`);
@@ -66,20 +78,46 @@ export function productBodyDescription({
     sentences.push(`По справочнику подходит для: ${fitmentShort}.`);
   }
 
+  if (stockText) {
+    sentences.push(stockText.endsWith('.') ? stockText : `${stockText}.`);
+  } else if (stockFlag) {
+    if (qty && qty > 1) {
+      sentences.push(`В наличии ${qty} шт. в ${cityText}.`);
+    } else {
+      sentences.push(`В наличии в ${cityText}.`);
+    }
+  } else {
+    sentences.push(`Сейчас нет в наличии — смотрите актуальные предложения ${label} в каталоге.`);
+  }
+
   if (seller) {
     sentences.push(`Продавец: ${seller}, город ${cityText}.`);
-  } else {
-    sentences.push(`Товар находится в ${cityText}.`);
+  } else if (!stockText) {
+    sentences.push(`Город: ${cityText}.`);
   }
 
   if (isNew) {
-    sentences.push(
-      'Новая деталь в упаковке или на складе. Доставка по России, самовывоз — у продавца.',
-    );
+    sentences.push('Новая деталь со склада поставщика. Доставка по России.');
   } else {
-    sentences.push(
-      'Перед покупкой можно осмотреть деталь и уточнить совместимость у продавца. Доставка по России, самовывоз — у продавца.',
-    );
+    sentences.push('Можно осмотреть у продавца перед покупкой. Доставка по России.');
+  }
+
+  const listingNum = Number(listingId);
+  if (Number.isFinite(listingNum) && listingNum > 0) {
+    sentences.push(`Объявление №${listingNum}.`);
+  }
+
+  if (!unique) {
+    for (const candidate of [short, display]) {
+      if (
+        candidate
+        && candidate.length >= 20
+        && !sentences.join(' ').toLowerCase().includes(candidate.toLowerCase())
+      ) {
+        sentences.unshift(candidate.endsWith('.') ? candidate : `${candidate}.`);
+        break;
+      }
+    }
   }
 
   const combined = sentences.filter(Boolean).join(' ');

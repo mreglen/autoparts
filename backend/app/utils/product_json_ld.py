@@ -54,6 +54,20 @@ def _fitment_hint(fitment_text: str | None, max_len: int = 80) -> str:
     return f"{fitment[: max_len - 1].strip()}…"
 
 
+def _format_price_phrase(price: float | int | str | None) -> str:
+    if price is None:
+        return ""
+    try:
+        amount = float(price)
+    except (TypeError, ValueError):
+        return ""
+    if amount <= 0:
+        return ""
+    if amount.is_integer():
+        return f"{int(amount)} ₽"
+    return f"{amount:.2f} ₽"
+
+
 def product_body_description(
     *,
     brand: str | None,
@@ -66,7 +80,12 @@ def product_body_description(
     fitment_text: str | None = None,
     seller_name: str | None = None,
     is_new: bool = False,
-    max_len: int = 500,
+    price: float | int | str | None = None,
+    quantity: int | None = None,
+    in_stock: bool | None = None,
+    stock_summary: str | None = None,
+    listing_id: int | None = None,
+    max_len: int = 560,
 ) -> str:
     unique = _strip_html(unique_description)
     short = (short_name or "").strip()
@@ -78,21 +97,27 @@ def product_body_description(
     seller = (seller_name or "").strip()
     condition = "Новая" if is_new else "Б/у"
     label = f"{brand_text} {article_text}".strip() or display or "автозапчасть"
-    fitment = _fitment_hint(fitment_text)
+    fitment = _fitment_hint(fitment_text, max_len=120)
+    stock_text = _strip_html(stock_summary)
+    price_phrase = _format_price_phrase(price)
+    qty: int | None = None
+    if quantity is not None:
+        try:
+            qty = max(0, int(quantity))
+        except (TypeError, ValueError):
+            qty = None
+    stock_flag = in_stock if in_stock is not None else (qty is not None and qty > 0)
 
     sentences: list[str] = []
 
     if unique and len(unique) >= 20:
         sentences.append(unique if unique.endswith(".") else f"{unique}.")
 
-    if part_type:
-        sentences.append(
-            f"{condition} {part_type.lower()} {label} — предложение на маркетплейсе «Свой Гараж»."
-        )
-    else:
-        sentences.append(
-            f"{condition} автозапчасть {label} — предложение на маркетплейсе «Свой Гараж»."
-        )
+    type_label = part_type.lower() if part_type else "автозапчасть"
+    identity = f"{condition} {type_label} {label} на маркетплейсе «Свой Гараж»"
+    if price_phrase:
+        identity = f"{identity}, цена {price_phrase}"
+    sentences.append(f"{identity}.")
 
     if short and short.casefold() not in " ".join(sentences).casefold():
         sentences.append(f"Назначение: {short}.")
@@ -100,20 +125,33 @@ def product_body_description(
     if fitment:
         sentences.append(f"По справочнику подходит для: {fitment}.")
 
+    if stock_text:
+        sentences.append(stock_text if stock_text.endswith(".") else f"{stock_text}.")
+    elif stock_flag:
+        if qty and qty > 1:
+            sentences.append(f"В наличии {qty} шт. в {city_text}.")
+        else:
+            sentences.append(f"В наличии в {city_text}.")
+    else:
+        sentences.append(f"Сейчас нет в наличии — смотрите актуальные предложения {label} в каталоге.")
+
     if seller:
         sentences.append(f"Продавец: {seller}, город {city_text}.")
-    else:
-        sentences.append(f"Товар находится в {city_text}.")
+    elif not stock_text:
+        sentences.append(f"Город: {city_text}.")
 
     if is_new:
-        sentences.append(
-            "Новая деталь в упаковке или на складе. Доставка по России, самовывоз — у продавца."
-        )
+        sentences.append("Новая деталь со склада поставщика. Доставка по России.")
     else:
-        sentences.append(
-            "Перед покупкой можно осмотреть деталь и уточнить совместимость у продавца. "
-            "Доставка по России, самовывоз — у продавца."
-        )
+        sentences.append("Можно осмотреть у продавца перед покупкой. Доставка по России.")
+
+    if listing_id:
+        try:
+            listing_num = int(listing_id)
+        except (TypeError, ValueError):
+            listing_num = None
+        if listing_num:
+            sentences.append(f"Объявление №{listing_num}.")
 
     if not unique:
         for candidate in (short, display):

@@ -52,8 +52,56 @@ class NewPartSeoMeta:
     schema_name: str = ""
     keywords: str = ""
     product_description: str | None = None
+    seo_summary: str = ""
     brand: str = ""
     article: str = ""
+    city: str = ""
+    fitment_text: str = ""
+    stock_summary: str = ""
+    part_type_name: str = ""
+    used_catalog_url: str = ""
+    robots: str = "index, follow"
+    warehouse_count: int = 0
+    quantity: int = 0
+    listing_id: int = 0
+
+
+def build_new_part_stock_summary(card: NewPartsSeoCard) -> tuple[str, int, int]:
+    """Returns (summary text, warehouse_count, total_available)."""
+    stocks = _stocks_from_card(card)
+    available = [row for row in stocks if int(row.get("available_count") or 0) > 0]
+    total_qty = sum(int(row.get("available_count") or 0) for row in available)
+    warehouse_count = len(available)
+    if not available:
+        qty = max(0, int(card.stock_count or 0))
+        if qty > 0:
+            return (f"В наличии у поставщика ({qty} шт.)", 1, qty)
+        return ("", 0, 0)
+
+    parts: list[str] = []
+    if warehouse_count == 1:
+        parts.append(f"В наличии на 1 складе ({total_qty} шт.)")
+    else:
+        parts.append(f"В наличии на {warehouse_count} складах ({total_qty} шт.)")
+
+    earliest = None
+    latest = None
+    for row in available:
+        start = _parse_iso_datetime(row.get("delivery_start"))
+        end = _parse_iso_datetime(row.get("delivery_end"))
+        if start and (earliest is None or start < earliest):
+            earliest = start
+        if end and (latest is None or end > latest):
+            latest = end
+    if earliest and latest:
+        parts.append(
+            f"отгрузка ориентировочно с {earliest.strftime('%d.%m.%Y')} "
+            f"по {latest.strftime('%d.%m.%Y')}"
+        )
+    elif earliest:
+        parts.append(f"отгрузка ориентировочно с {earliest.strftime('%d.%m.%Y')}")
+
+    return (". ".join(parts), warehouse_count, total_qty)
 
 
 def _safe_text(value: object, *, default: str = "") -> str:
@@ -202,7 +250,7 @@ def _merge_payload(existing_payload: dict, incoming: dict) -> dict:
 def is_rossko_new_part_sitemap_eligible(card: NewPartsSeoCard) -> bool:
     """
     Карточка раздела /autoparts/new, созданная из ответа Rossko API
-    (не каталог б/у и не другие источники).
+    (не каталог б/у и не другие источники). В sitemap — только при реальном наличии.
     """
     if not card.is_active:
         return False
@@ -210,14 +258,17 @@ def is_rossko_new_part_sitemap_eligible(card: NewPartsSeoCard) -> bool:
         return False
     if not _safe_text(card.brand) or not _safe_text(card.article):
         return False
-    payload = _payload_from_raw(card)
     stocks = _stocks_from_card(card)
-    if stocks:
+    if any(int(row.get("available_count") or 0) > 0 for row in stocks):
         return True
-    return bool(
-        _safe_text(payload.get("supplier_stock_id"))
-        or _safe_text(payload.get("guid"))
-    )
+    return max(0, int(card.stock_count or 0)) > 0
+
+
+def has_new_part_real_stock(card: NewPartsSeoCard) -> bool:
+    stocks = _stocks_from_card(card)
+    if any(int(row.get("available_count") or 0) > 0 for row in stocks):
+        return True
+    return max(0, int(card.stock_count or 0)) > 0
 
 
 def iter_rossko_new_part_cards_for_sitemap(db: Session):
@@ -526,6 +577,12 @@ def build_new_part_json_ld_graph(
     brand: str | None = None,
     article: str | None = None,
     in_stock: bool = True,
+    city: str | None = None,
+    fitment_text: str | None = None,
+    part_type_name: str | None = None,
+    quantity: int | None = None,
+    price: float | int | str | None = None,
+    stock_summary: str | None = None,
 ) -> str:
     """Product + BreadcrumbList + WebPage для JSON-LD Rossko-карточек."""
     product_obj = None
@@ -591,8 +648,14 @@ def build_new_part_json_ld_graph(
                 canonical_url=canonical_url,
                 brand=brand,
                 article=article,
+                part_type_name=part_type_name,
                 is_new=True,
+                city=city,
+                fitment_text=fitment_text,
                 in_stock=in_stock,
+                quantity=quantity,
+                price=price,
+                stock_summary=stock_summary,
             )
         )
 
@@ -609,13 +672,36 @@ def build_new_part_seo_meta(
     *,
     site_origin: str | None = None,
     markup_percent: float | None = None,
+    db: Session | None = None,
 ) -> NewPartSeoMeta:
+    from app.services.product_reference_fitment_service import (
+        format_fitment_text,
+        get_reference_fitment_vehicles,
+    )
+    from app.utils.organization_city import DEFAULT_CITY
+    from app.utils.product_display_name import extract_product_description
+    from app.utils.product_search_seo import build_product_seo_summary
+
     origin = _resolve_site_origin(site_origin)
-    display_name = _safe_text(card.name) or f"{card.brand} {card.article}"
+    brand = str(card.brand or "").strip()
+    article = str(card.article or "").strip()
+    display_name = _safe_text(card.name) or f"{brand} {article}".strip()
+    short_name = str(extract_product_description(card.name, brand, article) or "").strip()
+    part_type_name = short_name
     markup = float(markup_percent) if markup_percent is not None else 15.0
     display_price = min_stock_price_with_markup(card, markup)
     seo_price = min_stock_base_price(card)
-    in_stock = (card.stock_count or 0) > 0
+    stock_summary, warehouse_count, quantity = build_new_part_stock_summary(card)
+    in_stock = has_new_part_real_stock(card)
+    city = DEFAULT_CITY
+    fitment_text = ""
+    if db is not None and brand and article:
+        try:
+            vehicles = get_reference_fitment_vehicles(db, brand=brand, article=article)
+            fitment_text = format_fitment_text(vehicles)
+        except Exception:
+            fitment_text = ""
+
     title = build_new_part_search_title(
         brand=card.brand,
         article=card.article,
@@ -641,6 +727,11 @@ def build_new_part_seo_meta(
     price_text = f"{display_price:.2f}" if display_price is not None else None
     canonical = f"{origin}{build_new_part_card_path(card.id, card.brand, card.article)}"
     image_url = _absolute_photo_url(_safe_text(card.image_url), origin) or resolve_product_placeholder_image_url(origin)
+    used_catalog_url = ""
+    if brand and article:
+        from urllib.parse import quote as url_quote
+
+        used_catalog_url = f"{origin}/autoparts/used?q={url_quote(f'{brand} {article}')}"
 
     product_json_ld = build_new_part_card_json_ld(
         card,
@@ -650,23 +741,53 @@ def build_new_part_seo_meta(
         schema_name=schema_name,
     )
     json_ld = dumps_json_ld(product_json_ld)
+    body_description = product_body_description(
+        brand=brand,
+        article=article,
+        name=display_name,
+        unique_description=_safe_text(card.description),
+        short_name=short_name,
+        part_type_name=part_type_name,
+        city=city,
+        fitment_text=fitment_text,
+        is_new=True,
+        price=seo_price if seo_price is not None else display_price,
+        quantity=quantity,
+        in_stock=in_stock,
+        stock_summary=stock_summary,
+        listing_id=int(card.id),
+    )
+    seo_summary = build_product_seo_summary(
+        brand=brand,
+        article=article,
+        name=display_name,
+        is_new=True,
+        city=city,
+        price=seo_price if seo_price is not None else display_price,
+        in_stock=in_stock,
+        short_name=short_name,
+        unique_description=_safe_text(card.description),
+        fitment_text=fitment_text,
+        quantity=quantity,
+        stock_summary=stock_summary,
+    )
     json_ld_graph = build_new_part_json_ld_graph(
         json_ld=json_ld,
         canonical_url=canonical,
         h1=h1,
         title=title,
         description=description,
-        brand=str(card.brand or "").strip(),
-        article=str(card.article or "").strip(),
+        brand=brand,
+        article=article,
         in_stock=in_stock,
+        city=city,
+        fitment_text=fitment_text,
+        part_type_name=part_type_name,
+        quantity=quantity,
+        price=seo_price if seo_price is not None else display_price,
+        stock_summary=stock_summary,
     )
-    body_description = product_body_description(
-        brand=str(card.brand or "").strip(),
-        article=str(card.article or "").strip(),
-        name=display_name,
-        unique_description=_safe_text(card.description),
-        is_new=True,
-    )
+    robots = "index, follow" if in_stock else "noindex, follow"
 
     return NewPartSeoMeta(
         title=title,
@@ -685,8 +806,18 @@ def build_new_part_seo_meta(
             article=card.article,
         ),
         product_description=body_description,
-        brand=str(card.brand or "").strip(),
-        article=str(card.article or "").strip(),
+        seo_summary=seo_summary,
+        brand=brand,
+        article=article,
+        city=city,
+        fitment_text=fitment_text,
+        stock_summary=stock_summary,
+        part_type_name=part_type_name,
+        used_catalog_url=used_catalog_url,
+        robots=robots,
+        warehouse_count=warehouse_count,
+        quantity=quantity,
+        listing_id=int(card.id),
     )
 
 
@@ -716,7 +847,7 @@ def get_new_part_seo_for_path(db: Session, raw_path: str) -> NewPartSeoMeta | No
         return None
     settings_row = get_or_create_site_settings(db)
     markup_percent = global_markup_percent(settings_row)
-    return build_new_part_seo_meta(card, markup_percent=markup_percent)
+    return build_new_part_seo_meta(card, markup_percent=markup_percent, db=db)
 
 
 def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
@@ -724,7 +855,7 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
     description = html.escape(meta.description, quote=True)
     canonical = html.escape(meta.canonical_url, quote=True)
     h1 = html.escape(meta.h1)
-    body_desc = html.escape(meta.product_description or meta.description)
+    about_text = html.escape(meta.product_description or meta.seo_summary or meta.description)
     image_tag = f'<meta property="og:image" content="{html.escape(meta.image_url or resolve_product_placeholder_image_url(""), quote=True)}" />'
     image_block = ""
     if meta.image_url:
@@ -738,6 +869,12 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
         brand=meta.brand,
         article=meta.article,
         in_stock=meta.in_stock,
+        city=meta.city,
+        fitment_text=meta.fitment_text,
+        part_type_name=meta.part_type_name,
+        quantity=meta.quantity,
+        price=meta.price,
+        stock_summary=meta.stock_summary,
     )
     json_ld_scripts = build_json_ld_script_tags(
         *split_graph_json_ld_for_yandex(
@@ -769,31 +906,87 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
         keywords_tag = (
             f'  <meta name="keywords" content="{html.escape(meta.keywords, quote=True)}" />\n'
         )
-    robots = html.escape("index, follow", quote=True)
+    robots = html.escape(meta.robots or ("index, follow" if meta.in_stock else "noindex, follow"), quote=True)
     site_origin = meta.canonical_url.split("/autoparts/new/part/")[0]
-    details_html = ""
-    if meta.brand or meta.article or meta.price:
-        brand_row = (
-            f"<dt>Бренд</dt><dd>{html.escape(meta.brand)}</dd>"
-            if meta.brand
-            else ""
+
+    stock_label = "В наличии" if meta.in_stock else "Нет в наличии"
+    if meta.in_stock and meta.quantity > 1:
+        stock_label = f"В наличии ({meta.quantity} шт.)"
+    brand_row = f"<dt>Бренд</dt><dd>{html.escape(meta.brand)}</dd>" if meta.brand else ""
+    article_row = f"<dt>Артикул</dt><dd>{html.escape(meta.article)}</dd>" if meta.article else ""
+    price_row = f"<dt>Цена</dt><dd>{html.escape(meta.price)} ₽</dd>" if meta.price else ""
+    stock_row = f"<dt>Наличие</dt><dd>{html.escape(stock_label)}</dd>"
+    warehouse_row = (
+        f"<dt>Склады</dt><dd>{meta.warehouse_count}</dd>"
+        if meta.warehouse_count > 0
+        else ""
+    )
+    city_row = f"<dt>Город</dt><dd>{html.escape(meta.city)}</dd>" if meta.city else ""
+    condition_row = "<dt>Состояние</dt><dd>Новая</dd>"
+    part_type_row = (
+        f"<dt>Тип детали</dt><dd>{html.escape(meta.part_type_name)}</dd>"
+        if meta.part_type_name
+        else ""
+    )
+    stock_summary_row = (
+        f"<dt>Поставка</dt><dd>{html.escape(meta.stock_summary)}</dd>"
+        if meta.stock_summary
+        else ""
+    )
+    details_html = (
+        "    <dl>"
+        f"{brand_row}{article_row}{price_row}{stock_row}{warehouse_row}"
+        f"{city_row}{condition_row}{part_type_row}{stock_summary_row}"
+        "</dl>\n"
+    )
+
+    about_html = (
+        f"    <h2>О запчасти</h2>\n"
+        f"    <p>{about_text}</p>\n"
+    )
+    delivery_html = (
+        "    <h2>Доставка и оплата</h2>\n"
+        "    <p>Новая запчасть со склада поставщика. Доставка по России, "
+        "сроки зависят от склада. Подробнее — "
+        f'<a href="{html.escape(site_origin, quote=True)}/delivery">страница «Доставка»</a>.</p>\n'
+    )
+    warranty_html = (
+        "    <h2>Гарантия и комплектация</h2>\n"
+        "    <p>Новая запчасть. Состояние упаковки, комплектацию и условия "
+        "гарантии уточняйте у продавца до оплаты.</p>\n"
+    )
+    fitment_html = ""
+    if meta.fitment_text:
+        fitment_html = (
+            f"    <h2>Подходит для автомобилей</h2>\n"
+            f"    <p>{html.escape(meta.fitment_text)}</p>\n"
+            "    <p><em>Справочная информация. Перед покупкой сверьте артикул и совместимость.</em></p>\n"
         )
-        article_row = (
-            f"<dt>Артикул</dt><dd>{html.escape(meta.article)}</dd>"
-            if meta.article
-            else ""
+    used_catalog_link = ""
+    if meta.used_catalog_url:
+        used_catalog_link = (
+            f'    <p><a href="{html.escape(meta.used_catalog_url, quote=True)}">'
+            f"Б/у варианты {html.escape(meta.brand)} {html.escape(meta.article)}</a></p>\n"
         )
-        price_row = (
-            f"<dt>Цена</dt><dd>{html.escape(meta.price)} ₽</dd>"
-            if meta.price
-            else ""
+    brand_slug = slugify_brand(meta.brand) if meta.brand else ""
+    brand_link = ""
+    if brand_slug:
+        brand_link = (
+            f'    <p><a href="{html.escape(site_origin, quote=True)}/autoparts/new/brand/'
+            f'{html.escape(brand_slug, quote=True)}">Все новые {html.escape(meta.brand)}</a></p>\n'
         )
-        details_html = f"    <dl>{brand_row}{article_row}{price_row}</dl>\n"
+
     faq_items = build_product_faq_items(
         brand=meta.brand,
         article=meta.article,
+        part_type_name=meta.part_type_name,
         is_new=True,
+        city=meta.city,
+        fitment_text=meta.fitment_text,
         in_stock=meta.in_stock,
+        quantity=meta.quantity,
+        price=meta.price,
+        stock_summary=meta.stock_summary,
     )
     faq_html = ""
     if faq_items:
@@ -832,8 +1025,7 @@ def render_new_part_prerender_html(meta: NewPartSeoMeta) -> str:
 </head>
 <body>
 {breadcrumb_html}{article_microdata}    <h1>{h1}</h1>{image_block}
-    <p>{body_desc}</p>
-{details_html}{faq_html}  </article>
+{about_html}{details_html}{fitment_html}{delivery_html}{warranty_html}{faq_html}{used_catalog_link}{brand_link}  </article>
 </body>
 </html>
 """

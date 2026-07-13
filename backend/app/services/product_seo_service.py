@@ -67,6 +67,7 @@ class ProductSeoMeta:
     seller_url: str = ""
     fitment_text: str = ""
     internal_code: str = ""
+    quantity: int = 0
     alternate_offers: tuple[tuple[str, str], ...] = ()
 
 
@@ -245,6 +246,7 @@ def build_product_seo_meta(
         fitment_text=fitment_text,
         in_stock=in_stock,
     )
+    quantity = max(0, int(product.quantity or 0))
     body_description = product_body_description(
         brand=brand,
         article=article,
@@ -256,6 +258,10 @@ def build_product_seo_meta(
         fitment_text=fitment_text,
         seller_name=org_name,
         is_new=bool(product.is_new),
+        price=product.price,
+        quantity=quantity,
+        in_stock=in_stock,
+        listing_id=getattr(product, "id", None),
     )
     seo_summary = build_product_seo_summary(
         brand=brand,
@@ -267,6 +273,9 @@ def build_product_seo_meta(
         in_stock=in_stock,
         short_name=short_name,
         unique_description=unique_desc,
+        fitment_text=fitment_text,
+        quantity=quantity,
+        seller_name=org_name,
     )
     used_catalog_url = build_product_used_catalog_url(product, origin)
     parsed_catalog = urlparse(used_catalog_url)
@@ -309,6 +318,7 @@ def build_product_seo_meta(
         seller_url=seller_url,
         fitment_text=fitment_text,
         internal_code=internal_code,
+        quantity=quantity,
         alternate_offers=alternate_offers,
     )
 
@@ -523,6 +533,8 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
         )
 
     stock_label = "В наличии" if meta.in_stock else "Нет в наличии"
+    if meta.in_stock and meta.quantity > 1:
+        stock_label = f"В наличии ({meta.quantity} шт.)"
     brand_row = (
         f"<dt>Бренд</dt><dd>{html.escape(meta.brand)}</dd>"
         if meta.brand
@@ -624,6 +636,8 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
         city=meta.city,
         fitment_text=meta.fitment_text,
         in_stock=meta.in_stock,
+        quantity=meta.quantity,
+        price=meta.price,
     )
     faq_html = ""
     if faq_items:

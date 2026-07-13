@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const INSPECTION_STEPS = [
+const INSPECTION_STEPS_USED = [
   'Сверьте артикул и бренд с заказом и упаковкой.',
   'Осмотрите корпус, резьбу и посадочные места — без трещин и деформаций.',
   'Для б/у детали проверьте износ, следы ремонта и комплектность.',
@@ -8,8 +8,17 @@ const INSPECTION_STEPS = [
   'Если деталь не соответствует описанию — свяжитесь с продавцом до установки на автомобиль.',
 ];
 
+const INSPECTION_STEPS_NEW = [
+  'Сверьте артикул и бренд с заказом и упаковкой.',
+  'Осмотрите корпус, резьбу и посадочные места — без трещин и деформаций.',
+  'Проверьте целостность упаковки и комплектацию новой детали.',
+  'При получении в ПВЗ или от курьера зафиксируйте повреждения упаковки на месте.',
+  'Если деталь не соответствует описанию — свяжитесь с продавцом до установки на автомобиль.',
+];
+
 export default function PartDetailInspectionBlock({ isNew = false }) {
   const [open, setOpen] = useState(false);
+  const steps = isNew ? INSPECTION_STEPS_NEW : INSPECTION_STEPS_USED;
 
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
@@ -33,7 +42,7 @@ export default function PartDetailInspectionBlock({ isNew = false }) {
       </button>
       {open ? (
         <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-gray-700">
-          {INSPECTION_STEPS.map((step) => (
+          {steps.map((step) => (
             <li key={step}>{step}</li>
           ))}
         </ol>

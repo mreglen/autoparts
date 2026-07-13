@@ -299,7 +299,7 @@ class NewBrandsSitemapTests(unittest.TestCase):
 
 
 class RosskoNewPartSitemapEligibilityTests(unittest.TestCase):
-    def test_requires_rossko_source_and_api_payload(self):
+    def test_requires_real_stock_not_guid_only(self):
         from app.services.new_parts_seo_card_service import is_rossko_new_part_sitemap_eligible
 
         card = MagicMock()
@@ -307,8 +307,16 @@ class RosskoNewPartSitemapEligibilityTests(unittest.TestCase):
         card.source = "rossko"
         card.brand = "MANN"
         card.article = "W712"
+        card.stock_count = 0
         card.raw_payload = json.dumps({"guid": "abc-123", "stocks": []})
 
+        with patch(
+            "app.services.new_parts_seo_card_service._stocks_from_card",
+            return_value=[],
+        ):
+            self.assertFalse(is_rossko_new_part_sitemap_eligible(card))
+
+        card.stock_count = 2
         with patch(
             "app.services.new_parts_seo_card_service._stocks_from_card",
             return_value=[],
@@ -317,6 +325,21 @@ class RosskoNewPartSitemapEligibilityTests(unittest.TestCase):
 
         card.source = "manual"
         self.assertFalse(is_rossko_new_part_sitemap_eligible(card))
+
+    def test_accepts_available_stocks(self):
+        from app.services.new_parts_seo_card_service import is_rossko_new_part_sitemap_eligible
+
+        card = MagicMock()
+        card.is_active = True
+        card.source = "rossko"
+        card.brand = "MANN"
+        card.article = "W712"
+        card.stock_count = 0
+        with patch(
+            "app.services.new_parts_seo_card_service._stocks_from_card",
+            return_value=[{"stock_id": "1", "available_count": 3, "price": 100}],
+        ):
+            self.assertTrue(is_rossko_new_part_sitemap_eligible(card))
 
 
 class BuildNewPartsSitemapXmlTests(unittest.TestCase):

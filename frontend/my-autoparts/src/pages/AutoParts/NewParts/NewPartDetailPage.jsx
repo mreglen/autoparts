@@ -10,6 +10,9 @@ import { buildNewPartDetailPath, parseNewPartDetailParam } from '../../../utils/
 import { extractProductDescription, formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import Breadcrumbs from '../../../components/Breadcrumbs/Breadcrumbs';
 import PartDetailFaqBlock from '../../PartDetail/PartDetailFaqBlock';
+import PartDetailAboutBlock from '../../PartDetail/PartDetailAboutBlock';
+import PartDetailFitmentBlock from '../../PartDetail/PartDetailFitmentBlock';
+import PartDetailSeoCrossLinks from '../../PartDetail/PartDetailSeoCrossLinks';
 import NewPartProductCard from './NewPartProductCard';
 import NewPartDeliveryStockBlock from './NewPartDeliveryStockBlock';
 import NewPartAnalogsTable from './NewPartAnalogsTable';
@@ -34,6 +37,11 @@ import { extractCityFromAddress } from '../../../utils/organizationCity';
 import { slugifyBrand } from '../../../utils/slugUtils';
 import NewPartHorizontalScroll from './NewPartHorizontalScroll';
 import useHistoryBack from '../../../hooks/useHistoryBack';
+import {
+  PART_DETAIL_CACHE,
+  readPartDetailCache,
+  writePartDetailCache,
+} from '../../../utils/partDetailCache';
 
 const safeText = (value, fallback = '') => {
   if (typeof value === 'string') return value.trim() || fallback;
@@ -130,6 +138,8 @@ export default function NewPartDetailPage() {
   const [usedMatchError, setUsedMatchError] = useState('');
   const [usedMatchLoading, setUsedMatchLoading] = useState(false);
   const [apiSeo, setApiSeo] = useState(null);
+  const [referenceVehicles, setReferenceVehicles] = useState([]);
+  const [fitmentLoading, setFitmentLoading] = useState(false);
 
   useEffect(() => {
     if (!numericCardId || Number.isNaN(numericCardId)) {
@@ -247,6 +257,46 @@ export default function NewPartDetailPage() {
     run();
   }, [card]);
 
+  useEffect(() => {
+    if (!card?.brand || !card?.article) {
+      setReferenceVehicles([]);
+      return undefined;
+    }
+    const brandText = String(card.brand).trim();
+    const articleText = String(card.article).trim();
+    const fitmentKey = `${brandText}|${articleText}|new`;
+    const cached = readPartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey);
+    if (cached !== null) {
+      setReferenceVehicles(Array.isArray(cached) ? cached : []);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setFitmentLoading(true);
+    (async () => {
+      try {
+        const response = await apiAxiosUnauth.get('/public/part-reference-fitment', {
+          params: { brand: brandText, article: articleText },
+        });
+        const vehicles = Array.isArray(response?.data?.vehicles) ? response.data.vehicles : [];
+        if (!cancelled) {
+          writePartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey, vehicles);
+          setReferenceVehicles(vehicles);
+        }
+      } catch (_e) {
+        if (!cancelled) {
+          writePartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey, []);
+          setReferenceVehicles([]);
+        }
+      } finally {
+        if (!cancelled) setFitmentLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [card?.brand, card?.article]);
+
   const livePart = useMemo(() => {
     if (!card) return null;
     const fromRossko = pickBestRosskoPart(rosskoData, card.article, card.brand);
@@ -301,7 +351,7 @@ export default function NewPartDetailPage() {
     const ogImage = ogImageRaw
       ? (ogImageRaw.startsWith('http') ? ogImageRaw : resolveOgImageUrl(ogImageRaw.startsWith('/') ? ogImageRaw : `/${ogImageRaw}`))
       : resolveOgImageUrl(null);
-    const inStock = (card?.stock_count || 0) > 0;
+    const inStock = (card?.stock_count || 0) > 0 || liveStocks.length > 0;
     return {
       title: buildNewPartSearchTitle({
         brand,
@@ -320,14 +370,14 @@ export default function NewPartDetailPage() {
         uniqueDescription: card?.description,
       }),
       canonicalUrl: `${SITE_ORIGIN}${canonicalPath}`,
-      robots: 'index, follow',
+      robots: inStock ? 'index, follow' : 'noindex, follow',
       ogType: 'product',
       ogImage,
       price: displayPrice,
       inStock,
       keywords: buildNewPartCardKeywords({ brand, article }),
     };
-  }, [apiSeo, card, canonicalPath, displayPrice, seoPrice]);
+  }, [apiSeo, card, canonicalPath, displayPrice, seoPrice, liveStocks.length]);
 
   const handleAnalogNavigateCreate = useCallback(async (part) => {
     const brand = safeText(part?.brand);
@@ -406,8 +456,11 @@ export default function NewPartDetailPage() {
   const article = safeText(card?.article, '—');
   const pageH1 = apiSeo?.h1 || buildNewPartH1({ brand, article, rawName: card?.name });
   const canonicalUrl = `${SITE_ORIGIN}${canonicalPath}`;
-  const inStock = (card?.stock_count || 0) > 0;
-  const partTypeName = extractProductDescription(card?.name, brand, article);
+  const inStock = apiSeo?.inStock ?? ((card?.stock_count || 0) > 0 || liveStocks.length > 0);
+  const partTypeName = apiSeo?.partTypeName || extractProductDescription(card?.name, brand, article);
+  const bodyDescription = apiSeo?.bodyDescription || apiSeo?.seoSummary || '';
+  const usedCatalogPath = apiSeo?.usedCatalogPath
+    || `/autoparts/used?q=${encodeURIComponent(`${brand} ${article}`.trim())}`;
 
   const parsedApiJsonLd = apiSeo?.jsonLd;
   const productJsonLd = parsedApiJsonLd?.['@graph']
@@ -428,7 +481,12 @@ export default function NewPartDetailPage() {
     article,
     partTypeName,
     isNew: true,
+    city: apiSeo?.city,
+    fitmentText: apiSeo?.fitmentText,
     inStock,
+    quantity: apiSeo?.quantity || liveStocks.reduce((sum, row) => sum + (Number(row.available_count) || 0), 0),
+    price: seoPrice ?? displayPrice,
+    stockSummary: apiSeo?.stockSummary,
   });
   const faqItems = apiSeo?.faqItems || null;
   const structuredDataBlocks = buildProductStructuredDataBlocks({
@@ -492,14 +550,29 @@ export default function NewPartDetailPage() {
             ) : null}
           </div>
         </NewPartHorizontalScroll>
+        <PartDetailSeoCrossLinks
+          brand={brand}
+          article={article}
+          isNew
+          usedCatalogPath={usedCatalogPath}
+        />
       </section>
 
       <NewPartDeliveryStockBlock
         stocks={liveStocks}
-        inStock={(card?.stock_count || 0) > 0}
+        inStock={inStock}
       />
 
       {mainProductBlock}
+
+      <div className="mt-6 space-y-4">
+        <PartDetailAboutBlock bodyDescription={bodyDescription} isNew />
+        <PartDetailFitmentBlock
+          sellerVehicles={[]}
+          referenceVehicles={referenceVehicles}
+          loading={fitmentLoading}
+        />
+      </div>
 
       <NewPartUsedMatchesBlock
         brand={brand}
@@ -515,6 +588,8 @@ export default function NewPartDetailPage() {
           article={article}
           partTypeName={partTypeName}
           isNew
+          city={apiSeo?.city}
+          fitmentText={apiSeo?.fitmentText}
           inStock={inStock}
           items={faqItems}
         />

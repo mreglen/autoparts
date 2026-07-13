@@ -67,8 +67,39 @@ export default function PartDetailSeoCrossLinks({
     };
   }, [isNew, brandText, articleText]);
 
-  if (isNew || !brandText) {
+  if (!brandText) {
     return null;
+  }
+
+  if (isNew) {
+    return (
+      <div className="mt-3 flex flex-wrap gap-2">
+        {catalogHref ? (
+          <Link
+            to={catalogHref}
+            className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 sm:text-sm"
+          >
+            Б/у по артикулу
+          </Link>
+        ) : null}
+        {brandSlug ? (
+          <Link
+            to={`/autoparts/used/brand/${encodeURIComponent(brandSlug)}`}
+            className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100 sm:text-sm"
+          >
+            Все б/у {brandText}
+          </Link>
+        ) : null}
+        {brandSlug ? (
+          <Link
+            to={`/autoparts/new/brand/${encodeURIComponent(brandSlug)}`}
+            className="rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-100 sm:text-sm"
+          >
+            Все новые {brandText}
+          </Link>
+        ) : null}
+      </div>
+    );
   }
 
   return (

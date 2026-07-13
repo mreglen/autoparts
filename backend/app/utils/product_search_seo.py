@@ -348,18 +348,45 @@ def build_product_seo_summary(
     in_stock: bool = True,
     short_name: str | None = None,
     unique_description: str | None = None,
+    fitment_text: str | None = None,
+    quantity: int | None = None,
+    seller_name: str | None = None,
+    stock_summary: str | None = None,
 ) -> str:
     brand_str = (brand or "").strip()
     article_str = (article or "").strip()
     condition = "Новая" if is_new else "Б/у"
     city_prep = format_city_in_prepositional(city or DEFAULT_CITY)
     label = f"{brand_str} {article_str}".strip() or (name or "").strip() or "автозапчасть"
-    stock_phrase = "в наличии" if in_stock else "доступна"
+    qty: int | None = None
+    if quantity is not None:
+        try:
+            qty = max(0, int(quantity))
+        except (TypeError, ValueError):
+            qty = None
+    if in_stock and qty and qty > 1:
+        stock_phrase = f"в наличии ({qty} шт.)"
+    elif in_stock:
+        stock_phrase = "в наличии"
+    else:
+        stock_phrase = "сейчас недоступна"
     price_text = _format_price_rub(price)
     price_part = f" Цена {price_text} ₽." if price_text else ""
-    snippet = _merge_content_snippet(short_name=short_name, unique_description=unique_description, max_len=120)
+    seller = (seller_name or "").strip()
+    seller_part = f" Продавец: {seller}." if seller else ""
+    stock_extra = re.sub(r"\s+", " ", (stock_summary or "")).strip()
+    stock_part = f" {stock_extra}." if stock_extra and stock_extra.casefold() not in stock_phrase.casefold() else ""
+    fitment = re.sub(r"\s+", " ", (fitment_text or "")).strip().rstrip(".")
+    fitment_part = ""
+    if fitment:
+        fitment_short = fitment if len(fitment) <= 70 else f"{fitment[:69].rstrip()}…"
+        fitment_part = f" Подходит для: {fitment_short}."
+    snippet = _merge_content_snippet(short_name=short_name, unique_description=unique_description, max_len=90)
     detail = f" {snippet}." if snippet else ""
-    return f"{condition} автозапчасть {label} {stock_phrase} в {city_prep}.{price_part}{detail}".replace("  ", " ").strip()
+    return (
+        f"{condition} автозапчасть {label} {stock_phrase} в {city_prep}."
+        f"{price_part}{seller_part}{stock_part}{fitment_part}{detail}"
+    ).replace("  ", " ").strip()
 
 
 def build_product_alternate_names(*, brand: str | None, article: str | None) -> list[str]:

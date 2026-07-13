@@ -293,6 +293,9 @@ class NewPartSeoServiceJsonLdIntegrationTests(unittest.TestCase):
         card.image_url = "/uploads/new/test.jpg"
         card.id = 42
         card.currency = "RUB"
+        card.raw_payload = None
+        card.delivery_start = None
+        card.delivery_end = None
         return card
 
     def test_build_new_part_seo_meta_json_ld(self):

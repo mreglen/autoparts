@@ -76,6 +76,16 @@ class NewPartSeoMetaResponse(BaseModel):
     faq_items: list[ProductFaqItemOut] = []
     faq_json_ld: str | None = None
     keywords: str = ""
+    seo_summary: str = ""
+    body_description: str | None = None
+    fitment_text: str = ""
+    stock_summary: str = ""
+    part_type_name: str = ""
+    city: str = ""
+    used_catalog_path: str = ""
+    robots: str = "index, follow"
+    warehouse_count: int = 0
+    quantity: int = 0
 
 
 @router.get("/public/part-meta", response_model=ProductSeoMetaResponse)
@@ -96,6 +106,8 @@ def public_part_meta(
         city=meta.city,
         fitment_text=meta.fitment_text,
         in_stock=meta.in_stock,
+        quantity=meta.quantity,
+        price=meta.price,
     )
     faq_json_ld = build_product_faq_json_ld(
         canonical_url=meta.canonical_url,
@@ -106,6 +118,8 @@ def public_part_meta(
         city=meta.city,
         fitment_text=meta.fitment_text,
         in_stock=meta.in_stock,
+        quantity=meta.quantity,
+        price=meta.price,
     )
     return ProductSeoMetaResponse(
         title=meta.title,
@@ -195,16 +209,36 @@ def public_new_part_meta(
     faq_items = build_product_faq_items(
         brand=meta.brand,
         article=meta.article,
+        part_type_name=meta.part_type_name,
         is_new=True,
+        city=meta.city,
+        fitment_text=meta.fitment_text,
         in_stock=meta.in_stock,
+        quantity=meta.quantity,
+        price=meta.price,
+        stock_summary=meta.stock_summary,
     )
     faq_json_ld = build_product_faq_json_ld(
         canonical_url=meta.canonical_url,
         brand=meta.brand,
         article=meta.article,
+        part_type_name=meta.part_type_name,
         is_new=True,
+        city=meta.city,
+        fitment_text=meta.fitment_text,
         in_stock=meta.in_stock,
+        quantity=meta.quantity,
+        price=meta.price,
+        stock_summary=meta.stock_summary,
     )
+    used_catalog_path = ""
+    if meta.used_catalog_url:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(meta.used_catalog_url)
+        used_catalog_path = parsed.path
+        if parsed.query:
+            used_catalog_path = f"{used_catalog_path}?{parsed.query}"
     return NewPartSeoMetaResponse(
         title=meta.title,
         description=meta.description,
@@ -218,6 +252,16 @@ def public_new_part_meta(
         faq_items=[ProductFaqItemOut(**item) for item in faq_items],
         faq_json_ld=dumps_json_ld(faq_json_ld),
         keywords=meta.keywords,
+        seo_summary=meta.seo_summary,
+        body_description=meta.product_description,
+        fitment_text=meta.fitment_text,
+        stock_summary=meta.stock_summary,
+        part_type_name=meta.part_type_name,
+        city=meta.city,
+        used_catalog_path=used_catalog_path,
+        robots=meta.robots,
+        warehouse_count=meta.warehouse_count,
+        quantity=meta.quantity,
     )
 
 

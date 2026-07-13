@@ -1,5 +1,12 @@
 import { DEFAULT_CITY, formatCityInPrepositional } from './organizationCity';
 
+function formatPricePhrase(price) {
+  if (price == null || price === '') return '';
+  const amount = Number(price);
+  if (!Number.isFinite(amount) || amount <= 0) return '';
+  return Number.isInteger(amount) ? `${amount} ₽` : `${amount.toFixed(2)} ₽`;
+}
+
 export function buildProductFaqItems({
   brand,
   article,
@@ -8,6 +15,9 @@ export function buildProductFaqItems({
   city,
   fitmentText,
   inStock = true,
+  quantity,
+  price,
+  stockSummary,
 } = {}) {
   const brandText = String(brand || '').trim();
   const articleText = String(article || '').trim();
@@ -16,6 +26,13 @@ export function buildProductFaqItems({
   const cityPrep = formatCityInPrepositional(city || DEFAULT_CITY);
   const condition = isNew ? 'новая' : 'б/у';
   const fitment = String(fitmentText || '').trim().replace(/\.$/, '');
+  const pricePhrase = formatPricePhrase(price);
+  const stockText = String(stockSummary || '').trim().replace(/\.$/, '');
+  let qty = null;
+  if (quantity != null && quantity !== '') {
+    const parsed = Number(quantity);
+    if (Number.isFinite(parsed)) qty = Math.max(0, Math.trunc(parsed));
+  }
 
   const items = [];
 
@@ -24,7 +41,7 @@ export function buildProductFaqItems({
       question: `На какие автомобили подходит ${label}?`,
       answer:
         `По справочным данным ${label} (${partType.toLowerCase()}) может подойти для: ${fitment}. `
-        + `Перед покупкой уточните совместимость у продавца — это ${condition} деталь, осмотр рекомендуется.`,
+        + `Перед покупкой сверьте артикул ${articleText || label} и уточните совместимость у продавца.`,
     });
   } else {
     items.push({
@@ -36,18 +53,37 @@ export function buildProductFaqItems({
     });
   }
 
+  let stockAnswer;
+  if (inStock) {
+    const qtyPart = qty && qty > 1 ? ` (${qty} шт.)` : '';
+    const pricePart = pricePhrase ? ` Актуальная цена на карточке — ${pricePhrase}.` : '';
+    const stockPart = stockText ? ` ${stockText}.` : '';
+    stockAnswer = (
+      `Да, ${label} сейчас в наличии${qtyPart} в ${cityPrep}.${pricePart}${stockPart} `
+      + 'Количество и сроки доставки уточняйте на карточке перед заказом.'
+    );
+  } else if (isNew) {
+    stockAnswer = (
+      `Сейчас новых предложений ${label} на складах нет. Посмотрите б/у варианты `
+      + `${label} в каталоге «Свой Гараж» или аналоги на этой странице.`
+    );
+  } else {
+    stockAnswer = (
+      `Это предложение сейчас недоступно. Посмотрите другие варианты ${label} `
+      + 'в каталоге б/у запчастей «Свой Гараж».'
+    );
+  }
+
   items.push({
     question: `Есть ли ${label} в наличии?`,
-    answer: inStock
-      ? `Да, ${label} сейчас в наличии в ${cityPrep}. Количество и актуальность уточняйте на карточке или у продавца.`
-      : `Это предложение может быть недоступно. Посмотрите другие варианты ${label} в каталоге б/у запчастей «Свой Гараж».`,
+    answer: stockAnswer,
   });
 
   items.push({
-    question: 'Как оформить доставку и оплату?',
+    question: `Как оформить доставку и оплату для ${label}?`,
     answer:
-      `Добавьте товар в корзину на svoygarage.ru или свяжитесь с продавцом. `
-      + `Доставка по России, самовывоз в ${cityPrep} — условия согласуются с продавцом. `
+      `Добавьте ${label} в корзину на svoygarage.ru или свяжитесь с продавцом. `
+      + `Доставка по России, самовывоз в ${cityPrep} — условия согласуются при заказе. `
       + 'Подробнее — на странице «Доставка».',
   });
 
@@ -55,8 +91,8 @@ export function buildProductFaqItems({
     items.push({
       question: `Какое состояние у новой запчасти ${label}?`,
       answer:
-        `Это новая ${partType.toLowerCase()} ${label}. Состояние упаковки и комплектацию `
-        + 'уточняйте у продавца перед покупкой.',
+        `Это новая ${partType.toLowerCase()} ${label} со склада поставщика. `
+        + 'Состояние упаковки и комплектацию уточняйте у продавца перед покупкой.',
     });
   } else {
     items.push({
@@ -67,10 +103,11 @@ export function buildProductFaqItems({
     });
   }
 
+  const priceHint = pricePhrase && inStock ? ` по цене ${pricePhrase}` : '';
   items.push({
-    question: 'Как купить запчасть на «Свой Гараж»?',
+    question: `Как купить ${label} на «Свой Гараж»?`,
     answer:
-      `Откройте карточку ${label}, добавьте товар в корзину или нажмите «Написать» / `
+      `Откройте карточку ${label}${priceHint}, добавьте товар в корзину или нажмите «Написать» / `
       + '«Позвонить» продавцу. Оформление заказа и оплата проходят через маркетплейс '
       + 'или напрямую с продавцом — как указано на карточке.',
   });
@@ -87,6 +124,9 @@ export function buildProductFaqJsonLd({
   city,
   fitmentText,
   inStock = true,
+  quantity,
+  price,
+  stockSummary,
 } = {}) {
   const items = buildProductFaqItems({
     brand,
@@ -96,6 +136,9 @@ export function buildProductFaqJsonLd({
     city,
     fitmentText,
     inStock,
+    quantity,
+    price,
+    stockSummary,
   });
   return {
     '@type': 'FAQPage',
