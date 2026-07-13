@@ -106,7 +106,12 @@ def product_body_description(
             qty = max(0, int(quantity))
         except (TypeError, ValueError):
             qty = None
-    stock_flag = in_stock if in_stock is not None else (qty is not None and qty > 0)
+    if in_stock is not None:
+        stock_flag = bool(in_stock)
+    elif qty is not None:
+        stock_flag = qty > 0
+    else:
+        stock_flag = True
 
     sentences: list[str] = []
 
@@ -324,7 +329,12 @@ def build_catalog_product_json_ld(
         short_name=short_name,
         part_type_name=category_name or None,
         city=city,
+        seller_name=str(org_name) if org_name is not None else None,
         is_new=bool(product.is_new),
+        price=product.price,
+        quantity=int(product.quantity or 0),
+        in_stock=in_stock,
+        listing_id=getattr(product, "id", None),
     )
 
     product_json: dict[str, Any] = {
@@ -387,12 +397,17 @@ def build_new_part_card_json_ld(
     display_name = str(card.name or "").strip() or f"{brand} {article}".strip()
     product_name = (schema_name or "").strip() or display_name
     unique_desc = str(card.description or "").strip()
+    in_stock = int(card.stock_count or 0) > 0
     description = product_body_description(
         brand=brand,
         article=article,
         name=display_name,
         unique_description=unique_desc,
         is_new=True,
+        price=display_price if display_price is not None else card.price,
+        quantity=int(card.stock_count or 0),
+        in_stock=in_stock,
+        listing_id=getattr(card, "id", None),
     )
 
     image_url = _absolute_photo_url(str(card.image_url or "").strip(), site_origin)
@@ -404,7 +419,6 @@ def build_new_part_card_json_ld(
     if not price:
         return None
 
-    in_stock = int(card.stock_count or 0) > 0
     alternate_names = build_product_alternate_names(brand=brand, article=article)
     offers = build_product_offer_json_ld(
         canonical_url=canonical_url,

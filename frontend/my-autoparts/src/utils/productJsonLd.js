@@ -57,7 +57,9 @@ export function productBodyDescription({
     const parsedQty = Number(quantity);
     if (Number.isFinite(parsedQty)) qty = Math.max(0, Math.trunc(parsedQty));
   }
-  const stockFlag = inStock != null ? Boolean(inStock) : (qty != null && qty > 0);
+  let stockFlag = true;
+  if (inStock != null) stockFlag = Boolean(inStock);
+  else if (qty != null) stockFlag = qty > 0;
 
   const sentences = [];
 
@@ -202,7 +204,13 @@ export function buildCatalogProductJsonLd(product, { siteOrigin = SITE_ORIGIN, c
     name: displayName,
     uniqueDescription: uniqueDesc,
     shortName,
+    city: resolveProductCity(organization),
+    sellerName: organization?.name,
     isNew: Boolean(product.is_new),
+    price: product.price,
+    quantity: product.quantity,
+    inStock,
+    listingId: product?.id,
   });
   const alternateName = buildProductAlternateNames({ brand, article });
   const categoryRaw = product?.part_type?.name ?? product?.part_type_name;
@@ -259,12 +267,17 @@ export function buildNewPartCardJsonLd(
   const path = buildNewPartDetailPath(card);
   const url = canonicalUrl || `${siteOrigin}${path}`;
   const uniqueDesc = String(card.description || '').trim();
+  const inStock = Number(card.stock_count || 0) > 0;
   const description = productBodyDescription({
     brand,
     article,
     name: displayName,
     uniqueDescription: uniqueDesc,
     isNew: true,
+    price: displayPrice != null ? displayPrice : card.price,
+    quantity: card.stock_count,
+    inStock,
+    listingId: card?.id,
   });
 
   let imageUrl = String(card.image_url || '').trim();
@@ -278,7 +291,6 @@ export function buildNewPartCardJsonLd(
   const price = formatPriceLd(priceSource);
   if (!price) return null;
 
-  const inStock = Number(card.stock_count || 0) > 0;
   const alternateName = buildProductAlternateNames({ brand, article });
   const offers = buildProductOfferJsonLd({
     canonicalUrl: url,
