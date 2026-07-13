@@ -93,7 +93,9 @@ const UsedPartsFiltersAside = React.memo(function UsedPartsFiltersAside({ update
   );
 });
 
-const MediaDisplay = React.memo(function MediaDisplay({ part }) {
+const LIST_MEDIA_SIZES = '(max-width:640px) 96px, (max-width:1024px) 160px, 176px';
+
+const MediaDisplay = React.memo(function MediaDisplay({ part, listPriority = false }) {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [hoverSide, setHoverSide] = useState(null);
   const [resolvedUrl, setResolvedUrl] = useState('');
@@ -189,8 +191,12 @@ const MediaDisplay = React.memo(function MediaDisplay({ part }) {
           src={resolvedUrl || currentMedia.url}
           alt={part.name || part.article}
           className="w-full h-full object-cover rounded-lg"
-          loading="lazy"
+          width={176}
+          height={176}
+          sizes={LIST_MEDIA_SIZES}
+          loading={listPriority ? 'eager' : 'lazy'}
           decoding="async"
+          fetchPriority={listPriority ? 'high' : 'auto'}
           onError={() => {
             const chain = currentMedia.urlChain || [];
             const nextIndex = urlFallbackIndex + 1;
@@ -526,7 +532,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     return loc ? (loc.address || `Склад #${locationId}`) : `Склад #${locationId}`;
   };
 
-  const renderPartListCard = (part, listKey) => {
+  const renderPartListCard = (part, listKey, listPriority = false) => {
     const availableQty = part.quantity || part.available_count || 0;
     const sellerOrg = part.organization || organization;
     const detailPath = buildPartDetailPath(part);
@@ -546,7 +552,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
         >
           <div className="flex flex-row gap-3 p-3 sm:gap-4 sm:p-4">
             <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-40 sm:w-40 lg:h-44 lg:w-44">
-              <MediaDisplay part={part} />
+              <MediaDisplay part={part} listPriority={listPriority} />
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-2">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
@@ -769,7 +775,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           {/* List view — компактная строка: превью + данные, продавец снизу */}
           {viewMode === 'list' && !shouldVirtualize && (
             <div className="space-y-3">
-              {sortedAvailableParts.map((part) => renderPartListCard(part, part.id))}
+              {sortedAvailableParts.map((part, index) => renderPartListCard(part, part.id, index < 2))}
             </div>
           )}
           {viewMode === 'list' && shouldVirtualize && (
@@ -787,7 +793,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                     className="absolute left-0 top-0 w-full pb-3"
                     style={{ transform: `translateY(${virtualRow.start}px)` }}
                   >
-                    {renderPartListCard(part, part.id)}
+                    {renderPartListCard(part, part.id, virtualRow.index < 2)}
                   </div>
                 );
               })}

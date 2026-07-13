@@ -81,7 +81,9 @@ export default function NewPartsCategoryLandingPage() {
           ? `В каталоге ${catalogData.total} позиций — ${landing?.title_ru || 'категория'}`
           : 'Каталог новых запчастей с доставкой по России'
       }
-      renderGridItem={(card) => <NewPartSeoCardTile key={card.id} card={card} />}
+      renderGridItem={(card, index) => (
+        <NewPartSeoCardTile key={card.id} card={card} listPriority={index < 2} />
+      )}
       emptyMessage="Пока нет карточек для этой категории."
       emptyLink="/autoparts/new"
       emptyLinkLabel="Перейти к поиску"

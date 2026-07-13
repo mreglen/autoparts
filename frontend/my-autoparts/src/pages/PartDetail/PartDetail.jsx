@@ -31,6 +31,7 @@ import FavoriteButton from '../../components/FavoriteButton/FavoriteButton';
 import Breadcrumbs from '../../components/Breadcrumbs/Breadcrumbs';
 import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
 import useHistoryBack from '../../hooks/useHistoryBack';
+import useDeferredMount from '../../hooks/useDeferredMount';
 import { recordProductView } from '../../redux/slices/UserEngagementSlice';
 import { mergeProductFitment } from '../../utils/mergeProductFitment';
 import { buildProductFaqJsonLd } from '../../utils/partDetailFaq';
@@ -193,6 +194,11 @@ const PartDetail = () => {
   }, [currentProduct, productMatchesRoute, resolvedProductId]);
 
   const showProduct = Boolean(displayProduct);
+  const { enabled: secondaryEnabled } = useDeferredMount({
+    mode: 'idle',
+    active: showProduct,
+    idleTimeoutMs: 1200,
+  });
 
   useEffect(() => {
     fetchedProductIdRef.current = null;
@@ -238,9 +244,11 @@ const PartDetail = () => {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!showProduct || !displayProduct?.brand || !displayProduct?.article) {
-      setAlternateOffers([]);
-      setAlternateOffersError('');
+    if (!showProduct || !secondaryEnabled || !displayProduct?.brand || !displayProduct?.article) {
+      if (!showProduct) {
+        setAlternateOffers([]);
+        setAlternateOffersError('');
+      }
       return undefined;
     }
 
@@ -284,11 +292,11 @@ const PartDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [showProduct, displayProduct?.id, displayProduct?.brand, displayProduct?.article]);
+  }, [showProduct, secondaryEnabled, displayProduct?.id, displayProduct?.brand, displayProduct?.article]);
 
   useEffect(() => {
-    if (!showProduct || !displayProduct?.brand || !displayProduct?.article) {
-      setReferenceFitment([]);
+    if (!showProduct || !secondaryEnabled || !displayProduct?.brand || !displayProduct?.article) {
+      if (!showProduct) setReferenceFitment([]);
       return undefined;
     }
 
@@ -326,7 +334,7 @@ const PartDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [showProduct, displayProduct?.id, displayProduct?.brand, displayProduct?.article]);
+  }, [showProduct, secondaryEnabled, displayProduct?.id, displayProduct?.brand, displayProduct?.article]);
 
   useEffect(() => {
     if (showProduct || !error) {
@@ -1055,6 +1063,7 @@ const PartDetail = () => {
         organizationId={sellerOrg?.id}
         organizationName={sellerOrg?.name}
         usedCatalogPath={seo.usedCatalogPath}
+        deferEnabled={secondaryEnabled}
       />
     </>
   );
@@ -1375,6 +1384,7 @@ const PartDetail = () => {
                   organizationId={sellerOrg?.id}
                   organizationName={sellerOrg?.name}
                   usedCatalogPath={seo.usedCatalogPath}
+                  deferEnabled={secondaryEnabled}
                   />
                 </div>
 
@@ -1433,31 +1443,33 @@ const PartDetail = () => {
       <PartDetailFitmentBlock
         sellerVehicles={currentProduct.compatible_vehicles}
         referenceVehicles={referenceFitment}
-        loading={referenceFitmentLoading}
+        loading={secondaryEnabled ? referenceFitmentLoading : true}
       />
 
       <PartArticleMatchesBlock
         title={alternateOffersTitle}
         items={alternateOffers}
-        loading={alternateOffersLoading}
+        loading={secondaryEnabled ? alternateOffersLoading : true}
         error={alternateOffersError}
         currentProductId={currentProduct.id}
       />
 
-      <PartDetailInspectionBlock isNew={Boolean(currentProduct.is_new)} />
-
-      <PartDetailReturnPolicyBlock isNew={Boolean(currentProduct.is_new)} />
-
-      <PartDetailFaqBlock
-        brand={partBrand}
-        article={partArticle}
-        partTypeName={partTypeName}
-        isNew={Boolean(currentProduct.is_new)}
-        city={productCity}
-        fitmentText={fitmentText}
-        inStock={inStock}
-        items={faqItems}
-      />
+      {secondaryEnabled ? (
+        <>
+          <PartDetailInspectionBlock isNew={Boolean(currentProduct.is_new)} />
+          <PartDetailReturnPolicyBlock isNew={Boolean(currentProduct.is_new)} />
+          <PartDetailFaqBlock
+            brand={partBrand}
+            article={partArticle}
+            partTypeName={partTypeName}
+            isNew={Boolean(currentProduct.is_new)}
+            city={productCity}
+            fitmentText={fitmentText}
+            inStock={inStock}
+            items={faqItems}
+          />
+        </>
+      ) : null}
         </div>
       </div>
 

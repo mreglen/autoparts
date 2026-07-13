@@ -1,11 +1,13 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { buildImageUrlFallbackChain } from '../../utils/apiClient';
+import { buildListImageUrlFallbackChain } from '../../utils/apiClient';
 import { buildPartDetailPath } from '../../utils/partRoutes';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
 import { useProductPriceFormat } from '../../hooks/useProductPriceFormat';
 
-function ListingCard({ product }) {
+const LIST_IMAGE_SIZES = '(max-width:640px) 50vw, 33vw';
+
+function ListingCard({ product, listPriority = false }) {
   const { formatPrice } = useProductPriceFormat();
   const href = buildPartDetailPath(product);
   const title = formatProductDisplayTitle(product.brand, product.article, product.title);
@@ -13,7 +15,7 @@ function ListingCard({ product }) {
   const photoUrl = useMemo(() => {
     const photos = product.photos || [];
     for (const photo of photos) {
-      const chain = buildImageUrlFallbackChain(photo);
+      const chain = buildListImageUrlFallbackChain(photo);
       if (chain.length > 0) return chain[0];
     }
     return null;
@@ -30,7 +32,12 @@ function ListingCard({ product }) {
             src={photoUrl}
             alt=""
             className="h-full w-full object-cover transition group-hover:scale-[1.02]"
-            loading="lazy"
+            width={400}
+            height={300}
+            sizes={LIST_IMAGE_SIZES}
+            loading={listPriority ? 'eager' : 'lazy'}
+            decoding="async"
+            fetchPriority={listPriority ? 'high' : 'auto'}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-gray-300">
@@ -89,8 +96,8 @@ export default function RecentListingsGrid({ organizationId, products, total }) 
         </Link>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {items.map((product) => (
-          <ListingCard key={product.id} product={product} />
+        {items.map((product, index) => (
+          <ListingCard key={product.id} product={product} listPriority={index < 2} />
         ))}
       </div>
     </section>

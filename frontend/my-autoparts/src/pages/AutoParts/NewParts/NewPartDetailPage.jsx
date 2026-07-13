@@ -37,6 +37,7 @@ import { extractCityFromAddress } from '../../../utils/organizationCity';
 import { slugifyBrand } from '../../../utils/slugUtils';
 import NewPartHorizontalScroll from './NewPartHorizontalScroll';
 import useHistoryBack from '../../../hooks/useHistoryBack';
+import useDeferredMount from '../../../hooks/useDeferredMount';
 import {
   PART_DETAIL_CACHE,
   readPartDetailCache,
@@ -141,6 +142,19 @@ export default function NewPartDetailPage() {
   const [referenceVehicles, setReferenceVehicles] = useState([]);
   const [fitmentLoading, setFitmentLoading] = useState(false);
 
+  const cardReady = Boolean(card?.id);
+  const { enabled: secondaryEnabled } = useDeferredMount({
+    mode: 'idle',
+    active: cardReady && !loading && !error,
+    idleTimeoutMs: 1200,
+  });
+  const { enabled: analogsVisible, sentinelRef: analogsSentinelRef } = useDeferredMount({
+    mode: 'idle-or-visible',
+    active: cardReady && !loading && !error,
+    rootMargin: '200px',
+    idleTimeoutMs: 1800,
+  });
+
   useEffect(() => {
     if (!numericCardId || Number.isNaN(numericCardId)) {
       setError('Некорректный идентификатор карточки');
@@ -184,8 +198,8 @@ export default function NewPartDetailPage() {
   }, [card?.brand, card?.article]);
 
   useEffect(() => {
-    if (!card?.brand || !card?.article) {
-      setUsedMatches([]);
+    if (!secondaryEnabled || !card?.brand || !card?.article) {
+      if (!card?.brand || !card?.article) setUsedMatches([]);
       return;
     }
     const run = async () => {
@@ -228,7 +242,7 @@ export default function NewPartDetailPage() {
       }
     };
     run();
-  }, [card?.brand, card?.article]);
+  }, [secondaryEnabled, card?.brand, card?.article]);
 
   useEffect(() => {
     if (!card?.id) return;
@@ -239,8 +253,8 @@ export default function NewPartDetailPage() {
   }, [card, location.pathname, navigate]);
 
   useEffect(() => {
-    if (!card?.id) {
-      setApiSeo(null);
+    if (!secondaryEnabled || !card?.id) {
+      if (!card?.id) setApiSeo(null);
       return;
     }
     const path = buildNewPartDetailPath(card);
@@ -255,11 +269,11 @@ export default function NewPartDetailPage() {
       }
     };
     run();
-  }, [card]);
+  }, [secondaryEnabled, card]);
 
   useEffect(() => {
-    if (!card?.brand || !card?.article) {
-      setReferenceVehicles([]);
+    if (!secondaryEnabled || !card?.brand || !card?.article) {
+      if (!card?.brand || !card?.article) setReferenceVehicles([]);
       return undefined;
     }
     const brandText = String(card.brand).trim();
@@ -268,6 +282,7 @@ export default function NewPartDetailPage() {
     const cached = readPartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey);
     if (cached !== null) {
       setReferenceVehicles(Array.isArray(cached) ? cached : []);
+      setFitmentLoading(false);
       return undefined;
     }
 
@@ -295,7 +310,7 @@ export default function NewPartDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [card?.brand, card?.article]);
+  }, [secondaryEnabled, card?.brand, card?.article]);
 
   const livePart = useMemo(() => {
     if (!card) return null;
@@ -570,7 +585,7 @@ export default function NewPartDetailPage() {
         <PartDetailFitmentBlock
           sellerVehicles={[]}
           referenceVehicles={referenceVehicles}
-          loading={fitmentLoading}
+          loading={secondaryEnabled ? fitmentLoading : true}
         />
       </div>
 
@@ -578,35 +593,43 @@ export default function NewPartDetailPage() {
         brand={brand}
         article={article}
         items={usedMatches}
-        loading={usedMatchLoading}
+        loading={secondaryEnabled ? usedMatchLoading : true}
         error={usedMatchError}
       />
 
-      <div className="mt-6">
-        <PartDetailFaqBlock
-          brand={brand}
-          article={article}
-          partTypeName={partTypeName}
-          isNew
-          city={apiSeo?.city}
-          fitmentText={apiSeo?.fitmentText}
-          inStock={inStock}
-          items={faqItems}
-        />
-      </div>
+      {secondaryEnabled ? (
+        <div className="mt-6">
+          <PartDetailFaqBlock
+            brand={brand}
+            article={article}
+            partTypeName={partTypeName}
+            isNew
+            city={apiSeo?.city}
+            fitmentText={apiSeo?.fitmentText}
+            inStock={inStock}
+            items={faqItems}
+          />
+        </div>
+      ) : null}
 
-      <section className="mt-8">
+      <section className="mt-8" ref={analogsSentinelRef}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-900">Аналоги</h2>
-          {!analogsLoading && analogParts.length > 0 && (
+          {analogsVisible && !analogsLoading && analogParts.length > 0 && (
             <span className="text-sm text-gray-500">{analogParts.length} шт.</span>
           )}
         </div>
-        <NewPartAnalogsTable
-          analogParts={analogParts}
-          loading={analogsLoading}
-          onNavigateCreate={handleAnalogNavigateCreate}
-        />
+        {analogsVisible ? (
+          <NewPartAnalogsTable
+            analogParts={analogParts}
+            loading={analogsLoading}
+            onNavigateCreate={handleAnalogNavigateCreate}
+          />
+        ) : (
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-500">
+            Загрузка аналогов…
+          </div>
+        )}
       </section>
     </div>
   );

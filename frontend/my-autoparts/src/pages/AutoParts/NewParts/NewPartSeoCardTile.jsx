@@ -3,13 +3,15 @@ import { Link } from 'react-router-dom';
 import { formatProductDisplayTitle } from '../../../utils/productDisplayName';
 import { prefetchNewPartDetail } from '../../../utils/prefetchPartDetail';
 
+const TILE_IMAGE_SIZES = '(max-width:640px) 50vw, (max-width:1280px) 33vw, 25vw';
+
 function formatPrice(price) {
   const value = Number(price);
   if (!Number.isFinite(value) || value <= 0) return null;
   return `${value.toLocaleString('ru-RU')} ₽`;
 }
 
-export default function NewPartSeoCardTile({ card }) {
+export default function NewPartSeoCardTile({ card, listPriority = false }) {
   const title = formatProductDisplayTitle(card?.brand, card?.article, card?.name);
   const priceText = formatPrice(card?.price);
   const to = card?.canonical_url?.startsWith('http')
@@ -30,7 +32,12 @@ export default function NewPartSeoCardTile({ card }) {
             src={card.image_url}
             alt={title}
             className="h-full w-full object-contain p-3 transition group-hover:scale-[1.02]"
-            loading="lazy"
+            width={400}
+            height={300}
+            sizes={TILE_IMAGE_SIZES}
+            loading={listPriority ? 'eager' : 'lazy'}
+            decoding="async"
+            fetchPriority={listPriority ? 'high' : 'auto'}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-gray-400">Нет фото</div>

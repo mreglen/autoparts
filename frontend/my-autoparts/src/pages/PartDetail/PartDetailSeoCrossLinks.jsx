@@ -16,6 +16,7 @@ export default function PartDetailSeoCrossLinks({
   organizationId,
   organizationName,
   usedCatalogPath,
+  deferEnabled = true,
 }) {
   const [newPartHref, setNewPartHref] = useState(null);
   const brandText = (brand || '').trim();
@@ -27,7 +28,7 @@ export default function PartDetailSeoCrossLinks({
       : null);
 
   useEffect(() => {
-    if (isNew || !brandText || !articleText) {
+    if (!deferEnabled || isNew || !brandText || !articleText) {
       setNewPartHref(null);
       return undefined;
     }
@@ -65,7 +66,7 @@ export default function PartDetailSeoCrossLinks({
     return () => {
       cancelled = true;
     };
-  }, [isNew, brandText, articleText]);
+  }, [deferEnabled, isNew, brandText, articleText]);
 
   if (!brandText) {
     return null;

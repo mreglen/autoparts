@@ -122,7 +122,7 @@ export default function SeoLandingPageView({
         <section>
           <h2 className="mb-4 text-lg font-semibold text-gray-900 sm:text-xl">Каталог</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {catalogData.items.map((item) => renderGridItem(item))}
+            {catalogData.items.map((item, index) => renderGridItem(item, index))}
           </div>
           <SeoLandingCatalogPagination
             page={page}

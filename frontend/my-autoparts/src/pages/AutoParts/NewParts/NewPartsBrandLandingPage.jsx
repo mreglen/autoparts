@@ -59,7 +59,9 @@ export default function NewPartsBrandLandingPage() {
           ? `В каталоге ${catalogData.total} позиций ${landing?.brand_name || landing?.title_ru || ''}`
           : 'Каталог новых запчастей с доставкой по России'
       }
-      renderGridItem={(card) => <NewPartSeoCardTile key={card.id} card={card} />}
+      renderGridItem={(card, index) => (
+        <NewPartSeoCardTile key={card.id} card={card} listPriority={index < 2} />
+      )}
       emptyMessage="Пока нет карточек для этого бренда."
       emptyLink="/autoparts/new"
       emptyLinkLabel="Перейти к поиску"

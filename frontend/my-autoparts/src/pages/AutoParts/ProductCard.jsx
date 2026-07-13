@@ -162,6 +162,7 @@ const ProductCard = ({
                 className="h-full w-full object-contain"
                 width={400}
                 height={300}
+                sizes="(max-width:640px) 50vw, (max-width:1280px) 33vw, 25vw"
                 loading={listPriority ? 'eager' : 'lazy'}
                 decoding="async"
                 fetchPriority={listPriority ? 'high' : 'auto'}
