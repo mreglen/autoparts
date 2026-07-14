@@ -5,6 +5,8 @@ import { getPageTitle } from '../../hooks/useMobileMenuShell';
 import useHistoryBack from '../../hooks/useHistoryBack';
 import { useShowYandexBadge } from '../../utils/siteReviewsPublic';
 import HeaderYandexBadge from '../Seo/HeaderYandexBadge';
+import CitySelectModal from '../CitySelectModal/CitySelectModal';
+import { useSelectedCity } from '../../hooks/useSelectedCity';
 
 function HeaderIconButton({ onClick, to, label, children, accent, badge = 0 }) {
     const className = `relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-[0.97] ${
@@ -65,10 +67,34 @@ function BackIcon() {
     );
 }
 
+function LocationPinIcon({ className = 'h-3.5 w-3.5' }) {
+    return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+    );
+}
+
 export default function MobileHeader({ onMenuClick, showMenuButton = true, hidden = false }) {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, token } = useSelector((state) => state.auth);
+    const {
+        city: selectedCity,
+        isModalOpen: isCityModalOpen,
+        openModal: openCityModal,
+        closeModal: closeCityModal,
+        selectCity,
+        cities,
+        citiesStatus,
+        citiesError,
+        loadCities,
+    } = useSelectedCity();
 
     const pageTitle = getPageTitle(location.pathname);
     const isHome = location.pathname === '/';
@@ -76,6 +102,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
         location.pathname === '/autoparts' ||
         location.pathname === '/autoparts/new' ||
         location.pathname === '/autoparts/used';
+    const showCityChip = isHome || isAutopartsListRoot;
     const showBack = !isHome && !isAutopartsListRoot;
 
     const firstName = user?.first_name || user?.name?.split?.(' ')?.[0] || 'П';
@@ -85,6 +112,7 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
     const handleBack = useHistoryBack('/');
 
     return (
+        <>
         <header className={`lg:hidden fixed inset-x-0 top-0 z-40 border-b border-gray-200/90 bg-white/95 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-white/85 pt-safe-top ${hidden ? 'hidden' : ''}`}>
             {showYandexBadge ? <HeaderYandexBadge /> : null}
             <div className="flex h-[3.75rem] items-center gap-2.5 px-3 sm:px-4">
@@ -113,8 +141,21 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
                 <div className="min-w-0 flex-1 text-center sm:text-left">
                     {showBack ? (
                         <p className="truncate text-[15px] font-semibold text-gray-900">{pageTitle}</p>
-                    ) : isHome ? (
-                        <p className="hidden truncate text-xs text-gray-500 sm:block">Автозапчасти новые и б/у</p>
+                    ) : showCityChip ? (
+                        <button
+                            type="button"
+                            onClick={openCityModal}
+                            className="mx-auto inline-flex max-w-full items-center gap-1 rounded-lg px-1.5 py-1 text-left text-xs font-medium text-gray-600 transition active:bg-gray-50 sm:mx-0"
+                            aria-haspopup="dialog"
+                            aria-expanded={isCityModalOpen}
+                            aria-label={`Город: ${selectedCity}`}
+                        >
+                            <LocationPinIcon className="h-3.5 w-3.5 shrink-0 text-indigo-500" />
+                            <span className="truncate">г. {selectedCity}</span>
+                            <svg className="h-3 w-3 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
                     ) : (
                         <p className="truncate text-[15px] font-semibold text-gray-900">{pageTitle}</p>
                     )}
@@ -151,5 +192,16 @@ export default function MobileHeader({ onMenuClick, showMenuButton = true, hidde
                 </div>
             </div>
         </header>
+        <CitySelectModal
+            isOpen={isCityModalOpen}
+            onClose={closeCityModal}
+            selectedCity={selectedCity}
+            cities={cities}
+            citiesStatus={citiesStatus}
+            citiesError={citiesError}
+            onSelect={selectCity}
+            onRetry={loadCities}
+        />
+        </>
     );
 }

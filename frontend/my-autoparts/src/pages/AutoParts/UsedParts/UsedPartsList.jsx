@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -448,16 +448,47 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     [sortedAvailableParts, gridColumns]
   );
 
+  const virtualGridRef = useRef(null);
+  const virtualListRef = useRef(null);
+  const [gridScrollMargin, setGridScrollMargin] = useState(0);
+  const [listScrollMargin, setListScrollMargin] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!shouldVirtualize) return undefined;
+    const el = viewMode === 'grid' ? virtualGridRef.current : virtualListRef.current;
+    if (!el) return undefined;
+
+    const updateMargin = () => {
+      const top = el.offsetTop || 0;
+      if (viewMode === 'grid') setGridScrollMargin(top);
+      else setListScrollMargin(top);
+    };
+
+    updateMargin();
+    window.addEventListener('resize', updateMargin);
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateMargin) : null;
+    if (ro) {
+      ro.observe(el);
+      if (el.offsetParent) ro.observe(el.offsetParent);
+    }
+    return () => {
+      window.removeEventListener('resize', updateMargin);
+      ro?.disconnect();
+    };
+  }, [shouldVirtualize, viewMode, gridRows.length, sortedAvailableParts.length]);
+
   const gridRowVirtualizer = useWindowVirtualizer({
     count: shouldVirtualize && viewMode === 'grid' ? gridRows.length : 0,
     estimateSize: () => GRID_ROW_ESTIMATE_PX,
     overscan: 5,
+    scrollMargin: gridScrollMargin,
   });
 
   const listRowVirtualizer = useWindowVirtualizer({
     count: shouldVirtualize && viewMode === 'list' ? sortedAvailableParts.length : 0,
     estimateSize: () => LIST_ROW_ESTIMATE_PX,
     overscan: 5,
+    scrollMargin: listScrollMargin,
   });
 
   const gridVirtualEndIndex = gridRowVirtualizer.range?.endIndex ?? -1;
@@ -745,6 +776,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           )}
           {viewMode === 'grid' && shouldVirtualize && (
             <div
+              ref={virtualGridRef}
               className="relative w-full"
               style={{ height: `${gridRowVirtualizer.getTotalSize()}px` }}
             >
@@ -754,8 +786,11 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   <div
                     key={virtualRow.key}
                     data-index={virtualRow.index}
-                    className="absolute left-0 top-0 w-full grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
-                    style={{ transform: `translateY(${virtualRow.start}px)` }}
+                    ref={gridRowVirtualizer.measureElement}
+                    className="absolute left-0 top-0 w-full grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-3"
+                    style={{
+                      transform: `translateY(${virtualRow.start - gridScrollMargin}px)`,
+                    }}
                   >
                     {rowParts.map((part, colIndex) => (
                       <ProductCard
@@ -780,6 +815,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           )}
           {viewMode === 'list' && shouldVirtualize && (
             <div
+              ref={virtualListRef}
               className="relative w-full"
               style={{ height: `${listRowVirtualizer.getTotalSize()}px` }}
             >
@@ -790,8 +826,11 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   <div
                     key={virtualRow.key}
                     data-index={virtualRow.index}
+                    ref={listRowVirtualizer.measureElement}
                     className="absolute left-0 top-0 w-full pb-3"
-                    style={{ transform: `translateY(${virtualRow.start}px)` }}
+                    style={{
+                      transform: `translateY(${virtualRow.start - listScrollMargin}px)`,
+                    }}
                   >
                     {renderPartListCard(part, part.id, virtualRow.index < 2)}
                   </div>

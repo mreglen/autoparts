@@ -8,6 +8,8 @@ import { fetchUnreadCount } from '../../redux/slices/ChatSlice';
 import Search from './Search/Search';
 import { useShowSiteReviews, useShowYandexBadge } from '../../utils/siteReviewsPublic';
 import HeaderYandexBadge from '../../components/Seo/HeaderYandexBadge';
+import CitySelectModal from '../../components/CitySelectModal/CitySelectModal';
+import { useSelectedCity } from '../../hooks/useSelectedCity';
 
 const formatPhoneNumber = (phone) => {
   if (!phone) return '';
@@ -74,6 +76,17 @@ export default function Navigation() {
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
   const showSiteReviews = useShowSiteReviews();
   const showYandexBadge = useShowYandexBadge();
+  const {
+    city: selectedCity,
+    isModalOpen: isCityModalOpen,
+    openModal: openCityModal,
+    closeModal: closeCityModal,
+    selectCity,
+    cities,
+    citiesStatus,
+    citiesError,
+    loadCities,
+  } = useSelectedCity();
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [closeTimeout, setCloseTimeout] = useState(null);
@@ -141,19 +154,29 @@ export default function Navigation() {
     );
 
   return (
+    <>
     <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-200 bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/90">
       {showYandexBadge ? <HeaderYandexBadge /> : null}
       {/* Верхняя полоска: контакты и навигация */}
       <div className="border-b border-gray-100 bg-gray-50/90">
         <div className="mx-auto flex h-9 max-w-7xl items-center justify-between gap-4 px-4 lg:px-6">
           <div className="flex min-w-0 items-center gap-3 text-xs text-gray-600">
-            <span className="inline-flex items-center gap-1.5">
-              <svg className="h-3.5 w-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <button
+              type="button"
+              onClick={openCityModal}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition hover:bg-white hover:text-indigo-600 hover:shadow-sm"
+              aria-haspopup="dialog"
+              aria-expanded={isCityModalOpen}
+            >
+              <svg className="h-3.5 w-3.5 shrink-0 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              г. Екатеринбург
-            </span>
+              <span className="truncate">г. {selectedCity}</span>
+              <svg className="h-3 w-3 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
             {adminOrganizationPhone?.organization_phone && (
               <>
                 <span className="hidden text-gray-300 sm:inline">|</span>
@@ -360,5 +383,16 @@ export default function Navigation() {
         </div>
       </div>
     </header>
+    <CitySelectModal
+      isOpen={isCityModalOpen}
+      onClose={closeCityModal}
+      selectedCity={selectedCity}
+      cities={cities}
+      citiesStatus={citiesStatus}
+      citiesError={citiesError}
+      onSelect={selectCity}
+      onRetry={loadCities}
+    />
+    </>
   );
 }
