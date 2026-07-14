@@ -58,7 +58,12 @@ from app.services.audit_service import log_audit
 from app.utils.client_buyers import order_matches_buyer, order_visible_to_buyer
 from app.utils.user_avatar import avatar_public_url, resolve_user_by_contact
 from app.schemas.avito_orders import AvitoCheckConfirmationCodeRequest, AvitoOrderTransitionRequest
+from app.schemas.sales_menu_counts import SalesMenuCountsResponse
 from app.services.avito_pro_status_service import ensure_avito_pro_active
+from app.services.sales_menu_counts_service import (
+    get_sales_menu_badge_counts,
+    user_has_sales_menu_access,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +146,19 @@ def _has_sales_orders_access(db: Session, user: UserModel) -> bool:
 def _require_sales_orders_access(db: Session, user: UserModel) -> None:
     if not _has_sales_orders_access(db, user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нет доступа к заказам")
+
+
+@router.get("/menu-counts", response_model=SalesMenuCountsResponse)
+def get_sales_menu_counts(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    if not user_has_sales_menu_access(db, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Нет доступа к разделу «Продажи»",
+        )
+    return SalesMenuCountsResponse(**get_sales_menu_badge_counts(db, current_user))
 
 
 def _require_avito_pro_orders(db: Session, user: UserModel) -> None:

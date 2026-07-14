@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 import { subscribeToPushNotifications } from '../../redux/slices/ChatSlice';
+import { fetchSalesMenuCounts } from '../../redux/slices/SalesMenuCountsSlice';
 import { AvitoOrderCard } from '../../components/AvitoOrderCard';
 import SalesGarageOrderCard from '../../components/SalesOrders/SalesGarageOrderCard';
 import SalesOrdersEmptyState from '../../components/SalesOrders/SalesOrdersEmptyState';
@@ -330,6 +331,7 @@ export default function SalesOrdersPage() {
           text: itemId ? 'Статус позиции обновлён.' : 'Статус заказа обновлён.',
         });
       }
+      dispatch(fetchSalesMenuCounts());
     } catch (error) {
       const detail = error?.response?.data?.detail;
       setUsedOrderStatusMessage({
@@ -373,6 +375,7 @@ export default function SalesOrdersPage() {
           ? 'Статус позиции обновлён. Покупатель увидит его в «Мои заказы».'
           : 'Статус заказа обновлён. Покупатель увидит его в «Мои заказы».',
       });
+      dispatch(fetchSalesMenuCounts());
     } catch (error) {
       setUsedOrderStatusMessage({
         type: 'error',

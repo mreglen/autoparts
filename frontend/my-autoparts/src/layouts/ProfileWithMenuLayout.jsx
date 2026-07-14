@@ -1,9 +1,10 @@
 // src/layouts/ProfileWithMenuLayout.jsx
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Outlet, useLocation } from 'react-router-dom';
 import { fetchPendingProducts } from '../redux/slices/ModerationProductsSlice';
 import { fetchPendingSellers } from '../redux/slices/ModerationSlice';
+import { fetchSalesMenuCounts } from '../redux/slices/SalesMenuCountsSlice';
 import Navigation from '../pages/Navigation/Navigation';
 import MobileHeader from '../components/MobileHeader/MobileHeader';
 import MobileBottomNav from '../components/MobileBottomNav/MobileBottomNav';
@@ -23,9 +24,17 @@ export default function ProfileWithMenuLayout() {
     const permissionCodes = useSelector((state) => state.auth.permissionCodes);
     const moderationProducts = useSelector((state) => state.moderationProducts);
     const moderation = useSelector((state) => state.moderation);
+    const salesMenuCounts = useSelector((state) => state.salesMenuCounts);
     const location = useLocation();
 
     const isChatsPage = location.pathname.startsWith('/chats');
+
+    const canFetchSalesCounts = useMemo(() => {
+        if (!user) return false;
+        if (user.is_admin || user.is_seller) return true;
+        if (!user.is_employee || !Array.isArray(permissionCodes)) return false;
+        return permissionCodes.includes('sales.orders') || permissionCodes.includes('sales.returns');
+    }, [user, permissionCodes]);
 
     const badgeCounts = {
         'product-moderation': moderationProducts?.pendingProducts?.length || 0,
@@ -33,6 +42,9 @@ export default function ProfileWithMenuLayout() {
         administration:
             (moderationProducts?.pendingProducts?.length || 0) +
             (moderation?.pendingSellers?.length || 0),
+        'sales-orders': salesMenuCounts?.orders || 0,
+        'sales-returns': salesMenuCounts?.returns || 0,
+        sales: salesMenuCounts?.sales || 0,
     };
 
     const {
@@ -49,6 +61,11 @@ export default function ProfileWithMenuLayout() {
         dispatch(fetchPendingProducts());
         dispatch(fetchPendingSellers());
     }, [dispatch, isReady, user?.is_admin]);
+
+    useEffect(() => {
+        if (!isReady || !canFetchSalesCounts) return;
+        dispatch(fetchSalesMenuCounts());
+    }, [dispatch, isReady, canFetchSalesCounts, location.pathname]);
 
     if (!isReady) {
         return (

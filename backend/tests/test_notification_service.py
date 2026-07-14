@@ -20,6 +20,7 @@ from app.services.notification_service import (
     merge_notification_prefs_patch,
     normalize_notification_prefs,
     notification_prefs_from_legacy,
+    notify_return_request_seller,
     order_status_label,
     should_send_email_for_event,
     should_send_push_for_event,
@@ -222,6 +223,26 @@ class NotificationServiceTests(unittest.TestCase):
             )
 
         mock_email.assert_called_once_with("buyer@example.com", "Subject", "Body text")
+
+    @patch("app.services.notification_service.dispatch_org_sales_returns_notification")
+    @patch("app.services.notification_service.dispatch_org_sales_notification")
+    def test_notify_return_request_seller_uses_returns_recipients(
+        self, mock_orders_dispatch, mock_returns_dispatch
+    ):
+        db = MagicMock()
+        notify_return_request_seller(
+            db,
+            organization_id="org1",
+            return_id=15,
+            order_id=99,
+            reason_label="Брак / неисправность",
+        )
+        mock_returns_dispatch.assert_called_once()
+        mock_orders_dispatch.assert_not_called()
+        kwargs = mock_returns_dispatch.call_args.kwargs
+        self.assertEqual(kwargs["event_type"], "return_request_seller")
+        self.assertEqual(kwargs["push_data"]["url"], "/sales/returns")
+        self.assertEqual(kwargs["push_data"]["returnId"], 15)
 
 
 if __name__ == "__main__":

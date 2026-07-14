@@ -7,7 +7,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models.user import User
-from app.services.push_notifications import get_sales_order_recipient_user_ids
+from app.services.push_notifications import (
+    get_sales_order_recipient_user_ids,
+    get_sales_returns_recipient_user_ids,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +238,25 @@ def dispatch_org_sales_notification(
         )
 
 
+def dispatch_org_sales_returns_notification(
+    db: Session,
+    organization_id: str | None,
+    *,
+    event_type: str,
+    push_data: dict[str, Any] | None,
+    email_subject: str,
+    email_body: str,
+) -> None:
+    for user_id in get_sales_returns_recipient_user_ids(db, organization_id):
+        dispatch_user_notification(
+            user_id,
+            event_type=event_type,
+            push_data=push_data,
+            email_subject=email_subject,
+            email_body=email_body,
+        )
+
+
 def notify_order_status_buyer(
     *,
     user_id: int | None,
@@ -343,7 +365,7 @@ def notify_return_request_seller(
         f"Откройте раздел возвратов: https://svoygarage.ru/sales/returns\n\n"
         f"С уважением,\nСвой Гараж"
     )
-    dispatch_org_sales_notification(
+    dispatch_org_sales_returns_notification(
         db,
         organization_id,
         event_type=EVENT_RETURN_REQUEST_SELLER,

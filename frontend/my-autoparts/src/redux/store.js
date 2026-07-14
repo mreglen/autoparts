@@ -22,6 +22,7 @@ import chatReducer from './slices/ChatSlice';
 import avitoChatReducer from './slices/AvitoChatSlice';
 import partTypesReducer from './slices/PartTypeSlice';
 import userEngagementReducer from './slices/UserEngagementSlice';
+import salesMenuCountsReducer from './slices/SalesMenuCountsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -48,6 +49,7 @@ export const store = configureStore({
     avitoChats: avitoChatReducer,
     partTypes: partTypesReducer,
     userEngagement: userEngagementReducer,
+    salesMenuCounts: salesMenuCountsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

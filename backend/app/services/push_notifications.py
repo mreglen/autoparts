@@ -23,11 +23,31 @@ def user_has_sales_orders_access(db: Session, user: User) -> bool:
     return db.query(q.exists()).scalar() is True
 
 
+def user_has_sales_returns_access(db: Session, user: User) -> bool:
+    if user.is_admin or user.is_seller:
+        return True
+    if not user.is_employee:
+        return False
+    q = (
+        db.query(Permission.code)
+        .join(UserPermission, UserPermission.permission_id == Permission.id)
+        .filter(UserPermission.user_id == user.id, Permission.code == "sales.returns")
+    )
+    return db.query(q.exists()).scalar() is True
+
+
 def get_sales_order_recipient_user_ids(db: Session, organization_id: str | None) -> list[int]:
     if not organization_id:
         return []
     users = db.query(User).filter(User.organization_id == organization_id).all()
     return [u.id for u in users if user_has_sales_orders_access(db, u)]
+
+
+def get_sales_returns_recipient_user_ids(db: Session, organization_id: str | None) -> list[int]:
+    if not organization_id:
+        return []
+    users = db.query(User).filter(User.organization_id == organization_id).all()
+    return [u.id for u in users if user_has_sales_returns_access(db, u)]
 
 
 def _format_amount(total_amount: float | None) -> str:

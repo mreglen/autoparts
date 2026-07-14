@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { apiAxios } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import { subscribeToPushNotifications } from '../../redux/slices/ChatSlice';
+import { fetchSalesMenuCounts } from '../../redux/slices/SalesMenuCountsSlice';
 import {
   AVITO_RETURN_STATUS_LABELS,
   SELLER_NEXT_STATUSES,
@@ -166,6 +168,7 @@ function AvitoReturnCard({ order, onAcceptReturn, onTransition }) {
 
 export default function SalesReturnsPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { isReady } = useAuthReady();
   const { user, permissionCodes } = useSelector((state) => state.auth);
   const [loading, setLoading] = useState(true);
@@ -199,6 +202,11 @@ export default function SalesReturnsPage() {
   }, [isReady, user, hasPermission, navigate]);
 
   useEffect(() => {
+    if (!hasPermission) return;
+    dispatch(subscribeToPushNotifications({ prompt: true }));
+  }, [dispatch, hasPermission]);
+
+  useEffect(() => {
     if (isReady && hasPermission) load();
   }, [isReady, hasPermission, load]);
 
@@ -207,6 +215,7 @@ export default function SalesReturnsPage() {
       status_code: statusCode,
       seller_note: sellerNote || null,
     });
+    dispatch(fetchSalesMenuCounts());
     load();
   };
 
