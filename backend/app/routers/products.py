@@ -22,6 +22,8 @@ from app.schemas.product import (
     DeleteVideosRequest,
     QrPartCardResponse,
 )
+from app.schemas.article_matches import ArticleMatchDetailResponse, ArticleMatchesResponse
+from app.services.article_matches_service import find_article_matches, get_article_match_detail
 from app.schemas.vehicle import Vehicle as VehicleSchema
 from app.models.vehicle import Vehicle as VehicleModel
 from app.db.database import get_db
@@ -409,6 +411,49 @@ def get_my_product_storage_cell_values(
 
     rows = query.distinct().order_by(func.trim(ProductStorageCellModel.value).asc()).all()
     return [str(row[0]).strip() for row in rows if row[0] is not None and str(row[0]).strip()]
+
+
+@router.get("/article-matches", response_model=ArticleMatchesResponse)
+def list_article_matches(
+    q: str = Query(..., min_length=1),
+    sort: str = Query("date", pattern="^(date|quantity)$"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Организация не указана")
+    return find_article_matches(
+        db,
+        organization_id=current_user.organization_id,
+        q=q,
+        sort=sort,  # type: ignore[arg-type]
+        offset=offset,
+        limit=limit,
+    )
+
+
+@router.get("/article-matches/{source}/{item_id}", response_model=ArticleMatchDetailResponse)
+def read_article_match_detail(
+    source: str,
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if source not in ("product", "pending"):
+        raise HTTPException(status_code=400, detail="Некорректный source")
+    if not current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Организация не указана")
+    detail = get_article_match_detail(
+        db,
+        organization_id=current_user.organization_id,
+        source=source,  # type: ignore[arg-type]
+        item_id=item_id,
+    )
+    if not detail:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+    return detail
 
 
 @router.get("/{product_id}", response_model=ProductSchema)

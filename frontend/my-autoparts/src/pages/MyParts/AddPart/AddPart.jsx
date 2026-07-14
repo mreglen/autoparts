@@ -54,6 +54,7 @@ import {
 import VehicleModal from './VehicleModal';
 import MobilePageSection from '../../../components/MobilePageSection/MobilePageSection';
 import MobileStickyFooter from '../../../components/MobileStickyFooter/MobileStickyFooter';
+import ArticleMatchesModal from '../../../components/ArticleMatchesModal/ArticleMatchesModal';
 
 const SUGGEST_LIST =
   'mt-1 max-h-44 overflow-y-auto rounded-md border border-gray-300 bg-white text-sm text-gray-900 shadow-sm';
@@ -150,6 +151,8 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
   const [brandLoading, setBrandLoading] = useState(false);
   const [articleFocused, setArticleFocused] = useState(false);
   const [brandFocused, setBrandFocused] = useState(false);
+  const [articleMatchesCount, setArticleMatchesCount] = useState(0);
+  const [articleMatchesOpen, setArticleMatchesOpen] = useState(false);
   const [rosskoLookupLoading, setRosskoLookupLoading] = useState(false);
   const [rosskoLookupError, setRosskoLookupError] = useState(null);
   const [rosskoLookupNotice, setRosskoLookupNotice] = useState(null);
@@ -921,6 +924,31 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
   }, [formData.article]);
 
   useEffect(() => {
+    const q = (formData.article || '').trim();
+    if (q.length < 2) {
+      setArticleMatchesCount(0);
+      return undefined;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      apiAxios
+        .get('/products/article-matches', { params: { q, sort: 'date', offset: 0, limit: 1 } })
+        .then((res) => {
+          if (cancelled) return;
+          setArticleMatchesCount(Number(res.data?.total) || 0);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setArticleMatchesCount(0);
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [formData.article]);
+
+  useEffect(() => {
     const q = (formData.brand || '').trim();
     const article = (formData.article || '').trim();
     if (!q && !article) {
@@ -1359,15 +1387,36 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         {/* Артикул */}
         <div data-part-field="article">
           <label className={partFieldLabelClass(showFieldError('article'))}>Артикул *</label>
-          <input
-            name="article"
-            value={formData.article}
-            onChange={handleInputChange}
-            onFocus={() => setArticleFocused(true)}
-            onBlur={() => setTimeout(() => setArticleFocused(false), 120)}
-            className={partFieldClass(showFieldError('article'))}
-            autoComplete="off"
-          />
+          <div className="relative">
+            <input
+              name="article"
+              value={formData.article}
+              onChange={handleInputChange}
+              onFocus={() => setArticleFocused(true)}
+              onBlur={() => {
+                setTimeout(() => setArticleFocused(false), 120);
+                const q = (formData.article || '').trim();
+                if (q.length >= 2) {
+                  apiAxios
+                    .get('/products/article-matches', { params: { q, sort: 'date', offset: 0, limit: 1 } })
+                    .then((res) => setArticleMatchesCount(Number(res.data?.total) || 0))
+                    .catch(() => setArticleMatchesCount(0));
+                }
+              }}
+              className={`${partFieldClass(showFieldError('article'))}${articleMatchesCount >= 1 ? ' pr-11' : ''}`}
+              autoComplete="off"
+            />
+            {articleMatchesCount >= 1 ? (
+              <button
+                type="button"
+                onClick={() => setArticleMatchesOpen(true)}
+                className="absolute inset-y-0 right-1 my-auto flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-base font-bold text-amber-700 transition hover:bg-amber-200"
+                aria-label="Похожие товары"
+              >
+                !
+              </button>
+            ) : null}
+          </div>
           {articleFocused && (articleLoading || articleOptions.length > 0) && (
             <ul className={SUGGEST_LIST}>
               {articleLoading && (
@@ -1905,6 +1954,17 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
         onClose={() => setIsVehicleModalOpen(false)}
         onSelectVehicle={setSelectedVehicle}
         selectedVehicle={selectedVehicle}
+      />
+
+      <ArticleMatchesModal
+        isOpen={articleMatchesOpen}
+        onClose={() => setArticleMatchesOpen(false)}
+        articleQuery={(formData.article || '').trim()}
+        onAddAsNew={() => setArticleMatchesOpen(false)}
+        onStockInSuccess={() => {
+          setArticleMatchesOpen(false);
+          navigate('/my-parts');
+        }}
       />
     </div>
   );
