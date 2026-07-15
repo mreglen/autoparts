@@ -27,9 +27,12 @@ from app.schemas.sales_orders import (
     NewPartsOrderCanViewResponse,
     NewPartsOrderItemResponse,
     NewPartsOrderResponse,
+    PickupActionResponse,
+    PickupOverrideRequest,
     UpdateStatusRequest,
     UpdateUsedOrderStatusResponse,
     UsedPartsOrderResponse,
+    VerifyPickupRequest,
     PurchasedUsedOrderResponse,
     PurchasedNewOrderResponse,
     PurchasedNewOrderItemResponse,
@@ -53,6 +56,16 @@ from app.services.marketplace_used_fulfillment import (
     FULFILLMENT_TRIGGER_STATUS,
     fulfill_used_order_on_status_change,
     fulfill_used_order_item_on_status_change,
+)
+from app.services.pickup_verification_service import (
+    NEW_PICKUP_READY_STATUS,
+    PICKUP_READY_STATUS,
+    apply_pickup_override,
+    block_direct_pickup_delivery,
+    ensure_pickup_code,
+    get_buyer_pickup_payload,
+    is_pickup_delivery,
+    verify_pickup_code,
 )
 from app.services.audit_service import log_audit
 from app.utils.client_buyers import order_matches_buyer, order_visible_to_buyer
@@ -79,6 +92,7 @@ USED_ORDER_STATUS_CODES = frozenset({
     "confirmed",
     "rejected",
     "assembled",
+    "ready_for_pickup",
     "shipped",
     "delivered",
     "closed",
@@ -89,9 +103,10 @@ USED_STATUS_PRIORITY: dict[str, int] = {
     "pending": 1,
     "confirmed": 2,
     "assembled": 3,
-    "shipped": 4,
-    "delivered": 5,
-    "closed": 6,
+    "ready_for_pickup": 4,
+    "shipped": 5,
+    "delivered": 6,
+    "closed": 7,
 }
 
 
@@ -276,6 +291,11 @@ def update_used_parts_order_status(
     current_user: UserModel = Depends(get_current_user),
 ):
     _require_sales_orders_access(db, current_user)
+    if payload.status_code not in USED_ORDER_STATUS_CODES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Недопустимый статус: {payload.status_code}",
+        )
     order = (
         db.query(GarageUsedOrder)
         .options(selectinload(GarageUsedOrder.items))
@@ -287,7 +307,10 @@ def update_used_parts_order_status(
     if not current_user.is_admin and order.organization_id != current_user.organization_id:
         raise HTTPException(status_code=403, detail="Нет доступа к заказу")
 
+    block_direct_pickup_delivery(order, new_status=payload.status_code, order_kind="used")
+
     previous_status_code = order.status_code
+    pickup_code: str | None = None
     try:
         summaries = fulfill_used_order_on_status_change(
             db,
@@ -296,6 +319,13 @@ def update_used_parts_order_status(
             previous_status_code=previous_status_code,
             acting_user_id=current_user.id,
         )
+        if payload.status_code == PICKUP_READY_STATUS:
+            if not is_pickup_delivery(order):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Статус «К выдаче» доступен только для самовывоза",
+                )
+            pickup_code = ensure_pickup_code(order, order_kind="used")
         order.status_code = payload.status_code
         for item in order.items:
             item.status_code = payload.status_code
@@ -344,6 +374,7 @@ def update_used_parts_order_status(
         order_kind="used",
         status_code=payload.status_code,
         previous_status_code=previous_status_code,
+        pickup_code=pickup_code,
     )
 
     return UpdateUsedOrderStatusResponse(
@@ -452,7 +483,16 @@ def update_new_parts_order_status(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Недопустимый статус: {payload.status_code}",
         )
+    block_direct_pickup_delivery(order, new_status=payload.status_code, order_kind="new")
     previous_status_code = order.status_code
+    pickup_code: str | None = None
+    if payload.status_code == NEW_PICKUP_READY_STATUS:
+        if not is_pickup_delivery(order):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Статус «К выдаче» доступен только для самовывоза",
+            )
+        pickup_code = ensure_pickup_code(order, order_kind="new")
     order.status_code = payload.status_code
     for item in order.items:
         item.status_code = payload.status_code
@@ -478,6 +518,7 @@ def update_new_parts_order_status(
         order_kind="new",
         status_code=payload.status_code,
         previous_status_code=previous_status_code,
+        pickup_code=pickup_code,
     )
     return {"status": "ok"}
 
@@ -515,6 +556,15 @@ def update_new_parts_order_item_status(
     item = next((i for i in order.items if i.id == item_id), None)
     if not item:
         raise HTTPException(status_code=404, detail="Позиция заказа не найдена")
+
+    if is_pickup_delivery(order) and payload.status_code in (
+        NEW_PICKUP_READY_STATUS,
+        "new_received",
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Для самовывоза выдачу оформляйте на уровне всего заказа",
+        )
 
     previous_status_code = item.status_code
     previous_order_status = order.status_code
@@ -580,6 +630,15 @@ def update_used_parts_order_item_status(
     item = next((i for i in order.items if i.id == item_id), None)
     if not item:
         raise HTTPException(status_code=404, detail="Позиция заказа не найдена")
+
+    if is_pickup_delivery(order) and payload.status_code in (
+        PICKUP_READY_STATUS,
+        "delivered",
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Для самовывоза выдачу оформляйте на уровне всего заказа",
+        )
 
     previous_item_status = item.status_code
     previous_order_status = order.status_code
@@ -974,6 +1033,230 @@ async def check_avito_confirmation_code(
         raise _map_avito_error_to_http(e)
 
 
+def _load_used_order_for_seller(db: Session, order_id: int, current_user: UserModel) -> GarageUsedOrder:
+    order = (
+        db.query(GarageUsedOrder)
+        .options(selectinload(GarageUsedOrder.items))
+        .filter(GarageUsedOrder.id == order_id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    if not current_user.is_admin and order.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к заказу")
+    return order
+
+
+def _load_new_order_for_seller(db: Session, order_id: int, current_user: UserModel) -> GarageNewOrder:
+    order = (
+        db.query(GarageNewOrder)
+        .options(selectinload(GarageNewOrder.items))
+        .filter(GarageNewOrder.id == order_id)
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    if not current_user.is_admin and order.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Нет доступа к заказу")
+    return order
+
+
+@router.post(
+    "/used-parts-orders/{order_id}/verify-pickup",
+    response_model=PickupActionResponse,
+)
+def verify_used_pickup(
+    order_id: int,
+    payload: VerifyPickupRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _require_sales_orders_access(db, current_user)
+    order = _load_used_order_for_seller(db, order_id, current_user)
+    if not is_pickup_delivery(order):
+        raise HTTPException(status_code=422, detail="Проверка кода только для самовывоза")
+    previous = order.status_code
+    try:
+        delivered = verify_pickup_code(
+            order,
+            code=payload.code,
+            qr_payload=payload.qr_payload,
+            order_kind="used",
+        )
+        order.status_code = delivered
+        for item in order.items:
+            item.status_code = delivered
+        db.commit()
+    except HTTPException:
+        db.commit()  # persist attempts
+        raise
+    log_audit(
+        db,
+        event_type="order_pickup_verified",
+        category="orders",
+        summary=f"Выдача Б/У #{order_id} по коду",
+        user=current_user,
+        organization_id=order.organization_id,
+        details={"order_id": order_id, "previous_status": previous, "new_status": delivered},
+        entity_type="garage_used_order",
+        entity_id=order_id,
+    )
+    notify_order_status_buyer(
+        user_id=order.user_id,
+        order_id=order_id,
+        order_kind="used",
+        status_code=delivered,
+        previous_status_code=previous,
+    )
+    return PickupActionResponse(status="ok", status_code=delivered, order_id=order_id)
+
+
+@router.post(
+    "/used-parts-orders/{order_id}/pickup-override",
+    response_model=PickupActionResponse,
+)
+def override_used_pickup(
+    order_id: int,
+    payload: PickupOverrideRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _require_sales_orders_access(db, current_user)
+    order = _load_used_order_for_seller(db, order_id, current_user)
+    if not is_pickup_delivery(order):
+        raise HTTPException(status_code=422, detail="Override только для самовывоза")
+    previous = order.status_code
+    delivered = apply_pickup_override(order, order_kind="used")
+    order.status_code = delivered
+    for item in order.items:
+        item.status_code = delivered
+    db.commit()
+    log_audit(
+        db,
+        event_type="order_pickup_override",
+        category="orders",
+        summary=f"Выдача Б/У #{order_id} без кода",
+        user=current_user,
+        organization_id=order.organization_id,
+        details={
+            "order_id": order_id,
+            "previous_status": previous,
+            "new_status": delivered,
+            "reason": payload.reason.strip(),
+        },
+        entity_type="garage_used_order",
+        entity_id=order_id,
+    )
+    notify_order_status_buyer(
+        user_id=order.user_id,
+        order_id=order_id,
+        order_kind="used",
+        status_code=delivered,
+        previous_status_code=previous,
+    )
+    return PickupActionResponse(status="ok", status_code=delivered, order_id=order_id)
+
+
+@router.post(
+    "/new-parts-orders/{order_id}/verify-pickup",
+    response_model=PickupActionResponse,
+)
+def verify_new_pickup(
+    order_id: int,
+    payload: VerifyPickupRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _require_sales_orders_access(db, current_user)
+    if not _can_view_new_parts_orders(db, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Новые заказы недоступны для организации")
+    order = _load_new_order_for_seller(db, order_id, current_user)
+    if not is_pickup_delivery(order):
+        raise HTTPException(status_code=422, detail="Проверка кода только для самовывоза")
+    previous = order.status_code
+    try:
+        delivered = verify_pickup_code(
+            order,
+            code=payload.code,
+            qr_payload=payload.qr_payload,
+            order_kind="new",
+        )
+        order.status_code = delivered
+        for item in order.items:
+            item.status_code = delivered
+        db.commit()
+    except HTTPException:
+        db.commit()
+        raise
+    log_audit(
+        db,
+        event_type="order_pickup_verified",
+        category="orders",
+        summary=f"Выдача новых #{order_id} по коду",
+        user=current_user,
+        organization_id=order.organization_id,
+        details={"order_id": order_id, "previous_status": previous, "new_status": delivered},
+        entity_type="garage_new_order",
+        entity_id=order_id,
+    )
+    notify_order_status_buyer(
+        user_id=order.user_id,
+        order_id=order_id,
+        order_kind="new",
+        status_code=delivered,
+        previous_status_code=previous,
+    )
+    return PickupActionResponse(status="ok", status_code=delivered, order_id=order_id)
+
+
+@router.post(
+    "/new-parts-orders/{order_id}/pickup-override",
+    response_model=PickupActionResponse,
+)
+def override_new_pickup(
+    order_id: int,
+    payload: PickupOverrideRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _require_sales_orders_access(db, current_user)
+    if not _can_view_new_parts_orders(db, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Новые заказы недоступны для организации")
+    order = _load_new_order_for_seller(db, order_id, current_user)
+    if not is_pickup_delivery(order):
+        raise HTTPException(status_code=422, detail="Override только для самовывоза")
+    previous = order.status_code
+    delivered = apply_pickup_override(order, order_kind="new")
+    order.status_code = delivered
+    for item in order.items:
+        item.status_code = delivered
+    db.commit()
+    log_audit(
+        db,
+        event_type="order_pickup_override",
+        category="orders",
+        summary=f"Выдача новых #{order_id} без кода",
+        user=current_user,
+        organization_id=order.organization_id,
+        details={
+            "order_id": order_id,
+            "previous_status": previous,
+            "new_status": delivered,
+            "reason": payload.reason.strip(),
+        },
+        entity_type="garage_new_order",
+        entity_id=order_id,
+    )
+    notify_order_status_buyer(
+        user_id=order.user_id,
+        order_id=order_id,
+        order_kind="new",
+        status_code=delivered,
+        previous_status_code=previous,
+    )
+    return PickupActionResponse(status="ok", status_code=delivered, order_id=order_id)
+
+
 # Purchase endpoints for buyers
 @router.get("/purchases/used-orders", response_model=list[PurchasedUsedOrderResponse])
 def list_purchased_used_orders(
@@ -996,6 +1279,7 @@ def list_purchased_used_orders(
         if not order_visible_to_buyer(order, current_user.id, target_email, target_phone):
             continue
         org = db.query(Organization).filter(Organization.id == order.organization_id).first()
+        pickup = get_buyer_pickup_payload(order, order_kind="used")
         order_dict = {
             "id": order.id,
             "organization_id": order.organization_id,
@@ -1013,6 +1297,8 @@ def list_purchased_used_orders(
             "is_paid": order.is_paid,
             "status_code": order.status_code,
             "created_at": order.created_at,
+            "pickup_code": pickup["pickup_code"],
+            "pickup_qr_payload": pickup["pickup_qr_payload"],
             "items": order.items,
         }
         result.append(order_dict)

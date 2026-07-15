@@ -118,6 +118,7 @@ export default function SalesGarageOrderCard({
   editingStatus,
   onEditStatus,
   onUpdateStatus,
+  onOpenPickupVerify,
   statusEditable = true,
   getStatusColor,
   getStatusName,
@@ -137,6 +138,7 @@ export default function SalesGarageOrderCard({
   const rosskoStatus = order.rossko_status;
   const rosskoOrderId = order.rossko_order_id;
   const rosskoSyncError = order.rossko_sync_error;
+  const isPickup = String(order.delivery_type || '').toLowerCase() === 'pickup';
 
   const isEditingOrder =
     editingStatus?.type === orderType &&
@@ -147,6 +149,47 @@ export default function SalesGarageOrderCard({
     editingStatus?.type === orderType &&
     editingStatus?.orderId === order.id &&
     editingStatus?.itemId === itemId;
+
+  const primaryCta = (() => {
+    if (isUsed) {
+      if (orderStatusCode === 'pending') {
+        return { label: 'Подтвердить', status: 'confirmed' };
+      }
+      if (orderStatusCode === 'confirmed') {
+        return { label: 'Собрано', status: 'assembled' };
+      }
+      if (orderStatusCode === 'assembled' && isPickup) {
+        return { label: 'К выдаче', status: 'ready_for_pickup' };
+      }
+      if (orderStatusCode === 'assembled' && !isPickup) {
+        return { label: 'В доставку', status: 'shipped' };
+      }
+      if (orderStatusCode === 'ready_for_pickup' && isPickup) {
+        return { label: 'Выдать', action: 'verify' };
+      }
+      if (orderStatusCode === 'shipped') {
+        return { label: 'Получен', status: 'delivered' };
+      }
+    }
+    if (isNew) {
+      if (orderStatusCode === 'new_waiting_confirmation') {
+        return { label: 'В сборку', status: 'new_assembling' };
+      }
+      if (orderStatusCode === 'new_assembling') {
+        return { label: 'Отгружено', status: 'new_shipped' };
+      }
+      if (orderStatusCode === 'new_shipped' || orderStatusCode === 'new_awaiting_arrival') {
+        if (isPickup) {
+          return { label: 'К выдаче', status: 'new_ready_for_pickup' };
+        }
+        return { label: 'Получен', status: 'new_received' };
+      }
+      if (orderStatusCode === 'new_ready_for_pickup' && isPickup) {
+        return { label: 'Выдать', action: 'verify' };
+      }
+    }
+    return null;
+  })();
 
   const deliveryText = getGarageDeliveryInfo(order);
 
@@ -274,6 +317,22 @@ export default function SalesGarageOrderCard({
                 showStatusIcon={isNew}
                 title={isNew ? 'Статус заказа для покупателя (Свой Гараж)' : 'Статус заказа'}
               />
+              {primaryCta ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (primaryCta.action === 'verify') {
+                      onOpenPickupVerify?.(order, orderType);
+                      return;
+                    }
+                    onUpdateStatus(order.id, primaryCta.status, null);
+                  }}
+                  className="inline-flex items-center rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                >
+                  {primaryCta.label}
+                </button>
+              ) : null}
               {isNew && rosskoStatus && (
                 <span
                   className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-800 ring-1 ring-sky-100"

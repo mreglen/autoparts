@@ -28,6 +28,13 @@ class GarageNewOrder(Base):
     is_paid = Column(Boolean, nullable=False, default=False)
     status_code = Column(String(50), nullable=False, default="new_waiting_confirmation", index=True)
 
+    pickup_code_hash = Column(String(64), nullable=True)
+    pickup_code_cipher = Column(Text, nullable=True)
+    pickup_code_created_at = Column(DateTime(timezone=True), nullable=True)
+    pickup_code_expires_at = Column(DateTime(timezone=True), nullable=True)
+    pickup_verified_at = Column(DateTime(timezone=True), nullable=True)
+    pickup_verify_attempts = Column(Integer, nullable=False, default=0)
+
     seller = Column(String(255), nullable=True)
     deliver_in_parts = Column(Boolean, nullable=False, default=False)
     rossko_order_id = Column(String(64), nullable=True, index=True)

@@ -151,6 +151,21 @@ class UpdateStatusRequest(BaseModel):
     status_code: str
 
 
+class VerifyPickupRequest(BaseModel):
+    code: Optional[str] = None
+    qr_payload: Optional[str] = None
+
+
+class PickupOverrideRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=500)
+
+
+class PickupActionResponse(BaseModel):
+    status: str = "ok"
+    status_code: str
+    order_id: int
+
+
 class PurchasedUsedOrderItemResponse(BaseModel):
     id: int
     product_id: Optional[int] = None
@@ -182,6 +197,8 @@ class PurchasedUsedOrderResponse(BaseModel):
     is_paid: bool
     status_code: str
     created_at: datetime
+    pickup_code: Optional[str] = None
+    pickup_qr_payload: Optional[str] = None
     items: list[PurchasedUsedOrderItemResponse] = Field(default_factory=list)
 
     class Config:
@@ -222,6 +239,8 @@ class PurchasedNewOrderResponse(BaseModel):
     seller: Optional[str] = None
     deliver_in_parts: bool
     created_at: datetime
+    pickup_code: Optional[str] = None
+    pickup_qr_payload: Optional[str] = None
     items: list[PurchasedNewOrderItemResponse] = Field(default_factory=list)
 
     class Config:

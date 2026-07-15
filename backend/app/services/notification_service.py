@@ -55,6 +55,7 @@ ORDER_STATUS_LABELS: dict[str, str] = {
     "confirmed": "Подтверждён",
     "rejected": "Не подтверждён",
     "assembled": "Сформирован",
+    "ready_for_pickup": "К выдаче",
     "shipped": "В доставке",
     "delivered": "Получен",
     "closed": "Закрыт",
@@ -62,6 +63,7 @@ ORDER_STATUS_LABELS: dict[str, str] = {
     "new_assembling": "Комплектуется",
     "new_shipped": "Отгружено",
     "new_awaiting_arrival": "Ожидает поступления",
+    "new_ready_for_pickup": "К выдаче",
     "new_received": "Получен",
 }
 
@@ -264,6 +266,7 @@ def notify_order_status_buyer(
     order_kind: str,
     status_code: str,
     previous_status_code: str | None = None,
+    pickup_code: str | None = None,
 ) -> None:
     if not user_id or status_code == previous_status_code:
         return
@@ -271,7 +274,13 @@ def notify_order_status_buyer(
     status_label = order_status_label(status_code)
     kind_label = "новых запчастей" if order_kind == "new" else "б/у"
     title = f"Заказ №{order_id}: {status_label}"
-    body = f"Статус вашего заказа {kind_label} изменён на «{status_label}»."
+    if status_code in ("ready_for_pickup", "new_ready_for_pickup"):
+        body = (
+            f"Заказ {kind_label} №{order_id} готов к выдаче."
+            + (f" Код: {pickup_code}." if pickup_code else "")
+        )
+    else:
+        body = f"Статус вашего заказа {kind_label} изменён на «{status_label}»."
     push_data = {
         "type": "order_status",
         "orderId": order_id,

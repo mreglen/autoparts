@@ -22,6 +22,10 @@ from app.services.rossko_status_labels import (
     format_rossko_status,
     map_rossko_line_status_to_new_parts_status_code,
 )
+from app.services.pickup_verification_service import (
+    NEW_PICKUP_READY_STATUS,
+    get_buyer_pickup_payload,
+)
 
 
 def item_match_key(brand: str | None, partnumber: str | None) -> tuple[str, str]:
@@ -180,11 +184,15 @@ def build_buyer_new_parts_order_response(
     items = merge_buyer_items_with_rossko(db, order, snapshot, resolve_seo_card_id=resolve_seo_card_id)
 
     status_code = order.status_code
-    if snapshot and not rossko_sync_error:
+    if order.status_code in (NEW_PICKUP_READY_STATUS, "new_received"):
+        status_code = order.status_code
+    elif snapshot and not rossko_sync_error:
         status_code = aggregate_status_from_codes(
             [item.status_code for item in items],
             default=order.status_code or "new_waiting_confirmation",
         )
+
+    pickup = get_buyer_pickup_payload(order, order_kind="new")
 
     return PurchasedNewOrderResponse(
         id=order.id,
@@ -206,5 +214,7 @@ def build_buyer_new_parts_order_response(
         seller=order.seller,
         deliver_in_parts=bool(order.deliver_in_parts),
         created_at=order.created_at,
+        pickup_code=pickup["pickup_code"],
+        pickup_qr_payload=pickup["pickup_qr_payload"],
         items=items,
     )

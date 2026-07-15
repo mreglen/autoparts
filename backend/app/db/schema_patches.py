@@ -2499,3 +2499,36 @@ def ensure_user_rossko_favorites_table() -> None:
 
     logger.info("Applied user_rossko_favorites table patch")
 
+
+def ensure_garage_order_pickup_columns() -> None:
+    """Pickup verification columns for used/new garage orders."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    ts_type = "TIMESTAMPTZ" if engine.dialect.name == "postgresql" else "DATETIME"
+    int_default = "INTEGER NOT NULL DEFAULT 0"
+
+    columns_to_add = [
+        ("pickup_code_hash", "VARCHAR(64)"),
+        ("pickup_code_cipher", "TEXT"),
+        ("pickup_code_created_at", ts_type),
+        ("pickup_code_expires_at", ts_type),
+        ("pickup_verified_at", ts_type),
+        ("pickup_verify_attempts", int_default),
+    ]
+
+    for table in ("garage_used_orders", "garage_new_orders"):
+        if table not in table_names:
+            continue
+        existing = {col["name"] for col in inspector.get_columns(table)}
+        statements: list[str] = []
+        for name, col_type in columns_to_add:
+            if name in existing:
+                continue
+            statements.append(f"ALTER TABLE {table} ADD COLUMN {name} {col_type}")
+        if not statements:
+            continue
+        with engine.begin() as conn:
+            for stmt in statements:
+                conn.execute(text(stmt))
+        logger.info("Applied %s pickup columns patch", table)
+

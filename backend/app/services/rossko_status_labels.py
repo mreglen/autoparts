@@ -28,6 +28,7 @@ NEW_PARTS_STATUS_CODES: dict[str, str] = {
     "new_assembling": "Комплектуется",
     "new_shipped": "Отгружено",
     "new_awaiting_arrival": "Ожидает поступления",
+    "new_ready_for_pickup": "К выдаче",
     "new_received": "Получен",
 }
 
@@ -37,7 +38,8 @@ NEW_PARTS_STATUS_PRIORITY: dict[str, int] = {
     "new_assembling": 2,
     "new_shipped": 3,
     "new_awaiting_arrival": 4,
-    "new_received": 5,
+    "new_ready_for_pickup": 5,
+    "new_received": 6,
 }
 
 

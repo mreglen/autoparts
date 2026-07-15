@@ -6,7 +6,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import PurchaseOrderCard, { PurchaseOrdersEmptyState } from '../../components/PurchaseOrderCard/PurchaseOrderCard';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
-import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus, getGarageStatusColor, getGarageStatusName, getUsedOrderBuyerHint } from '../../utils/garageOrderUi';
+import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus, getGarageStatusColor, getGarageStatusName, getUsedOrderBuyerHint, getNewOrderBuyerHint } from '../../utils/garageOrderUi';
 import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
 import { isUsedOrderReturnEligible, TERMINAL_RETURN_STATUSES } from '../../utils/returnStatusUi';
 import { openOrderItemProductFlow } from '../../utils/avitoProductFlow';
@@ -346,7 +346,7 @@ export default function PurchasesOrdersPage() {
                   formatPrice={formatPrice}
                   getStatusColor={getGarageStatusColor}
                   getStatusName={getGarageStatusName}
-                  getBuyerHint={isUsed ? getUsedOrderBuyerHint : undefined}
+                  getBuyerHint={isUsed ? getUsedOrderBuyerHint : getNewOrderBuyerHint}
                   getDeliveryInfo={getGarageDeliveryInfo}
                   onProductClick={handleProductClick}
                   canRequestReturn={

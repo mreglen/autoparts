@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import OrderWriteMessageButton from '../OrderWriteMessageButton/OrderWriteMessageButton';
 import { canLinkGarageOrderItem } from '../../utils/partRoutes';
 
@@ -32,6 +33,11 @@ const STATUS_ICONS = {
   assembled: (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+    </svg>
+  ),
+  ready_for_pickup: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
     </svg>
   ),
   shipped: (
@@ -71,6 +77,11 @@ const STATUS_ICONS = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10m10 0h4m-4 0a2 2 0 104 0m-4 0v-4m8 4V8m0 0l3 3m-3-3l-3 3" />
     </svg>
   ),
+  new_ready_for_pickup: (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+    </svg>
+  ),
   new_received: (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -103,7 +114,12 @@ export default function PurchaseOrderCard({
     || (isUsed ? 'Продавец не указан' : 'Новые запчасти от поставщика');
   const statusCode = order.status_code || 'pending';
   const statusIcon = STATUS_ICONS[statusCode] || STATUS_ICONS.pending;
-  const buyerHint = isUsed && getBuyerHint ? getBuyerHint(statusCode) : null;
+  const buyerHint = getBuyerHint ? getBuyerHint(statusCode) : null;
+  const pickupCode = order.pickup_code;
+  const pickupQr = order.pickup_qr_payload;
+  const showPickupCode =
+    Boolean(pickupCode) &&
+    (statusCode === 'ready_for_pickup' || statusCode === 'new_ready_for_pickup');
 
   return (
     <article
@@ -187,6 +203,23 @@ export default function PurchaseOrderCard({
             {items.length} {items.length === 1 ? 'позиция' : items.length < 5 ? 'позиции' : 'позиций'}
           </span>
         </div>
+
+        {showPickupCode ? (
+          <div className="mt-4 rounded-2xl border border-indigo-100 bg-gradient-to-b from-indigo-50/60 to-white p-4 sm:p-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Код получения</p>
+            <div className="mt-3 flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="font-mono text-3xl font-bold tracking-[0.35em] text-gray-900 tabular-nums sm:text-4xl">
+                {String(pickupCode).split('').join('')}
+              </p>
+              {pickupQr ? (
+                <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                  <QRCodeSVG value={pickupQr} size={128} level="M" includeMargin={false} />
+                </div>
+              ) : null}
+            </div>
+            <p className="mt-3 text-center text-xs text-gray-500 sm:text-left">Покажите продавцу</p>
+          </div>
+        ) : null}
       </div>
 
       {/* Кнопка раскрытия состава заказа */}

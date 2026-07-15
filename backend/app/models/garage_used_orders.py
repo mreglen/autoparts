@@ -29,6 +29,13 @@ class GarageUsedOrder(Base):
     is_paid = Column(Boolean, nullable=False, default=False)
     status_code = Column(String(50), nullable=False, default="pending", index=True)
 
+    pickup_code_hash = Column(String(64), nullable=True)
+    pickup_code_cipher = Column(Text, nullable=True)
+    pickup_code_created_at = Column(DateTime(timezone=True), nullable=True)
+    pickup_code_expires_at = Column(DateTime(timezone=True), nullable=True)
+    pickup_verified_at = Column(DateTime(timezone=True), nullable=True)
+    pickup_verify_attempts = Column(Integer, nullable=False, default=0)
+
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 

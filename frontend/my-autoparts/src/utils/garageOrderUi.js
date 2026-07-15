@@ -61,6 +61,7 @@ export const GARAGE_STATUS_COLORS = {
   confirmed: 'bg-blue-50 text-blue-800 ring-1 ring-blue-100',
   rejected: 'bg-red-50 text-red-800 ring-1 ring-red-100',
   assembled: 'bg-indigo-50 text-indigo-800 ring-1 ring-indigo-100',
+  ready_for_pickup: 'bg-teal-50 text-teal-800 ring-1 ring-teal-100',
   shipped: 'bg-violet-50 text-violet-800 ring-1 ring-violet-100',
   delivered: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100',
   closed: 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
@@ -70,6 +71,7 @@ export const GARAGE_STATUS_COLORS = {
   new_assembling: 'bg-indigo-50 text-indigo-800 ring-1 ring-indigo-100',
   new_shipped: 'bg-violet-50 text-violet-800 ring-1 ring-violet-100',
   new_awaiting_arrival: 'bg-sky-50 text-sky-800 ring-1 ring-sky-100',
+  new_ready_for_pickup: 'bg-teal-50 text-teal-800 ring-1 ring-teal-100',
   new_received: 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100',
 };
 
@@ -78,6 +80,7 @@ export const GARAGE_STATUS_NAMES = {
   confirmed: 'Подтверждён',
   rejected: 'Не подтверждён',
   assembled: 'Сформирован',
+  ready_for_pickup: 'К выдаче',
   shipped: 'В доставке',
   delivered: 'Получен',
   closed: 'Закрыт',
@@ -86,6 +89,7 @@ export const GARAGE_STATUS_NAMES = {
   new_assembling: 'Комплектуется',
   new_shipped: 'Отгружено',
   new_awaiting_arrival: 'Ожидает поступления',
+  new_ready_for_pickup: 'К выдаче',
   new_received: 'Получен',
 };
 
@@ -93,12 +97,14 @@ export const GARAGE_ACTIVE_STATUSES = new Set([
   'pending',
   'confirmed',
   'assembled',
+  'ready_for_pickup',
   'shipped',
 
   'new_waiting_confirmation',
   'new_assembling',
   'new_shipped',
   'new_awaiting_arrival',
+  'new_ready_for_pickup',
 ]);
 
 export const GARAGE_COMPLETED_STATUSES = new Set(['delivered', 'closed', 'new_received']);
@@ -107,15 +113,30 @@ export const USED_ORDER_BUYER_HINTS = {
   pending: 'Продавец проверяет наличие. Обычно отвечает в течение рабочего дня.',
   confirmed: 'Заказ подтверждён. Продавец готовит товар.',
   assembled: 'Заказ собран. Ожидайте передачи или доставки.',
+  ready_for_pickup: 'Покажите QR или назовите код при получении.',
   shipped: 'Товар передан в доставку или курьеру.',
   delivered: 'Заказ получен. Спасибо за покупку!',
   rejected: 'Продавец не подтвердил заказ. Напишите ему в чат.',
   closed: 'Заказ закрыт.',
 };
 
+export const NEW_ORDER_BUYER_HINTS = {
+  new_waiting_confirmation: 'Заказ принят. Ждём подтверждения.',
+  new_assembling: 'Заказ комплектуется.',
+  new_shipped: 'Заказ отгружен поставщиком.',
+  new_awaiting_arrival: 'Ожидаем поступление на точку выдачи.',
+  new_ready_for_pickup: 'Покажите QR или назовите код при получении.',
+  new_received: 'Заказ получен. Спасибо за покупку!',
+};
+
 export function getUsedOrderBuyerHint(statusCode) {
   const code = statusCode || 'pending';
   return USED_ORDER_BUYER_HINTS[code] || USED_ORDER_BUYER_HINTS.pending;
+}
+
+export function getNewOrderBuyerHint(statusCode) {
+  const code = statusCode || 'new_waiting_confirmation';
+  return NEW_ORDER_BUYER_HINTS[code] || null;
 }
 
 export function getGarageStatusName(statusCode) {

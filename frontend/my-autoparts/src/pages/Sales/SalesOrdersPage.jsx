@@ -6,6 +6,7 @@ import { fetchSalesMenuCounts } from '../../redux/slices/SalesMenuCountsSlice';
 import { AvitoOrderCard } from '../../components/AvitoOrderCard';
 import SalesGarageOrderCard from '../../components/SalesOrders/SalesGarageOrderCard';
 import SalesOrdersEmptyState from '../../components/SalesOrders/SalesOrdersEmptyState';
+import PickupVerifyModal from '../../components/SalesOrders/PickupVerifyModal';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import OrderSourceBadge from '../../components/Orders/OrderSourceBadge';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
@@ -117,6 +118,13 @@ export default function SalesOrdersPage() {
     error: '',
     isSubmitting: false,
   });
+  const [pickupModal, setPickupModal] = useState({
+    isOpen: false,
+    order: null,
+    orderKind: 'used',
+    error: '',
+    isSubmitting: false,
+  });
 
   const usedOrderStatusOptions = useMemo(() => {
     if (availableStatuses.length > 0) return availableStatuses;
@@ -125,6 +133,7 @@ export default function SalesOrdersPage() {
       { code: 'confirmed', name: 'Подтверждён' },
       { code: 'rejected', name: 'Не подтверждён' },
       { code: 'assembled', name: 'Сформирован' },
+      { code: 'ready_for_pickup', name: 'К выдаче' },
       { code: 'shipped', name: 'Передан в доставку' },
       { code: 'delivered', name: 'Получен' },
       { code: 'closed', name: 'Закрыт' },
@@ -136,6 +145,7 @@ export default function SalesOrdersPage() {
     { code: 'new_assembling', name: 'Комплектуется' },
     { code: 'new_shipped', name: 'Отгружено' },
     { code: 'new_awaiting_arrival', name: 'Ожидает поступления' },
+    { code: 'new_ready_for_pickup', name: 'К выдаче' },
     { code: 'new_received', name: 'Получен' },
   ]), []);
 
@@ -383,6 +393,93 @@ export default function SalesOrdersPage() {
       });
     }
   };
+
+  const openPickupVerify = useCallback((order, orderKind) => {
+    setPickupModal({
+      isOpen: true,
+      order,
+      orderKind,
+      error: '',
+      isSubmitting: false,
+    });
+  }, []);
+
+  const closePickupVerify = useCallback(() => {
+    setPickupModal({
+      isOpen: false,
+      order: null,
+      orderKind: 'used',
+      error: '',
+      isSubmitting: false,
+    });
+  }, []);
+
+  const applyPickupLocalStatus = (orderId, orderKind, statusCode) => {
+    const setter = orderKind === 'new' ? setNewOrders : setUsedOrders;
+    setter((prev) =>
+      prev.map((o) => {
+        if (o.id !== orderId) return o;
+        return {
+          ...o,
+          status_code: statusCode,
+          items: (o.items || []).map((item) => ({ ...item, status_code: statusCode })),
+        };
+      })
+    );
+  };
+
+  const submitPickupVerify = useCallback(async ({ code, qr_payload } = {}) => {
+    const order = pickupModal.order;
+    const orderKind = pickupModal.orderKind;
+    if (!order) return;
+    setPickupModal((prev) => ({ ...prev, isSubmitting: true, error: '' }));
+    try {
+      const base =
+        orderKind === 'new'
+          ? `/sales/new-parts-orders/${order.id}`
+          : `/sales/used-parts-orders/${order.id}`;
+      const response = await apiAxios.post(`${base}/verify-pickup`, {
+        code: code || undefined,
+        qr_payload: qr_payload || undefined,
+      });
+      const statusCode = response.data?.status_code;
+      applyPickupLocalStatus(order.id, orderKind, statusCode);
+      setUsedOrderStatusMessage({ type: 'success', text: 'Заказ выдан.' });
+      closePickupVerify();
+      dispatch(fetchSalesMenuCounts());
+    } catch (error) {
+      setPickupModal((prev) => ({
+        ...prev,
+        isSubmitting: false,
+        error: formatStatusErrorDetail(error?.response?.data?.detail),
+      }));
+    }
+  }, [pickupModal.order, pickupModal.orderKind, closePickupVerify, dispatch]);
+
+  const submitPickupOverride = useCallback(async (reason) => {
+    const order = pickupModal.order;
+    const orderKind = pickupModal.orderKind;
+    if (!order) return;
+    setPickupModal((prev) => ({ ...prev, isSubmitting: true, error: '' }));
+    try {
+      const base =
+        orderKind === 'new'
+          ? `/sales/new-parts-orders/${order.id}`
+          : `/sales/used-parts-orders/${order.id}`;
+      const response = await apiAxios.post(`${base}/pickup-override`, { reason });
+      const statusCode = response.data?.status_code;
+      applyPickupLocalStatus(order.id, orderKind, statusCode);
+      setUsedOrderStatusMessage({ type: 'success', text: 'Заказ выдан без кода.' });
+      closePickupVerify();
+      dispatch(fetchSalesMenuCounts());
+    } catch (error) {
+      setPickupModal((prev) => ({
+        ...prev,
+        isSubmitting: false,
+        error: formatStatusErrorDetail(error?.response?.data?.detail),
+      }));
+    }
+  }, [pickupModal.order, pickupModal.orderKind, closePickupVerify, dispatch]);
 
   const refreshSupplierStatus = async (orderId) => {
     setSupplierRefreshLoadingByOrderId((prev) => ({ ...prev, [orderId]: true }));
@@ -1034,6 +1131,7 @@ export default function SalesOrdersPage() {
                   editingStatus={editingStatus}
                   onEditStatus={setEditingStatus}
                   onUpdateStatus={isUsed ? updateUsedOrderStatus : updateNewOrderStatus}
+                  onOpenPickupVerify={openPickupVerify}
                   getStatusColor={getGarageStatusColor}
                   getStatusName={(code) => getGarageStatusName(code, entry.source)}
                   orderStatusOptions={isUsed ? usedOrderStatusOptions : newOrderStatusOptions}
@@ -1120,18 +1218,16 @@ export default function SalesOrdersPage() {
         {receiveCodeModal.isOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
-              <h3 className="text-lg font-semibold text-gray-900">Подтверждение получения заказа</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Выдача Avito · 4 цифры</h3>
               {receiveCodeModal.step === 'hint' && (
-                <div className="mt-2 space-y-2 text-sm text-gray-700">
+                <div className="mt-3 space-y-1 text-sm text-gray-600">
                   {(() => {
                     const hint = getCncReceiveHint(receiveCodeModal.order);
                     return (
                       <>
-                        {hint.receiveBefore && <p>Передайте заказ до {formatDate(hint.receiveBefore)}.</p>}
-                        <p>Попросите номер заказа: {hint.marketplaceId}.</p>
-                        <p>Адрес: {hint.address}.</p>
-                        <p>Комментарий: {hint.details}.</p>
-                        <p>После выдачи нажмите «Ввести код».</p>
+                        {hint.marketplaceId ? <p>№ {hint.marketplaceId}</p> : null}
+                        {hint.address ? <p>{hint.address}</p> : null}
+                        {hint.receiveBefore ? <p>до {formatDate(hint.receiveBefore)}</p> : null}
                       </>
                     );
                   })()}
@@ -1139,19 +1235,19 @@ export default function SalesOrdersPage() {
               )}
               {receiveCodeModal.step === 'code' && (
                 <>
-                  <p className="mt-2 text-sm text-gray-600">
-                    Введите 4-значный код покупателя.
-                  </p>
-                  <label className="mt-4 block text-sm font-medium text-gray-700" htmlFor="receive-confirm-code">
-                    Код подтверждения
-                  </label>
+                  <p className="mt-2 text-sm text-gray-500">Код покупателя Avito</p>
                   <input
                     id="receive-confirm-code"
                     type="text"
+                    inputMode="numeric"
                     value={receiveCodeModal.confirmCode}
-                    onChange={(e) => setReceiveCodeModal((prev) => ({ ...prev, confirmCode: e.target.value, error: '' }))}
-                    className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
-                    placeholder="Введите код"
+                    onChange={(e) => setReceiveCodeModal((prev) => ({
+                      ...prev,
+                      confirmCode: e.target.value.replace(/\D/g, '').slice(0, 4),
+                      error: '',
+                    }))}
+                    className="mt-3 w-full rounded-xl border border-gray-300 px-3 py-3 text-center font-mono text-2xl font-semibold tracking-[0.35em] text-gray-900 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                    placeholder="····"
                     autoFocus
                   />
                 </>
@@ -1162,7 +1258,7 @@ export default function SalesOrdersPage() {
               <div className="mt-5 flex justify-end gap-2">
                 <button
                   type="button"
-                  className="rounded border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   onClick={closeReceiveCodeModal}
                   disabled={receiveCodeModal.isSubmitting}
                 >
@@ -1190,9 +1286,9 @@ export default function SalesOrdersPage() {
                       type="button"
                       className="rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={submitReceiveCodeTransition}
-                      disabled={receiveCodeModal.isSubmitting}
+                      disabled={receiveCodeModal.isSubmitting || String(receiveCodeModal.confirmCode || '').trim().length !== 4}
                     >
-                      {receiveCodeModal.isSubmitting ? 'Проверяем...' : 'Подтвердить'}
+                      {receiveCodeModal.isSubmitting ? 'Проверка…' : 'Выдать'}
                     </button>
                   </>
                 )}
@@ -1200,6 +1296,18 @@ export default function SalesOrdersPage() {
             </div>
           </div>
         )}
+
+        <PickupVerifyModal
+          isOpen={pickupModal.isOpen}
+          orderId={pickupModal.order?.id}
+          orderKind={pickupModal.orderKind}
+          isSubmitting={pickupModal.isSubmitting}
+          error={pickupModal.error}
+          onClose={closePickupVerify}
+          onVerify={submitPickupVerify}
+          onOverride={submitPickupOverride}
+          allowOverride
+        />
     </div>
   );
 }
