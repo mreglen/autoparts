@@ -69,7 +69,7 @@ export default function PurchasesOrdersPage() {
   const [newOrders, setNewOrders] = useState([]);
   const [expandedOrderKey, setExpandedOrderKey] = useState(null);
   const [newOrdersLoadFailed, setNewOrdersLoadFailed] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeReturnOrderIds, setActiveReturnOrderIds] = useState(new Set());
 
