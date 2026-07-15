@@ -260,18 +260,28 @@ function App() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (!token || user) return;
-    dispatch(fetchProfile())
-      .unwrap()
-      .then(() => {
-        dispatch(subscribeToPushNotifications({ prompt: false }));
-      })
-      .catch((error) => {
-        if (error?.includes('401') || error?.includes('Unauthorized')) {
+    if (!token) return undefined;
+
+    let cancelled = false;
+    const ensurePush = async () => {
+      try {
+        if (!user) {
+          await dispatch(fetchProfile()).unwrap();
+        }
+        if (!cancelled) {
+          dispatch(subscribeToPushNotifications({ prompt: false }));
+        }
+      } catch (error) {
+        if (String(error || '').includes('401') || String(error || '').includes('Unauthorized')) {
           setAuthToken(null);
           dispatch(logout());
         }
-      });
+      }
+    };
+    ensurePush();
+    return () => {
+      cancelled = true;
+    };
   }, [dispatch, token, user]);
 
   return (

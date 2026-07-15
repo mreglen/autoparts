@@ -38,6 +38,8 @@ class NotificationServiceTests(unittest.TestCase):
     def test_order_status_label_known(self):
         self.assertEqual(order_status_label("confirmed"), "Подтверждён")
         self.assertEqual(order_status_label("new_shipped"), "Отгружено")
+        self.assertEqual(order_status_label("ready_for_pickup"), "К выдаче")
+        self.assertEqual(order_status_label("new_ready_for_pickup"), "К выдаче")
 
     def test_order_status_label_unknown(self):
         self.assertEqual(order_status_label("custom_status"), "custom_status")

@@ -158,6 +158,19 @@ def merge_notification_prefs_patch(
     return merged
 
 
+def _celery_workers_available() -> bool:
+    try:
+        from app.celery_app import celery_app
+
+        inspector = celery_app.control.inspect(timeout=0.4)
+        if not inspector:
+            return False
+        ping = inspector.ping() or {}
+        return bool(ping)
+    except Exception:
+        return False
+
+
 def _enqueue_or_send(
     user_id: int,
     *,
@@ -166,40 +179,49 @@ def _enqueue_or_send(
     email_subject: str,
     email_body: str,
 ) -> None:
-    try:
-        from app.tasks.notification_tasks import send_user_notification
+    """Queue via Celery when a worker is up; otherwise send synchronously."""
+    from app.tasks.notification_tasks import deliver_user_notification, send_user_notification
 
-        send_user_notification.delay(
-            user_id,
-            event_type,
-            push_data,
-            email_subject,
-            email_body,
-        )
-    except Exception as exc:
-        logger.warning(
-            "Celery enqueue failed for %s user %s, sync fallback: %s",
-            event_type,
-            user_id,
-            exc,
-        )
+    if _celery_workers_available():
         try:
-            from app.tasks.notification_tasks import deliver_user_notification
-
-            deliver_user_notification(
+            send_user_notification.delay(
                 user_id,
                 event_type,
                 push_data,
                 email_subject,
                 email_body,
             )
-        except Exception as fallback_exc:
-            logger.exception(
-                "Sync notification fallback failed for %s user %s: %s",
+            logger.info("Notification queued for user %s (%s)", user_id, event_type)
+            return
+        except Exception as exc:
+            logger.warning(
+                "Celery enqueue failed for %s user %s, sync fallback: %s",
                 event_type,
                 user_id,
-                fallback_exc,
+                exc,
             )
+    else:
+        logger.info(
+            "No Celery workers for %s user %s — sending synchronously",
+            event_type,
+            user_id,
+        )
+
+    try:
+        deliver_user_notification(
+            user_id,
+            event_type,
+            push_data,
+            email_subject,
+            email_body,
+        )
+    except Exception as fallback_exc:
+        logger.exception(
+            "Sync notification failed for %s user %s: %s",
+            event_type,
+            user_id,
+            fallback_exc,
+        )
 
 
 def dispatch_user_notification(

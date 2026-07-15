@@ -10,16 +10,19 @@ import { getGarageDeliveryInfo, normalizeNewPartsCustomerStatus, getGarageStatus
 import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
 import { isUsedOrderReturnEligible, TERMINAL_RETURN_STATUSES } from '../../utils/returnStatusUi';
 import { openOrderItemProductFlow } from '../../utils/avitoProductFlow';
+import { subscribeToPushNotifications } from '../../redux/slices/ChatSlice';
 
 const ACTIVE_STATUSES = new Set([
   'pending',
   'confirmed',
   'assembled',
+  'ready_for_pickup',
   'shipped',
   'new_waiting_confirmation',
   'new_assembling',
   'new_shipped',
   'new_awaiting_arrival',
+  'new_ready_for_pickup',
 ]);
 const COMPLETED_STATUSES = new Set(['delivered', 'closed', 'new_received']);
 
@@ -69,6 +72,11 @@ export default function PurchasesOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeReturnOrderIds, setActiveReturnOrderIds] = useState(new Set());
+
+  useEffect(() => {
+    if (!isReady || !isAuthenticated) return;
+    dispatch(subscribeToPushNotifications({ prompt: true }));
+  }, [dispatch, isReady, isAuthenticated]);
 
   useEffect(() => {
     if (!isReady) return;
