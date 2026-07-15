@@ -7,7 +7,6 @@ async function stopScannerSafe(scanner) {
   if (!scanner) return;
   try {
     const state = typeof scanner.getState === 'function' ? scanner.getState() : null;
-    // 2 = SCANNING, 3 = PAUSED
     if (state == null || state === 2 || state === 3) {
       await scanner.stop();
     }
@@ -19,6 +18,34 @@ async function stopScannerSafe(scanner) {
   } catch (_) {
     /* DOM already gone */
   }
+}
+
+/** Local QR check before confirm — same shape as backend pickup payload. */
+function parsePickupQr(raw, expectedOrderId, expectedKind) {
+  if (!raw || !String(raw).trim()) {
+    return { ok: false, message: 'QR пустой' };
+  }
+  let data;
+  try {
+    data = JSON.parse(String(raw).trim());
+  } catch (_) {
+    return { ok: false, message: 'Недействительный QR' };
+  }
+  if (!data || data.k !== 'pickup' || data.v !== 1) {
+    return { ok: false, message: 'Недействительный QR' };
+  }
+  const scannedOrderId = Number(data.o);
+  if (!Number.isFinite(scannedOrderId) || scannedOrderId !== Number(expectedOrderId)) {
+    return { ok: false, message: 'QR от другого заказа' };
+  }
+  if (data.kind && expectedKind && String(data.kind) !== String(expectedKind)) {
+    return { ok: false, message: 'QR от другого типа заказа' };
+  }
+  const code = String(data.c || '').trim();
+  if (!/^\d{6}$/.test(code)) {
+    return { ok: false, message: 'В QR нет кода получения' };
+  }
+  return { ok: true, code, qr_payload: String(raw).trim() };
 }
 
 export default function PickupVerifyModal({
@@ -34,24 +61,27 @@ export default function PickupVerifyModal({
 }) {
   const [shellOpen, setShellOpen] = useState(false);
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
-  const [mode, setMode] = useState('code'); // code | scan | override
+  // code | scan | override | confirm
+  const [mode, setMode] = useState('code');
   const [overrideReason, setOverrideReason] = useState('');
   const [scanError, setScanError] = useState('');
+  const [pendingPickup, setPendingPickup] = useState(null); // { code, qr_payload }
   const inputsRef = useRef([]);
   const html5QrCodeRef = useRef(null);
   const scanLockRef = useRef(false);
-  const onVerifyRef = useRef(onVerify);
   const isSubmittingRef = useRef(isSubmitting);
-
-  useEffect(() => {
-    onVerifyRef.current = onVerify;
-  }, [onVerify]);
+  const orderIdRef = useRef(orderId);
+  const orderKindRef = useRef(orderKind);
 
   useEffect(() => {
     isSubmittingRef.current = isSubmitting;
   }, [isSubmitting]);
 
-  // Keep modal shell mounted until camera is fully stopped — prevents white-screen crash
+  useEffect(() => {
+    orderIdRef.current = orderId;
+    orderKindRef.current = orderKind;
+  }, [orderId, orderKind]);
+
   useEffect(() => {
     if (isOpen) {
       setShellOpen(true);
@@ -68,6 +98,7 @@ export default function PickupVerifyModal({
       setMode('code');
       setOverrideReason('');
       setScanError('');
+      setPendingPickup(null);
       scanLockRef.current = false;
       setShellOpen(false);
     })();
@@ -96,9 +127,7 @@ export default function PickupVerifyModal({
         return;
       }
 
-      // Clear stale children if previous session left nodes
       el.innerHTML = '';
-
       scanner = new Html5Qrcode(SCANNER_ID);
       html5QrCodeRef.current = scanner;
 
@@ -115,15 +144,19 @@ export default function PickupVerifyModal({
             await stopScannerSafe(active);
             if (cancelled) return;
 
-            setMode('code');
-
-            try {
-              await onVerifyRef.current?.({ qr_payload: decoded });
-            } catch (_) {
-              /* parent shows error */
-            } finally {
+            const parsed = parsePickupQr(decoded, orderIdRef.current, orderKindRef.current);
+            if (!parsed.ok) {
+              setScanError(parsed.message);
+              setPendingPickup(null);
+              setMode('scan_invalid');
               scanLockRef.current = false;
+              return;
             }
+
+            setScanError('');
+            setPendingPickup({ code: parsed.code, qr_payload: parsed.qr_payload });
+            setMode('confirm');
+            scanLockRef.current = false;
           },
           () => {}
         );
@@ -153,6 +186,27 @@ export default function PickupVerifyModal({
     await stopScannerSafe(active);
     onClose?.();
   }, [onClose]);
+
+  const startScan = () => {
+    setScanError('');
+    setPendingPickup(null);
+    scanLockRef.current = false;
+    setMode('scan');
+  };
+
+  const cancelConfirm = () => {
+    setPendingPickup(null);
+    setScanError('');
+    setMode('code');
+  };
+
+  const confirmIssue = () => {
+    if (!pendingPickup || isSubmitting) return;
+    onVerify?.({
+      code: pendingPickup.code,
+      qr_payload: pendingPickup.qr_payload,
+    });
+  };
 
   if (!shellOpen) return null;
 
@@ -199,6 +253,60 @@ export default function PickupVerifyModal({
           {orderKind === 'new' ? 'Новые запчасти' : 'Б/у'} · 6 цифр или QR
         </p>
 
+        {mode === 'confirm' && (
+          <div className="mt-5 space-y-4">
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">QR распознан</p>
+              <p className="mt-2 font-mono text-3xl font-bold tracking-[0.35em] text-gray-900 tabular-nums">
+                {pendingPickup?.code}
+              </p>
+            </div>
+            <p className="text-center text-sm text-gray-600">Выдать товар покупателю?</p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                onClick={cancelConfirm}
+                disabled={isSubmitting}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                onClick={confirmIssue}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Выдача…' : 'Выдать товар'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mode === 'scan_invalid' && (
+          <div className="mt-5 space-y-4">
+            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-4 text-center">
+              <p className="text-sm font-medium text-red-700">{scanError || 'Недействительный QR'}</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                onClick={handleClose}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                onClick={startScan}
+              >
+                Сканировать снова
+              </button>
+            </div>
+          </div>
+        )}
+
         {mode === 'code' && (
           <>
             <div className="mt-5 flex justify-center gap-2" onPaste={handlePaste}>
@@ -225,11 +333,7 @@ export default function PickupVerifyModal({
               <button
                 type="button"
                 className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-                onClick={() => {
-                  setScanError('');
-                  scanLockRef.current = false;
-                  setMode('scan');
-                }}
+                onClick={startScan}
                 disabled={isSubmitting}
               >
                 Сканировать
@@ -253,7 +357,6 @@ export default function PickupVerifyModal({
             id={SCANNER_ID}
             className="overflow-hidden rounded-xl border border-gray-200 bg-black/5 min-h-[240px]"
           />
-          {scanError ? <p className="text-sm text-red-600">{scanError}</p> : null}
           <button
             type="button"
             className="text-sm font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
@@ -288,42 +391,46 @@ export default function PickupVerifyModal({
           </div>
         )}
 
-        {isSubmitting ? (
+        {isSubmitting && mode !== 'confirm' ? (
           <p className="mt-3 text-sm text-indigo-600">Проверка кода…</p>
         ) : null}
 
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+        {error && mode !== 'scan_invalid' ? (
+          <p className="mt-3 text-sm text-red-600">{error}</p>
+        ) : null}
 
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            onClick={handleClose}
-            disabled={isSubmitting}
-          >
-            Отмена
-          </button>
-          {mode === 'code' ? (
+        {mode !== 'confirm' && mode !== 'scan_invalid' ? (
+          <div className="mt-5 flex justify-end gap-2">
             <button
               type="button"
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isSubmitting || codeValue.length !== 6}
-              onClick={() => onVerify({ code: codeValue })}
+              className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              onClick={handleClose}
+              disabled={isSubmitting}
             >
-              {isSubmitting ? 'Проверка…' : 'Выдать'}
+              Отмена
             </button>
-          ) : null}
-          {mode === 'override' ? (
-            <button
-              type="button"
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isSubmitting || !overrideReason.trim()}
-              onClick={() => onOverride(overrideReason.trim())}
-            >
-              {isSubmitting ? 'Сохраняем…' : 'Выдать без кода'}
-            </button>
-          ) : null}
-        </div>
+            {mode === 'code' ? (
+              <button
+                type="button"
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isSubmitting || codeValue.length !== 6}
+                onClick={() => onVerify({ code: codeValue })}
+              >
+                {isSubmitting ? 'Проверка…' : 'Выдать'}
+              </button>
+            ) : null}
+            {mode === 'override' ? (
+              <button
+                type="button"
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isSubmitting || !overrideReason.trim()}
+                onClick={() => onOverride(overrideReason.trim())}
+              >
+                {isSubmitting ? 'Сохраняем…' : 'Выдать без кода'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );
