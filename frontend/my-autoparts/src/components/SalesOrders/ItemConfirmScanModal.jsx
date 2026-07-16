@@ -507,11 +507,7 @@ export default function ItemConfirmScanModal({
 
               {(entryError || error) ? (
                 <p className="mt-1 shrink-0 text-[11px] text-red-600">{entryError || error}</p>
-              ) : (
-                <p className="mt-1 shrink-0 text-[10px] text-gray-500">
-                  QR в рамку камеры или код вручную + OK
-                </p>
-              )}
+              ) : null}
             </>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center">

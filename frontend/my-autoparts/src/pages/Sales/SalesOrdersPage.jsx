@@ -9,6 +9,7 @@ import SalesOrdersEmptyState from '../../components/SalesOrders/SalesOrdersEmpty
 import PickupVerifyModal from '../../components/SalesOrders/PickupVerifyModal';
 import ItemConfirmScanModal from '../../components/SalesOrders/ItemConfirmScanModal';
 import OrderPaymentModal from '../../components/SalesOrders/OrderPaymentModal';
+import ConfirmModal from '../../components/ConfirmModal';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import OrderSourceBadge from '../../components/Orders/OrderSourceBadge';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
@@ -146,6 +147,16 @@ export default function SalesOrdersPage() {
     methodsError: '',
     error: '',
     isSubmitting: false,
+  });
+  const [cancelPaymentModal, setCancelPaymentModal] = useState({
+    isOpen: false,
+    order: null,
+    isSubmitting: false,
+  });
+  const [unconfirmItemModal, setUnconfirmItemModal] = useState({
+    isOpen: false,
+    order: null,
+    item: null,
   });
 
   const usedOrderStatusOptions = useMemo(() => {
@@ -620,6 +631,66 @@ export default function SalesOrdersPage() {
       }));
     }
   }, [paymentModal.order, closePaymentModal, dispatch]);
+
+  const openCancelPaymentModal = useCallback((order) => {
+    setCancelPaymentModal({ isOpen: true, order, isSubmitting: false });
+  }, []);
+
+  const closeCancelPaymentModal = useCallback(() => {
+    setCancelPaymentModal({ isOpen: false, order: null, isSubmitting: false });
+  }, []);
+
+  const submitCancelPayment = useCallback(async () => {
+    const order = cancelPaymentModal.order;
+    if (!order) return;
+    setCancelPaymentModal((prev) => ({ ...prev, isSubmitting: true }));
+    try {
+      await apiAxios.post(`/sales/used-parts-orders/${order.id}/unmark-paid`);
+      setUsedOrders((prev) =>
+        prev.map((o) =>
+          o.id === order.id
+            ? {
+                ...o,
+                is_paid: false,
+                payment_method_id: null,
+                payment_method_name: null,
+                paid_at: null,
+              }
+            : o
+        )
+      );
+      closeCancelPaymentModal();
+      dispatch(fetchSalesMenuCounts());
+    } catch (err) {
+      setCancelPaymentModal((prev) => ({ ...prev, isSubmitting: false }));
+      setUsedOrderStatusMessage({
+        type: 'error',
+        text: formatStatusErrorDetail(err?.response?.data?.detail) || 'Не удалось отменить оплату',
+      });
+    }
+  }, [cancelPaymentModal.order, closeCancelPaymentModal, dispatch]);
+
+  const openUnconfirmItemModal = useCallback((order, item) => {
+    setUnconfirmItemModal({ isOpen: true, order, item });
+  }, []);
+
+  const closeUnconfirmItemModal = useCallback(() => {
+    setUnconfirmItemModal({ isOpen: false, order: null, item: null });
+  }, []);
+
+  const submitUnconfirmItem = useCallback(async () => {
+    const { order, item } = unconfirmItemModal;
+    if (!order || !item) return;
+    const ok = await updateUsedOrderStatus(order.id, 'pending', item.id);
+    if (ok) {
+      closeUnconfirmItemModal();
+      return;
+    }
+    setUsedOrderStatusMessage({
+      type: 'error',
+      text: 'Не удалось отменить статус позиции',
+    });
+  }, [unconfirmItemModal, closeUnconfirmItemModal, updateUsedOrderStatus]);
 
   const confirmRosskoItem = useCallback(async (order, item) => {
     try {
@@ -1281,6 +1352,8 @@ export default function SalesOrdersPage() {
                   onOpenPickupVerify={openPickupVerify}
                   onOpenItemConfirm={openItemConfirmScan}
                   onOpenPayment={openPaymentModal}
+                  onOpenCancelPayment={openCancelPaymentModal}
+                  onOpenUnconfirmItem={openUnconfirmItemModal}
                   onRejectItem={rejectItem}
                   onConfirmRosskoItem={confirmRosskoItem}
                   getStatusColor={getGarageStatusColor}
@@ -1481,6 +1554,28 @@ export default function SalesOrdersPage() {
           formatPrice={formatPrice}
           onClose={closePaymentModal}
           onConfirm={submitOrderPayment}
+        />
+
+        <ConfirmModal
+          isOpen={cancelPaymentModal.isOpen}
+          onClose={closeCancelPaymentModal}
+          onConfirm={submitCancelPayment}
+          title="Отмена оплаты"
+          message="Вы хотите отменить оплату?"
+          confirmText="Да, отменить оплату"
+          cancelText="Отмена"
+          type="danger"
+        />
+
+        <ConfirmModal
+          isOpen={unconfirmItemModal.isOpen}
+          onClose={closeUnconfirmItemModal}
+          onConfirm={submitUnconfirmItem}
+          title="Отмена позиции"
+          message="Вы точно хотите отменить позицию?"
+          confirmText="Да, отменить позицию"
+          cancelText="Отмена"
+          type="danger"
         />
     </div>
   );

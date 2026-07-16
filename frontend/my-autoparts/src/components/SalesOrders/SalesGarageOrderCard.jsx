@@ -125,6 +125,8 @@ export default function SalesGarageOrderCard({
   onOpenPickupVerify,
   onOpenItemConfirm,
   onOpenPayment,
+  onOpenCancelPayment,
+  onOpenUnconfirmItem,
   onRejectItem,
   onConfirmRosskoItem,
   statusEditable = true,
@@ -299,9 +301,17 @@ export default function SalesGarageOrderCard({
             <div className="flex flex-wrap items-center gap-2">
               {isUsed ? (
                 order.is_paid ? (
-                  <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-100">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenCancelPayment?.(order);
+                    }}
+                    className="inline-flex rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white ring-1 ring-emerald-600/30 hover:bg-emerald-600"
+                    title="Отменить оплату"
+                  >
                     Оплачено
-                  </span>
+                  </button>
                 ) : (
                   <button
                     type="button"
@@ -399,6 +409,8 @@ export default function SalesGarageOrderCard({
               const itemStatusCode = item.status_code || orderStatusCode;
               const showItemConfirmActions = isGarageItemAwaitingSellerConfirm(itemStatusCode, orderType)
                 && (isUsed ? Boolean(item.product_id) : isRossko);
+              const isItemConfirmed = isUsed && itemStatusCode === 'confirmed';
+              const isItemRejected = isUsed && itemStatusCode === 'rejected';
               return (
                 <li
                   key={item.id || `${order.id}-${idx}`}
@@ -430,12 +442,6 @@ export default function SalesGarageOrderCard({
                     </div>
                     <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                       <div className="text-base font-semibold tabular-nums text-gray-900">{formatPrice(lineTotal)}</div>
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(itemStatusCode)}`}
-                        title="Статус позиции"
-                      >
-                        {getStatusName(itemStatusCode)}
-                      </span>
                       {showItemConfirmActions ? (
                         <div className="flex flex-col gap-1.5">
                           <button
@@ -463,6 +469,40 @@ export default function SalesGarageOrderCard({
                             Не подтверждён
                           </button>
                         </div>
+                      ) : null}
+                      {isItemConfirmed ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenUnconfirmItem?.(order, item);
+                          }}
+                          className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600"
+                          title="Отменить подтверждение позиции"
+                        >
+                          Подтверждено
+                        </button>
+                      ) : null}
+                      {isItemRejected ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenUnconfirmItem?.(order, item);
+                          }}
+                          className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                          title="Отменить отказ по позиции"
+                        >
+                          Не подтверждён
+                        </button>
+                      ) : null}
+                      {isNew && !showItemConfirmActions ? (
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(itemStatusCode)}`}
+                          title="Статус позиции"
+                        >
+                          {getStatusName(itemStatusCode)}
+                        </span>
                       ) : null}
                       {isNew && item.rossko_status && (
                         <span

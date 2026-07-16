@@ -65,7 +65,7 @@ class MarkUsedOrderPaidRequest(BaseModel):
 
 class MarkUsedOrderPaidResponse(BaseModel):
     status: str = "ok"
-    is_paid: bool = True
+    is_paid: bool = False
     payment_method_id: Optional[int] = None
     payment_method_name: Optional[str] = None
     paid_at: Optional[datetime] = None

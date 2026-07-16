@@ -1172,6 +1172,70 @@ def mark_used_order_paid(
 
 
 @router.post(
+    "/used-parts-orders/{order_id}/unmark-paid",
+    response_model=MarkUsedOrderPaidResponse,
+)
+def unmark_used_order_paid(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Отменить оплату б/у заказа — запись исчезнет из финансов."""
+    from app.models.stock_out import StockOut
+
+    _require_sales_orders_access(db, current_user)
+    order = _load_used_order_for_seller(db, order_id, current_user)
+
+    if not order.is_paid:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Заказ ещё не оплачен",
+        )
+
+    previous_method = order.payment_method_name
+    order.is_paid = False
+    order.payment_method_id = None
+    order.payment_method_name = None
+    order.paid_at = None
+
+    item_ids = [item.id for item in (order.items or []) if item.id]
+    if item_ids:
+        stock_outs = (
+            db.query(StockOut)
+            .filter(StockOut.garage_used_order_item_id.in_(item_ids))
+            .all()
+        )
+        for so in stock_outs:
+            so.payment_method = None
+
+    db.commit()
+    db.refresh(order)
+
+    log_audit(
+        db,
+        event_type="order_unmarked_paid",
+        category="orders",
+        summary=f"Заказ Б/У #{order_id}: оплата отменена",
+        user=current_user,
+        organization_id=order.organization_id,
+        details={
+            "order_id": order_id,
+            "previous_payment_method_name": previous_method,
+            "total_amount": order.total_amount,
+        },
+        entity_type="garage_used_order",
+        entity_id=order_id,
+    )
+
+    return MarkUsedOrderPaidResponse(
+        is_paid=False,
+        payment_method_id=None,
+        payment_method_name=None,
+        paid_at=None,
+    )
+
+
+@router.post(
     "/used-parts-orders/{order_id}/verify-pickup",
     response_model=PickupActionResponse,
 )
