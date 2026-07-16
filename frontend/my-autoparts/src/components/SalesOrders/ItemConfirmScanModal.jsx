@@ -1,10 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { parseSellerPartCardQr } from '../../utils/parseSellerPartCardQr';
-import { normalizeInternalCodeForSearch } from '../../utils/internalCode';
+import { normalizeInternalCodeForCompare } from '../../utils/internalCode';
 import StorageCellsDisplayTable from '../StorageCellsTable/StorageCellsDisplayTable';
 
 const SCANNER_ID = 'garage-item-confirm-qr-scanner';
+
+function buildQrScanConfig() {
+  return {
+    fps: 10,
+    qrbox: (viewfinderWidth, viewfinderHeight) => {
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+      const size = Math.max(140, Math.min(240, Math.floor(minEdge * 0.72)));
+      return { width: size, height: size };
+    },
+    aspectRatio: 1,
+  };
+}
 
 async function stopScannerSafe(scanner) {
   if (!scanner) return;
@@ -34,10 +46,6 @@ function parseProductIdFromScan(raw) {
   return null;
 }
 
-function normalizeCode(value) {
-  return normalizeInternalCodeForSearch(value).trim().toUpperCase().replace(/\s+/g, '');
-}
-
 function verifyScanInput(raw, expectedProductId, expectedInternalCode) {
   const trimmed = String(raw || '').trim();
   if (!trimmed) {
@@ -51,8 +59,8 @@ function verifyScanInput(raw, expectedProductId, expectedInternalCode) {
     return { ok: true };
   }
 
-  const inputCode = normalizeCode(trimmed);
-  const expectedCode = normalizeCode(expectedInternalCode);
+  const inputCode = normalizeInternalCodeForCompare(trimmed);
+  const expectedCode = normalizeInternalCodeForCompare(expectedInternalCode);
   if (expectedCode && inputCode === expectedCode) {
     return { ok: true };
   }
@@ -200,7 +208,7 @@ export default function ItemConfirmScanModal({
     let scanner;
 
     const start = async () => {
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 120));
       if (cancelled) return;
 
       const el = document.getElementById(SCANNER_ID);
@@ -216,7 +224,7 @@ export default function ItemConfirmScanModal({
       try {
         await scanner.start(
           { facingMode: 'environment' },
-          { fps: 8, qrbox: { width: 180, height: 180 } },
+          buildQrScanConfig(),
           async (decoded) => {
             if (cancelled || scanLockRef.current || isSubmittingRef.current) return;
             scanLockRef.current = true;
@@ -318,90 +326,73 @@ export default function ItemConfirmScanModal({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col px-4 py-3 sm:px-5">
-          {mode === 'entry' && (
-            <>
-              {!cameraError ? (
-                <div className="shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-black">
-                  <div id={SCANNER_ID} className="aspect-[4/3] max-h-[34vh] w-full sm:max-h-[200px]" />
-                </div>
-              ) : (
-                <div className="shrink-0 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-center">
-                  <p className="text-xs font-medium text-amber-800">{cameraError}</p>
-                  <p className="mt-1 text-[11px] text-amber-700">Используйте ввод внутреннего кода ниже</p>
-                </div>
-              )}
-
-              <form onSubmit={handleManualSubmit} className="mt-2 shrink-0">
-                <label className="mb-1 block text-xs font-medium text-gray-600" htmlFor="item-confirm-manual-id">
-                  Внутренний код
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    id="item-confirm-manual-id"
-                    type="text"
-                    value={manualId}
-                    onChange={(e) => {
-                      setManualId(e.target.value);
-                      if (entryError) setEntryError('');
-                    }}
-                    placeholder={productCard?.internal_code || 'XXXX-AAAAA'}
-                    className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    disabled={isSubmitting}
-                    autoComplete="off"
+          <div className="shrink-0 min-h-[17.5rem] sm:min-h-[15.5rem]">
+            {mode === 'entry' ? (
+              <>
+                {!cameraError ? (
+                  <div
+                    id={SCANNER_ID}
+                    className="item-confirm-qr-scanner h-[200px] w-full overflow-hidden rounded-xl border border-gray-200 bg-black sm:h-[220px]"
                   />
-                  <button
-                    type="submit"
-                    disabled={manualSubmitDisabled}
-                    className="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-                  >
-                    OK
-                  </button>
+                ) : (
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-center">
+                    <p className="text-xs font-medium text-amber-800">{cameraError}</p>
+                    <p className="mt-1 text-[11px] text-amber-700">Используйте ввод внутреннего кода ниже</p>
+                  </div>
+                )}
+
+                <form onSubmit={handleManualSubmit} className="mt-2">
+                  <label className="mb-1 block text-xs font-medium text-gray-600" htmlFor="item-confirm-manual-id">
+                    Внутренний код
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="item-confirm-manual-id"
+                      type="text"
+                      value={manualId}
+                      onChange={(e) => {
+                        setManualId(e.target.value);
+                        if (entryError) setEntryError('');
+                      }}
+                      placeholder={productCard?.internal_code || 'XXXX-AAAAA'}
+                      className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      disabled={isSubmitting}
+                      autoComplete="off"
+                    />
+                    <button
+                      type="submit"
+                      disabled={manualSubmitDisabled}
+                      className="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      OK
+                    </button>
+                  </div>
+                </form>
+
+                {entryError ? (
+                  <p className="mt-2 text-xs text-red-600">{entryError}</p>
+                ) : null}
+                {error ? (
+                  <p className="mt-2 text-xs text-red-600">{error}</p>
+                ) : null}
+              </>
+            ) : (
+              <div className="flex h-full min-h-[inherit] flex-col justify-center">
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-center">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Товар совпал</p>
+                  <p className="mt-1 text-sm font-medium text-gray-900">
+                    {productCard?.internal_code ? (
+                      <span className="font-mono">{productCard.internal_code}</span>
+                    ) : (
+                      <>ID {expectedProductId}</>
+                    )}
+                  </p>
                 </div>
-              </form>
-
-              {entryError ? (
-                <p className="mt-2 shrink-0 text-xs text-red-600">{entryError}</p>
-              ) : null}
-              {error ? (
-                <p className="mt-2 shrink-0 text-xs text-red-600">{error}</p>
-              ) : null}
-            </>
-          )}
-
-          {mode === 'confirm' && (
-            <div className="shrink-0 space-y-3 py-1">
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-center">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Товар совпал</p>
-                <p className="mt-1 text-sm font-medium text-gray-900">
-                  {productCard?.internal_code ? (
-                    <span className="font-mono">{productCard.internal_code}</span>
-                  ) : (
-                    <>ID {expectedProductId}</>
-                  )}
-                </p>
               </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="flex-1 rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  onClick={restartEntry}
-                  disabled={isSubmitting}
-                >
-                  Снова
-                </button>
-                <button
-                  type="button"
-                  className="flex-1 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-                  onClick={onConfirm}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? '…' : 'Подтвердить'}
-                </button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          <div className="mt-auto shrink-0 pt-2">
+          <div className="shrink-0 pt-2">
             <WarehouseFooter
               productCard={productCard}
               productCardLoading={productCardLoading}
@@ -410,8 +401,8 @@ export default function ItemConfirmScanModal({
           </div>
         </div>
 
-        {mode === 'entry' && (
-          <div className="shrink-0 border-t border-gray-100 px-4 py-3 sm:px-5">
+        <div className="shrink-0 border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
+          {mode === 'entry' ? (
             <button
               type="button"
               className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -420,8 +411,27 @@ export default function ItemConfirmScanModal({
             >
               Отмена
             </button>
-          </div>
-        )}
+          ) : (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                onClick={restartEntry}
+                disabled={isSubmitting}
+              >
+                Снова
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                onClick={onConfirm}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? '…' : 'Подтвердить'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

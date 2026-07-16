@@ -12,3 +12,10 @@ export function formatInternalCodeDisplay(code) {
   const normalized = normalizeInternalCodeForSearch(code).trim();
   return normalized || '—';
 }
+
+/** Сравнение кодов: без учёта регистра, дефиса и пробелов. */
+export function normalizeInternalCodeForCompare(code) {
+  const raw = normalizeInternalCodeForSearch(code).trim();
+  if (!raw) return '';
+  return raw.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+}

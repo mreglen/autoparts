@@ -183,3 +183,19 @@ input[type="password"] {
     height: -webkit-fill-available;
   }
 }
+
+/* html5-qrcode: стабильный видеопоток и прицел в модалке подтверждения */
+.item-confirm-qr-scanner {
+  position: relative;
+}
+
+.item-confirm-qr-scanner video {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.item-confirm-qr-scanner #qr-shaded-region {
+  border-color: rgba(255, 255, 255, 0.85) !important;
+}

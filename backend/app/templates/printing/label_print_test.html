@@ -53,11 +53,11 @@
 
       .side {
         flex: 0 0 auto;
-        width: 12.5mm;
+        width: 14mm;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 0.4mm;
+        gap: 0.35mm;
       }
 
       .qr {
@@ -73,6 +73,33 @@
         font-size: 5.6pt;
         line-height: 1.02;
         white-space: nowrap;
+      }
+
+      .internal-code-block {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.15mm;
+      }
+
+      .code-label {
+        font-size: 5pt;
+        line-height: 1;
+        font-weight: 700;
+      }
+
+      .internal-code {
+        width: 100%;
+        text-align: center;
+        font-size: 6pt;
+        font-weight: 700;
+        font-family: "DejaVu Sans Mono", "Courier New", monospace;
+        line-height: 1.05;
+        letter-spacing: -0.04em;
+        white-space: normal;
+        word-break: break-all;
+        overflow-wrap: anywhere;
       }
 
       .field {
@@ -175,7 +202,10 @@
           <div class="side">
             <img class="qr" src="{{qr_data_uri}}" alt="QR code" />
             <div class="right-meta">Цена: {{price|default("—")}}</div>
-            <div class="right-meta">Код: {{internal_code|default("—")}}</div>
+            <div class="internal-code-block">
+              <div class="code-label">Код</div>
+              <div class="internal-code" id="internal-code-value">{{internal_code|default("—")}}</div>
+            </div>
           </div>
         </div>
 
@@ -208,6 +238,19 @@
     </div>
     <script>
       (function () {
+        function fitInternalCode(defaultSize, minSize) {
+          var codeEl = document.getElementById("internal-code-value");
+          if (!codeEl) return;
+          var size = defaultSize;
+          codeEl.style.fontSize = size + "pt";
+          var guard = 0;
+          while (codeEl.scrollWidth > codeEl.clientWidth && size > minSize && guard < 14) {
+            size -= 0.25;
+            codeEl.style.fontSize = size + "pt";
+            guard += 1;
+          }
+        }
+
         try {
           var label = document.querySelector(".label");
           var design = document.getElementById("design");
@@ -223,12 +266,12 @@
           var scaleY = actualH / (baseH * 3.78);
           var k = Math.min(scaleX, scaleY);
 
-          if (!isFinite(k) || k <= 0 || k > 1.5) return;
-          /* Не уменьшаем — иначе сжимается верхняя строка таблицы адресов */
-          if (k < 1) return;
+          if (isFinite(k) && k > 0 && k <= 1.5 && k >= 1) {
+            design.style.transformOrigin = "center center";
+            design.style.transform = "scale(" + k.toFixed(4) + ")";
+          }
 
-          design.style.transformOrigin = "center center";
-          design.style.transform = "scale(" + k.toFixed(4) + ")";
+          fitInternalCode(6.0, 4.2);
         } catch (e) {}
       })();
     </script>

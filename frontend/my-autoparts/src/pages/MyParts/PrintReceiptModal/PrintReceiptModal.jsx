@@ -183,7 +183,7 @@ function LabelPreview({ widthMm, heightMm, selectedPart, storageCellsForLabel })
                 </div>
               </div>
 
-              <div className="shrink-0 w-[52px] flex flex-col items-center">
+              <div className="shrink-0 w-[56px] flex flex-col items-center">
                 <div className="w-[48px] h-[48px] border border-black overflow-hidden bg-white">
                   {qrPreviewSrc ? (
                     <img
@@ -197,8 +197,11 @@ function LabelPreview({ widthMm, heightMm, selectedPart, storageCellsForLabel })
                 <div className="mt-1 text-[8px] leading-tight text-black text-center whitespace-nowrap">
                   Цена: {selectedPart?.price != null ? `${parseFloat(selectedPart.price).toFixed(0)} ₽` : '—'}
                 </div>
-                <div className="mt-0.5 text-[7px] leading-tight text-black text-center whitespace-nowrap">
-                  Код: {internalCodeLabel}
+                <div className="mt-0.5 w-full text-center text-black">
+                  <div className="text-[7px] font-bold leading-tight">Код</div>
+                  <div className="font-mono text-[8px] font-bold leading-tight break-all">
+                    {internalCodeLabel}
+                  </div>
                 </div>
               </div>
             </div>
