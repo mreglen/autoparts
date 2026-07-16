@@ -184,19 +184,24 @@ input[type="password"] {
   }
 }
 
-/* html5-qrcode in order confirm modal — do not crop video (breaks decode region) */
+/* Order-confirm QR: full-frame decode + custom square reticle (hide library qrbox) */
+.item-confirm-qr-wrap {
+  isolation: isolate;
+}
+
 .item-confirm-qr-scanner {
-  position: relative;
+  position: absolute;
+  inset: 0;
   background: #000;
 }
 
-.item-confirm-qr-scanner > video,
 .item-confirm-qr-scanner video {
-  /* Keep contain so shaded qrbox aligns with decoded pixels */
-  object-fit: contain !important;
-  background: #000;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
 }
 
 .item-confirm-qr-scanner #qr-shaded-region {
-  border-color: rgba(255, 255, 255, 0.9) !important;
+  display: none !important;
 }

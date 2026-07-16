@@ -7,18 +7,10 @@ import StorageCellsDisplayTable from '../StorageCellsTable/StorageCellsDisplayTa
 
 const SCANNER_ID = 'garage-item-confirm-qr-scanner';
 
+/** Full-frame decode — library qrbox warps into a wide strip in short containers. */
 function buildQrScanConfig() {
   return {
     fps: 12,
-    // Large box relative to viewfinder; avoid aspectRatio (distorts shaded region).
-    qrbox: (viewfinderWidth, viewfinderHeight) => {
-      const minEdge = Math.min(viewfinderWidth || 0, viewfinderHeight || 0);
-      if (!minEdge) {
-        return { width: 180, height: 180 };
-      }
-      const size = Math.max(150, Math.min(280, Math.floor(minEdge * 0.9)));
-      return { width: size, height: size };
-    },
     disableFlip: false,
   };
 }
@@ -328,6 +320,7 @@ export default function ItemConfirmScanModal({
       }
 
       el.innerHTML = '';
+      // Keep config minimal — same approach as WarehouseScanPage / PickupVerifyModal.
       scanner = new Html5Qrcode(SCANNER_ID, {
         verbose: false,
         formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
@@ -343,6 +336,9 @@ export default function ItemConfirmScanModal({
             if (cancelled || scanLockRef.current || isSubmittingRef.current) return;
             scanLockRef.current = true;
             try {
+              if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                navigator.vibrate(40);
+              }
               await handleScanResultRef.current?.(decoded, { fromScanner: true });
             } catch (_) {
               scanLockRef.current = false;
@@ -355,10 +351,36 @@ export default function ItemConfirmScanModal({
           setCameraError('');
         }
       } catch (_) {
-        if (!cancelled) {
-          setCameraError('Не удалось открыть камеру');
-          html5QrCodeRef.current = null;
-          await stopScannerSafe(scanner);
+        // Fallback: first available camera (some devices reject facingMode)
+        if (cancelled) return;
+        try {
+          const cameras = await Html5Qrcode.getCameras();
+          if (!cameras?.length) throw new Error('no cameras');
+          await scanner.start(
+            cameras[cameras.length - 1].id,
+            buildQrScanConfig(),
+            async (decoded) => {
+              if (cancelled || scanLockRef.current || isSubmittingRef.current) return;
+              scanLockRef.current = true;
+              try {
+                if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                  navigator.vibrate(40);
+                }
+                await handleScanResultRef.current?.(decoded, { fromScanner: true });
+              } catch (__) {
+                scanLockRef.current = false;
+                setEntryError('Не удалось проверить код. Попробуйте ещё раз или введите вручную.');
+              }
+            },
+            () => {}
+          );
+          if (!cancelled) setCameraError('');
+        } catch (__) {
+          if (!cancelled) {
+            setCameraError('Не удалось открыть камеру');
+            html5QrCodeRef.current = null;
+            await stopScannerSafe(scanner);
+          }
         }
       }
     };
@@ -451,10 +473,24 @@ export default function ItemConfirmScanModal({
             {mode === 'entry' ? (
               <>
                 {!cameraError ? (
-                  <div
-                    id={SCANNER_ID}
-                    className="item-confirm-qr-scanner h-[240px] w-full overflow-hidden rounded-xl border border-gray-200 bg-black sm:h-[260px]"
-                  />
+                  <div className="item-confirm-qr-wrap relative h-[260px] w-full overflow-hidden rounded-xl border border-gray-200 bg-black sm:h-[280px]">
+                    <div
+                      id={SCANNER_ID}
+                      className="item-confirm-qr-scanner absolute inset-0 h-full w-full"
+                    />
+                    {/* Own square reticle — do not use html5-qrcode qrbox overlay */}
+                    <div
+                      className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
+                      aria-hidden
+                    >
+                      <div className="relative aspect-square h-[58%] max-h-[200px] min-h-[140px]">
+                        <span className="absolute left-0 top-0 h-6 w-6 border-l-[3px] border-t-[3px] border-white" />
+                        <span className="absolute right-0 top-0 h-6 w-6 border-r-[3px] border-t-[3px] border-white" />
+                        <span className="absolute bottom-0 left-0 h-6 w-6 border-b-[3px] border-l-[3px] border-white" />
+                        <span className="absolute bottom-0 right-0 h-6 w-6 border-b-[3px] border-r-[3px] border-white" />
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-center">
                     <p className="text-xs font-medium text-amber-800">{cameraError}</p>
@@ -495,7 +531,7 @@ export default function ItemConfirmScanModal({
                   <p className="mt-2 text-xs text-red-600">{entryError}</p>
                 ) : (
                   <p className="mt-2 text-[11px] text-gray-500">
-                    Наведите камеру так, чтобы QR полностью попал в рамку. Или введите код с этикетки и нажмите OK.
+                    Держите QR в центре квадрата. Или введите код с этикетки и нажмите OK.
                   </p>
                 )}
                 {error ? (
