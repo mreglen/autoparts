@@ -11,11 +11,13 @@ function buildQrScanConfig() {
   return {
     fps: 10,
     qrbox: (viewfinderWidth, viewfinderHeight) => {
-      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-      const size = Math.max(140, Math.min(240, Math.floor(minEdge * 0.72)));
+      const minEdge = Math.min(viewfinderWidth || 0, viewfinderHeight || 0);
+      if (!minEdge) {
+        return { width: 160, height: 160 };
+      }
+      const size = Math.max(120, Math.min(200, Math.floor(minEdge * 0.7)));
       return { width: size, height: size };
     },
-    aspectRatio: 1,
   };
 }
 
@@ -48,7 +50,13 @@ function looksLikeInternalCode(value) {
  * pendingId ≠ product.id, so comparing only product_id always fails.
  * Also full URL must not be treated as an internal code.
  */
-async function verifyScanInput(raw, expectedProductId, expectedInternalCode, sourcePendingId) {
+async function verifyScanInput(
+  raw,
+  expectedProductId,
+  expectedInternalCode,
+  sourcePendingId,
+  { productCardLoading = false } = {},
+) {
   const trimmed = String(raw || '').trim();
   if (!trimmed) {
     return { ok: false, message: 'Введите внутренний код или отсканируйте этикетку' };
@@ -59,7 +67,7 @@ async function verifyScanInput(raw, expectedProductId, expectedInternalCode, sou
   const expectedPendingId = sourcePendingId != null ? Number(sourcePendingId) : null;
   const parsed = parseSellerPartCardQr(trimmed);
 
-  // 1) /seller/part-card/{id}, /part/{id}, numeric id
+  // 1) /seller/part-card/{id}, /part/{id}, numeric id — works without productCard
   const scannedProductId = parsed?.productId
     ?? (/^\d+$/.test(trimmed) ? parseInt(trimmed, 10) : null);
   if (
@@ -70,12 +78,45 @@ async function verifyScanInput(raw, expectedProductId, expectedInternalCode, sou
     return { ok: true };
   }
 
+  const needsCardData = Boolean(
+    parsed?.type === 'edit-pending'
+    || parsed?.type === 'label-code'
+    || parsed?.internalCode
+    || looksLikeInternalCode(trimmed),
+  );
+  if (needsCardData && productCardLoading && !expectedCode && !Number.isFinite(expectedPendingId)) {
+    return { ok: false, message: 'Подождите, загружаются данные товара…' };
+  }
+
   // 2) /qr/label/{internal_code} or typed internal code
   const scannedCode = normalizeInternalCodeForCompare(
     parsed?.internalCode || (looksLikeInternalCode(trimmed) ? trimmed : ''),
   );
   if (expectedCode && scannedCode && scannedCode === expectedCode) {
     return { ok: true };
+  }
+
+  // 2b) Resolve /qr/label/CODE via API if local compare failed (e.g. formatting)
+  if (parsed?.type === 'label-code' && parsed.internalCode) {
+    try {
+      const response = await apiAxios.get(
+        `/products/label-resolve/${encodeURIComponent(parsed.internalCode)}`,
+      );
+      const resolved = response.data || {};
+      if (
+        Number.isFinite(expectedId)
+        && resolved.product_id != null
+        && Number(resolved.product_id) === expectedId
+      ) {
+        return { ok: true };
+      }
+      const resolvedCode = normalizeInternalCodeForCompare(resolved.internal_code);
+      if (expectedCode && resolvedCode && resolvedCode === expectedCode) {
+        return { ok: true };
+      }
+    } catch (_) {
+      /* fall through */
+    }
   }
 
   // 3) Legacy label: /my-parts/edit-pending/{pendingId}
@@ -191,12 +232,17 @@ export default function ItemConfirmScanModal({
   const expectedProductIdRef = useRef(null);
   const expectedInternalCodeRef = useRef(null);
   const expectedSourcePendingIdRef = useRef(null);
+  const productCardLoadingRef = useRef(productCardLoading);
   const isSubmittingRef = useRef(isSubmitting);
   const handleScanResultRef = useRef(null);
 
   useEffect(() => {
     isSubmittingRef.current = isSubmitting;
   }, [isSubmitting]);
+
+  useEffect(() => {
+    productCardLoadingRef.current = productCardLoading;
+  }, [productCardLoading]);
 
   useEffect(() => {
     expectedProductIdRef.current = item?.product_id ?? productCard?.id ?? null;
@@ -210,6 +256,7 @@ export default function ItemConfirmScanModal({
       expectedProductIdRef.current,
       expectedInternalCodeRef.current,
       expectedSourcePendingIdRef.current,
+      { productCardLoading: productCardLoadingRef.current },
     );
 
     if (!verification.ok) {

@@ -26,6 +26,8 @@ import {
 import { fetchPartTypes } from '../../../redux/slices/PartTypeSlice';
 import { normalizeImageUrl, apiRequest, apiRequestFormData, apiAxios } from '../../../utils/apiClient';
 import { useAuthReady } from '../../../hooks/useAuthReady';
+import { usePermissionCodes } from '../../../hooks/useWarehousePermissions';
+import { resolvePathFromLabelResolve } from '../../../utils/resolveProductQrScan';
 import { useAiDescriptionGenerator } from '../../../hooks/useAiDescriptionGenerator';
 import AuthLoadingScreen from '../../../components/AuthLoadingScreen/AuthLoadingScreen';
 import {
@@ -107,6 +109,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
   const dispatch = useDispatch();
   const { isReady, token } = useAuthReady();
   const user = useSelector((state) => state.auth.user);
+  const permissionCodes = usePermissionCodes();
   const canAccess = Boolean(user?.is_seller || user?.is_employee || user?.is_admin);
   const productStatus = useSelector((state) => state.products.loading);
   const productError = useSelector((state) => state.products.error);
@@ -422,10 +425,14 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
       .catch(async (err) => {
         if (cancelled) return;
         try {
-          const resolved = await apiAxios.get(`/products/label-resolve-pending/${editPendingId}`);
-          const path = resolved.data?.path;
-          if (path && path !== `/my-parts/edit-pending/${editPendingId}`) {
-            navigate(path, { replace: true });
+          const response = await apiAxios.get(`/products/label-resolve-pending/${editPendingId}`);
+          const routed = await resolvePathFromLabelResolve(
+            response.data,
+            user,
+            permissionCodes,
+          );
+          if (routed?.path && routed.path !== `/my-parts/edit-pending/${editPendingId}`) {
+            navigate(routed.path, { replace: true });
             return;
           }
         } catch (_) {
@@ -445,7 +452,7 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
     return () => {
       cancelled = true;
     };
-  }, [dispatch, editPendingMode, editPendingId, navigate, isReady, token, canAccess]);
+  }, [dispatch, editPendingMode, editPendingId, navigate, isReady, token, canAccess, user, permissionCodes]);
 
   const applyDraftSnapshot = useCallback((snapshot, { skipAutosave = true, draftId } = {}) => {
     if (!snapshot) return;

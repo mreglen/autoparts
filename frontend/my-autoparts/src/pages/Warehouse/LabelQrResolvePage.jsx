@@ -2,16 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { apiAxios } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
+import { usePermissionCodes } from '../../hooks/useWarehousePermissions';
+import { resolvePathFromLabelResolve } from '../../utils/resolveProductQrScan';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 
 /**
  * Stable label QR landing: /qr/label/{internal_code}
- * Resolves to seller part-card, edit-pending, or resubmit.
+ * Seller of org → /seller/part-card/; others → /part/...
  */
 export default function LabelQrResolvePage() {
   const { code } = useParams();
   const navigate = useNavigate();
-  const { isReady, isAuthenticated } = useAuthReady();
+  const { isReady, isAuthenticated, user } = useAuthReady();
+  const permissionCodes = usePermissionCodes();
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -36,21 +39,28 @@ export default function LabelQrResolvePage() {
         const response = await apiAxios.get(
           `/products/label-resolve/${encodeURIComponent(raw)}`,
         );
-        const path = response.data?.path;
-        if (!path) {
-          if (!cancelled) setError('Запчасть не найдена');
+        const routed = await resolvePathFromLabelResolve(
+          response.data,
+          user,
+          permissionCodes,
+        );
+        if (cancelled) return;
+        if (!routed?.path) {
+          setError(routed?.message || 'Запчасть не найдена');
           return;
         }
-        if (!cancelled) navigate(path, { replace: true });
+        navigate(routed.path, { replace: true });
       } catch (_) {
-        if (!cancelled) setError('Запчасть не найдена. Перепечатайте этикетку после модерации.');
+        if (!cancelled) {
+          setError('Запчасть не найдена. Перепечатайте этикетку после модерации.');
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [isReady, isAuthenticated, code, navigate]);
+  }, [isReady, isAuthenticated, code, navigate, user, permissionCodes]);
 
   if (!isReady) return <AuthLoadingScreen />;
 

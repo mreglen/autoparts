@@ -423,6 +423,10 @@ def approve_product(
         summary=f"Товар одобрен модерацией #{db_product.id}",
         user=current_user,
         organization_id=db_product.organization_id,
+        details={
+            "pending_product_id": pending_id_for_link,
+            "product_id": db_product.id,
+        },
         entity_type="product",
         entity_id=db_product.id,
     )

@@ -712,12 +712,8 @@ def resolve_label_qr_by_internal_code(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Resolve /qr/label/{internal_code} to seller card / pending / resubmit path."""
-    from app.utils.org_product_access import user_can_access_qr_part_card
+    """Resolve /qr/label/{internal_code} → product/pending/rejected ids (path chosen on frontend)."""
     from app.services.label_qr_resolve_service import resolve_label_internal_code
-
-    if not user_can_access_qr_part_card(db, current_user):
-        raise HTTPException(status_code=404, detail="Not found")
 
     resolved = resolve_label_internal_code(
         db,
@@ -735,34 +731,13 @@ def resolve_label_qr_by_pending_id(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Legacy labels with /my-parts/edit-pending/{id} after approval."""
-    from app.utils.org_product_access import user_can_access_qr_part_card
-    from app.services.label_qr_resolve_service import resolve_approved_product_by_pending_id
-    from app.models.pending_product import PendingProduct as PendingProductModel
+    """Legacy labels with /my-parts/edit-pending/{id} — pending or approved product."""
+    from app.services.label_qr_resolve_service import resolve_pending_label
 
-    if not user_can_access_qr_part_card(db, current_user):
-        raise HTTPException(status_code=404, detail="Not found")
-
-    pending = (
-        db.query(PendingProductModel)
-        .filter(
-            PendingProductModel.id == pending_id,
-            PendingProductModel.organization_id == current_user.organization_id,
-        )
-        .first()
-    )
-    if pending:
-        return {
-            "type": "pending",
-            "path": f"/my-parts/edit-pending/{pending.id}",
-            "pending_product_id": pending.id,
-            "internal_code": pending.internal_code,
-        }
-
-    resolved = resolve_approved_product_by_pending_id(
+    resolved = resolve_pending_label(
         db,
-        organization_id=current_user.organization_id,
         pending_id=pending_id,
+        organization_id=current_user.organization_id,
     )
     if not resolved:
         raise HTTPException(status_code=404, detail="Запчасть не найдена")

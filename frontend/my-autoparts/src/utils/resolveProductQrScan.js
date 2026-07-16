@@ -97,3 +97,84 @@ export async function resolveProductQrScan(productId, user, permissionCodes = []
 
   return { mode: 'public', path: publicPath };
 }
+
+function isSameOrganization(user, organizationId) {
+  if (!user?.organization_id || organizationId == null || organizationId === '') return false;
+  return String(user.organization_id) === String(organizationId);
+}
+
+/**
+ * Open product from label QR by role:
+ * — warehouse access + same org → /seller/part-card/{id}
+ * — otherwise → public /part/...
+ */
+export async function resolveLabelProductOpen(productId, user, permissionCodes = [], productOrgId = null) {
+  const numericId = parseInt(String(productId), 10);
+  if (!Number.isFinite(numericId) || numericId <= 0) {
+    return { mode: 'not_found' };
+  }
+
+  const sameOrg = isSameOrganization(user, productOrgId);
+  const hasWarehouseAccess = Boolean(user && userHasWarehouseQrAccess(user, permissionCodes));
+
+  if (hasWarehouseAccess && (sameOrg || user?.is_admin)) {
+    const sellerResult = await fetchSellerQrPartCard(numericId, user, permissionCodes);
+    if (sellerResult?.ok) {
+      return { mode: 'seller', path: `/seller/part-card/${numericId}` };
+    }
+  }
+
+  const publicPath = await resolvePublicPartPath(numericId);
+  if (publicPath) {
+    return { mode: 'public', path: publicPath };
+  }
+
+  if (hasWarehouseAccess && sameOrg) {
+    return { mode: 'seller', path: `/seller/part-card/${numericId}` };
+  }
+
+  return { mode: 'not_found' };
+}
+
+/**
+ * Map API label-resolve* payload to an in-app navigation path.
+ */
+export async function resolvePathFromLabelResolve(resolved, user, permissionCodes = []) {
+  if (!resolved?.type) {
+    return { mode: 'not_found' };
+  }
+
+  if (resolved.type === 'pending') {
+    const pendingId = resolved.pending_product_id;
+    if (!pendingId) return { mode: 'not_found' };
+    const sameOrg = isSameOrganization(user, resolved.organization_id);
+    if (sameOrg && userHasWarehouseQrAccess(user, permissionCodes)) {
+      return { mode: 'pending', path: `/my-parts/edit-pending/${pendingId}` };
+    }
+    return {
+      mode: 'not_found',
+      message: 'Заявка на модерации доступна только организации продавца',
+    };
+  }
+
+  if (resolved.type === 'rejected') {
+    const rejectedId = resolved.rejected_product_id;
+    if (!rejectedId) return { mode: 'not_found' };
+    const sameOrg = isSameOrganization(user, resolved.organization_id);
+    if (sameOrg && userHasWarehouseQrAccess(user, permissionCodes)) {
+      return { mode: 'rejected', path: `/my-parts/resubmit/${rejectedId}` };
+    }
+    return { mode: 'not_found' };
+  }
+
+  if (resolved.type === 'product' && resolved.product_id != null) {
+    return resolveLabelProductOpen(
+      resolved.product_id,
+      user,
+      permissionCodes,
+      resolved.organization_id,
+    );
+  }
+
+  return { mode: 'not_found' };
+}
