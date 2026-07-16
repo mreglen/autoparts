@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { apiAxios } from '../../utils/apiClient';
+import { apiAxios, apiAxiosUnauth } from '../../utils/apiClient';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { usePermissionCodes } from '../../hooks/useWarehousePermissions';
-import { resolvePathFromLabelResolve } from '../../utils/resolveProductQrScan';
+import {
+  resolvePathFromLabelResolve,
+  resolvePublicPartPath,
+} from '../../utils/resolveProductQrScan';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 
 /**
  * Stable label QR landing: /qr/label/{internal_code}
- * Seller of org → /seller/part-card/; others → /part/...
+ * Seller of org → /seller/part-card/; others (incl. guests) → /part/...
  */
 export default function LabelQrResolvePage() {
   const { code } = useParams();
@@ -19,13 +22,6 @@ export default function LabelQrResolvePage() {
 
   useEffect(() => {
     if (!isReady) return undefined;
-    if (!isAuthenticated) {
-      navigate('/auth', {
-        replace: true,
-        state: { from: `/qr/label/${encodeURIComponent(code || '')}` },
-      });
-      return undefined;
-    }
 
     let cancelled = false;
     const raw = decodeURIComponent(code || '').trim();
@@ -36,11 +32,47 @@ export default function LabelQrResolvePage() {
 
     (async () => {
       try {
-        const response = await apiAxios.get(
+        const client = isAuthenticated ? apiAxios : apiAxiosUnauth;
+        const response = await client.get(
           `/products/label-resolve/${encodeURIComponent(raw)}`,
         );
+        if (cancelled) return;
+
+        const data = response.data || {};
+
+        if (data.type === 'product' && data.product_id != null) {
+          if (isAuthenticated) {
+            const routed = await resolvePathFromLabelResolve(
+              data,
+              user,
+              permissionCodes,
+            );
+            if (cancelled) return;
+            if (routed?.path) {
+              navigate(routed.path, { replace: true });
+              return;
+            }
+          }
+          const publicPath = await resolvePublicPartPath(data.product_id);
+          if (cancelled) return;
+          if (publicPath) {
+            navigate(publicPath, { replace: true });
+            return;
+          }
+          setError('Запчасть не найдена');
+          return;
+        }
+
+        if (!isAuthenticated) {
+          navigate('/auth', {
+            replace: true,
+            state: { from: `/qr/label/${encodeURIComponent(code || '')}` },
+          });
+          return;
+        }
+
         const routed = await resolvePathFromLabelResolve(
-          response.data,
+          data,
           user,
           permissionCodes,
         );
@@ -50,10 +82,17 @@ export default function LabelQrResolvePage() {
           return;
         }
         navigate(routed.path, { replace: true });
-      } catch (_) {
-        if (!cancelled) {
-          setError('Запчасть не найдена. Перепечатайте этикетку после модерации.');
+      } catch (err) {
+        if (cancelled) return;
+        const status = err?.response?.status;
+        if (status === 401 || (!isAuthenticated && status !== 404)) {
+          navigate('/auth', {
+            replace: true,
+            state: { from: `/qr/label/${encodeURIComponent(code || '')}` },
+          });
+          return;
         }
+        setError('Запчасть не найдена. Перепечатайте этикетку после модерации.');
       }
     })();
 

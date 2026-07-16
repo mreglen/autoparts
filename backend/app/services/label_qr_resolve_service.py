@@ -78,6 +78,30 @@ def resolve_label_internal_code(
     if not variants:
         return None
 
+    # Durable mapping table (pending + product for the same code)
+    try:
+        from app.services.label_qr_link_service import get_link_by_internal_code
+
+        link = get_link_by_internal_code(
+            db,
+            internal_code=internal_code,
+            organization_id=organization_id,
+        )
+        if link and link.product_id:
+            product = db.query(Product).filter(Product.id == link.product_id).first()
+            if product:
+                return _product_payload(product, source_pending_id=link.pending_product_id)
+        if link and link.pending_product_id:
+            pending = db.query(PendingProduct).filter(PendingProduct.id == link.pending_product_id).first()
+            if pending:
+                return _pending_payload(pending)
+        if link and link.rejected_product_id:
+            rejected = db.query(RejectedProduct).filter(RejectedProduct.id == link.rejected_product_id).first()
+            if rejected:
+                return _rejected_payload(rejected)
+    except Exception:
+        logger.exception("label_qr_links lookup by code failed")
+
     product_q = db.query(Product).filter(Product.internal_code.in_(variants))
     if organization_id:
         product = product_q.filter(Product.organization_id == organization_id).first()
@@ -111,24 +135,45 @@ def resolve_label_internal_code(
     return None
 
 
+def _parse_event_details(raw) -> dict | None:
+    if not raw:
+        return None
+    try:
+        details = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        return None
+    return details if isinstance(details, dict) else None
+
+
+def _event_log_pending_id_filters(pending_id: int):
+    """SQL LIKE variants for JSON details containing pending_product_id."""
+    needle = int(pending_id)
+    return [
+        f'"pending_product_id": {needle}',
+        f'"pending_product_id":{needle}',
+        f'"pending_product_id": "{needle}"',
+        f'"pending_product_id":"{needle}"',
+    ]
+
+
 def _find_product_id_from_approval_audit(db: Session, pending_id: int) -> int | None:
     """Look up product_id from product_moderation_approved audit details."""
-    rows = (
-        db.query(EventLog)
-        .filter(EventLog.event_type == "product_moderation_approved")
-        .order_by(desc(EventLog.id))
-        .limit(500)
-        .all()
-    )
     needle = int(pending_id)
+    query = db.query(EventLog).filter(EventLog.event_type == "product_moderation_approved")
+    narrowed = None
+    for fragment in _event_log_pending_id_filters(needle):
+        candidate = query.filter(EventLog.details.contains(fragment)).order_by(desc(EventLog.id)).first()
+        if candidate:
+            narrowed = candidate
+            break
+
+    rows = [narrowed] if narrowed else (
+        query.order_by(desc(EventLog.id)).limit(1000).all()
+    )
+
     for row in rows:
-        if not row.details:
-            continue
-        try:
-            details = json.loads(row.details) if isinstance(row.details, str) else row.details
-        except Exception:
-            continue
-        if not isinstance(details, dict):
+        details = _parse_event_details(row.details)
+        if not details:
             continue
         try:
             logged_pending = details.get("pending_product_id")
@@ -146,6 +191,54 @@ def _find_product_id_from_approval_audit(db: Session, pending_id: int) -> int | 
     return None
 
 
+def _find_internal_code_from_pending_audit(db: Session, pending_id: int) -> str | None:
+    """Recover internal_code from pending_product_created / updated audit."""
+    needle = int(pending_id)
+    event_types = (
+        "pending_product_created",
+        "pending_product_updated",
+        "product_moderation_approved",
+    )
+    query = db.query(EventLog).filter(EventLog.event_type.in_(event_types))
+
+    rows = []
+    for fragment in _event_log_pending_id_filters(needle):
+        rows = (
+            query.filter(EventLog.details.contains(fragment))
+            .order_by(desc(EventLog.id))
+            .limit(20)
+            .all()
+        )
+        if rows:
+            break
+
+    if not rows:
+        rows = (
+            query.filter(
+                EventLog.entity_type == "pending_product",
+                EventLog.entity_id == str(needle),
+            )
+            .order_by(desc(EventLog.id))
+            .limit(20)
+            .all()
+        )
+
+    for row in rows:
+        details = _parse_event_details(row.details)
+        if not details:
+            continue
+        try:
+            logged_pending = details.get("pending_product_id")
+            if logged_pending is not None and int(logged_pending) != needle:
+                continue
+        except (TypeError, ValueError):
+            continue
+        code = normalize_label_internal_code(details.get("internal_code"))
+        if code:
+            return code
+    return None
+
+
 def resolve_approved_product_by_pending_id(
     db: Session,
     *,
@@ -155,6 +248,19 @@ def resolve_approved_product_by_pending_id(
     if not pending_id:
         return None
 
+    # 0) Durable label_qr_links table
+    try:
+        from app.services.label_qr_link_service import get_link_by_pending_id, upsert_label_qr_link
+
+        link = get_link_by_pending_id(db, pending_id)
+        if link and link.product_id:
+            product = db.query(Product).filter(Product.id == link.product_id).first()
+            if product:
+                return _product_payload(product, source_pending_id=pending_id)
+    except Exception:
+        logger.exception("label_qr_links lookup by pending_id failed")
+        link = None
+
     product_q = db.query(Product).filter(Product.source_pending_id == pending_id)
     if organization_id:
         product = product_q.filter(Product.organization_id == organization_id).first()
@@ -163,16 +269,76 @@ def resolve_approved_product_by_pending_id(
     else:
         product = product_q.first()
     if product:
+        try:
+            from app.services.label_qr_link_service import upsert_label_qr_link
+
+            upsert_label_qr_link(
+                db,
+                organization_id=product.organization_id,
+                internal_code=product.internal_code,
+                pending_product_id=pending_id,
+                product_id=product.id,
+                commit=True,
+            )
+        except Exception:
+            logger.exception("failed to persist label_qr_link from source_pending_id")
         return _product_payload(product, source_pending_id=pending_id)
 
     audited_product_id = _find_product_id_from_approval_audit(db, pending_id)
     if audited_product_id:
         product = db.query(Product).filter(Product.id == audited_product_id).first()
         if product:
-            if organization_id and product.organization_id != organization_id:
-                # Still return — frontend routes by role/org of the product
-                pass
+            try:
+                from app.services.label_qr_link_service import upsert_label_qr_link
+
+                upsert_label_qr_link(
+                    db,
+                    organization_id=product.organization_id,
+                    internal_code=product.internal_code,
+                    pending_product_id=pending_id,
+                    product_id=product.id,
+                    commit=True,
+                )
+                if not getattr(product, "source_pending_id", None):
+                    product.source_pending_id = pending_id
+                    db.commit()
+            except Exception:
+                logger.exception("failed to persist label_qr_link from approve audit")
             return _product_payload(product, source_pending_id=pending_id)
+
+    # Legacy: pending deleted before source_pending_id / approve audit details —
+    # recover via internal_code from create/update audit.
+    legacy_code = _find_internal_code_from_pending_audit(db, pending_id)
+    if not legacy_code and link is not None:
+        legacy_code = normalize_label_internal_code(getattr(link, "internal_code", None))
+    if legacy_code:
+        resolved = resolve_label_internal_code(
+            db,
+            organization_id=organization_id,
+            internal_code=legacy_code,
+        )
+        if resolved and resolved.get("type") == "product":
+            resolved = dict(resolved)
+            resolved["source_pending_id"] = pending_id
+            try:
+                from app.services.label_qr_link_service import upsert_label_qr_link
+
+                product = db.query(Product).filter(Product.id == resolved["product_id"]).first()
+                if product:
+                    upsert_label_qr_link(
+                        db,
+                        organization_id=product.organization_id,
+                        internal_code=legacy_code,
+                        pending_product_id=pending_id,
+                        product_id=product.id,
+                        commit=True,
+                    )
+                    if not getattr(product, "source_pending_id", None):
+                        product.source_pending_id = pending_id
+                        db.commit()
+            except Exception:
+                logger.exception("failed to persist label_qr_link from legacy code")
+            return resolved
 
     return None
 
@@ -196,6 +362,21 @@ def resolve_pending_label(
         pending = pending_q.first()
     if pending:
         return _pending_payload(pending)
+
+    try:
+        from app.services.label_qr_link_service import get_link_by_pending_id
+
+        link = get_link_by_pending_id(db, pending_id)
+        if link and link.rejected_product_id and not link.product_id:
+            rejected = (
+                db.query(RejectedProduct)
+                .filter(RejectedProduct.id == link.rejected_product_id)
+                .first()
+            )
+            if rejected:
+                return _rejected_payload(rejected)
+    except Exception:
+        logger.exception("label_qr_links rejected lookup failed")
 
     return resolve_approved_product_by_pending_id(
         db,

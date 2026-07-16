@@ -393,6 +393,10 @@ const PrintReceiptModal = ({
       alert('Укажите количество этикеток — целое число больше 0');
       return;
     }
+    if (!getLabelQrUrl(selectedPart)) {
+      alert('Нет внутреннего кода — QR на этикетке не будет работать. Сохраните товар с кодом и повторите печать.');
+      return;
+    }
 
     const productData = buildLabelPrintPayload(
       selectedPart,
@@ -417,7 +421,7 @@ const PrintReceiptModal = ({
   };
 
   const canPrint = Boolean(
-    selectedPrinterId && selectedPrinter?.is_online && !printing && parsedPrintCopies,
+    selectedPrinterId && selectedPrinter?.is_online && !printing && parsedPrintCopies && getLabelQrUrl(selectedPart),
   );
 
   const handleCopiesChange = (event) => {

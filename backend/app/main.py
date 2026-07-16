@@ -41,6 +41,8 @@ from app.db.schema_patches import (
     ensure_garage_used_order_buyer_comment_column,
     ensure_garage_order_pickup_columns,
     ensure_product_source_pending_id_column,
+    ensure_label_qr_links_table,
+    ensure_label_qr_links_backfill,
     ensure_cart_max_quantity_columns,
     ensure_yookassa_payment_tables,
     ensure_yookassa_refund_columns,
@@ -195,6 +197,8 @@ try:
     ensure_garage_used_order_buyer_comment_column()
     ensure_garage_order_pickup_columns()
     ensure_product_source_pending_id_column()
+    ensure_label_qr_links_table()
+    ensure_label_qr_links_backfill()
     ensure_cart_max_quantity_columns()
     ensure_yookassa_payment_tables()
     ensure_yookassa_refund_columns()

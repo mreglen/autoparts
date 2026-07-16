@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session, joinedload
 import json
+import logging
 
 from app.db.database import get_db
 from app.models.pending_product import PendingProduct as PendingProductModel
@@ -23,6 +24,8 @@ from app.schemas.product import ProductCreate
 from app.core.auth import get_current_admin_user, get_current_user
 from app.services.audit_service import log_audit
 from app.services.yandex_feed_sync_service import mark_yandex_feed_dirty_for_used_product
+
+logger = logging.getLogger(__name__)
 from app.utils.internal_code import is_valid_internal_code, next_internal_code
 from app.utils.public_catalog_cache import (
     invalidate_public_catalog_cache,
@@ -416,6 +419,24 @@ def approve_product(
     
     db.commit()
     db.refresh(db_product)
+    try:
+        from app.services.label_qr_link_service import upsert_label_qr_link
+
+        upsert_label_qr_link(
+            db,
+            organization_id=db_product.organization_id,
+            internal_code=db_product.internal_code,
+            pending_product_id=pending_id_for_link,
+            product_id=db_product.id,
+            commit=True,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to register label_qr_link pending=%s product=%s",
+            pending_id_for_link,
+            db_product.id,
+        )
+
     log_audit(
         db,
         event_type="product_moderation_approved",
@@ -426,6 +447,7 @@ def approve_product(
         details={
             "pending_product_id": pending_id_for_link,
             "product_id": db_product.id,
+            "internal_code": db_product.internal_code,
         },
         entity_type="product",
         entity_id=db_product.id,
@@ -522,6 +544,23 @@ def reject_product(
 
     db.commit()
     db.refresh(db_rejected)
+    try:
+        from app.services.label_qr_link_service import upsert_label_qr_link
+
+        upsert_label_qr_link(
+            db,
+            organization_id=pending_org_id,
+            internal_code=db_rejected.internal_code,
+            pending_product_id=product_id,
+            rejected_product_id=db_rejected.id,
+            commit=True,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to register label_qr_link pending=%s rejected=%s",
+            product_id,
+            db_rejected.id,
+        )
     log_audit(
         db,
         event_type="product_moderation_rejected",

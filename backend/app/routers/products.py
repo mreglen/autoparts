@@ -27,7 +27,7 @@ from app.services.article_matches_service import find_article_matches, get_artic
 from app.schemas.vehicle import Vehicle as VehicleSchema
 from app.models.vehicle import Vehicle as VehicleModel
 from app.db.database import get_db
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_current_user_optional
 from app.models.user import User
 from app.services.audit_service import log_audit
 from app.services.yandex_feed_sync_service import (
@@ -710,18 +710,27 @@ def read_qr_part_card(
 def resolve_label_qr_by_internal_code(
     internal_code: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
-    """Resolve /qr/label/{internal_code} → product/pending/rejected ids (path chosen on frontend)."""
+    """Resolve /qr/label/{internal_code} → product/pending/rejected ids (path chosen on frontend).
+
+    Guests may resolve approved products (for public /part/). Pending/rejected require auth.
+    """
     from app.services.label_qr_resolve_service import resolve_label_internal_code
 
+    org_id = current_user.organization_id if current_user else None
     resolved = resolve_label_internal_code(
         db,
-        organization_id=current_user.organization_id,
+        organization_id=org_id,
         internal_code=internal_code,
     )
     if not resolved:
         raise HTTPException(status_code=404, detail="Запчасть не найдена")
+    if resolved.get("type") != "product" and not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Требуется авторизация",
+        )
     return resolved
 
 
@@ -729,18 +738,27 @@ def resolve_label_qr_by_internal_code(
 def resolve_label_qr_by_pending_id(
     pending_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
-    """Legacy labels with /my-parts/edit-pending/{id} — pending or approved product."""
+    """Legacy labels with /my-parts/edit-pending/{id} — pending or approved product.
+
+    Guests may resolve approved products (for public /part/). Pending/rejected require auth.
+    """
     from app.services.label_qr_resolve_service import resolve_pending_label
 
+    org_id = current_user.organization_id if current_user else None
     resolved = resolve_pending_label(
         db,
         pending_id=pending_id,
-        organization_id=current_user.organization_id,
+        organization_id=org_id,
     )
     if not resolved:
         raise HTTPException(status_code=404, detail="Запчасть не найдена")
+    if resolved.get("type") != "product" and not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Требуется авторизация",
+        )
     return resolved
 
 

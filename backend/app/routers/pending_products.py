@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 import json
+import logging
 import os
 
 from app.db.database import get_db
@@ -16,6 +17,7 @@ from app.models.organization import Organization
 from app.utils.internal_code import next_internal_code
 
 router = APIRouter(prefix="/pending-products", tags=["Pending Products"])
+logger = logging.getLogger(__name__)
 
 
 def _require_organization(user: User) -> None:
@@ -117,6 +119,19 @@ def create_pending_product(
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
+    try:
+        from app.services.label_qr_link_service import upsert_label_qr_link
+
+        upsert_label_qr_link(
+            db,
+            organization_id=current_user.organization_id,
+            internal_code=internal_code,
+            pending_product_id=db_product.id,
+            commit=True,
+        )
+    except Exception:
+        logger.exception("Failed to register label_qr_link for pending %s", db_product.id)
+
     log_audit(
         db,
         event_type="pending_product_created",

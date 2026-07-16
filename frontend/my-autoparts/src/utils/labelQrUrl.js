@@ -1,6 +1,7 @@
 /**
  * URL для QR на этикетке.
- * Стабильный путь по внутреннему коду — работает и до, и после модерации.
+ * Всегда стабильный /qr/label/{INTERNAL_CODE} — работает и на модерации, и после одобрения.
+ * Legacy edit-pending на уже напечатанных этикетках резолвится на бэкенде через label_qr_links.
  */
 import { formatInternalCodeDisplay, normalizeInternalCodeForSearch } from './internalCode';
 
@@ -9,17 +10,8 @@ export function getLabelQrPath(part) {
   if (code && code !== '—') {
     return `/qr/label/${encodeURIComponent(code.toUpperCase())}`;
   }
-
-  if (!part?.id) return '';
-
-  // Fallback for rare cases without internal_code
-  if (part.moderationKind === 'pending') {
-    return `/my-parts/edit-pending/${part.id}`;
-  }
-  if (part.moderationKind === 'rejected') {
-    return `/my-parts/resubmit/${part.id}`;
-  }
-  return `/seller/part-card/${part.id}`;
+  // Без внутреннего кода этикетка с рабочим QR невозможна — не печатаем битый edit-pending.
+  return '';
 }
 
 export function getLabelQrUrl(part, origin) {

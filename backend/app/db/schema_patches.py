@@ -2546,3 +2546,55 @@ def ensure_product_source_pending_id_column() -> None:
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_products_source_pending_id ON products (source_pending_id)"))
     logger.info("Applied products.source_pending_id column patch")
 
+
+def ensure_label_qr_links_table() -> None:
+    """Durable pending↔product↔internal_code map for warehouse label QR."""
+    inspector = inspect(engine)
+    if "label_qr_links" in inspector.get_table_names():
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE label_qr_links (
+                    id SERIAL PRIMARY KEY,
+                    organization_id VARCHAR(10) NOT NULL,
+                    internal_code VARCHAR(64) NOT NULL,
+                    pending_product_id INTEGER,
+                    product_id INTEGER,
+                    rejected_product_id INTEGER,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_label_qr_links_pending_product_id "
+                "ON label_qr_links (pending_product_id) WHERE pending_product_id IS NOT NULL"
+            )
+        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_label_qr_links_internal_code ON label_qr_links (internal_code)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_label_qr_links_product_id ON label_qr_links (product_id)"))
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS ix_label_qr_links_organization_id ON label_qr_links (organization_id)")
+        )
+    logger.info("Applied label_qr_links table patch")
+
+
+def ensure_label_qr_links_backfill() -> None:
+    """One-shot / idempotent recovery of label QR links for already printed stickers."""
+    from app.db.database import SessionLocal
+    from app.services.label_qr_link_service import backfill_label_qr_links
+
+    db = SessionLocal()
+    try:
+        stats = backfill_label_qr_links(db)
+        logger.info("label_qr_links backfill finished: %s", stats)
+    except Exception:
+        logger.exception("label_qr_links backfill failed")
+        db.rollback()
+    finally:
+        db.close()
+

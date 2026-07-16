@@ -4,6 +4,7 @@ from app.models.organization import Organization
 from app.models.product import Product
 from app.models.pending_product import PendingProduct
 from app.models.rejected_product import RejectedProduct
+from app.models.label_qr_link import LabelQrLink
 from app.models.acquired_product import AcquiredProduct
 from app.models.storage_location import StorageLocation
 from app.models.storage_cell import StorageCell
