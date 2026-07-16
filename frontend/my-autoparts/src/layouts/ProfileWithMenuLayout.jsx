@@ -1,10 +1,11 @@
 // src/layouts/ProfileWithMenuLayout.jsx
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Outlet, useLocation } from 'react-router-dom';
 import { fetchPendingProducts } from '../redux/slices/ModerationProductsSlice';
 import { fetchPendingSellers } from '../redux/slices/ModerationSlice';
 import { fetchSalesMenuCounts } from '../redux/slices/SalesMenuCountsSlice';
+import { apiAxios } from '../utils/apiClient';
 import Navigation from '../pages/Navigation/Navigation';
 import MobileHeader from '../components/MobileHeader/MobileHeader';
 import MobileBottomNav from '../components/MobileBottomNav/MobileBottomNav';
@@ -16,6 +17,21 @@ import AuthLoadingScreen from '../components/AuthLoadingScreen/AuthLoadingScreen
 import useCartSync from '../hooks/useCartSync';
 import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
 import HeaderBadgeHeightSync from '../components/Seo/HeaderBadgeHeightSync';
+import { normalizeNewPartsCustomerStatus } from '../utils/garageOrderUi';
+import { TERMINAL_RETURN_STATUSES } from '../utils/returnStatusUi';
+
+const ACTIVE_PURCHASE_STATUSES = new Set([
+  'pending',
+  'confirmed',
+  'assembled',
+  'ready_for_pickup',
+  'shipped',
+  'new_waiting_confirmation',
+  'new_assembling',
+  'new_shipped',
+  'new_awaiting_arrival',
+  'new_ready_for_pickup',
+]);
 
 export default function ProfileWithMenuLayout() {
     const dispatch = useDispatch();
@@ -26,6 +42,7 @@ export default function ProfileWithMenuLayout() {
     const moderation = useSelector((state) => state.moderation);
     const salesMenuCounts = useSelector((state) => state.salesMenuCounts);
     const location = useLocation();
+  const [purchasesMenuCounts, setPurchasesMenuCounts] = useState({ orders: 0, returns: 0 });
 
     const isChatsPage = location.pathname.startsWith('/chats');
 
@@ -36,12 +53,68 @@ export default function ProfileWithMenuLayout() {
         return permissionCodes.includes('sales.orders') || permissionCodes.includes('sales.returns');
     }, [user, permissionCodes]);
 
+  useEffect(() => {
+    if (!isReady || !user) return;
+    let cancelled = false;
+
+    const fetchPurchasesCounts = async () => {
+      try {
+        const results = await Promise.allSettled([
+          apiAxios.get('/sales/purchases/used-orders'),
+          apiAxios.get('/sales/purchases/new-orders'),
+          apiAxios.get('/sales/purchases/returns'),
+        ]);
+
+        const [usedRes, newRes, returnsRes] = results;
+
+        const usedOrders = usedRes.status === 'fulfilled' && Array.isArray(usedRes.value.data)
+          ? usedRes.value.data
+          : [];
+        const newOrders = newRes.status === 'fulfilled' && Array.isArray(newRes.value.data)
+          ? newRes.value.data
+          : [];
+        const returns = returnsRes.status === 'fulfilled' && Array.isArray(returnsRes.value.data)
+          ? returnsRes.value.data
+          : [];
+
+        const usedActive = usedOrders.reduce((acc, o) => {
+          const code = o?.status_code || 'pending';
+          return acc + (ACTIVE_PURCHASE_STATUSES.has(code) ? 1 : 0);
+        }, 0);
+
+        const newActive = newOrders.reduce((acc, o) => {
+          const code = normalizeNewPartsCustomerStatus(o?.status_code);
+          return acc + (ACTIVE_PURCHASE_STATUSES.has(code) ? 1 : 0);
+        }, 0);
+
+        const activeReturns = returns.reduce((acc, r) => {
+          const code = r?.status_code || '';
+          return acc + (!TERMINAL_RETURN_STATUSES.has(code) ? 1 : 0);
+        }, 0);
+
+        if (cancelled) return;
+        setPurchasesMenuCounts({ orders: usedActive + newActive, returns: activeReturns });
+      } catch (_) {
+        if (cancelled) return;
+        setPurchasesMenuCounts({ orders: 0, returns: 0 });
+      }
+    };
+
+    fetchPurchasesCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isReady, user?.id]);
+
     const badgeCounts = {
         'product-moderation': moderationProducts?.pendingProducts?.length || 0,
         'pending-sellers': moderation?.pendingSellers?.length || 0,
         administration:
             (moderationProducts?.pendingProducts?.length || 0) +
             (moderation?.pendingSellers?.length || 0),
+    'purchases-orders': purchasesMenuCounts?.orders || 0,
+    'purchases-returns': purchasesMenuCounts?.returns || 0,
         'sales-orders': salesMenuCounts?.orders || 0,
         'sales-returns': salesMenuCounts?.returns || 0,
         sales: salesMenuCounts?.sales || 0,

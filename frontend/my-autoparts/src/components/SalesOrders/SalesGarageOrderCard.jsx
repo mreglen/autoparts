@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { fetchAvitoChatProductLink } from '../../redux/slices/AvitoChatSlice';
 import { openOrderItemProductFlow } from '../../utils/avitoProductFlow';
-import { getGarageDeliveryInfo } from '../../utils/garageOrderUi';
+import {
+  getGarageDeliveryInfo,
+  isGarageItemAwaitingSellerConfirm,
+  isRosskoNewOrder,
+} from '../../utils/garageOrderUi';
 import UserAvatar from '../UserAvatar/UserAvatar';
 import OrderSourceBadge from '../Orders/OrderSourceBadge';
 import OrderWriteMessageButton from '../OrderWriteMessageButton/OrderWriteMessageButton';
@@ -119,6 +123,9 @@ export default function SalesGarageOrderCard({
   onEditStatus,
   onUpdateStatus,
   onOpenPickupVerify,
+  onOpenItemConfirm,
+  onRejectItem,
+  onConfirmRosskoItem,
   statusEditable = true,
   getStatusColor,
   getStatusName,
@@ -139,6 +146,14 @@ export default function SalesGarageOrderCard({
   const rosskoOrderId = order.rossko_order_id;
   const rosskoSyncError = order.rossko_sync_error;
   const isPickup = String(order.delivery_type || '').toLowerCase() === 'pickup';
+  const isRossko = isNew && isRosskoNewOrder(order);
+
+  const getStatusOptionsForDropdown = (currentStatusCode) => {
+    if (!isPickup) return orderStatusOptions;
+    return orderStatusOptions.filter(
+      (status) => status.code !== 'shipped' || status.code === currentStatusCode
+    );
+  };
 
   const isEditingOrder =
     editingStatus?.type === orderType &&
@@ -313,7 +328,7 @@ export default function SalesGarageOrderCard({
                 onCloseEdit={() => onEditStatus(null)}
                 getStatusColor={getStatusColor}
                 getStatusName={getStatusName}
-                orderStatusOptions={orderStatusOptions}
+                orderStatusOptions={getStatusOptionsForDropdown(orderStatusCode)}
                 showStatusIcon={isNew}
                 title={isNew ? 'Статус заказа для покупателя (Свой Гараж)' : 'Статус заказа'}
               />
@@ -373,6 +388,8 @@ export default function SalesGarageOrderCard({
               const lineTotal = (item.price || 0) * (item.quantity || 0);
               const title = item.product_name || item.name || 'Товар';
               const itemStatusCode = item.status_code || orderStatusCode;
+              const showItemConfirmActions = isGarageItemAwaitingSellerConfirm(itemStatusCode, orderType)
+                && (isUsed ? Boolean(item.product_id) : isRossko);
               return (
                 <li
                   key={item.id || `${order.id}-${idx}`}
@@ -401,11 +418,6 @@ export default function SalesGarageOrderCard({
                       <p className="mt-2 text-xs text-gray-500">
                         {item.quantity || 0} шт. × {formatPrice(item.price)}
                       </p>
-                      {(item.stock_out_id || item.fulfilled_at) && (
-                        <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-emerald-100">
-                          Списано со склада{item.stock_out_id ? ` #${item.stock_out_id}` : ''}
-                        </span>
-                      )}
                     </div>
                     <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                       <div className="text-base font-semibold tabular-nums text-gray-900">{formatPrice(lineTotal)}</div>
@@ -421,11 +433,39 @@ export default function SalesGarageOrderCard({
                         onCloseEdit={() => onEditStatus(null)}
                         getStatusColor={getStatusColor}
                         getStatusName={getStatusName}
-                        orderStatusOptions={orderStatusOptions}
+                        orderStatusOptions={getStatusOptionsForDropdown(itemStatusCode)}
                         size="sm"
                         showStatusIcon={isNew}
                         title={isNew ? 'Статус позиции для покупателя (Свой Гараж)' : 'Статус позиции'}
                       />
+                      {showItemConfirmActions ? (
+                        <div className="flex flex-col gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isRossko) {
+                                onConfirmRosskoItem?.(order, item);
+                                return;
+                              }
+                              onOpenItemConfirm?.(order, item, orderType);
+                            }}
+                            className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                          >
+                            Подтвердить
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRejectItem?.(order, item, orderType);
+                            }}
+                            className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50"
+                          >
+                            Не подтверждён
+                          </button>
+                        </div>
+                      ) : null}
                       {isNew && item.rossko_status && (
                         <span
                           className="inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-sky-100"

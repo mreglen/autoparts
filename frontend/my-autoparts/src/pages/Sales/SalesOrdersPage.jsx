@@ -7,6 +7,7 @@ import { AvitoOrderCard } from '../../components/AvitoOrderCard';
 import SalesGarageOrderCard from '../../components/SalesOrders/SalesGarageOrderCard';
 import SalesOrdersEmptyState from '../../components/SalesOrders/SalesOrdersEmptyState';
 import PickupVerifyModal from '../../components/SalesOrders/PickupVerifyModal';
+import ItemConfirmScanModal from '../../components/SalesOrders/ItemConfirmScanModal';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import OrderSourceBadge from '../../components/Orders/OrderSourceBadge';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
@@ -124,6 +125,17 @@ export default function SalesOrdersPage() {
     orderKind: 'used',
     error: '',
     isSubmitting: false,
+  });
+  const [itemConfirmModal, setItemConfirmModal] = useState({
+    isOpen: false,
+    order: null,
+    item: null,
+    orderKind: 'used',
+    error: '',
+    isSubmitting: false,
+    productCard: null,
+    productCardLoading: false,
+    productCardError: '',
   });
 
   const usedOrderStatusOptions = useMemo(() => {
@@ -331,12 +343,14 @@ export default function SalesOrdersPage() {
       setEditingStatus(null);
       setUsedOrderStatusMessage(null);
       dispatch(fetchSalesMenuCounts());
+      return true;
     } catch (error) {
       const detail = error?.response?.data?.detail;
       setUsedOrderStatusMessage({
         type: 'error',
         text: formatStatusErrorDetail(detail),
       });
+      return false;
     }
   };
 
@@ -370,11 +384,13 @@ export default function SalesOrdersPage() {
       setEditingStatus(null);
       setUsedOrderStatusMessage(null);
       dispatch(fetchSalesMenuCounts());
+      return true;
     } catch (error) {
       setUsedOrderStatusMessage({
         type: 'error',
         text: formatStatusErrorDetail(error?.response?.data?.detail),
       });
+      return false;
     }
   };
 
@@ -438,6 +454,91 @@ export default function SalesOrdersPage() {
       }));
     }
   }, [pickupModal.order, pickupModal.orderKind, closePickupVerify, dispatch]);
+
+  const closeItemConfirmModal = useCallback(() => {
+    setItemConfirmModal({
+      isOpen: false,
+      order: null,
+      item: null,
+      orderKind: 'used',
+      error: '',
+      isSubmitting: false,
+      productCard: null,
+      productCardLoading: false,
+      productCardError: '',
+    });
+  }, []);
+
+  const openItemConfirmScan = useCallback(async (order, item, orderKind) => {
+    if (!item?.product_id) return;
+    setItemConfirmModal({
+      isOpen: true,
+      order,
+      item,
+      orderKind,
+      error: '',
+      isSubmitting: false,
+      productCard: null,
+      productCardLoading: true,
+      productCardError: '',
+    });
+    try {
+      const response = await apiAxios.get(`/products/qr-card/${item.product_id}`);
+      setItemConfirmModal((prev) => ({
+        ...prev,
+        productCard: response.data,
+        productCardLoading: false,
+      }));
+    } catch (_) {
+      setItemConfirmModal((prev) => ({
+        ...prev,
+        productCardLoading: false,
+        productCardError: 'Не удалось загрузить данные склада',
+      }));
+    }
+  }, []);
+
+  const submitItemConfirm = useCallback(async () => {
+    const { order, item } = itemConfirmModal;
+    if (!order || !item) return;
+    setItemConfirmModal((prev) => ({ ...prev, isSubmitting: true, error: '' }));
+    const ok = await updateUsedOrderStatus(order.id, 'confirmed', item.id);
+    if (ok) {
+      closeItemConfirmModal();
+      return;
+    }
+    setItemConfirmModal((prev) => ({
+      ...prev,
+      isSubmitting: false,
+      error: 'Не удалось обновить статус позиции',
+    }));
+  }, [itemConfirmModal, closeItemConfirmModal]);
+
+  const rejectItem = useCallback(async (order, item, orderKind) => {
+    try {
+      if (orderKind === 'new') {
+        await updateNewOrderStatus(order.id, 'new_waiting_confirmation', item.id);
+      } else {
+        await updateUsedOrderStatus(order.id, 'rejected', item.id);
+      }
+    } catch (error) {
+      setUsedOrderStatusMessage({
+        type: 'error',
+        text: formatStatusErrorDetail(error?.response?.data?.detail),
+      });
+    }
+  }, []);
+
+  const confirmRosskoItem = useCallback(async (order, item) => {
+    try {
+      await updateNewOrderStatus(order.id, 'new_assembling', item.id);
+    } catch (error) {
+      setUsedOrderStatusMessage({
+        type: 'error',
+        text: formatStatusErrorDetail(error?.response?.data?.detail),
+      });
+    }
+  }, []);
 
   const refreshSupplierStatus = async (orderId) => {
     setSupplierRefreshLoadingByOrderId((prev) => ({ ...prev, [orderId]: true }));
@@ -1086,6 +1187,9 @@ export default function SalesOrdersPage() {
                   onEditStatus={setEditingStatus}
                   onUpdateStatus={isUsed ? updateUsedOrderStatus : updateNewOrderStatus}
                   onOpenPickupVerify={openPickupVerify}
+                  onOpenItemConfirm={openItemConfirmScan}
+                  onRejectItem={rejectItem}
+                  onConfirmRosskoItem={confirmRosskoItem}
                   getStatusColor={getGarageStatusColor}
                   getStatusName={(code) => getGarageStatusName(code, entry.source)}
                   orderStatusOptions={isUsed ? usedOrderStatusOptions : newOrderStatusOptions}
@@ -1259,6 +1363,18 @@ export default function SalesOrdersPage() {
           error={pickupModal.error}
           onClose={closePickupVerify}
           onVerify={submitPickupVerify}
+        />
+
+        <ItemConfirmScanModal
+          isOpen={itemConfirmModal.isOpen}
+          item={itemConfirmModal.item}
+          productCard={itemConfirmModal.productCard}
+          productCardLoading={itemConfirmModal.productCardLoading}
+          productCardError={itemConfirmModal.productCardError}
+          isSubmitting={itemConfirmModal.isSubmitting}
+          error={itemConfirmModal.error}
+          onClose={closeItemConfirmModal}
+          onConfirm={submitItemConfirm}
         />
     </div>
   );

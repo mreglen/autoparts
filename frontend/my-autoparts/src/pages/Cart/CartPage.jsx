@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -12,6 +12,7 @@ import {
   removeUsedFromCart,
 } from '../../redux/slices/CartSlice';
 import { formatProductDisplayTitle } from '../../utils/productDisplayName';
+import CartAuthModal from '../../components/CartAuthModal/CartAuthModal';
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(price);
@@ -326,7 +327,7 @@ function SellerCartBlock({
                   onClick={onCheckoutSelected}
                   className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
                 >
-                  {isAuthorized ? 'Оформить выбранное' : 'Войти'}
+                  {isAuthorized ? 'Оформить выбранное' : 'Оформить выбранное'}
                 </button>
               </div>
             )}
@@ -351,7 +352,7 @@ function SellerCartBlock({
                 className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:flex-none"
               >
                 <img src="/img/cart.svg" alt="" className="h-4 w-4 brightness-0 invert" />
-                {isAuthorized ? checkoutLabel : 'Войти для заказа'}
+                {checkoutLabel}
               </button>
             </div>
           </div>
@@ -382,6 +383,8 @@ export default function CartPage() {
   const isAuthorized = useSelector((state) => Boolean(state.auth.token));
 
   const [selectedItems, setSelectedItems] = useState(new Set());
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const pendingCheckoutRef = useRef(null);
 
   useEffect(() => {
     dispatch(fetchCart());
@@ -497,43 +500,68 @@ export default function CartPage() {
     }
   };
 
+  const openAuthModalForCheckout = useCallback((payload) => {
+    pendingCheckoutRef.current = payload;
+    setIsAuthModalOpen(true);
+  }, []);
+
+  const finalizeUsedCheckout = useCallback((items, seller) => {
+    const usedOnly = items.filter((item) => item.type === 'used');
+    if (!usedOnly.length) return;
+    const orderData = {
+      items: usedOnly,
+      seller,
+      deliverInParts: false,
+      checkoutType: 'used',
+    };
+    localStorage.setItem('orderData', JSON.stringify(orderData));
+    navigate('/order-reg');
+  }, [navigate]);
+
   const saveUsedOrderAndNavigate = useCallback(
     (items, seller) => {
       if (!isAuthorized) {
-        navigate('/auth');
+        openAuthModalForCheckout({ type: 'used', items, seller });
         return;
       }
-      const usedOnly = items.filter((item) => item.type === 'used');
-      if (!usedOnly.length) return;
-      const orderData = {
-        items: usedOnly,
-        seller,
-        deliverInParts: false,
-        checkoutType: 'used',
-      };
-      localStorage.setItem('orderData', JSON.stringify(orderData));
-      navigate('/order-reg');
+      finalizeUsedCheckout(items, seller);
     },
-    [isAuthorized, navigate]
+    [finalizeUsedCheckout, isAuthorized, openAuthModalForCheckout]
   );
 
   const handleNewPartsCheckout = useCallback(() => {
     if (!isAuthorized) {
-      navigate('/auth');
+      openAuthModalForCheckout({ type: 'new' });
       return;
     }
     navigate('/cart/new/checkout');
-  }, [isAuthorized, navigate]);
+  }, [isAuthorized, navigate, openAuthModalForCheckout]);
 
   const handleNewPartsCheckoutSelected = useCallback(() => {
     if (!isAuthorized) {
-      navigate('/auth');
+      openAuthModalForCheckout({ type: 'new' });
       return;
     }
     const selected = newPartsItems.filter((item) => selectedItems.has(item.id));
     if (selected.length === 0) return;
     navigate('/cart/new/checkout');
-  }, [isAuthorized, navigate, newPartsItems, selectedItems]);
+  }, [isAuthorized, navigate, newPartsItems, openAuthModalForCheckout, selectedItems]);
+
+  const handleAuthSuccess = useCallback(() => {
+    setIsAuthModalOpen(false);
+    const pending = pendingCheckoutRef.current;
+    pendingCheckoutRef.current = null;
+    if (!pending) return;
+
+    if (pending.type === 'used') {
+      finalizeUsedCheckout(pending.items || [], pending.seller || 'Организация');
+      return;
+    }
+
+    if (pending.type === 'new') {
+      navigate('/cart/new/checkout');
+    }
+  }, [finalizeUsedCheckout, navigate]);
 
   const handleCheckout = (seller) => {
     saveUsedOrderAndNavigate(usedGroupedItems[seller] || [], seller);
@@ -709,6 +737,15 @@ export default function CartPage() {
             ))}
         </div>
       )}
+
+      <CartAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => {
+          setIsAuthModalOpen(false);
+          pendingCheckoutRef.current = null;
+        }}
+        onAuthSuccess={handleAuthSuccess}
+      />
     </div>
   );
 }

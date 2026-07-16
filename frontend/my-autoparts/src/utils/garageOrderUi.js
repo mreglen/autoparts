@@ -170,3 +170,18 @@ export const AVITO_STATUS_COLORS = {
 export const AVITO_ACTIVE_STATUSES = new Set(['on_confirmation', 'ready_to_ship', 'in_transit', 'in_dispute']);
 export const AVITO_COMPLETED_STATUSES = new Set(['delivered', 'closed']);
 export const AVITO_CANCELED_STATUSES = new Set(['canceled', 'on_return']);
+
+const USED_ITEM_AWAITING_CONFIRM = new Set(['pending', 'rejected']);
+
+export function isRosskoNewOrder(order) {
+  return Boolean(order?.rossko_order_id);
+}
+
+/** Показывать кнопки подтверждения позиции (ещё не подтверждена и не дальше по цепочке). */
+export function isGarageItemAwaitingSellerConfirm(statusCode, orderType = 'used') {
+  const code = statusCode || (orderType === 'new' ? 'new_waiting_confirmation' : 'pending');
+  if (orderType === 'new') {
+    return code === 'new_waiting_confirmation';
+  }
+  return USED_ITEM_AWAITING_CONFIRM.has(code);
+}
