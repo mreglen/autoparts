@@ -24,6 +24,7 @@ class StockOut(Base):
         ForeignKey("garage_used_order_items.id", ondelete="SET NULL"),
         nullable=True,
     )
+    payment_method = Column(String(255), nullable=True)
 
     organization = relationship("Organization", back_populates="stock_outs")
     storage_location = relationship("StorageLocation", back_populates="stock_outs")

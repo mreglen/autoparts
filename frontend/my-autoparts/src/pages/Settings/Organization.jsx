@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchOrganization, clearOrganization, updateOrganization } from '../../redux/slices/OrganizationSlice';
 import DeliveryMethodsSection from './DeliveryMethodsSection';
+import PaymentMethodsSection from './PaymentMethodsSection';
 import StorageLocationsSection from './StorageLocationsSection';
 import OrganizationInfoSection from './OrganizationInfoSection';
 import WatermarksSection from './WatermarksSection';
@@ -219,6 +220,10 @@ export default function Organization() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <StorageLocationsSection orgId={orgId} />
                 <DeliveryMethodsSection orgId={orgId} />
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <PaymentMethodsSection orgId={orgId} />
             </div>
         </div>
     );

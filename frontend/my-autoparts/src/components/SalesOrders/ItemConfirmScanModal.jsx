@@ -182,16 +182,16 @@ function WarehouseFooter({ productCard, productCardLoading, productCardError }) 
     : (storageAddresses || []).join('; ');
 
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <div className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5">
-        <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-500">Склад</div>
-        <div className="mt-0.5 truncate text-[11px] font-medium text-gray-900">
+    <div className="grid grid-cols-2 gap-2.5">
+      <div className="min-w-0 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Склад</div>
+        <div className="mt-1 line-clamp-2 text-xs font-medium leading-snug text-gray-900">
           {productCardLoading ? '…' : (productCardError ? 'Ошибка' : (warehouseName || '—'))}
         </div>
       </div>
-      <div className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5">
-        <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-500">Ячейка</div>
-        <div className="mt-0.5 truncate text-[11px] font-medium text-gray-900">
+      <div className="min-w-0 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Ячейка</div>
+        <div className="mt-1 line-clamp-2 text-xs font-medium leading-snug text-gray-900">
           {productCardLoading ? '…' : (cellLabel || '—')}
         </div>
       </div>
@@ -451,7 +451,7 @@ export default function ItemConfirmScanModal({
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2 sm:px-5 sm:py-3">
           {mode === 'entry' ? (
             <>
-              <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-gray-200 bg-black sm:min-h-[280px]">
+              <div className="relative mx-auto w-full max-h-[36dvh] min-h-0 flex-1 overflow-hidden rounded-xl border border-gray-200 bg-black sm:max-h-[280px] sm:min-h-[240px]">
                 <div
                   id={SCANNER_ID}
                   className={`absolute inset-0 h-full w-full ${!cameraActive ? 'invisible' : ''}`}
@@ -529,13 +529,13 @@ export default function ItemConfirmScanModal({
           )}
         </div>
 
-        <div className="shrink-0 border-t border-gray-100 bg-white px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:pt-3 sm:pb-3">
+        <div className="shrink-0 border-t border-gray-100 bg-white px-3 pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:pt-3 sm:pb-3">
           <WarehouseFooter
             productCard={productCard}
             productCardLoading={productCardLoading}
             productCardError={productCardError}
           />
-          <div className="mt-2">
+          <div className="mt-3">
             {mode === 'entry' ? (
               <button
                 type="button"

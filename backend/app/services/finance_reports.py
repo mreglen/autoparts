@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.product import Product
 from app.models.stock_in import StockIn
 from app.models.stock_out import StockOut
+from app.models.garage_used_orders import GarageUsedOrder, GarageUsedOrderItem
 from app.services.stock_out_sales import (
     _warehouse_sale_filters,
     enrich_warehouse_sale_prices,
@@ -24,7 +25,11 @@ from app.services.stock_out_sales import (
 
 
 def _finance_sales_query_options():
-    return (joinedload(StockOut.product),)
+    return (
+        joinedload(StockOut.product),
+        joinedload(StockOut.garage_used_order_item).joinedload(GarageUsedOrderItem.order),
+    )
+
 
 CHANNEL_AVITO = "avito"
 CHANNEL_MARKETPLACE_USED = "marketplace_used"
@@ -58,6 +63,32 @@ def resolve_sale_channel(row: StockOut) -> str:
     ):
         return CHANNEL_MARKETPLACE_USED
     return CHANNEL_WAREHOUSE
+
+
+def _marketplace_used_order_is_paid(row: StockOut) -> bool:
+    """Сайт (Б/У) попадает в финансы только после подтверждения оплаты."""
+    item = getattr(row, "garage_used_order_item", None)
+    order = getattr(item, "order", None) if item is not None else None
+    if order is not None:
+        return bool(getattr(order, "is_paid", False))
+    # Fallback: payment_method on stock_out set only after mark-paid
+    return bool(getattr(row, "payment_method", None))
+
+
+def _include_finance_sale_row(row: StockOut, channel: str) -> bool:
+    if channel != CHANNEL_MARKETPLACE_USED:
+        return True
+    return _marketplace_used_order_is_paid(row)
+
+
+def _payment_method_for_row(row: StockOut) -> Optional[str]:
+    if getattr(row, "payment_method", None):
+        return row.payment_method
+    item = getattr(row, "garage_used_order_item", None)
+    order = getattr(item, "order", None) if item is not None else None
+    if order is not None and getattr(order, "is_paid", False):
+        return getattr(order, "payment_method_name", None)
+    return None
 
 
 def _line_total(unit_price: float, quantity: int) -> float:
@@ -110,11 +141,14 @@ def list_finance_sales(
     rows = enrich_warehouse_sale_prices(db, rows, persist_fixes=False)
 
     result_rows: list[dict[str, Any]] = []
+    included_rows: list[StockOut] = []
     for row in rows:
         if not is_warehouse_sale(row):
             continue
         channel = resolve_sale_channel(row)
         if filters.channel != CHANNEL_ALL and channel != filters.channel:
+            continue
+        if not _include_finance_sale_row(row, channel):
             continue
 
         try:
@@ -125,6 +159,7 @@ def list_finance_sales(
         if unit_price <= 0:
             continue
 
+        included_rows.append(row)
         pf = _product_fields(row.product)
         result_rows.append(
             {
@@ -140,17 +175,20 @@ def list_finance_sales(
                 "source_kind": getattr(row, "source_kind", None),
                 "avito_order_id": row.avito_order_id,
                 "garage_used_order_item_id": getattr(row, "garage_used_order_item_id", None),
+                "payment_method": _payment_method_for_row(row),
                 "reason": row.reason,
                 "storage_location_id": row.storage_location_id,
             }
         )
 
-    count, total = warehouse_sales_totals(
-        [r for r in rows if filters.channel == CHANNEL_ALL or resolve_sale_channel(r) == filters.channel]
-    )
+    count, total = warehouse_sales_totals(included_rows)
     by_channel: dict[str, dict[str, float | int]] = {}
     for ch in (CHANNEL_AVITO, CHANNEL_MARKETPLACE_USED, CHANNEL_WAREHOUSE):
-        ch_rows = [r for r in rows if is_warehouse_sale(r) and resolve_sale_channel(r) == ch]
+        ch_rows = [
+            r
+            for r in included_rows
+            if resolve_sale_channel(r) == ch
+        ]
         ch_count, ch_total = warehouse_sales_totals(ch_rows)
         by_channel[ch] = {"count": ch_count, "total": ch_total, "label": CHANNEL_LABELS[ch]}
 

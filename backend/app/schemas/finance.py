@@ -46,6 +46,7 @@ class FinanceSalesRow(BaseModel):
     source_kind: Optional[str] = None
     avito_order_id: Optional[str] = None
     garage_used_order_item_id: Optional[int] = None
+    payment_method: Optional[str] = None
     reason: Optional[str] = None
     storage_location_id: Optional[int] = None
 

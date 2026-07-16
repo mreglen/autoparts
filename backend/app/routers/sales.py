@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional, TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -25,6 +25,8 @@ from app.schemas.sales_orders import (
     AvitoRetryWarehouseResponse,
     AvitoWarehouseFulfillmentInfo,
     FulfilledOrderItemOut,
+    MarkUsedOrderPaidRequest,
+    MarkUsedOrderPaidResponse,
     NewPartsOrderCanViewResponse,
     NewPartsOrderItemResponse,
     NewPartsOrderResponse,
@@ -1083,6 +1085,93 @@ def _load_new_order_for_seller(db: Session, order_id: int, current_user: UserMod
 
 
 @router.post(
+    "/used-parts-orders/{order_id}/mark-paid",
+    response_model=MarkUsedOrderPaidResponse,
+)
+def mark_used_order_paid(
+    order_id: int,
+    payload: MarkUsedOrderPaidRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Подтвердить оплату б/у заказа выбранным способом оплаты организации."""
+    from app.models.payment_method import PaymentMethod, organization_payment_methods
+    from app.models.stock_out import StockOut
+
+    _require_sales_orders_access(db, current_user)
+    order = _load_used_order_for_seller(db, order_id, current_user)
+
+    if order.is_paid:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Заказ уже оплачен",
+        )
+
+    method = (
+        db.query(PaymentMethod)
+        .filter(PaymentMethod.id == payload.payment_method_id)
+        .first()
+    )
+    if not method:
+        raise HTTPException(status_code=404, detail="Способ оплаты не найден")
+
+    assigned = db.execute(
+        organization_payment_methods.select().where(
+            organization_payment_methods.c.organization_id == order.organization_id,
+            organization_payment_methods.c.payment_method_id == method.id,
+        )
+    ).fetchone()
+    if not assigned:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Способ оплаты не назначен организации",
+        )
+
+    paid_at = datetime.now(timezone.utc)
+    order.is_paid = True
+    order.payment_method_id = method.id
+    order.payment_method_name = method.name
+    order.paid_at = paid_at
+
+    item_ids = [item.id for item in (order.items or []) if item.id]
+    if item_ids:
+        stock_outs = (
+            db.query(StockOut)
+            .filter(StockOut.garage_used_order_item_id.in_(item_ids))
+            .all()
+        )
+        for so in stock_outs:
+            so.payment_method = method.name
+
+    db.commit()
+    db.refresh(order)
+
+    log_audit(
+        db,
+        event_type="order_marked_paid",
+        category="orders",
+        summary=f"Заказ Б/У #{order_id} оплачен ({method.name})",
+        user=current_user,
+        organization_id=order.organization_id,
+        details={
+            "order_id": order_id,
+            "payment_method_id": method.id,
+            "payment_method_name": method.name,
+            "total_amount": order.total_amount,
+        },
+        entity_type="garage_used_order",
+        entity_id=order_id,
+    )
+
+    return MarkUsedOrderPaidResponse(
+        is_paid=True,
+        payment_method_id=method.id,
+        payment_method_name=method.name,
+        paid_at=paid_at,
+    )
+
+
+@router.post(
     "/used-parts-orders/{order_id}/verify-pickup",
     response_model=PickupActionResponse,
 )
@@ -1316,6 +1405,9 @@ def list_purchased_used_orders(
             "pickup_address": order.pickup_address,
             "total_amount": order.total_amount,
             "is_paid": order.is_paid,
+            "payment_method_id": getattr(order, "payment_method_id", None),
+            "payment_method_name": getattr(order, "payment_method_name", None),
+            "paid_at": getattr(order, "paid_at", None),
             "status_code": order.status_code,
             "created_at": order.created_at,
             "pickup_code": pickup["pickup_code"],

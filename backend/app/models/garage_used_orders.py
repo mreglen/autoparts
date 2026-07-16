@@ -27,6 +27,9 @@ class GarageUsedOrder(Base):
 
     total_amount = Column(Float, nullable=False, default=0.0)
     is_paid = Column(Boolean, nullable=False, default=False)
+    payment_method_id = Column(Integer, ForeignKey("payment_methods.id"), nullable=True)
+    payment_method_name = Column(String(255), nullable=True)
+    paid_at = Column(DateTime(timezone=True), nullable=True)
     status_code = Column(String(50), nullable=False, default="pending", index=True)
 
     pickup_code_hash = Column(String(64), nullable=True)

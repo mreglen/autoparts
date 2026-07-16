@@ -130,6 +130,7 @@ def _fulfill_single_used_item(
                 sale_channel="marketplace_used",
                 avito_order_id=None,
                 garage_used_order_item_id=item.id,
+                payment_method=getattr(order, "payment_method_name", None) if order.is_paid else None,
             ),
             commit=False,
         )

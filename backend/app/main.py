@@ -43,6 +43,7 @@ from app.db.schema_patches import (
     ensure_product_source_pending_id_column,
     ensure_label_qr_links_table,
     ensure_label_qr_links_backfill,
+    ensure_payment_methods_tables,
     ensure_cart_max_quantity_columns,
     ensure_yookassa_payment_tables,
     ensure_yookassa_refund_columns,
@@ -113,6 +114,7 @@ import app.models.site_openrouter_integration  # noqa: F401 — OpenRouter integ
 import app.models.organization_ai_description_access  # noqa: F401 — AI description org allowlist
 import app.models.product_draft  # noqa: F401 — product drafts
 import app.models.user_engagement  # noqa: F401 — favorites, views, subscriptions
+import app.models.payment_method  # noqa: F401 — org payment methods
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse, FileResponse
 from app.core.config import settings
@@ -199,6 +201,7 @@ try:
     ensure_product_source_pending_id_column()
     ensure_label_qr_links_table()
     ensure_label_qr_links_backfill()
+    ensure_payment_methods_tables()
     ensure_cart_max_quantity_columns()
     ensure_yookassa_payment_tables()
     ensure_yookassa_refund_columns()

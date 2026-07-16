@@ -124,6 +124,7 @@ export default function SalesGarageOrderCard({
   onUpdateStatus,
   onOpenPickupVerify,
   onOpenItemConfirm,
+  onOpenPayment,
   onRejectItem,
   onConfirmRosskoItem,
   statusEditable = true,
@@ -296,13 +297,34 @@ export default function SalesGarageOrderCard({
               <div className="text-xl font-bold tabular-nums text-gray-900">{formatPrice(order.total_amount)}</div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                  order.is_paid ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-100'
-                }`}
-              >
-                {order.is_paid ? 'Оплачен' : 'Не оплачен'}
-              </span>
+              {isUsed ? (
+                order.is_paid ? (
+                  <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-100">
+                    Оплачено
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenPayment?.(order);
+                    }}
+                    className="inline-flex rounded-full bg-amber-400 px-2.5 py-1 text-xs font-semibold text-amber-950 ring-1 ring-amber-500/30 hover:bg-amber-500"
+                  >
+                    Оплата
+                  </button>
+                )
+              ) : (
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                    order.is_paid
+                      ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100'
+                      : 'bg-amber-50 text-amber-800 ring-1 ring-amber-100'
+                  }`}
+                >
+                  {order.is_paid ? 'Оплачен' : 'Не оплачен'}
+                </span>
+              )}
               <GarageCustomerStatusControl
                 statusCode={orderStatusCode}
                 statusEditable={statusEditable}
@@ -408,6 +430,12 @@ export default function SalesGarageOrderCard({
                     </div>
                     <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                       <div className="text-base font-semibold tabular-nums text-gray-900">{formatPrice(lineTotal)}</div>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(itemStatusCode)}`}
+                        title="Статус позиции"
+                      >
+                        {getStatusName(itemStatusCode)}
+                      </span>
                       {showItemConfirmActions ? (
                         <div className="flex flex-col gap-1.5">
                           <button

@@ -267,6 +267,14 @@ const organizationSlice = createSlice({
             deliveryMethodAssignments: false,
         },
         deliveryMethodsError: null,
+        // Payment methods state
+        allPaymentMethods: [],
+        orgPaymentMethods: [],
+        loadingPaymentMethods: {
+            paymentMethods: false,
+            paymentMethodAssignments: false,
+        },
+        paymentMethodsError: null,
     },
     reducers: {
         clearOrganization: (state) => {
@@ -280,6 +288,9 @@ const organizationSlice = createSlice({
         },
         clearDeliveryMethodsError: (state) => {
             state.deliveryMethodsError = null;
+        },
+        clearPaymentMethodsError: (state) => {
+            state.paymentMethodsError = null;
         },
     },
     extraReducers: (builder) => {
@@ -452,6 +463,60 @@ const organizationSlice = createSlice({
             .addCase(removeDeliveryMethod.rejected, (state, action) => {
                 state.loadingDeliveryMethods.deliveryMethodAssignments = false;
                 state.deliveryMethodsError = action.payload;
+            })
+            // Payment methods
+            .addCase(fetchAllPaymentMethods.pending, (state) => {
+                state.loadingPaymentMethods.paymentMethods = true;
+                state.paymentMethodsError = null;
+            })
+            .addCase(fetchAllPaymentMethods.fulfilled, (state, action) => {
+                state.loadingPaymentMethods.paymentMethods = false;
+                state.allPaymentMethods = Array.isArray(action.payload) ? action.payload : [];
+            })
+            .addCase(fetchAllPaymentMethods.rejected, (state, action) => {
+                state.loadingPaymentMethods.paymentMethods = false;
+                state.paymentMethodsError = action.payload;
+            })
+            .addCase(fetchOrgPaymentMethods.pending, (state) => {
+                state.loadingPaymentMethods.paymentMethods = true;
+                state.paymentMethodsError = null;
+            })
+            .addCase(fetchOrgPaymentMethods.fulfilled, (state, action) => {
+                state.loadingPaymentMethods.paymentMethods = false;
+                state.orgPaymentMethods = Array.isArray(action.payload) ? action.payload : [];
+            })
+            .addCase(fetchOrgPaymentMethods.rejected, (state, action) => {
+                state.loadingPaymentMethods.paymentMethods = false;
+                state.paymentMethodsError = action.payload;
+            })
+            .addCase(assignPaymentMethod.pending, (state) => {
+                state.loadingPaymentMethods.paymentMethodAssignments = true;
+                state.paymentMethodsError = null;
+            })
+            .addCase(assignPaymentMethod.fulfilled, (state, action) => {
+                state.loadingPaymentMethods.paymentMethodAssignments = false;
+                const method = state.allPaymentMethods.find((m) => m.id === action.meta.arg.methodId);
+                if (method && !state.orgPaymentMethods.some((m) => m.id === method.id)) {
+                    state.orgPaymentMethods.push(method);
+                }
+            })
+            .addCase(assignPaymentMethod.rejected, (state, action) => {
+                state.loadingPaymentMethods.paymentMethodAssignments = false;
+                state.paymentMethodsError = action.payload;
+            })
+            .addCase(removePaymentMethod.pending, (state) => {
+                state.loadingPaymentMethods.paymentMethodAssignments = true;
+                state.paymentMethodsError = null;
+            })
+            .addCase(removePaymentMethod.fulfilled, (state, action) => {
+                state.loadingPaymentMethods.paymentMethodAssignments = false;
+                state.orgPaymentMethods = state.orgPaymentMethods.filter(
+                    (m) => m.id !== action.payload.methodId
+                );
+            })
+            .addCase(removePaymentMethod.rejected, (state, action) => {
+                state.loadingPaymentMethods.paymentMethodAssignments = false;
+                state.paymentMethodsError = action.payload;
             });
     },
 });
@@ -509,5 +574,58 @@ export const removeDeliveryMethod = createAsyncThunk(
     }
 );
 
-export const { clearOrganization, clearPermissionsError, clearDeliveryMethodsError } = organizationSlice.actions;
+export const fetchAllPaymentMethods = createAsyncThunk(
+    'organization/fetchAllPaymentMethods',
+    async (_, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest('/payment-methods/');
+            return result;
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка загрузки способов оплаты');
+        }
+    }
+);
+
+export const fetchOrgPaymentMethods = createAsyncThunk(
+    'organization/fetchOrgPaymentMethods',
+    async (orgId, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest(`/payment-methods/by-organization/${orgId}`);
+            return result;
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка загрузки способов оплаты организации');
+        }
+    }
+);
+
+export const assignPaymentMethod = createAsyncThunk(
+    'organization/assignPaymentMethod',
+    async ({ orgId, methodId }, { rejectWithValue }) => {
+        try {
+            const result = await apiRequest(
+                `/payment-methods/assign-to-org?organization_id=${orgId}&payment_method_id=${methodId}`,
+                { method: 'POST' }
+            );
+            return result;
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка добавления способа оплаты');
+        }
+    }
+);
+
+export const removePaymentMethod = createAsyncThunk(
+    'organization/removePaymentMethod',
+    async ({ orgId, methodId }, { rejectWithValue }) => {
+        try {
+            await apiRequest(`/payment-methods/remove-from-org/${orgId}/${methodId}`, {
+                method: 'DELETE',
+            });
+            return { orgId, methodId };
+        } catch (err) {
+            return rejectWithValue(err?.detail || 'Ошибка удаления способа оплаты');
+        }
+    }
+);
+
+export const { clearOrganization, clearPermissionsError, clearDeliveryMethodsError, clearPaymentMethodsError } = organizationSlice.actions;
 export default organizationSlice.reducer;

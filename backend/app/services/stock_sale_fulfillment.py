@@ -40,6 +40,7 @@ class FulfillStockOutRequest:
     sale_channel: Optional[str] = None
     avito_order_id: Optional[str] = None
     garage_used_order_item_id: Optional[int] = None
+    payment_method: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,7 @@ def fulfill_stock_out(
         avito_order_id=request.avito_order_id,
         source_kind=request.source_kind.value,
         garage_used_order_item_id=request.garage_used_order_item_id,
+        payment_method=request.payment_method,
     )
     product.quantity -= request.quantity
     db.add(stock_out)

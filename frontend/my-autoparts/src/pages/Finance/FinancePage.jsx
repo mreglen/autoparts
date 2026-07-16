@@ -340,6 +340,7 @@ export default function FinancePage() {
                         </p>
                       </div>
                       <FinanceField label="Канал">{row.channel_label}</FinanceField>
+                      <FinanceField label="Оплата">{row.payment_method || '—'}</FinanceField>
                       <FinanceField label="Кол-во">{row.quantity}</FinanceField>
                       <FinanceField label="Сумма">{formatFinanceCurrency(row.line_total)}</FinanceField>
                     </FinanceMobileCard>
@@ -353,6 +354,7 @@ export default function FinancePage() {
                       <th className="px-3 py-2">Дата</th>
                       <th className="px-3 py-2">Товар</th>
                       <th className="px-3 py-2">Канал</th>
+                      <th className="px-3 py-2">Оплата</th>
                       <th className="px-3 py-2 text-right">Кол-во</th>
                       <th className="px-3 py-2 text-right">Сумма</th>
                     </tr>
@@ -360,7 +362,7 @@ export default function FinancePage() {
                   <tbody>
                     {sales.rows?.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                        <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
                           Нет продаж за период
                         </td>
                       </tr>
@@ -377,6 +379,7 @@ export default function FinancePage() {
                             </div>
                           </td>
                           <td className="px-3 py-2">{row.channel_label}</td>
+                          <td className="px-3 py-2">{row.payment_method || '—'}</td>
                           <td className="px-3 py-2 text-right">{row.quantity}</td>
                           <td className="px-3 py-2 text-right font-medium">
                             {formatFinanceCurrency(row.line_total)}

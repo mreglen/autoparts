@@ -171,13 +171,13 @@ export const AVITO_ACTIVE_STATUSES = new Set(['on_confirmation', 'ready_to_ship'
 export const AVITO_COMPLETED_STATUSES = new Set(['delivered', 'closed']);
 export const AVITO_CANCELED_STATUSES = new Set(['canceled', 'on_return']);
 
-const USED_ITEM_AWAITING_CONFIRM = new Set(['pending', 'rejected']);
+const USED_ITEM_AWAITING_CONFIRM = new Set(['pending']);
 
 export function isRosskoNewOrder(order) {
   return Boolean(order?.rossko_order_id);
 }
 
-/** Показывать кнопки подтверждения позиции (ещё не подтверждена и не дальше по цепочке). */
+/** Показывать кнопки подтверждения позиции (ещё не подтверждена продавцом). */
 export function isGarageItemAwaitingSellerConfirm(statusCode, orderType = 'used') {
   const code = statusCode || (orderType === 'new' ? 'new_waiting_confirmation' : 'pending');
   if (orderType === 'new') {

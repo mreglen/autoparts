@@ -186,19 +186,15 @@ export default function PurchaseOrderCard({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {isUsed ? (
-            <span className="inline-flex rounded-full bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-100">
-              Оплата при получении
-            </span>
-          ) : (
-            <span
-              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                order.is_paid ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100' : 'bg-amber-50 text-amber-800 ring-1 ring-amber-100'
-              }`}
-            >
-              {order.is_paid ? 'Оплачен' : 'Ожидает оплаты'}
-            </span>
-          )}
+          <span
+            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+              order.is_paid
+                ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100'
+                : 'bg-amber-50 text-amber-800 ring-1 ring-amber-100'
+            }`}
+          >
+            {order.is_paid ? 'Оплачено' : 'Не оплачено'}
+          </span>
           <span className="text-xs text-gray-500">
             {items.length} {items.length === 1 ? 'позиция' : items.length < 5 ? 'позиции' : 'позиций'}
           </span>

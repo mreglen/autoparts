@@ -8,6 +8,7 @@ import SalesGarageOrderCard from '../../components/SalesOrders/SalesGarageOrderC
 import SalesOrdersEmptyState from '../../components/SalesOrders/SalesOrdersEmptyState';
 import PickupVerifyModal from '../../components/SalesOrders/PickupVerifyModal';
 import ItemConfirmScanModal from '../../components/SalesOrders/ItemConfirmScanModal';
+import OrderPaymentModal from '../../components/SalesOrders/OrderPaymentModal';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import OrderSourceBadge from '../../components/Orders/OrderSourceBadge';
 import { buildUnifiedOrders, getUnifiedOrderKey } from '../../utils/orderSourceMeta';
@@ -136,6 +137,15 @@ export default function SalesOrdersPage() {
     productCard: null,
     productCardLoading: false,
     productCardError: '',
+  });
+  const [paymentModal, setPaymentModal] = useState({
+    isOpen: false,
+    order: null,
+    methods: [],
+    methodsLoading: false,
+    methodsError: '',
+    error: '',
+    isSubmitting: false,
   });
 
   const usedOrderStatusOptions = useMemo(() => {
@@ -512,7 +522,7 @@ export default function SalesOrdersPage() {
       isSubmitting: false,
       error: 'Не удалось обновить статус позиции',
     }));
-  }, [itemConfirmModal, closeItemConfirmModal]);
+  }, [itemConfirmModal, closeItemConfirmModal, updateUsedOrderStatus]);
 
   const rejectItem = useCallback(async (order, item, orderKind) => {
     try {
@@ -528,6 +538,88 @@ export default function SalesOrdersPage() {
       });
     }
   }, []);
+
+  const closePaymentModal = useCallback(() => {
+    setPaymentModal({
+      isOpen: false,
+      order: null,
+      methods: [],
+      methodsLoading: false,
+      methodsError: '',
+      error: '',
+      isSubmitting: false,
+    });
+  }, []);
+
+  const openPaymentModal = useCallback(async (order) => {
+    const orgId = order?.organization_id || user?.organization_id;
+    setPaymentModal({
+      isOpen: true,
+      order,
+      methods: [],
+      methodsLoading: true,
+      methodsError: '',
+      error: '',
+      isSubmitting: false,
+    });
+    if (!orgId) {
+      setPaymentModal((prev) => ({
+        ...prev,
+        methodsLoading: false,
+        methodsError: 'Не удалось определить организацию',
+      }));
+      return;
+    }
+    try {
+      const response = await apiAxios.get(`/payment-methods/by-organization/${orgId}`);
+      setPaymentModal((prev) => ({
+        ...prev,
+        methods: Array.isArray(response.data) ? response.data : [],
+        methodsLoading: false,
+      }));
+    } catch (err) {
+      setPaymentModal((prev) => ({
+        ...prev,
+        methodsLoading: false,
+        methodsError: formatStatusErrorDetail(err?.response?.data?.detail) || 'Не удалось загрузить способы оплаты',
+      }));
+    }
+  }, [user?.organization_id]);
+
+  const submitOrderPayment = useCallback(async (method) => {
+    const order = paymentModal.order;
+    if (!order || !method?.id) return;
+    setPaymentModal((prev) => ({ ...prev, isSubmitting: true, error: '' }));
+    try {
+      const response = await apiAxios.post(`/sales/used-parts-orders/${order.id}/mark-paid`, {
+        payment_method_id: method.id,
+      });
+      const paidAt = response.data?.paid_at || new Date().toISOString();
+      const methodName = response.data?.payment_method_name || method.name;
+      const methodId = response.data?.payment_method_id ?? method.id;
+      setUsedOrders((prev) =>
+        prev.map((o) =>
+          o.id === order.id
+            ? {
+                ...o,
+                is_paid: true,
+                payment_method_id: methodId,
+                payment_method_name: methodName,
+                paid_at: paidAt,
+              }
+            : o
+        )
+      );
+      closePaymentModal();
+      dispatch(fetchSalesMenuCounts());
+    } catch (err) {
+      setPaymentModal((prev) => ({
+        ...prev,
+        isSubmitting: false,
+        error: formatStatusErrorDetail(err?.response?.data?.detail) || 'Не удалось подтвердить оплату',
+      }));
+    }
+  }, [paymentModal.order, closePaymentModal, dispatch]);
 
   const confirmRosskoItem = useCallback(async (order, item) => {
     try {
@@ -1188,6 +1280,7 @@ export default function SalesOrdersPage() {
                   onUpdateStatus={isUsed ? updateUsedOrderStatus : updateNewOrderStatus}
                   onOpenPickupVerify={openPickupVerify}
                   onOpenItemConfirm={openItemConfirmScan}
+                  onOpenPayment={openPaymentModal}
                   onRejectItem={rejectItem}
                   onConfirmRosskoItem={confirmRosskoItem}
                   getStatusColor={getGarageStatusColor}
@@ -1375,6 +1468,19 @@ export default function SalesOrdersPage() {
           error={itemConfirmModal.error}
           onClose={closeItemConfirmModal}
           onConfirm={submitItemConfirm}
+        />
+
+        <OrderPaymentModal
+          isOpen={paymentModal.isOpen}
+          order={paymentModal.order}
+          methods={paymentModal.methods}
+          methodsLoading={paymentModal.methodsLoading}
+          methodsError={paymentModal.methodsError}
+          isSubmitting={paymentModal.isSubmitting}
+          error={paymentModal.error}
+          formatPrice={formatPrice}
+          onClose={closePaymentModal}
+          onConfirm={submitOrderPayment}
         />
     </div>
   );

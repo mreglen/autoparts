@@ -48,12 +48,27 @@ class UsedPartsOrderResponse(BaseModel):
     pickup_address: Optional[str] = None
     total_amount: float
     is_paid: bool
+    payment_method_id: Optional[int] = None
+    payment_method_name: Optional[str] = None
+    paid_at: Optional[datetime] = None
     status_code: str
     created_at: datetime
     items: list[UsedPartsOrderItemResponse] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
+
+
+class MarkUsedOrderPaidRequest(BaseModel):
+    payment_method_id: int
+
+
+class MarkUsedOrderPaidResponse(BaseModel):
+    status: str = "ok"
+    is_paid: bool = True
+    payment_method_id: Optional[int] = None
+    payment_method_name: Optional[str] = None
+    paid_at: Optional[datetime] = None
 
 
 class NewPartsOrderItemResponse(BaseModel):
@@ -195,6 +210,9 @@ class PurchasedUsedOrderResponse(BaseModel):
     pickup_address: Optional[str] = None
     total_amount: float
     is_paid: bool
+    payment_method_id: Optional[int] = None
+    payment_method_name: Optional[str] = None
+    paid_at: Optional[datetime] = None
     status_code: str
     created_at: datetime
     pickup_code: Optional[str] = None

@@ -137,6 +137,24 @@ export default function PurchasesOrdersPage() {
     }
   }, [isReady, isAuthenticated, fetchAll]);
 
+  // Обновлять статусы позиций после подтверждения продавцом на /sales/orders
+  useEffect(() => {
+    if (!isReady || !isAuthenticated) return undefined;
+
+    const refresh = () => {
+      if (document.visibilityState === 'visible') {
+        fetchAll(true);
+      }
+    };
+
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [isReady, isAuthenticated, fetchAll]);
+
   const allOrdersPool = useMemo(
     () => buildUnifiedOrders(usedOrders, newOrders, [], { canViewNewOrders: true, avitoProActive: false }),
     [usedOrders, newOrders],

@@ -2598,3 +2598,118 @@ def ensure_label_qr_links_backfill() -> None:
     finally:
         db.close()
 
+
+DEFAULT_PAYMENT_METHODS = (
+    ("cash", "Наличные", "Оплата наличными при получении"),
+    ("qr", "QR-код", "Оплата по QR-коду"),
+    ("card", "Картой", "Оплата банковской картой"),
+)
+
+
+def ensure_payment_methods_tables() -> None:
+    """Payment methods catalog + org M2M + order/stock_out payment columns."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    dialect = engine.dialect.name
+    is_pg = dialect == "postgresql"
+
+    with engine.begin() as conn:
+        if "payment_methods" not in tables:
+            if is_pg:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE payment_methods (
+                            id SERIAL PRIMARY KEY,
+                            code VARCHAR(50) NOT NULL UNIQUE,
+                            name VARCHAR(255) NOT NULL,
+                            description TEXT
+                        )
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE payment_methods (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            code VARCHAR(50) NOT NULL UNIQUE,
+                            name VARCHAR(255) NOT NULL,
+                            description TEXT
+                        )
+                        """
+                    )
+                )
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_payment_methods_code ON payment_methods (code)"))
+            logger.info("Created payment_methods table")
+
+        if "organization_payment_methods" not in tables:
+            if is_pg:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE organization_payment_methods (
+                            id SERIAL PRIMARY KEY,
+                            payment_method_id INTEGER REFERENCES payment_methods(id),
+                            organization_id VARCHAR(10) REFERENCES organizations(id)
+                        )
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE organization_payment_methods (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            payment_method_id INTEGER REFERENCES payment_methods(id),
+                            organization_id VARCHAR(10) REFERENCES organizations(id)
+                        )
+                        """
+                    )
+                )
+            logger.info("Created organization_payment_methods table")
+
+        for code, name, description in DEFAULT_PAYMENT_METHODS:
+            existing = conn.execute(
+                text("SELECT id FROM payment_methods WHERE code = :code"),
+                {"code": code},
+            ).fetchone()
+            if existing:
+                continue
+            conn.execute(
+                text(
+                    "INSERT INTO payment_methods (code, name, description) "
+                    "VALUES (:code, :name, :description)"
+                ),
+                {"code": code, "name": name, "description": description},
+            )
+        logger.info("Ensured default payment methods seed")
+
+    inspector = inspect(engine)
+    if "garage_used_orders" in inspector.get_table_names():
+        cols = {col["name"] for col in inspector.get_columns("garage_used_orders")}
+        statements: list[str] = []
+        if "payment_method_id" not in cols:
+            statements.append("ALTER TABLE garage_used_orders ADD COLUMN payment_method_id INTEGER")
+        if "payment_method_name" not in cols:
+            statements.append("ALTER TABLE garage_used_orders ADD COLUMN payment_method_name VARCHAR(255)")
+        if "paid_at" not in cols:
+            if is_pg:
+                statements.append("ALTER TABLE garage_used_orders ADD COLUMN paid_at TIMESTAMPTZ")
+            else:
+                statements.append("ALTER TABLE garage_used_orders ADD COLUMN paid_at DATETIME")
+        if statements:
+            with engine.begin() as conn:
+                for stmt in statements:
+                    conn.execute(text(stmt))
+            logger.info("Applied garage_used_orders payment columns patch")
+
+    if "stock_out" in inspector.get_table_names():
+        cols = {col["name"] for col in inspector.get_columns("stock_out")}
+        if "payment_method" not in cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE stock_out ADD COLUMN payment_method VARCHAR(255)"))
+            logger.info("Applied stock_out.payment_method column patch")
+

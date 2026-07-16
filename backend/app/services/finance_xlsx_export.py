@@ -95,6 +95,7 @@ def _sheet_sales(wb: Workbook, rows: list[dict]) -> None:
         "Цена",
         "Сумма",
         "Канал",
+        "Способ оплаты",
         "ID Авито",
         "ID заказа Б/У",
         "Причина",
@@ -110,9 +111,10 @@ def _sheet_sales(wb: Workbook, rows: list[dict]) -> None:
         ws.cell(row=i, column=7, value=r.get("unit_price"))
         ws.cell(row=i, column=8, value=r.get("line_total"))
         ws.cell(row=i, column=9, value=r.get("channel_label"))
-        ws.cell(row=i, column=10, value=r.get("avito_order_id"))
-        ws.cell(row=i, column=11, value=r.get("garage_used_order_item_id"))
-        ws.cell(row=i, column=12, value=r.get("reason"))
+        ws.cell(row=i, column=10, value=r.get("payment_method"))
+        ws.cell(row=i, column=11, value=r.get("avito_order_id"))
+        ws.cell(row=i, column=12, value=r.get("garage_used_order_item_id"))
+        ws.cell(row=i, column=13, value=r.get("reason"))
     _autosize_columns(ws)
 
 

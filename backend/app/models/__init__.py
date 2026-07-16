@@ -32,6 +32,7 @@ from app.models.tecdoc import (
 )
 from app.models.product_vehicle import ProductVehicleAssociation
 from app.models.delivery_method import DeliveryMethod, organization_delivery_methods
+from app.models.payment_method import PaymentMethod, organization_payment_methods
 from app.models.product_avito_listing_link import ProductAvitoListingLink
 from app.models.avito_autoload_job import AvitoAutoloadJob
 from app.models.garage_used_orders import GarageUsedOrder, GarageUsedOrderItem
@@ -110,6 +111,9 @@ Vehicle.compatible_products = relationship("Product", secondary="product_vehicle
 
 # Organization <-> DeliveryMethod relationship
 Organization.delivery_methods = relationship("DeliveryMethod", secondary="organization_delivery_methods", back_populates="organizations")
+
+# Organization <-> PaymentMethod relationship
+Organization.payment_methods = relationship("PaymentMethod", secondary="organization_payment_methods", back_populates="organizations")
 
 # User <-> Chat relationships
 User.buyer_chats = relationship("Chat", foreign_keys="Chat.buyer_id", back_populates="buyer")
