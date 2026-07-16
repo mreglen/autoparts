@@ -3,12 +3,12 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { parseSellerPartCardQr } from '../../utils/parseSellerPartCardQr';
 import { normalizeInternalCodeForCompare } from '../../utils/internalCode';
 import { apiAxios } from '../../utils/apiClient';
-import StorageCellsDisplayTable from '../StorageCellsTable/StorageCellsDisplayTable';
+import { resolveStorageCellName, shortStorageCellText } from '../../utils/labelPrintDisplay';
 
 const SCANNER_ID = 'garage-item-confirm-qr-scanner';
 
 /** Same camera config as working WarehouseScanPage (/warehouse/scan). */
-const QR_SCAN_CONFIG = { fps: 8, qrbox: { width: 250, height: 250 } };
+const QR_SCAN_CONFIG = { fps: 8, qrbox: { width: 220, height: 220 } };
 
 async function stopScannerSafe(scanner) {
   if (!scanner) return;
@@ -169,32 +169,31 @@ function WarehouseFooter({ productCard, productCardLoading, productCardError }) 
   const warehouseName = productCard?.storage_location_name;
   const storageCells = productCard?.product_storage_cells || [];
   const storageAddresses = productCard?.storage_addresses || [];
+  const cellLabel = storageCells.length > 0
+    ? storageCells
+      .map((link) => {
+        if (link.value == null || String(link.value).trim() === '') return null;
+        const name = shortStorageCellText(resolveStorageCellName(link, []));
+        const value = shortStorageCellText(String(link.value).trim());
+        return [name, value].filter(Boolean).join(' ');
+      })
+      .filter(Boolean)
+      .join(' · ')
+    : (storageAddresses || []).join('; ');
 
   return (
-    <div className="space-y-2 border-t border-gray-100 pt-3">
-      <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Склад</div>
-        {productCardLoading ? (
-          <div className="mt-0.5 text-xs text-gray-500">Загрузка…</div>
-        ) : (
-          <div className="mt-0.5 truncate text-xs font-medium text-gray-900">
-            {productCardError ? 'Не удалось загрузить' : (warehouseName || '—')}
-          </div>
-        )}
+    <div className="grid grid-cols-2 gap-2">
+      <div className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5">
+        <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-500">Склад</div>
+        <div className="mt-0.5 truncate text-[11px] font-medium text-gray-900">
+          {productCardLoading ? '…' : (productCardError ? 'Ошибка' : (warehouseName || '—'))}
+        </div>
       </div>
-      <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Адресное хранение</div>
-        {productCardLoading ? (
-          <div className="mt-0.5 text-xs text-gray-500">Загрузка…</div>
-        ) : storageCells.length > 0 ? (
-          <div className="mt-1 max-h-16 overflow-hidden">
-            <StorageCellsDisplayTable productStorageCells={storageCells} compact />
-          </div>
-        ) : storageAddresses.length > 0 ? (
-          <div className="mt-0.5 line-clamp-2 text-xs text-gray-800">{storageAddresses.join('; ')}</div>
-        ) : (
-          <div className="mt-0.5 text-xs text-gray-500">—</div>
-        )}
+      <div className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5">
+        <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-500">Ячейка</div>
+        <div className="mt-0.5 truncate text-[11px] font-medium text-gray-900">
+          {productCardLoading ? '…' : (cellLabel || '—')}
+        </div>
       </div>
     </div>
   );
@@ -272,6 +271,15 @@ export default function ItemConfirmScanModal({
   useEffect(() => {
     handleScanResultRef.current = handleScanResult;
   }, [handleScanResult]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -409,18 +417,21 @@ export default function ItemConfirmScanModal({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4 ${
+      className={`fixed inset-0 z-[100] flex bg-black/50 ${
         isOpen ? '' : 'pointer-events-none opacity-0'
-      }`}
+      } sm:items-center sm:justify-center sm:p-4`}
       aria-hidden={!isOpen}
     >
-      <div className="flex max-h-[calc(100dvh-5.25rem)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[min(92dvh,640px)] sm:rounded-2xl">
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-5">
+      {/* Mobile: fullscreen. Desktop: centered card. */}
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:h-auto sm:max-h-[min(92dvh,640px)] sm:max-w-md sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-xl">
+        <div
+          className="flex shrink-0 items-start justify-between gap-2 border-b border-gray-100 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:px-5 sm:pt-3"
+        >
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-gray-900">Подтверждение позиции</h3>
-            <p className="truncate text-sm font-medium text-gray-800">{title}</p>
+            <h3 className="text-sm font-semibold text-gray-900 sm:text-base">Подтверждение позиции</h3>
+            <p className="truncate text-xs font-medium text-gray-800 sm:text-sm">{title}</p>
             {(brand || partnumber) && (
-              <p className="truncate text-xs text-gray-500">
+              <p className="truncate text-[11px] text-gray-500">
                 {[brand, partnumber].filter(Boolean).join(' · ')}
               </p>
             )}
@@ -437,36 +448,36 @@ export default function ItemConfirmScanModal({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2 sm:px-5 sm:py-3">
           {mode === 'entry' ? (
-            <div className="flex flex-col">
-              <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-black">
+            <>
+              <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-gray-200 bg-black sm:min-h-[280px]">
                 <div
                   id={SCANNER_ID}
-                  className={`w-full min-h-[240px] sm:min-h-[280px] ${!cameraActive ? 'invisible absolute inset-0' : ''}`}
+                  className={`absolute inset-0 h-full w-full ${!cameraActive ? 'invisible' : ''}`}
                 />
                 {!cameraActive ? (
-                  <div className="flex min-h-[240px] items-center justify-center bg-gray-900 text-sm text-white sm:min-h-[280px]">
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-sm text-white">
                     Камера остановлена
                   </div>
                 ) : null}
               </div>
 
               {cameraError ? (
-                <div className="mt-2 space-y-1">
-                  <p className="text-xs text-amber-700">{cameraError}</p>
+                <div className="mt-1.5 shrink-0 space-y-0.5">
+                  <p className="text-[11px] text-amber-700">{cameraError}</p>
                   <button
                     type="button"
                     onClick={restartCamera}
-                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                    className="text-[11px] font-medium text-indigo-600 hover:text-indigo-700"
                   >
                     Повторить
                   </button>
                 </div>
               ) : null}
 
-              <form onSubmit={handleManualSubmit} className="mt-2">
-                <label className="mb-1 block text-xs font-medium text-gray-600" htmlFor="item-confirm-manual-id">
+              <form onSubmit={handleManualSubmit} className="mt-2 shrink-0">
+                <label className="mb-0.5 block text-[11px] font-medium text-gray-600" htmlFor="item-confirm-manual-id">
                   Внутренний код
                 </label>
                 <div className="flex gap-2">
@@ -494,20 +505,17 @@ export default function ItemConfirmScanModal({
                 </div>
               </form>
 
-              {entryError ? (
-                <p className="mt-2 text-xs text-red-600">{entryError}</p>
+              {(entryError || error) ? (
+                <p className="mt-1 shrink-0 text-[11px] text-red-600">{entryError || error}</p>
               ) : (
-                <p className="mt-2 text-[11px] text-gray-500">
-                  Наведите QR в квадратную рамку камеры. Или введите код и нажмите OK.
+                <p className="mt-1 shrink-0 text-[10px] text-gray-500">
+                  QR в рамку камеры или код вручную + OK
                 </p>
               )}
-              {error ? (
-                <p className="mt-2 text-xs text-red-600">{error}</p>
-              ) : null}
-            </div>
+            </>
           ) : (
-            <div className="flex flex-col items-center justify-center py-8">
-              <div className="w-full rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-5 text-center">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+              <div className="w-full rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-6 text-center">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Товар совпал</p>
                 <p className="mt-2 text-base font-medium text-gray-900">
                   {productCard?.internal_code ? (
@@ -521,13 +529,13 @@ export default function ItemConfirmScanModal({
           )}
         </div>
 
-        <div className="shrink-0 border-t border-gray-100 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
+        <div className="shrink-0 border-t border-gray-100 bg-white px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-5 sm:pt-3 sm:pb-3">
           <WarehouseFooter
             productCard={productCard}
             productCardLoading={productCardLoading}
             productCardError={productCardError}
           />
-          <div className="mt-3">
+          <div className="mt-2">
             {mode === 'entry' ? (
               <button
                 type="button"
