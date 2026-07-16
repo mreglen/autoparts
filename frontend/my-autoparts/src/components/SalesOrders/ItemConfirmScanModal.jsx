@@ -409,12 +409,12 @@ export default function ItemConfirmScanModal({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm sm:items-center sm:p-4 ${
+      className={`fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4 ${
         isOpen ? '' : 'pointer-events-none opacity-0'
       }`}
       aria-hidden={!isOpen}
     >
-      <div className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[min(92dvh,640px)] sm:rounded-2xl">
+      <div className="flex max-h-[calc(100dvh-5.25rem)] w-full max-w-md flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[min(92dvh,640px)] sm:rounded-2xl">
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <h3 className="text-base font-semibold text-gray-900">Подтверждение позиции</h3>
@@ -437,130 +437,127 @@ export default function ItemConfirmScanModal({
           </button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col px-4 py-3 sm:px-5">
-          <div className="shrink-0 min-h-[20rem] sm:min-h-[18rem]">
-            {mode === 'entry' ? (
-              <>
-                <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-black">
-                  <div
-                    id={SCANNER_ID}
-                    className={`w-full min-h-[280px] ${!cameraActive ? 'invisible absolute inset-0' : ''}`}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
+          {mode === 'entry' ? (
+            <div className="flex flex-col">
+              <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-black">
+                <div
+                  id={SCANNER_ID}
+                  className={`w-full min-h-[240px] sm:min-h-[280px] ${!cameraActive ? 'invisible absolute inset-0' : ''}`}
+                />
+                {!cameraActive ? (
+                  <div className="flex min-h-[240px] items-center justify-center bg-gray-900 text-sm text-white sm:min-h-[280px]">
+                    Камера остановлена
+                  </div>
+                ) : null}
+              </div>
+
+              {cameraError ? (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs text-amber-700">{cameraError}</p>
+                  <button
+                    type="button"
+                    onClick={restartCamera}
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                  >
+                    Повторить
+                  </button>
+                </div>
+              ) : null}
+
+              <form onSubmit={handleManualSubmit} className="mt-2">
+                <label className="mb-1 block text-xs font-medium text-gray-600" htmlFor="item-confirm-manual-id">
+                  Внутренний код
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="item-confirm-manual-id"
+                    type="text"
+                    value={manualId}
+                    onChange={(e) => {
+                      setManualId(e.target.value);
+                      if (entryError) setEntryError('');
+                    }}
+                    placeholder={productCard?.internal_code || 'XXXX-AAAAA'}
+                    className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    disabled={isSubmitting}
+                    autoComplete="off"
+                    enterKeyHint="done"
                   />
-                  {!cameraActive ? (
-                    <div className="flex min-h-[280px] items-center justify-center bg-gray-900 text-sm text-white">
-                      Камера остановлена
-                    </div>
-                  ) : null}
+                  <button
+                    type="submit"
+                    disabled={manualSubmitDisabled}
+                    className="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    OK
+                  </button>
                 </div>
+              </form>
 
-                {cameraError ? (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-xs text-amber-700">{cameraError}</p>
-                    <button
-                      type="button"
-                      onClick={restartCamera}
-                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
-                    >
-                      Повторить
-                    </button>
-                  </div>
-                ) : null}
+              {entryError ? (
+                <p className="mt-2 text-xs text-red-600">{entryError}</p>
+              ) : (
+                <p className="mt-2 text-[11px] text-gray-500">
+                  Наведите QR в квадратную рамку камеры. Или введите код и нажмите OK.
+                </p>
+              )}
+              {error ? (
+                <p className="mt-2 text-xs text-red-600">{error}</p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8">
+              <div className="w-full rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-5 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Товар совпал</p>
+                <p className="mt-2 text-base font-medium text-gray-900">
+                  {productCard?.internal_code ? (
+                    <span className="font-mono">{productCard.internal_code}</span>
+                  ) : (
+                    <>ID {expectedProductId}</>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
 
-                <form onSubmit={handleManualSubmit} className="mt-2">
-                  <label className="mb-1 block text-xs font-medium text-gray-600" htmlFor="item-confirm-manual-id">
-                    Внутренний код
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      id="item-confirm-manual-id"
-                      type="text"
-                      value={manualId}
-                      onChange={(e) => {
-                        setManualId(e.target.value);
-                        if (entryError) setEntryError('');
-                      }}
-                      placeholder={productCard?.internal_code || 'XXXX-AAAAA'}
-                      className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                      disabled={isSubmitting}
-                      autoComplete="off"
-                      enterKeyHint="done"
-                    />
-                    <button
-                      type="submit"
-                      disabled={manualSubmitDisabled}
-                      className="shrink-0 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-                    >
-                      OK
-                    </button>
-                  </div>
-                </form>
-
-                {entryError ? (
-                  <p className="mt-2 text-xs text-red-600">{entryError}</p>
-                ) : (
-                  <p className="mt-2 text-[11px] text-gray-500">
-                    Наведите QR в квадратную рамку камеры. Или введите код и нажмите OK.
-                  </p>
-                )}
-                {error ? (
-                  <p className="mt-2 text-xs text-red-600">{error}</p>
-                ) : null}
-              </>
+        <div className="shrink-0 border-t border-gray-100 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
+          <WarehouseFooter
+            productCard={productCard}
+            productCardLoading={productCardLoading}
+            productCardError={productCardError}
+          />
+          <div className="mt-3">
+            {mode === 'entry' ? (
+              <button
+                type="button"
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                onClick={handleClose}
+                disabled={isSubmitting}
+              >
+                Отмена
+              </button>
             ) : (
-              <div className="flex h-full min-h-[inherit] flex-col justify-center">
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Товар совпал</p>
-                  <p className="mt-1 text-sm font-medium text-gray-900">
-                    {productCard?.internal_code ? (
-                      <span className="font-mono">{productCard.internal_code}</span>
-                    ) : (
-                      <>ID {expectedProductId}</>
-                    )}
-                  </p>
-                </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  onClick={restartEntry}
+                  disabled={isSubmitting}
+                >
+                  Снова
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                  onClick={onConfirm}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? '…' : 'Подтвердить'}
+                </button>
               </div>
             )}
           </div>
-
-          <div className="shrink-0 pt-2">
-            <WarehouseFooter
-              productCard={productCard}
-              productCardLoading={productCardLoading}
-              productCardError={productCardError}
-            />
-          </div>
-        </div>
-
-        <div className="shrink-0 border-t border-gray-100 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
-          {mode === 'entry' ? (
-            <button
-              type="button"
-              className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              onClick={handleClose}
-              disabled={isSubmitting}
-            >
-              Отмена
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                onClick={restartEntry}
-                disabled={isSubmitting}
-              >
-                Снова
-              </button>
-              <button
-                type="button"
-                className="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-                onClick={onConfirm}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? '…' : 'Подтвердить'}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -160,11 +160,6 @@ export default function SalesGarageOrderCard({
     editingStatus?.orderId === order.id &&
     editingStatus?.itemId == null;
 
-  const isEditingItem = (itemId) =>
-    editingStatus?.type === orderType &&
-    editingStatus?.orderId === order.id &&
-    editingStatus?.itemId === itemId;
-
   const primaryCta = (() => {
     if (isUsed) {
       if (orderStatusCode === 'pending') {
@@ -214,14 +209,6 @@ export default function SalesGarageOrderCard({
       return;
     }
     onEditStatus({ type: orderType, orderId: order.id, itemId: null });
-  };
-
-  const openItemEditor = (itemId) => {
-    if (isEditingItem(itemId)) {
-      onEditStatus(null);
-      return;
-    }
-    onEditStatus({ type: orderType, orderId: order.id, itemId });
   };
 
   const handleProductClick = async (item, e) => {
@@ -421,23 +408,6 @@ export default function SalesGarageOrderCard({
                     </div>
                     <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                       <div className="text-base font-semibold tabular-nums text-gray-900">{formatPrice(lineTotal)}</div>
-                      <GarageCustomerStatusControl
-                        statusCode={itemStatusCode}
-                        statusEditable={statusEditable}
-                        isEditing={isEditingItem(item.id)}
-                        onToggleEdit={() => openItemEditor(item.id)}
-                        onStatusChange={(code) => {
-                          onUpdateStatus(order.id, code, item.id);
-                          onEditStatus(null);
-                        }}
-                        onCloseEdit={() => onEditStatus(null)}
-                        getStatusColor={getStatusColor}
-                        getStatusName={getStatusName}
-                        orderStatusOptions={getStatusOptionsForDropdown(itemStatusCode)}
-                        size="sm"
-                        showStatusIcon={isNew}
-                        title={isNew ? 'Статус позиции для покупателя (Свой Гараж)' : 'Статус позиции'}
-                      />
                       {showItemConfirmActions ? (
                         <div className="flex flex-col gap-1.5">
                           <button
