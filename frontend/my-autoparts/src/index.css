@@ -183,25 +183,3 @@ input[type="password"] {
     height: -webkit-fill-available;
   }
 }
-
-/* Order-confirm QR: full-frame decode + custom square reticle (hide library qrbox) */
-.item-confirm-qr-wrap {
-  isolation: isolate;
-}
-
-.item-confirm-qr-scanner {
-  position: absolute;
-  inset: 0;
-  background: #000;
-}
-
-.item-confirm-qr-scanner video {
-  display: block !important;
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-}
-
-.item-confirm-qr-scanner #qr-shaded-region {
-  display: none !important;
-}

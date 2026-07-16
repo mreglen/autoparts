@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import { parseSellerPartCardQr } from '../../utils/parseSellerPartCardQr';
 import { normalizeInternalCodeForCompare } from '../../utils/internalCode';
 import { apiAxios } from '../../utils/apiClient';
@@ -7,13 +7,8 @@ import StorageCellsDisplayTable from '../StorageCellsTable/StorageCellsDisplayTa
 
 const SCANNER_ID = 'garage-item-confirm-qr-scanner';
 
-/** Full-frame decode — library qrbox warps into a wide strip in short containers. */
-function buildQrScanConfig() {
-  return {
-    fps: 12,
-    disableFlip: false,
-  };
-}
+/** Same camera config as working WarehouseScanPage (/warehouse/scan). */
+const QR_SCAN_CONFIG = { fps: 8, qrbox: { width: 250, height: 250 } };
 
 async function stopScannerSafe(scanner) {
   if (!scanner) return;
@@ -220,6 +215,7 @@ export default function ItemConfirmScanModal({
   const [mode, setMode] = useState('entry'); // entry | confirm
   const [entryError, setEntryError] = useState('');
   const [cameraError, setCameraError] = useState('');
+  const [cameraActive, setCameraActive] = useState(true);
   const [manualId, setManualId] = useState('');
   const html5QrCodeRef = useRef(null);
   const scanLockRef = useRef(false);
@@ -265,6 +261,7 @@ export default function ItemConfirmScanModal({
       const active = html5QrCodeRef.current;
       html5QrCodeRef.current = null;
       await stopScannerSafe(active);
+      setCameraActive(false);
     }
 
     setEntryError('');
@@ -279,6 +276,10 @@ export default function ItemConfirmScanModal({
   useEffect(() => {
     if (isOpen) {
       setShellOpen(true);
+      setCameraActive(true);
+      setCameraError('');
+      setMode('entry');
+      scanLockRef.current = false;
       return undefined;
     }
 
@@ -291,6 +292,7 @@ export default function ItemConfirmScanModal({
       setMode('entry');
       setEntryError('');
       setCameraError('');
+      setCameraActive(true);
       setManualId('');
       scanLockRef.current = false;
       setShellOpen(false);
@@ -301,8 +303,9 @@ export default function ItemConfirmScanModal({
     };
   }, [isOpen]);
 
+  // Mirror WarehouseScanPage: start once, fixed 250×250 qrbox, no CSS video hacks.
   useEffect(() => {
-    if (!shellOpen || !isOpen || mode !== 'entry' || cameraError) {
+    if (!shellOpen || !isOpen || mode !== 'entry' || !cameraActive) {
       return undefined;
     }
 
@@ -310,77 +313,35 @@ export default function ItemConfirmScanModal({
     let scanner;
 
     const start = async () => {
-      await new Promise((r) => setTimeout(r, 120));
+      await new Promise((r) => setTimeout(r, 50));
       if (cancelled) return;
 
       const el = document.getElementById(SCANNER_ID);
       if (!el) {
-        setCameraError('Не удалось открыть камеру');
+        setCameraError('Не удалось открыть камеру. Разрешите доступ или введите код вручную.');
         return;
       }
 
       el.innerHTML = '';
-      // Keep config minimal — same approach as WarehouseScanPage / PickupVerifyModal.
-      scanner = new Html5Qrcode(SCANNER_ID, {
-        verbose: false,
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        useBarCodeDetectorIfSupported: true,
-      });
+      scanner = new Html5Qrcode(SCANNER_ID);
       html5QrCodeRef.current = scanner;
 
       try {
         await scanner.start(
           { facingMode: 'environment' },
-          buildQrScanConfig(),
-          async (decoded) => {
+          QR_SCAN_CONFIG,
+          async (decodedText) => {
             if (cancelled || scanLockRef.current || isSubmittingRef.current) return;
             scanLockRef.current = true;
-            try {
-              if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                navigator.vibrate(40);
-              }
-              await handleScanResultRef.current?.(decoded, { fromScanner: true });
-            } catch (_) {
-              scanLockRef.current = false;
-              setEntryError('Не удалось проверить код. Попробуйте ещё раз или введите вручную.');
-            }
+            await handleScanResultRef.current?.(decodedText, { fromScanner: true });
           },
           () => {}
         );
-        if (!cancelled) {
-          setCameraError('');
-        }
       } catch (_) {
-        // Fallback: first available camera (some devices reject facingMode)
-        if (cancelled) return;
-        try {
-          const cameras = await Html5Qrcode.getCameras();
-          if (!cameras?.length) throw new Error('no cameras');
-          await scanner.start(
-            cameras[cameras.length - 1].id,
-            buildQrScanConfig(),
-            async (decoded) => {
-              if (cancelled || scanLockRef.current || isSubmittingRef.current) return;
-              scanLockRef.current = true;
-              try {
-                if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                  navigator.vibrate(40);
-                }
-                await handleScanResultRef.current?.(decoded, { fromScanner: true });
-              } catch (__) {
-                scanLockRef.current = false;
-                setEntryError('Не удалось проверить код. Попробуйте ещё раз или введите вручную.');
-              }
-            },
-            () => {}
-          );
-          if (!cancelled) setCameraError('');
-        } catch (__) {
-          if (!cancelled) {
-            setCameraError('Не удалось открыть камеру');
-            html5QrCodeRef.current = null;
-            await stopScannerSafe(scanner);
-          }
+        if (!cancelled) {
+          setCameraError('Не удалось открыть камеру. Разрешите доступ или введите код вручную.');
+          html5QrCodeRef.current = null;
+          await stopScannerSafe(scanner);
         }
       }
     };
@@ -393,12 +354,13 @@ export default function ItemConfirmScanModal({
       html5QrCodeRef.current = null;
       stopScannerSafe(active);
     };
-  }, [shellOpen, isOpen, mode, cameraError]);
+  }, [shellOpen, isOpen, mode, cameraActive]);
 
   const handleClose = useCallback(async () => {
     const active = html5QrCodeRef.current;
     html5QrCodeRef.current = null;
     await stopScannerSafe(active);
+    setCameraActive(false);
     onClose?.();
   }, [onClose]);
 
@@ -408,6 +370,13 @@ export default function ItemConfirmScanModal({
     scanLockRef.current = false;
     setMode('entry');
     setCameraError('');
+    setCameraActive(true);
+  };
+
+  const restartCamera = () => {
+    scanLockRef.current = false;
+    setCameraError('');
+    setCameraActive(true);
   };
 
   const handleManualSubmit = async (e) => {
@@ -472,31 +441,30 @@ export default function ItemConfirmScanModal({
           <div className="shrink-0 min-h-[20rem] sm:min-h-[18rem]">
             {mode === 'entry' ? (
               <>
-                {!cameraError ? (
-                  <div className="item-confirm-qr-wrap relative h-[260px] w-full overflow-hidden rounded-xl border border-gray-200 bg-black sm:h-[280px]">
-                    <div
-                      id={SCANNER_ID}
-                      className="item-confirm-qr-scanner absolute inset-0 h-full w-full"
-                    />
-                    {/* Own square reticle — do not use html5-qrcode qrbox overlay */}
-                    <div
-                      className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
-                      aria-hidden
-                    >
-                      <div className="relative aspect-square h-[58%] max-h-[200px] min-h-[140px]">
-                        <span className="absolute left-0 top-0 h-6 w-6 border-l-[3px] border-t-[3px] border-white" />
-                        <span className="absolute right-0 top-0 h-6 w-6 border-r-[3px] border-t-[3px] border-white" />
-                        <span className="absolute bottom-0 left-0 h-6 w-6 border-b-[3px] border-l-[3px] border-white" />
-                        <span className="absolute bottom-0 right-0 h-6 w-6 border-b-[3px] border-r-[3px] border-white" />
-                      </div>
+                <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-black">
+                  <div
+                    id={SCANNER_ID}
+                    className={`w-full min-h-[280px] ${!cameraActive ? 'invisible absolute inset-0' : ''}`}
+                  />
+                  {!cameraActive ? (
+                    <div className="flex min-h-[280px] items-center justify-center bg-gray-900 text-sm text-white">
+                      Камера остановлена
                     </div>
+                  ) : null}
+                </div>
+
+                {cameraError ? (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-amber-700">{cameraError}</p>
+                    <button
+                      type="button"
+                      onClick={restartCamera}
+                      className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                    >
+                      Повторить
+                    </button>
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-center">
-                    <p className="text-xs font-medium text-amber-800">{cameraError}</p>
-                    <p className="mt-1 text-[11px] text-amber-700">Используйте ввод внутреннего кода ниже</p>
-                  </div>
-                )}
+                ) : null}
 
                 <form onSubmit={handleManualSubmit} className="mt-2">
                   <label className="mb-1 block text-xs font-medium text-gray-600" htmlFor="item-confirm-manual-id">
@@ -531,7 +499,7 @@ export default function ItemConfirmScanModal({
                   <p className="mt-2 text-xs text-red-600">{entryError}</p>
                 ) : (
                   <p className="mt-2 text-[11px] text-gray-500">
-                    Держите QR в центре квадрата. Или введите код с этикетки и нажмите OK.
+                    Наведите QR в квадратную рамку камеры. Или введите код и нажмите OK.
                   </p>
                 )}
                 {error ? (
