@@ -113,6 +113,9 @@ export default function ProfileWithMenuLayout() {
         administration:
             (moderationProducts?.pendingProducts?.length || 0) +
             (moderation?.pendingSellers?.length || 0),
+        purchases:
+            (purchasesMenuCounts?.orders || 0) +
+            (purchasesMenuCounts?.returns || 0),
     'purchases-orders': purchasesMenuCounts?.orders || 0,
     'purchases-returns': purchasesMenuCounts?.returns || 0,
         'sales-orders': salesMenuCounts?.orders || 0,
