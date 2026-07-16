@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { parseSellerPartCardQr } from '../../utils/parseSellerPartCardQr';
 import { normalizeInternalCodeForCompare } from '../../utils/internalCode';
 import { apiAxios } from '../../utils/apiClient';
@@ -9,15 +9,17 @@ const SCANNER_ID = 'garage-item-confirm-qr-scanner';
 
 function buildQrScanConfig() {
   return {
-    fps: 10,
+    fps: 12,
+    // Large box relative to viewfinder; avoid aspectRatio (distorts shaded region).
     qrbox: (viewfinderWidth, viewfinderHeight) => {
       const minEdge = Math.min(viewfinderWidth || 0, viewfinderHeight || 0);
       if (!minEdge) {
-        return { width: 160, height: 160 };
+        return { width: 180, height: 180 };
       }
-      const size = Math.max(120, Math.min(200, Math.floor(minEdge * 0.7)));
+      const size = Math.max(150, Math.min(280, Math.floor(minEdge * 0.9)));
       return { width: size, height: size };
     },
+    disableFlip: false,
   };
 }
 
@@ -326,7 +328,11 @@ export default function ItemConfirmScanModal({
       }
 
       el.innerHTML = '';
-      scanner = new Html5Qrcode(SCANNER_ID);
+      scanner = new Html5Qrcode(SCANNER_ID, {
+        verbose: false,
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        useBarCodeDetectorIfSupported: true,
+      });
       html5QrCodeRef.current = scanner;
 
       try {
@@ -336,7 +342,12 @@ export default function ItemConfirmScanModal({
           async (decoded) => {
             if (cancelled || scanLockRef.current || isSubmittingRef.current) return;
             scanLockRef.current = true;
-            await handleScanResultRef.current?.(decoded, { fromScanner: true });
+            try {
+              await handleScanResultRef.current?.(decoded, { fromScanner: true });
+            } catch (_) {
+              scanLockRef.current = false;
+              setEntryError('Не удалось проверить код. Попробуйте ещё раз или введите вручную.');
+            }
           },
           () => {}
         );
@@ -436,13 +447,13 @@ export default function ItemConfirmScanModal({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col px-4 py-3 sm:px-5">
-          <div className="shrink-0 min-h-[17.5rem] sm:min-h-[15.5rem]">
+          <div className="shrink-0 min-h-[20rem] sm:min-h-[18rem]">
             {mode === 'entry' ? (
               <>
                 {!cameraError ? (
                   <div
                     id={SCANNER_ID}
-                    className="item-confirm-qr-scanner h-[200px] w-full overflow-hidden rounded-xl border border-gray-200 bg-black sm:h-[220px]"
+                    className="item-confirm-qr-scanner h-[240px] w-full overflow-hidden rounded-xl border border-gray-200 bg-black sm:h-[260px]"
                   />
                 ) : (
                   <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-center">
@@ -468,6 +479,7 @@ export default function ItemConfirmScanModal({
                       className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                       disabled={isSubmitting}
                       autoComplete="off"
+                      enterKeyHint="done"
                     />
                     <button
                       type="submit"
@@ -481,7 +493,11 @@ export default function ItemConfirmScanModal({
 
                 {entryError ? (
                   <p className="mt-2 text-xs text-red-600">{entryError}</p>
-                ) : null}
+                ) : (
+                  <p className="mt-2 text-[11px] text-gray-500">
+                    Наведите камеру так, чтобы QR полностью попал в рамку. Или введите код с этикетки и нажмите OK.
+                  </p>
+                )}
                 {error ? (
                   <p className="mt-2 text-xs text-red-600">{error}</p>
                 ) : null}

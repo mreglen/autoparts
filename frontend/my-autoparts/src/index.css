@@ -184,18 +184,19 @@ input[type="password"] {
   }
 }
 
-/* html5-qrcode: стабильный видеопоток и прицел в модалке подтверждения */
+/* html5-qrcode in order confirm modal — do not crop video (breaks decode region) */
 .item-confirm-qr-scanner {
   position: relative;
+  background: #000;
 }
 
+.item-confirm-qr-scanner > video,
 .item-confirm-qr-scanner video {
-  display: block !important;
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
+  /* Keep contain so shaded qrbox aligns with decoded pixels */
+  object-fit: contain !important;
+  background: #000;
 }
 
 .item-confirm-qr-scanner #qr-shaded-region {
-  border-color: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
 }
