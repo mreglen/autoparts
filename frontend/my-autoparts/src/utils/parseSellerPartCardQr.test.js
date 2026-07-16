@@ -60,6 +60,12 @@ describe('parseSellerPartCardQr', () => {
     expect(result?.path).toBe('/my-parts/edit-pending/7');
   });
 
+  it('parses stable label QR by internal code', () => {
+    const result = parseSellerPartCardQr('https://svoygarage.ru/qr/label/TVGP-AABBP');
+    expect(result?.type).toBe('label-code');
+    expect(result?.internalCode).toBe('TVGP-AABBP');
+  });
+
   it('returns null for invalid payload', () => {
     expect(parseSellerPartCardQr('')).toBeNull();
     expect(parseSellerPartCardQr('hello-world')).toBeNull();

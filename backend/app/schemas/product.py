@@ -189,6 +189,7 @@ class QrPartCardResponse(BaseModel):
     article: str
     quantity: int
     internal_code: Optional[str] = None
+    source_pending_id: Optional[int] = None
     price: Optional[float] = None
     storage_location_id: Optional[int] = None
     storage_location_name: Optional[str] = None

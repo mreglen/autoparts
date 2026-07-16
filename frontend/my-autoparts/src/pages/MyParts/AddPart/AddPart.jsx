@@ -419,10 +419,24 @@ const AddPart = ({ resubmitMode = false, editPendingMode = false, draftMode = fa
           // Ячейки хранения не обязательны для открытия формы
         }
       })
-      .catch((err) => {
+      .catch(async (err) => {
         if (cancelled) return;
-        alert(typeof err === 'string' ? err : 'Не удалось загрузить запчасть на модерации');
-        navigate('/my-parts?tab=pending', { replace: true });
+        try {
+          const resolved = await apiAxios.get(`/products/label-resolve-pending/${editPendingId}`);
+          const path = resolved.data?.path;
+          if (path && path !== `/my-parts/edit-pending/${editPendingId}`) {
+            navigate(path, { replace: true });
+            return;
+          }
+        } catch (_) {
+          /* fall through */
+        }
+        alert(
+          typeof err === 'string'
+            ? err
+            : 'Заявка не найдена. Возможно, запчасть уже одобрена — перепечатайте этикетку или откройте товар в «Мои запчасти».',
+        );
+        navigate('/my-parts', { replace: true });
       })
       .finally(() => {
         if (!cancelled) setLoadingFormData(false);

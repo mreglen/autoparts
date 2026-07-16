@@ -61,6 +61,7 @@ _SPA_ROUTE_RULES: tuple[_RouteRule, ...] = (
     _RouteRule(re.compile(r"^/organizations$")),
     _RouteRule(re.compile(rf"^/organizations/(?P<org_id>{_ORG})$"), "organization"),
     _RouteRule(re.compile(rf"^/seller/part-card/(?P<part_id>{_NUM})$")),
+    _RouteRule(re.compile(r"^/qr/label/(?P<code>[A-Za-z0-9%-]+)$")),
     _RouteRule(re.compile(rf"^/users/(?P<public_code>{_PUBLIC_CODE})$"), "user"),
     _RouteRule(re.compile(rf"^/seller/(?P<public_code>{_LEGACY_CODE})$"), "seller"),
     _RouteRule(re.compile(rf"^/buyer/(?P<public_code>{_LEGACY_CODE})$"), "buyer"),

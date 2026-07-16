@@ -33,6 +33,16 @@ export function parseSellerPartCardQr(text) {
 
   path = normalizeQrPath(path);
 
+  const labelCodeMatch = path.match(/\/qr\/label\/([^/?#]+)/i);
+  if (labelCodeMatch) {
+    const internalCode = decodeURIComponent(labelCodeMatch[1]).trim();
+    return {
+      type: 'label-code',
+      internalCode,
+      path: `/qr/label/${encodeURIComponent(internalCode)}`,
+    };
+  }
+
   const partCardMatch = path.match(/\/seller\/part-card\/(\d+)/i);
   if (partCardMatch) {
     return {

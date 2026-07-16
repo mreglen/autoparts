@@ -660,65 +660,67 @@ async def print_test_label(
 
 
 def _resolve_label_qr_url(payload: dict, current_user: User, db: Session) -> str:
-    """QR для этикетки: складской товар, на модерации или отклонённый."""
+    """QR для этикетки: стабильная ссылка по внутреннему коду (/qr/label/...)."""
+    from app.services.label_qr_resolve_service import build_label_qr_path, normalize_label_internal_code
+
     base_url = _normalize_public_base_url(settings.PUBLIC_BASE_URL or "")
     source = (payload.get("source") or "product").strip().lower()
+    code = normalize_label_internal_code(payload.get("internal_code"))
 
-    if source == "pending":
-        try:
-            pending_id = int(payload.get("pending_product_id") or payload.get("product_id"))
-        except Exception:
-            raise HTTPException(status_code=422, detail="pending_product_id is required")
-        row = (
-            db.query(PendingProduct)
-            .filter(
-                PendingProduct.id == pending_id,
-                PendingProduct.organization_id == current_user.organization_id,
+    if not code:
+        if source == "pending":
+            try:
+                pending_id = int(payload.get("pending_product_id") or payload.get("product_id"))
+            except Exception:
+                raise HTTPException(status_code=422, detail="pending_product_id is required")
+            row = (
+                db.query(PendingProduct)
+                .filter(
+                    PendingProduct.id == pending_id,
+                    PendingProduct.organization_id == current_user.organization_id,
+                )
+                .first()
             )
-            .first()
-        )
-        if not row:
-            raise HTTPException(status_code=404, detail="Pending product not found")
-        path = f"/my-parts/edit-pending/{pending_id}"
-        return f"{base_url}{path}" if base_url else path
-
-    if source == "rejected":
-        try:
-            rejected_id = int(payload.get("rejected_product_id") or payload.get("product_id"))
-        except Exception:
-            raise HTTPException(status_code=422, detail="rejected_product_id is required")
-        row = (
-            db.query(RejectedProduct)
-            .filter(
-                RejectedProduct.id == rejected_id,
-                RejectedProduct.organization_id == current_user.organization_id,
+            if not row:
+                raise HTTPException(status_code=404, detail="Pending product not found")
+            code = normalize_label_internal_code(row.internal_code)
+        elif source == "rejected":
+            try:
+                rejected_id = int(payload.get("rejected_product_id") or payload.get("product_id"))
+            except Exception:
+                raise HTTPException(status_code=422, detail="rejected_product_id is required")
+            row = (
+                db.query(RejectedProduct)
+                .filter(
+                    RejectedProduct.id == rejected_id,
+                    RejectedProduct.organization_id == current_user.organization_id,
+                )
+                .first()
             )
-            .first()
-        )
-        if not row:
-            raise HTTPException(status_code=404, detail="Rejected product not found")
-        path = f"/my-parts/resubmit/{rejected_id}"
-        return f"{base_url}{path}" if base_url else path
+            if not row:
+                raise HTTPException(status_code=404, detail="Rejected product not found")
+            code = normalize_label_internal_code(row.internal_code)
+        else:
+            try:
+                product_id = int(payload.get("product_id"))
+            except Exception:
+                raise HTTPException(status_code=422, detail="product_id is required")
+            product = (
+                db.query(ProductModel)
+                .filter(
+                    ProductModel.id == product_id,
+                    ProductModel.organization_id == current_user.organization_id,
+                )
+                .first()
+            )
+            if not product:
+                raise HTTPException(status_code=404, detail="Product not found")
+            code = normalize_label_internal_code(product.internal_code)
 
-    try:
-        product_id = int(payload.get("product_id"))
-    except Exception:
-        raise HTTPException(status_code=422, detail="product_id is required")
-
-    product = (
-        db.query(ProductModel)
-        .filter(
-            ProductModel.id == product_id,
-            ProductModel.organization_id == current_user.organization_id,
-        )
-        .first()
-    )
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-
-    if base_url:
-        return f"{base_url}/seller/part-card/{product_id}"
-    return f"/seller/part-card/{product_id}"
+    path = build_label_qr_path(code)
+    if not path:
+        raise HTTPException(status_code=422, detail="internal_code is required for label QR")
+    return f"{base_url}{path}" if base_url else path
 
 
 @router.post("/id/{printer_id}/print-label")

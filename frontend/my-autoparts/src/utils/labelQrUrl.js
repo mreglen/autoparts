@@ -1,12 +1,18 @@
 /**
  * URL для QR на этикетке.
- * — pending: редактирование на модерации
- * — rejected: повторная отправка
- * — иначе: карточка складского товара продавца
+ * Стабильный путь по внутреннему коду — работает и до, и после модерации.
  */
+import { formatInternalCodeDisplay, normalizeInternalCodeForSearch } from './internalCode';
+
 export function getLabelQrPath(part) {
+  const code = normalizeInternalCodeForSearch(part?.internal_code).trim();
+  if (code && code !== '—') {
+    return `/qr/label/${encodeURIComponent(code.toUpperCase())}`;
+  }
+
   if (!part?.id) return '';
 
+  // Fallback for rare cases without internal_code
   if (part.moderationKind === 'pending') {
     return `/my-parts/edit-pending/${part.id}`;
   }
@@ -31,4 +37,8 @@ export function partForLabelPrint(part, { moderationKind } = {}) {
   }
   const { moderationKind: _drop, ...rest } = part;
   return rest;
+}
+
+export function labelQrPreviewCode(part) {
+  return formatInternalCodeDisplay(part?.internal_code);
 }

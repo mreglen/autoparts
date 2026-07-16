@@ -2532,3 +2532,17 @@ def ensure_garage_order_pickup_columns() -> None:
                 conn.execute(text(stmt))
         logger.info("Applied %s pickup columns patch", table)
 
+
+def ensure_product_source_pending_id_column() -> None:
+    """Link approved product back to pending id for legacy label QR redirects."""
+    inspector = inspect(engine)
+    if "products" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("products")}
+    if "source_pending_id" in columns:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE products ADD COLUMN source_pending_id INTEGER"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_products_source_pending_id ON products (source_pending_id)"))
+    logger.info("Applied products.source_pending_id column patch")
+

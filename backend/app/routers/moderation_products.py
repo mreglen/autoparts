@@ -306,6 +306,7 @@ def approve_product(
         product_price = normalize_product_price_for_save(product_price, db=db)
 
     # Создать запись в products (без vehicle_ids и photos)
+    pending_id_for_link = pending_product.id
     db_product = ProductModel(
         article=pending_product.article,
         name=pending_product.name,
@@ -319,6 +320,7 @@ def approve_product(
         storage_location_id=pending_product.storage_location_id,
         created_by=pending_product.created_by,
         part_type_id=pending_product.part_type_id,
+        source_pending_id=pending_id_for_link,
     )
     
     db.add(db_product)

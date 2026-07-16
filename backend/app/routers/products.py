@@ -695,6 +695,7 @@ def read_qr_part_card(
         article=product.article,
         quantity=product.quantity,
         internal_code=product.internal_code,
+        source_pending_id=getattr(product, "source_pending_id", None),
         price=float(product.price) if product.price is not None else None,
         storage_location_id=product.storage_location_id,
         storage_location_name=(product.storage_location.address if product.storage_location else None),
@@ -703,6 +704,70 @@ def read_qr_part_card(
         photos=product.photos or [],
         videos=product.videos or [],
     )
+
+
+@router.get("/label-resolve/{internal_code}")
+def resolve_label_qr_by_internal_code(
+    internal_code: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Resolve /qr/label/{internal_code} to seller card / pending / resubmit path."""
+    from app.utils.org_product_access import user_can_access_qr_part_card
+    from app.services.label_qr_resolve_service import resolve_label_internal_code
+
+    if not user_can_access_qr_part_card(db, current_user):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    resolved = resolve_label_internal_code(
+        db,
+        organization_id=current_user.organization_id,
+        internal_code=internal_code,
+    )
+    if not resolved:
+        raise HTTPException(status_code=404, detail="Запчасть не найдена")
+    return resolved
+
+
+@router.get("/label-resolve-pending/{pending_id}")
+def resolve_label_qr_by_pending_id(
+    pending_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Legacy labels with /my-parts/edit-pending/{id} after approval."""
+    from app.utils.org_product_access import user_can_access_qr_part_card
+    from app.services.label_qr_resolve_service import resolve_approved_product_by_pending_id
+    from app.models.pending_product import PendingProduct as PendingProductModel
+
+    if not user_can_access_qr_part_card(db, current_user):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    pending = (
+        db.query(PendingProductModel)
+        .filter(
+            PendingProductModel.id == pending_id,
+            PendingProductModel.organization_id == current_user.organization_id,
+        )
+        .first()
+    )
+    if pending:
+        return {
+            "type": "pending",
+            "path": f"/my-parts/edit-pending/{pending.id}",
+            "pending_product_id": pending.id,
+            "internal_code": pending.internal_code,
+        }
+
+    resolved = resolve_approved_product_by_pending_id(
+        db,
+        organization_id=current_user.organization_id,
+        pending_id=pending_id,
+    )
+    if not resolved:
+        raise HTTPException(status_code=404, detail="Запчасть не найдена")
+    return resolved
+
 
 @router.put("/{product_id}", response_model=ProductSchema)
 def update_product(

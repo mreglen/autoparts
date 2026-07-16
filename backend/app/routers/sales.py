@@ -19,6 +19,7 @@ from app.models.user import User as UserModel
 from app.models.user_permission import UserPermission
 from app.utils.org_access import org_has_admin_director
 from app.services.notification_service import notify_order_status_buyer
+from app.services.order_pickup_chat_service import maybe_send_order_ready_pickup_chat_message
 from app.schemas.sales_orders import (
     AvitoOrderResponseV2,
     AvitoRetryWarehouseResponse,
@@ -376,6 +377,16 @@ def update_used_parts_order_status(
         previous_status_code=previous_status_code,
         pickup_code=pickup_code,
     )
+    maybe_send_order_ready_pickup_chat_message(
+        db,
+        buyer_user_id=order.user_id,
+        seller_user_id=current_user.id,
+        order_id=order_id,
+        order_kind="used",
+        pickup_code=pickup_code,
+        previous_status_code=previous_status_code,
+        new_status_code=payload.status_code,
+    )
 
     return UpdateUsedOrderStatusResponse(
         status="ok",
@@ -519,6 +530,16 @@ def update_new_parts_order_status(
         status_code=payload.status_code,
         previous_status_code=previous_status_code,
         pickup_code=pickup_code,
+    )
+    maybe_send_order_ready_pickup_chat_message(
+        db,
+        buyer_user_id=order.user_id,
+        seller_user_id=current_user.id,
+        order_id=order_id,
+        order_kind="new",
+        pickup_code=pickup_code,
+        previous_status_code=previous_status_code,
+        new_status_code=payload.status_code,
     )
     return {"status": "ok"}
 

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { parseSellerPartCardQr } from '../../utils/parseSellerPartCardQr';
 import { normalizeInternalCodeForCompare } from '../../utils/internalCode';
+import { apiAxios } from '../../utils/apiClient';
 import StorageCellsDisplayTable from '../StorageCellsTable/StorageCellsDisplayTable';
 
 const SCANNER_ID = 'garage-item-confirm-qr-scanner';
@@ -35,45 +36,102 @@ async function stopScannerSafe(scanner) {
   }
 }
 
-function parseProductIdFromScan(raw) {
-  const parsed = parseSellerPartCardQr(raw);
-  if (parsed?.productId) return parsed.productId;
-  const trimmed = String(raw || '').trim();
-  if (/^\d+$/.test(trimmed)) {
-    const id = parseInt(trimmed, 10);
-    return Number.isFinite(id) && id > 0 ? id : null;
-  }
-  return null;
+function looksLikeInternalCode(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed || /^https?:\/\//i.test(trimmed) || trimmed.includes('/')) return false;
+  const compact = normalizeInternalCodeForCompare(trimmed);
+  return compact.length >= 6;
 }
 
-function verifyScanInput(raw, expectedProductId, expectedInternalCode) {
+/**
+ * Real bug: warehouse labels often encode /my-parts/edit-pending/{pendingId}.
+ * pendingId ≠ product.id, so comparing only product_id always fails.
+ * Also full URL must not be treated as an internal code.
+ */
+async function verifyScanInput(raw, expectedProductId, expectedInternalCode, sourcePendingId) {
   const trimmed = String(raw || '').trim();
   if (!trimmed) {
     return { ok: false, message: 'Введите внутренний код или отсканируйте этикетку' };
   }
 
-  const parsedProductId = parseProductIdFromScan(trimmed);
   const expectedId = Number(expectedProductId);
-
-  if (parsedProductId && Number.isFinite(expectedId) && parsedProductId === expectedId) {
-    return { ok: true };
-  }
-
-  const inputCode = normalizeInternalCodeForCompare(trimmed);
   const expectedCode = normalizeInternalCodeForCompare(expectedInternalCode);
-  if (expectedCode && inputCode === expectedCode) {
+  const expectedPendingId = sourcePendingId != null ? Number(sourcePendingId) : null;
+  const parsed = parseSellerPartCardQr(trimmed);
+
+  // 1) /seller/part-card/{id}, /part/{id}, numeric id
+  const scannedProductId = parsed?.productId
+    ?? (/^\d+$/.test(trimmed) ? parseInt(trimmed, 10) : null);
+  if (
+    scannedProductId
+    && Number.isFinite(expectedId)
+    && Number(scannedProductId) === expectedId
+  ) {
     return { ok: true };
   }
 
-  if (parsedProductId) {
+  // 2) /qr/label/{internal_code} or typed internal code
+  const scannedCode = normalizeInternalCodeForCompare(
+    parsed?.internalCode || (looksLikeInternalCode(trimmed) ? trimmed : ''),
+  );
+  if (expectedCode && scannedCode && scannedCode === expectedCode) {
+    return { ok: true };
+  }
+
+  // 3) Legacy label: /my-parts/edit-pending/{pendingId}
+  if (parsed?.type === 'edit-pending' && parsed.id) {
+    if (
+      Number.isFinite(expectedPendingId)
+      && Number(parsed.id) === expectedPendingId
+      && Number.isFinite(expectedId)
+    ) {
+      return { ok: true };
+    }
+
+    try {
+      const response = await apiAxios.get(`/products/label-resolve-pending/${parsed.id}`);
+      const resolved = response.data || {};
+      if (
+        Number.isFinite(expectedId)
+        && resolved.product_id != null
+        && Number(resolved.product_id) === expectedId
+      ) {
+        return { ok: true };
+      }
+      const resolvedCode = normalizeInternalCodeForCompare(resolved.internal_code);
+      if (expectedCode && resolvedCode && resolvedCode === expectedCode) {
+        return { ok: true };
+      }
+      if (resolved.type === 'pending') {
+        return {
+          ok: false,
+          message: 'Товар ещё на модерации. Дождитесь одобрения или введите внутренний код.',
+        };
+      }
+    } catch (_) {
+      return {
+        ok: false,
+        message: expectedCode
+          ? `Старая этикетка (до модерации). Введите внутренний код: ${expectedInternalCode}`
+          : 'Старая этикетка. Введите внутренний код с этикетки вручную.',
+      };
+    }
+
+    return {
+      ok: false,
+      message: 'Это другой товар. Проверьте этикетку нужной позиции.',
+    };
+  }
+
+  if (scannedProductId) {
     return { ok: false, message: 'Это другой товар. Проверьте этикетку нужной позиции.' };
   }
-  if (inputCode && expectedCode) {
+  if (scannedCode && expectedCode) {
     return { ok: false, message: 'Неверный внутренний код для этой позиции.' };
   }
   return {
     ok: false,
-    message: 'Не удалось распознать код. Введите внутренний код или ссылку с этикетки.',
+    message: 'Не удалось распознать код. Введите внутренний код или отсканируйте этикетку.',
   };
 }
 
@@ -132,6 +190,7 @@ export default function ItemConfirmScanModal({
   const scanLockRef = useRef(false);
   const expectedProductIdRef = useRef(null);
   const expectedInternalCodeRef = useRef(null);
+  const expectedSourcePendingIdRef = useRef(null);
   const isSubmittingRef = useRef(isSubmitting);
   const handleScanResultRef = useRef(null);
 
@@ -142,13 +201,15 @@ export default function ItemConfirmScanModal({
   useEffect(() => {
     expectedProductIdRef.current = item?.product_id ?? productCard?.id ?? null;
     expectedInternalCodeRef.current = productCard?.internal_code ?? null;
-  }, [item?.product_id, productCard?.id, productCard?.internal_code]);
+    expectedSourcePendingIdRef.current = productCard?.source_pending_id ?? null;
+  }, [item?.product_id, productCard?.id, productCard?.internal_code, productCard?.source_pending_id]);
 
   const handleScanResult = useCallback(async (raw, { fromScanner = false } = {}) => {
-    const verification = verifyScanInput(
+    const verification = await verifyScanInput(
       raw,
       expectedProductIdRef.current,
       expectedInternalCodeRef.current,
+      expectedSourcePendingIdRef.current,
     );
 
     if (!verification.ok) {
@@ -274,8 +335,9 @@ export default function ItemConfirmScanModal({
     if (isSubmitting) return;
 
     const trimmed = manualId.trim();
-    const needsInternalCode = !parseProductIdFromScan(trimmed);
-    if (needsInternalCode && productCardLoading) {
+    const parsed = parseSellerPartCardQr(trimmed);
+    const needsCardData = !parsed?.productId && !/^\d+$/.test(trimmed);
+    if (needsCardData && productCardLoading) {
       setEntryError('Подождите, загружаются данные товара…');
       return;
     }
@@ -283,10 +345,11 @@ export default function ItemConfirmScanModal({
     await handleScanResult(trimmed, { fromScanner: false });
   };
 
-  const manualLooksLikeProductRef = Boolean(parseProductIdFromScan(manualId.trim()));
+  const parsedManual = parseSellerPartCardQr(manualId.trim());
+  const manualLooksLikeProductId = Boolean(parsedManual?.productId) || /^\d+$/.test(manualId.trim());
   const manualSubmitDisabled = isSubmitting
     || !manualId.trim()
-    || (productCardLoading && !manualLooksLikeProductRef);
+    || (productCardLoading && !manualLooksLikeProductId);
 
   if (!shellOpen || !item) return null;
 

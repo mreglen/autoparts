@@ -75,6 +75,7 @@ const ClientsPage = lazy(() => import('./pages/Profile/ClientsPage'));
 const StorageAddressesPage = lazy(() => import('./pages/Profile/StorageAddressesPage'));
 const WmsStoragesPage = lazy(() => import('./pages/Warehouse/WmsStoragesPage'));
 const WarehouseScanPage = lazy(() => import('./pages/Warehouse/WarehouseScanPage'));
+const LabelQrResolvePage = lazy(() => import('./pages/Warehouse/LabelQrResolvePage'));
 const PendingSellersPage = lazy(() => import('./pages/Moderation/PendingSellersPage'));
 const ProductModeration = lazy(() => import('./pages/Moderation/ProductModeration/ProductModeration'));
 const OrganizationProductModerationPage = lazy(() => import('./pages/Moderation/ProductModeration/OrganizationProductModerationPage'));
@@ -341,6 +342,14 @@ function App() {
             element={(
               <LazyRoute>
                 <SellerPartCardPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/qr/label/:code"
+            element={(
+              <LazyRoute>
+                <LabelQrResolvePage />
               </LazyRoute>
             )}
           />
