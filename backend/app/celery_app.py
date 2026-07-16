@@ -3,6 +3,9 @@ from celery.schedules import crontab
 from app.core.config import settings
 import logging
 
+# Ensure ORM relationships resolve in worker processes (no FastAPI router imports).
+import app.models  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 celery_app = Celery(

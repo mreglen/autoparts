@@ -291,7 +291,6 @@ export default function SalesOrdersPage() {
       const fulfilled = Array.isArray(response.data?.fulfilled_items)
         ? response.data.fulfilled_items
         : [];
-      const createdCount = fulfilled.filter((item) => item.created).length;
       const orderStatusFromApi = response.data?.order_status_code;
 
       setUsedOrders((prev) =>
@@ -330,17 +329,7 @@ export default function SalesOrdersPage() {
         })
       );
       setEditingStatus(null);
-      if (createdCount > 0) {
-        setUsedOrderStatusMessage({
-          type: 'success',
-          text: `Списано со склада: ${createdCount} поз.`,
-        });
-      } else {
-        setUsedOrderStatusMessage({
-          type: 'success',
-          text: itemId ? 'Статус позиции обновлён.' : 'Статус заказа обновлён.',
-        });
-      }
+      setUsedOrderStatusMessage(null);
       dispatch(fetchSalesMenuCounts());
     } catch (error) {
       const detail = error?.response?.data?.detail;
@@ -379,12 +368,7 @@ export default function SalesOrdersPage() {
         })
       );
       setEditingStatus(null);
-      setUsedOrderStatusMessage({
-        type: 'success',
-        text: itemId
-          ? 'Статус позиции обновлён. Покупатель увидит его в «Мои заказы».'
-          : 'Статус заказа обновлён. Покупатель увидит его в «Мои заказы».',
-      });
+      setUsedOrderStatusMessage(null);
       dispatch(fetchSalesMenuCounts());
     } catch (error) {
       setUsedOrderStatusMessage({
@@ -444,32 +428,6 @@ export default function SalesOrdersPage() {
       });
       const statusCode = response.data?.status_code;
       applyPickupLocalStatus(order.id, orderKind, statusCode);
-      setUsedOrderStatusMessage({ type: 'success', text: 'Заказ выдан.' });
-      closePickupVerify();
-      dispatch(fetchSalesMenuCounts());
-    } catch (error) {
-      setPickupModal((prev) => ({
-        ...prev,
-        isSubmitting: false,
-        error: formatStatusErrorDetail(error?.response?.data?.detail),
-      }));
-    }
-  }, [pickupModal.order, pickupModal.orderKind, closePickupVerify, dispatch]);
-
-  const submitPickupOverride = useCallback(async (reason) => {
-    const order = pickupModal.order;
-    const orderKind = pickupModal.orderKind;
-    if (!order) return;
-    setPickupModal((prev) => ({ ...prev, isSubmitting: true, error: '' }));
-    try {
-      const base =
-        orderKind === 'new'
-          ? `/sales/new-parts-orders/${order.id}`
-          : `/sales/used-parts-orders/${order.id}`;
-      const response = await apiAxios.post(`${base}/pickup-override`, { reason });
-      const statusCode = response.data?.status_code;
-      applyPickupLocalStatus(order.id, orderKind, statusCode);
-      setUsedOrderStatusMessage({ type: 'success', text: 'Заказ выдан без кода.' });
       closePickupVerify();
       dispatch(fetchSalesMenuCounts());
     } catch (error) {
@@ -491,12 +449,14 @@ export default function SalesOrdersPage() {
       setNewOrders((prev) =>
         prev.map((o) => (o.id === orderId ? { ...o, ...updated } : o))
       );
-      setUsedOrderStatusMessage({
-        type: updated.rossko_sync_error ? 'error' : 'success',
-        text: updated.rossko_sync_error
-          ? 'Статус поставщика временно недоступен. Показаны данные из базы.'
-          : 'Статус поставщика обновлён.',
-      });
+      setUsedOrderStatusMessage(
+        updated.rossko_sync_error
+          ? {
+              type: 'error',
+              text: 'Статус поставщика временно недоступен. Показаны данные из базы.',
+            }
+          : null
+      );
     } catch (error) {
       setUsedOrderStatusMessage({
         type: 'error',
@@ -1055,14 +1015,8 @@ export default function SalesOrdersPage() {
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{transitionError}</div>
       )}
 
-      {!loading && !error && usedOrderStatusMessage && (
-        <div
-          className={`rounded-xl px-4 py-3 text-sm ${
-            usedOrderStatusMessage.type === 'success'
-              ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
-              : 'border border-red-200 bg-red-50 text-red-800'
-          }`}
-        >
+      {!loading && !error && usedOrderStatusMessage?.type === 'error' && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {usedOrderStatusMessage.text}
         </div>
       )}
@@ -1305,8 +1259,6 @@ export default function SalesOrdersPage() {
           error={pickupModal.error}
           onClose={closePickupVerify}
           onVerify={submitPickupVerify}
-          onOverride={submitPickupOverride}
-          allowOverride
         />
     </div>
   );

@@ -15,6 +15,11 @@ class StorageCell(Base):
     # Relationships
     storage_location = relationship("StorageLocation", back_populates="storage_cells")
     product_storage_cells = relationship("ProductStorageCell", back_populates="storage_cell", cascade="all, delete-orphan")
+    pending_product_storage_cells = relationship(
+        "PendingProductStorageCell",
+        back_populates="storage_cell",
+        cascade="all, delete-orphan",
+    )
 
 # Relationship for StorageLocation -> StorageCells
 from .storage_location import StorageLocation

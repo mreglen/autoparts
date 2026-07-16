@@ -8,6 +8,8 @@ from app.models.acquired_product import AcquiredProduct
 from app.models.storage_location import StorageLocation
 from app.models.storage_cell import StorageCell
 from app.models.product_storage_cell import ProductStorageCell
+from app.models.pending_product_storage_cell import PendingProductStorageCell
+from app.models.organization_avito_integration import OrganizationAvitoIntegration
 from app.models.pickup_location import PickupLocation
 from app.models.stock_in import StockIn
 from app.models.stock_out import StockOut

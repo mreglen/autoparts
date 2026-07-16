@@ -56,14 +56,11 @@ export default function PickupVerifyModal({
   error = '',
   onClose,
   onVerify,
-  onOverride,
-  allowOverride = true,
 }) {
   const [shellOpen, setShellOpen] = useState(false);
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
-  // code | scan | override | confirm
+  // code | scan | scan_invalid | confirm
   const [mode, setMode] = useState('code');
-  const [overrideReason, setOverrideReason] = useState('');
   const [scanError, setScanError] = useState('');
   const [pendingPickup, setPendingPickup] = useState(null); // { code, qr_payload }
   const inputsRef = useRef([]);
@@ -96,7 +93,6 @@ export default function PickupVerifyModal({
       if (cancelled) return;
       setDigits(['', '', '', '', '', '']);
       setMode('code');
-      setOverrideReason('');
       setScanError('');
       setPendingPickup(null);
       scanLockRef.current = false;
@@ -338,16 +334,6 @@ export default function PickupVerifyModal({
               >
                 Сканировать
               </button>
-              {allowOverride ? (
-                <button
-                  type="button"
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                  onClick={() => setMode('override')}
-                  disabled={isSubmitting}
-                >
-                  Без кода
-                </button>
-              ) : null}
             </div>
           </>
         )}
@@ -366,30 +352,6 @@ export default function PickupVerifyModal({
             Ввести код
           </button>
         </div>
-
-        {mode === 'override' && (
-          <div className="mt-4 space-y-3">
-            <label className="block text-sm font-medium text-gray-700" htmlFor="pickup-override-reason">
-              Причина
-            </label>
-            <input
-              id="pickup-override-reason"
-              type="text"
-              value={overrideReason}
-              onChange={(e) => setOverrideReason(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              placeholder="Забыл телефон / код"
-              disabled={isSubmitting}
-            />
-            <button
-              type="button"
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-              onClick={() => setMode('code')}
-            >
-              Вернуться к коду
-            </button>
-          </div>
-        )}
 
         {isSubmitting && mode !== 'confirm' ? (
           <p className="mt-3 text-sm text-indigo-600">Проверка кода…</p>
@@ -417,16 +379,6 @@ export default function PickupVerifyModal({
                 onClick={() => onVerify({ code: codeValue })}
               >
                 {isSubmitting ? 'Проверка…' : 'Выдать'}
-              </button>
-            ) : null}
-            {mode === 'override' ? (
-              <button
-                type="button"
-                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isSubmitting || !overrideReason.trim()}
-                onClick={() => onOverride(overrideReason.trim())}
-              >
-                {isSubmitting ? 'Сохраняем…' : 'Выдать без кода'}
               </button>
             ) : null}
           </div>
