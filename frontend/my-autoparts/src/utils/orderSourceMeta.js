@@ -9,6 +9,11 @@ export const ORDER_SOURCE_META = {
     label: 'Новые',
     title: 'Новые запчасти · от поставщика',
   },
+  rossko: {
+    logo: '/logos/rossko.png',
+    label: 'Rossko',
+    title: 'Новые запчасти · Rossko',
+  },
   avito: {
     logo: '/logos/avito.png',
     label: 'Авито',

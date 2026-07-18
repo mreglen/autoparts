@@ -238,7 +238,10 @@ export default function SalesGarageOrderCard({
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1 ring-1 ring-gray-100">
-                <OrderSourceBadge source={isUsed ? 'used' : 'new'} size="sm" />
+                <OrderSourceBadge
+                  source={isUsed ? 'used' : isRossko ? 'rossko' : 'new'}
+                  size="sm"
+                />
                 <span className="text-xs font-semibold text-gray-800">#{order.id}</span>
               </span>
               {isNew && rosskoOrderId && (
