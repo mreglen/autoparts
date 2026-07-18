@@ -1,0 +1,76 @@
+/* Hide html5-qrcode’s fixed shaded qrbox — custom frame replaces it. */
+.qr-scan-host #qr-shaded-region {
+  display: none !important;
+}
+
+.qr-scan-host video {
+  object-fit: cover !important;
+}
+
+.qr-scan-frame {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 18px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.48);
+  transition:
+    left 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s ease;
+  will-change: left, top, width, height;
+}
+
+.qr-scan-frame--locked {
+  box-shadow:
+    0 0 0 2px rgba(16, 185, 129, 0.95),
+    0 0 0 9999px rgba(0, 0, 0, 0.42);
+}
+
+.qr-scan-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-color: #fff;
+  border-style: solid;
+  border-width: 0;
+  transition: border-color 0.2s ease, width 0.2s ease, height 0.2s ease;
+}
+
+.qr-scan-frame--locked .qr-scan-corner {
+  border-color: #34d399;
+  width: 26px;
+  height: 26px;
+}
+
+.qr-scan-corner--tl {
+  top: -1px;
+  left: -1px;
+  border-top-width: 3px;
+  border-left-width: 3px;
+  border-top-left-radius: 14px;
+}
+
+.qr-scan-corner--tr {
+  top: -1px;
+  right: -1px;
+  border-top-width: 3px;
+  border-right-width: 3px;
+  border-top-right-radius: 14px;
+}
+
+.qr-scan-corner--bl {
+  bottom: -1px;
+  left: -1px;
+  border-bottom-width: 3px;
+  border-left-width: 3px;
+  border-bottom-left-radius: 14px;
+}
+
+.qr-scan-corner--br {
+  bottom: -1px;
+  right: -1px;
+  border-bottom-width: 3px;
+  border-right-width: 3px;
+  border-bottom-right-radius: 14px;
+}

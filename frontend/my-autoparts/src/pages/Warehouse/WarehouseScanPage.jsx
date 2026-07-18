@@ -5,6 +5,12 @@ import { parseSellerPartCardQr } from '../../utils/parseSellerPartCardQr';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import { userHasWarehouseQrAccess, usePermissionCodes } from '../../hooks/useWarehousePermissions';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import QrScanFrameOverlay from '../../components/QrScanner/QrScanFrameOverlay';
+import {
+  QR_SCAN_CAMERA_CONFIG,
+  QR_SCAN_HOST_CLASS,
+  useQrFrameTracker,
+} from '../../components/QrScanner/useQrFrameTracker';
 
 const SCANNER_ID = 'warehouse-qr-reader';
 
@@ -33,6 +39,7 @@ export default function WarehouseScanPage() {
   const html5QrCodeRef = useRef(null);
   const scanLockRef = useRef(false);
   const navigateRef = useRef(navigate);
+  const scanViewportRef = useRef(null);
 
   const [cameraError, setCameraError] = useState('');
   const [manualId, setManualId] = useState('');
@@ -41,6 +48,12 @@ export default function WarehouseScanPage() {
   const [cameraActive, setCameraActive] = useState(true);
 
   const canScan = userHasWarehouseQrAccess(user, permissionCodes);
+  const frameActive = Boolean(canScan && cameraActive && !isNavigating && !cameraError);
+  const scanFrame = useQrFrameTracker({
+    active: frameActive,
+    containerRef: scanViewportRef,
+    locked: isNavigating,
+  });
 
   useEffect(() => {
     navigateRef.current = navigate;
@@ -79,7 +92,7 @@ export default function WarehouseScanPage() {
       try {
         await scanner.start(
           { facingMode: 'environment' },
-          { fps: 8, qrbox: { width: 250, height: 250 } },
+          QR_SCAN_CAMERA_CONFIG,
           async (decodedText) => {
             if (cancelled || scanLockRef.current) return;
             scanLockRef.current = true;
@@ -104,7 +117,7 @@ export default function WarehouseScanPage() {
 
             setCameraActive(false);
             setIsNavigating(true);
-            await new Promise((r) => setTimeout(r, 80));
+            await new Promise((r) => setTimeout(r, 180));
             navigateRef.current(parsed.path);
           },
           () => {}
@@ -188,13 +201,21 @@ export default function WarehouseScanPage() {
       <h1 className="text-2xl font-bold text-gray-900">Сканировать QR</h1>
       <p className="mt-1 text-sm text-gray-600">Наведите камеру на QR-код с этикетки запчасти</p>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-gray-200 bg-black relative">
+      <div
+        ref={scanViewportRef}
+        className="relative mt-5 min-h-[280px] overflow-hidden rounded-2xl border border-gray-200 bg-black"
+      >
         <div
           id={SCANNER_ID}
-          className={`w-full min-h-[280px] ${isNavigating || !cameraActive ? 'invisible absolute inset-0' : ''}`}
+          className={`${QR_SCAN_HOST_CLASS} absolute inset-0 h-full w-full ${
+            isNavigating || !cameraActive ? 'invisible' : ''
+          }`}
         />
+        {frameActive ? (
+          <QrScanFrameOverlay frame={scanFrame} locked={isNavigating} />
+        ) : null}
         {isNavigating ? (
-          <div className="flex min-h-[280px] items-center justify-center bg-gray-900 text-sm text-white">
+          <div className="absolute inset-0 z-20 flex min-h-[280px] items-center justify-center bg-gray-900/80 text-sm text-white">
             Открываем карточку…
           </div>
         ) : null}

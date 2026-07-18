@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
+import QrScanFrameOverlay from '../QrScanner/QrScanFrameOverlay';
+import {
+  QR_SCAN_CAMERA_CONFIG,
+  QR_SCAN_HOST_CLASS,
+  useQrFrameTracker,
+} from '../QrScanner/useQrFrameTracker';
 
 const SCANNER_ID = 'garage-pickup-qr-scanner';
 
@@ -66,9 +72,17 @@ export default function PickupVerifyModal({
   const inputsRef = useRef([]);
   const html5QrCodeRef = useRef(null);
   const scanLockRef = useRef(false);
+  const scanViewportRef = useRef(null);
   const isSubmittingRef = useRef(isSubmitting);
   const orderIdRef = useRef(orderId);
   const orderKindRef = useRef(orderKind);
+
+  const frameActive = Boolean(shellOpen && isOpen && mode === 'scan');
+  const scanFrame = useQrFrameTracker({
+    active: frameActive,
+    containerRef: scanViewportRef,
+    locked: mode === 'confirm',
+  });
 
   useEffect(() => {
     isSubmittingRef.current = isSubmitting;
@@ -130,7 +144,7 @@ export default function PickupVerifyModal({
       try {
         await scanner.start(
           { facingMode: 'environment' },
-          { fps: 8, qrbox: { width: 220, height: 220 } },
+          QR_SCAN_CAMERA_CONFIG,
           async (decoded) => {
             if (cancelled || scanLockRef.current || isSubmittingRef.current) return;
             scanLockRef.current = true;
@@ -340,9 +354,17 @@ export default function PickupVerifyModal({
 
         <div className={mode === 'scan' ? 'mt-4 space-y-3' : 'hidden'}>
           <div
-            id={SCANNER_ID}
-            className="overflow-hidden rounded-xl border border-gray-200 bg-black/5 min-h-[240px]"
-          />
+            ref={scanViewportRef}
+            className="relative min-h-[240px] overflow-hidden rounded-xl border border-gray-200 bg-black"
+          >
+            <div
+              id={SCANNER_ID}
+              className={`${QR_SCAN_HOST_CLASS} absolute inset-0 h-full w-full`}
+            />
+            {frameActive ? (
+              <QrScanFrameOverlay frame={scanFrame} hint="Наведите на QR выдачи" />
+            ) : null}
+          </div>
           <button
             type="button"
             className="text-sm font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"

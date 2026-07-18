@@ -4,11 +4,14 @@ import { parseSellerPartCardQr } from '../../utils/parseSellerPartCardQr';
 import { normalizeInternalCodeForCompare } from '../../utils/internalCode';
 import { apiAxios } from '../../utils/apiClient';
 import { resolveStorageCellName, shortStorageCellText } from '../../utils/labelPrintDisplay';
+import QrScanFrameOverlay from '../QrScanner/QrScanFrameOverlay';
+import {
+  QR_SCAN_CAMERA_CONFIG,
+  QR_SCAN_HOST_CLASS,
+  useQrFrameTracker,
+} from '../QrScanner/useQrFrameTracker';
 
 const SCANNER_ID = 'garage-item-confirm-qr-scanner';
-
-/** Same camera config as working WarehouseScanPage (/warehouse/scan). */
-const QR_SCAN_CONFIG = { fps: 8, qrbox: { width: 220, height: 220 } };
 
 async function stopScannerSafe(scanner) {
   if (!scanner) return;
@@ -218,12 +221,22 @@ export default function ItemConfirmScanModal({
   const [manualId, setManualId] = useState('');
   const html5QrCodeRef = useRef(null);
   const scanLockRef = useRef(false);
+  const scanViewportRef = useRef(null);
   const expectedProductIdRef = useRef(null);
   const expectedInternalCodeRef = useRef(null);
   const expectedSourcePendingIdRef = useRef(null);
   const productCardLoadingRef = useRef(productCardLoading);
   const isSubmittingRef = useRef(isSubmitting);
   const handleScanResultRef = useRef(null);
+
+  const frameActive = Boolean(
+    shellOpen && isOpen && mode === 'entry' && cameraActive && !cameraError,
+  );
+  const scanFrame = useQrFrameTracker({
+    active: frameActive,
+    containerRef: scanViewportRef,
+    locked: mode === 'confirm',
+  });
 
   useEffect(() => {
     isSubmittingRef.current = isSubmitting;
@@ -337,7 +350,7 @@ export default function ItemConfirmScanModal({
       try {
         await scanner.start(
           { facingMode: 'environment' },
-          QR_SCAN_CONFIG,
+          QR_SCAN_CAMERA_CONFIG,
           async (decodedText) => {
             if (cancelled || scanLockRef.current || isSubmittingRef.current) return;
             scanLockRef.current = true;
@@ -451,13 +464,19 @@ export default function ItemConfirmScanModal({
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2 sm:px-5 sm:py-3">
           {mode === 'entry' ? (
             <>
-              <div className="relative mx-auto w-full max-h-[36dvh] min-h-0 flex-1 overflow-hidden rounded-xl border border-gray-200 bg-black sm:max-h-[280px] sm:min-h-[240px]">
+              <div
+                ref={scanViewportRef}
+                className="relative mx-auto w-full max-h-[36dvh] min-h-0 flex-1 overflow-hidden rounded-xl border border-gray-200 bg-black sm:max-h-[280px] sm:min-h-[240px]"
+              >
                 <div
                   id={SCANNER_ID}
-                  className={`absolute inset-0 h-full w-full ${!cameraActive ? 'invisible' : ''}`}
+                  className={`${QR_SCAN_HOST_CLASS} absolute inset-0 h-full w-full ${!cameraActive ? 'invisible' : ''}`}
                 />
+                {frameActive ? (
+                  <QrScanFrameOverlay frame={scanFrame} hint="Наведите на QR этикетки" />
+                ) : null}
                 {!cameraActive ? (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900 text-sm text-white">
+                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-gray-900 text-sm text-white">
                     Камера остановлена
                   </div>
                 ) : null}
