@@ -8,6 +8,7 @@ import {
   isGarageItemAwaitingSellerConfirm,
   isRosskoNewOrder,
 } from '../../utils/garageOrderUi';
+import { formatProductStorageInline } from '../../utils/labelPrintDisplay';
 import UserAvatar from '../UserAvatar/UserAvatar';
 import OrderSourceBadge from '../Orders/OrderSourceBadge';
 import OrderWriteMessageButton from '../OrderWriteMessageButton/OrderWriteMessageButton';
@@ -239,7 +240,7 @@ export default function SalesGarageOrderCard({
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1 ring-1 ring-gray-100">
                 <OrderSourceBadge
-                  source={isUsed ? 'used' : isRossko ? 'rossko' : 'new'}
+                  source={isUsed ? 'used' : 'rossko'}
                   size="sm"
                 />
                 <span className="text-xs font-semibold text-gray-800">#{order.id}</span>
@@ -414,6 +415,9 @@ export default function SalesGarageOrderCard({
                 && (isUsed ? Boolean(item.product_id) : isRossko);
               const isItemConfirmed = isUsed && itemStatusCode === 'confirmed';
               const isItemRejected = isUsed && itemStatusCode === 'rejected';
+              const storage = isUsed
+                ? formatProductStorageInline(item)
+                : { warehouse: '', cells: '', line: '' };
               return (
                 <li
                   key={item.id || `${order.id}-${idx}`}
@@ -442,6 +446,28 @@ export default function SalesGarageOrderCard({
                       <p className="mt-2 text-xs text-gray-500">
                         {item.quantity || 0} шт. × {formatPrice(item.price)}
                       </p>
+                      {storage.line ? (
+                        <p
+                          className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs leading-snug text-gray-500"
+                          title={storage.line}
+                        >
+                          <span className="shrink-0 text-gray-400">Хранение</span>
+                          <span className="text-gray-300" aria-hidden>·</span>
+                          {storage.warehouse ? (
+                            <span className="min-w-0 break-words font-medium text-gray-700">
+                              {storage.warehouse}
+                            </span>
+                          ) : null}
+                          {storage.warehouse && storage.cells ? (
+                            <span className="text-gray-300" aria-hidden>·</span>
+                          ) : null}
+                          {storage.cells ? (
+                            <span className="min-w-0 break-words font-medium text-gray-700">
+                              {storage.cells}
+                            </span>
+                          ) : null}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                       <div className="text-base font-semibold tabular-nums text-gray-900">{formatPrice(lineTotal)}</div>

@@ -61,3 +61,43 @@ export function buildStorageCellsForLabel(productStorageCells, cellCatalog = [])
     })
     .filter(Boolean);
 }
+
+/**
+ * Compact "адресное хранение" line for order / confirm UI.
+ * Returns { warehouse, cells, line } — empty strings when nothing to show.
+ */
+export function formatProductStorageInline({
+  storage_location_name,
+  product_storage_cells,
+  storage_addresses,
+} = {}, { short = false } = {}) {
+  const warehouse = String(storage_location_name || '').trim();
+
+  const links = Array.isArray(product_storage_cells) ? product_storage_cells : [];
+  const cellParts = links
+    .map((link) => {
+      if (link?.value == null || String(link.value).trim() === '') return null;
+      const name = resolveStorageCellName(link, []);
+      const value = String(link.value).trim();
+      if (short) {
+        const nameShort = shortStorageCellText(name);
+        const valueShort = shortStorageCellText(value);
+        return [nameShort !== '—' ? nameShort : '', valueShort !== '—' ? valueShort : '']
+          .filter(Boolean)
+          .join(' ');
+      }
+      return [name, value].filter(Boolean).join(' ');
+    })
+    .filter(Boolean);
+
+  let cells = cellParts.join(' · ');
+  if (!cells && Array.isArray(storage_addresses) && storage_addresses.length) {
+    cells = storage_addresses
+      .map((row) => String(row || '').trim())
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  const line = [warehouse, cells].filter(Boolean).join(' · ');
+  return { warehouse, cells, line };
+}

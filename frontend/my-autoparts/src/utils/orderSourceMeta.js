@@ -5,9 +5,9 @@ export const ORDER_SOURCE_META = {
     title: 'Свой Гараж · Б/у',
   },
   new: {
-    logo: '/logos/svoygarage.png',
-    label: 'Новые',
-    title: 'Новые запчасти · от поставщика',
+    logo: '/logos/rossko.png',
+    label: 'Rossko',
+    title: 'Новые запчасти · Rossko',
   },
   rossko: {
     logo: '/logos/rossko.png',

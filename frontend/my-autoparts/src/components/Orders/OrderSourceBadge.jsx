@@ -34,7 +34,11 @@ export default function OrderSourceBadge({
         className={`inline-flex shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white ${sizeClass.box}`}
         aria-hidden
       >
-        <img src={meta.logo} alt="" className={`${sizeClass.img} object-contain`} />
+        <img
+          src={meta.logo}
+          alt=""
+          className={`${sizeClass.img} object-contain ${source === 'rossko' || source === 'new' ? 'scale-110' : ''}`}
+        />
       </span>
       {showLabel && (
         <span className={`font-medium text-gray-700 ${sizeClass.text}`}>{meta.label}</span>

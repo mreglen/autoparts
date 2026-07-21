@@ -6,7 +6,7 @@ export default function SalesOrdersEmptyState({ hasAnyOrders = false }) {
     <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center shadow-sm">
       <div className="mx-auto mb-5 flex items-center justify-center gap-3">
         <OrderSourceBadge source="used" size="md" />
-        <OrderSourceBadge source="new" size="md" />
+        <OrderSourceBadge source="rossko" size="md" />
         <OrderSourceBadge source="avito" size="md" />
       </div>
       <h3 className="text-lg font-semibold text-gray-900">

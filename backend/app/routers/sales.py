@@ -222,10 +222,86 @@ def _seller_user_id_for_org(db: Session, org_id: str | None) -> int | None:
     return seller.id if seller else None
 
 
-def _used_order_response(db: Session, order: GarageUsedOrder) -> UsedPartsOrderResponse:
+def _product_storage_payloads(
+    db: Session,
+    product_ids: set[int],
+) -> dict[int, dict[str, Any]]:
+    """Batch-load warehouse + address storage cells for used-order line items."""
+    if not product_ids:
+        return {}
+
+    from app.models.product import Product
+    from app.models.product_storage_cell import ProductStorageCell
+
+    products = (
+        db.query(Product)
+        .options(
+            selectinload(Product.storage_location),
+            selectinload(Product.product_storage_cells).selectinload(ProductStorageCell.storage_cell),
+        )
+        .filter(Product.id.in_(product_ids))
+        .all()
+    )
+
+    out: dict[int, dict[str, Any]] = {}
+    for product in products:
+        cells_out: list[dict[str, Any]] = []
+        addresses: list[str] = []
+        for link in product.product_storage_cells or []:
+            value = (link.value or "").strip()
+            if not value:
+                continue
+            cell_name = link.storage_cell.name if link.storage_cell else None
+            cells_out.append(
+                {
+                    "id": link.id,
+                    "storage_cell_id": link.storage_cell_id,
+                    "value": value,
+                    "storage_cell_name": cell_name,
+                }
+            )
+            if cell_name:
+                addresses.append(f"{cell_name}: {value}")
+            else:
+                addresses.append(value)
+
+        location_name = None
+        if product.storage_location is not None:
+            location_name = (
+                getattr(product.storage_location, "address", None)
+                or getattr(product.storage_location, "name", None)
+            )
+            if location_name:
+                location_name = str(location_name).strip() or None
+
+        out[int(product.id)] = {
+            "storage_location_name": location_name,
+            "storage_addresses": addresses,
+            "product_storage_cells": cells_out,
+        }
+    return out
+
+
+def _used_order_response(
+    db: Session,
+    order: GarageUsedOrder,
+    *,
+    storage_by_product_id: dict[int, dict[str, Any]] | None = None,
+) -> UsedPartsOrderResponse:
     base = UsedPartsOrderResponse.model_validate(order)
+    enriched_items = []
+    for item in base.items:
+        payload = {}
+        if item.product_id and storage_by_product_id:
+            payload = storage_by_product_id.get(int(item.product_id)) or {}
+        if payload:
+            enriched_items.append(item.model_copy(update=payload))
+        else:
+            enriched_items.append(item)
+
     return base.model_copy(
         update={
+            "items": enriched_items,
             "buyer_avatar_url": _buyer_avatar_for_order(db, order),
             "buyer_user_id": _buyer_user_id_for_order(db, order),
         }
@@ -283,7 +359,17 @@ def list_used_parts_orders(
     if not current_user.is_admin:
         q = q.filter(GarageUsedOrder.organization_id == current_user.organization_id)
     orders = q.all()
-    return [_used_order_response(db, o) for o in orders]
+    product_ids = {
+        int(item.product_id)
+        for order in orders
+        for item in (order.items or [])
+        if item.product_id
+    }
+    storage_by_product_id = _product_storage_payloads(db, product_ids)
+    return [
+        _used_order_response(db, o, storage_by_product_id=storage_by_product_id)
+        for o in orders
+    ]
 
 
 @router.put("/used-parts-orders/{order_id}/status", response_model=UpdateUsedOrderStatusResponse)

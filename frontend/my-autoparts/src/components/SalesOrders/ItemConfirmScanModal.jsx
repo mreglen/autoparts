@@ -3,7 +3,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { parseSellerPartCardQr } from '../../utils/parseSellerPartCardQr';
 import { normalizeInternalCodeForCompare } from '../../utils/internalCode';
 import { apiAxios } from '../../utils/apiClient';
-import { resolveStorageCellName, shortStorageCellText } from '../../utils/labelPrintDisplay';
+import { formatProductStorageInline } from '../../utils/labelPrintDisplay';
 import QrScanFrameOverlay from '../QrScanner/QrScanFrameOverlay';
 import {
   QR_SCAN_CAMERA_CONFIG,
@@ -169,33 +169,20 @@ async function verifyScanInput(
 }
 
 function WarehouseFooter({ productCard, productCardLoading, productCardError }) {
-  const warehouseName = productCard?.storage_location_name;
-  const storageCells = productCard?.product_storage_cells || [];
-  const storageAddresses = productCard?.storage_addresses || [];
-  const cellLabel = storageCells.length > 0
-    ? storageCells
-      .map((link) => {
-        if (link.value == null || String(link.value).trim() === '') return null;
-        const name = shortStorageCellText(resolveStorageCellName(link, []));
-        const value = shortStorageCellText(String(link.value).trim());
-        return [name, value].filter(Boolean).join(' ');
-      })
-      .filter(Boolean)
-      .join(' · ')
-    : (storageAddresses || []).join('; ');
+  const storage = formatProductStorageInline(productCard || {}, { short: true });
 
   return (
     <div className="grid grid-cols-2 gap-2.5">
       <div className="min-w-0 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Склад</div>
         <div className="mt-1 line-clamp-2 text-xs font-medium leading-snug text-gray-900">
-          {productCardLoading ? '…' : (productCardError ? 'Ошибка' : (warehouseName || '—'))}
+          {productCardLoading ? '…' : (productCardError ? 'Ошибка' : (storage.warehouse || '—'))}
         </div>
       </div>
       <div className="min-w-0 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
         <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Ячейка</div>
         <div className="mt-1 line-clamp-2 text-xs font-medium leading-snug text-gray-900">
-          {productCardLoading ? '…' : (cellLabel || '—')}
+          {productCardLoading ? '…' : (storage.cells || '—')}
         </div>
       </div>
     </div>

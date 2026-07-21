@@ -1202,7 +1202,7 @@ export default function SalesOrdersPage() {
           </span>
           {canViewNewOrders && (
             <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-              <OrderSourceBadge source="new" size="sm" />
+              <OrderSourceBadge source="rossko" size="sm" />
               <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium tabular-nums text-gray-700">
                 {sourceCounts.new}
               </span>

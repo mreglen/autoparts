@@ -174,7 +174,9 @@ export const AVITO_CANCELED_STATUSES = new Set(['canceled', 'on_return']);
 const USED_ITEM_AWAITING_CONFIRM = new Set(['pending']);
 
 export function isRosskoNewOrder(order) {
-  return Boolean(order?.rossko_order_id);
+  // New-parts channel is always Rossko-sourced. rossko_order_id may be
+  // missing on legacy rows or before/without a successful supplier sync.
+  return Boolean(order);
 }
 
 /** Показывать кнопки подтверждения позиции (ещё не подтверждена продавцом). */

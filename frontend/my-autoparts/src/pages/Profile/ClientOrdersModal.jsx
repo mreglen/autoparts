@@ -144,7 +144,7 @@ export default function ClientOrdersModal({
                                             <div>
                                                 <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold text-gray-900">
                                                     <OrderSourceBadge
-                                                        source={order.order_type === 'new' ? 'new' : 'used'}
+                                                        source={order.order_type === 'new' ? 'rossko' : 'used'}
                                                         size="sm"
                                                     />
                                                     <span>Заказ #{order.id}</span>

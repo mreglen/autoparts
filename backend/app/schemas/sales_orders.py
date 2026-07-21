@@ -6,6 +6,13 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 
+class UsedPartsOrderStorageCellOut(BaseModel):
+    id: int
+    storage_cell_id: int
+    value: Optional[str] = None
+    storage_cell_name: Optional[str] = None
+
+
 class UsedPartsOrderItemResponse(BaseModel):
     id: int
     product_id: Optional[int] = None
@@ -17,6 +24,9 @@ class UsedPartsOrderItemResponse(BaseModel):
     status_code: str
     stock_out_id: Optional[int] = None
     fulfilled_at: Optional[datetime] = None
+    storage_location_name: Optional[str] = None
+    storage_addresses: list[str] = Field(default_factory=list)
+    product_storage_cells: list[UsedPartsOrderStorageCellOut] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
