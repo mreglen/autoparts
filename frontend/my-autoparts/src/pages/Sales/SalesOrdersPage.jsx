@@ -142,6 +142,7 @@ export default function SalesOrdersPage() {
   const [paymentModal, setPaymentModal] = useState({
     isOpen: false,
     order: null,
+    item: null,
     methods: [],
     methodsLoading: false,
     methodsError: '',
@@ -151,7 +152,14 @@ export default function SalesOrdersPage() {
   const [cancelPaymentModal, setCancelPaymentModal] = useState({
     isOpen: false,
     order: null,
+    item: null,
     isSubmitting: false,
+  });
+  const [unpaidIssueModal, setUnpaidIssueModal] = useState({
+    isOpen: false,
+    order: null,
+    orderKind: 'used',
+    unpaidItems: [],
   });
   const [unconfirmItemModal, setUnconfirmItemModal] = useState({
     isOpen: false,
@@ -415,7 +423,7 @@ export default function SalesOrdersPage() {
     }
   };
 
-  const openPickupVerify = useCallback((order, orderKind) => {
+  const openPickupVerifyDirect = useCallback((order, orderKind) => {
     setPickupModal({
       isOpen: true,
       order,
@@ -424,6 +432,41 @@ export default function SalesOrdersPage() {
       isSubmitting: false,
     });
   }, []);
+
+  const openPickupVerify = useCallback((order, orderKind) => {
+    if (orderKind === 'used') {
+      const unpaidItems = (order?.items || []).filter(
+        (item) => !item.is_paid && (item.status_code || '') !== 'rejected'
+      );
+      if (unpaidItems.length > 0) {
+        setUnpaidIssueModal({
+          isOpen: true,
+          order,
+          orderKind,
+          unpaidItems,
+        });
+        return;
+      }
+    }
+    openPickupVerifyDirect(order, orderKind);
+  }, [openPickupVerifyDirect]);
+
+  const closeUnpaidIssueModal = useCallback(() => {
+    setUnpaidIssueModal({
+      isOpen: false,
+      order: null,
+      orderKind: 'used',
+      unpaidItems: [],
+    });
+  }, []);
+
+  const confirmUnpaidIssue = useCallback(() => {
+    const { order, orderKind } = unpaidIssueModal;
+    closeUnpaidIssueModal();
+    if (order) {
+      openPickupVerifyDirect(order, orderKind);
+    }
+  }, [unpaidIssueModal, closeUnpaidIssueModal, openPickupVerifyDirect]);
 
   const closePickupVerify = useCallback(() => {
     setPickupModal({
@@ -554,6 +597,7 @@ export default function SalesOrdersPage() {
     setPaymentModal({
       isOpen: false,
       order: null,
+      item: null,
       methods: [],
       methodsLoading: false,
       methodsError: '',
@@ -562,11 +606,12 @@ export default function SalesOrdersPage() {
     });
   }, []);
 
-  const openPaymentModal = useCallback(async (order) => {
+  const openPaymentModal = useCallback(async (order, item = null) => {
     const orgId = order?.organization_id || user?.organization_id;
     setPaymentModal({
       isOpen: true,
       order,
+      item: item || null,
       methods: [],
       methodsLoading: true,
       methodsError: '',
@@ -597,30 +642,87 @@ export default function SalesOrdersPage() {
     }
   }, [user?.organization_id]);
 
+  const applyUsedOrderPaymentLocal = useCallback((orderId, patchOrder, patchItem) => {
+    setUsedOrders((prev) =>
+      prev.map((o) => {
+        if (o.id !== orderId) return o;
+        const items = (o.items || []).map((item) => {
+          if (patchItem && item.id === patchItem.id) {
+            return { ...item, ...patchItem };
+          }
+          if (patchOrder?.markAllPaid) {
+            if ((item.status_code || '') === 'rejected') return item;
+            return {
+              ...item,
+              is_paid: true,
+              payment_method_id: patchOrder.payment_method_id,
+              payment_method_name: patchOrder.payment_method_name,
+              paid_at: patchOrder.paid_at,
+            };
+          }
+          if (patchOrder?.clearAllPaid) {
+            return {
+              ...item,
+              is_paid: false,
+              payment_method_id: null,
+              payment_method_name: null,
+              paid_at: null,
+            };
+          }
+          return item;
+        });
+        const billable = items.filter((item) => (item.status_code || '') !== 'rejected');
+        const orderIsPaid = billable.length > 0 && billable.every((item) => item.is_paid);
+        return {
+          ...o,
+          ...patchOrder,
+          markAllPaid: undefined,
+          clearAllPaid: undefined,
+          is_paid: patchOrder?.order_is_paid ?? orderIsPaid,
+          items,
+        };
+      })
+    );
+  }, []);
+
   const submitOrderPayment = useCallback(async (method) => {
     const order = paymentModal.order;
+    const item = paymentModal.item;
     if (!order || !method?.id) return;
     setPaymentModal((prev) => ({ ...prev, isSubmitting: true, error: '' }));
     try {
-      const response = await apiAxios.post(`/sales/used-parts-orders/${order.id}/mark-paid`, {
+      const url = item
+        ? `/sales/used-parts-orders/${order.id}/items/${item.id}/mark-paid`
+        : `/sales/used-parts-orders/${order.id}/mark-paid`;
+      const response = await apiAxios.post(url, {
         payment_method_id: method.id,
       });
       const paidAt = response.data?.paid_at || new Date().toISOString();
       const methodName = response.data?.payment_method_name || method.name;
       const methodId = response.data?.payment_method_id ?? method.id;
-      setUsedOrders((prev) =>
-        prev.map((o) =>
-          o.id === order.id
-            ? {
-                ...o,
-                is_paid: true,
-                payment_method_id: methodId,
-                payment_method_name: methodName,
-                paid_at: paidAt,
-              }
-            : o
-        )
-      );
+      const orderIsPaid = response.data?.order_is_paid;
+      if (item) {
+        applyUsedOrderPaymentLocal(order.id, {
+          order_is_paid: orderIsPaid,
+          payment_method_id: orderIsPaid ? methodId : null,
+          payment_method_name: orderIsPaid ? methodName : null,
+          paid_at: orderIsPaid ? paidAt : null,
+        }, {
+          id: item.id,
+          is_paid: true,
+          payment_method_id: methodId,
+          payment_method_name: methodName,
+          paid_at: paidAt,
+        });
+      } else {
+        applyUsedOrderPaymentLocal(order.id, {
+          markAllPaid: true,
+          order_is_paid: true,
+          payment_method_id: methodId,
+          payment_method_name: methodName,
+          paid_at: paidAt,
+        });
+      }
       closePaymentModal();
       dispatch(fetchSalesMenuCounts());
     } catch (err) {
@@ -630,35 +732,49 @@ export default function SalesOrdersPage() {
         error: formatStatusErrorDetail(err?.response?.data?.detail) || 'Не удалось подтвердить оплату',
       }));
     }
-  }, [paymentModal.order, closePaymentModal, dispatch]);
+  }, [paymentModal.order, paymentModal.item, closePaymentModal, dispatch, applyUsedOrderPaymentLocal]);
 
-  const openCancelPaymentModal = useCallback((order) => {
-    setCancelPaymentModal({ isOpen: true, order, isSubmitting: false });
+  const openCancelPaymentModal = useCallback((order, item = null) => {
+    setCancelPaymentModal({ isOpen: true, order, item: item || null, isSubmitting: false });
   }, []);
 
   const closeCancelPaymentModal = useCallback(() => {
-    setCancelPaymentModal({ isOpen: false, order: null, isSubmitting: false });
+    setCancelPaymentModal({ isOpen: false, order: null, item: null, isSubmitting: false });
   }, []);
 
   const submitCancelPayment = useCallback(async () => {
     const order = cancelPaymentModal.order;
+    const item = cancelPaymentModal.item;
     if (!order) return;
     setCancelPaymentModal((prev) => ({ ...prev, isSubmitting: true }));
     try {
-      await apiAxios.post(`/sales/used-parts-orders/${order.id}/unmark-paid`);
-      setUsedOrders((prev) =>
-        prev.map((o) =>
-          o.id === order.id
-            ? {
-                ...o,
-                is_paid: false,
-                payment_method_id: null,
-                payment_method_name: null,
-                paid_at: null,
-              }
-            : o
-        )
-      );
+      const url = item
+        ? `/sales/used-parts-orders/${order.id}/items/${item.id}/unmark-paid`
+        : `/sales/used-parts-orders/${order.id}/unmark-paid`;
+      const response = await apiAxios.post(url);
+      const orderIsPaid = response.data?.order_is_paid ?? false;
+      if (item) {
+        applyUsedOrderPaymentLocal(order.id, {
+          order_is_paid: orderIsPaid,
+          payment_method_id: null,
+          payment_method_name: null,
+          paid_at: null,
+        }, {
+          id: item.id,
+          is_paid: false,
+          payment_method_id: null,
+          payment_method_name: null,
+          paid_at: null,
+        });
+      } else {
+        applyUsedOrderPaymentLocal(order.id, {
+          clearAllPaid: true,
+          order_is_paid: false,
+          payment_method_id: null,
+          payment_method_name: null,
+          paid_at: null,
+        });
+      }
       closeCancelPaymentModal();
       dispatch(fetchSalesMenuCounts());
     } catch (err) {
@@ -668,7 +784,7 @@ export default function SalesOrdersPage() {
         text: formatStatusErrorDetail(err?.response?.data?.detail) || 'Не удалось отменить оплату',
       });
     }
-  }, [cancelPaymentModal.order, closeCancelPaymentModal, dispatch]);
+  }, [cancelPaymentModal.order, cancelPaymentModal.item, closeCancelPaymentModal, dispatch, applyUsedOrderPaymentLocal]);
 
   const openUnconfirmItemModal = useCallback((order, item) => {
     setUnconfirmItemModal({ isOpen: true, order, item });
@@ -1353,6 +1469,8 @@ export default function SalesOrdersPage() {
                   onOpenItemConfirm={openItemConfirmScan}
                   onOpenPayment={openPaymentModal}
                   onOpenCancelPayment={openCancelPaymentModal}
+                  onOpenItemPayment={(order, item) => openPaymentModal(order, item)}
+                  onOpenCancelItemPayment={(order, item) => openCancelPaymentModal(order, item)}
                   onOpenUnconfirmItem={openUnconfirmItemModal}
                   onRejectItem={rejectItem}
                   onConfirmRosskoItem={confirmRosskoItem}
@@ -1546,6 +1664,7 @@ export default function SalesOrdersPage() {
         <OrderPaymentModal
           isOpen={paymentModal.isOpen}
           order={paymentModal.order}
+          item={paymentModal.item}
           methods={paymentModal.methods}
           methodsLoading={paymentModal.methodsLoading}
           methodsError={paymentModal.methodsError}
@@ -1561,11 +1680,42 @@ export default function SalesOrdersPage() {
           onClose={closeCancelPaymentModal}
           onConfirm={submitCancelPayment}
           title="Отмена оплаты"
-          message="Вы хотите отменить оплату?"
-          confirmText="Да, отменить оплату"
-          cancelText="Отмена"
+          message={
+            cancelPaymentModal.item
+              ? 'Отменить оплату позиции?'
+              : 'Отменить оплату заказа?'
+          }
+          confirmText="Отменить"
+          cancelText="Назад"
           type="danger"
         />
+
+        <ConfirmModal
+          isOpen={unpaidIssueModal.isOpen}
+          onClose={closeUnpaidIssueModal}
+          onConfirm={confirmUnpaidIssue}
+          title="Выдать заказ?"
+          confirmText="Выдать"
+          cancelText="Назад"
+          type="warning"
+        >
+          <p className="text-sm text-gray-600">Есть неоплаченные позиции:</p>
+          <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto">
+            {unpaidIssueModal.unpaidItems.map((item) => {
+              const title = item.product_name || item.name || 'Товар';
+              const meta = [item.brand, item.partnumber].filter(Boolean).join(' · ');
+              return (
+                <li
+                  key={item.id}
+                  className="rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2 text-sm"
+                >
+                  <div className="font-medium text-gray-900">{title}</div>
+                  {meta ? <div className="mt-0.5 text-xs text-gray-500">{meta}</div> : null}
+                </li>
+              );
+            })}
+          </ul>
+        </ConfirmModal>
 
         <ConfirmModal
           isOpen={unconfirmItemModal.isOpen}

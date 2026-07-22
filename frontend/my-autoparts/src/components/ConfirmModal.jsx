@@ -1,14 +1,15 @@
 import React, { useEffect } from 'react';
 
-const ConfirmModal = ({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  title, 
-  message, 
+const ConfirmModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  children,
   confirmText = 'Подтвердить',
   cancelText = 'Отмена',
-  type = 'danger' // 'danger' | 'success' | 'warning'
+  type = 'danger', // 'danger' | 'success' | 'warning'
 }) => {
   useEffect(() => {
     if (isOpen) {
@@ -16,7 +17,7 @@ const ConfirmModal = ({
     } else {
       document.body.style.overflow = 'unset';
     }
-    
+
     return () => {
       document.body.style.overflow = 'unset';
     };
@@ -31,7 +32,7 @@ const ConfirmModal = ({
       case 'success':
         return 'bg-green-600 hover:bg-green-700 text-white';
       case 'warning':
-        return 'bg-yellow-600 hover:bg-yellow-700 text-white';
+        return 'bg-amber-500 hover:bg-amber-600 text-white';
       default:
         return 'bg-blue-600 hover:bg-blue-700 text-white';
     }
@@ -40,17 +41,14 @@ const ConfirmModal = ({
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full transform transition-all">
-        {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
         </div>
-        
-        {/* Body */}
+
         <div className="px-6 py-4">
-          <p className="text-sm text-gray-600">{message}</p>
+          {children || (message ? <p className="text-sm text-gray-600">{message}</p> : null)}
         </div>
-        
-        {/* Footer */}
+
         <div className="px-6 py-4 flex gap-3 justify-end">
           {cancelText && (
             <button

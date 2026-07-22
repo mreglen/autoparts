@@ -66,12 +66,13 @@ def resolve_sale_channel(row: StockOut) -> str:
 
 
 def _marketplace_used_order_is_paid(row: StockOut) -> bool:
-    """Сайт (Б/У) попадает в финансы только после подтверждения оплаты."""
+    """Сайт (Б/У) попадает в финансы после оплаты позиции (или всего заказа)."""
     item = getattr(row, "garage_used_order_item", None)
+    if item is not None and getattr(item, "is_paid", False):
+        return True
     order = getattr(item, "order", None) if item is not None else None
     if order is not None:
         return bool(getattr(order, "is_paid", False))
-    # Fallback: payment_method on stock_out set only after mark-paid
     return bool(getattr(row, "payment_method", None))
 
 
@@ -85,6 +86,8 @@ def _payment_method_for_row(row: StockOut) -> Optional[str]:
     if getattr(row, "payment_method", None):
         return row.payment_method
     item = getattr(row, "garage_used_order_item", None)
+    if item is not None and getattr(item, "is_paid", False):
+        return getattr(item, "payment_method_name", None)
     order = getattr(item, "order", None) if item is not None else None
     if order is not None and getattr(order, "is_paid", False):
         return getattr(order, "payment_method_name", None)

@@ -22,6 +22,10 @@ class UsedPartsOrderItemResponse(BaseModel):
     quantity: int
     price: float
     status_code: str
+    is_paid: bool = False
+    payment_method_id: Optional[int] = None
+    payment_method_name: Optional[str] = None
+    paid_at: Optional[datetime] = None
     stock_out_id: Optional[int] = None
     fulfilled_at: Optional[datetime] = None
     storage_location_name: Optional[str] = None
@@ -79,6 +83,8 @@ class MarkUsedOrderPaidResponse(BaseModel):
     payment_method_id: Optional[int] = None
     payment_method_name: Optional[str] = None
     paid_at: Optional[datetime] = None
+    order_is_paid: Optional[bool] = None
+    item_id: Optional[int] = None
 
 
 class NewPartsOrderItemResponse(BaseModel):

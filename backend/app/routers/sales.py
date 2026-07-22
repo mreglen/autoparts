@@ -1156,6 +1156,78 @@ def _load_used_order_for_seller(db: Session, order_id: int, current_user: UserMo
     return order
 
 
+def _billable_used_order_items(order: GarageUsedOrder) -> list[GarageUsedOrderItem]:
+    return [
+        item
+        for item in (order.items or [])
+        if (item.status_code or "") != "rejected"
+    ]
+
+
+def _sync_used_order_paid_from_items(order: GarageUsedOrder) -> None:
+    """Order is_paid when every billable line is paid."""
+    items = _billable_used_order_items(order)
+    if not items:
+        order.is_paid = False
+        order.payment_method_id = None
+        order.payment_method_name = None
+        order.paid_at = None
+        return
+
+    all_paid = all(bool(item.is_paid) for item in items)
+    order.is_paid = all_paid
+    if not all_paid:
+        order.payment_method_id = None
+        order.payment_method_name = None
+        order.paid_at = None
+        return
+
+    paid_items = [item for item in items if item.is_paid and item.paid_at]
+    source = max(paid_items, key=lambda i: i.paid_at) if paid_items else items[0]
+    order.payment_method_id = source.payment_method_id
+    order.payment_method_name = source.payment_method_name
+    order.paid_at = source.paid_at
+
+
+def _resolve_org_payment_method(db: Session, organization_id: str, payment_method_id: int):
+    from app.models.payment_method import PaymentMethod, organization_payment_methods
+
+    method = (
+        db.query(PaymentMethod)
+        .filter(PaymentMethod.id == payment_method_id)
+        .first()
+    )
+    if not method:
+        raise HTTPException(status_code=404, detail="Способ оплаты не найден")
+
+    assigned = db.execute(
+        organization_payment_methods.select().where(
+            organization_payment_methods.c.organization_id == organization_id,
+            organization_payment_methods.c.payment_method_id == method.id,
+        )
+    ).fetchone()
+    if not assigned:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Способ оплаты не назначен организации",
+        )
+    return method
+
+
+def _stamp_stock_out_payment(db: Session, item: GarageUsedOrderItem, method_name: str | None) -> None:
+    from app.models.stock_out import StockOut
+
+    if not item.id:
+        return
+    stock_outs = (
+        db.query(StockOut)
+        .filter(StockOut.garage_used_order_item_id == item.id)
+        .all()
+    )
+    for so in stock_outs:
+        so.payment_method = method_name
+
+
 def _load_new_order_for_seller(db: Session, order_id: int, current_user: UserModel) -> GarageNewOrder:
     order = (
         db.query(GarageNewOrder)
@@ -1180,55 +1252,28 @@ def mark_used_order_paid(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Подтвердить оплату б/у заказа выбранным способом оплаты организации."""
-    from app.models.payment_method import PaymentMethod, organization_payment_methods
-    from app.models.stock_out import StockOut
-
+    """Оплатить все неоплаченные позиции б/у заказа."""
     _require_sales_orders_access(db, current_user)
     order = _load_used_order_for_seller(db, order_id, current_user)
 
-    if order.is_paid:
+    unpaid = [item for item in _billable_used_order_items(order) if not item.is_paid]
+    if not unpaid and order.is_paid:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Заказ уже оплачен",
         )
 
-    method = (
-        db.query(PaymentMethod)
-        .filter(PaymentMethod.id == payload.payment_method_id)
-        .first()
-    )
-    if not method:
-        raise HTTPException(status_code=404, detail="Способ оплаты не найден")
-
-    assigned = db.execute(
-        organization_payment_methods.select().where(
-            organization_payment_methods.c.organization_id == order.organization_id,
-            organization_payment_methods.c.payment_method_id == method.id,
-        )
-    ).fetchone()
-    if not assigned:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Способ оплаты не назначен организации",
-        )
-
+    method = _resolve_org_payment_method(db, order.organization_id, payload.payment_method_id)
     paid_at = datetime.now(timezone.utc)
-    order.is_paid = True
-    order.payment_method_id = method.id
-    order.payment_method_name = method.name
-    order.paid_at = paid_at
+    targets = unpaid or _billable_used_order_items(order)
+    for item in targets:
+        item.is_paid = True
+        item.payment_method_id = method.id
+        item.payment_method_name = method.name
+        item.paid_at = paid_at
+        _stamp_stock_out_payment(db, item, method.name)
 
-    item_ids = [item.id for item in (order.items or []) if item.id]
-    if item_ids:
-        stock_outs = (
-            db.query(StockOut)
-            .filter(StockOut.garage_used_order_item_id.in_(item_ids))
-            .all()
-        )
-        for so in stock_outs:
-            so.payment_method = method.name
-
+    _sync_used_order_paid_from_items(order)
     db.commit()
     db.refresh(order)
 
@@ -1244,6 +1289,7 @@ def mark_used_order_paid(
             "payment_method_id": method.id,
             "payment_method_name": method.name,
             "total_amount": order.total_amount,
+            "item_ids": [item.id for item in targets],
         },
         entity_type="garage_used_order",
         entity_id=order_id,
@@ -1254,6 +1300,7 @@ def mark_used_order_paid(
         payment_method_id=method.id,
         payment_method_name=method.name,
         paid_at=paid_at,
+        order_is_paid=bool(order.is_paid),
     )
 
 
@@ -1266,34 +1313,26 @@ def unmark_used_order_paid(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ):
-    """Отменить оплату б/у заказа — запись исчезнет из финансов."""
-    from app.models.stock_out import StockOut
-
+    """Снять оплату со всех позиций б/у заказа."""
     _require_sales_orders_access(db, current_user)
     order = _load_used_order_for_seller(db, order_id, current_user)
 
-    if not order.is_paid:
+    paid_items = [item for item in (order.items or []) if item.is_paid]
+    if not paid_items and not order.is_paid:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Заказ ещё не оплачен",
         )
 
     previous_method = order.payment_method_name
-    order.is_paid = False
-    order.payment_method_id = None
-    order.payment_method_name = None
-    order.paid_at = None
+    for item in order.items or []:
+        item.is_paid = False
+        item.payment_method_id = None
+        item.payment_method_name = None
+        item.paid_at = None
+        _stamp_stock_out_payment(db, item, None)
 
-    item_ids = [item.id for item in (order.items or []) if item.id]
-    if item_ids:
-        stock_outs = (
-            db.query(StockOut)
-            .filter(StockOut.garage_used_order_item_id.in_(item_ids))
-            .all()
-        )
-        for so in stock_outs:
-            so.payment_method = None
-
+    _sync_used_order_paid_from_items(order)
     db.commit()
     db.refresh(order)
 
@@ -1318,6 +1357,123 @@ def unmark_used_order_paid(
         payment_method_id=None,
         payment_method_name=None,
         paid_at=None,
+        order_is_paid=False,
+    )
+
+
+@router.post(
+    "/used-parts-orders/{order_id}/items/{item_id}/mark-paid",
+    response_model=MarkUsedOrderPaidResponse,
+)
+def mark_used_order_item_paid(
+    order_id: int,
+    item_id: int,
+    payload: MarkUsedOrderPaidRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Оплатить одну позицию б/у заказа."""
+    _require_sales_orders_access(db, current_user)
+    order = _load_used_order_for_seller(db, order_id, current_user)
+    item = next((row for row in (order.items or []) if row.id == item_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Позиция не найдена")
+    if (item.status_code or "") == "rejected":
+        raise HTTPException(status_code=422, detail="Отклонённую позицию нельзя оплатить")
+    if item.is_paid:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Позиция уже оплачена")
+
+    method = _resolve_org_payment_method(db, order.organization_id, payload.payment_method_id)
+    paid_at = datetime.now(timezone.utc)
+    item.is_paid = True
+    item.payment_method_id = method.id
+    item.payment_method_name = method.name
+    item.paid_at = paid_at
+    _stamp_stock_out_payment(db, item, method.name)
+    _sync_used_order_paid_from_items(order)
+    db.commit()
+    db.refresh(order)
+
+    log_audit(
+        db,
+        event_type="order_item_marked_paid",
+        category="orders",
+        summary=f"Заказ Б/У #{order_id}: оплачена позиция #{item_id} ({method.name})",
+        user=current_user,
+        organization_id=order.organization_id,
+        details={
+            "order_id": order_id,
+            "item_id": item_id,
+            "payment_method_id": method.id,
+            "payment_method_name": method.name,
+            "line_amount": float(item.price or 0) * int(item.quantity or 0),
+        },
+        entity_type="garage_used_order_item",
+        entity_id=item_id,
+    )
+
+    return MarkUsedOrderPaidResponse(
+        is_paid=True,
+        payment_method_id=method.id,
+        payment_method_name=method.name,
+        paid_at=paid_at,
+        order_is_paid=bool(order.is_paid),
+        item_id=item_id,
+    )
+
+
+@router.post(
+    "/used-parts-orders/{order_id}/items/{item_id}/unmark-paid",
+    response_model=MarkUsedOrderPaidResponse,
+)
+def unmark_used_order_item_paid(
+    order_id: int,
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Снять оплату с одной позиции б/у заказа."""
+    _require_sales_orders_access(db, current_user)
+    order = _load_used_order_for_seller(db, order_id, current_user)
+    item = next((row for row in (order.items or []) if row.id == item_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Позиция не найдена")
+    if not item.is_paid:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Позиция ещё не оплачена")
+
+    previous_method = item.payment_method_name
+    item.is_paid = False
+    item.payment_method_id = None
+    item.payment_method_name = None
+    item.paid_at = None
+    _stamp_stock_out_payment(db, item, None)
+    _sync_used_order_paid_from_items(order)
+    db.commit()
+    db.refresh(order)
+
+    log_audit(
+        db,
+        event_type="order_item_unmarked_paid",
+        category="orders",
+        summary=f"Заказ Б/У #{order_id}: отмена оплаты позиции #{item_id}",
+        user=current_user,
+        organization_id=order.organization_id,
+        details={
+            "order_id": order_id,
+            "item_id": item_id,
+            "previous_payment_method_name": previous_method,
+        },
+        entity_type="garage_used_order_item",
+        entity_id=item_id,
+    )
+
+    return MarkUsedOrderPaidResponse(
+        is_paid=False,
+        payment_method_id=None,
+        payment_method_name=None,
+        paid_at=None,
+        order_is_paid=bool(order.is_paid),
+        item_id=item_id,
     )
 
 

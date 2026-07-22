@@ -63,6 +63,10 @@ class GarageUsedOrderItem(Base):
     quantity = Column(Integer, nullable=False, default=1)
     price = Column(Float, nullable=False, default=0.0)
     status_code = Column(String(50), nullable=False, default="pending", index=True)
+    is_paid = Column(Boolean, nullable=False, default=False)
+    payment_method_id = Column(Integer, ForeignKey("payment_methods.id"), nullable=True)
+    payment_method_name = Column(String(255), nullable=True)
+    paid_at = Column(DateTime(timezone=True), nullable=True)
     stock_out_id = Column(
         Integer,
         ForeignKey("stock_out.id", ondelete="SET NULL"),

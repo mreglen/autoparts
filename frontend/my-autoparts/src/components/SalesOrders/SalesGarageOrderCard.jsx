@@ -127,6 +127,8 @@ export default function SalesGarageOrderCard({
   onOpenItemConfirm,
   onOpenPayment,
   onOpenCancelPayment,
+  onOpenItemPayment,
+  onOpenCancelItemPayment,
   onOpenUnconfirmItem,
   onRejectItem,
   onConfirmRosskoItem,
@@ -151,6 +153,18 @@ export default function SalesGarageOrderCard({
   const rosskoSyncError = order.rossko_sync_error;
   const isPickup = String(order.delivery_type || '').toLowerCase() === 'pickup';
   const isRossko = isNew && isRosskoNewOrder(order);
+  const billableItems = items.filter((item) => (item.status_code || '') !== 'rejected');
+  const unpaidItems = isUsed
+    ? billableItems.filter((item) => !item.is_paid)
+    : [];
+  const paidItemsCount = billableItems.length - unpaidItems.length;
+  const paymentState = !isUsed
+    ? null
+    : unpaidItems.length === 0 && billableItems.length > 0
+      ? 'paid'
+      : paidItemsCount > 0
+        ? 'partial'
+        : 'unpaid';
 
   const getStatusOptionsForDropdown = (currentStatusCode) => {
     if (!isPickup) return orderStatusOptions;
@@ -304,7 +318,7 @@ export default function SalesGarageOrderCard({
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {isUsed ? (
-                order.is_paid ? (
+                paymentState === 'paid' ? (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -315,6 +329,18 @@ export default function SalesGarageOrderCard({
                     title="Отменить оплату"
                   >
                     Оплачено
+                  </button>
+                ) : paymentState === 'partial' ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenPayment?.(order);
+                    }}
+                    className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900 ring-1 ring-amber-200 hover:bg-amber-200"
+                    title="Оплатить оставшиеся позиции"
+                  >
+                    Частично
                   </button>
                 ) : (
                   <button
@@ -471,6 +497,32 @@ export default function SalesGarageOrderCard({
                     </div>
                     <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                       <div className="text-base font-semibold tabular-nums text-gray-900">{formatPrice(lineTotal)}</div>
+                      {isUsed && !isItemRejected ? (
+                        item.is_paid ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenCancelItemPayment?.(order, item);
+                            }}
+                            className="inline-flex rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-semibold text-white ring-1 ring-emerald-600/30 hover:bg-emerald-600"
+                            title="Отменить оплату позиции"
+                          >
+                            Оплачено
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenItemPayment?.(order, item);
+                            }}
+                            className="inline-flex rounded-full bg-amber-400 px-2.5 py-1 text-xs font-semibold text-amber-950 ring-1 ring-amber-500/30 hover:bg-amber-500"
+                          >
+                            Оплата
+                          </button>
+                        )
+                      ) : null}
                       {showItemConfirmActions ? (
                         <div className="flex flex-col gap-1.5">
                           <button

@@ -213,6 +213,100 @@ def ensure_garage_used_order_item_fulfillment_columns() -> None:
         )
 
 
+def ensure_garage_used_order_item_payment_columns() -> None:
+    """Per-line payment fields for marketplace used orders."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "garage_used_order_items" not in table_names:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("garage_used_order_items")}
+    statements = []
+
+    if "is_paid" not in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append(
+                "ALTER TABLE garage_used_order_items "
+                "ADD COLUMN is_paid BOOLEAN NOT NULL DEFAULT FALSE"
+            )
+        else:
+            statements.append(
+                "ALTER TABLE garage_used_order_items "
+                "ADD COLUMN is_paid BOOLEAN NOT NULL DEFAULT 0"
+            )
+    if "payment_method_id" not in columns:
+        statements.append(
+            "ALTER TABLE garage_used_order_items ADD COLUMN payment_method_id INTEGER"
+        )
+    if "payment_method_name" not in columns:
+        statements.append(
+            "ALTER TABLE garage_used_order_items "
+            "ADD COLUMN payment_method_name VARCHAR(255)"
+        )
+    if "paid_at" not in columns:
+        if engine.dialect.name == "postgresql":
+            statements.append(
+                "ALTER TABLE garage_used_order_items ADD COLUMN paid_at TIMESTAMPTZ"
+            )
+        else:
+            statements.append(
+                "ALTER TABLE garage_used_order_items ADD COLUMN paid_at DATETIME"
+            )
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+        if engine.dialect.name == "postgresql":
+            conn.execute(
+                text(
+                    """
+                    UPDATE garage_used_order_items AS i
+                    SET
+                        is_paid = TRUE,
+                        payment_method_id = o.payment_method_id,
+                        payment_method_name = o.payment_method_name,
+                        paid_at = o.paid_at
+                    FROM garage_used_orders AS o
+                    WHERE i.order_id = o.id
+                      AND o.is_paid = TRUE
+                      AND i.is_paid = FALSE
+                    """
+                )
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    UPDATE garage_used_order_items
+                    SET
+                        is_paid = 1,
+                        payment_method_id = (
+                            SELECT payment_method_id FROM garage_used_orders
+                            WHERE garage_used_orders.id = garage_used_order_items.order_id
+                        ),
+                        payment_method_name = (
+                            SELECT payment_method_name FROM garage_used_orders
+                            WHERE garage_used_orders.id = garage_used_order_items.order_id
+                        ),
+                        paid_at = (
+                            SELECT paid_at FROM garage_used_orders
+                            WHERE garage_used_orders.id = garage_used_order_items.order_id
+                        )
+                    WHERE order_id IN (
+                        SELECT id FROM garage_used_orders WHERE is_paid = 1
+                    )
+                    AND is_paid = 0
+                    """
+                )
+            )
+
+    if statements:
+        logger.info(
+            "Applied garage_used_order_items payment column patches: %s",
+            statements,
+        )
+
+
 def ensure_avito_order_fulfillment_columns() -> None:
     """Persist warehouse fulfillment status and skip reasons for Avito orders."""
     inspector = inspect(engine)

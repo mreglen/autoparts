@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 
 /**
  * Two-step payment modal: choose method → confirm payment.
+ * Supports whole order or a single line item.
  */
 export default function OrderPaymentModal({
   isOpen,
   order,
+  item = null,
   methods = [],
   methodsLoading = false,
   methodsError = '',
@@ -33,9 +35,15 @@ export default function OrderPaymentModal({
 
   if (!isOpen || !order) return null;
 
+  const lineAmount = item
+    ? Number(item.price || 0) * Number(item.quantity || 0)
+    : Number(order.total_amount || 0);
   const amountLabel = typeof formatPrice === 'function'
-    ? formatPrice(order.total_amount)
-    : `${Number(order.total_amount || 0).toLocaleString('ru-RU')} ₽`;
+    ? formatPrice(lineAmount)
+    : `${lineAmount.toLocaleString('ru-RU')} ₽`;
+  const itemTitle = item
+    ? (item.product_name || item.name || 'Позиция')
+    : null;
 
   const handleSelect = (method) => {
     setSelectedMethod(method);
@@ -60,7 +68,10 @@ export default function OrderPaymentModal({
             {step === 'select' ? 'Способ оплаты' : 'Подтверждение оплаты'}
           </h2>
           <p className="mt-0.5 text-sm text-gray-500">
-            Заказ #{order.id} · {amountLabel}
+            Заказ #{order.id}
+            {itemTitle ? ` · ${itemTitle}` : ''}
+            {' · '}
+            {amountLabel}
           </p>
         </div>
 
@@ -105,9 +116,7 @@ export default function OrderPaymentModal({
             </>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-gray-700">
-                Вы подтверждаете оплату?
-              </p>
+              <p className="text-sm text-gray-700">Подтвердить оплату?</p>
               <div className="rounded-xl border border-amber-100 bg-amber-50/80 px-4 py-3 text-sm">
                 <div className="flex justify-between gap-3">
                   <span className="text-gray-600">Способ</span>
