@@ -49,7 +49,51 @@ export const fetchFavoriteStatus = createAsyncThunk(
     }
   },
   {
-    condition: (_, { getState }) => hasAuthenticatedUser(getState),
+    condition: (productId, { getState }) => {
+      if (!hasAuthenticatedUser(getState)) return false;
+      const key = productFavoriteKey(productId);
+      if (!key) return false;
+      return !Object.prototype.hasOwnProperty.call(
+        getState().userEngagement?.favoriteByKey || {},
+        key,
+      );
+    },
+  },
+);
+
+export const fetchFavoriteStatusesBatch = createAsyncThunk(
+  'userEngagement/fetchFavoriteStatusesBatch',
+  async (productIds, { rejectWithValue }) => {
+    try {
+      const ids = [...new Set(
+        (productIds || [])
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0),
+      )].slice(0, 100);
+      if (!ids.length) return { entries: [] };
+      const data = await apiRequest('/user/favorites/status/batch', {
+        method: 'POST',
+        body: JSON.stringify({ product_ids: ids }),
+      });
+      const favorites = data?.favorites || {};
+      const entries = ids.map((id) => ({
+        key: productFavoriteKey(id),
+        isFavorite: Boolean(favorites[String(id)] ?? favorites[id]),
+      }));
+      return { entries };
+    } catch (error) {
+      return rejectWithValue(error?.message || 'Не удалось загрузить избранное');
+    }
+  },
+  {
+    condition: (productIds, { getState }) => {
+      if (!hasAuthenticatedUser(getState)) return false;
+      const known = getState().userEngagement?.favoriteByKey || {};
+      return (productIds || []).some((id) => {
+        const key = productFavoriteKey(id);
+        return key && !Object.prototype.hasOwnProperty.call(known, key);
+      });
+    },
   },
 );
 
@@ -262,6 +306,13 @@ const userEngagementSlice = createSlice({
       .addCase(fetchFavoriteStatus.fulfilled, (state, action) => {
         if (action.payload.key) {
           state.favoriteByKey[action.payload.key] = action.payload.isFavorite;
+        }
+      })
+      .addCase(fetchFavoriteStatusesBatch.fulfilled, (state, action) => {
+        for (const entry of action.payload?.entries || []) {
+          if (entry?.key) {
+            state.favoriteByKey[entry.key] = Boolean(entry.isFavorite);
+          }
         }
       })
       .addCase(fetchRosskoFavoriteStatus.fulfilled, (state, action) => {

@@ -6,6 +6,8 @@ from app.core.auth import get_current_user
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.user_engagement import (
+    FavoriteStatusBatchIn,
+    FavoriteStatusBatchOut,
     FavoriteStatusOut,
     FavoritesListOut,
     ProductViewsListOut,
@@ -58,6 +60,19 @@ def rossko_favorite_status(
 ):
     return FavoriteStatusOut(
         is_favorite=engagement.is_rossko_favorite(db, current_user.id, brand, partnumber)
+    )
+
+
+@router.post("/user/favorites/status/batch", response_model=FavoriteStatusBatchOut)
+def favorite_status_batch(
+    payload: FavoriteStatusBatchIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    unique_ids = list(dict.fromkeys(int(pid) for pid in payload.product_ids if pid is not None))
+    favorited = engagement.favorite_product_ids(db, current_user.id, unique_ids)
+    return FavoriteStatusBatchOut(
+        favorites={str(pid): (pid in favorited) for pid in unique_ids}
     )
 
 

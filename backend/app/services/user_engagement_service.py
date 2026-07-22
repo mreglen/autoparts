@@ -115,6 +115,26 @@ def is_favorite(db: Session, user_id: int, product_id: int) -> bool:
     )
 
 
+def favorite_product_ids(
+    db: Session,
+    user_id: int,
+    product_ids: list[int],
+) -> set[int]:
+    """Return subset of product_ids that are in the user's favorites."""
+    ids = [int(pid) for pid in product_ids if pid is not None]
+    if not ids:
+        return set()
+    rows = (
+        db.query(UserFavorite.product_id)
+        .filter(
+            UserFavorite.user_id == user_id,
+            UserFavorite.product_id.in_(ids),
+        )
+        .all()
+    )
+    return {int(row[0]) for row in rows if row and row[0] is not None}
+
+
 def is_rossko_favorite(db: Session, user_id: int, brand: str, partnumber: str) -> bool:
     brand_key, part_key = _normalize_rossko_part(brand, partnumber)
     return (

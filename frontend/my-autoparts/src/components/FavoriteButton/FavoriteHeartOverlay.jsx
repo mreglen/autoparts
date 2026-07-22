@@ -53,6 +53,13 @@ export default function FavoriteHeartOverlay({
     (state) => Boolean(state.userEngagement?.favoriteByKey?.[favoriteKey]),
   );
 
+  const favoriteStatusKnown = useSelector(
+    (state) => Object.prototype.hasOwnProperty.call(
+      state.userEngagement?.favoriteByKey || {},
+      favoriteKey,
+    ),
+  );
+
   const returnPath = `${location.pathname}${location.search}`;
 
   const goToAuth = useCallback(() => {
@@ -68,6 +75,7 @@ export default function FavoriteHeartOverlay({
       }));
       return;
     }
+    if (favoriteStatusKnown) return;
     dispatch(fetchFavoriteStatus(productId));
   }, [
     dispatch,
@@ -77,6 +85,7 @@ export default function FavoriteHeartOverlay({
     favoriteKey,
     productId,
     rossko,
+    favoriteStatusKnown,
   ]);
 
   const handleClick = useCallback(async (e) => {

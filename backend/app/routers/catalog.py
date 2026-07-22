@@ -13,18 +13,22 @@ from app.services.local_product_search import (
     build_search_relevance_score,
     search_local_products_query,
 )
-from app.schemas.product import Product as ProductSchema
+from app.schemas.product import ProductListItem
 from app.core.config import settings
 from app.utils.catalog_cache import build_catalog_cache_key
 from app.utils.json_cache_sync import get_cached_json_sync, set_cached_json_sync
+from app.utils.product_list_item import map_product_to_list_item
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
 
 SORT_OPTIONS = {"created_at_desc", "price_asc", "price_desc"}
 
+# Bump when list payload shape changes so Redis does not serve old full Product JSON.
+CATALOG_PRODUCTS_CACHE_PREFIX = "catalog:products:v2"
+
 
 class CatalogProductsResponse(BaseModel):
-    items: List[ProductSchema]
+    items: List[ProductListItem]
     total: int
     page: int
     page_size: int
@@ -42,13 +46,11 @@ class CatalogFacetsResponse(BaseModel):
 
 
 def _catalog_load_options():
+    """Lean loads for list tiles — no videos / vehicles / part_type."""
     return [
         selectinload(ProductModel.photos),
-        selectinload(ProductModel.videos),
         selectinload(ProductModel.storage_location),
         selectinload(ProductModel.organization),
-        selectinload(ProductModel.part_type),
-        selectinload(ProductModel.compatible_vehicles),
     ]
 
 
@@ -147,7 +149,7 @@ def list_catalog_products(
         sort = "created_at_desc"
 
     cache_key = build_catalog_cache_key(
-        "catalog:products",
+        CATALOG_PRODUCTS_CACHE_PREFIX,
         page=page,
         page_size=page_size,
         sort=sort,
@@ -213,7 +215,8 @@ def list_catalog_products(
     total = db.query(func.count()).select_from(id_subq).scalar() or 0
     query = _apply_sort(query, sort, relevance=search_relevance)
     offset = (page - 1) * page_size
-    items = query.offset(offset).limit(page_size).all()
+    products = query.offset(offset).limit(page_size).all()
+    items = [map_product_to_list_item(product, db=db) for product in products]
 
     response = CatalogProductsResponse(
         items=items,

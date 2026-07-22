@@ -17,6 +17,14 @@ class FavoriteStatusOut(BaseModel):
     is_favorite: bool
 
 
+class FavoriteStatusBatchIn(BaseModel):
+    product_ids: List[int] = Field(..., min_length=1, max_length=100)
+
+
+class FavoriteStatusBatchOut(BaseModel):
+    favorites: dict[str, bool] = Field(default_factory=dict)
+
+
 class FavoriteListItem(BaseModel):
     kind: Literal["product", "rossko"] = "product"
     id: int

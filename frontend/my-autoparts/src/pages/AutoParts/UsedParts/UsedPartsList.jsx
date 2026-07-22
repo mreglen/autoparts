@@ -30,12 +30,16 @@ import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
 import { useProductPriceFormat } from '../../../hooks/useProductPriceFormat';
 import { prefetchUsedPartDetail } from '../../../utils/prefetchPartDetail';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
+import { fetchFavoriteStatusesBatch } from '../../../redux/slices/UserEngagementSlice';
+import { useAuthReady } from '../../../hooks/useAuthReady';
+import { productFavoriteKey } from '../../../utils/favoriteKeys';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
 const VIRTUALIZE_THRESHOLD = 24;
 const GRID_ROW_ESTIMATE_PX = 380;
 const LIST_ROW_ESTIMATE_PX = 220;
+const VIRTUAL_OVERSCAN = 3;
 const LOAD_MORE_ROOT_MARGIN = '350px';
 
 function getGridColumnCount(width) {
@@ -270,6 +274,8 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const catalogHasMore = isCatalogMode && catalogHasMoreFromStore;
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
+  const { isAuthenticated, isReady, token } = useAuthReady();
+  const favoriteByKey = useSelector((state) => state.userEngagement?.favoriteByKey || {});
   const [organizationFilterName, setOrganizationFilterName] = useState('');
 
   useEffect(() => {
@@ -304,6 +310,20 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     const catalogIds = new Set(catalogItems.map((p) => p.id));
     return (usedPartsData?.analog_parts || []).filter((p) => !catalogIds.has(p.id));
   }, [urlQ, usedPartsData, catalogItems]);
+
+  useEffect(() => {
+    if (!isReady || !isAuthenticated || !token) return;
+    const ids = [...new Set(
+      [...(catalogItems || []), ...(analogParts || [])]
+        .map((p) => Number(p?.id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+        .filter((id) => !Object.prototype.hasOwnProperty.call(favoriteByKey, productFavoriteKey(id))),
+    )];
+    if (!ids.length) return;
+    for (let i = 0; i < ids.length; i += 100) {
+      dispatch(fetchFavoriteStatusesBatch(ids.slice(i, i + 100)));
+    }
+  }, [dispatch, catalogItems, analogParts, favoriteByKey, isReady, isAuthenticated, token]);
 
   const isInitialLoad = catalogLoading && catalogItems.length === 0;
   const status = isInitialLoad ? 'loading' : 'idle';
@@ -480,14 +500,14 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
   const gridRowVirtualizer = useWindowVirtualizer({
     count: shouldVirtualize && viewMode === 'grid' ? gridRows.length : 0,
     estimateSize: () => GRID_ROW_ESTIMATE_PX,
-    overscan: 5,
+    overscan: VIRTUAL_OVERSCAN,
     scrollMargin: gridScrollMargin,
   });
 
   const listRowVirtualizer = useWindowVirtualizer({
     count: shouldVirtualize && viewMode === 'list' ? sortedAvailableParts.length : 0,
     estimateSize: () => LIST_ROW_ESTIMATE_PX,
-    overscan: 5,
+    overscan: VIRTUAL_OVERSCAN,
     scrollMargin: listScrollMargin,
   });
 
@@ -533,9 +553,10 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     sellerVerified: true,
     photos: part.photos || [],
     videos: part.videos || [],
-    image: (part.photos && part.photos.length > 0)
-      ? (part.photos[0].full_url || part.photos[0].photo_url || part.photos[0])
-      : '/api/placeholder/200/200',
+    image: part.list_photo_url
+      || (part.photos && part.photos.length > 0
+        ? (part.photos[0].list_photo_url || part.photos[0].thumb_url || part.photos[0].full_url || part.photos[0].photo_url || part.photos[0])
+        : '/api/placeholder/200/200'),
     sellerLogo: organization?.name?.substring(0, 4).toUpperCase() || 'SELL',
     phone: organization?.phone || part.organization?.phone || '+7 (999) 123-45-67',
   }), [organization]);
