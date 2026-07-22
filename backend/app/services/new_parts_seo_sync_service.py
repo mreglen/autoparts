@@ -178,27 +178,35 @@ def count_seo_cards_created_today(db: Session) -> int:
     )
 
 
-def get_seo_sync_batch_size(*, daily_limit: int | None = None) -> int:
-    configured = int(settings.NEW_PARTS_SEO_SYNC_BATCH_SIZE or 0)
-    if configured > 0:
-        return configured
-    interval_minutes = max(1, int(settings.NEW_PARTS_SEO_SYNC_BATCH_INTERVAL_MINUTES or 30))
-    ticks_per_day = max(1, (24 * 60) // interval_minutes)
-    limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
-    return max(1, math.ceil(limit / ticks_per_day))
+def get_seo_sync_batch_size(*, daily_limit: int | None = None, db: Session | None = None) -> int:
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+    eff = resolve_effective_seo_sync_settings(db)
+    if daily_limit is not None:
+        # Recompute auto size against an explicit daily limit override.
+        configured = int(eff.batch_size or 0)
+        if configured > 0:
+            return configured
+        interval_minutes = max(1, int(eff.batch_interval_minutes or 30))
+        ticks_per_day = max(1, (24 * 60) // interval_minutes)
+        return max(1, math.ceil(int(daily_limit) / ticks_per_day))
+    return eff.resolved_batch_size()
 
 
-def get_seo_sync_runtime_settings() -> dict[str, object]:
-    daily_limit = int(settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT)
-    interval_minutes = max(1, int(settings.NEW_PARTS_SEO_SYNC_BATCH_INTERVAL_MINUTES or 30))
+def get_seo_sync_runtime_settings(db: Session | None = None) -> dict[str, object]:
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+    eff = resolve_effective_seo_sync_settings(db)
+    daily_limit = int(eff.daily_limit)
+    interval_minutes = max(1, int(eff.batch_interval_minutes or 30))
     return {
         "daily_limit": daily_limit,
-        "rossko_delay_sec": float(settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC),
+        "rossko_delay_sec": float(eff.rossko_delay_sec),
         "sitemap_daily_url_limit": int(settings.SEO_SITEMAP_DAILY_URL_LIMIT),
         "refresh_batch_size": int(settings.NEW_PARTS_SEO_REFRESH_BATCH_SIZE),
         "batch_interval_minutes": interval_minutes,
-        "batch_size": get_seo_sync_batch_size(daily_limit=daily_limit),
-        "batch_size_configured": int(settings.NEW_PARTS_SEO_SYNC_BATCH_SIZE or 0),
+        "batch_size": get_seo_sync_batch_size(daily_limit=daily_limit, db=db),
+        "batch_size_configured": int(eff.batch_size or 0),
         "use_celery": bool(settings.NEW_PARTS_SEO_SYNC_USE_CELERY),
         "micro_batch_enabled": True,
         "max_cards_per_response": _max_cards_per_response(),
@@ -208,7 +216,8 @@ def get_seo_sync_runtime_settings() -> dict[str, object]:
         "cross_recurse_daily": int(settings.NEW_PARTS_SEO_CROSS_RECURSE_DAILY or 0),
         "catchup_enabled": bool(settings.NEW_PARTS_SEO_CATCHUP_ENABLED),
         "catchup_slack": int(settings.NEW_PARTS_SEO_CATCHUP_SLACK or 0),
-        "seed_precheck_daily": int(settings.NEW_PARTS_SEO_SEED_PRECHECK_DAILY or 0),
+        "seed_precheck_daily": int(eff.seed_precheck_daily),
+        "seed_precheck_interval_minutes": int(eff.seed_precheck_interval_minutes),
     }
 
 
@@ -853,7 +862,9 @@ def _apply_fair_quota_order(db: Session, candidates: list[SyncCandidate]) -> lis
     if not candidates:
         return []
 
-    daily_limit = int(settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT or 1000)
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+    daily_limit = int(resolve_effective_seo_sync_settings(db).daily_limit)
     shares = get_source_daily_shares()
     created_by_source = count_cards_created_today_by_source(db)
 
@@ -926,7 +937,13 @@ async def _run_seo_sync(
     batch_size: int = 0,
     remaining_daily_quota: int = 0,
 ) -> SyncResult:
-    delay = rossko_delay_sec if rossko_delay_sec is not None else settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+    delay = (
+        rossko_delay_sec
+        if rossko_delay_sec is not None
+        else resolve_effective_seo_sync_settings(db).rossko_delay_sec
+    )
     retry_days = (
         not_found_retry_days
         if not_found_retry_days is not None
@@ -985,10 +1002,16 @@ async def sync_new_parts_seo_batch(
     rossko_delay_sec: float | None = None,
     not_found_retry_days: int | None = None,
 ) -> SyncResult:
-    limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+    limit = (
+        daily_limit
+        if daily_limit is not None
+        else resolve_effective_seo_sync_settings(db).daily_limit
+    )
     already_created_today = count_seo_cards_created_today(db)
     remaining_daily = max(0, limit - already_created_today)
-    batch_size = max_new_cards if max_new_cards is not None else get_seo_sync_batch_size(daily_limit=limit)
+    batch_size = max_new_cards if max_new_cards is not None else get_seo_sync_batch_size(daily_limit=limit, db=db)
 
     if settings.NEW_PARTS_SEO_CATCHUP_ENABLED and is_behind_quota(db, daily_limit=limit):
         batch_size = min(remaining_daily, batch_size * 2)
@@ -1012,7 +1035,13 @@ async def sync_new_parts_seo_from_products(
     rossko_delay_sec: float | None = None,
     not_found_retry_days: int | None = None,
 ) -> SyncResult:
-    limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+    limit = (
+        daily_limit
+        if daily_limit is not None
+        else resolve_effective_seo_sync_settings(db).daily_limit
+    )
     already_created_today = count_seo_cards_created_today(db)
     remaining_daily = max(0, limit - already_created_today)
 
@@ -1123,6 +1152,6 @@ def get_new_parts_seo_dashboard_stats(db: Session, *, days: int = 14) -> dict[st
         "cards_eligible_pct": eligible_pct,
         "cards_created_today": created_today,
         "created_by_day": get_cards_created_by_day(db, days=days),
-        "settings": get_seo_sync_runtime_settings(),
+        "settings": get_seo_sync_runtime_settings(db),
         "quota": get_quota_status(db),
     }

@@ -1413,13 +1413,87 @@ def get_new_parts_seo_stats(
     return stats
 
 
+class SeoNewPartsSyncSettingsUpdate(BaseModel):
+    daily_limit: Optional[int] = Field(None, ge=1, le=100000)
+    batch_interval_minutes: Optional[int] = Field(None, ge=1, le=1440)
+    batch_size: Optional[int] = Field(None, ge=0, le=5000)
+    rossko_delay_sec: Optional[float] = Field(None, ge=0, le=60)
+    seed_precheck_daily: Optional[int] = Field(None, ge=0, le=100000)
+    seed_precheck_interval_minutes: Optional[int] = Field(None, ge=1, le=1440)
+
+
+def _apply_seo_settings_and_reschedule(db: Session, payload: dict, *, user_id: int | None) -> dict:
+    from app.services.seo_sync_settings_service import (
+        resolve_effective_seo_sync_settings,
+        update_seo_sync_settings,
+    )
+    from app.utils.apscheduler_runtime import reschedule_seo_jobs
+
+    result = update_seo_sync_settings(db, payload, user_id=user_id)
+    eff = resolve_effective_seo_sync_settings(db)
+    result["reschedule"] = reschedule_seo_jobs(
+        batch_interval_minutes=eff.batch_interval_minutes,
+        precheck_interval_minutes=eff.seed_precheck_interval_minutes,
+    )
+    return result
+
+
+@router.get("/seo/new-parts/settings")
+def get_new_parts_seo_settings(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    from app.services.seo_sync_settings_service import get_seo_sync_settings_payload
+
+    return get_seo_sync_settings_payload(db)
+
+
+@router.patch("/seo/new-parts/settings")
+def patch_new_parts_seo_settings(
+    payload: SeoNewPartsSyncSettingsUpdate,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.seo_sync_settings_service import validate_seo_sync_settings_payload
+
+    raw = payload.model_dump(exclude_unset=True)
+    if not raw:
+        raise HTTPException(status_code=400, detail="Нет полей для обновления")
+    try:
+        cleaned = validate_seo_sync_settings_payload(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _apply_seo_settings_and_reschedule(db, cleaned, user_id=current_user.id)
+
+
+@router.post("/seo/new-parts/settings/reset")
+def reset_new_parts_seo_settings(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.seo_sync_settings_service import (
+        reset_seo_sync_settings,
+        resolve_effective_seo_sync_settings,
+    )
+    from app.utils.apscheduler_runtime import reschedule_seo_jobs
+
+    result = reset_seo_sync_settings(db, user_id=current_user.id)
+    eff = resolve_effective_seo_sync_settings(db)
+    result["reschedule"] = reschedule_seo_jobs(
+        batch_interval_minutes=eff.batch_interval_minutes,
+        precheck_interval_minutes=eff.seed_precheck_interval_minutes,
+    )
+    return result
+
+
 @router.post("/seo/new-parts/sync-from-products")
 async def sync_new_parts_seo_from_products_endpoint(
     limit: int | None = Query(
         None,
         ge=1,
         le=1000,
-        description="Максимум новых SEO-карточек за сутки (по умолчанию из .env)",
+        description="Максимум новых SEO-карточек за сутки (по умолчанию из настроек)",
     ),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
@@ -1430,13 +1504,17 @@ async def sync_new_parts_seo_from_products_endpoint(
         append_created_cards_to_new_parts_sitemap,
         sync_new_parts_seo_from_products,
     )
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
     from app.services.sitemap_service import get_new_parts_sitemap_cache_meta
 
     integration = get_or_create_yandex_integration(db)
     host = integration.host_url
+    effective_limit = (
+        limit if limit is not None else resolve_effective_seo_sync_settings(db).daily_limit
+    )
     sync_stats = await sync_new_parts_seo_from_products(
         db,
-        daily_limit=limit if limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT,
+        daily_limit=effective_limit,
     )
     append_created_cards_to_new_parts_sitemap(
         db,

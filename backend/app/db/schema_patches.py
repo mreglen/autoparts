@@ -2713,3 +2713,57 @@ def ensure_payment_methods_tables() -> None:
                 conn.execute(text("ALTER TABLE stock_out ADD COLUMN payment_method VARCHAR(255)"))
             logger.info("Applied stock_out.payment_method column patch")
 
+
+def ensure_seo_new_parts_sync_settings_table() -> None:
+    """Create seo_new_parts_sync_settings singleton (id=1) for runtime SEO rate controls."""
+    inspector = inspect(engine)
+    if "seo_new_parts_sync_settings" in inspector.get_table_names():
+        _seed_seo_sync_settings_row()
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE seo_new_parts_sync_settings (
+            id INTEGER PRIMARY KEY,
+            daily_limit INTEGER,
+            batch_interval_minutes INTEGER,
+            batch_size INTEGER,
+            rossko_delay_sec DOUBLE PRECISION,
+            seed_precheck_daily INTEGER,
+            seed_precheck_interval_minutes INTEGER,
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_by_user_id INTEGER REFERENCES users(id)
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE seo_new_parts_sync_settings (
+            id INTEGER PRIMARY KEY,
+            daily_limit INTEGER,
+            batch_interval_minutes INTEGER,
+            batch_size INTEGER,
+            rossko_delay_sec REAL,
+            seed_precheck_daily INTEGER,
+            seed_precheck_interval_minutes INTEGER,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_by_user_id INTEGER REFERENCES users(id)
+        )
+        """
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+    logger.info("Created seo_new_parts_sync_settings table")
+    _seed_seo_sync_settings_row()
+
+
+def _seed_seo_sync_settings_row() -> None:
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO seo_new_parts_sync_settings (id)
+                SELECT 1
+                WHERE NOT EXISTS (SELECT 1 FROM seo_new_parts_sync_settings WHERE id = 1)
+                """
+            )
+        )
+

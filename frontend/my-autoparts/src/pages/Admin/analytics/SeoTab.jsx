@@ -129,6 +129,223 @@ function ActionButton({ children, onClick, disabled }) {
   );
 }
 
+const SETTINGS_FIELDS = [
+  {
+    key: 'daily_limit',
+    label: 'Дневной лимит карточек',
+    hint: 'Сколько новых карточек создавать за сутки',
+    step: 1,
+  },
+  {
+    key: 'batch_interval_minutes',
+    label: 'Интервал создания (мин)',
+    hint: 'Как часто запускать батч',
+    step: 1,
+  },
+  {
+    key: 'batch_size',
+    label: 'Размер батча',
+    hint: '0 = авто (лимит ÷ число тиков в сутки)',
+    step: 1,
+  },
+  {
+    key: 'rossko_delay_sec',
+    label: 'Задержка Rossko (сек)',
+    hint: 'Пауза между запросами к поставщику',
+    step: 0.1,
+  },
+  {
+    key: 'seed_precheck_daily',
+    label: 'Лимит precheck / сутки',
+    hint: 'Проверок наличия в очереди за день',
+    step: 1,
+  },
+  {
+    key: 'seed_precheck_interval_minutes',
+    label: 'Интервал precheck (мин)',
+    hint: 'Как часто проверять очередь',
+    step: 1,
+  },
+];
+
+function SeoSyncRatePanel({ onSaved }) {
+  const [form, setForm] = useState(() =>
+    Object.fromEntries(SETTINGS_FIELDS.map((f) => [f.key, ''])),
+  );
+  const [sources, setSources] = useState({});
+  const [defaults, setDefaults] = useState({});
+  const [resolvedBatch, setResolvedBatch] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const loadSettings = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await apiRequest('/admin/seo/new-parts/settings');
+      const effective = data?.effective || {};
+      setForm(
+        Object.fromEntries(
+          SETTINGS_FIELDS.map((f) => [f.key, effective[f.key] ?? '']),
+        ),
+      );
+      setSources(data?.sources || {});
+      setDefaults(data?.defaults || {});
+      setResolvedBatch(effective.resolved_batch_size ?? null);
+    } catch (e) {
+      setError(e?.message || 'Не удалось загрузить настройки');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  const setField = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setMessage('');
+  };
+
+  const buildPayload = () => {
+    const payload = {};
+    for (const field of SETTINGS_FIELDS) {
+      const raw = String(form[field.key] ?? '').trim();
+      if (raw === '') continue;
+      payload[field.key] = field.key === 'rossko_delay_sec' ? Number(raw) : parseInt(raw, 10);
+    }
+    return payload;
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      const payload = buildPayload();
+      if (!Object.keys(payload).length) {
+        throw new Error('Заполните хотя бы одно поле');
+      }
+      const data = await apiRequest('/admin/seo/new-parts/settings', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      const effective = data?.effective || {};
+      setForm(
+        Object.fromEntries(
+          SETTINGS_FIELDS.map((f) => [f.key, effective[f.key] ?? '']),
+        ),
+      );
+      setSources(data?.sources || {});
+      setDefaults(data?.defaults || {});
+      setResolvedBatch(effective.resolved_batch_size ?? null);
+      setMessage('Сохранено. Изменения применяются сразу.');
+      await onSaved?.();
+    } catch (e) {
+      setError(e?.message || 'Не удалось сохранить');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const reset = async () => {
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      const data = await apiRequest('/admin/seo/new-parts/settings/reset', {
+        method: 'POST',
+      });
+      const effective = data?.effective || {};
+      setForm(
+        Object.fromEntries(
+          SETTINGS_FIELDS.map((f) => [f.key, effective[f.key] ?? '']),
+        ),
+      );
+      setSources(data?.sources || {});
+      setDefaults(data?.defaults || {});
+      setResolvedBatch(effective.resolved_batch_size ?? null);
+      setMessage('Сброшено к значениям из .env');
+      await onSaved?.();
+    } catch (e) {
+      setError(e?.message || 'Не удалось сбросить');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded border border-gray-200 bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">Скорость создания карточек</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Лимит, частота и задержка Rossko. Можно менять в любой момент без перезапуска.
+          </p>
+        </div>
+        {resolvedBatch != null ? (
+          <p className="text-sm text-gray-500">
+            Эффективный батч: <span className="font-medium tabular-nums text-gray-800">{resolvedBatch}</span>
+          </p>
+        ) : null}
+      </div>
+
+      {loading ? (
+        <p className="mt-4 text-sm text-gray-500">Загрузка настроек…</p>
+      ) : (
+        <>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {SETTINGS_FIELDS.map((field) => (
+              <label key={field.key} className="block">
+                <span className="flex items-center justify-between gap-2 text-sm text-gray-700">
+                  <span>{field.label}</span>
+                  <span className="text-xs text-gray-400">
+                    {sources[field.key] === 'db' ? 'вручную' : '.env'}
+                  </span>
+                </span>
+                <input
+                  type="number"
+                  step={field.step}
+                  value={form[field.key]}
+                  onChange={(e) => setField(field.key, e.target.value)}
+                  className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm tabular-nums focus:border-gray-500 focus:outline-none"
+                />
+                <span className="mt-1 block text-xs text-gray-500">
+                  {field.hint}
+                  {defaults[field.key] != null ? ` · .env: ${defaults[field.key]}` : ''}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-40"
+            >
+              {saving ? '…' : 'Сохранить'}
+            </button>
+            <ActionButton onClick={reset} disabled={saving}>
+              Сбросить к .env
+            </ActionButton>
+            <ActionButton onClick={loadSettings} disabled={saving}>
+              Обновить
+            </ActionButton>
+          </div>
+        </>
+      )}
+
+      {message ? <p className="mt-3 text-sm text-green-800">{message}</p> : null}
+      {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+    </div>
+  );
+}
+
 export default function SeoTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -268,6 +485,8 @@ export default function SeoTab() {
           <p className="mt-2 text-sm text-amber-800">Кэш sitemap устарел — дождитесь ночной пересборки.</p>
         ) : null}
       </div>
+
+      <SeoSyncRatePanel onSaved={load} />
 
       <SeedQueuePanel quota={seoStats?.quota} />
 

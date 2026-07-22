@@ -60,8 +60,13 @@ def increment_created_by_source(db: Session, source: str, *, amount: int = 1) ->
     return counts
 
 
-def source_quota_cap(source: str, *, daily_limit: int | None = None) -> int:
-    limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
+def source_quota_cap(source: str, *, daily_limit: int | None = None, db: Session | None = None) -> int:
+    if daily_limit is not None:
+        limit = daily_limit
+    else:
+        from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+        limit = resolve_effective_seo_sync_settings(db).daily_limit
     share = get_source_daily_shares().get(source, 0.0)
     if share <= 0:
         return 0
@@ -74,7 +79,7 @@ def source_has_quota_remaining(
     *,
     daily_limit: int | None = None,
 ) -> bool:
-    cap = source_quota_cap(source, daily_limit=daily_limit)
+    cap = source_quota_cap(source, daily_limit=daily_limit, db=db)
     if cap <= 0:
         return False
     created = count_cards_created_today_by_source(db).get(source, 0)
@@ -95,15 +100,25 @@ def _today_utc() -> date:
     return _utcnow().date()
 
 
-def get_expected_created_by_now(*, daily_limit: int | None = None) -> int:
-    limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
+def get_expected_created_by_now(*, daily_limit: int | None = None, db: Session | None = None) -> int:
+    if daily_limit is not None:
+        limit = daily_limit
+    else:
+        from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+        limit = resolve_effective_seo_sync_settings(db).daily_limit
     now = _utcnow()
     hour_fraction = now.hour / 24.0
     return int(math.floor(hour_fraction * limit))
 
 
 def is_behind_quota(db: Session, *, daily_limit: int | None = None, slack: int | None = None) -> bool:
-    limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
+    if daily_limit is not None:
+        limit = daily_limit
+    else:
+        from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+        limit = resolve_effective_seo_sync_settings(db).daily_limit
     slack_value = slack if slack is not None else settings.NEW_PARTS_SEO_CATCHUP_SLACK
     created = _count_created_today(db)
     expected = get_expected_created_by_now(daily_limit=limit)
@@ -161,7 +176,9 @@ def cross_recurse_budget_remaining(db: Session) -> int:
 
 
 def precheck_budget_remaining(db: Session) -> int:
-    limit = int(settings.NEW_PARTS_SEO_SEED_PRECHECK_DAILY or 0)
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+    limit = int(resolve_effective_seo_sync_settings(db).seed_precheck_daily or 0)
     if limit <= 0:
         return 0
     return max(0, limit - count_precheck_calls_today(db))
@@ -231,7 +248,10 @@ def get_seed_conversion_by_source(db: Session) -> dict[str, dict[str, object]]:
 
 
 def get_quota_status(db: Session, *, daily_limit: int | None = None) -> dict[str, object]:
-    limit = daily_limit if daily_limit is not None else settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+    eff = resolve_effective_seo_sync_settings(db)
+    limit = daily_limit if daily_limit is not None else int(eff.daily_limit)
     created_today = _count_created_today(db)
     expected = get_expected_created_by_now(daily_limit=limit)
     ready_count = count_seed_queue_by_status(db, "ready")
@@ -240,7 +260,7 @@ def get_quota_status(db: Session, *, daily_limit: int | None = None) -> dict[str
     behind = is_behind_quota(db, daily_limit=limit)
     recurse_limit = int(settings.NEW_PARTS_SEO_CROSS_RECURSE_DAILY or 0)
     recurse_used = count_cross_recurse_calls_today(db)
-    precheck_limit = int(settings.NEW_PARTS_SEO_SEED_PRECHECK_DAILY or 0)
+    precheck_limit = int(eff.seed_precheck_daily or 0)
     precheck_used = count_precheck_calls_today(db)
     guaranteed_ceiling = min(limit, ready_count + created_today) if ready_count else created_today
     pool_days_estimate = round(ready_count / limit, 1) if limit > 0 and ready_count else 0.0

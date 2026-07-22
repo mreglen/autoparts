@@ -34,6 +34,7 @@ from app.db.schema_patches import (
     ensure_product_photo_thumb_url_column,
     ensure_rossko_settings_table,
     ensure_rossko_settings_row_defaults,
+    ensure_seo_new_parts_sync_settings_table,
     ensure_garage_new_order_rossko_columns,
     ensure_garage_new_order_item_seo_card_column,
     ensure_garage_new_order_user_id_column,
@@ -101,6 +102,7 @@ import app.models.seo_product_url_export  # noqa: F401 — SEO URL export tracki
 import app.models.seo_new_part_url_export  # noqa: F401 — Rossko SEO URL export tracking
 import app.models.seo_sitemap_cache  # noqa: F401 — SEO sitemap cache
 import app.models.rossko_settings  # noqa: F401 — Rossko checkout settings
+import app.models.seo_new_parts_sync_settings  # noqa: F401 — SEO sync rate overrides
 import app.models.new_parts_checkout_session  # noqa: F401 — YooKassa checkout sessions
 import app.models.yookassa_payment  # noqa: F401 — YooKassa payments
 import app.models.new_parts_seo_card  # noqa: F401 — SEO cards for supplier new parts
@@ -192,6 +194,7 @@ try:
     ensure_product_photo_thumb_url_column()
     ensure_rossko_settings_table()
     ensure_rossko_settings_row_defaults()
+    ensure_seo_new_parts_sync_settings_table()
     ensure_garage_new_order_rossko_columns()
     ensure_garage_new_order_item_seo_card_column()
     ensure_garage_new_order_user_id_column()
@@ -300,7 +303,20 @@ async def startup_event():
         return
 
     scheduler = AsyncIOScheduler()
-    
+
+    from app.db.database import SessionLocal
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+    from app.utils.apscheduler_runtime import set_apscheduler
+
+    seo_db = SessionLocal()
+    try:
+        seo_eff = resolve_effective_seo_sync_settings(seo_db)
+    finally:
+        seo_db.close()
+
+    seo_sync_interval = seo_eff.batch_interval_minutes
+    seo_precheck_interval = seo_eff.seed_precheck_interval_minutes
+
     scheduler.add_job(
         func=run_cleanup_expired_sessions,
         trigger=IntervalTrigger(hours=1),
@@ -331,7 +347,7 @@ async def startup_event():
     )
     scheduler.add_job(
         func=run_new_parts_seo_sync_tick,
-        trigger=IntervalTrigger(minutes=settings.NEW_PARTS_SEO_SYNC_BATCH_INTERVAL_MINUTES),
+        trigger=IntervalTrigger(minutes=seo_sync_interval),
         id="new_parts_seo_sync_batch",
         name="Rossko SEO cards micro-batch sync",
         replace_existing=True,
@@ -345,7 +361,7 @@ async def startup_event():
     )
     scheduler.add_job(
         func=run_seo_seed_precheck_tick,
-        trigger=IntervalTrigger(minutes=settings.NEW_PARTS_SEO_SEED_PRECHECK_INTERVAL_MINUTES),
+        trigger=IntervalTrigger(minutes=seo_precheck_interval),
         id="seo_rossko_seed_precheck",
         name="Rossko SEO seed queue pre-check",
         replace_existing=True,
@@ -380,7 +396,12 @@ async def startup_event():
     )
     
     scheduler.start()
-    logger.info("Scheduler started. Expired session cleanup job scheduled.")
+    set_apscheduler(scheduler)
+    logger.info(
+        "Scheduler started. SEO sync every %s min, precheck every %s min.",
+        seo_sync_interval,
+        seo_precheck_interval,
+    )
     _scheduler_renew_task = asyncio.create_task(_scheduler_leader_renew_loop())
 
     try:
@@ -468,6 +489,9 @@ async def shutdown_event():
         scheduler.shutdown()
         logger.info("Scheduler уничтожен")
         scheduler = None
+        from app.utils.apscheduler_runtime import set_apscheduler
+
+        set_apscheduler(None)
 
     if _scheduler_leader:
         release_scheduler_lock()

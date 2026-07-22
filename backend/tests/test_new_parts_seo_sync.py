@@ -439,21 +439,27 @@ class SyncNewPartsSeoFromProductsTests(unittest.TestCase):
 
 
 class SeoSyncBatchSettingsTests(unittest.TestCase):
-    @patch("app.services.new_parts_seo_sync_service.settings")
+    @patch("app.services.seo_sync_settings_service.settings")
     def test_auto_batch_size_from_daily_limit(self, mock_settings):
         mock_settings.NEW_PARTS_SEO_SYNC_BATCH_SIZE = 0
         mock_settings.NEW_PARTS_SEO_SYNC_BATCH_INTERVAL_MINUTES = 30
         mock_settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT = 1000
+        mock_settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC = 0.2
+        mock_settings.NEW_PARTS_SEO_SEED_PRECHECK_DAILY = 1500
+        mock_settings.NEW_PARTS_SEO_SEED_PRECHECK_INTERVAL_MINUTES = 30
 
         from app.services.new_parts_seo_sync_service import get_seo_sync_batch_size
 
         self.assertEqual(get_seo_sync_batch_size(), 21)
 
-    @patch("app.services.new_parts_seo_sync_service.settings")
+    @patch("app.services.seo_sync_settings_service.settings")
     def test_configured_batch_size_override(self, mock_settings):
         mock_settings.NEW_PARTS_SEO_SYNC_BATCH_SIZE = 50
         mock_settings.NEW_PARTS_SEO_SYNC_BATCH_INTERVAL_MINUTES = 30
         mock_settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT = 1000
+        mock_settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC = 0.2
+        mock_settings.NEW_PARTS_SEO_SEED_PRECHECK_DAILY = 1500
+        mock_settings.NEW_PARTS_SEO_SEED_PRECHECK_INTERVAL_MINUTES = 30
 
         from app.services.new_parts_seo_sync_service import get_seo_sync_batch_size
 
@@ -513,25 +519,22 @@ class CountSeoCardsCreatedTodayTests(unittest.TestCase):
 
 
 class QuotaCatchupTests(unittest.TestCase):
-    @patch("app.services.seo_quota_service.settings")
-    def test_expected_created_scales_with_hour(self, mock_settings):
-        mock_settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT = 1000
+    def test_expected_created_scales_with_hour(self):
         with patch(
             "app.services.seo_quota_service._utcnow",
             return_value=datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc),
         ):
-            self.assertEqual(get_expected_created_by_now(), 500)
+            self.assertEqual(get_expected_created_by_now(daily_limit=1000), 500)
 
     @patch("app.services.seo_quota_service._count_created_today", return_value=100)
     @patch("app.services.seo_quota_service.settings")
     def test_is_behind_when_created_below_expected_minus_slack(self, mock_settings, _count):
-        mock_settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT = 1000
         mock_settings.NEW_PARTS_SEO_CATCHUP_SLACK = 50
         with patch(
             "app.services.seo_quota_service._utcnow",
             return_value=datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc),
         ):
-            self.assertTrue(is_behind_quota(MagicMock()))
+            self.assertTrue(is_behind_quota(MagicMock(), daily_limit=1000))
 
 
 if __name__ == "__main__":

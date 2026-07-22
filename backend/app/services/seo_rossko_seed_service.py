@@ -680,8 +680,9 @@ def _resolve_precheck_batch_size(db: Session, requested: int | None) -> int:
     ready_count = count_seed_queue_by_status(db, "ready")
     target = int(settings.NEW_PARTS_SEO_SEED_READY_TARGET or 1500)
     from app.services.new_parts_seo_sync_service import count_seo_cards_created_today
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
 
-    daily_limit = int(settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT or 1000)
+    daily_limit = int(resolve_effective_seo_sync_settings(db).daily_limit)
     created_today = count_seo_cards_created_today(db)
     deficit = max(0, daily_limit - created_today)
 
@@ -783,7 +784,9 @@ async def run_seed_precheck_batch(db: Session, *, max_checks: int | None = None)
     rows = _select_pending_seed_rows_fair(db, limit=limit)
 
     stats = {"checked": 0, "ready": 0, "not_found": 0, "skipped": 0, "reactivated": 0}
-    delay = float(settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC or 0)
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+    delay = float(resolve_effective_seo_sync_settings(db).rossko_delay_sec or 0)
 
     import asyncio
 
@@ -809,8 +812,9 @@ async def run_seed_precheck_batch(db: Session, *, max_checks: int | None = None)
 async def maybe_run_precheck_boost(db: Session) -> dict[str, int] | None:
     ready_count = count_seed_queue_by_status(db, "ready")
     from app.services.new_parts_seo_sync_service import count_seo_cards_created_today
+    from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
 
-    daily_limit = int(settings.NEW_PARTS_SEO_SYNC_DAILY_LIMIT or 1000)
+    daily_limit = int(resolve_effective_seo_sync_settings(db).daily_limit)
     created_today = count_seo_cards_created_today(db)
     deficit = max(0, daily_limit - created_today)
     if ready_count >= deficit or precheck_budget_remaining(db) <= 0:

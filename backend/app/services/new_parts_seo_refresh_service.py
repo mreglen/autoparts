@@ -50,7 +50,12 @@ async def refresh_new_parts_seo_cards(
     rossko_delay_sec: float | None = None,
 ) -> RefreshResult:
     limit = batch_size if batch_size is not None else settings.NEW_PARTS_SEO_REFRESH_BATCH_SIZE
-    delay = rossko_delay_sec if rossko_delay_sec is not None else settings.NEW_PARTS_SEO_SYNC_ROSSKO_DELAY_SEC
+    if rossko_delay_sec is not None:
+        delay = rossko_delay_sec
+    else:
+        from app.services.seo_sync_settings_service import resolve_effective_seo_sync_settings
+
+        delay = resolve_effective_seo_sync_settings(db).rossko_delay_sec
     result = RefreshResult()
     cards = iter_cards_for_refresh(db, limit=limit)
     result.candidates = len(cards)
