@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Response
-from fastapi.staticfiles import StaticFiles
+from app.utils.cached_static_files import CachedStaticFiles, CACHE_CONTROL_IMMUTABLE
 from app.db.database import Base, engine
 from app.db.schema_patches import (
     ensure_avito_order_fulfillment_columns,
@@ -668,25 +668,29 @@ from pathlib import Path
 
 uploads_dir = Path(__file__).parent.parent / "uploads"
 if uploads_dir.exists():
-    app.mount("/uploads", StaticFiles(directory=str(uploads_dir)), name="uploads")
+    app.mount("/uploads", CachedStaticFiles(directory=str(uploads_dir)), name="uploads")
 else:
     logger.error(f"Каталог загрузок не найден: {uploads_dir}")
 
 pictures_dir = Path(__file__).parent.parent / "uploads" / "pictures"
 if pictures_dir.exists():
-    app.mount("/pictures", StaticFiles(directory=str(pictures_dir)), name="pictures")
+    app.mount("/pictures", CachedStaticFiles(directory=str(pictures_dir)), name="pictures")
 else:
     logger.error(f"Каталог изображений не найден: {pictures_dir}")
 
 videos_dir = Path(__file__).parent.parent / "uploads" / "videos"
 if videos_dir.exists():
-    app.mount("/videos", StaticFiles(directory=str(videos_dir)), name="videos")
+    app.mount("/videos", CachedStaticFiles(directory=str(videos_dir)), name="videos")
 else:
     logger.error(f"Каталог видео не найден: {videos_dir}")
 
 vehicle_pictures_dir = Path(__file__).parent.parent / "uploads" / "vehicle_pictures"
 if vehicle_pictures_dir.exists():
-    app.mount("/vehicle_pictures", StaticFiles(directory=str(vehicle_pictures_dir)), name="vehicle_pictures")
+    app.mount(
+        "/vehicle_pictures",
+        CachedStaticFiles(directory=str(vehicle_pictures_dir)),
+        name="vehicle_pictures",
+    )
 else:
     logger.error(f"Каталог vehicle_pictures не найден: {vehicle_pictures_dir}")
 
@@ -730,8 +734,11 @@ async def get_media_file(path: str):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "*"
+    if not path.startswith("temp/"):
+        response.headers["Cache-Control"] = CACHE_CONTROL_IMMUTABLE
+    else:
+        response.headers["Cache-Control"] = "no-store"
     return response
-
 
 @app.get("/")
 def read_root():

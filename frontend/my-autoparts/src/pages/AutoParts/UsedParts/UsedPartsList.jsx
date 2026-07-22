@@ -33,14 +33,16 @@ import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHea
 import { fetchFavoriteStatusesBatch } from '../../../redux/slices/UserEngagementSlice';
 import { useAuthReady } from '../../../hooks/useAuthReady';
 import { productFavoriteKey } from '../../../utils/favoriteKeys';
+import { prefetchListImages } from '../../../utils/prefetchListImages';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
 const VIRTUALIZE_THRESHOLD = 24;
 const GRID_ROW_ESTIMATE_PX = 380;
 const LIST_ROW_ESTIMATE_PX = 220;
-const VIRTUAL_OVERSCAN = 3;
+const VIRTUAL_OVERSCAN = 7;
 const LOAD_MORE_ROOT_MARGIN = '350px';
+const LIST_IMAGE_PREFETCH_LIMIT = 40;
 
 function getGridColumnCount(width) {
   if (width >= 1280) return 4;
@@ -324,6 +326,16 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
       dispatch(fetchFavoriteStatusesBatch(ids.slice(i, i + 100)));
     }
   }, [dispatch, catalogItems, analogParts, favoriteByKey, isReady, isAuthenticated, token]);
+
+  useEffect(() => {
+    const parts = [...(catalogItems || []), ...(analogParts || [])];
+    if (!parts.length) return undefined;
+    // Defer slightly so first eager LCP imgs keep network priority.
+    const timer = window.setTimeout(() => {
+      prefetchListImages(parts, { limit: LIST_IMAGE_PREFETCH_LIMIT });
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [catalogItems, analogParts]);
 
   const isInitialLoad = catalogLoading && catalogItems.length === 0;
   const status = isInitialLoad ? 'loading' : 'idle';
