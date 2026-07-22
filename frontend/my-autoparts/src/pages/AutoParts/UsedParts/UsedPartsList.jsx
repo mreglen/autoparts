@@ -33,16 +33,14 @@ import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHea
 import { fetchFavoriteStatusesBatch } from '../../../redux/slices/UserEngagementSlice';
 import { useAuthReady } from '../../../hooks/useAuthReady';
 import { productFavoriteKey } from '../../../utils/favoriteKeys';
-import { prefetchListImages } from '../../../utils/prefetchListImages';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
 const VIRTUALIZE_THRESHOLD = 24;
 const GRID_ROW_ESTIMATE_PX = 380;
 const LIST_ROW_ESTIMATE_PX = 220;
-const VIRTUAL_OVERSCAN = 7;
-const LOAD_MORE_ROOT_MARGIN = '350px';
-const LIST_IMAGE_PREFETCH_LIMIT = 40;
+const VIRTUAL_OVERSCAN = 4;
+const LOAD_MORE_ROOT_MARGIN = '500px';
 
 function getGridColumnCount(width) {
   if (width >= 1280) return 4;
@@ -273,6 +271,15 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     }
   }, [catalogLoadingMore]);
 
+  // Safety: never leave load-more permanently locked if a request stalls/aborts oddly.
+  useEffect(() => {
+    if (!catalogLoadingMore && !loadMoreInFlightRef.current) return undefined;
+    const timer = window.setTimeout(() => {
+      loadMoreInFlightRef.current = false;
+    }, 15000);
+    return () => window.clearTimeout(timer);
+  }, [catalogLoadingMore, catalogItems.length]);
+
   const catalogHasMore = isCatalogMode && catalogHasMoreFromStore;
   const { storageLocations, data: organization } = useSelector((state) => state.organization);
   const user = useSelector((state) => state.auth.user);
@@ -327,16 +334,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     }
   }, [dispatch, catalogItems, analogParts, favoriteByKey, isReady, isAuthenticated, token]);
 
-  useEffect(() => {
-    const parts = [...(catalogItems || []), ...(analogParts || [])];
-    if (!parts.length) return undefined;
-    // Defer slightly so first eager LCP imgs keep network priority.
-    const timer = window.setTimeout(() => {
-      prefetchListImages(parts, { limit: LIST_IMAGE_PREFETCH_LIMIT });
-    }, 50);
-    return () => window.clearTimeout(timer);
-  }, [catalogItems, analogParts]);
-
   const isInitialLoad = catalogLoading && catalogItems.length === 0;
   const status = isInitialLoad ? 'loading' : 'idle';
 
@@ -357,24 +354,6 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
       append: true,
     }));
   }, [isCatalogMode, dispatch]);
-
-  useEffect(() => {
-    if (!isCatalogMode || !catalogHasMore) {
-      return undefined;
-    }
-    const sentinel = loadMoreSentinelRef.current;
-    if (!sentinel) return undefined;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries[0]?.isIntersecting) return;
-        loadMoreCatalog();
-      },
-      { root: null, rootMargin: LOAD_MORE_ROOT_MARGIN, threshold: 0 }
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [isCatalogMode, catalogHasMore, loadMoreCatalog]);
 
   const activeFilters = useMemo(() => ({
     partTypes: searchParams.getAll('part_type'),
@@ -530,7 +509,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     if (!shouldVirtualize || !isCatalogMode || !catalogHasMore) return;
     const lastVisibleIndex = viewMode === 'grid' ? gridVirtualEndIndex : listVirtualEndIndex;
     const totalCount = viewMode === 'grid' ? gridRows.length : sortedAvailableParts.length;
-    if (totalCount > 0 && lastVisibleIndex >= totalCount - 2) {
+    if (totalCount > 0 && lastVisibleIndex >= totalCount - 4) {
       loadMoreCatalog();
     }
   }, [
@@ -543,6 +522,32 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     gridRows.length,
     sortedAvailableParts.length,
     loadMoreCatalog,
+  ]);
+
+  useEffect(() => {
+    if (!isCatalogMode || !catalogHasMore) {
+      return undefined;
+    }
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel) return undefined;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        loadMoreCatalog();
+      },
+      { root: null, rootMargin: LOAD_MORE_ROOT_MARGIN, threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [
+    isCatalogMode,
+    catalogHasMore,
+    loadMoreCatalog,
+    shouldVirtualize,
+    viewMode,
+    sortedAvailableParts.length,
+    catalogLoadingMore,
   ]);
 
   const buildProductCardPart = useCallback((part) => ({
@@ -872,7 +877,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
             </div>
           )}
 
-          {isCatalogMode && catalogHasMore && !shouldVirtualize && (
+          {isCatalogMode && catalogHasMore && (
             <div ref={loadMoreSentinelRef} className="mt-6 min-h-4" aria-hidden="true">
               {catalogLoadingMore && (
                 viewMode === 'list'

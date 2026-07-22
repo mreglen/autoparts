@@ -1210,12 +1210,14 @@ const productSlice = createSlice({
                 }
             })
             .addCase(fetchCatalogProducts.rejected, (state, action) => {
+                const append = Boolean(action.meta?.arg?.append);
+                // Always clear loading flags so infinite-scroll cannot stick forever
+                // (aborted requests previously returned early and left catalogLoadingMore=true).
+                state.catalogLoading = false;
+                state.catalogLoadingMore = false;
                 if (action.meta?.aborted || action.payload?.aborted) {
                     return;
                 }
-                const append = Boolean(action.meta?.arg?.append);
-                state.catalogLoading = false;
-                state.catalogLoadingMore = false;
                 if (!append) {
                     state.error = action.payload;
                     state.catalogItems = [];
