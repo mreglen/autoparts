@@ -808,6 +808,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   part={productCardPartsMap.get(part.id)}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
+                  hideWarehouse={true}
                 />
               ))}
             </div>
@@ -837,6 +838,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                         part={productCardPartsMap.get(part.id)}
                         isTestOrganization={true}
                         hideConditionAndQuantity={true}
+                        hideWarehouse={true}
                       />
                     ))}
                   </div>
@@ -911,6 +913,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                   part={productCardPartsMap.get(part.id)}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
+                  hideWarehouse={true}
                 />
               ))}
             </div>
