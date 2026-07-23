@@ -47,6 +47,7 @@ from app.services.organization_clients import (
 )
 from app.services.photo_localization import (
     format_failures_for_output,
+    list_orgs_with_avito_photos,
     migrate_external_product_photos,
 )
 from app.services.internal_code_migration import (
@@ -129,6 +130,7 @@ class OrdersV2MigrationResponse(BaseModel):
 class PhotoLocalizationAdminRequest(BaseModel):
     dry_run: bool = False
     org_id: Optional[str] = None
+    org_ids: Optional[List[str]] = None
     all_external: bool = False
     limit: Optional[int] = Field(None, ge=1, le=50000)
     failure_limit: int = Field(30, ge=1, le=200)
@@ -142,6 +144,17 @@ class PhotoLocalizationFailure(BaseModel):
     reason: str
 
 
+class PhotoLocalizationOrgResult(BaseModel):
+    org_id: str
+    org_name: str = ""
+    avito_photo_count: int = 0
+    scanned: int = 0
+    matched: int = 0
+    migrated: int = 0
+    failed: int = 0
+    skipped: int = 0
+
+
 class PhotoLocalizationAdminResponse(BaseModel):
     dry_run: bool
     scanned: int
@@ -150,6 +163,18 @@ class PhotoLocalizationAdminResponse(BaseModel):
     failed: int
     skipped: int
     failures: List[PhotoLocalizationFailure]
+    by_org: List[PhotoLocalizationOrgResult] = []
+
+
+class PhotoLocalizationOrgPreview(BaseModel):
+    org_id: str
+    org_name: str = ""
+    avito_photo_count: int = 0
+
+
+class PhotoLocalizationOrgsResponse(BaseModel):
+    organizations: List[PhotoLocalizationOrgPreview]
+    total_avito_photos: int = 0
 
 
 class InternalCodeMigrationRequest(BaseModel):
@@ -324,16 +349,43 @@ def migrate_orders_v2_down(
     )
 
 
+@router.get("/photos/localize-external/orgs", response_model=PhotoLocalizationOrgsResponse)
+def list_photo_localization_orgs(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    rows = list_orgs_with_avito_photos(db)
+    organizations = [
+        PhotoLocalizationOrgPreview(
+            org_id=row.org_id,
+            org_name=row.org_name,
+            avito_photo_count=row.avito_photo_count,
+        )
+        for row in rows
+    ]
+    return PhotoLocalizationOrgsResponse(
+        organizations=organizations,
+        total_avito_photos=sum(row.avito_photo_count for row in rows),
+    )
+
+
 @router.post("/photos/localize-external", response_model=PhotoLocalizationAdminResponse)
 def localize_external_product_photos_admin(
     payload: PhotoLocalizationAdminRequest,
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
+    org_ids = [str(v).strip() for v in (payload.org_ids or []) if str(v or "").strip()]
+    if not org_ids and not (payload.org_id or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Выберите хотя бы одну организацию (org_ids)",
+        )
     result = migrate_external_product_photos(
         db,
         dry_run=payload.dry_run,
         org_id=payload.org_id,
+        org_ids=org_ids or None,
         process_all_external=payload.all_external,
         row_limit=payload.limit,
         per_photo_timeout_s=payload.per_photo_timeout_s,
@@ -341,6 +393,19 @@ def localize_external_product_photos_admin(
     )
     counters = result.counters
     failures = format_failures_for_output(result.failures, limit=payload.failure_limit)
+    by_org = [
+        PhotoLocalizationOrgResult(
+            org_id=row.org_id,
+            org_name=row.org_name,
+            avito_photo_count=row.avito_photo_count,
+            scanned=row.scanned,
+            matched=row.matched,
+            migrated=row.migrated,
+            failed=row.failed,
+            skipped=row.skipped,
+        )
+        for row in result.by_org
+    ]
     log_audit(
         db,
         event_type="admin_photo_localization_run",
@@ -350,6 +415,7 @@ def localize_external_product_photos_admin(
         details={
             "dry_run": payload.dry_run,
             "org_id": payload.org_id,
+            "org_ids": org_ids or ([payload.org_id] if payload.org_id else []),
             "all_external": payload.all_external,
             "limit": payload.limit,
             "scanned": counters.scanned,
@@ -367,6 +433,7 @@ def localize_external_product_photos_admin(
         failed=counters.failed,
         skipped=counters.skipped,
         failures=failures,
+        by_org=by_org,
     )
 
 
