@@ -202,14 +202,15 @@ class ProductSeoMetaIntegrationTests(unittest.TestCase):
         self.assertIn('prefix="og: http://ogp.me/ns# product: http://ogp.me/ns/product#"', html)
         self.assertIn('"@type": "Product"', html)
         self.assertIn('"@type": "BreadcrumbList"', html)
-        self.assertIn('"@type": "FAQPage"', html)
+        self.assertNotIn('"@type": "FAQPage"', html)
 
     def test_prerender_html_has_no_noindex(self):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
         html = render_product_prerender_html(meta)
         self.assertIn("MANN IF1009 Масляный фильтр", html)
-        self.assertIn("О запчасти", html)
-        self.assertIn("Частые вопросы", html)
+        self.assertNotIn("О запчасти", html)
+        self.assertNotIn("Частые вопросы", html)
+        self.assertIn("Гарантия и возврат", html)
         self.assertNotIn("noindex", html)
         self.assertNotIn("Открыть карточку", html)
         self.assertNotIn("Цена:", html)

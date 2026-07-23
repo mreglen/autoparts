@@ -231,11 +231,12 @@ class ProductSeoServiceJsonLdIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(json_ld["name"], meta.schema_name)
 
-    def test_prerender_html_contains_faq_details(self):
+    def test_prerender_html_omits_generated_seo_faq(self):
         meta = build_product_seo_meta(self._make_product(), site_origin="https://svoygarage.ru")
         html = render_product_prerender_html(meta)
-        self.assertIn("<details>", html)
-        self.assertIn("Частые вопросы", html)
+        self.assertNotIn("<details>", html)
+        self.assertNotIn("Частые вопросы", html)
+        self.assertNotIn("О запчасти", html)
 
 
 class ProductPageH1Tests(unittest.TestCase):

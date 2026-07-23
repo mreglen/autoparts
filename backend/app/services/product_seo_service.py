@@ -19,7 +19,6 @@ from app.services.spa_page_check_service import PART_PATH_RE, _normalize_path
 from app.services.yandex_feed_xml_service import _absolute_photo_url, _resolve_site_origin
 from app.utils.page_keywords import build_page_keywords
 from app.utils.product_display_name import extract_product_description, format_product_display_title
-from app.utils.product_part_faq import build_product_faq_items, build_product_faq_json_ld
 from app.utils.product_json_ld import (
     build_catalog_product_json_ld,
     build_json_ld_script_tags,
@@ -400,18 +399,6 @@ def build_product_json_ld_graph(
                 "mainEntity": {"@id": f"{canonical_url}#product"},
             }
         )
-        graph.append(
-            build_product_faq_json_ld(
-                canonical_url=canonical_url,
-                brand=brand,
-                article=article,
-                part_type_name=part_type_name,
-                is_new=is_new,
-                city=city,
-                fitment_text=fitment_text,
-                in_stock=in_stock,
-            )
-        )
 
     if len(graph) == 1:
         graph_obj = {"@context": "https://schema.org", **graph[0]}
@@ -470,7 +457,6 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
     description = html.escape(meta.description, quote=True)
     canonical = html.escape(meta.canonical_url, quote=True)
     h1 = html.escape(meta.h1)
-    about_text = html.escape(meta.body_description or meta.seo_summary or meta.description)
     image_tag = (
         f'<meta property="og:image" content="{html.escape(meta.image_url, quote=True)}" />'
         if meta.image_url
@@ -587,10 +573,6 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
         "</dl>\n"
     )
 
-    about_html = (
-        f"    <h2>О запчасти</h2>\n"
-        f"    <p>{about_text}</p>\n"
-    )
     delivery_html = (
         "    <h2>Доставка и оплата</h2>\n"
         "    <p>Доставка по России и самовывоз у продавца. Способы оплаты и сроки "
@@ -598,16 +580,15 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
         f'<a href="{html.escape(site_origin, quote=True)}/delivery">страница «Доставка»</a>.</p>\n'
     )
     warranty_html = (
-        "    <h2>Гарантия и осмотр</h2>\n"
-        "    <p>Б/у запчасть рекомендуется осмотреть перед покупкой или запросить "
-        "дополнительные фото и видео у продавца. Условия возврата и гарантии "
-        "уточняйте у продавца до оплаты.</p>\n"
+        "    <h2>Гарантия и возврат</h2>\n"
+        "    <p>Б/у запчасть продаётся в текущем состоянии. Возврат и обмен — только "
+        "по договорённости с продавцом до установки. Условия уточняйте до оплаты.</p>\n"
     )
     if meta.condition_label == "Новая":
         warranty_html = (
-            "    <h2>Гарантия и комплектация</h2>\n"
-            "    <p>Новая запчасть. Состояние упаковки, комплектацию и условия "
-            "гарантии уточняйте у продавца до оплаты.</p>\n"
+            "    <h2>Гарантия и возврат</h2>\n"
+            "    <p>Условия гарантии, сроки и комплектацию новой детали уточняйте у продавца "
+            "до оплаты. Возврат — по договорённости с продавцом и правилам платформы.</p>\n"
         )
 
     fitment_html = ""
@@ -627,26 +608,6 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
             f"    <h2>Другие предложения {html.escape(meta.brand)} {html.escape(meta.article)}</h2>\n"
             f"    <ul>{items}</ul>\n"
         )
-
-    faq_items = build_product_faq_items(
-        brand=meta.brand,
-        article=meta.article,
-        part_type_name=meta.part_type_name,
-        is_new=meta.condition_label == "Новая",
-        city=meta.city,
-        fitment_text=meta.fitment_text,
-        in_stock=meta.in_stock,
-        quantity=meta.quantity,
-        price=meta.price,
-    )
-    faq_html = ""
-    if faq_items:
-        faq_entries = "".join(
-            f"      <details><summary>{html.escape(item['question'])}</summary>"
-            f"<p>{html.escape(item['answer'])}</p></details>\n"
-            for item in faq_items
-        )
-        faq_html = f"    <h2>Частые вопросы</h2>\n    <section>\n{faq_entries}    </section>\n"
 
     is_new = meta.condition_label == "Новая"
     catalog_label = "Новые запчасти" if is_new else "Б/у запчасти"
@@ -680,7 +641,7 @@ def render_product_prerender_html(meta: ProductSeoMeta) -> str:
 </head>
 <body>
 {breadcrumb_html}{article_microdata}    <h1>{h1}</h1>{image_block}
-{about_html}{details_html}{fitment_html}{delivery_html}{warranty_html}{alternate_offers_html}{faq_html}{used_catalog_link}  </article>
+{details_html}{fitment_html}{delivery_html}{warranty_html}{alternate_offers_html}{used_catalog_link}  </article>
 </body>
 </html>
 """

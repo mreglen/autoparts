@@ -14,16 +14,12 @@ import { DEFAULT_OG_IMAGE_URL } from '../../utils/seoConstants';
 import { buildBreadcrumbJsonLd, buildBreadcrumbsForPath } from '../../utils/breadcrumbs';
 import MediaModal from '../../components/MediaModal/MediaModal';
 import PartDetailSeoCrossLinks from './PartDetailSeoCrossLinks';
-import PartDetailSeoSummary from './PartDetailSeoSummary';
 import PartDetailSpecsBlock from './PartDetailSpecsBlock';
 import PartDetailDesktopGallery from './PartDetailDesktopGallery';
 import PartDetailOrganizationSidebar from './PartDetailOrganizationSidebar';
 import PartDetailPurchaseSidebar from './PartDetailPurchaseSidebar';
 import PartDetailFitmentBlock from './PartDetailFitmentBlock';
-import PartDetailAboutBlock from './PartDetailAboutBlock';
-import PartDetailFaqBlock from './PartDetailFaqBlock';
 import PartDetailTrustRow from './PartDetailTrustRow';
-import PartDetailInspectionBlock from './PartDetailInspectionBlock';
 import PartDetailReturnPolicyBlock from './PartDetailReturnPolicyBlock';
 import PartArticleMatchesBlock from '../../components/PartArticleMatchesBlock/PartArticleMatchesBlock';
 import ShareButton from '../../components/ShareButton/ShareButton';
@@ -33,9 +29,6 @@ import { trackConversion, CONVERSION_EVENTS } from '../../utils/siteAnalytics';
 import useHistoryBack from '../../hooks/useHistoryBack';
 import useDeferredMount from '../../hooks/useDeferredMount';
 import { recordProductView } from '../../redux/slices/UserEngagementSlice';
-import { mergeProductFitment } from '../../utils/mergeProductFitment';
-import { buildProductFaqJsonLd } from '../../utils/partDetailFaq';
-import { resolveProductCity } from '../../utils/productSearchSeo';
 import { buildProductUsedCatalogPath } from '../../utils/productSeo';
 import {
   PART_DETAIL_CACHE,
@@ -910,33 +903,10 @@ const PartDetail = () => {
   const breadcrumbJsonLd = buildBreadcrumbJsonLd(breadcrumbItems);
   const partBrand = (currentProduct.brand || '').trim();
   const partArticle = (currentProduct.article || '').trim();
-  const partTypeName = (currentProduct.part_type?.name || '').trim();
-  const productCity = resolveProductCity(currentProduct.organization);
-  const mergedFitment = mergeProductFitment(
-    currentProduct.compatible_vehicles,
-    referenceFitment,
-  );
-  const fitmentText = mergedFitment
-    .slice(0, 8)
-    .map((vehicle) => [vehicle.brand, vehicle.model, vehicle.generation].filter(Boolean).join(' '))
-    .join(', ');
   const inStock = (currentProduct.quantity || 0) > 0;
-  const bodyDescription = seo.bodyDescription || localSeo.bodyDescription;
-  const faqJsonLd = apiSeo?.faqJsonLd || buildProductFaqJsonLd({
-    canonicalUrl: seo.canonicalUrl,
-    brand: partBrand,
-    article: partArticle,
-    partTypeName,
-    isNew: Boolean(currentProduct.is_new),
-    city: productCity,
-    fitmentText,
-    inStock,
-  });
-  const faqItems = apiSeo?.faqItems || null;
   const structuredDataBlocks = buildProductStructuredDataBlocks({
     productJsonLd: seo.jsonLd,
     breadcrumbJsonLd,
-    faqJsonLd,
   });
 
   const photoAltMain = buildProductPhotoAlt({
@@ -1318,14 +1288,8 @@ const PartDetail = () => {
                 ) : null}
 
                 <div className="space-y-3">
-                  <PartDetailSeoSummary summary={seo.seoSummary} />
                   <PartDetailTrustRow />
                 </div>
-
-                <PartDetailAboutBlock
-                  bodyDescription={bodyDescription}
-                  isNew={Boolean(currentProduct.is_new)}
-                />
               </div>
             </div>
           </div>
@@ -1429,12 +1393,7 @@ const PartDetail = () => {
             </div>
 
             <div className="mt-8 space-y-5 border-t border-gray-100 pt-8 lg:mt-10 lg:pt-10">
-              <PartDetailSeoSummary summary={seo.seoSummary} />
               <PartDetailTrustRow />
-              <PartDetailAboutBlock
-                bodyDescription={bodyDescription}
-                isNew={Boolean(currentProduct.is_new)}
-              />
             </div>
           </div>
         </div>
@@ -1455,20 +1414,7 @@ const PartDetail = () => {
       />
 
       {secondaryEnabled ? (
-        <>
-          <PartDetailInspectionBlock isNew={Boolean(currentProduct.is_new)} />
-          <PartDetailReturnPolicyBlock isNew={Boolean(currentProduct.is_new)} />
-          <PartDetailFaqBlock
-            brand={partBrand}
-            article={partArticle}
-            partTypeName={partTypeName}
-            isNew={Boolean(currentProduct.is_new)}
-            city={productCity}
-            fitmentText={fitmentText}
-            inStock={inStock}
-            items={faqItems}
-          />
-        </>
+        <PartDetailReturnPolicyBlock isNew={Boolean(currentProduct.is_new)} />
       ) : null}
         </div>
       </div>
