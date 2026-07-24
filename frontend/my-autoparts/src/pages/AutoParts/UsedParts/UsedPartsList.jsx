@@ -19,7 +19,7 @@ import {
   selectAnalogsLoading,
 } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
-import { buildListImageUrlFallbackChain } from '../../../utils/apiClient';
+import { buildListImageUrlFallbackChain, pickListImageUrlNormalized } from '../../../utils/apiClient';
 import {
   buildUsedCatalogParams,
   getUsedPartsUrlQuery,
@@ -29,6 +29,7 @@ import SubscribeSearchButton from '../../../components/SubscribeSearchButton/Sub
 import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
 import { useProductPriceFormat } from '../../../hooks/useProductPriceFormat';
 import { prefetchUsedPartDetail } from '../../../utils/prefetchPartDetail';
+import { prefetchListImages } from '../../../utils/prefetchListImages';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
 import { fetchFavoriteStatusesBatch } from '../../../redux/slices/UserEngagementSlice';
 import { useAuthReady } from '../../../hooks/useAuthReady';
@@ -36,16 +37,47 @@ import { productFavoriteKey } from '../../../utils/favoriteKeys';
 
 const selectUsedPartsData = (state) => state.products.usedPartsData;
 
-const VIRTUALIZE_THRESHOLD = 24;
-const GRID_ROW_ESTIMATE_PX = 380;
-const LIST_ROW_ESTIMATE_PX = 220;
-const VIRTUAL_OVERSCAN = 4;
-const LOAD_MORE_ROOT_MARGIN = '500px';
+/** На мобилке виртуализация с завышенным estimate даёт «дыру» под карточками — порог выше. */
+const VIRTUALIZE_THRESHOLD_DESKTOP = 24;
+const VIRTUALIZE_THRESHOLD_MOBILE = 80;
+const LIST_ROW_ESTIMATE_MOBILE_PX = 148;
+const LIST_ROW_ESTIMATE_TABLET_PX = 196;
+const LIST_ROW_ESTIMATE_DESKTOP_PX = 220;
+/** Overscan в рядах; на мобилке больше — раньше монтируем и качаем превью. */
+const VIRTUAL_OVERSCAN_DESKTOP = 6;
+const VIRTUAL_OVERSCAN_MOBILE = 10;
+const LOAD_MORE_ROOT_MARGIN = '1000px';
+/** LCP: high fetchPriority только у первых карточек. */
+const LCP_PRIORITY_COUNT = 4;
+/** Сколько thumb прогреть сразу после ответа каталога. */
+const PREFETCH_IMAGE_COUNT = 40;
 
 function getGridColumnCount(width) {
   if (width >= 1280) return 4;
   if (width >= 1024) return 3;
   return 2;
+}
+
+function getVirtualizeThreshold(width) {
+  return width < 1024 ? VIRTUALIZE_THRESHOLD_MOBILE : VIRTUALIZE_THRESHOLD_DESKTOP;
+}
+
+/** Реалистичная высота ряда сетки (aspect 4/3 + текст) — иначе getTotalSize() раздувает скролл. */
+function estimateGridRowHeight(viewportWidth, columns) {
+  const hasFiltersAside = viewportWidth >= 1024;
+  const horizontalChrome = hasFiltersAside ? 280 : 24;
+  const gap = 12;
+  const usable = Math.max(280, Math.min(viewportWidth, 1536) - horizontalChrome);
+  const cardWidth = Math.max(120, (usable - gap * (columns - 1)) / columns);
+  const imageHeight = cardWidth * 0.75;
+  const metaHeight = viewportWidth < 640 ? 92 : 108;
+  return Math.round(imageHeight + metaHeight + gap);
+}
+
+function estimateListRowHeight(viewportWidth) {
+  if (viewportWidth < 640) return LIST_ROW_ESTIMATE_MOBILE_PX;
+  if (viewportWidth < 1024) return LIST_ROW_ESTIMATE_TABLET_PX;
+  return LIST_ROW_ESTIMATE_DESKTOP_PX;
 }
 
 function chunkIntoRows(items, columns) {
@@ -54,6 +86,26 @@ function chunkIntoRows(items, columns) {
     rows.push(items.slice(i, i + columns));
   }
   return rows;
+}
+
+function collectPartPreviewUrls(parts, limit) {
+  const urls = [];
+  for (const part of parts || []) {
+    let url = '';
+    if (part.list_photo_url) {
+      url = pickListImageUrlNormalized(part.list_photo_url);
+    }
+    if (!url) {
+      const photos = part.photos || [];
+      for (let i = 0; i < photos.length; i += 1) {
+        url = pickListImageUrlNormalized(photos[i]);
+        if (url) break;
+      }
+    }
+    if (url) urls.push(url);
+    if (urls.length >= limit) break;
+  }
+  return urls;
 }
 
 // Функция форматирования телефона
@@ -99,11 +151,12 @@ const UsedPartsFiltersAside = React.memo(function UsedPartsFiltersAside({ update
 
 const LIST_MEDIA_SIZES = '(max-width:640px) 96px, (max-width:1024px) 160px, 176px';
 
-const MediaDisplay = React.memo(function MediaDisplay({ part, listPriority = false }) {
+const MediaDisplay = React.memo(function MediaDisplay({ part, listPriority = false, eagerImage = false }) {
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [hoverSide, setHoverSide] = useState(null);
   const [resolvedUrl, setResolvedUrl] = useState('');
   const [urlFallbackIndex, setUrlFallbackIndex] = useState(0);
+  const [photoLoaded, setPhotoLoaded] = useState(false);
 
   const allMedia = React.useMemo(() => {
     const photos = (part.photos || []).slice(0, 1).map((photo) => {
@@ -127,6 +180,7 @@ const MediaDisplay = React.memo(function MediaDisplay({ part, listPriority = fal
   React.useEffect(() => {
     setResolvedUrl(allMedia[currentMediaIndex]?.url || '');
     setUrlFallbackIndex(0);
+    setPhotoLoaded(false);
   }, [allMedia, currentMediaIndex]);
 
   if (!allMedia || allMedia.length === 0) {
@@ -191,25 +245,34 @@ const MediaDisplay = React.memo(function MediaDisplay({ part, listPriority = fal
           playsInline
         />
       ) : (
-        <img
-          src={resolvedUrl || currentMedia.url}
-          alt={part.name || part.article}
-          className="w-full h-full object-cover rounded-lg"
-          width={176}
-          height={176}
-          sizes={LIST_MEDIA_SIZES}
-          loading={listPriority ? 'eager' : 'lazy'}
-          decoding="async"
-          fetchPriority={listPriority ? 'high' : 'auto'}
-          onError={() => {
-            const chain = currentMedia.urlChain || [];
-            const nextIndex = urlFallbackIndex + 1;
-            if (nextIndex < chain.length && chain[nextIndex] !== resolvedUrl) {
-              setUrlFallbackIndex(nextIndex);
-              setResolvedUrl(chain[nextIndex]);
-            }
-          }}
-        />
+        <>
+          {!photoLoaded ? (
+            <div className="absolute inset-0 animate-pulse rounded-lg bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200" aria-hidden />
+          ) : null}
+          <img
+            src={resolvedUrl || currentMedia.url}
+            alt={part.name || part.article}
+            className={`w-full h-full object-cover rounded-lg transition-opacity duration-200 ${photoLoaded ? 'opacity-100' : 'opacity-0'}`}
+            width={176}
+            height={176}
+            sizes={LIST_MEDIA_SIZES}
+            loading={(listPriority || eagerImage) ? 'eager' : 'lazy'}
+            decoding="async"
+            fetchPriority={listPriority ? 'high' : 'auto'}
+            onLoad={() => setPhotoLoaded(true)}
+            onError={() => {
+              const chain = currentMedia.urlChain || [];
+              const nextIndex = urlFallbackIndex + 1;
+              if (nextIndex < chain.length && chain[nextIndex] !== resolvedUrl) {
+                setUrlFallbackIndex(nextIndex);
+                setResolvedUrl(chain[nextIndex]);
+                setPhotoLoaded(false);
+              } else {
+                setPhotoLoaded(true);
+              }
+            }}
+          />
+        </>
       )}
 
       {isVideo && (
@@ -314,11 +377,24 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
   const availableParts = useMemo(() => catalogItems, [catalogItems]);
 
+  // Прогрев thumb сразу после ответа API — до/параллельно с paint карточек.
+  useEffect(() => {
+    if (!catalogItems.length) return;
+    prefetchListImages(collectPartPreviewUrls(catalogItems, PREFETCH_IMAGE_COUNT), {
+      limit: PREFETCH_IMAGE_COUNT,
+    });
+  }, [catalogItems]);
+
   const analogParts = useMemo(() => {
     if (!urlQ) return [];
     const catalogIds = new Set(catalogItems.map((p) => p.id));
     return (usedPartsData?.analog_parts || []).filter((p) => !catalogIds.has(p.id));
   }, [urlQ, usedPartsData, catalogItems]);
+
+  useEffect(() => {
+    if (!analogParts.length) return;
+    prefetchListImages(collectPartPreviewUrls(analogParts, 12), { limit: 12, preloadCount: 4 });
+  }, [analogParts]);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated || !token) return;
@@ -443,17 +519,32 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     return sorted;
   }, [analogParts, sortBy, isCatalogMode, matchesActiveFilters]);
 
-  const [gridColumns, setGridColumns] = useState(() => getGridColumnCount(
+  const [viewportWidth, setViewportWidth] = useState(() => (
     typeof window !== 'undefined' ? window.innerWidth : 1024
   ));
+  const [gridColumns, setGridColumns] = useState(() => getGridColumnCount(viewportWidth));
 
   useEffect(() => {
-    const onResize = () => setGridColumns(getGridColumnCount(window.innerWidth));
+    const onResize = () => {
+      const width = window.innerWidth;
+      setViewportWidth(width);
+      setGridColumns(getGridColumnCount(width));
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const shouldVirtualize = sortedAvailableParts.length > VIRTUALIZE_THRESHOLD;
+  const virtualizeThreshold = getVirtualizeThreshold(viewportWidth);
+  const shouldVirtualize = sortedAvailableParts.length > virtualizeThreshold;
+  const gridRowEstimatePx = useMemo(
+    () => estimateGridRowHeight(viewportWidth, gridColumns),
+    [viewportWidth, gridColumns]
+  );
+  const listRowEstimatePx = useMemo(
+    () => estimateListRowHeight(viewportWidth),
+    [viewportWidth]
+  );
+  const virtualOverscan = viewportWidth < 1024 ? VIRTUAL_OVERSCAN_MOBILE : VIRTUAL_OVERSCAN_DESKTOP;
   const gridRows = useMemo(
     () => chunkIntoRows(sortedAvailableParts, gridColumns),
     [sortedAvailableParts, gridColumns]
@@ -488,19 +579,40 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     };
   }, [shouldVirtualize, viewMode, gridRows.length, sortedAvailableParts.length]);
 
+  const estimateGridSize = useCallback(() => gridRowEstimatePx, [gridRowEstimatePx]);
+  const estimateListSize = useCallback(() => listRowEstimatePx, [listRowEstimatePx]);
+  const getGridItemKey = useCallback((index) => {
+    const row = gridRows[index];
+    return row?.map((p) => p.id).join('-') || index;
+  }, [gridRows]);
+  const getListItemKey = useCallback(
+    (index) => sortedAvailableParts[index]?.id ?? index,
+    [sortedAvailableParts]
+  );
+
   const gridRowVirtualizer = useWindowVirtualizer({
     count: shouldVirtualize && viewMode === 'grid' ? gridRows.length : 0,
-    estimateSize: () => GRID_ROW_ESTIMATE_PX,
-    overscan: VIRTUAL_OVERSCAN,
+    estimateSize: estimateGridSize,
+    overscan: virtualOverscan,
     scrollMargin: gridScrollMargin,
+    getItemKey: getGridItemKey,
   });
 
   const listRowVirtualizer = useWindowVirtualizer({
     count: shouldVirtualize && viewMode === 'list' ? sortedAvailableParts.length : 0,
-    estimateSize: () => LIST_ROW_ESTIMATE_PX,
-    overscan: VIRTUAL_OVERSCAN,
+    estimateSize: estimateListSize,
+    overscan: virtualOverscan,
     scrollMargin: listScrollMargin,
+    getItemKey: getListItemKey,
   });
+
+  // После смены ширины/колонок сбрасываем кэш высот — иначе остаётся старый раздутый scrollHeight.
+  useLayoutEffect(() => {
+    if (!shouldVirtualize) return;
+    if (viewMode === 'grid') gridRowVirtualizer.measure();
+    else listRowVirtualizer.measure();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- measure only when geometry inputs change
+  }, [shouldVirtualize, viewMode, gridRowEstimatePx, listRowEstimatePx, gridColumns]);
 
   const gridVirtualEndIndex = gridRowVirtualizer.range?.endIndex ?? -1;
   const listVirtualEndIndex = listRowVirtualizer.range?.endIndex ?? -1;
@@ -601,7 +713,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     return loc ? (loc.address || `Склад #${locationId}`) : `Склад #${locationId}`;
   };
 
-  const renderPartListCard = (part, listKey, listPriority = false) => {
+  const renderPartListCard = (part, listKey, listPriority = false, eagerImage = false) => {
     const availableQty = part.quantity || part.available_count || 0;
     const sellerOrg = part.organization || organization;
     const detailPath = buildPartDetailPath(part);
@@ -621,7 +733,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
         >
           <div className="flex flex-row gap-3 p-3 sm:gap-4 sm:p-4">
             <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-40 sm:w-40 lg:h-44 lg:w-44">
-              <MediaDisplay part={part} listPriority={listPriority} />
+              <MediaDisplay part={part} listPriority={listPriority} eagerImage={eagerImage} />
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-2">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
@@ -804,7 +916,8 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
               {sortedAvailableParts.map((part, index) => (
                 <ProductCard
                   key={part.id}
-                  listPriority={index < 2}
+                  listPriority={index < LCP_PRIORITY_COUNT}
+                  eagerImage
                   part={productCardPartsMap.get(part.id)}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
@@ -834,7 +947,8 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                     {rowParts.map((part, colIndex) => (
                       <ProductCard
                         key={part.id}
-                        listPriority={virtualRow.index === 0 && colIndex < 2}
+                        listPriority={virtualRow.index === 0 && colIndex < LCP_PRIORITY_COUNT}
+                        eagerImage
                         part={productCardPartsMap.get(part.id)}
                         isTestOrganization={true}
                         hideConditionAndQuantity={true}
@@ -850,7 +964,9 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           {/* List view — компактная строка: превью + данные, продавец снизу */}
           {viewMode === 'list' && !shouldVirtualize && (
             <div className="space-y-3">
-              {sortedAvailableParts.map((part, index) => renderPartListCard(part, part.id, index < 2))}
+              {sortedAvailableParts.map((part, index) => (
+                renderPartListCard(part, part.id, index < LCP_PRIORITY_COUNT, true)
+              ))}
             </div>
           )}
           {viewMode === 'list' && shouldVirtualize && (
@@ -872,7 +988,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                       transform: `translateY(${virtualRow.start - listScrollMargin}px)`,
                     }}
                   >
-                    {renderPartListCard(part, part.id, virtualRow.index < 2)}
+                    {renderPartListCard(part, part.id, virtualRow.index < LCP_PRIORITY_COUNT, true)}
                   </div>
                 );
               })}
@@ -909,7 +1025,8 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
               {sortedAnalogParts.map((part, index) => (
                 <ProductCard
                   key={`analog-${part.id}`}
-                  listPriority={index < 2}
+                  listPriority={index < LCP_PRIORITY_COUNT}
+                  eagerImage
                   part={productCardPartsMap.get(part.id)}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
@@ -922,7 +1039,9 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           {/* List view — аналоги */}
           {viewMode === 'list' && (
             <div className="space-y-3">
-              {sortedAnalogParts.map((part) => renderPartListCard(part, `analog-${part.id}`))}
+              {sortedAnalogParts.map((part, index) => (
+                renderPartListCard(part, `analog-${part.id}`, index < LCP_PRIORITY_COUNT, true)
+              ))}
             </div>
           )}
         </>

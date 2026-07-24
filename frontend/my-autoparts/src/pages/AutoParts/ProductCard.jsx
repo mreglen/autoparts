@@ -60,6 +60,8 @@ const ProductCard = ({
   hideConditionAndQuantity = false,
   hideWarehouse = false,
   listPriority = false,
+  /** Без native lazy (виртуализатор уже ограничивает DOM). */
+  eagerImage = false,
   showFavorite = true,
   showNewBadge,
 }) => {
@@ -111,10 +113,12 @@ const ProductCard = ({
 
   const [photoSrc, setPhotoSrc] = useState(listPreview?.url || '');
   const [photoFallbackIndex, setPhotoFallbackIndex] = useState(0);
+  const [photoLoaded, setPhotoLoaded] = useState(false);
 
   useEffect(() => {
     setPhotoSrc(listPreview?.url || '');
     setPhotoFallbackIndex(0);
+    setPhotoLoaded(false);
   }, [listPreview?.url]);
 
   const priceLabel = useMemo(() => {
@@ -146,7 +150,7 @@ const ProductCard = ({
           onFocus={prefetchDetail}
           onTouchStart={prefetchDetail}
         >
-          <div className="relative flex aspect-[4/3] w-full cursor-pointer items-center justify-center overflow-hidden bg-gray-50">
+          <div className="relative flex aspect-[4/3] w-full cursor-pointer items-center justify-center overflow-hidden bg-gray-100">
             {shouldShowNewBadge ? <CatalogNewBadge /> : null}
             {showFavorite ? (
               isRossko ? (
@@ -156,25 +160,34 @@ const ProductCard = ({
               )
             ) : null}
             {listPreview?.type === 'photo' && photoSrc ? (
-              <img
-                src={photoSrc}
-                alt={displayTitle}
-                className="h-full w-full object-contain"
-                width={400}
-                height={300}
-                sizes="(max-width:640px) 50vw, (max-width:1280px) 33vw, 25vw"
-                loading={listPriority ? 'eager' : 'lazy'}
-                decoding="async"
-                fetchPriority={listPriority ? 'high' : 'auto'}
-                onError={() => {
-                  const chain = listPreview?.urlChain || [];
-                  const nextIndex = photoFallbackIndex + 1;
-                  if (nextIndex < chain.length && chain[nextIndex] !== photoSrc) {
-                    setPhotoFallbackIndex(nextIndex);
-                    setPhotoSrc(chain[nextIndex]);
-                  }
-                }}
-              />
+              <>
+                {!photoLoaded ? (
+                  <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200" aria-hidden />
+                ) : null}
+                <img
+                  src={photoSrc}
+                  alt={displayTitle}
+                  className={`h-full w-full object-contain transition-opacity duration-200 ${photoLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  width={400}
+                  height={300}
+                  sizes="(max-width:640px) 50vw, (max-width:1280px) 33vw, 25vw"
+                  loading={(listPriority || eagerImage) ? 'eager' : 'lazy'}
+                  decoding="async"
+                  fetchPriority={listPriority ? 'high' : 'auto'}
+                  onLoad={() => setPhotoLoaded(true)}
+                  onError={() => {
+                    const chain = listPreview?.urlChain || [];
+                    const nextIndex = photoFallbackIndex + 1;
+                    if (nextIndex < chain.length && chain[nextIndex] !== photoSrc) {
+                      setPhotoFallbackIndex(nextIndex);
+                      setPhotoSrc(chain[nextIndex]);
+                      setPhotoLoaded(false);
+                    } else {
+                      setPhotoLoaded(true);
+                    }
+                  }}
+                />
+              </>
             ) : listPreview?.type === 'video' ? (
               <div className="flex flex-col items-center text-gray-500" aria-label="Есть видео">
                 <svg className="h-14 w-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
