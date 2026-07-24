@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
@@ -81,14 +82,19 @@ function Modal({ title, children, onClose, wide }) {
   );
 }
 
-export function CreatePaymentModal({ onClose, onCreated }) {
-  const [title, setTitle] = useState('');
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [mode, setMode] = useState('days'); // 'days' | 'end'
-  const [durationDays, setDurationDays] = useState('30');
-  const [endDate, setEndDate] = useState('');
-  const [monthlyAmount, setMonthlyAmount] = useState('');
-  const [comment, setComment] = useState('');
+export function CreatePaymentModal({ onClose, onCreated, payment = null }) {
+  const isEdit = Boolean(payment?.id);
+  const [title, setTitle] = useState(payment?.title || '');
+  const [startDate, setStartDate] = useState(
+    () => (payment?.start_date ? String(payment.start_date).slice(0, 10) : new Date().toISOString().slice(0, 10))
+  );
+  const [mode, setMode] = useState(payment ? 'end' : 'days');
+  const [durationDays, setDurationDays] = useState(String(payment?.duration_days || '30'));
+  const [endDate, setEndDate] = useState(payment?.end_date ? String(payment.end_date).slice(0, 10) : '');
+  const [monthlyAmount, setMonthlyAmount] = useState(
+    payment?.monthly_amount != null ? String(payment.monthly_amount) : ''
+  );
+  const [comment, setComment] = useState(payment?.comment || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -129,24 +135,30 @@ export function CreatePaymentModal({ onClose, onCreated }) {
       };
       if (mode === 'days') {
         body.duration_days = parseInt(durationDays, 10);
+        delete body.end_date;
       } else {
         body.end_date = endDate;
       }
-      const row = await apiRequest('/admin/site-payments', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
+      const row = isEdit
+        ? await apiRequest(`/admin/site-payments/${payment.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+          })
+        : await apiRequest('/admin/site-payments', {
+            method: 'POST',
+            body: JSON.stringify(body),
+          });
       onCreated(row);
       onClose();
     } catch (err) {
-      setError(err?.message || 'Не удалось создать платёж');
+      setError(err?.message || (isEdit ? 'Не удалось сохранить' : 'Не удалось создать платёж'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal title="Добавить платёж" onClose={onClose}>
+    <Modal title={isEdit ? 'Редактировать платёж' : 'Добавить платёж'} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
@@ -220,7 +232,7 @@ export function CreatePaymentModal({ onClose, onCreated }) {
           )}
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Ежемесячная сумма, ₽</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Сумма к оплате, ₽</label>
           <input
             type="number"
             min={0.01}
@@ -253,7 +265,7 @@ export function CreatePaymentModal({ onClose, onCreated }) {
             disabled={saving}
             className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
           >
-            {saving ? 'Создание…' : 'Создать'}
+            {saving ? 'Сохранение…' : isEdit ? 'Сохранить' : 'Создать'}
           </button>
         </div>
       </form>
@@ -338,6 +350,7 @@ export function PaymentDetailModal({ paymentId, onClose, onChanged }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [payOpen, setPayOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -392,7 +405,7 @@ export function PaymentDetailModal({ paymentId, onClose, onChanged }) {
 
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl bg-gray-50 p-3 ring-1 ring-gray-100">
-                <p className="text-xs text-gray-500">Ежемесячно</p>
+                <p className="text-xs text-gray-500">Сумма к оплате</p>
                 <p className="mt-1 font-semibold text-gray-900">{formatMoney(payment.monthly_amount)}</p>
               </div>
               <div className="rounded-xl bg-gray-50 p-3 ring-1 ring-gray-100">
@@ -430,6 +443,14 @@ export function PaymentDetailModal({ paymentId, onClose, onChanged }) {
             )}
 
             <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-4">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setEditOpen(true)}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Редактировать
+              </button>
               {payment.status !== 'cancelled' && payment.status !== 'paid' && (
                 <button
                   type="button"
@@ -484,35 +505,81 @@ export function PaymentDetailModal({ paymentId, onClose, onChanged }) {
           }}
         />
       )}
+      {editOpen && payment && (
+        <CreatePaymentModal
+          payment={payment}
+          onClose={() => setEditOpen(false)}
+          onCreated={(row) => {
+            setPayment(row);
+            onChanged?.(row);
+          }}
+        />
+      )}
     </>
   );
 }
 
-function ActionsMenu({ payment, onPay, onPause, onResume, onCancel, onOpen }) {
+function ActionsMenu({ payment, onPay, onPause, onResume, onCancel, onOpen, onEdit }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+
+  const updatePosition = useCallback(() => {
+    const btn = buttonRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const menuWidth = 176;
+    const gap = 4;
+    let left = rect.right - menuWidth;
+    if (left < 8) left = 8;
+    if (left + menuWidth > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - menuWidth - 8);
+    }
+    let top = rect.bottom + gap;
+    const estimatedHeight = 220;
+    if (top + estimatedHeight > window.innerHeight - 8) {
+      top = Math.max(8, rect.top - estimatedHeight - gap);
+    }
+    setMenuPos({ top, left });
+  }, []);
 
   useEffect(() => {
+    if (!open) return undefined;
+    updatePosition();
+    const onScrollOrResize = () => updatePosition();
+    window.addEventListener('resize', onScrollOrResize);
+    window.addEventListener('scroll', onScrollOrResize, true);
+    return () => {
+      window.removeEventListener('resize', onScrollOrResize);
+      window.removeEventListener('scroll', onScrollOrResize, true);
+    };
+  }, [open, updatePosition]);
+
+  useEffect(() => {
+    if (!open) return undefined;
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (
+        buttonRef.current?.contains(e.target) ||
+        menuRef.current?.contains(e.target)
+      ) {
+        return;
+      }
+      setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [open]);
 
   const canAct = payment.status !== 'cancelled' && payment.status !== 'paid';
 
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-      >
-        Действия
-      </button>
-      {open && (
-        <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+  const menu = open
+    ? createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[200] w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl ring-1 ring-black/5"
+          style={{ top: menuPos.top, left: menuPos.left }}
+        >
           <button
             type="button"
             className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
@@ -522,6 +589,16 @@ function ActionsMenu({ payment, onPay, onPause, onResume, onCancel, onOpen }) {
             }}
           >
             Подробнее
+          </button>
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+          >
+            Редактировать
           </button>
           {canAct && (
             <button
@@ -571,8 +648,25 @@ function ActionsMenu({ payment, onPay, onPause, onResume, onCancel, onOpen }) {
               Отменить
             </button>
           )}
-        </div>
-      )}
+        </div>,
+        document.body
+      )
+    : null;
+
+  return (
+    <div className="relative inline-block">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => {
+          if (!open) updatePosition();
+          setOpen((v) => !v);
+        }}
+        className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+      >
+        Действия
+      </button>
+      {menu}
     </div>
   );
 }
@@ -744,6 +838,7 @@ export function PaymentsTable({
   clickableRows,
 }) {
   const [payTarget, setPayTarget] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
   const [detailId, setDetailId] = useState(null);
 
   const runAction = async (id, action) => {
@@ -768,7 +863,7 @@ export function PaymentsTable({
             <tr>
               <th className="px-4 py-3 font-semibold">Название</th>
               <th className="px-4 py-3 font-semibold">Период</th>
-              <th className="px-4 py-3 font-semibold">Ежемесячно</th>
+              <th className="px-4 py-3 font-semibold">Сумма к оплате</th>
               <th className="px-4 py-3 font-semibold">Общая</th>
               <th className="px-4 py-3 font-semibold">К оплате осталось</th>
               <th className="px-4 py-3 font-semibold">Статус</th>
@@ -797,6 +892,7 @@ export function PaymentsTable({
                   <ActionsMenu
                     payment={row}
                     onOpen={() => setDetailId(row.id)}
+                    onEdit={() => setEditTarget(row)}
                     onPay={() => setPayTarget(row)}
                     onPause={() => runAction(row.id, 'pause')}
                     onResume={() => runAction(row.id, 'resume')}
@@ -813,6 +909,13 @@ export function PaymentsTable({
           payment={payTarget}
           onClose={() => setPayTarget(null)}
           onDone={(updated) => onRefreshRow(updated)}
+        />
+      )}
+      {editTarget && (
+        <CreatePaymentModal
+          payment={editTarget}
+          onClose={() => setEditTarget(null)}
+          onCreated={(updated) => onRefreshRow(updated)}
         />
       )}
       {detailId != null && (

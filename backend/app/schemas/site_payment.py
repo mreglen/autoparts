@@ -32,6 +32,21 @@ class SitePaymentPay(BaseModel):
     note: Optional[str] = None
 
 
+class SitePaymentUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    duration_days: Optional[int] = Field(None, ge=1)
+    monthly_amount: Optional[Decimal] = Field(None, gt=0)
+    comment: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_period(self):
+        if self.end_date is not None and self.start_date is not None and self.end_date < self.start_date:
+            raise ValueError("Дата конца не может быть раньше даты начала")
+        return self
+
+
 class SitePaymentLedgerView(BaseModel):
     id: int
     amount: Decimal

@@ -14,6 +14,7 @@ from app.models.user import User
 from app.schemas.site_payment import (
     SitePaymentCreate,
     SitePaymentPay,
+    SitePaymentUpdate,
     SitePaymentView,
 )
 from app.services.audit_service import log_audit
@@ -156,6 +157,73 @@ def create_site_payment(
         user=current_user,
     )
     return _to_view(row)
+
+
+@router.patch("/{payment_id}", response_model=SitePaymentView)
+def update_site_payment(
+    payment_id: int,
+    payload: SitePaymentUpdate,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    row = _get_payment(db, payment_id)
+    data = payload.model_dump(exclude_unset=True)
+
+    if "title" in data and data["title"] is not None:
+        row.title = str(data["title"]).strip()
+    if "comment" in data:
+        comment = data["comment"]
+        row.comment = (str(comment).strip() if comment is not None else "") or None
+
+    start = data.get("start_date", row.start_date)
+    end = data.get("end_date")
+    days = data.get("duration_days")
+    period_touched = any(k in data for k in ("start_date", "end_date", "duration_days"))
+
+    if period_touched:
+        if end is not None:
+            if end < start:
+                raise HTTPException(status_code=400, detail="Дата конца не может быть раньше даты начала")
+            duration_days = (end - start).days
+            if duration_days < 1:
+                duration_days = 1
+                end = start
+        elif days is not None:
+            duration_days = int(days)
+            if duration_days < 1:
+                raise HTTPException(status_code=400, detail="Количество дней должно быть не меньше 1")
+            end = start + timedelta(days=duration_days)
+        else:
+            # only start_date changed — keep duration
+            duration_days = int(row.duration_days)
+            end = start + timedelta(days=duration_days)
+        row.start_date = start
+        row.end_date = end
+        row.duration_days = duration_days
+
+    if "monthly_amount" in data and data["monthly_amount"] is not None:
+        row.monthly_amount = _money(data["monthly_amount"])
+
+    if period_touched or "monthly_amount" in data:
+        row.total_amount = _calc_total(_money(row.monthly_amount), int(row.duration_days))
+        paid = _money(row.amount_paid)
+        total = _money(row.total_amount)
+        if paid > total:
+            row.amount_paid = total
+            paid = total
+        if row.status not in ("cancelled", "paused"):
+            row.status = "paid" if paid >= total else "active"
+
+    db.commit()
+    row = _get_payment(db, payment_id)
+    log_audit(
+        db,
+        event_type="site_payment_updated",
+        category="admin",
+        summary=f"Обновлён платёж сайта #{payment_id}: {row.title}",
+        user=current_user,
+    )
+    return _to_view(row, include_ledger=True)
 
 
 @router.post("/{payment_id}/pay", response_model=SitePaymentView)
