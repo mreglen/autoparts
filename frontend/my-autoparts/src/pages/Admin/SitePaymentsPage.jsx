@@ -577,6 +577,166 @@ function ActionsMenu({ payment, onPay, onPause, onResume, onCancel, onOpen }) {
   );
 }
 
+function toIsoDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function getPeriodPreset(preset) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (preset === 'month') {
+    const from = new Date(today.getFullYear(), today.getMonth(), 1);
+    const to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    return { preset: 'month', dateFrom: toIsoDate(from), dateTo: toIsoDate(to) };
+  }
+  if (preset === 'year') {
+    const from = new Date(today.getFullYear(), 0, 1);
+    const to = new Date(today.getFullYear(), 11, 31);
+    return { preset: 'year', dateFrom: toIsoDate(from), dateTo: toIsoDate(to) };
+  }
+  return { preset: 'all', dateFrom: '', dateTo: '' };
+}
+
+const PRESET_LABELS = {
+  month: 'За месяц',
+  year: 'За год',
+  all: 'За всё время',
+  custom: 'Период',
+};
+
+export function PeriodFilters({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [draftFrom, setDraftFrom] = useState(value.dateFrom || '');
+  const [draftTo, setDraftTo] = useState(value.dateTo || '');
+
+  useEffect(() => {
+    setDraftFrom(value.dateFrom || '');
+    setDraftTo(value.dateTo || '');
+  }, [value.dateFrom, value.dateTo]);
+
+  const activeLabel = useMemo(() => {
+    if (value.preset === 'custom' && (value.dateFrom || value.dateTo)) {
+      const a = value.dateFrom ? formatDate(value.dateFrom) : '…';
+      const b = value.dateTo ? formatDate(value.dateTo) : '…';
+      return `${a} — ${b}`;
+    }
+    return PRESET_LABELS[value.preset] || PRESET_LABELS.all;
+  }, [value]);
+
+  const applyCustom = () => {
+    if (draftFrom && draftTo && draftFrom > draftTo) {
+      window.alert('Дата начала не может быть позже даты конца');
+      return;
+    }
+    onChange({
+      preset: 'custom',
+      dateFrom: draftFrom || '',
+      dateTo: draftTo || '',
+    });
+    setOpen(false);
+  };
+
+  return (
+    <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold shadow-sm transition ${
+              open || value.preset === 'custom'
+                ? 'border-indigo-300 bg-indigo-50 text-indigo-800'
+                : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
+            }`}
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+              />
+            </svg>
+            Фильтры
+          </button>
+          <span className="text-sm text-gray-500">
+            Сейчас: <span className="font-medium text-gray-800">{activeLabel}</span>
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(['month', 'year', 'all']).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onChange(getPeriodPreset(key))}
+              className={`rounded-xl px-3 py-2 text-sm font-medium ring-1 transition ${
+                value.preset === key
+                  ? 'bg-indigo-600 text-white ring-indigo-600'
+                  : 'bg-white text-gray-700 ring-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {PRESET_LABELS[key]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {open && (
+        <div className="mt-4 grid gap-3 border-t border-gray-100 pt-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">С даты</label>
+            <input
+              type="date"
+              className={inputClass}
+              value={draftFrom}
+              onChange={(e) => setDraftFrom(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">По дату</label>
+            <input
+              type="date"
+              className={inputClass}
+              value={draftTo}
+              onChange={(e) => setDraftTo(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={applyCustom}
+              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Применить
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onChange(getPeriodPreset('all'));
+                setOpen(false);
+              }}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Сбросить
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function buildPeriodQuery(period) {
+  const params = new URLSearchParams();
+  if (period?.dateFrom) params.set('date_from', period.dateFrom);
+  if (period?.dateTo) params.set('date_to', period.dateTo);
+  const qs = params.toString();
+  return qs ? `&${qs}` : '';
+}
+
 export function PaymentsTable({
   rows,
   emptyText,
@@ -673,19 +833,20 @@ export default function SitePaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [period, setPeriod] = useState(() => getPeriodPreset('all'));
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiRequest('/admin/site-payments?scope=active');
+      const data = await apiRequest(`/admin/site-payments?scope=active${buildPeriodQuery(period)}`);
       setRows(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err?.message || 'Не удалось загрузить платежи');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [period]);
 
   useEffect(() => {
     if (!isReady) return;
@@ -738,9 +899,11 @@ export default function SitePaymentsPage() {
         </div>
       </div>
 
+      <PeriodFilters value={period} onChange={setPeriod} />
+
       <div className="mb-6 grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Общая сумма (активные)</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Общая сумма (по фильтру)</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">{formatMoney(totals.total)}</p>
         </div>
         <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 shadow-sm">
@@ -757,7 +920,7 @@ export default function SitePaymentsPage() {
       ) : (
         <PaymentsTable
           rows={rows}
-          emptyText="Активных платежей нет. Нажмите «Добавить платёж»."
+          emptyText="Нет платежей за выбранный период."
           onRefreshRow={upsertRow}
         />
       )}

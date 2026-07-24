@@ -5,7 +5,13 @@ import { Helmet } from 'react-helmet-async';
 import { fetchPublicProduct, searchAllProducts } from '../../redux/slices/ProductSlice';
 import { addUsedPartsToCart, removeUsedFromCart, updateUsedCartItemQuantity, selectCart, fetchCart } from '../../redux/slices/CartSlice';
 import { createOrGetChat } from '../../redux/slices/ChatSlice';
-import { normalizeImageUrl, apiAxiosUnauth } from '../../utils/apiClient';
+import {
+  normalizeImageUrl,
+  apiAxiosUnauth,
+  pickFullImageUrl,
+  pickListImageUrlNormalized,
+} from '../../utils/apiClient';
+import ProgressiveProductImage from '../../components/ProductMedia/ProgressiveProductImage';
 import { stripHtmlTags } from '../../utils/text';
 import { buildPartDetailPath, parsePartDetailParam, partDetailPathsMatch } from '../../utils/partRoutes';
 import { extractProductDescription, formatProductDisplayTitle } from '../../utils/productDisplayName';
@@ -429,6 +435,23 @@ const PartDetail = () => {
     dispatch(recordProductView(currentProduct.id));
   }, [showProduct, currentProduct?.id, user, location.pathname, dispatch]);
 
+  // Preload first photo thumb for faster LCP on /part/
+  useEffect(() => {
+    if (!showProduct || !currentProduct?.photos?.length) return undefined;
+    const first = currentProduct.photos[0];
+    if (isVideo(first)) return undefined;
+    const href = pickListImageUrlNormalized(first);
+    if (!href) return undefined;
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = href;
+    document.head.appendChild(link);
+    return () => {
+      if (link.parentNode) link.parentNode.removeChild(link);
+    };
+  }, [showProduct, currentProduct?.id, currentProduct?.photos]);
+
   useEffect(() => {
     if (!displayProduct?.id) return;
     const canonicalPath = buildPartDetailPath(displayProduct);
@@ -757,12 +780,8 @@ const PartDetail = () => {
   const getMediaUrl = (item) => {
     if (typeof item === 'string') {
       return item;
-    } else if (item?.full_url) {
-      return item.full_url;
-    } else if (item?.photo_url) {
-      return item.photo_url;
     }
-    return '';
+    return pickFullImageUrl(item) || item?.photo_url || '';
   };
 
   const handleOpenMediaModal = (startIndex = 0) => {
@@ -948,7 +967,6 @@ const PartDetail = () => {
     return (
       <div className={`grid grid-cols-4 gap-2 sm:grid-cols-5 md:grid-cols-4 lg:grid-cols-5 ${className}`}>
         {allMediaItems.map((item, index) => {
-          const mediaUrl = normalizeImageUrl(getMediaUrl(item));
           const isVideoItem = isVideo(item);
 
           return (
@@ -964,7 +982,7 @@ const PartDetail = () => {
               {isVideoItem ? (
                 <>
                   <video
-                    src={mediaUrl}
+                    src={normalizeImageUrl(getMediaUrl(item))}
                     className="h-full w-full object-cover"
                     muted
                     playsInline
@@ -977,8 +995,8 @@ const PartDetail = () => {
                   </div>
                 </>
               ) : (
-                <img
-                  src={mediaUrl}
+                <ProgressiveProductImage
+                  photo={item}
                   alt={buildProductPhotoAlt({
                     brand: partBrand,
                     article: partArticle,
@@ -986,7 +1004,10 @@ const PartDetail = () => {
                     index,
                   })}
                   className="h-full w-full object-cover"
-                  loading="lazy"
+                  upgradeToFull={false}
+                  width={96}
+                  height={96}
+                  sizes="96px"
                 />
               )}
             </div>
@@ -1051,9 +1072,9 @@ const PartDetail = () => {
             >
               {(() => {
                 const firstItem = allMediaItems[currentMainMediaIndex];
-                const mediaUrl = normalizeImageUrl(getMediaUrl(firstItem));
                 const isVideoItem = isVideo(firstItem);
                 if (isVideoItem) {
+                  const mediaUrl = normalizeImageUrl(getMediaUrl(firstItem));
                   return (
                     <div className="relative h-full min-h-[52dvh] max-h-[62dvh]">
                       <video
@@ -1074,11 +1095,14 @@ const PartDetail = () => {
                   );
                 }
                 return (
-                  <img
-                    src={mediaUrl}
+                  <ProgressiveProductImage
+                    key={currentMainMediaIndex}
+                    photo={firstItem}
                     alt={photoAltMain}
                     className="h-full min-h-[52dvh] max-h-[62dvh] w-full object-contain"
-                    loading="eager"
+                    priority
+                    upgradeToFull
+                    sizes="100vw"
                   />
                 );
               })()}

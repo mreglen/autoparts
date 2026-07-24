@@ -1,21 +1,30 @@
 import React from 'react';
-import { normalizeImageUrl } from '../../utils/apiClient';
+import {
+  normalizeImageUrl,
+  pickFullImageUrlNormalized,
+} from '../../utils/apiClient';
 import { buildProductPhotoAlt } from '../../utils/productSeo';
+import ProgressiveProductImage from '../../components/ProductMedia/ProgressiveProductImage';
 
 function isVideoItem(item) {
-  const url = getMediaUrl(item);
-  if (!url) return false;
-  const lower = url.toLowerCase();
-  const videoExt = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.mkv', '.webm', '.m4v', '.3gp', '.mpeg', '.mpg'];
-  if (videoExt.some((ext) => lower.endsWith(ext))) return true;
-  return lower.includes('/uploads/videos/') || lower.includes('video/');
+  if (!item) return false;
+  if (typeof item === 'string') {
+    const lower = item.toLowerCase();
+    return (
+      ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.mkv', '.webm', '.m4v', '.3gp', '.mpeg', '.mpg'].some((ext) =>
+        lower.endsWith(ext)
+      ) ||
+      lower.includes('/uploads/videos/') ||
+      lower.includes('video/')
+    );
+  }
+  const url = item.full_url || item.photo_url || item.url || '';
+  return isVideoItem(url);
 }
 
-function getMediaUrl(item) {
-  if (typeof item === 'string') return item;
-  if (item?.full_url) return item.full_url;
-  if (item?.photo_url) return item.photo_url;
-  return '';
+function getVideoUrl(item) {
+  if (typeof item === 'string') return normalizeImageUrl(item);
+  return pickFullImageUrlNormalized(item) || normalizeImageUrl(item?.photo_url || '');
 }
 
 export default function PartDetailDesktopGallery({
@@ -37,8 +46,8 @@ export default function PartDetailDesktopGallery({
   }
 
   const currentItem = items[currentIndex];
-  const mediaUrl = normalizeImageUrl(getMediaUrl(currentItem));
   const isVideo = isVideoItem(currentItem);
+  const mediaUrl = isVideo ? getVideoUrl(currentItem) : pickFullImageUrlNormalized(currentItem);
   const alt = mainAlt || buildProductPhotoAlt({ brand, article, name, isMain: true });
 
   return (
@@ -46,7 +55,6 @@ export default function PartDetailDesktopGallery({
       {items.length > 1 ? (
         <div className="flex max-h-[min(680px,72vh)] w-[4.75rem] shrink-0 flex-col gap-2.5 overflow-y-auto pr-0.5 lg:w-20">
           {items.map((item, index) => {
-            const thumbUrl = normalizeImageUrl(getMediaUrl(item));
             const thumbIsVideo = isVideoItem(item);
             const isActive = index === currentIndex;
             return (
@@ -62,7 +70,7 @@ export default function PartDetailDesktopGallery({
                 {thumbIsVideo ? (
                   <>
                     <video
-                      src={thumbUrl}
+                      src={getVideoUrl(item)}
                       className="h-full w-full object-cover"
                       muted
                       playsInline
@@ -75,11 +83,14 @@ export default function PartDetailDesktopGallery({
                     </div>
                   </>
                 ) : (
-                  <img
-                    src={thumbUrl}
+                  <ProgressiveProductImage
+                    photo={item}
                     alt={buildProductPhotoAlt({ brand, article, name, index })}
                     className="h-full w-full object-cover"
-                    loading="lazy"
+                    upgradeToFull={false}
+                    width={80}
+                    height={80}
+                    sizes="80px"
                   />
                 )}
               </button>
@@ -119,11 +130,14 @@ export default function PartDetailDesktopGallery({
               </div>
             </div>
           ) : (
-            <img
-              src={mediaUrl}
+            <ProgressiveProductImage
+              key={currentIndex}
+              photo={currentItem}
               alt={alt}
               className="h-full w-full object-contain"
-              loading="eager"
+              priority
+              upgradeToFull
+              sizes="(max-width:1024px) 90vw, 480px"
             />
           )}
         </div>

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
@@ -94,15 +94,22 @@ def _get_payment(db: Session, payment_id: int) -> SitePayment:
 @router.get("", response_model=List[SitePaymentView])
 def list_site_payments(
     scope: str = Query("active", pattern="^(active|history)$"),
+    date_from: Optional[date] = Query(None, description="Начало периода (по дате старта услуги)"),
+    date_to: Optional[date] = Query(None, description="Конец периода (по дате старта услуги)"),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
     del current_user
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise HTTPException(status_code=400, detail="Дата начала периода не может быть позже даты конца")
+
     q = db.query(SitePayment).order_by(SitePayment.created_at.desc())
     if scope == "active":
         q = q.filter(SitePayment.status.in_(ACTIVE_STATUSES))
-        # Also include partially paid still in active/paused — already covered.
-        # Exclude fully paid and cancelled from main list.
+    if date_from is not None:
+        q = q.filter(SitePayment.start_date >= date_from)
+    if date_to is not None:
+        q = q.filter(SitePayment.start_date <= date_to)
     rows = q.all()
     return [_to_view(row) for row in rows]
 
