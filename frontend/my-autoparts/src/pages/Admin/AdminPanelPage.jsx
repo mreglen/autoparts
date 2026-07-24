@@ -20,6 +20,7 @@ import ServerStatsPanel from './ServerStatsPanel';
 import OpenRouterSection from './OpenRouterSection';
 import BackupSection from './BackupSection';
 import AvitoPhotoLocalizationSection from './AvitoPhotoLocalizationSection';
+import ProductPhotoThumbsSection from './ProductPhotoThumbsSection';
 
 function AdminPanelPage() {
   const dispatch = useDispatch();
@@ -616,6 +617,7 @@ function AdminPanelPage() {
         )}
       </div>
 
+      <ProductPhotoThumbsSection />
       <AvitoPhotoLocalizationSection />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">

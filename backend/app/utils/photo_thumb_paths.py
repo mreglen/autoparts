@@ -12,6 +12,12 @@ def build_thumb_filename(final_filename: str) -> str:
 
 
 def build_thumb_media_path(media_path: str) -> str:
-    if media_path.endswith(".webp"):
-        return f"{media_path[:-5]}_thumb.webp"
-    return f"{media_path}_thumb.webp"
+    """Build thumb URL next to the original media path (any image extension)."""
+    path = (media_path or "").strip()
+    if not path:
+        return ""
+    parent, name = os.path.split(path.rstrip("/"))
+    thumb_name = build_thumb_filename(name or path)
+    if not parent or parent == ".":
+        return thumb_name if not path.startswith("/") else f"/{thumb_name}"
+    return f"{parent}/{thumb_name}"

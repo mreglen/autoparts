@@ -50,6 +50,10 @@ from app.services.photo_localization import (
     list_orgs_with_avito_photos,
     migrate_external_product_photos,
 )
+from app.services.product_photo_thumbs import (
+    generate_thumbs,
+    get_thumbs_stats,
+)
 from app.services.internal_code_migration import (
     format_changes_for_output,
     migrate_internal_codes,
@@ -175,6 +179,36 @@ class PhotoLocalizationOrgPreview(BaseModel):
 class PhotoLocalizationOrgsResponse(BaseModel):
     organizations: List[PhotoLocalizationOrgPreview]
     total_avito_photos: int = 0
+
+
+class ProductPhotoThumbsStatsResponse(BaseModel):
+    total: int
+    with_thumb: int
+    missing_thumb: int
+    external_skipped: int
+
+
+class ProductPhotoThumbsGenerateRequest(BaseModel):
+    mode: str = Field("missing", description="missing | force")
+    limit: int = Field(500, ge=1, le=5000)
+    batch_size: int = Field(50, ge=1, le=500)
+    failure_limit: int = Field(30, ge=1, le=200)
+
+
+class ProductPhotoThumbsFailure(BaseModel):
+    photo_id: int
+    photo_url: str
+    reason: str
+
+
+class ProductPhotoThumbsGenerateResponse(BaseModel):
+    mode: str
+    processed: int
+    created: int
+    linked_existing_file: int
+    skipped: int
+    failed: int
+    failures: List[ProductPhotoThumbsFailure]
 
 
 class InternalCodeMigrationRequest(BaseModel):
@@ -434,6 +468,75 @@ def localize_external_product_photos_admin(
         skipped=counters.skipped,
         failures=failures,
         by_org=by_org,
+    )
+
+
+@router.get("/photos/thumbs/stats", response_model=ProductPhotoThumbsStatsResponse)
+def product_photo_thumbs_stats(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    stats = get_thumbs_stats(db)
+    return ProductPhotoThumbsStatsResponse(
+        total=stats.total,
+        with_thumb=stats.with_thumb,
+        missing_thumb=stats.missing_thumb,
+        external_skipped=stats.external_skipped,
+    )
+
+
+@router.post("/photos/thumbs/generate", response_model=ProductPhotoThumbsGenerateResponse)
+def product_photo_thumbs_generate(
+    payload: ProductPhotoThumbsGenerateRequest,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    mode = (payload.mode or "missing").strip().lower()
+    if mode not in ("missing", "force"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="mode must be 'missing' or 'force'",
+        )
+    result = generate_thumbs(
+        db,
+        mode=mode,
+        limit=payload.limit,
+        batch_size=payload.batch_size,
+        failure_limit=payload.failure_limit,
+        invalidate_cache=True,
+    )
+    log_audit(
+        db,
+        event_type="admin_product_photo_thumbs_run",
+        category="admin",
+        summary="Запущена генерация превью фото товаров",
+        user=current_user,
+        details={
+            "mode": result.mode,
+            "limit": payload.limit,
+            "batch_size": payload.batch_size,
+            "processed": result.processed,
+            "created": result.created,
+            "linked_existing_file": result.linked_existing_file,
+            "skipped": result.skipped,
+            "failed": result.failed,
+        },
+    )
+    return ProductPhotoThumbsGenerateResponse(
+        mode=result.mode,
+        processed=result.processed,
+        created=result.created,
+        linked_existing_file=result.linked_existing_file,
+        skipped=result.skipped,
+        failed=result.failed,
+        failures=[
+            ProductPhotoThumbsFailure(
+                photo_id=f.photo_id,
+                photo_url=f.photo_url,
+                reason=f.reason,
+            )
+            for f in result.failures
+        ],
     )
 
 
