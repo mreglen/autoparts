@@ -353,6 +353,8 @@ export default function SeoTab() {
   const [sitemapData, setSitemapData] = useState(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadedFilename, setDownloadedFilename] = useState(null);
+  const [downloadingQueries, setDownloadingQueries] = useState(false);
+  const [downloadedQueriesFilename, setDownloadedQueriesFilename] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -377,33 +379,55 @@ export default function SeoTab() {
     load();
   }, [load]);
 
+  const downloadTxtAttachment = async (path, fallbackName) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || 'Ошибка скачивания');
+    }
+    const blob = await response.blob();
+    const match = (response.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
+    const filename = match?.[1] || fallbackName;
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    return filename;
+  };
+
   const downloadUrls = async () => {
     setDownloading(true);
     setError(null);
     setDownloadedFilename(null);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/admin/seo/product-card-urls`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || 'Ошибка скачивания');
-      }
-      const blob = await response.blob();
-      const match = (response.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
-      const filename = match?.[1] || 'urls.txt';
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.click();
-      window.URL.revokeObjectURL(url);
+      const filename = await downloadTxtAttachment('/admin/seo/product-card-urls', 'urls.txt');
       setDownloadedFilename(filename);
     } catch (e) {
       setError(e?.message || 'Ошибка скачивания');
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const downloadQueries = async () => {
+    setDownloadingQueries(true);
+    setError(null);
+    setDownloadedQueriesFilename(null);
+    try {
+      const filename = await downloadTxtAttachment(
+        '/admin/seo/popular-queries-export?limit=500',
+        'seo-queries.txt',
+      );
+      setDownloadedQueriesFilename(filename);
+    } catch (e) {
+      setError(e?.message || 'Ошибка скачивания запросов');
+    } finally {
+      setDownloadingQueries(false);
     }
   };
 
@@ -502,6 +526,22 @@ export default function SeoTab() {
         </div>
         {downloadedFilename ? (
           <p className="mt-3 text-sm text-gray-600">Скачан файл {downloadedFilename}</p>
+        ) : null}
+      </div>
+
+      <div className="rounded border border-gray-200 bg-white p-4">
+        <h2 className="text-base font-semibold text-gray-900">Выгрузка SEO-запросов</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          ~500 запросов: популярные поиски + вариации из топ-карточек (города РФ, чаще
+          Екатеринбург) — по одному запросу на строку.
+        </p>
+        <div className="mt-4">
+          <ActionButton disabled={downloadingQueries} onClick={downloadQueries}>
+            {downloadingQueries ? '…' : 'Скачать 500 запросов'}
+          </ActionButton>
+        </div>
+        {downloadedQueriesFilename ? (
+          <p className="mt-3 text-sm text-gray-600">Скачан файл {downloadedQueriesFilename}</p>
         ) : null}
       </div>
 

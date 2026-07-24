@@ -1839,6 +1839,35 @@ def download_product_card_urls(
     )
 
 
+@router.get("/seo/popular-queries-export")
+def download_popular_seo_queries(
+    limit: int = Query(500, ge=1, le=1000),
+    days: int = Query(30, ge=1, le=90),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    del current_user
+    from app.services.seo_query_export import build_seo_queries_export
+
+    content, total_count, export_date = build_seo_queries_export(
+        db,
+        limit=limit,
+        days=days,
+    )
+    if total_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Нет данных для формирования списка SEO-запросов",
+        )
+
+    filename = f"seo-queries-{export_date.isoformat()}-{total_count}.txt"
+    return Response(
+        content=content.encode("utf-8"),
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/seo/kpi/dashboard")
 def get_seo_kpi_dashboard(
     days: int = Query(14, ge=1, le=90),
