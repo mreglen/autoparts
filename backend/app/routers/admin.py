@@ -54,6 +54,10 @@ from app.services.product_photo_thumbs import (
     generate_thumbs,
     get_thumbs_stats,
 )
+from app.services.product_photo_reprocess import (
+    get_reprocess_stats,
+    reprocess_stuck_photos,
+)
 from app.services.internal_code_migration import (
     format_changes_for_output,
     migrate_internal_codes,
@@ -209,6 +213,34 @@ class ProductPhotoThumbsGenerateResponse(BaseModel):
     skipped: int
     failed: int
     failures: List[ProductPhotoThumbsFailure]
+
+
+class ProductPhotoReprocessStatsResponse(BaseModel):
+    total_photos: int
+    temp_url: int
+    unfinished_status: int
+    reprocess_candidates: int
+
+
+class ProductPhotoReprocessRequest(BaseModel):
+    limit: int = Field(50, ge=1, le=500)
+    only_temp: bool = True
+    failure_limit: int = Field(30, ge=1, le=200)
+
+
+class ProductPhotoReprocessFailure(BaseModel):
+    photo_id: int
+    photo_url: str
+    reason: str
+
+
+class ProductPhotoReprocessResponse(BaseModel):
+    processed: int
+    queued: int
+    skipped: int
+    failed: int
+    task_ids: List[str] = []
+    failures: List[ProductPhotoReprocessFailure] = []
 
 
 class InternalCodeMigrationRequest(BaseModel):
@@ -531,6 +563,65 @@ def product_photo_thumbs_generate(
         failed=result.failed,
         failures=[
             ProductPhotoThumbsFailure(
+                photo_id=f.photo_id,
+                photo_url=f.photo_url,
+                reason=f.reason,
+            )
+            for f in result.failures
+        ],
+    )
+
+
+@router.get("/photos/reprocess/stats", response_model=ProductPhotoReprocessStatsResponse)
+def product_photo_reprocess_stats(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    stats = get_reprocess_stats(db)
+    return ProductPhotoReprocessStatsResponse(
+        total_photos=stats.total_photos,
+        temp_url=stats.temp_url,
+        unfinished_status=stats.unfinished_status,
+        reprocess_candidates=stats.reprocess_candidates,
+    )
+
+
+@router.post("/photos/reprocess", response_model=ProductPhotoReprocessResponse)
+def product_photo_reprocess(
+    payload: ProductPhotoReprocessRequest,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    result = reprocess_stuck_photos(
+        db,
+        limit=payload.limit,
+        only_temp=payload.only_temp,
+        failure_limit=payload.failure_limit,
+        invalidate_cache=True,
+    )
+    log_audit(
+        db,
+        event_type="admin_product_photo_reprocess_run",
+        category="admin",
+        summary="Запущена повторная обработка застрявших фото товаров",
+        user=current_user,
+        details={
+            "limit": payload.limit,
+            "only_temp": payload.only_temp,
+            "processed": result.processed,
+            "queued": result.queued,
+            "skipped": result.skipped,
+            "failed": result.failed,
+        },
+    )
+    return ProductPhotoReprocessResponse(
+        processed=result.processed,
+        queued=result.queued,
+        skipped=result.skipped,
+        failed=result.failed,
+        task_ids=result.task_ids,
+        failures=[
+            ProductPhotoReprocessFailure(
                 photo_id=f.photo_id,
                 photo_url=f.photo_url,
                 reason=f.reason,

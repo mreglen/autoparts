@@ -21,6 +21,7 @@ import OpenRouterSection from './OpenRouterSection';
 import BackupSection from './BackupSection';
 import AvitoPhotoLocalizationSection from './AvitoPhotoLocalizationSection';
 import ProductPhotoThumbsSection from './ProductPhotoThumbsSection';
+import ProductPhotoReprocessSection from './ProductPhotoReprocessSection';
 
 function AdminPanelPage() {
   const dispatch = useDispatch();
@@ -618,6 +619,7 @@ function AdminPanelPage() {
       </div>
 
       <ProductPhotoThumbsSection />
+      <ProductPhotoReprocessSection />
       <AvitoPhotoLocalizationSection />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
