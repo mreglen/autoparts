@@ -2818,43 +2818,41 @@ def ensure_organization_drom_api_columns() -> None:
     is_pg = engine.dialect.name == "postgresql"
     statements: list[str] = []
 
-    if "packet_id" not in columns:
-        statements.append("ALTER TABLE organization_drom_integration ADD COLUMN packet_id VARCHAR(64)")
-    if "api_key_encrypted" not in columns:
-        statements.append("ALTER TABLE organization_drom_integration ADD COLUMN api_key_encrypted TEXT")
-    if "auto_sync_enabled" not in columns:
+    def _add(col: str, ddl_type: str) -> None:
+        if col in columns:
+            return
         if is_pg:
             statements.append(
-                "ALTER TABLE organization_drom_integration "
-                "ADD COLUMN auto_sync_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+                f"ALTER TABLE organization_drom_integration ADD COLUMN IF NOT EXISTS {col} {ddl_type}"
             )
         else:
-            statements.append(
-                "ALTER TABLE organization_drom_integration "
-                "ADD COLUMN auto_sync_enabled BOOLEAN NOT NULL DEFAULT 1"
-            )
-    if "last_sync_at" not in columns:
-        if is_pg:
-            statements.append(
-                "ALTER TABLE organization_drom_integration ADD COLUMN last_sync_at TIMESTAMPTZ"
-            )
-        else:
-            statements.append(
-                "ALTER TABLE organization_drom_integration ADD COLUMN last_sync_at DATETIME"
-            )
-    if "last_sync_status" not in columns:
-        statements.append("ALTER TABLE organization_drom_integration ADD COLUMN last_sync_status INTEGER")
-    if "last_sync_error" not in columns:
-        statements.append(
-            "ALTER TABLE organization_drom_integration ADD COLUMN last_sync_error VARCHAR(1000)"
-        )
+            statements.append(f"ALTER TABLE organization_drom_integration ADD COLUMN {col} {ddl_type}")
+
+    _add("packet_id", "VARCHAR(64)")
+    _add("api_key_encrypted", "TEXT")
+    if is_pg:
+        _add("auto_sync_enabled", "BOOLEAN NOT NULL DEFAULT TRUE")
+        _add("last_sync_at", "TIMESTAMPTZ")
+    else:
+        _add("auto_sync_enabled", "BOOLEAN NOT NULL DEFAULT 1")
+        _add("last_sync_at", "DATETIME")
+    _add("last_sync_status", "INTEGER")
+    _add("last_sync_error", "VARCHAR(1000)")
 
     if not statements:
         return
 
     with engine.begin() as conn:
         for stmt in statements:
-            conn.execute(text(stmt))
+            try:
+                conn.execute(text(stmt))
+            except Exception as exc:
+                # Parallel gunicorn workers may race on first boot.
+                msg = str(exc).lower()
+                if "already exists" in msg or "duplicate column" in msg:
+                    logger.info("Drom column patch already applied concurrently: %s", stmt)
+                    continue
+                raise
     logger.info("Applied organization_drom_integration API column patches: %s", statements)
 
 
