@@ -394,14 +394,30 @@ def _remove_from_drom_xlsx(
     organization_id: str,
     processed_products: list[dict[str, Any]],
 ) -> None:
-    """Удалить товары из Drom xlsx файла номенклатуры."""
-    from app.services.drom_autoload_xlsx import remove_product_from_drom_autoload
+    """Удалить товары из Drom xlsx и отправить qty=0 в API (если auto_sync)."""
+    from datetime import datetime, timezone
+
+    from app.models.organization_drom_integration import OrganizationDromIntegration
+    from app.services.drom_api import sync_price_list_chunks_sync
+    from app.services.drom_autoload_xlsx import (
+        chunk_export_rows_for_drom_sync,
+        remove_product_from_drom_autoload,
+        zero_quantity_rows_for_articles,
+    )
+    from app.utils.avito_crypto import decrypt_secret
 
     try:
+        articles = [
+            str(p.get("article") or "").strip()
+            for p in processed_products
+            if str(p.get("article") or "").strip()
+        ]
         cache = db.query(OrganizationDromAutoloadCache).filter_by(organization_id=organization_id).first()
         xlsx_path = None
         if cache and cache.saved_path:
             candidate = Path(cache.saved_path)
+            if not candidate.is_absolute():
+                candidate = Path(__file__).resolve().parents[2] / cache.saved_path.lstrip("/")
             if candidate.is_file():
                 xlsx_path = candidate
 
@@ -411,24 +427,58 @@ def _remove_from_drom_xlsx(
             autoload_path = drom_dir / "autoload.xlsx"
             xlsx_path = export_path if export_path.exists() else autoload_path
 
-        if not xlsx_path.exists():
+        if xlsx_path.exists():
+            existing_bytes = xlsx_path.read_bytes()
+            current_bytes = existing_bytes
+            for article in articles:
+                try:
+                    current_bytes = remove_product_from_drom_autoload(current_bytes, article)
+                    logger.info("Removed product %s from Drom xlsx", article)
+                except Exception as e:
+                    logger.error("Error removing product %s from Drom xlsx: %s", article, e)
+
+            xlsx_path.write_bytes(current_bytes)
+            _update_drom_cache(db, organization_id, current_bytes)
+        else:
             logger.warning("Drom xlsx file not found: %s", xlsx_path)
-            return
 
-        existing_bytes = xlsx_path.read_bytes()
-        current_bytes = existing_bytes
-        for product_info in processed_products:
-            article = product_info.get("article")
-            if not article:
-                continue
+        # API sync: удаление через количество 0
+        integration = (
+            db.query(OrganizationDromIntegration)
+            .filter_by(organization_id=organization_id)
+            .first()
+        )
+        if (
+            integration
+            and integration.is_enabled
+            and integration.auto_sync_enabled
+            and integration.packet_id
+            and integration.api_key_encrypted
+            and articles
+        ):
             try:
-                current_bytes = remove_product_from_drom_autoload(current_bytes, article)
-                logger.info("Removed product %s from Drom xlsx", article)
+                api_key = decrypt_secret(integration.api_key_encrypted)
+                zero_rows = zero_quantity_rows_for_articles(articles)
+                chunks = chunk_export_rows_for_drom_sync(zero_rows)
+                result = sync_price_list_chunks_sync(
+                    packet_id=integration.packet_id,
+                    api_key=api_key,
+                    chunks=chunks,
+                )
+                integration.last_sync_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                integration.last_sync_status = result.status_code if result.status_code else None
+                integration.last_sync_error = (
+                    None if result.ok else (result.error_message or result.error_code)
+                )
+                db.commit()
+                logger.info(
+                    "Drom API qty=0 sync for org %s: ok=%s status=%s",
+                    organization_id,
+                    result.ok,
+                    result.status_code,
+                )
             except Exception as e:
-                logger.error("Error removing product %s from Drom xlsx: %s", article, e)
-
-        xlsx_path.write_bytes(current_bytes)
-        _update_drom_cache(db, organization_id, current_bytes)
+                logger.error("Drom API qty=0 sync failed: %s", e, exc_info=True)
 
     except Exception as e:
         logger.error("Error removing products from Drom xlsx: %s", e, exc_info=True)

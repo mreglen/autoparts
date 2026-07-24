@@ -9,6 +9,7 @@ from app.db.schema_patches import (
     ensure_garage_used_order_item_payment_columns,
     ensure_garage_order_delivery_columns,
     ensure_organization_markup_columns,
+    ensure_organization_drom_api_columns,
     ensure_stock_out_source_columns,
     ensure_avito_pro_status_columns,
     ensure_site_reviews_table,
@@ -164,6 +165,7 @@ except Exception as e:
 
 try:
     ensure_organization_markup_columns()
+    ensure_organization_drom_api_columns()
     ensure_stock_out_source_columns()
     ensure_garage_used_order_item_fulfillment_columns()
     ensure_garage_used_order_item_payment_columns()
@@ -599,7 +601,7 @@ async def run_weekly_backups():
     try:
         from app.services.backup_service import run_scheduled_backups
 
-        result = run_scheduled_backups()
+        result = await asyncio.to_thread(run_scheduled_backups)
         logger.info("Weekly backups completed: %s", result)
     except Exception as e:
         logger.error("Ошибка еженедельного резервного копирования: %s", e)

@@ -2808,6 +2808,56 @@ def ensure_payment_methods_tables() -> None:
             logger.info("Applied stock_out.payment_method column patch")
 
 
+def ensure_organization_drom_api_columns() -> None:
+    """Add Drom price-list API credentials and sync status columns."""
+    inspector = inspect(engine)
+    if "organization_drom_integration" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("organization_drom_integration")}
+    is_pg = engine.dialect.name == "postgresql"
+    statements: list[str] = []
+
+    if "packet_id" not in columns:
+        statements.append("ALTER TABLE organization_drom_integration ADD COLUMN packet_id VARCHAR(64)")
+    if "api_key_encrypted" not in columns:
+        statements.append("ALTER TABLE organization_drom_integration ADD COLUMN api_key_encrypted TEXT")
+    if "auto_sync_enabled" not in columns:
+        if is_pg:
+            statements.append(
+                "ALTER TABLE organization_drom_integration "
+                "ADD COLUMN auto_sync_enabled BOOLEAN NOT NULL DEFAULT TRUE"
+            )
+        else:
+            statements.append(
+                "ALTER TABLE organization_drom_integration "
+                "ADD COLUMN auto_sync_enabled BOOLEAN NOT NULL DEFAULT 1"
+            )
+    if "last_sync_at" not in columns:
+        if is_pg:
+            statements.append(
+                "ALTER TABLE organization_drom_integration ADD COLUMN last_sync_at TIMESTAMPTZ"
+            )
+        else:
+            statements.append(
+                "ALTER TABLE organization_drom_integration ADD COLUMN last_sync_at DATETIME"
+            )
+    if "last_sync_status" not in columns:
+        statements.append("ALTER TABLE organization_drom_integration ADD COLUMN last_sync_status INTEGER")
+    if "last_sync_error" not in columns:
+        statements.append(
+            "ALTER TABLE organization_drom_integration ADD COLUMN last_sync_error VARCHAR(1000)"
+        )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.info("Applied organization_drom_integration API column patches: %s", statements)
+
+
 def ensure_seo_new_parts_sync_settings_table() -> None:
     """Create seo_new_parts_sync_settings singleton (id=1) for runtime SEO rate controls."""
     inspector = inspect(engine)

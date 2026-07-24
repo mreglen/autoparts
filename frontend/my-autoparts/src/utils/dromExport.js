@@ -21,10 +21,19 @@ export function formatDromLocalErrors(errors, limit = 5) {
 
 export function formatDromExportMessage(data) {
   const count = data?.exported_count ?? data?.items?.length ?? 0;
-  const base = `Экспорт в Drom выполнен (${count} товар(ов)).`;
+  let base = `Экспорт в Drom выполнен (${count} товар(ов)).`;
+
+  if (data?.sync?.ok) {
+    base += ` Отправлено в API Drom (чанков: ${data.sync.chunks_sent || 1}).`;
+  } else if (data?.sync?.skipped) {
+    base += ' API sync пропущен — проверьте настройки интеграции.';
+  } else if (data?.sync && data.sync.ok === false) {
+    base += ` Ошибка API: ${data.sync.error_message || data.sync.error_code || 'неизвестно'}.`;
+  }
+
   if (data?.local_validation_ok === false && data?.local_errors?.length) {
     const errText = formatDromLocalErrors(data.local_errors);
     return `${base}\n\nЕсть ошибки валидации XLSX:\n${errText}\n\nСкачайте файл в настройках Drom и исправьте данные.`;
   }
-  return `${base} Скачайте XLSX в «Настройки → Интеграции → Drom».`;
+  return `${base} Файл и статус sync — в «Настройки → Интеграции → Drom».`;
 }

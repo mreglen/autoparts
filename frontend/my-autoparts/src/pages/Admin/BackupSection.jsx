@@ -30,10 +30,25 @@ function triggerLabel(trigger) {
   return trigger;
 }
 
+function formatApiError(err, fallback) {
+  if (!err) return fallback;
+  if (typeof err === 'string') return err;
+  if (Array.isArray(err)) {
+    return err.map((item) => item?.msg || String(item)).join('; ') || fallback;
+  }
+  if (typeof err === 'object' && err.msg) return err.msg;
+  return fallback;
+}
+
 async function downloadBackupResponse(response, fallbackName) {
   if (!response.ok) {
+    if (response.status === 502 || response.status === 504) {
+      throw new Error(
+        'Сервер не успел отдать файл (таймаут прокси). Создайте копию отдельно и скачайте из списка.'
+      );
+    }
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail || 'Ошибка скачивания');
+    throw new Error(formatApiError(err.detail, 'Ошибка скачивания'));
   }
   const blob = await response.blob();
   const match = (response.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
@@ -47,6 +62,32 @@ async function downloadBackupResponse(response, fallbackName) {
   return filename;
 }
 
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForBackupJob(jobId, { onProgress } = {}) {
+  const started = Date.now();
+  const maxMs = 45 * 60 * 1000;
+  while (Date.now() - started < maxMs) {
+    const response = await fetch(`${API_BASE}/admin/backups/jobs/${encodeURIComponent(jobId)}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(formatApiError(err.detail, 'Не удалось получить статус задачи'));
+    }
+    const job = await response.json();
+    if (typeof onProgress === 'function') onProgress(job);
+    if (job.status === 'done') return job;
+    if (job.status === 'error') {
+      throw new Error(job.error || 'Ошибка создания резервной копии');
+    }
+    await sleep(2000);
+  }
+  throw new Error('Создание резервной копии занимает слишком долго. Проверьте список позже.');
+}
+
 export default function BackupSection() {
   const [backups, setBackups] = useState([]);
   const [retentionCount, setRetentionCount] = useState(8);
@@ -56,6 +97,8 @@ export default function BackupSection() {
   const [notice, setNotice] = useState(null);
   const [busyDb, setBusyDb] = useState(false);
   const [busyUploads, setBusyUploads] = useState(false);
+  const [progressDb, setProgressDb] = useState(null);
+  const [progressUploads, setProgressUploads] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
@@ -65,7 +108,7 @@ export default function BackupSection() {
     });
     if (!rows.ok) {
       const err = await rows.json().catch(() => ({}));
-      throw new Error(err.detail || 'Не удалось загрузить список резервных копий');
+      throw new Error(formatApiError(err.detail, 'Не удалось загрузить список резервных копий'));
     }
     const data = await rows.json();
     if (Array.isArray(data)) {
@@ -96,24 +139,58 @@ export default function BackupSection() {
   const createAndDownload = async (kind) => {
     const isDb = kind === 'db';
     const setBusy = isDb ? setBusyDb : setBusyUploads;
+    const setProgress = isDb ? setProgressDb : setProgressUploads;
     setBusy(true);
     setError(null);
     setNotice(null);
+    setProgress('Запуск…');
     try {
-      const response = await fetch(`${API_BASE}/admin/backups/${kind}/download`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
+      const startResponse = await fetch(
+        `${API_BASE}/admin/backups/jobs/${isDb ? 'database' : 'uploads'}`,
+        {
+          method: 'POST',
+          headers: getAuthHeaders(),
+        }
+      );
+      if (!startResponse.ok) {
+        if (startResponse.status === 502 || startResponse.status === 504) {
+          throw new Error('Прокси оборвал запрос (502/504). Обновите nginx-таймауты для /admin/backups/.');
+        }
+        const err = await startResponse.json().catch(() => ({}));
+        throw new Error(formatApiError(err.detail, 'Не удалось запустить создание копии'));
+      }
+      const started = await startResponse.json();
+      const jobId = started?.id;
+      if (!jobId) throw new Error('Сервер не вернул id задачи');
+
+      setProgress('Создание на сервере…');
+      const job = await waitForBackupJob(jobId, {
+        onProgress: () => setProgress('Создание на сервере…'),
       });
+      const backupId = job?.result?.id;
+      if (!backupId) throw new Error('Копия создана, но id файла не получен');
+
+      setProgress('Скачивание…');
+      const response = await fetch(
+        `${API_BASE}/admin/backups/${encodeURIComponent(backupId)}/download`,
+        { headers: getAuthHeaders() }
+      );
       const filename = await downloadBackupResponse(
         response,
         isDb ? 'database-backup.sql.gz' : 'uploads-backup.tar.gz'
       );
-      setNotice(`Скачан файл: ${filename}`);
+      setNotice(`Готово: ${filename}`);
       await loadBackups();
     } catch (e) {
       setError(e?.message || 'Ошибка создания резервной копии');
+      try {
+        await loadBackups();
+      } catch {
+        /* ignore */
+      }
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -146,7 +223,7 @@ export default function BackupSection() {
       });
       if (!response.ok && response.status !== 204) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.detail || 'Не удалось удалить');
+        throw new Error(formatApiError(err.detail, 'Не удалось удалить'));
       }
       setNotice('Резервная копия удалена');
       await loadBackups();
@@ -163,8 +240,8 @@ export default function BackupSection() {
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Резервные копии</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Еженедельное автоматическое сохранение БД и папки uploads в каталог на сервере.
-            По кнопке создаётся свежая копия и сразу скачивается.
+            Еженедельное автоматическое сохранение БД и папки uploads на сервере.
+            Кнопка запускает создание в фоне (без обрыва по таймауту 60 с), затем скачивает готовый файл.
           </p>
         </div>
       </div>
@@ -180,24 +257,29 @@ export default function BackupSection() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row gap-3 mb-2">
         <button
           type="button"
-          disabled={busyDb}
-          onClick={() => createAndDownload('database')}
+          disabled={busyDb || busyUploads}
+          onClick={() => createAndDownload('db')}
           className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
         >
-          {busyDb ? 'Создание копии БД…' : 'Скачать базу данных'}
+          {busyDb ? progressDb || 'Создание копии БД…' : 'Создать и скачать БД'}
         </button>
         <button
           type="button"
-          disabled={busyUploads}
+          disabled={busyDb || busyUploads}
           onClick={() => createAndDownload('uploads')}
           className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-gray-800 text-white text-sm font-medium hover:bg-gray-900 disabled:opacity-50"
         >
-          {busyUploads ? 'Архивирование uploads…' : 'Скачать uploads'}
+          {busyUploads ? progressUploads || 'Архивирование uploads…' : 'Создать и скачать uploads'}
         </button>
       </div>
+      {(progressDb || progressUploads) && (
+        <p className="text-xs text-gray-500 mb-4">
+          {progressDb || progressUploads} Архив больших uploads может занять несколько минут.
+        </p>
+      )}
 
       <div className="text-sm text-gray-500 mb-3">
         Хранится последних {retentionCount} копий каждого типа. Автобэкап — по воскресеньям в {weeklyHourUtc}:00 UTC.

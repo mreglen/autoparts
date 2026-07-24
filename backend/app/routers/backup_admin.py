@@ -15,8 +15,10 @@ from app.services.backup_service import (
     cleanup_old_backups,
     create_database_backup,
     create_uploads_backup,
+    get_backup_job,
     list_backups,
     resolve_backup_path,
+    start_backup_job,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,11 +46,24 @@ def get_backups(
     }
 
 
+@router.get("/jobs/{job_id}")
+def get_job_status(
+    job_id: str,
+    current_user: User = Depends(get_current_admin_user),
+):
+    del current_user
+    job = get_backup_job(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Задача не найдена")
+    return job
+
+
 @router.post("/database")
 def create_database_backup_now(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
+    """Синхронное создание (для небольших БД). Для UI предпочтительнее /jobs."""
     try:
         item = create_database_backup(trigger="manual")
     except RuntimeError as exc:
@@ -104,11 +119,48 @@ def create_uploads_backup_now(
     return item.to_dict()
 
 
+@router.post("/jobs/database")
+def start_database_backup_job(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    job = start_backup_job("db", trigger="manual")
+    log_audit(
+        db,
+        event_type="backup_database_started",
+        category="settings",
+        summary="Запущено создание резервной копии БД",
+        user=current_user,
+        entity_type="backup_job",
+        entity_id=job.get("id"),
+    )
+    return job
+
+
+@router.post("/jobs/uploads")
+def start_uploads_backup_job(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    job = start_backup_job("uploads", trigger="manual")
+    log_audit(
+        db,
+        event_type="backup_uploads_started",
+        category="settings",
+        summary="Запущено создание резервной копии uploads",
+        user=current_user,
+        entity_type="backup_job",
+        entity_id=job.get("id"),
+    )
+    return job
+
+
 @router.post("/database/download")
 def create_and_download_database_backup(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
 ):
+    """Совместимость: создать и отдать файл. Может упираться в proxy timeout — лучше /jobs."""
     try:
         item = create_database_backup(trigger="manual")
     except RuntimeError as exc:

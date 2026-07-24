@@ -44,11 +44,17 @@ class BackupServiceTests(unittest.TestCase):
             names = archive.getnames()
         self.assertIn("uploads/pictures/org1/photo.webp", names)
 
-    @patch("app.services.backup_service.subprocess.run")
+    @patch("app.services.backup_service.subprocess.Popen")
     @patch("app.services.backup_service._ensure_pg_dump_available", return_value="/usr/bin/pg_dump")
     @patch("app.services.backup_service._database_url_supports_backup", return_value=True)
-    def test_create_database_backup_uses_pg_dump(self, _supports, _pg_dump, mock_run):
-        mock_run.return_value = MagicMock(returncode=0, stdout=b"SELECT 1;", stderr=b"")
+    def test_create_database_backup_uses_pg_dump(self, _supports, _pg_dump, mock_popen):
+        process = MagicMock()
+        process.stdout = MagicMock()
+        process.stdout.read.side_effect = [b"SELECT 1;", b""]
+        process.stderr = MagicMock()
+        process.stderr.read.return_value = b""
+        process.wait.return_value = 0
+        mock_popen.return_value = process
 
         item = backup_service.create_database_backup(trigger="manual")
         self.assertEqual(item.backup_type, "db")
@@ -56,6 +62,29 @@ class BackupServiceTests(unittest.TestCase):
         with gzip.open(path, "rb") as gz_file:
             content = gz_file.read()
         self.assertEqual(content, b"SELECT 1;")
+
+    def test_start_backup_job_completes(self):
+        with patch.object(backup_service, "create_uploads_backup") as mock_create:
+            mock_create.return_value = backup_service.BackupItem(
+                id="uploads-manual-20260101-000000.tar.gz",
+                backup_type="uploads",
+                trigger="manual",
+                filename="uploads-manual-20260101-000000.tar.gz",
+                size_bytes=10,
+                created_at="2026-01-01T00:00:00+00:00",
+            )
+            job = backup_service.start_backup_job("uploads", trigger="manual")
+            self.assertEqual(job["status"], "running")
+            for _ in range(50):
+                current = backup_service.get_backup_job(job["id"])
+                if current and current["status"] != "running":
+                    break
+                import time
+
+                time.sleep(0.05)
+            current = backup_service.get_backup_job(job["id"])
+            self.assertIsNotNone(current)
+            self.assertEqual(current["status"], "done")
 
     def test_cleanup_old_backups_keeps_recent(self):
         now = datetime.now(timezone.utc)

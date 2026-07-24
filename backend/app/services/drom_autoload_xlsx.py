@@ -280,6 +280,98 @@ def upsert_products_to_drom_autoload(
     return out.getvalue()
 
 
+def build_drom_delta_xlsx(
+    export_rows: list[dict[str, Any]],
+    public_base_url: str = "",
+) -> bytes:
+    """Минимальный XLSX с заголовком шаблона и только переданными строками (для API sync)."""
+    header_only = build_drom_header_only_xlsx()
+    return upsert_products_to_drom_autoload(header_only, export_rows, public_base_url)
+
+
+def build_drom_header_only_xlsx() -> bytes:
+    """XLSX только с заголовками шаблона — для проверки packetId/auth."""
+    template_path = Path(__file__).resolve().parents[2] / TEMPLATE_XLSX_REL_PATH
+    if not template_path.is_file():
+        raise FileNotFoundError(f"Шаблон Drom не найден: {template_path}")
+    wb = load_workbook(str(template_path), read_only=False)
+    ws = wb.active
+    # Удаляем все строки данных, оставляем заголовок
+    max_row = ws.max_row or 1
+    if max_row > 1:
+        ws.delete_rows(2, max_row - 1)
+    out = BytesIO()
+    wb.save(out)
+    wb.close()
+    return out.getvalue()
+
+
+def chunk_export_rows_for_drom_sync(
+    export_rows: list[dict[str, Any]],
+    *,
+    public_base_url: str = "",
+    max_bytes: int = 5 * 1024 * 1024,
+) -> list[bytes]:
+    """
+    Разбить строки на XLSX-чанки ≤ max_bytes (лимит Drom API).
+    Гарантирует хотя бы один чанк на строку, если одна строка всё же больше лимита —
+    вызывающий код должен обработать ошибку API.
+    """
+    if not export_rows:
+        return []
+
+    chunks: list[bytes] = []
+    batch: list[dict[str, Any]] = []
+
+    def flush() -> None:
+        nonlocal batch
+        if not batch:
+            return
+        chunks.append(build_drom_delta_xlsx(batch, public_base_url))
+        batch = []
+
+    for row in export_rows:
+        candidate = batch + [row]
+        candidate_bytes = build_drom_delta_xlsx(candidate, public_base_url)
+        if len(candidate_bytes) <= max_bytes:
+            batch = candidate
+            continue
+        # Текущий batch не вмещает row — сбрасываем batch и начинаем новый
+        flush()
+        single = build_drom_delta_xlsx([row], public_base_url)
+        if len(single) <= max_bytes:
+            batch = [row]
+        else:
+            # Одна строка больше лимита — всё равно отдаём (API вернёт ошибку)
+            chunks.append(single)
+            batch = []
+
+    flush()
+    return chunks
+
+
+def zero_quantity_rows_for_articles(articles: list[str]) -> list[dict[str, Any]]:
+    """Строки для удаления через API: количество 0."""
+    rows: list[dict[str, Any]] = []
+    for article in articles:
+        art = str(article or "").strip()
+        if not art:
+            continue
+        rows.append(
+            {
+                "article": art,
+                "name": art,
+                "is_new": False,
+                "brand": "",
+                "price": 1,
+                "quantity": 0,
+                "photos": [],
+                "storage_address": "",
+            }
+        )
+    return rows
+
+
 def remove_product_from_drom_autoload(
     existing_xlsx: bytes,
     article: str,

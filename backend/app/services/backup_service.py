@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import gzip
+import json
 import logging
 import os
 import re
 import shutil
 import subprocess
 import tarfile
+import threading
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy.engine import make_url
 
@@ -26,6 +29,9 @@ BACKUP_FILENAME_RE = re.compile(
 
 BackupType = Literal["db", "uploads"]
 BackupTrigger = Literal["manual", "scheduled"]
+
+_jobs_lock = threading.Lock()
+_backup_jobs: dict[str, dict[str, Any]] = {}
 
 
 @dataclass(frozen=True)
@@ -138,6 +144,9 @@ def _ensure_pg_dump_available() -> str:
         Path(r"C:\Program Files\PostgreSQL\14\bin\pg_dump.exe"),
         Path(r"C:\Program Files\PostgreSQL\13\bin\pg_dump.exe"),
         Path("/usr/bin/pg_dump"),
+        Path("/usr/lib/postgresql/16/bin/pg_dump"),
+        Path("/usr/lib/postgresql/15/bin/pg_dump"),
+        Path("/usr/lib/postgresql/14/bin/pg_dump"),
         Path("/usr/local/bin/pg_dump"),
     ]
     for candidate in common_candidates:
@@ -171,6 +180,7 @@ def create_database_backup(*, trigger: BackupTrigger = "manual") -> BackupItem:
 
     filename = _build_filename("db", trigger)
     output_path = get_backup_dir() / filename
+    partial_path = output_path.with_suffix(output_path.suffix + ".partial")
 
     env = os.environ.copy()
     if password:
@@ -189,13 +199,32 @@ def create_database_backup(*, trigger: BackupTrigger = "manual") -> BackupItem:
         "--no-owner",
         "--no-acl",
     ]
-    result = subprocess.run(cmd, capture_output=True, env=env, check=False)
-    if result.returncode != 0:
-        stderr = (result.stderr or b"").decode("utf-8", errors="replace").strip()
-        raise RuntimeError(stderr or "pg_dump завершился с ошибкой")
 
-    with gzip.open(output_path, "wb") as gz_file:
-        gz_file.write(result.stdout)
+    try:
+        with gzip.open(partial_path, "wb", compresslevel=6) as gz_file:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            assert process.stdout is not None
+            assert process.stderr is not None
+            while True:
+                chunk = process.stdout.read(1024 * 1024)
+                if not chunk:
+                    break
+                gz_file.write(chunk)
+            stderr = process.stderr.read()
+            returncode = process.wait()
+        if returncode != 0:
+            partial_path.unlink(missing_ok=True)
+            err_text = (stderr or b"").decode("utf-8", errors="replace").strip()
+            raise RuntimeError(err_text or "pg_dump завершился с ошибкой")
+        partial_path.replace(output_path)
+    except Exception:
+        partial_path.unlink(missing_ok=True)
+        raise
 
     item = _parse_backup_filename(filename)
     if item is None:
@@ -222,17 +251,47 @@ def create_uploads_backup(*, trigger: BackupTrigger = "manual") -> BackupItem:
 
     filename = _build_filename("uploads", trigger)
     output_path = get_backup_dir() / filename
+    partial_path = output_path.with_suffix(output_path.suffix + ".partial")
 
-    with tarfile.open(output_path, "w:gz") as archive:
-        for item in sorted(uploads_dir.rglob("*")):
-            if _should_skip_uploads_path(item, uploads_dir):
-                continue
-            archive.add(item, arcname=str(Path("uploads") / item.relative_to(uploads_dir)))
+    skipped = 0
+    added = 0
+    try:
+        # compresslevel=1: быстрее архивация больших uploads (таймауты nginx/прокси).
+        with tarfile.open(partial_path, "w:gz", compresslevel=1) as archive:
+            for item in sorted(uploads_dir.rglob("*")):
+                if _should_skip_uploads_path(item, uploads_dir):
+                    continue
+                if item.is_symlink():
+                    skipped += 1
+                    continue
+                if not item.is_file() and not item.is_dir():
+                    skipped += 1
+                    continue
+                try:
+                    archive.add(
+                        item,
+                        arcname=str(Path("uploads") / item.relative_to(uploads_dir)),
+                        recursive=False,
+                    )
+                    added += 1
+                except (OSError, tarfile.TarError) as exc:
+                    skipped += 1
+                    logger.warning("Skip uploads path %s: %s", item, exc)
+        partial_path.replace(output_path)
+    except Exception:
+        partial_path.unlink(missing_ok=True)
+        raise
 
     item = _parse_backup_filename(filename)
     if item is None:
         raise RuntimeError("Не удалось создать резервную копию uploads")
-    logger.info("Uploads backup created: %s (%s bytes)", filename, item.size_bytes)
+    logger.info(
+        "Uploads backup created: %s (%s bytes, added=%s, skipped=%s)",
+        filename,
+        item.size_bytes,
+        added,
+        skipped,
+    )
     return item
 
 
@@ -262,3 +321,81 @@ def run_scheduled_backups() -> dict:
         "uploads": uploads_item.to_dict(),
         "removed": removed,
     }
+
+
+def _job_path(job_id: str) -> Path:
+    safe = Path(job_id).name
+    if not safe or safe != job_id or ".." in job_id:
+        raise ValueError("Некорректный id задачи")
+    jobs_dir = get_backup_dir() / "jobs"
+    jobs_dir.mkdir(parents=True, exist_ok=True)
+    return jobs_dir / f"{safe}.json"
+
+
+def _set_job(job_id: str, **fields: Any) -> dict[str, Any]:
+    path = _job_path(job_id)
+    with _jobs_lock:
+        current: dict[str, Any] = {"id": job_id}
+        if path.is_file():
+            try:
+                current.update(json.loads(path.read_text(encoding="utf-8")))
+            except (OSError, json.JSONDecodeError):
+                pass
+        current.update(fields)
+        current["id"] = job_id
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(current, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+        _backup_jobs[job_id] = current
+        return dict(current)
+
+
+def get_backup_job(job_id: str) -> dict[str, Any] | None:
+    try:
+        path = _job_path(job_id)
+    except ValueError:
+        return None
+    with _jobs_lock:
+        if path.is_file():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    _backup_jobs[job_id] = data
+                    return dict(data)
+            except (OSError, json.JSONDecodeError):
+                pass
+        job = _backup_jobs.get(job_id)
+        return dict(job) if job else None
+
+
+def start_backup_job(backup_type: BackupType, *, trigger: BackupTrigger = "manual") -> dict[str, Any]:
+    job_id = uuid.uuid4().hex
+    _set_job(
+        job_id,
+        status="running",
+        backup_type=backup_type,
+        trigger=trigger,
+        error=None,
+        result=None,
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+    def _runner() -> None:
+        try:
+            if backup_type == "db":
+                item = create_database_backup(trigger=trigger)
+            else:
+                item = create_uploads_backup(trigger=trigger)
+            cleanup_old_backups()
+            _set_job(job_id, status="done", result=item.to_dict(), error=None)
+        except Exception as exc:
+            logger.exception("Backup job %s failed", job_id)
+            _set_job(job_id, status="error", error=str(exc), result=None)
+
+    thread = threading.Thread(
+        target=_runner,
+        name=f"backup-{backup_type}-{job_id[:8]}",
+        daemon=True,
+    )
+    thread.start()
+    return get_backup_job(job_id) or {"id": job_id, "status": "running"}

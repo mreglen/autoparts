@@ -67,10 +67,10 @@ export default function IntegrationPage() {
               </div>
               <div className="flex-1">
                 <h2 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                  Drom — выгрузка XLSX
+                  Drom — прайс по API
                 </h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Формирование XLSX для автозагрузки запчастей на Drom.ru
+                  Онлайн-обновление прайса через API Drom и XLSX для полной автозагрузки
                 </p>
                 <div className="flex items-center gap-1 mt-3 text-sm text-blue-600 group-hover:text-blue-700">
                   <span>Настроить</span>
