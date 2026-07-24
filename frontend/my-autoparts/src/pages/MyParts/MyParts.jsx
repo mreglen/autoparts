@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useNavigate, Link, useSearchParams, useLocation } from 'react-router-dom';
 import PhotoThumbnail from '../../components/PhotoGallery/PhotoThumbnail';
 import MediaModal from '../../components/MediaModal/MediaModal';
-import { normalizeImageUrl, apiRequest, API_LONG_REQUEST_TIMEOUT_MS } from '../../utils/apiClient';
+import { normalizeImageUrl, pickListImageUrlNormalized, buildListImageUrlFallbackChain, apiRequest, API_LONG_REQUEST_TIMEOUT_MS } from '../../utils/apiClient';
 import { stripHtmlTags } from '../../utils/text';
 import { fetchMyProducts, fetchMyPendingProducts, fetchMyRejectedProducts, deletePendingProduct, deleteRejectedProduct, updateProductQuantityAPI, fetchMyProductDrafts, deleteProductDraft, submitProductDraft, selectMyProductsTotal, selectMyProductsTotalQuantity, selectMyProductsTotalValue, selectMyProductsPage, selectMyProductsHasMore, selectMyProductsLoadingMore, selectMyProductsFilterKey, selectDraftItems, selectDraftLoading, selectDraftError } from '../../redux/slices/ProductSlice';
 import { formatDraftTitle } from '../../utils/productDraftUtils';
@@ -191,12 +191,33 @@ const CardPart = ({
     };
   }, [showActions]);
 
-  // Get first photo for card preview
-  const firstPhoto = part.photos && part.photos.length > 0 
-    ? (typeof part.photos[0] === 'string' ? part.photos[0] : part.photos[0].photo_url || part.photos[0].full_url || '')
-    : null;
-  const normalizedPhotoUrl = firstPhoto ? normalizeImageUrl(firstPhoto) : null;
+  // Превью карточки: thumb → list → full (как в каталоге)
+  const listPreviewChain = useMemo(() => {
+    const photos = part.photos || [];
+    for (let i = 0; i < photos.length; i += 1) {
+      const chain = buildListImageUrlFallbackChain(photos[i]);
+      if (chain.length) return chain;
+    }
+    return [];
+  }, [part.photos]);
+  const [previewSrc, setPreviewSrc] = useState(listPreviewChain[0] || '');
+  const [previewFallbackIndex, setPreviewFallbackIndex] = useState(0);
+
+  useEffect(() => {
+    setPreviewSrc(listPreviewChain[0] || '');
+    setPreviewFallbackIndex(0);
+  }, [listPreviewChain]);
+
   const hasImageError = imageErrors[part.id];
+  const handlePreviewError = () => {
+    const nextIndex = previewFallbackIndex + 1;
+    if (nextIndex < listPreviewChain.length && listPreviewChain[nextIndex] !== previewSrc) {
+      setPreviewFallbackIndex(nextIndex);
+      setPreviewSrc(listPreviewChain[nextIndex]);
+      return;
+    }
+    onImageError?.(part.id);
+  };
 
   return (
   <React.Fragment>
@@ -225,12 +246,14 @@ const CardPart = ({
             className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 cursor-pointer" 
             onClick={onToggleExpand}
           >
-            {normalizedPhotoUrl && !hasImageError ? (
+            {previewSrc && !hasImageError ? (
               <img 
-                src={normalizedPhotoUrl} 
+                src={previewSrc} 
                 alt={part.name}
                 className="w-full h-full object-cover"
-                onError={() => onImageError(part.id)}
+                loading="lazy"
+                decoding="async"
+                onError={handlePreviewError}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -372,12 +395,14 @@ const CardPart = ({
         <div className="flex gap-3">
           {/* Product image */}
           <div className="w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
-            {normalizedPhotoUrl && !hasImageError ? (
+            {previewSrc && !hasImageError ? (
               <img 
-                src={normalizedPhotoUrl} 
+                src={previewSrc} 
                 alt={part.name}
                 className="w-full h-full object-cover"
-                onError={() => onImageError(part.id)}
+                loading="lazy"
+                decoding="async"
+                onError={handlePreviewError}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -748,7 +773,7 @@ const DraftCard = ({ draft, onContinue, onSubmit, onDelete }) => {
   const [showActions, setShowActions] = useState(false);
   const actionsPlacement = useActionsDropdownPlacement(showActions, 160);
   const firstPhoto = draft.photos?.[0];
-  const photoUrl = firstPhoto ? normalizeImageUrl(firstPhoto) : null;
+  const photoUrl = firstPhoto ? pickListImageUrlNormalized(firstPhoto) : null;
 
   const renderActionsMenu = (menuClassName) => (
     <div className={menuClassName}>
