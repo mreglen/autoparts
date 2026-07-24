@@ -13,6 +13,8 @@ from app.db.schema_patches import (
     ensure_stock_out_source_columns,
     ensure_avito_pro_status_columns,
     ensure_site_reviews_table,
+    ensure_site_payments_table,
+    ensure_site_payment_ledger_table,
     ensure_site_reviews_user_id_column,
     ensure_site_settings_show_site_reviews_column,
     ensure_site_settings_show_yandex_badge_column,
@@ -97,6 +99,7 @@ import app.models.yandex_feed_sync_state  # noqa: F401 — yandex feed sync stat
 import app.models.yandex_oauth_state  # noqa: F401 — yandex oauth state
 import app.models.site_delivery_option  # noqa: F401 — site delivery matrix
 import app.models.site_quick_link  # noqa: F401 — site quick links
+import app.models.site_payment  # noqa: F401 — admin site payments
 import app.models.site_analytics  # noqa: F401 — site analytics
 import app.models.analytics_query_review  # noqa: F401 — query review snapshots
 import app.models.site_review  # noqa: F401 — site reviews
@@ -173,6 +176,8 @@ try:
     ensure_avito_order_fulfillment_columns()
     ensure_avito_pro_status_columns()
     ensure_site_reviews_table()
+    ensure_site_payments_table()
+    ensure_site_payment_ledger_table()
     ensure_site_reviews_user_id_column()
     ensure_site_settings_show_site_reviews_column()
     ensure_site_settings_show_yandex_badge_column()

@@ -2913,3 +2913,89 @@ def _seed_seo_sync_settings_row() -> None:
             )
         )
 
+
+def ensure_site_payments_table() -> None:
+    """Create site_payments table for admin site service billing."""
+    inspector = inspect(engine)
+    if "site_payments" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE site_payments (
+            id SERIAL PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            start_date DATE NOT NULL,
+            end_date DATE NOT NULL,
+            duration_days INTEGER NOT NULL,
+            monthly_amount NUMERIC(12, 2) NOT NULL,
+            total_amount NUMERIC(12, 2) NOT NULL,
+            amount_paid NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            comment TEXT,
+            status VARCHAR(32) NOT NULL DEFAULT 'active',
+            created_by_id INTEGER REFERENCES users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE site_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title VARCHAR(255) NOT NULL,
+            start_date DATE NOT NULL,
+            end_date DATE NOT NULL,
+            duration_days INTEGER NOT NULL,
+            monthly_amount NUMERIC(12, 2) NOT NULL,
+            total_amount NUMERIC(12, 2) NOT NULL,
+            amount_paid NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            comment TEXT,
+            status VARCHAR(32) NOT NULL DEFAULT 'active',
+            created_by_id INTEGER REFERENCES users(id),
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+
+    logger.info("Applied site_payments table patch")
+
+
+def ensure_site_payment_ledger_table() -> None:
+    """Create site_payment_ledger for partial payment history."""
+    inspector = inspect(engine)
+    if "site_payment_ledger" in inspector.get_table_names():
+        return
+    if "site_payments" not in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE site_payment_ledger (
+            id SERIAL PRIMARY KEY,
+            payment_id INTEGER NOT NULL REFERENCES site_payments(id) ON DELETE CASCADE,
+            amount NUMERIC(12, 2) NOT NULL,
+            note TEXT,
+            created_by_id INTEGER REFERENCES users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE site_payment_ledger (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            payment_id INTEGER NOT NULL REFERENCES site_payments(id) ON DELETE CASCADE,
+            amount NUMERIC(12, 2) NOT NULL,
+            note TEXT,
+            created_by_id INTEGER REFERENCES users(id),
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+
+    logger.info("Applied site_payment_ledger table patch")
+

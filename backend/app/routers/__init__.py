@@ -50,6 +50,7 @@ from app.routers.backup_admin import router as backup_admin_router
 from app.routers.public_feeds import router as public_feeds_router
 from app.routers.site_delivery import router as site_delivery_router
 from app.routers.site_quick_links import router as site_quick_links_router
+from app.routers.site_payments import router as site_payments_router
 from app.routers.site_reviews import router as site_reviews_router
 from app.routers.public_pages import router as public_pages_router
 from app.routers.public_pages_seo import router as public_pages_seo_router
@@ -122,6 +123,7 @@ api_router.include_router(backup_admin_router)
 api_router.include_router(public_feeds_router)
 api_router.include_router(site_delivery_router)
 api_router.include_router(site_quick_links_router)
+api_router.include_router(site_payments_router)
 api_router.include_router(site_reviews_router)
 api_router.include_router(public_pages_router)
 api_router.include_router(public_new_parts_cards_router)

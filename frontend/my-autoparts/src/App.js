@@ -107,6 +107,8 @@ const AdminPanelPage = lazy(() => import('./pages/Admin/AdminPanelPage'));
 const AuditLogPage = lazy(() => import('./pages/Admin/AuditLogPage'));
 const AdminUsersPage = lazy(() => import('./pages/Admin/AdminUsersPage'));
 const RosskoSettingsPage = lazy(() => import('./pages/Admin/RosskoSettingsPage'));
+const SitePaymentsPage = lazy(() => import('./pages/Admin/SitePaymentsPage'));
+const SitePaymentsHistoryPage = lazy(() => import('./pages/Admin/SitePaymentsHistoryPage'));
 const AnalyticsPage = lazy(() => import('./pages/Admin/AnalyticsPage'));
 const SeoSeedQueuePage = lazy(() => import('./pages/Admin/analytics/SeoSeedQueuePage'));
 
@@ -786,6 +788,22 @@ function App() {
             element={(
               <LazyRoute>
                 <RosskoSettingsPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/admin/site-payments/history"
+            element={(
+              <LazyRoute>
+                <SitePaymentsHistoryPage />
+              </LazyRoute>
+            )}
+          />
+          <Route
+            path="/admin/site-payments"
+            element={(
+              <LazyRoute>
+                <SitePaymentsPage />
               </LazyRoute>
             )}
           />
