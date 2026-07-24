@@ -156,7 +156,6 @@ const MediaDisplay = React.memo(function MediaDisplay({ part, listPriority = fal
   const [hoverSide, setHoverSide] = useState(null);
   const [resolvedUrl, setResolvedUrl] = useState('');
   const [urlFallbackIndex, setUrlFallbackIndex] = useState(0);
-  const [photoLoaded, setPhotoLoaded] = useState(false);
 
   const allMedia = React.useMemo(() => {
     const photos = (part.photos || []).slice(0, 1).map((photo) => {
@@ -180,7 +179,6 @@ const MediaDisplay = React.memo(function MediaDisplay({ part, listPriority = fal
   React.useEffect(() => {
     setResolvedUrl(allMedia[currentMediaIndex]?.url || '');
     setUrlFallbackIndex(0);
-    setPhotoLoaded(false);
   }, [allMedia, currentMediaIndex]);
 
   if (!allMedia || allMedia.length === 0) {
@@ -245,34 +243,25 @@ const MediaDisplay = React.memo(function MediaDisplay({ part, listPriority = fal
           playsInline
         />
       ) : (
-        <>
-          {!photoLoaded ? (
-            <div className="absolute inset-0 animate-pulse rounded-lg bg-gradient-to-br from-gray-100 via-gray-50 to-gray-200" aria-hidden />
-          ) : null}
-          <img
-            src={resolvedUrl || currentMedia.url}
-            alt={part.name || part.article}
-            className={`w-full h-full object-cover rounded-lg transition-opacity duration-200 ${photoLoaded ? 'opacity-100' : 'opacity-0'}`}
-            width={176}
-            height={176}
-            sizes={LIST_MEDIA_SIZES}
-            loading={(listPriority || eagerImage) ? 'eager' : 'lazy'}
-            decoding="async"
-            fetchPriority={listPriority ? 'high' : 'auto'}
-            onLoad={() => setPhotoLoaded(true)}
-            onError={() => {
-              const chain = currentMedia.urlChain || [];
-              const nextIndex = urlFallbackIndex + 1;
-              if (nextIndex < chain.length && chain[nextIndex] !== resolvedUrl) {
-                setUrlFallbackIndex(nextIndex);
-                setResolvedUrl(chain[nextIndex]);
-                setPhotoLoaded(false);
-              } else {
-                setPhotoLoaded(true);
-              }
-            }}
-          />
-        </>
+        <img
+          src={resolvedUrl || currentMedia.url}
+          alt={part.name || part.article}
+          className="w-full h-full object-cover rounded-lg"
+          width={176}
+          height={176}
+          sizes={LIST_MEDIA_SIZES}
+          loading={(listPriority || eagerImage) ? 'eager' : 'lazy'}
+          decoding="async"
+          fetchPriority={listPriority ? 'high' : 'auto'}
+          onError={() => {
+            const chain = currentMedia.urlChain || [];
+            const nextIndex = urlFallbackIndex + 1;
+            if (nextIndex < chain.length && chain[nextIndex] !== resolvedUrl) {
+              setUrlFallbackIndex(nextIndex);
+              setResolvedUrl(chain[nextIndex]);
+            }
+          }}
+        />
       )}
 
       {isVideo && (
@@ -393,7 +382,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
   useEffect(() => {
     if (!analogParts.length) return;
-    prefetchListImages(collectPartPreviewUrls(analogParts, 12), { limit: 12, preloadCount: 4 });
+    prefetchListImages(collectPartPreviewUrls(analogParts, 12), { limit: 12 });
   }, [analogParts]);
 
   useEffect(() => {
