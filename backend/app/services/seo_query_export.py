@@ -1,6 +1,7 @@
 """Build a plain-text SEO query list for Wordstat / SEO tools."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Iterable
@@ -10,17 +11,20 @@ from sqlalchemy.orm import Session
 from app.services.analytics_query_review_service import get_latest_query_review
 from app.services.site_analytics_service import get_popular_new_part_queries, get_product_cards
 
-DEFAULT_EXPORT_LIMIT = 500
+DEFAULT_EXPORT_LIMIT = 200
 MAX_EXPORT_LIMIT = 1000
-MAX_REAL_QUERIES = 100
+MAX_REAL_QUERIES = 50
 PRODUCT_CARDS_LIMIT = 80
 DEFAULT_DAYS = 30
+
+# Keep only letters (any script) — no digits/punctuation.
+_NON_LETTER_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
 
 # ~58% Екатеринбург when cycling through weighted list
 PRIMARY_CITY = "Екатеринбург"
 OTHER_RU_CITIES = (
     "Москва",
-    "Санкт-Петербург",
+    "Санкт Петербург",
     "Челябинск",
     "Тюмень",
     "Пермь",
@@ -30,7 +34,7 @@ OTHER_RU_CITIES = (
     "Самара",
     "Краснодар",
     "Нижний Новгород",
-    "Ростов-на-Дону",
+    "Ростов на Дону",
     "Омск",
     "Воронеж",
     "Красноярск",
@@ -52,12 +56,14 @@ class ProductSeed:
     article: str | None
 
 
-def normalize_query_key(text: str) -> str:
-    return " ".join((text or "").strip().casefold().split())
-
-
 def clean_query_display(text: str) -> str:
-    return " ".join((text or "").strip().split())
+    """Letters and spaces only; collapse whitespace."""
+    parts = _NON_LETTER_RE.findall(text or "")
+    return " ".join(parts).strip()
+
+
+def normalize_query_key(text: str) -> str:
+    return clean_query_display(text).casefold()
 
 
 def _city_for_index(index: int, cities: tuple[str, ...] = WEIGHTED_CITIES) -> str:
@@ -107,18 +113,12 @@ def product_seeds_from_cards(db: Session, *, days: int = DEFAULT_DAYS, limit: in
     cards = get_product_cards(db, days=days, limit=limit)
     seeds: list[ProductSeed] = []
     for row in cards.items:
-        name = clean_query_display(row.name or "")
-        brand = clean_query_display(row.brand or "")
-        article = clean_query_display(row.article or "")
+        name = clean_query_display(row.name or "") or None
+        brand = clean_query_display(row.brand or "") or None
+        article = clean_query_display(row.article or "") or None
         if not name and not (brand and article):
             continue
-        seeds.append(
-            ProductSeed(
-                name=name or None,
-                brand=brand or None,
-                article=article or None,
-            )
-        )
+        seeds.append(ProductSeed(name=name, brand=brand, article=article))
     return seeds
 
 
@@ -129,9 +129,9 @@ def generate_queries_for_product(
     cities: tuple[str, ...] = WEIGHTED_CITIES,
 ) -> list[str]:
     """Many template variants for one product; cities cycle with Ekaterinburg bias."""
-    name = seed.name
-    brand = seed.brand
-    article = seed.article
+    name = clean_query_display(seed.name or "") or None
+    brand = clean_query_display(seed.brand or "") or None
+    article = clean_query_display(seed.article or "") or None
     variants: list[str] = []
     i = start_index
 
@@ -146,14 +146,14 @@ def generate_queries_for_product(
             [
                 f"купить {name} в {city()}",
                 f"{name} купить {city()}",
-                f"б/у {name} {city()}",
+                f"бу {name} {city()}",
                 f"{name} недорого",
                 f"заказать {name}",
                 f"{name} с доставкой",
                 f"{name} цена {city()}",
-                f"купить б/у {name} в {city()}",
-                f"{name} наличие {city()}",
-                f"{name} наличие",
+                f"купить бу {name} в {city()}",
+                f"{name} авторазбор {city()}",
+                f"{name} авторазбор",
             ]
         )
     if brand and article:
@@ -175,7 +175,7 @@ def generate_queries_for_product(
     for v in variants:
         display = clean_query_display(v)
         key = normalize_query_key(display)
-        if not display or key in seen:
+        if not display or len(display) < 2 or key in seen:
             continue
         seen.add(key)
         cleaned.append(display)

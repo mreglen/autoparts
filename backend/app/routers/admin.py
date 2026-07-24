@@ -1841,7 +1841,7 @@ def download_product_card_urls(
 
 @router.get("/seo/popular-queries-export")
 def download_popular_seo_queries(
-    limit: int = Query(500, ge=1, le=1000),
+    limit: int = Query(200, ge=1, le=1000),
     days: int = Query(30, ge=1, le=90),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
