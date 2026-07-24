@@ -19,7 +19,7 @@ import {
   selectAnalogsLoading,
 } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations, fetchOrganization } from '../../../redux/slices/OrganizationSlice';
-import { buildListImageUrlFallbackChain, pickListImageUrlNormalized } from '../../../utils/apiClient';
+import { buildListImageUrlFallbackChain } from '../../../utils/apiClient';
 import {
   buildUsedCatalogParams,
   getUsedPartsUrlQuery,
@@ -29,7 +29,6 @@ import SubscribeSearchButton from '../../../components/SubscribeSearchButton/Sub
 import { usedHasActiveFilters } from '../../../utils/autopartsFilters';
 import { useProductPriceFormat } from '../../../hooks/useProductPriceFormat';
 import { prefetchUsedPartDetail } from '../../../utils/prefetchPartDetail';
-import { prefetchListImages } from '../../../utils/prefetchListImages';
 import FavoriteHeartOverlay from '../../../components/FavoriteButton/FavoriteHeartOverlay';
 import { fetchFavoriteStatusesBatch } from '../../../redux/slices/UserEngagementSlice';
 import { useAuthReady } from '../../../hooks/useAuthReady';
@@ -43,14 +42,13 @@ const VIRTUALIZE_THRESHOLD_MOBILE = 80;
 const LIST_ROW_ESTIMATE_MOBILE_PX = 148;
 const LIST_ROW_ESTIMATE_TABLET_PX = 196;
 const LIST_ROW_ESTIMATE_DESKTOP_PX = 220;
-/** Overscan в рядах; на мобилке больше — раньше монтируем и качаем превью. */
-const VIRTUAL_OVERSCAN_DESKTOP = 6;
-const VIRTUAL_OVERSCAN_MOBILE = 10;
-const LOAD_MORE_ROOT_MARGIN = '1000px';
-/** LCP: high fetchPriority только у первых карточек. */
-const LCP_PRIORITY_COUNT = 4;
-/** Сколько thumb прогреть сразу после ответа каталога. */
-const PREFETCH_IMAGE_COUNT = 40;
+/** Небольшой overscan: слишком большой + eager = очередь из десятков full-JPG. */
+const VIRTUAL_OVERSCAN = 4;
+const LOAD_MORE_ROOT_MARGIN = '600px';
+/** high fetchPriority — только LCP-карточки. */
+const LCP_PRIORITY_COUNT = 2;
+/** eager без high — первый экран; остальное lazy, иначе браузер душит 6 слотов на все 20 фото. */
+const EAGER_VIEWPORT_COUNT = 8;
 
 function getGridColumnCount(width) {
   if (width >= 1280) return 4;
@@ -86,26 +84,6 @@ function chunkIntoRows(items, columns) {
     rows.push(items.slice(i, i + columns));
   }
   return rows;
-}
-
-function collectPartPreviewUrls(parts, limit) {
-  const urls = [];
-  for (const part of parts || []) {
-    let url = '';
-    if (part.list_photo_url) {
-      url = pickListImageUrlNormalized(part.list_photo_url);
-    }
-    if (!url) {
-      const photos = part.photos || [];
-      for (let i = 0; i < photos.length; i += 1) {
-        url = pickListImageUrlNormalized(photos[i]);
-        if (url) break;
-      }
-    }
-    if (url) urls.push(url);
-    if (urls.length >= limit) break;
-  }
-  return urls;
 }
 
 // Функция форматирования телефона
@@ -366,24 +344,11 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
 
   const availableParts = useMemo(() => catalogItems, [catalogItems]);
 
-  // Прогрев thumb сразу после ответа API — до/параллельно с paint карточек.
-  useEffect(() => {
-    if (!catalogItems.length) return;
-    prefetchListImages(collectPartPreviewUrls(catalogItems, PREFETCH_IMAGE_COUNT), {
-      limit: PREFETCH_IMAGE_COUNT,
-    });
-  }, [catalogItems]);
-
   const analogParts = useMemo(() => {
     if (!urlQ) return [];
     const catalogIds = new Set(catalogItems.map((p) => p.id));
     return (usedPartsData?.analog_parts || []).filter((p) => !catalogIds.has(p.id));
   }, [urlQ, usedPartsData, catalogItems]);
-
-  useEffect(() => {
-    if (!analogParts.length) return;
-    prefetchListImages(collectPartPreviewUrls(analogParts, 12), { limit: 12 });
-  }, [analogParts]);
 
   useEffect(() => {
     if (!isReady || !isAuthenticated || !token) return;
@@ -533,7 +498,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
     () => estimateListRowHeight(viewportWidth),
     [viewportWidth]
   );
-  const virtualOverscan = viewportWidth < 1024 ? VIRTUAL_OVERSCAN_MOBILE : VIRTUAL_OVERSCAN_DESKTOP;
+  const virtualOverscan = VIRTUAL_OVERSCAN;
   const gridRows = useMemo(
     () => chunkIntoRows(sortedAvailableParts, gridColumns),
     [sortedAvailableParts, gridColumns]
@@ -906,7 +871,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                 <ProductCard
                   key={part.id}
                   listPriority={index < LCP_PRIORITY_COUNT}
-                  eagerImage
+                  eagerImage={index < EAGER_VIEWPORT_COUNT}
                   part={productCardPartsMap.get(part.id)}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
@@ -933,17 +898,20 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                       transform: `translateY(${virtualRow.start - gridScrollMargin}px)`,
                     }}
                   >
-                    {rowParts.map((part, colIndex) => (
-                      <ProductCard
-                        key={part.id}
-                        listPriority={virtualRow.index === 0 && colIndex < LCP_PRIORITY_COUNT}
-                        eagerImage
-                        part={productCardPartsMap.get(part.id)}
-                        isTestOrganization={true}
-                        hideConditionAndQuantity={true}
-                        hideWarehouse={true}
-                      />
-                    ))}
+                    {rowParts.map((part, colIndex) => {
+                      const flatIndex = virtualRow.index * gridColumns + colIndex;
+                      return (
+                        <ProductCard
+                          key={part.id}
+                          listPriority={flatIndex < LCP_PRIORITY_COUNT}
+                          eagerImage={flatIndex < EAGER_VIEWPORT_COUNT}
+                          part={productCardPartsMap.get(part.id)}
+                          isTestOrganization={true}
+                          hideConditionAndQuantity={true}
+                          hideWarehouse={true}
+                        />
+                      );
+                    })}
                   </div>
                 );
               })}
@@ -954,7 +922,12 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           {viewMode === 'list' && !shouldVirtualize && (
             <div className="space-y-3">
               {sortedAvailableParts.map((part, index) => (
-                renderPartListCard(part, part.id, index < LCP_PRIORITY_COUNT, true)
+                renderPartListCard(
+                  part,
+                  part.id,
+                  index < LCP_PRIORITY_COUNT,
+                  index < EAGER_VIEWPORT_COUNT,
+                )
               ))}
             </div>
           )}
@@ -977,7 +950,12 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                       transform: `translateY(${virtualRow.start - listScrollMargin}px)`,
                     }}
                   >
-                    {renderPartListCard(part, part.id, virtualRow.index < LCP_PRIORITY_COUNT, true)}
+                    {renderPartListCard(
+                      part,
+                      part.id,
+                      virtualRow.index < LCP_PRIORITY_COUNT,
+                      virtualRow.index < EAGER_VIEWPORT_COUNT,
+                    )}
                   </div>
                 );
               })}
@@ -1015,7 +993,7 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
                 <ProductCard
                   key={`analog-${part.id}`}
                   listPriority={index < LCP_PRIORITY_COUNT}
-                  eagerImage
+                  eagerImage={index < EAGER_VIEWPORT_COUNT}
                   part={productCardPartsMap.get(part.id)}
                   isTestOrganization={true}
                   hideConditionAndQuantity={true}
@@ -1029,7 +1007,12 @@ const UsedPartsList = ({ viewMode = 'grid', sortBy = 'date', updateCatalogUrl })
           {viewMode === 'list' && (
             <div className="space-y-3">
               {sortedAnalogParts.map((part, index) => (
-                renderPartListCard(part, `analog-${part.id}`, index < LCP_PRIORITY_COUNT, true)
+                renderPartListCard(
+                  part,
+                  `analog-${part.id}`,
+                  index < LCP_PRIORITY_COUNT,
+                  index < EAGER_VIEWPORT_COUNT,
+                )
               ))}
             </div>
           )}
