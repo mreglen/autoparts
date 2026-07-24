@@ -24,6 +24,8 @@ from app.services.marketplace_site_footer import append_marketplace_site_info
 from app.schemas.drom_integration import (
     DromAutoloadExportRequest,
     DromAutoloadExportResponse,
+    DromAutoloadRemoveRowsRequest,
+    DromAutoloadRemoveRowsResponse,
     DromAutoloadUploadResponse,
     DromCredentialsResponse,
     DromCredentialsUpdate,
@@ -35,7 +37,9 @@ from app.services.drom_autoload_xlsx import (
     build_drom_header_only_xlsx,
     chunk_export_rows_for_drom_sync,
     parse_and_validate_drom_autoload,
+    remove_products_from_drom_autoload,
     upsert_products_to_drom_autoload,
+    zero_quantity_rows_for_articles,
 )
 from app.utils.avito_crypto import decrypt_secret, encrypt_secret
 
@@ -649,6 +653,118 @@ async def upload_drom_autoload_file(
         local_validation_ok=parsed.local_ok,
         local_errors=parsed.local_errors,
         warnings=warnings if warnings else None,
+        sync=sync_result,
+    )
+
+
+@router.post("/{org_id}/drom/autoload/remove-rows", response_model=DromAutoloadRemoveRowsResponse)
+async def remove_drom_autoload_rows(
+    org_id: str,
+    body: DromAutoloadRemoveRowsRequest,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    """Удаляет позиции из XLSX прайс-листа Drom и отправляет qty=0 в API автообновления."""
+    _ensure_org_access(current_user, org_id)
+    _org_exists(db, org_id)
+
+    articles = list(
+        dict.fromkeys(str(a or "").strip() for a in (body.articles or []) if str(a or "").strip())
+    )
+    if not articles:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Список артикулов пуст")
+
+    xlsx_path, rel_path = _resolve_saved_drom_file(db, org_id)
+    cache = (
+        db.query(OrganizationDromAutoloadCache)
+        .filter(OrganizationDromAutoloadCache.organization_id == org_id)
+        .first()
+    )
+    if cache and cache.saved_path:
+        candidate = Path(cache.saved_path)
+        if not candidate.is_absolute():
+            candidate = Path(__file__).resolve().parents[2] / cache.saved_path.lstrip("/")
+        if candidate.is_file():
+            xlsx_path = candidate
+            rel_path = cache.saved_path
+
+    if not xlsx_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Файл автозагрузки Drom не найден",
+        )
+
+    before = parse_and_validate_drom_autoload(xlsx_path.read_bytes())
+    before_articles = {
+        str(item.get("article") or item.get("Артикул") or "").strip()
+        for item in before.items
+    }
+    matched = [a for a in articles if a in before_articles]
+    if not matched:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Указанные артикулы не найдены в прайс-листе Drom",
+        )
+
+    updated_bytes = remove_products_from_drom_autoload(xlsx_path.read_bytes(), matched)
+    xlsx_path.write_bytes(updated_bytes)
+    parsed = parse_and_validate_drom_autoload(updated_bytes)
+
+    # Снимаем связь «экспортирован в Drom», чтобы позиция не считалась в номенклатуре
+    products = (
+        db.query(ProductModel)
+        .filter(
+            ProductModel.organization_id == org_id,
+            ProductModel.article.in_(matched),
+        )
+        .all()
+    )
+    product_ids = [p.id for p in products]
+    if product_ids:
+        db.query(ProductDromListingLink).filter(
+            ProductDromListingLink.organization_id == org_id,
+            ProductDromListingLink.product_id.in_(product_ids),
+        ).delete(synchronize_session=False)
+        db.commit()
+
+    warnings = [
+        f"Удалено позиций из файла: {len(matched)}",
+    ]
+    _save_autoload_cache(
+        db,
+        org_id,
+        saved_path=rel_path,
+        items=parsed.items,
+        local_validation_ok=parsed.local_ok,
+        local_errors=parsed.local_errors,
+        warnings=warnings,
+    )
+
+    # API автообновления прайс-листа: количество 0 = убрать с площадки
+    sync_result = await _sync_export_rows(
+        db,
+        org_id,
+        zero_quantity_rows_for_articles(matched),
+        force=False,
+    )
+
+    log_audit(
+        db,
+        event_type="drom_autoload_remove_rows",
+        category="integrations",
+        summary=f"Удаление из номенклатуры Drom: {len(matched)} поз.",
+        user=current_user,
+        organization_id=org_id,
+        details={"articles": matched, "removed_count": len(matched)},
+    )
+
+    return DromAutoloadRemoveRowsResponse(
+        saved_path=rel_path,
+        items=parsed.items,
+        local_validation_ok=parsed.local_ok,
+        local_errors=parsed.local_errors,
+        removed_count=len(matched),
+        warnings=warnings,
         sync=sync_result,
     )
 

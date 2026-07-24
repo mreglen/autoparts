@@ -381,36 +381,42 @@ def remove_product_from_drom_autoload(
     existing_xlsx: bytes,
     article: str,
 ) -> bytes:
+    """Удалить одну позицию из Drom xlsx по артикулу."""
+    return remove_products_from_drom_autoload(existing_xlsx, [article])
+
+
+def remove_products_from_drom_autoload(
+    existing_xlsx: bytes,
+    articles: list[str],
+) -> bytes:
     """
-    Удалить товар из Drom xlsx по article (Артикул).
-    
-    Args:
-        existing_xlsx: Байты существующего xlsx файла
-        article: Артикул товара (article из Product)
-    
-    Returns:
-        Обновлённые байты xlsx файла без удалённой строки
+    Удалить товары из Drom xlsx по списку артикулов.
+    Удаляет строки с конца, чтобы индексы не смещались.
     """
+    wanted = {str(a or "").strip() for a in articles if str(a or "").strip()}
+    if not wanted:
+        return existing_xlsx
+
     wb = load_workbook(BytesIO(existing_xlsx), read_only=False)
     ws = wb.active
-    
-    # Читаем заголовки из Row 1
+
     header_row = list(ws.iter_rows(min_row=1, max_row=1, values_only=True))[0]
     col_map = _find_col_map(header_row)
-    
     article_col = col_map.get(ARTICLE_HEADER)
-    if article_col:
-        row_to_delete = None
-        for row_idx, row_values in _iter_sheet_data_rows(ws):
-            if article_col <= len(row_values):
-                cell_value = _cell_str(row_values[article_col - 1])
-                if cell_value == article:
-                    row_to_delete = row_idx
-                    break
+    if not article_col:
+        wb.close()
+        return existing_xlsx
 
-        if row_to_delete:
-            ws.delete_rows(row_to_delete, 1)
-    
+    rows_to_delete: list[int] = []
+    for row_idx, row_values in _iter_sheet_data_rows(ws):
+        if article_col <= len(row_values):
+            cell_value = _cell_str(row_values[article_col - 1])
+            if cell_value in wanted:
+                rows_to_delete.append(row_idx)
+
+    for row_idx in sorted(rows_to_delete, reverse=True):
+        ws.delete_rows(row_idx, 1)
+
     output = BytesIO()
     wb.save(output)
     wb.close()

@@ -58,6 +58,20 @@ class DromAutoloadUploadResponse(BaseModel):
     sync: Optional[dict[str, Any]] = None
 
 
+class DromAutoloadRemoveRowsRequest(BaseModel):
+    articles: list[str] = Field(..., min_length=1, description="Артикулы позиций для удаления из прайс-листа")
+
+
+class DromAutoloadRemoveRowsResponse(BaseModel):
+    saved_path: Optional[str] = None
+    items: list = []
+    local_validation_ok: bool = False
+    local_errors: list = []
+    removed_count: int = 0
+    warnings: Optional[list] = None
+    sync: Optional[dict[str, Any]] = None
+
+
 class DromSyncResponse(BaseModel):
     ok: bool
     status_code: int = 0

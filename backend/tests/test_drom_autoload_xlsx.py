@@ -7,6 +7,7 @@ from app.services.drom_autoload_xlsx import (
     chunk_export_rows_for_drom_sync,
     parse_and_validate_drom_autoload,
     remove_product_from_drom_autoload,
+    remove_products_from_drom_autoload,
     upsert_products_to_drom_autoload,
     zero_quantity_rows_for_articles,
     QUANTITY_HEADER,
@@ -74,6 +75,21 @@ class DromAutoloadXlsxTests(unittest.TestCase):
         self.assertTrue(parsed.local_ok, parsed.local_errors)
         self.assertEqual(len(parsed.items), 1)
         self.assertEqual(parsed.items[0]["article"], "A2")
+
+    def test_remove_multiple_products_from_xlsx(self):
+        xlsx_bytes = upsert_products_to_drom_autoload(
+            None,
+            [
+                self._sample_row(article="A1"),
+                self._sample_row(article="A2"),
+                self._sample_row(article="A3"),
+            ],
+            public_base_url="",
+        )
+        updated = remove_products_from_drom_autoload(xlsx_bytes, ["A1", "A3"])
+        parsed = parse_and_validate_drom_autoload(updated)
+        self.assertTrue(parsed.local_ok, parsed.local_errors)
+        self.assertEqual([item["article"] for item in parsed.items], ["A2"])
 
     def test_upsert_handles_many_rows(self):
         rows = [

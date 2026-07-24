@@ -29,31 +29,60 @@ def resolve_public_site_origin(preferred: str | None = None) -> str:
     return "https://svoygarage.ru"
 
 
-def build_marketplace_site_footer(*, product_url: str) -> str:
+def build_marketplace_site_footer(
+    *,
+    product_url: str,
+    internal_code: str | None = None,
+) -> str:
     url = (product_url or "").strip()
-    return (
-        "Эту запчасть вы также можете посмотреть на сайте Свой Гараж:\n"
-        f"{url}\n\n"
-        "На площадке Свой Гараж доступны фотографии, характеристики и актуальная цена. "
-        "Перейдите по ссылке выше, чтобы открыть карточку этого товара на нашем сайте "
-        "и связаться с продавцом напрямую.\n\n"
-        "Если вы нашли это объявление на Авито или Дром, карточку с полным описанием "
-        "и дополнительными сведениями удобнее смотреть на Свой Гараж по ссылке выше."
+    code = " ".join(str(internal_code or "").strip().split())
+    lines = [
+        "Эту запчасть вы также можете посмотреть на сайте Свой Гараж:",
+        url,
+        "",
+    ]
+    if code:
+        lines.extend(
+            [
+                f"Внутренний код товара на сайте Свой Гараж: {code}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "На площадке Свой Гараж доступны фотографии, характеристики и актуальная цена. "
+            "Перейдите по ссылке выше, чтобы открыть карточку этого товара на нашем сайте "
+            "и связаться с продавцом напрямую.",
+            "",
+            "Если вы нашли это объявление на Авито или Дром, карточку с полным описанием "
+            "и дополнительными сведениями удобнее смотреть на Свой Гараж по ссылке выше.",
+        ]
     )
+    return "\n".join(lines)
 
 
 def _product_like(product) -> SimpleNamespace | object:
     if product is None:
-        return SimpleNamespace(id=None, brand=None, article=None)
-    if hasattr(product, "id"):
+        return SimpleNamespace(id=None, brand=None, article=None, internal_code=None)
+    if hasattr(product, "id") and not isinstance(product, dict):
         return product
     if isinstance(product, dict):
         return SimpleNamespace(
             id=product.get("id") or product.get("product_id"),
             brand=product.get("brand"),
             article=product.get("article"),
+            internal_code=product.get("internal_code"),
         )
     return product
+
+
+def _internal_code_of(product) -> str | None:
+    obj = _product_like(product)
+    code = getattr(obj, "internal_code", None)
+    if code is None and isinstance(product, dict):
+        code = product.get("internal_code")
+    text = " ".join(str(code or "").strip().split())
+    return text or None
 
 
 def append_marketplace_site_info(
@@ -72,8 +101,12 @@ def append_marketplace_site_info(
         return base
 
     origin = resolve_public_site_origin(site_origin)
-    url = build_product_page_url(_product_like(product), origin)
-    footer = build_marketplace_site_footer(product_url=url)
+    product_obj = _product_like(product)
+    url = build_product_page_url(product_obj, origin)
+    footer = build_marketplace_site_footer(
+        product_url=url,
+        internal_code=_internal_code_of(product),
+    )
     if not base:
         return footer
     return f"{base}\n\n{footer}"
