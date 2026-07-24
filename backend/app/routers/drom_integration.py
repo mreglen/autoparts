@@ -20,6 +20,7 @@ from app.models.product_drom_listing_link import ProductDromListingLink
 from app.models.storage_location import StorageLocation as StorageLocationModel
 from app.models.user import User as UserModel
 from app.services.audit_service import log_audit
+from app.services.marketplace_site_footer import append_marketplace_site_info
 from app.schemas.drom_integration import (
     DromAutoloadExportRequest,
     DromAutoloadExportResponse,
@@ -470,6 +471,13 @@ async def export_products_to_drom_autoload(
         storage = storage_by_id.get(product.storage_location_id) if product.storage_location_id else None
         address = (storage.address if storage and storage.address else None) or (org.address or "")
 
+        note = append_marketplace_site_info(
+            product.description or "",
+            enabled=bool(getattr(org, "append_marketplace_site_info", False)),
+            product=product,
+            site_origin=(settings.PUBLIC_BASE_URL or settings.BASE_URL or "").strip(),
+        )
+
         export_rows.append(
             {
                 "product_id": product.id,
@@ -481,6 +489,7 @@ async def export_products_to_drom_autoload(
                 "quantity": product.quantity or 0,
                 "photos": photos[:5],
                 "storage_address": address,
+                "note": note,
             }
         )
 

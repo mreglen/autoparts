@@ -48,6 +48,7 @@ from app.schemas.avito_integration import (
 from app.tasks.avito_tasks import run_avito_export_job, run_avito_publish_job, _map_avito_category
 from app.services import avito_api as avito_api_svc
 from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload, upsert_products_to_avito_autoload
+from app.services.marketplace_site_footer import append_marketplace_site_info
 from app.utils.internal_code import next_internal_code, resolve_internal_code_for_import
 from app.services.avito_media import (
     ensure_local_pictures,
@@ -835,7 +836,12 @@ async def export_products_to_avito_autoload(
         # category больше не используется - всегда "Запчасти и аксессуары"
         storage = storage_by_id.get(product.storage_location_id) if product.storage_location_id else None
         address = (storage.address if storage and storage.address else None) or (org.address or "")
-        description = product.description or ""
+        description = append_marketplace_site_info(
+            product.description or "",
+            enabled=bool(getattr(org, "append_marketplace_site_info", False)),
+            product=product,
+            site_origin=(settings.PUBLIC_BASE_URL or settings.BASE_URL or "").strip(),
+        )
         
         export_rows.append(
             {

@@ -6,6 +6,7 @@ import PaymentMethodsSection from './PaymentMethodsSection';
 import StorageLocationsSection from './StorageLocationsSection';
 import OrganizationInfoSection from './OrganizationInfoSection';
 import WatermarksSection from './WatermarksSection';
+import MarketplaceSiteInfoSection from './MarketplaceSiteInfoSection';
 import {
     SettingsCard,
     SettingsSectionHeader,
@@ -216,6 +217,8 @@ export default function Organization() {
             </div>
 
             <WatermarksSection org={org} />
+
+            <MarketplaceSiteInfoSection org={org} />
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <StorageLocationsSection orgId={orgId} />

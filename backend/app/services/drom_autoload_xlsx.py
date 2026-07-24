@@ -266,6 +266,11 @@ def upsert_products_to_drom_autoload(
                 ws.cell(row=row_idx, column=col_map[PHOTO_HEADER], value=photo_url)
             else:
                 ws.cell(row=row_idx, column=col_map[PHOTO_HEADER], value="")
+
+        # Примечание (описание / ссылка на сайт)
+        if NOTE_HEADER in col_map:
+            note = str(export_row.get("note") or export_row.get("description") or "").strip()
+            ws.cell(row=row_idx, column=col_map[NOTE_HEADER], value=note)
         
         # Адрес склада
         if WAREHOUSE_ADDRESS_HEADER in col_map:

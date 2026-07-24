@@ -25,6 +25,10 @@ def ensure_organization_markup_columns() -> None:
         statements.append(
             "ALTER TABLE organizations ADD COLUMN new_parts_markup_manual BOOLEAN NOT NULL DEFAULT FALSE"
         )
+    if "append_marketplace_site_info" not in columns:
+        statements.append(
+            "ALTER TABLE organizations ADD COLUMN append_marketplace_site_info BOOLEAN NOT NULL DEFAULT FALSE"
+        )
 
     if not statements:
         return

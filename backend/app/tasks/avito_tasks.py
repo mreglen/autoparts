@@ -20,6 +20,7 @@ from app.models.product_avito_listing_link import ProductAvitoListingLink
 from app.models.storage_location import StorageLocation as StorageLocationModel
 from app.services import avito_api as avito_api_svc
 from app.services.avito_autoload_xlsx import parse_and_validate_avito_autoload, upsert_products_to_avito_autoload
+from app.services.marketplace_site_footer import append_marketplace_site_info
 from app.services.avito_media import product_photo_urls_for_avito_export
 from app.utils.avito_crypto import decrypt_secret
 from app.services.avito_pro_status_service import is_avito_pro_active
@@ -234,7 +235,12 @@ def run_avito_export_job(self, job_id: int):
             address = ((storage.address if storage and storage.address else "") or org_address).strip()
             raw_photos = photo_map.get(product.id, [])
             photos_for_xlsx = product_photo_urls_for_avito_export(raw_photos)
-            description = product.description or ""
+            description = append_marketplace_site_info(
+                product.description or "",
+                enabled=bool(getattr(org, "append_marketplace_site_info", False)),
+                product=product,
+                site_origin=(settings.PUBLIC_BASE_URL or settings.BASE_URL or "").strip(),
+            )
             
             export_rows.append(
                 {
