@@ -169,7 +169,7 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
         const pure = formatted.replace(/\D/g, '');
         setPhoneError(
             pure.length === 0 ? '' :
-                pure.length === 11 && pure.startsWith('7') ? '' :
+                pure.length === 11 && pure.startsWith('79') ? '' :
                     'Неверный формат телефона'
         );
     };
@@ -223,6 +223,12 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
         const { city, street, house } = formData.addressData || {};
         if (!city || !street || !house) {
             dispatch({ type: 'auth/setError', payload: 'Адрес должен содержать город, улицу и дом' });
+            return;
+        }
+        const phoneDigits = String(formData.phone || '').replace(/\D/g, '');
+        if (!(phoneDigits.length === 11 && phoneDigits.startsWith('79'))) {
+            setPhoneError('Неверный формат телефона');
+            dispatch({ type: 'auth/setError', payload: 'Введите мобильный номер в формате +7 (9XX) XXX-XX-XX' });
             return;
         }
 
@@ -314,6 +320,12 @@ export default function SellerRegistrationForm({ id = 'seller-registration' }) {
         }
         if (!formData.phone) {
             dispatch({ type: 'auth/setError', payload: 'Введите номер телефона' });
+            return;
+        }
+        const phoneDigits = String(formData.phone).replace(/\D/g, '');
+        if (!(phoneDigits.length === 11 && phoneDigits.startsWith('79'))) {
+            setPhoneError('Неверный формат телефона');
+            dispatch({ type: 'auth/setError', payload: 'Введите мобильный номер в формате +7 (9XX) XXX-XX-XX' });
             return;
         }
         handleSendCode();

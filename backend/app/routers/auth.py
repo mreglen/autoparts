@@ -129,6 +129,9 @@ def register_start(data: RegisterStep1, db: Session = Depends(get_db)):
         send_verification_email(data.email, code)
         return {"msg": "Код подтверждения отправлен на ваш email"}
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         logger.exception("Ошибка при сохранении или отправке email")
         db.rollback()
@@ -471,6 +474,9 @@ def complete_registration(data: RegisterStep1, db: Session = Depends(get_db), re
             merge_guest_cart_from_request(db, request, response, user.id)
         return {"access_token": access_token, "token_type": "bearer"}
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         logger.exception("Ошибка при создании пользователя")
         db.rollback()
@@ -584,7 +590,10 @@ def seller_register(data: SellerRegisterRequest, db: Session = Depends(get_db)):
         )
         
         return SellerRegisterResponse(msg="Заявка успешно отправлена. Ожидайте модерации. Подтверждение отправлено на ваш email.")
-        
+
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         logger.exception("Ошибка при регистрации продавца")
         db.rollback()

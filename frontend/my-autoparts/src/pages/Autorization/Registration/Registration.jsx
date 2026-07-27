@@ -76,11 +76,17 @@ export default function Registration() {
         }
         dispatch(updateField({ phone: formatted }));
         const pure = formatted.replace(/\D/g, '');
+        // Как на бэке: только мобильный +7 9XX …
         setPhoneError(
             pure.length === 0 ? '' :
-                pure.length === 11 && pure.startsWith('7') ? '' :
+                pure.length === 11 && pure.startsWith('79') ? '' :
                     'Неверный формат телефона'
         );
+    };
+
+    const isValidRuMobile = (phone) => {
+        const pure = String(phone || '').replace(/\D/g, '');
+        return pure.length === 11 && pure.startsWith('79');
     };
 
     const handleSendCode = () => {
@@ -132,6 +138,11 @@ export default function Registration() {
         }
         if (emailVerification.status !== 'verified') {
             dispatch({ type: 'auth/setError', payload: 'Подтвердите email' });
+            return;
+        }
+        if (!isValidRuMobile(formData.phone)) {
+            setPhoneError('Неверный формат телефона');
+            dispatch({ type: 'auth/setError', payload: 'Введите мобильный номер в формате +7 (9XX) XXX-XX-XX' });
             return;
         }
 
@@ -224,6 +235,11 @@ export default function Registration() {
         }
         if (!formData.phone) {
             dispatch({ type: 'auth/setError', payload: 'Введите номер телефона' });
+            return;
+        }
+        if (!isValidRuMobile(formData.phone)) {
+            setPhoneError('Неверный формат телефона');
+            dispatch({ type: 'auth/setError', payload: 'Введите мобильный номер в формате +7 (9XX) XXX-XX-XX' });
             return;
         }
         handleSendCode();
@@ -323,14 +339,25 @@ export default function Registration() {
                     <p className="text-red-600 text-sm text-center">{error || 'Неверный код'}</p>
                 )}
 
-                <div className="flex justify-between items-center">
-                    <button
-                        type="button"
-                        onClick={goToStep1}
-                        className="text-gray-600 hover:text-gray-800 font-medium transition-colors"
-                    >
-                        Назад
-                    </button>
+                <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                        <button
+                            type="button"
+                            onClick={goToStep1}
+                            className="text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                        >
+                            Назад
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleVerifyCode}
+                            disabled={loading || code.length !== 6}
+                            className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+                        >
+                            Продолжить
+                        </button>
+                    </div>
 
                     <div className="text-center">
                         <button
@@ -342,15 +369,6 @@ export default function Registration() {
                             Не пришёл код? Отправить снова
                         </button>
                     </div>
-
-                    <button
-                        type="button"
-                        onClick={handleVerifyCode}
-                        disabled={loading || code.length !== 6}
-                        className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition-colors"
-                    >
-                        Продолжить
-                    </button>
                 </div>
             </div>
         </div>
