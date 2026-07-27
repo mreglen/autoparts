@@ -101,6 +101,8 @@ const publicInfoSlice = createSlice({
         showSiteReviews: true,
         showYandexBadge: true,
         showWarehouseInventory: false,
+        showAutoservice: false,
+        autoserviceOrganizationId: null,
         newPartsMarkupPercent: 15,
         usedPartsPurchaseMode: 'both',
         roundProductPrices: false,
@@ -117,6 +119,8 @@ const publicInfoSlice = createSlice({
       state.showSiteReviews = true;
       state.showYandexBadge = true;
       state.showWarehouseInventory = false;
+      state.showAutoservice = false;
+      state.autoserviceOrganizationId = null;
       state.newPartsMarkupPercent = 15;
       state.usedPartsPurchaseMode = 'both';
       state.roundProductPrices = false;
@@ -133,6 +137,12 @@ const publicInfoSlice = createSlice({
     },
     setShowWarehouseInventory: (state, action) => {
       state.showWarehouseInventory = action.payload === true;
+    },
+    setShowAutoservice: (state, action) => {
+      state.showAutoservice = action.payload === true;
+    },
+    setAutoserviceOrganizationId: (state, action) => {
+      state.autoserviceOrganizationId = action.payload || null;
     },
     setNewPartsMarkupPercent: (state, action) => {
       const n = Number(action.payload);
@@ -164,6 +174,8 @@ const publicInfoSlice = createSlice({
         state.showSiteReviews = p?.show_site_reviews !== false;
         state.showYandexBadge = p?.show_yandex_badge !== false;
         state.showWarehouseInventory = p?.show_warehouse_inventory === true;
+        state.showAutoservice = p?.show_autoservice === true;
+        state.autoserviceOrganizationId = p?.autoservice_organization_id || null;
         const m = Number(p?.new_parts_markup_percent);
         state.newPartsMarkupPercent =
           Number.isFinite(m) && m >= 0 ? m : 15;
@@ -208,6 +220,8 @@ export const {
   setShowSiteReviews,
   setShowYandexBadge,
   setShowWarehouseInventory,
+  setShowAutoservice,
+  setAutoserviceOrganizationId,
   setNewPartsMarkupPercent,
   setRoundProductPrices,
   setUsedPartsPurchaseMode,

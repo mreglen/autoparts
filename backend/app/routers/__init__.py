@@ -52,6 +52,11 @@ from app.routers.site_delivery import router as site_delivery_router
 from app.routers.site_quick_links import router as site_quick_links_router
 from app.routers.site_payments import router as site_payments_router
 from app.routers.site_reviews import router as site_reviews_router
+from app.routers.autoservice_inspections import router as autoservice_inspections_router
+from app.routers.autoservice_clients import router as autoservice_clients_router
+from app.routers.autoservice_garage import router as autoservice_garage_router
+from app.routers.autoservice_settings import router as autoservice_settings_router
+from app.routers.autoservice_repair_orders import router as autoservice_repair_orders_router
 from app.routers.public_pages import router as public_pages_router
 from app.routers.public_pages_seo import router as public_pages_seo_router
 from app.routers.public_product_seo import router as public_product_seo_router
@@ -125,6 +130,11 @@ api_router.include_router(site_delivery_router)
 api_router.include_router(site_quick_links_router)
 api_router.include_router(site_payments_router)
 api_router.include_router(site_reviews_router)
+api_router.include_router(autoservice_inspections_router)
+api_router.include_router(autoservice_clients_router)
+api_router.include_router(autoservice_garage_router)
+api_router.include_router(autoservice_settings_router)
+api_router.include_router(autoservice_repair_orders_router)
 api_router.include_router(public_pages_router)
 api_router.include_router(public_new_parts_cards_router)
 api_router.include_router(seo_landing_pages_router)

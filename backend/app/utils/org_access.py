@@ -4,6 +4,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from app.models.organization import Organization
 from app.models.user import User as UserModel
 
 ADMIN_AUDIT_PERMISSION_CODE = "admin.audit"
@@ -20,3 +21,12 @@ def org_has_admin_director(db: Session, org_id: Optional[str]) -> bool:
         UserModel.is_admin == True,  # noqa: E712
     )
     return db.query(q.exists()).scalar() is True
+
+
+def resolve_autoservice_organization_id(db: Session) -> Optional[str]:
+    """First organization that has an admin director (is_director && is_admin)."""
+    org_ids = [row[0] for row in db.query(Organization.id).order_by(Organization.id).all()]
+    for org_id in org_ids:
+        if org_has_admin_director(db, org_id):
+            return org_id
+    return None

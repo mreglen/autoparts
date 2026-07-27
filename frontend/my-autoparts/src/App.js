@@ -14,6 +14,12 @@ import PullToRefresh from './components/PullToRefresh/PullToRefresh';
 import MainLayout from './layouts/MainLayout';
 import ProfileWithMenuLayout from './layouts/ProfileWithMenuLayout';
 import { useShowSiteReviews, useShowWarehouseInventory } from './utils/siteReviewsPublic';
+import {
+  useShowAutoservice,
+  useAutoserviceOrganizationId,
+  canAccessAutoserviceStaffMenu,
+  canAccessAutoserviceSettings,
+} from './utils/autoservicePublic';
 import { buildAutopartsRedirectSeo, PageSeoHelmet } from './utils/pageSeo';
 import useSiteAnalytics from './hooks/useSiteAnalytics';
 
@@ -90,6 +96,14 @@ const OrganizationsPage = lazy(() => import('./pages/Organizations/Organizations
 const OrganizationPublicPage = lazy(() => import('./pages/Organizations/OrganizationPublicPage'));
 const PublicUserProfilePage = lazy(() => import('./pages/PublicProfiles/PublicUserProfilePage'));
 const ReviewsPage = lazy(() => import('./pages/About/ReviewsPage'));
+const AutoservicePublicPage = lazy(() => import('./pages/Autoservice/AutoservicePublicPage'));
+const AutoserviceStaffStubPage = lazy(() => import('./pages/Autoservice/AutoserviceStaffStubPage'));
+const AutoserviceInspectionsPage = lazy(() => import('./pages/Autoservice/AutoserviceInspectionsPage'));
+const AutoserviceClientsPage = lazy(() => import('./pages/Autoservice/AutoserviceClientsPage'));
+const AutoserviceSettingsPage = lazy(() => import('./pages/Autoservice/AutoserviceSettingsPage'));
+const AutoserviceOrdersPage = lazy(() => import('./pages/Autoservice/AutoserviceOrdersPage'));
+const GaragePage = lazy(() => import('./pages/Garage/GaragePage'));
+const GarageOrdersPage = lazy(() => import('./pages/Garage/GarageOrdersPage'));
 
 // Lazy: интеграции
 const PrintSettings = lazy(() => import('./pages/Settings/PrintSettings'));
@@ -197,6 +211,82 @@ function WarehouseInventoryRoute() {
   return (
     <LazyRoute>
       <WmsStoragesPage />
+    </LazyRoute>
+  );
+}
+
+function AutoservicePublicRoute() {
+  const showAutoservice = useShowAutoservice();
+  if (!showAutoservice) {
+    return <Navigate to="/" replace />;
+  }
+  return (
+    <LazyRoute>
+      <AutoservicePublicPage />
+    </LazyRoute>
+  );
+}
+
+function GarageRoute({ children }) {
+  const showAutoservice = useShowAutoservice();
+  if (!showAutoservice) {
+    return <Navigate to="/" replace />;
+  }
+  return (
+    <RequireAuth>
+      <LazyRoute>
+        {children || <GaragePage />}
+      </LazyRoute>
+    </RequireAuth>
+  );
+}
+
+function AutoserviceStaffRoute({ section, settingsOnly = false }) {
+  const showAutoservice = useShowAutoservice();
+  const autoserviceOrganizationId = useAutoserviceOrganizationId();
+  const user = useSelector((state) => state.auth.user);
+  const accessOptions = { showAutoservice, autoserviceOrganizationId };
+
+  if (!showAutoservice) {
+    return <Navigate to="/" replace />;
+  }
+  if (!canAccessAutoserviceStaffMenu(user, accessOptions)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  if (settingsOnly && !canAccessAutoserviceSettings(user, accessOptions)) {
+    return <Navigate to="/autoservice/orders" replace />;
+  }
+  if (section === 'inspections') {
+    return (
+      <LazyRoute>
+        <AutoserviceInspectionsPage />
+      </LazyRoute>
+    );
+  }
+  if (section === 'clients') {
+    return (
+      <LazyRoute>
+        <AutoserviceClientsPage />
+      </LazyRoute>
+    );
+  }
+  if (section === 'settings') {
+    return (
+      <LazyRoute>
+        <AutoserviceSettingsPage />
+      </LazyRoute>
+    );
+  }
+  if (section === 'orders') {
+    return (
+      <LazyRoute>
+        <AutoserviceOrdersPage />
+      </LazyRoute>
+    );
+  }
+  return (
+    <LazyRoute>
+      <AutoserviceStaffStubPage section={section} />
     </LazyRoute>
   );
 }
@@ -323,6 +413,7 @@ function App() {
           <Route path="/delivery" element={<LazyRoute><DeliveryPage /></LazyRoute>} />
           <Route path="/payment" element={<LazyRoute><PaymentPage /></LazyRoute>} />
           <Route path="/reviews" element={<ReviewsRoute />} />
+          <Route path="/autoservice" element={<AutoservicePublicRoute />} />
           <Route
             path="/organizations"
             element={(
@@ -538,6 +629,15 @@ function App() {
               <LazyRoute>
                 <PurchasesReturnsPage />
               </LazyRoute>
+            )}
+          />
+          <Route path="/garage" element={<GarageRoute />} />
+          <Route
+            path="/garage/orders"
+            element={(
+              <GarageRoute>
+                <GarageOrdersPage />
+              </GarageRoute>
             )}
           />
           <Route path="/purchases/favorites" element={<Navigate to="/profile/favorites" replace />} />
@@ -806,6 +906,22 @@ function App() {
                 <SitePaymentsPage />
               </LazyRoute>
             )}
+          />
+          <Route
+            path="/autoservice/inspections"
+            element={<AutoserviceStaffRoute section="inspections" />}
+          />
+          <Route
+            path="/autoservice/clients"
+            element={<AutoserviceStaffRoute section="clients" />}
+          />
+          <Route
+            path="/autoservice/orders"
+            element={<AutoserviceStaffRoute section="orders" />}
+          />
+          <Route
+            path="/autoservice/settings"
+            element={<AutoserviceStaffRoute section="settings" settingsOnly />}
           />
         </Route>
       </Routes>

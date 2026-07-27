@@ -10,6 +10,7 @@ import {
   setShowSiteReviews,
   setShowYandexBadge,
   setShowWarehouseInventory,
+  setShowAutoservice,
   setNewPartsMarkupPercent,
   setRoundProductPrices,
   setUsedPartsPurchaseMode,
@@ -30,6 +31,7 @@ function AdminPanelPage() {
   const [showSiteReviews, setShowSiteReviewsLocal] = useState(true);
   const [showYandexBadge, setShowYandexBadgeLocal] = useState(true);
   const [showWarehouseInventory, setShowWarehouseInventoryLocal] = useState(false);
+  const [showAutoservice, setShowAutoserviceLocal] = useState(false);
   const [roundProductPrices, setRoundProductPricesLocal] = useState(false);
   const [usedPartsPurchaseMode, setUsedPartsPurchaseModeLocal] = useState('both');
   const [markupPercent, setMarkupPercent] = useState('15');
@@ -72,6 +74,7 @@ function AdminPanelPage() {
           setShowSiteReviewsLocal(data.show_site_reviews !== false);
           setShowYandexBadgeLocal(data.show_yandex_badge !== false);
           setShowWarehouseInventoryLocal(data.show_warehouse_inventory === true);
+          setShowAutoserviceLocal(data.show_autoservice === true);
           setRoundProductPricesLocal(data.round_product_prices === true);
           const mode = data.used_parts_purchase_mode;
           setUsedPartsPurchaseModeLocal(
@@ -192,6 +195,25 @@ function AdminPanelPage() {
       setShowWarehouseInventoryLocal(checked);
       dispatch(setShowWarehouseInventory(checked));
       patchPublicSiteConfigCache({ show_warehouse_inventory: checked });
+      dispatch(fetchPublicSiteConfig(true));
+    } catch (e) {
+      setError(e?.message || 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleShowAutoservice = async (checked) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest('/admin/site-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ show_autoservice: checked }),
+      });
+      setShowAutoserviceLocal(checked);
+      dispatch(setShowAutoservice(checked));
+      patchPublicSiteConfigCache({ show_autoservice: checked });
       dispatch(fetchPublicSiteConfig(true));
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения');
@@ -442,6 +464,22 @@ function AdminPanelPage() {
             <span className="text-sm text-gray-500 block mt-1">
               Если включено, в меню «Склад» появится раздел «Инвентаризация» (/warehouse/inventory).
               Страница и API остаются доступны только при включённом переключателе.
+            </span>
+          </span>
+        </label>
+        <label className="mt-6 flex items-start gap-3 cursor-pointer select-none border-t border-gray-100 pt-6">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            checked={showAutoservice}
+            disabled={loadingSettings || saving}
+            onChange={(e) => handleToggleShowAutoservice(e.target.checked)}
+          />
+          <span>
+            <span className="font-medium text-gray-900 block">Отображать автосервис на сайте</span>
+            <span className="text-sm text-gray-500 block mt-1">
+              Если включено, на сайте появляется публичная страница /autoservice, а сотрудникам
+              организации автосервиса — пункт меню «Автосервис».
             </span>
           </span>
         </label>

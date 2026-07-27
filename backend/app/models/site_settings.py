@@ -14,3 +14,4 @@ class SiteSettings(Base):
     used_parts_purchase_mode = Column(String(20), nullable=False, default="both")
     round_product_prices = Column(Boolean, nullable=False, default=False)
     show_warehouse_inventory = Column(Boolean, nullable=False, default=False)
+    show_autoservice = Column(Boolean, nullable=False, default=False)

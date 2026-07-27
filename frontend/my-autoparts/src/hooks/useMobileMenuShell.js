@@ -7,17 +7,27 @@ import {
     getPathForTab,
 } from '../pages/Profile/menu/profileMenuConfig';
 import { selectShowWarehouseInventory } from '../utils/siteReviewsPublic';
+import {
+    selectShowAutoservice,
+    selectAutoserviceOrganizationId,
+} from '../utils/autoservicePublic';
 
 export function useMobileMenuShell(userOverride) {
     const location = useLocation();
     const navigate = useNavigate();
     const { user: authUser, token, permissionCodes } = useSelector((state) => state.auth);
     const showWarehouseInventory = useSelector(selectShowWarehouseInventory);
+    const showAutoservice = useSelector(selectShowAutoservice);
+    const autoserviceOrganizationId = useSelector(selectAutoserviceOrganizationId);
     const user = userOverride ?? authUser;
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const activeTab = getActiveTabFromPath(location.pathname, user);
-    const tabs = getAvailableTabs(user, permissionCodes, { showWarehouseInventory });
+    const tabs = getAvailableTabs(user, permissionCodes, {
+        showWarehouseInventory,
+        showAutoservice,
+        autoserviceOrganizationId,
+    });
 
     useEffect(() => {
         setIsMobileMenuOpen(false);
@@ -121,6 +131,13 @@ export function getPageTitle(pathname) {
         '/admin/users': 'Пользователи',
         '/admin/rossko': 'Rossko',
         '/admin/analytics': 'Аналитика',
+        '/autoservice': 'Автосервис',
+        '/autoservice/inspections': 'Записи на тех осмотр',
+        '/autoservice/clients': 'Клиенты автосервиса',
+        '/autoservice/orders': 'Записи',
+        '/autoservice/settings': 'Настройки автосервиса',
+        '/garage': 'Гараж',
+        '/garage/orders': 'Мои записи',
     };
 
     if (exact[pathname]) return exact[pathname];

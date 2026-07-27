@@ -665,6 +665,27 @@ def ensure_site_settings_show_warehouse_inventory_column() -> None:
     logger.info("Applied site_settings show_warehouse_inventory column patch")
 
 
+def ensure_site_settings_show_autoservice_column() -> None:
+    """Add show_autoservice toggle to site_settings."""
+    inspector = inspect(engine)
+    if "site_settings" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("site_settings")}
+    if "show_autoservice" in columns:
+        return
+
+    if engine.dialect.name == "postgresql":
+        stmt = "ALTER TABLE site_settings ADD COLUMN show_autoservice BOOLEAN NOT NULL DEFAULT FALSE"
+    else:
+        stmt = "ALTER TABLE site_settings ADD COLUMN show_autoservice BOOLEAN NOT NULL DEFAULT 0"
+
+    with engine.begin() as conn:
+        conn.execute(text(stmt))
+
+    logger.info("Applied site_settings show_autoservice column patch")
+
+
 def ensure_group_chat_columns() -> None:
     """Add group chat columns to chats and create chat_participants table."""
     inspector = inspect(engine)
@@ -2998,4 +3019,451 @@ def ensure_site_payment_ledger_table() -> None:
         conn.execute(text(ddl))
 
     logger.info("Applied site_payment_ledger table patch")
+
+
+def ensure_inspection_bookings_table() -> None:
+    """Create inspection_bookings for autoservice tech-inspection requests."""
+    inspector = inspect(engine)
+    if "inspection_bookings" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE inspection_bookings (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            name VARCHAR(120) NOT NULL,
+            phone VARCHAR(32) NOT NULL,
+            preferred_date DATE NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'new',
+            source VARCHAR(32) NOT NULL,
+            created_by_user_id INTEGER REFERENCES users(id),
+            notes TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE inspection_bookings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            name VARCHAR(120) NOT NULL,
+            phone VARCHAR(32) NOT NULL,
+            preferred_date DATE NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'new',
+            source VARCHAR(32) NOT NULL,
+            created_by_user_id INTEGER REFERENCES users(id),
+            notes TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+
+    logger.info("Applied inspection_bookings table patch")
+
+
+def ensure_autoservice_clients_table() -> None:
+    """Create autoservice_clients for service consent / guest clients."""
+    inspector = inspect(engine)
+    if "autoservice_clients" in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE autoservice_clients (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            user_id INTEGER REFERENCES users(id),
+            name VARCHAR(120) NOT NULL,
+            phone VARCHAR(32) NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'active',
+            source VARCHAR(32) NOT NULL,
+            consented_at TIMESTAMPTZ NOT NULL,
+            created_by_user_id INTEGER REFERENCES users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_autoservice_clients_org_phone UNIQUE (organization_id, phone)
+        )
+        """
+        index_ddl = """
+        CREATE UNIQUE INDEX uq_autoservice_clients_org_user
+        ON autoservice_clients (organization_id, user_id)
+        WHERE user_id IS NOT NULL
+        """
+    else:
+        ddl = """
+        CREATE TABLE autoservice_clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            user_id INTEGER REFERENCES users(id),
+            name VARCHAR(120) NOT NULL,
+            phone VARCHAR(32) NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'active',
+            source VARCHAR(32) NOT NULL,
+            consented_at DATETIME NOT NULL,
+            created_by_user_id INTEGER REFERENCES users(id),
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT uq_autoservice_clients_org_phone UNIQUE (organization_id, phone)
+        )
+        """
+        index_ddl = None
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        if index_ddl:
+            conn.execute(text(index_ddl))
+
+    logger.info("Applied autoservice_clients table patch")
+
+
+def ensure_garage_vehicles_table() -> None:
+    """Create garage_vehicles for autoservice client cars."""
+    inspector = inspect(engine)
+    if "garage_vehicles" in inspector.get_table_names():
+        return
+    if "autoservice_clients" not in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE garage_vehicles (
+            id SERIAL PRIMARY KEY,
+            client_id INTEGER NOT NULL REFERENCES autoservice_clients(id) ON DELETE CASCADE,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            vin VARCHAR(17),
+            make VARCHAR(80) NOT NULL,
+            model VARCHAR(80) NOT NULL,
+            year INTEGER,
+            color VARCHAR(40),
+            plate VARCHAR(20),
+            notes TEXT,
+            source VARCHAR(32) NOT NULL DEFAULT 'manual',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT uq_garage_vehicles_client_vin UNIQUE (client_id, vin)
+        )
+        """
+        index_ddl = """
+        CREATE UNIQUE INDEX uq_garage_vehicles_client_vin_not_null
+        ON garage_vehicles (client_id, vin)
+        WHERE vin IS NOT NULL
+        """
+    else:
+        ddl = """
+        CREATE TABLE garage_vehicles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_id INTEGER NOT NULL REFERENCES autoservice_clients(id) ON DELETE CASCADE,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            vin VARCHAR(17),
+            make VARCHAR(80) NOT NULL,
+            model VARCHAR(80) NOT NULL,
+            year INTEGER,
+            color VARCHAR(40),
+            plate VARCHAR(20),
+            notes TEXT,
+            source VARCHAR(32) NOT NULL DEFAULT 'manual',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT uq_garage_vehicles_client_vin UNIQUE (client_id, vin)
+        )
+        """
+        index_ddl = None
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        if index_ddl:
+            try:
+                conn.execute(text(index_ddl))
+            except Exception:
+                pass
+
+    logger.info("Applied garage_vehicles table patch")
+
+
+def ensure_autoservice_settings_table() -> None:
+    """Create autoservice_settings (one row per org, lifts_count)."""
+    inspector = inspect(engine)
+    if "autoservice_settings" in inspector.get_table_names():
+        return
+    if "organizations" not in inspector.get_table_names():
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE autoservice_settings (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR(10) NOT NULL UNIQUE REFERENCES organizations(id),
+            lifts_count INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE autoservice_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR(10) NOT NULL UNIQUE REFERENCES organizations(id),
+            lifts_count INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+
+    logger.info("Applied autoservice_settings table patch")
+
+
+def ensure_repair_orders_tables() -> None:
+    """Create repair_orders and repair_order_assignees for autoservice repair journal."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "repair_orders" in tables and "repair_order_assignees" in tables:
+        return
+    if "autoservice_clients" not in tables or "garage_vehicles" not in tables:
+        return
+
+    if engine.dialect.name == "postgresql":
+        orders_ddl = """
+        CREATE TABLE IF NOT EXISTS repair_orders (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            order_number VARCHAR(32) NOT NULL UNIQUE,
+            client_id INTEGER NOT NULL REFERENCES autoservice_clients(id),
+            vehicle_id INTEGER NOT NULL REFERENCES garage_vehicles(id),
+            client_comment TEXT,
+            scheduled_at TIMESTAMPTZ NOT NULL,
+            accepted_by_user_id INTEGER NOT NULL REFERENCES users(id),
+            status VARCHAR(32) NOT NULL DEFAULT 'open',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+        assignees_ddl = """
+        CREATE TABLE IF NOT EXISTS repair_order_assignees (
+            order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            PRIMARY KEY (order_id, user_id)
+        )
+        """
+    else:
+        orders_ddl = """
+        CREATE TABLE IF NOT EXISTS repair_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            order_number VARCHAR(32) NOT NULL UNIQUE,
+            client_id INTEGER NOT NULL REFERENCES autoservice_clients(id),
+            vehicle_id INTEGER NOT NULL REFERENCES garage_vehicles(id),
+            client_comment TEXT,
+            scheduled_at DATETIME NOT NULL,
+            accepted_by_user_id INTEGER NOT NULL REFERENCES users(id),
+            status VARCHAR(32) NOT NULL DEFAULT 'open',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        assignees_ddl = """
+        CREATE TABLE IF NOT EXISTS repair_order_assignees (
+            order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            PRIMARY KEY (order_id, user_id)
+        )
+        """
+
+    index_ddl = [
+        "CREATE INDEX IF NOT EXISTS ix_repair_orders_organization_id ON repair_orders (organization_id)",
+        "CREATE INDEX IF NOT EXISTS ix_repair_orders_client_id ON repair_orders (client_id)",
+        "CREATE INDEX IF NOT EXISTS ix_repair_orders_vehicle_id ON repair_orders (vehicle_id)",
+        "CREATE INDEX IF NOT EXISTS ix_repair_orders_status ON repair_orders (status)",
+        "CREATE INDEX IF NOT EXISTS ix_repair_orders_scheduled_at ON repair_orders (scheduled_at)",
+    ]
+
+    with engine.begin() as conn:
+        if "repair_orders" not in tables:
+            conn.execute(text(orders_ddl))
+            for ddl in index_ddl:
+                try:
+                    conn.execute(text(ddl))
+                except Exception:
+                    pass
+        if "repair_order_assignees" not in tables:
+            conn.execute(text(assignees_ddl))
+
+    logger.info("Applied repair_orders tables patch")
+
+
+def ensure_repair_order_lines_tables() -> None:
+    """Add staff_comment + repair_order_works + repair_order_client_parts."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "repair_orders" not in tables:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("repair_orders")}
+    with engine.begin() as conn:
+        if "staff_comment" not in columns:
+            conn.execute(text("ALTER TABLE repair_orders ADD COLUMN staff_comment TEXT"))
+
+        if "repair_order_works" not in tables:
+            if engine.dialect.name == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE repair_order_works (
+                            id SERIAL PRIMARY KEY,
+                            order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+                            position INTEGER NOT NULL DEFAULT 1,
+                            title VARCHAR(255) NOT NULL,
+                            qty INTEGER NOT NULL DEFAULT 1,
+                            unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                            executor_user_id INTEGER REFERENCES users(id)
+                        )
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE repair_order_works (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+                            position INTEGER NOT NULL DEFAULT 1,
+                            title VARCHAR(255) NOT NULL,
+                            qty INTEGER NOT NULL DEFAULT 1,
+                            unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+                            executor_user_id INTEGER REFERENCES users(id)
+                        )
+                        """
+                    )
+                )
+            try:
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_repair_order_works_order_id "
+                        "ON repair_order_works (order_id)"
+                    )
+                )
+            except Exception:
+                pass
+
+        if "repair_order_client_parts" not in tables:
+            if engine.dialect.name == "postgresql":
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE repair_order_client_parts (
+                            id SERIAL PRIMARY KEY,
+                            order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+                            position INTEGER NOT NULL DEFAULT 1,
+                            title VARCHAR(255) NOT NULL,
+                            qty INTEGER NOT NULL DEFAULT 1
+                        )
+                        """
+                    )
+                )
+            else:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE repair_order_client_parts (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+                            position INTEGER NOT NULL DEFAULT 1,
+                            title VARCHAR(255) NOT NULL,
+                            qty INTEGER NOT NULL DEFAULT 1
+                        )
+                        """
+                    )
+                )
+            try:
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_repair_order_client_parts_order_id "
+                        "ON repair_order_client_parts (order_id)"
+                    )
+                )
+            except Exception:
+                pass
+
+    logger.info("Applied repair_order lines tables patch")
+
+
+def ensure_repair_order_shop_parts_table() -> None:
+    """Create repair_order_shop_parts for executor parts with markup."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "repair_order_shop_parts" in tables:
+        return
+    if "repair_orders" not in tables:
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE repair_order_shop_parts (
+            id SERIAL PRIMARY KEY,
+            order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+            position INTEGER NOT NULL DEFAULT 1,
+            title VARCHAR(255) NOT NULL,
+            qty INTEGER NOT NULL DEFAULT 1,
+            unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            markup_percent NUMERIC(6, 2) NOT NULL DEFAULT 5,
+            source VARCHAR(32) NOT NULL DEFAULT 'manual',
+            product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+            rossko_brand VARCHAR(120),
+            rossko_partnumber VARCHAR(120)
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE repair_order_shop_parts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL REFERENCES repair_orders(id) ON DELETE CASCADE,
+            position INTEGER NOT NULL DEFAULT 1,
+            title VARCHAR(255) NOT NULL,
+            qty INTEGER NOT NULL DEFAULT 1,
+            unit_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+            markup_percent NUMERIC(6, 2) NOT NULL DEFAULT 5,
+            source VARCHAR(32) NOT NULL DEFAULT 'manual',
+            product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+            rossko_brand VARCHAR(120),
+            rossko_partnumber VARCHAR(120)
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        try:
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_repair_order_shop_parts_order_id "
+                    "ON repair_order_shop_parts (order_id)"
+                )
+            )
+        except Exception:
+            pass
+
+    logger.info("Applied repair_order_shop_parts table patch")
+
+
+def ensure_repair_order_stage10() -> None:
+    """Add lift_number and migrate repair order statuses for stage 10."""
+    inspector = inspect(engine)
+    if "repair_orders" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("repair_orders")}
+    with engine.begin() as conn:
+        if "lift_number" not in columns:
+            conn.execute(text("ALTER TABLE repair_orders ADD COLUMN lift_number INTEGER"))
+        conn.execute(
+            text("UPDATE repair_orders SET status = 'accepted' WHERE status = 'open'")
+        )
+        conn.execute(
+            text("UPDATE repair_orders SET status = 'issued' WHERE status = 'completed'")
+        )
+
+    logger.info("Applied repair_order stage10 patch")
 

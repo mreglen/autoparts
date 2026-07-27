@@ -24,3 +24,8 @@ def get_or_create_site_settings(db: Session) -> SiteSettings:
 def site_reviews_enabled(db: Session) -> bool:
     row = get_or_create_site_settings(db)
     return getattr(row, "show_site_reviews", True) is not False
+
+
+def autoservice_enabled(db: Session) -> bool:
+    row = get_or_create_site_settings(db)
+    return getattr(row, "show_autoservice", False) is True

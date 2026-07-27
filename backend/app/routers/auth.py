@@ -34,6 +34,7 @@ from app.utils.id_generator import random_id
 from app.utils.phone import normalize_to_storage_format  
 from app.utils.guest_cart import merge_guest_cart_from_request
 from app.utils.site_settings_db import get_or_create_site_settings
+from app.utils.org_access import resolve_autoservice_organization_id
 from app.utils.org_markup import effective_markup_percent, global_markup_percent
 from app.utils.user_public_code import assign_public_code
 from app.utils.user_avatar import avatar_public_url
@@ -671,6 +672,8 @@ def get_public_site_config(
         "show_site_reviews": getattr(settings_row, "show_site_reviews", True) is not False,
         "show_yandex_badge": getattr(settings_row, "show_yandex_badge", True) is not False,
         "show_warehouse_inventory": getattr(settings_row, "show_warehouse_inventory", False) is True,
+        "show_autoservice": getattr(settings_row, "show_autoservice", False) is True,
+        "autoservice_organization_id": resolve_autoservice_organization_id(db),
         "new_parts_markup_percent": markup,
         "used_parts_purchase_mode": purchase_mode,
         "round_product_prices": getattr(settings_row, "round_product_prices", False) is True,
