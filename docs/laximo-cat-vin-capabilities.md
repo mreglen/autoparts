@@ -2,6 +2,8 @@
 
 Оценка по официальной документации [doc.laximo.ru](https://doc.laximo.ru/) (сервис **Laximo.CAT** — оригинальные каталоги запчастей).
 
+План внедрения в сайт (гараж, разборка, поиск по VIN, методы REST РФ): [laximo-cat-integration-plan.md](./laximo-cat-integration-plan.md).
+
 **Краткий вердикт:** для трёх целевых сценариев (VIN → авто, VIN → запчасти, VIN → узлы вроде «двигатель / ходовая») функционала **CAT в целом хватает**. Это OEM-каталог с навигацией по узлам, а не универсальный VIN-декодер и не витрина склада с ценами/наличием.
 
 Источники: [Поиск автомобиля](https://doc.laximo.ru/ru/cat/vehicle), [FindVehicle](https://doc.laximo.ru/ru/cat/FindVehicle) / [FindVehicleByVIN](https://doc.laximo.ru/ru/cat/FindVehicleByVIN), [GetVehicleInfo](https://doc.laximo.ru/ru/cat/GetVehicleInfo), [Поиск внутри автомобиля](https://doc.laximo.ru/ru/UseCases/SearchInsideTheCar), [ListCategories](https://doc.laximo.ru/ru/cat/ListCategories) / [ListUnits](https://doc.laximo.ru/ru/cat/ListUnits) / [ListDetailByUnit](https://doc.laximo.ru/ru/cat/ListDetailByUnit).
