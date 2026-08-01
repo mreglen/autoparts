@@ -4,6 +4,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiAxios, apiRequest } from '../../utils/apiClient';
 import { getRosskoMinPrice, getRosskoParts } from '../AutoParts/NewParts/rosskoHelpers';
+import { formatServerDateTime } from '../../utils/serverDate';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -33,16 +34,7 @@ const STATUS_STYLES = {
 };
 
 function formatDateTime(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatServerDateTime(value);
 }
 
 function formatMoney(value) {

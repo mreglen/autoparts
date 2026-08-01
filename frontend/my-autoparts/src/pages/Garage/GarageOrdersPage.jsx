@@ -6,6 +6,7 @@ import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScr
 import { AUTOSERVICE_PUBLIC_NAME } from '../../utils/autoserviceConstants';
 import { BECOME_CLIENT_CONFIRM } from '../../utils/autoservicePublic';
 import { apiRequest } from '../../utils/apiClient';
+import { formatServerDateTime } from '../../utils/serverDate';
 
 const STATUS_LABELS = {
   accepted: 'Принят',
@@ -28,16 +29,7 @@ const STATUS_STYLES = {
 };
 
 function formatDateTime(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatServerDateTime(value);
 }
 
 function vehicleLabel(v) {

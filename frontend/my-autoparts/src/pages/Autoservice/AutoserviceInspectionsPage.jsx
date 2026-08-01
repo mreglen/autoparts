@@ -3,6 +3,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
+import { formatServerDate, formatServerDateTime } from '../../utils/serverDate';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -23,26 +24,6 @@ const SOURCE_LABELS = {
   site: 'Сайт',
   staff: 'Сотрудник',
 };
-
-function formatDate(value) {
-  if (!value) return '—';
-  const parts = String(value).slice(0, 10).split('-');
-  if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
-  return String(value);
-}
-
-function formatDateTime(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return formatDate(value);
-  return d.toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function StatusBadge({ status }) {
   return (
@@ -325,10 +306,10 @@ export default function AutoserviceInspectionsPage() {
             ) : (
               rows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50/80">
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">{formatDateTime(row.created_at)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-gray-600">{formatServerDateTime(row.created_at)}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-gray-700">{row.phone}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatDate(row.preferred_date)}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-gray-700">{formatServerDate(row.preferred_date)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-gray-600">
                     {SOURCE_LABELS[row.source] || row.source}
                   </td>

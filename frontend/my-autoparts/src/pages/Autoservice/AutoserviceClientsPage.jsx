@@ -3,6 +3,7 @@ import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import { apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
+import { formatServerDateTime } from '../../utils/serverDate';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -11,23 +12,6 @@ const SOURCE_LABELS = {
   self: 'Сам',
   staff: 'Сотрудник',
 };
-
-function formatDateTime(value) {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) {
-    const parts = String(value).slice(0, 10).split('-');
-    if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
-    return String(value);
-  }
-  return d.toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function Modal({ title, children, onClose }) {
   return (
@@ -263,7 +247,7 @@ export default function AutoserviceClientsPage() {
                       {SOURCE_LABELS[row.source] || row.source}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                      {formatDateTime(row.consented_at)}
+                      {formatServerDateTime(row.consented_at)}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       {row.user_id ? (

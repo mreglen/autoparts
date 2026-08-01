@@ -232,6 +232,16 @@ export function buildDeliverySeo() {
   };
 }
 
+export function buildAutoserviceSeo() {
+  return {
+    title: 'Автосервис «Свой гараж» на Фруктовая 17 — запись на техосмотр',
+    description:
+      'Визитная карточка автосервиса «Свой гараж» в Екатеринбурге: запись на техосмотр онлайн, личный гараж и записи на обслуживание.',
+    canonicalUrl: absoluteUrl('/autoservice'),
+    robots: 'index, follow',
+  };
+}
+
 export function buildSellerPartCardSeo(part) {
   const name = formatProductDisplayTitle(part?.brand, part?.article, part?.name);
   const path = buildPartDetailPath(part);

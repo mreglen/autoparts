@@ -36,6 +36,7 @@ export default function MainLayout() {
     const isFullBleedAmbientPage =
         location.pathname === '/reviews' ||
         location.pathname === '/' ||
+        location.pathname === '/autoservice' ||
         location.pathname === '/organizations' ||
         location.pathname.startsWith('/organizations/');
 
