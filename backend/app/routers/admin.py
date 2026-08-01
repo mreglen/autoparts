@@ -91,6 +91,10 @@ from app.services.audit_service import (
 from app.utils.email import send_verification_email, send_welcome_email
 from app.schemas.server_stats import ServerStatsOut
 from app.services.server_stats_service import collect_server_stats
+from app.services.deploy_update_service import (
+    get_deploy_update_status,
+    start_deploy_update,
+)
 import math
 import secrets
 import string
@@ -312,6 +316,48 @@ def get_server_stats(
     db: Session = Depends(get_db),
 ):
     return collect_server_stats(db)
+
+
+@router.get("/deploy-update")
+def get_deploy_update(
+    current_user: User = Depends(get_current_admin_user),
+):
+    del current_user
+    return get_deploy_update_status()
+
+
+@router.post("/deploy-update")
+def post_deploy_update(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        result = start_deploy_update(user_id=current_user.id)
+    except RuntimeError as exc:
+        msg = str(exc)
+        code = (
+            status.HTTP_409_CONFLICT
+            if "уже выполняется" in msg.lower()
+            else status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+        raise HTTPException(status_code=code, detail=msg) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Не удалось запустить update: {exc}",
+        ) from exc
+
+    log_audit(
+        db,
+        event_type="deploy_update_started",
+        category="admin",
+        summary="Запущено production-обновление (update)",
+        user=current_user,
+        details={"status": result.get("status"), "started_at": result.get("started_at")},
+        entity_type="system",
+        entity_id="update",
+    )
+    return result
 
 
 @router.get("/site-settings", response_model=SiteSettingsResponse)

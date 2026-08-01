@@ -1,6 +1,7 @@
 import {
     canAccessAutoserviceStaffMenu,
     canAccessAutoserviceSettings,
+    canAccessAutoserviceClientMenu,
 } from '../../../utils/autoservicePublic';
 
 export const TAB_PATH_MAP = {
@@ -9,7 +10,6 @@ export const TAB_PATH_MAP = {
     profile: '/profile',
     'settings-notifications': '/profile/notifications',
     'purchases-orders': '/purchases/orders',
-    'purchases-garage': '/garage',
     'purchases-returns': '/purchases/returns',
     'sales-orders': '/sales/orders',
     'sales-returns': '/sales/returns',
@@ -36,18 +36,36 @@ export const TAB_PATH_MAP = {
     'site-payments': '/admin/site-payments',
     analytics: '/admin/analytics',
     chats: '/chats',
+    'autoservice-garage': '/garage',
+    'autoservice-my-orders': '/garage/orders',
+    'autoservice-public': '/autoservice',
     'autoservice-inspections': '/autoservice/inspections',
     'autoservice-clients': '/autoservice/clients',
     'autoservice-orders': '/autoservice/orders',
     'autoservice-settings': '/autoservice/settings',
 };
 
-const buildPurchasesSubmenu = (showAutoservice) => {
-    const submenu = [{ id: 'purchases-orders', label: 'Заказы' }];
-    if (showAutoservice) {
-        submenu.push({ id: 'purchases-garage', label: 'Гараж' });
+const buildPurchasesSubmenu = () => [
+    { id: 'purchases-orders', label: 'Заказы' },
+    { id: 'purchases-returns', label: 'Возвраты' },
+];
+
+const buildAutoserviceSubmenu = (user, options = {}) => {
+    const submenu = [
+        { id: 'autoservice-garage', label: 'Гараж' },
+        { id: 'autoservice-my-orders', label: 'Мои записи' },
+        { id: 'autoservice-public', label: 'Запись на ТО' },
+    ];
+    if (canAccessAutoserviceStaffMenu(user, options)) {
+        submenu.push(
+            { id: 'autoservice-inspections', label: 'Записи на тех осмотр' },
+            { id: 'autoservice-clients', label: 'Клиенты' },
+            { id: 'autoservice-orders', label: 'Записи (сотрудники)' },
+        );
+        if (canAccessAutoserviceSettings(user, options)) {
+            submenu.push({ id: 'autoservice-settings', label: 'Настройки' });
+        }
     }
-    submenu.push({ id: 'purchases-returns', label: 'Возвраты' });
     return submenu;
 };
 
@@ -72,7 +90,9 @@ export const getActiveTabFromPath = (path, user) => {
     if (path.startsWith('/admin/users')) return 'admin-users';
     if (path.startsWith('/admin/rossko')) return 'admin-rossko';
     if (path.startsWith('/admin/site-payments')) return 'site-payments';
-    if (path.startsWith('/garage')) return 'purchases-garage';
+    if (path.startsWith('/garage/orders')) return 'autoservice-my-orders';
+    if (path.startsWith('/garage')) return 'autoservice-garage';
+    if (path === '/autoservice' || path === '/autoservice/') return 'autoservice-public';
     if (path.startsWith('/autoservice/inspections')) return 'autoservice-inspections';
     if (path.startsWith('/autoservice/clients')) return 'autoservice-clients';
     if (path.startsWith('/autoservice/orders')) return 'autoservice-orders';
@@ -85,6 +105,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
     const showWarehouseInventory = options.showWarehouseInventory === true;
     const showAutoservice = options.showAutoservice === true;
     const autoserviceOrganizationId = options.autoserviceOrganizationId || null;
+    const autoserviceAccessOptions = { showAutoservice, autoserviceOrganizationId };
 
     if (!user) return [];
 
@@ -98,7 +119,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             {
                 id: 'purchases',
                 label: 'Покупки',
-                submenu: buildPurchasesSubmenu(showAutoservice),
+                submenu: buildPurchasesSubmenu(),
             },
         ];
     } else if (user.is_seller) {
@@ -109,7 +130,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             {
                 id: 'purchases',
                 label: 'Покупки',
-                submenu: buildPurchasesSubmenu(showAutoservice),
+                submenu: buildPurchasesSubmenu(),
             },
         ];
     } else {
@@ -117,7 +138,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             {
                 id: 'purchases',
                 label: 'Покупки',
-                submenu: buildPurchasesSubmenu(showAutoservice),
+                submenu: buildPurchasesSubmenu(),
             },
             { id: 'chats', label: 'Сообщения' },
             {
@@ -191,7 +212,7 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             {
                 id: 'purchases',
                 label: 'Покупки',
-                submenu: buildPurchasesSubmenu(showAutoservice),
+                submenu: buildPurchasesSubmenu(),
             },
         ];
 
@@ -301,29 +322,11 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
         });
     }
 
-    if (
-        canAccessAutoserviceStaffMenu(user, {
-            showAutoservice,
-            autoserviceOrganizationId,
-        })
-    ) {
-        const autoserviceSubmenu = [
-            { id: 'autoservice-inspections', label: 'Записи на тех осмотр' },
-            { id: 'autoservice-clients', label: 'Клиенты' },
-            { id: 'autoservice-orders', label: 'Записи' },
-        ];
-        if (
-            canAccessAutoserviceSettings(user, {
-                showAutoservice,
-                autoserviceOrganizationId,
-            })
-        ) {
-            autoserviceSubmenu.push({ id: 'autoservice-settings', label: 'Настройки' });
-        }
+    if (canAccessAutoserviceClientMenu(user, autoserviceAccessOptions)) {
         baseTabs.push({
             id: 'autoservice',
             label: 'Автосервис',
-            submenu: autoserviceSubmenu,
+            submenu: buildAutoserviceSubmenu(user, autoserviceAccessOptions),
         });
     }
 

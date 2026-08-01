@@ -31,6 +31,15 @@ export function canAccessAutoserviceStaffMenu(user, options = {}) {
   );
 }
 
+/**
+ * Client-facing autoservice menu (garage / my orders) for any logged-in user
+ * when the site flag is on.
+ */
+export function canAccessAutoserviceClientMenu(user, options = {}) {
+  if (!user) return false;
+  return options.showAutoservice === true;
+}
+
 /** Settings submenu: director of the autoservice org (incl. admin-director). */
 export function canAccessAutoserviceSettings(user, options = {}) {
   if (!canAccessAutoserviceStaffMenu(user, options)) return false;

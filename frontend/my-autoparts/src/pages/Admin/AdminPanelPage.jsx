@@ -18,6 +18,7 @@ import {
 } from '../../redux/slices/PublicInfoSlice';
 import { USED_PURCHASE_MODE_OPTIONS } from '../../utils/usedPurchaseMode';
 import ServerStatsPanel from './ServerStatsPanel';
+import DeployUpdateSection from './DeployUpdateSection';
 import OpenRouterSection from './OpenRouterSection';
 import BackupSection from './BackupSection';
 import AvitoPhotoLocalizationSection from './AvitoPhotoLocalizationSection';
@@ -418,6 +419,8 @@ function AdminPanelPage() {
 
       <ServerStatsPanel />
 
+      <DeployUpdateSection />
+
       <BackupSection />
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
@@ -478,8 +481,9 @@ function AdminPanelPage() {
           <span>
             <span className="font-medium text-gray-900 block">Отображать автосервис на сайте</span>
             <span className="text-sm text-gray-500 block mt-1">
-              Если включено, на сайте появляется публичная страница /autoservice, а сотрудникам
-              организации автосервиса — пункт меню «Автосервис».
+              Если включено, появляется публичная страница /autoservice. У всех авторизованных
+              пользователей в меню — раздел «Автосервис» (гараж, мои записи). Сотрудникам
+              организации автосервиса дополнительно доступны клиенты, записи и настройки.
             </span>
           </span>
         </label>

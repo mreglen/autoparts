@@ -17,6 +17,7 @@ import AuthLoadingScreen from '../components/AuthLoadingScreen/AuthLoadingScreen
 import useCartSync from '../hooks/useCartSync';
 import InstallPwaPrompt from '../components/InstallPwaPrompt/InstallPwaPrompt';
 import HeaderBadgeHeightSync from '../components/Seo/HeaderBadgeHeightSync';
+import NotificationsBanner from '../components/NotificationsBanner/NotificationsBanner';
 import { normalizeNewPartsCustomerStatus } from '../utils/garageOrderUi';
 import { TERMINAL_RETURN_STATUSES } from '../utils/returnStatusUi';
 
@@ -170,6 +171,8 @@ export default function ProfileWithMenuLayout() {
 
             <div className="hidden lg:block h-[var(--sg-desktop-header-h)] shrink-0" aria-hidden="true" />
             <div className="lg:hidden h-[var(--sg-mobile-header-h)] shrink-0" aria-hidden="true" />
+
+            <NotificationsBanner />
 
             <MobileSideMenu
                 isOpen={isMobileMenuOpen}

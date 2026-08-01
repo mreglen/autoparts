@@ -10,6 +10,8 @@ uploads/
 
 # Backups (DB dumps and uploads archives)
 backend/backups/
+backend/var/
+
 
 # Frontend
 node_modules/
