@@ -1394,32 +1394,35 @@ export default function AutoserviceOrderFormPage() {
           </p>
         </SectionCard>
 
-        <SectionCard title="Итого">
-          <div className="space-y-1 text-sm text-gray-700">
-            <p>Итого работ: {formatMoney(worksTotal)} ₽</p>
-            <p>Итого ЗЧ исполнителя: {formatMoney(shopPartsTotal)} ₽</p>
-            <p className="font-semibold text-gray-900">Итого заказ: {formatMoney(grandTotal)} ₽</p>
-          </div>
-        </SectionCard>
       </form>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/90">
-        <div className="mx-auto flex max-w-4xl justify-end gap-2">
-          <button
-            type="button"
-            onClick={goBack}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            Отмена
-          </button>
-          <button
-            type="submit"
-            form="repair-order-form"
-            disabled={saving}
-            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-          >
-            {saving ? 'Сохранение…' : 'Сохранить'}
-          </button>
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900">
+              Итого {formatMoney(grandTotal)} ₽
+            </p>
+            <p className="truncate text-xs text-gray-500">
+              работы {formatMoney(worksTotal)} · ЗЧ {formatMoney(shopPartsTotal)}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={goBack}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              form="repair-order-form"
+              disabled={saving}
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {saving ? 'Сохранение…' : 'Сохранить'}
+            </button>
+          </div>
         </div>
       </div>
 

@@ -297,6 +297,14 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
         });
     }
 
+    if (canAccessAutoserviceClientMenu(user, autoserviceAccessOptions)) {
+        baseTabs.push({
+            id: 'autoservice',
+            label: 'Автосервис',
+            submenu: buildAutoserviceSubmenu(user, autoserviceAccessOptions),
+        });
+    }
+
     const auditSubmenuItem = { id: 'audit-log', label: 'Журнал событий' };
     if (user.is_admin) {
         baseTabs.push({
@@ -319,14 +327,6 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             id: 'administration',
             label: 'Админка',
             submenu: [auditSubmenuItem],
-        });
-    }
-
-    if (canAccessAutoserviceClientMenu(user, autoserviceAccessOptions)) {
-        baseTabs.push({
-            id: 'autoservice',
-            label: 'Автосервис',
-            submenu: buildAutoserviceSubmenu(user, autoserviceAccessOptions),
         });
     }
 
