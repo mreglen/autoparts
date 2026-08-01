@@ -23,6 +23,10 @@ class GarageVehicleCreate(BaseModel):
     notes: Optional[str] = Field(None, max_length=2000)
 
 
+class GarageVehicleStaffCreate(GarageVehicleCreate):
+    client_id: int = Field(ge=1)
+
+
 class GarageVehicleUpdate(BaseModel):
     vin: Optional[str] = Field(None, max_length=32)
     make: Optional[str] = Field(None, min_length=1, max_length=80)

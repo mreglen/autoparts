@@ -12,6 +12,7 @@ from app.schemas.garage_vehicle import (
     GarageVehicleCreate,
     GarageVehicleDecodeVinRequest,
     GarageVehicleDecodeVinResponse,
+    GarageVehicleStaffCreate,
     GarageVehicleUpdate,
     GarageVehicleView,
 )
@@ -57,6 +58,45 @@ def _get_client_vehicle_or_404(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Автомобиль не найден",
         )
+    return row
+
+
+def _create_vehicle_for_client(
+    db: Session,
+    *,
+    client: AutoserviceClient,
+    payload: GarageVehicleCreate,
+) -> GarageVehicle:
+    vin = _normalize_vin_or_400(payload.vin)
+    if vin:
+        existing = (
+            db.query(GarageVehicle)
+            .filter(
+                GarageVehicle.client_id == client.id,
+                GarageVehicle.vin == vin,
+            )
+            .first()
+        )
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Автомобиль с таким VIN уже есть в гараже",
+            )
+    row = GarageVehicle(
+        client_id=client.id,
+        organization_id=client.organization_id,
+        vin=vin,
+        make=payload.make.strip(),
+        model=payload.model.strip(),
+        year=payload.year,
+        color=(payload.color or "").strip() or None,
+        plate=(payload.plate or "").strip() or None,
+        notes=(payload.notes or "").strip() or None,
+        source="manual",
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
     return row
 
 
@@ -124,36 +164,36 @@ def create_garage_vehicle(
     current_user: User = Depends(get_current_user),
 ):
     my_client = require_my_active_autoservice_client(db, current_user)
-    vin = _normalize_vin_or_400(payload.vin)
-    if vin:
-        existing = (
-            db.query(GarageVehicle)
-            .filter(
-                GarageVehicle.client_id == my_client.id,
-                GarageVehicle.vin == vin,
-            )
-            .first()
+    row = _create_vehicle_for_client(db, client=my_client, payload=payload)
+    return _vehicle_to_view(row)
+
+
+@router.post(
+    "/autoservice/garage/vehicles/staff",
+    response_model=GarageVehicleView,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_garage_vehicle_staff(
+    payload: GarageVehicleStaffCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    client = (
+        db.query(AutoserviceClient)
+        .filter(
+            AutoserviceClient.id == payload.client_id,
+            AutoserviceClient.organization_id == org_id,
+            AutoserviceClient.status == "active",
         )
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Автомобиль с таким VIN уже есть в гараже",
-            )
-    row = GarageVehicle(
-        client_id=my_client.id,
-        organization_id=my_client.organization_id,
-        vin=vin,
-        make=payload.make.strip(),
-        model=payload.model.strip(),
-        year=payload.year,
-        color=(payload.color or "").strip() or None,
-        plate=(payload.plate or "").strip() or None,
-        notes=(payload.notes or "").strip() or None,
-        source="manual",
+        .first()
     )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Клиент не найден",
+        )
+    row = _create_vehicle_for_client(db, client=client, payload=payload)
     return _vehicle_to_view(row)
 
 

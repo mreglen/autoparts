@@ -617,6 +617,20 @@ def list_repair_orders(
     return [_to_staff_view(row) for row in rows]
 
 
+@router.get(
+    "/autoservice/repair-orders/{order_id}",
+    response_model=RepairOrderStaffView,
+)
+def get_repair_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    row = _get_org_order_or_404(db, org_id, order_id)
+    return _to_staff_view(row)
+
+
 @router.post(
     "/autoservice/repair-orders",
     response_model=RepairOrderStaffView,
