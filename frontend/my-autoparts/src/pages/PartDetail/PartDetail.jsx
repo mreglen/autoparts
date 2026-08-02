@@ -43,6 +43,7 @@ import {
 } from '../../utils/partDetailCache';
 import { useProductPriceFormat } from '../../hooks/useProductPriceFormat';
 import { getUsedPurchaseActions } from '../../utils/usedPurchaseMode';
+import { mapLaximoApplicableVehicles } from '../../utils/fitmentDisplay';
 
 const formatErrorText = (value) => {
   if (!value) return 'Ошибка загрузки товара';
@@ -311,17 +312,32 @@ const PartDetail = () => {
     const run = async () => {
       setReferenceFitmentLoading(true);
       try {
-        const response = await apiAxiosUnauth.get('/public/part-reference-fitment', {
-          params: {
-            brand: displayProduct.brand,
-            article: displayProduct.article,
-            exclude_product_id: displayProduct.id,
-          },
-        });
-        const vehicles = Array.isArray(response?.data?.vehicles) ? response.data.vehicles : [];
+        const [refResponse, laximoResponse] = await Promise.all([
+          apiAxiosUnauth.get('/public/part-reference-fitment', {
+            params: {
+              brand: displayProduct.brand,
+              article: displayProduct.article,
+              exclude_product_id: displayProduct.id,
+            },
+          }),
+          apiAxiosUnauth
+            .post('/public/laximo/oem/applicable-vehicles', {
+              oem: displayProduct.article,
+              brand: displayProduct.brand,
+            })
+            .catch(() => null),
+        ]);
+        const vehicles = Array.isArray(refResponse?.data?.vehicles)
+          ? refResponse.data.vehicles
+          : [];
+        const laximoOk = laximoResponse?.data?.ok !== false;
+        const laximoRows = laximoOk
+          ? mapLaximoApplicableVehicles(laximoResponse?.data?.vehicles)
+          : [];
+        const merged = [...vehicles, ...laximoRows];
         if (!cancelled) {
-          writePartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey, vehicles);
-          setReferenceFitment(vehicles);
+          writePartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey, merged);
+          setReferenceFitment(merged);
         }
       } catch (_error) {
         if (!cancelled) setReferenceFitment([]);

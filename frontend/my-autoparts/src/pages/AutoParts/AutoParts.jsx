@@ -37,6 +37,7 @@ import {
 } from '../../utils/autopartsPublic';
 import { buildAutoPartsSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import { apiAxiosUnauth } from '../../utils/apiClient';
+import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 
 const UsedPartsList = React.lazy(() => import('./UsedParts/UsedPartsList'));
 const NewPartsResults = React.lazy(() => import('./NewParts/NewPartsResults'));
@@ -418,6 +419,11 @@ function AutoParts() {
   return (
     <div className="mt-0 sm:mt-5 px-0 w-full">
       <PageSeoHelmet seo={seo} />
+      {searchParams.get('vin_unavailable') === '1' ? (
+        <div className="mb-4 max-lg:px-3">
+          <SoftServiceNotice variant="unavailable" />
+        </div>
+      ) : null}
       <div className="max-lg:sticky max-lg:top-[var(--sg-mobile-header-h)] max-lg:z-20 max-lg:bg-gray-50">
         {activeTab === 'my' && (
           <MobileCompactSearch

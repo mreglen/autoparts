@@ -2,9 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
+import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
 import { apiAxios, apiRequest } from '../../utils/apiClient';
 import { formatPhoneInput, validatePhone } from '../../utils/contactValidation';
 import { parseServerDate } from '../../utils/serverDate';
+import {
+  candidateLabel,
+  mapCandidateToGarageCreatePayload,
+  mapCandidateToGarageForm,
+  softNoticeVariantFromReason,
+} from '../../utils/laximoVinCandidate';
 import { getRosskoMinPrice, getRosskoParts } from '../AutoParts/NewParts/rosskoHelpers';
 
 const inputClass =
@@ -315,6 +322,59 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [vinDecoding, setVinDecoding] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const [candidates, setCandidates] = useState([]);
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+
+  const applyCandidate = (candidate, vin) => {
+    const mapped = mapCandidateToGarageForm(candidate, vin);
+    setSelectedCandidate(candidate);
+    setForm((p) => ({
+      ...p,
+      vin: mapped.vin,
+      make: mapped.make,
+      model: mapped.model,
+      year: mapped.year,
+      color: mapped.color || p.color,
+    }));
+    setCandidates([]);
+    setNotice(null);
+  };
+
+  const handleDecodeVin = async () => {
+    setError('');
+    const vin = form.vin.trim().toUpperCase();
+    if (vin.length !== 17) {
+      setError('VIN должен содержать 17 символов');
+      return;
+    }
+    setVinDecoding(true);
+    try {
+      const result = await apiRequest('/laximo/vehicles/by-vin', {
+        method: 'POST',
+        body: JSON.stringify({ vin }),
+      });
+      const list = Array.isArray(result?.candidates) ? result.candidates : [];
+      if (result?.ok && list.length === 1) {
+        applyCandidate(list[0], vin);
+        return;
+      }
+      if (result?.ok && list.length > 1) {
+        setCandidates(list);
+        setSelectedCandidate(null);
+        setNotice(null);
+        return;
+      }
+      setSelectedCandidate(null);
+      setCandidates([]);
+      setNotice(softNoticeVariantFromReason(result?.reason));
+    } catch (err) {
+      setError(err?.message || 'Не удалось распознать VIN');
+    } finally {
+      setVinDecoding(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -332,18 +392,20 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
     }
     setSaving(true);
     try {
+      const payload = mapCandidateToGarageCreatePayload(selectedCandidate, {
+        vin: form.vin.trim() || '',
+        make,
+        model,
+        year: form.year,
+        color: form.color,
+        plate: form.plate,
+        notes: form.notes,
+      });
+      payload.year = year;
+      payload.client_id = Number(clientId);
       const row = await apiRequest('/autoservice/garage/vehicles/staff', {
         method: 'POST',
-        body: JSON.stringify({
-          client_id: Number(clientId),
-          make,
-          model,
-          year,
-          vin: form.vin.trim() || null,
-          plate: form.plate.trim() || null,
-          color: form.color.trim() || null,
-          notes: form.notes.trim() || null,
-        }),
+        body: JSON.stringify(payload),
       });
       onCreated(row);
       onClose();
@@ -357,6 +419,55 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
   return (
     <Modal title="Добавить автомобиль" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
+        {notice ? (
+          <SoftServiceNotice
+            variant={notice}
+            onRetry={() => {
+              setNotice(null);
+              handleDecodeVin();
+            }}
+          />
+        ) : null}
+        <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3">
+          <label className="block text-sm font-medium text-gray-700">Найти по VIN</label>
+          <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+            <input
+              className={inputClass}
+              value={form.vin}
+              onChange={(e) => {
+                setForm((p) => ({ ...p, vin: e.target.value.toUpperCase() }));
+                setError('');
+                setNotice(null);
+              }}
+              disabled={saving || vinDecoding}
+              maxLength={17}
+              placeholder="17 символов"
+            />
+            <button
+              type="button"
+              onClick={handleDecodeVin}
+              disabled={saving || vinDecoding}
+              className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {vinDecoding ? 'Проверка…' : 'Распознать'}
+            </button>
+          </div>
+          {candidates.length > 1 ? (
+            <ul className="mt-3 space-y-2">
+              {candidates.map((c, idx) => (
+                <li key={`${c.vehicle_id || 'v'}-${idx}`}>
+                  <button
+                    type="button"
+                    onClick={() => applyCandidate(c, form.vin.trim().toUpperCase())}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/40"
+                  >
+                    {candidateLabel(c)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-gray-700">Марка</label>
@@ -400,16 +511,6 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
               onChange={(e) => setForm((p) => ({ ...p, plate: e.target.value }))}
               disabled={saving}
               maxLength={20}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">VIN</label>
-            <input
-              className={inputClass}
-              value={form.vin}
-              onChange={(e) => setForm((p) => ({ ...p, vin: e.target.value.toUpperCase() }))}
-              disabled={saving}
-              maxLength={32}
             />
           </div>
           <div>

@@ -116,3 +116,33 @@ export function mapReferenceVehicle(vehicle) {
     source: vehicle?.source || 'reference',
   };
 }
+
+/**
+ * Map Laximo FindApplicableVehicles row to fitment chip shape.
+ * name is treated as model (e.g. "EXCEL 94 (1995-1999)").
+ */
+export function mapLaximoApplicableVehicle(vehicle) {
+  if (!vehicle) return null;
+  const brand = normalizeToken(vehicle.brand);
+  const name = normalizeToken(vehicle.name);
+  if (!brand && !name) return null;
+  const yearFrom = normalizeToken(vehicle.year_from);
+  const yearTo = normalizeToken(vehicle.year_to);
+  let generation = '';
+  if (yearFrom && yearTo) generation = `${yearFrom}–${yearTo}`;
+  else if (yearFrom) generation = yearFrom;
+  else if (yearTo) generation = yearTo;
+  return {
+    brand: brand || '—',
+    model: name || brand,
+    generation,
+    engine: '',
+    transmission: '',
+    source: 'laximo',
+  };
+}
+
+export function mapLaximoApplicableVehicles(vehicles = []) {
+  const list = Array.isArray(vehicles) ? vehicles : [];
+  return list.map(mapLaximoApplicableVehicle).filter(Boolean);
+}

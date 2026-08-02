@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
@@ -10,12 +12,18 @@ from app.models.garage_vehicle import GarageVehicle
 from app.models.user import User
 from app.schemas.garage_vehicle import (
     GarageVehicleCreate,
+    GarageVehicleDecodeFrameRequest,
+    GarageVehicleDecodeFrameResponse,
+    GarageVehicleDecodePlateRequest,
+    GarageVehicleDecodePlateResponse,
     GarageVehicleDecodeVinRequest,
     GarageVehicleDecodeVinResponse,
     GarageVehicleStaffCreate,
     GarageVehicleUpdate,
     GarageVehicleView,
 )
+from app.services.laximo.vehicle_lookup import lookup_by_frame, lookup_by_plate, lookup_by_vin
+from app.services.laximo.vin import normalize_vin_or_raise
 from app.utils.autoservice_access import (
     require_autoservice_staff,
     require_my_active_autoservice_client,
@@ -24,16 +32,10 @@ from app.utils.autoservice_access import (
 router = APIRouter(tags=["Autoservice garage"])
 
 
-def _normalize_vin_or_400(vin: str | None) -> str | None:
-    if not vin or not str(vin).strip():
+def _optional_vin_or_400(vin: str | None) -> str | None:
+    if vin is None or not str(vin).strip():
         return None
-    norm = str(vin).strip().upper()
-    if len(norm) != 17:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="VIN должен содержать ровно 17 символов",
-        )
-    return norm
+    return normalize_vin_or_raise(vin)
 
 
 def _vehicle_to_view(row: GarageVehicle) -> GarageVehicleView:
@@ -61,13 +63,27 @@ def _get_client_vehicle_or_404(
     return row
 
 
+def _resolve_source_and_laximo(
+    payload: GarageVehicleCreate,
+) -> tuple[str, Optional[str], Optional[str], Optional[list[dict[str, Any]]]]:
+    catalog = (payload.laximo_catalog or "").strip() or None
+    vehicle_id = (payload.laximo_vehicle_id or "").strip() or None
+    attrs = payload.laximo_attributes if isinstance(payload.laximo_attributes, list) else None
+    source_raw = (payload.source or "").strip().lower()
+    if source_raw == "plate":
+        return "plate", catalog, vehicle_id, attrs
+    if source_raw == "laximo" or catalog or vehicle_id:
+        return "laximo", catalog, vehicle_id, attrs
+    return "manual", None, None, None
+
+
 def _create_vehicle_for_client(
     db: Session,
     *,
     client: AutoserviceClient,
     payload: GarageVehicleCreate,
 ) -> GarageVehicle:
-    vin = _normalize_vin_or_400(payload.vin)
+    vin = _optional_vin_or_400(payload.vin)
     if vin:
         existing = (
             db.query(GarageVehicle)
@@ -82,6 +98,7 @@ def _create_vehicle_for_client(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Автомобиль с таким VIN уже есть в гараже",
             )
+    source, catalog, vehicle_id, attrs = _resolve_source_and_laximo(payload)
     row = GarageVehicle(
         client_id=client.id,
         organization_id=client.organization_id,
@@ -92,7 +109,10 @@ def _create_vehicle_for_client(
         color=(payload.color or "").strip() or None,
         plate=(payload.plate or "").strip() or None,
         notes=(payload.notes or "").strip() or None,
-        source="manual",
+        source=source,
+        laximo_catalog=catalog,
+        laximo_vehicle_id=vehicle_id,
+        laximo_attributes=attrs,
     )
     db.add(row)
     db.commit()
@@ -104,14 +124,46 @@ def _create_vehicle_for_client(
     "/autoservice/garage/decode-vin",
     response_model=GarageVehicleDecodeVinResponse,
 )
-def decode_garage_vin_stub(
+def decode_garage_vin(
     payload: GarageVehicleDecodeVinRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     require_my_active_autoservice_client(db, current_user)
-    _normalize_vin_or_400(payload.vin)
-    return GarageVehicleDecodeVinResponse(ok=False, reason="not_found")
+    result = lookup_by_vin(db, payload.vin)
+    return GarageVehicleDecodeVinResponse(**result.to_response_dict())
+
+
+@router.post(
+    "/autoservice/garage/decode-plate",
+    response_model=GarageVehicleDecodePlateResponse,
+)
+def decode_garage_plate(
+    payload: GarageVehicleDecodePlateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_my_active_autoservice_client(db, current_user)
+    result = lookup_by_plate(
+        db,
+        payload.plate,
+        country_code=payload.country_code or "ru",
+    )
+    return GarageVehicleDecodePlateResponse(**result.to_response_dict())
+
+
+@router.post(
+    "/autoservice/garage/decode-frame",
+    response_model=GarageVehicleDecodeFrameResponse,
+)
+def decode_garage_frame(
+    payload: GarageVehicleDecodeFrameRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_my_active_autoservice_client(db, current_user)
+    result = lookup_by_frame(db, payload.frame)
+    return GarageVehicleDecodeFrameResponse(**result.to_response_dict())
 
 
 @router.get("/autoservice/garage/vehicles", response_model=list[GarageVehicleView])
@@ -216,7 +268,7 @@ def update_garage_vehicle(
             detail="Нет полей для обновления",
         )
     if "vin" in data:
-        vin = _normalize_vin_or_400(data["vin"])
+        vin = _optional_vin_or_400(data["vin"])
         if vin:
             dup = (
                 db.query(GarageVehicle)

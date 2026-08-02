@@ -20,6 +20,7 @@ import { USED_PURCHASE_MODE_OPTIONS } from '../../utils/usedPurchaseMode';
 import ServerStatsPanel from './ServerStatsPanel';
 import DeployUpdateSection from './DeployUpdateSection';
 import OpenRouterSection from './OpenRouterSection';
+import LaximoCatSection from './LaximoCatSection';
 import BackupSection from './BackupSection';
 import AvitoPhotoLocalizationSection from './AvitoPhotoLocalizationSection';
 import ProductPhotoThumbsSection from './ProductPhotoThumbsSection';
@@ -32,6 +33,7 @@ const ADMIN_TOC = [
   { id: 'admin-features', label: 'Сайт' },
   { id: 'admin-markup', label: 'Наценка' },
   { id: 'admin-openrouter', label: 'OpenRouter' },
+  { id: 'admin-laximo', label: 'Laximo' },
   { id: 'admin-quick-links', label: 'Ссылки' },
   { id: 'admin-photo-thumbs', label: 'Превью' },
   { id: 'admin-photo-reprocess', label: 'Фото' },
@@ -600,6 +602,10 @@ function AdminPanelPage() {
 
         <section id="admin-openrouter" className="scroll-mt-24 space-y-6">
           <OpenRouterSection />
+        </section>
+
+        <section id="admin-laximo" className="scroll-mt-24 space-y-6">
+          <LaximoCatSection />
         </section>
 
         <section

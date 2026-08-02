@@ -5,6 +5,8 @@ from urllib.parse import quote
 
 from sqlalchemy.orm import Session
 
+from app.services.laximo.gate import laximo_cat_ready
+from app.services.laximo.vin import looks_like_vin, normalize_vin_or_none
 from app.services.new_parts_seo_card_service import (
     build_new_part_card_path,
     find_active_new_part_card_by_brand_article,
@@ -32,6 +34,25 @@ def resolve_search_query(db: Session, q: str, *, site_origin: str) -> ResolveSea
             redirect_path="/autoparts/used",
             redirect_url=f"{origin}/autoparts/used",
             match_type=None,
+        )
+
+    vin = normalize_vin_or_none(trimmed)
+    if vin and looks_like_vin(vin):
+        if laximo_cat_ready(db):
+            redirect_path = f"/autoparts/vin?vin={quote(vin, safe='')}"
+            return ResolveSearchResult(
+                status="redirect",
+                redirect_path=redirect_path,
+                redirect_url=f"{origin}{redirect_path}",
+                match_type="vin_catalog",
+            )
+        # Not ready: soft fallback to used listing with VIN as text query
+        fallback_path = f"/autoparts/used?q={quote(vin, safe='')}&vin_unavailable=1"
+        return ResolveSearchResult(
+            status="fallback",
+            redirect_path=fallback_path,
+            redirect_url=f"{origin}{fallback_path}",
+            match_type="vin_unavailable",
         )
 
     indexable = find_indexable_used_catalog_product(db, trimmed)

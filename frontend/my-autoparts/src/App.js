@@ -45,6 +45,7 @@ const NewPartDetailPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartD
 const NewPartOpenPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartOpenPage'));
 const NewPartsBrandLandingPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartsBrandLandingPage'));
 const NewPartsCategoryLandingPage = lazy(() => import('./pages/AutoParts/NewParts/NewPartsCategoryLandingPage'));
+const VinCatalogPage = lazy(() => import('./pages/AutoParts/VinCatalog/VinCatalogPage'));
 const UsedPartsBrandLandingPage = lazy(() => import('./pages/AutoParts/UsedParts/UsedPartsBrandLandingPage'));
 const UsedPartsCategoryLandingPage = lazy(() => import('./pages/AutoParts/UsedParts/UsedPartsCategoryLandingPage'));
 const UsedPartsGeoLandingPage = lazy(() => import('./pages/AutoParts/UsedParts/UsedPartsGeoLandingPage'));
@@ -105,6 +106,7 @@ const AutoserviceOrdersPage = lazy(() => import('./pages/Autoservice/Autoservice
 const AutoserviceOrderFormPage = lazy(() => import('./pages/Autoservice/AutoserviceOrderFormPage'));
 const GaragePage = lazy(() => import('./pages/Garage/GaragePage'));
 const GarageOrdersPage = lazy(() => import('./pages/Garage/GarageOrdersPage'));
+const LaximoCatalogSandboxPage = lazy(() => import('./pages/Laximo/LaximoCatalogSandboxPage'));
 
 // Lazy: интеграции
 const PrintSettings = lazy(() => import('./pages/Settings/PrintSettings'));
@@ -355,6 +357,14 @@ function App() {
           <Route path="/contacts" element={<Navigate to="/about" replace />} />
           <Route path="/autoparts/new/filters" element={<LazyRoute><NewPartsFiltersPage /></LazyRoute>} />
           <Route path="/autoparts/new" element={<AutoParts />} />
+          <Route
+            path="/autoparts/vin"
+            element={(
+              <LazyRoute>
+                <VinCatalogPage />
+              </LazyRoute>
+            )}
+          />
           <Route path="/autoparts/new/brand/:brandSlug" element={<LazyRoute><NewPartsBrandLandingPage /></LazyRoute>} />
           <Route path="/autoparts/new/category/:categorySlug" element={<LazyRoute><NewPartsCategoryLandingPage /></LazyRoute>} />
           <Route path="/autoparts/new/open" element={<LazyRoute><NewPartOpenPage /></LazyRoute>} />
@@ -598,6 +608,16 @@ function App() {
               <GarageRoute>
                 <GarageOrdersPage />
               </GarageRoute>
+            )}
+          />
+          <Route
+            path="/laximo/catalog"
+            element={(
+              <RequireAuth>
+                <LazyRoute>
+                  <LaximoCatalogSandboxPage />
+                </LazyRoute>
+              </RequireAuth>
             )}
           />
           <Route path="/purchases/favorites" element={<Navigate to="/profile/favorites" replace />} />

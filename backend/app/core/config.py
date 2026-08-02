@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     GOOGLE_CREDENTIALS_SECRET: Optional[str] = None
     # Ключ для шифрования API-ключа OpenRouter в БД. Если не задан — SECRET_KEY.
     OPENROUTER_CREDENTIALS_SECRET: Optional[str] = None
+    # Ключ для шифрования логина/пароля Laximo.CAT в БД. Если не задан — SECRET_KEY.
+    LAXIMO_CREDENTIALS_SECRET: Optional[str] = None
+    # Dev-fallback credentials (не основной путь; прод — /admin-settings).
+    LAXIMO_CAT_LOGIN: Optional[str] = None
+    LAXIMO_CAT_PASSWORD: Optional[str] = None
+    LAXIMO_CAT_BASE: Optional[str] = None
     
     # Пути к FFmpeg для обработки видео
     FFPROBE_PATH: Optional[str] = r"C:\ffmpeg\bin\ffprobe.exe"

@@ -1975,6 +1975,119 @@ def ensure_openrouter_tables() -> None:
         logger.info("Applied ai_description_generation_log table patch")
 
 
+def ensure_laximo_cat_tables() -> None:
+    """Create Laximo.CAT integration singleton table."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+
+    if "site_laximo_cat_integration" not in table_names:
+        if engine.dialect.name == "postgresql":
+            ddl = """
+            CREATE TABLE site_laximo_cat_integration (
+                id INTEGER PRIMARY KEY,
+                login_encrypted TEXT,
+                password_encrypted TEXT,
+                base_url VARCHAR(512) NOT NULL DEFAULT 'https://ws.laximo.ru/restApi/v1',
+                is_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                last_test_ok BOOLEAN NOT NULL DEFAULT FALSE,
+                last_tested_at TIMESTAMPTZ,
+                last_test_error TEXT,
+                last_test_catalogs_count INTEGER,
+                daily_request_limit INTEGER NOT NULL DEFAULT 500,
+                requests_today INTEGER NOT NULL DEFAULT 0,
+                requests_day DATE,
+                quota_exhausted_at TIMESTAMPTZ,
+                last_upstream_error_at TIMESTAMPTZ,
+                last_upstream_error TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+            seed = (
+                "INSERT INTO site_laximo_cat_integration "
+                "(id, is_enabled, last_test_ok, daily_request_limit, requests_today) "
+                "VALUES (1, FALSE, FALSE, 500, 0)"
+            )
+        else:
+            ddl = """
+            CREATE TABLE site_laximo_cat_integration (
+                id INTEGER PRIMARY KEY,
+                login_encrypted TEXT,
+                password_encrypted TEXT,
+                base_url VARCHAR(512) NOT NULL DEFAULT 'https://ws.laximo.ru/restApi/v1',
+                is_enabled BOOLEAN NOT NULL DEFAULT 0,
+                last_test_ok BOOLEAN NOT NULL DEFAULT 0,
+                last_tested_at DATETIME,
+                last_test_error TEXT,
+                last_test_catalogs_count INTEGER,
+                daily_request_limit INTEGER NOT NULL DEFAULT 500,
+                requests_today INTEGER NOT NULL DEFAULT 0,
+                requests_day DATE,
+                quota_exhausted_at DATETIME,
+                last_upstream_error_at DATETIME,
+                last_upstream_error TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+            seed = (
+                "INSERT INTO site_laximo_cat_integration "
+                "(id, is_enabled, last_test_ok, daily_request_limit, requests_today) "
+                "VALUES (1, 0, 0, 500, 0)"
+            )
+        with engine.begin() as conn:
+            conn.execute(text(ddl))
+            conn.execute(text(seed))
+        logger.info("Applied site_laximo_cat_integration table patch")
+
+    ensure_laximo_doc_columns()
+
+
+def ensure_laximo_doc_columns() -> None:
+    """Add Laximo.DOC credential/gate columns to site_laximo_cat_integration."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    if "site_laximo_cat_integration" not in table_names:
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("site_laximo_cat_integration")}
+    is_pg = engine.dialect.name == "postgresql"
+    bool_false = "FALSE" if is_pg else "0"
+    ts = "TIMESTAMPTZ" if is_pg else "DATETIME"
+    statements = []
+
+    patches = [
+        ("doc_login_encrypted", "TEXT"),
+        ("doc_password_encrypted", "TEXT"),
+        (
+            "doc_base_url",
+            "VARCHAR(512) NOT NULL DEFAULT 'https://ws.laximo.ru/restApi/v1'",
+        ),
+        ("doc_is_enabled", f"BOOLEAN NOT NULL DEFAULT {bool_false}"),
+        ("doc_last_test_ok", f"BOOLEAN NOT NULL DEFAULT {bool_false}"),
+        ("doc_last_tested_at", ts),
+        ("doc_last_test_error", "TEXT"),
+        ("doc_requests_today", "INTEGER NOT NULL DEFAULT 0"),
+        ("doc_requests_day", "DATE"),
+        ("doc_quota_exhausted_at", ts),
+        ("doc_last_upstream_error_at", ts),
+        ("doc_last_upstream_error", "TEXT"),
+    ]
+    for name, col_type in patches:
+        if name not in columns:
+            statements.append(
+                f"ALTER TABLE site_laximo_cat_integration ADD COLUMN {name} {col_type}"
+            )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    logger.info("Applied Laximo.DOC columns patch")
+
+
 def ensure_site_analytics_attribution_columns() -> None:
     """Add traffic attribution columns to site_analytics_sessions."""
     inspector = inspect(engine)
@@ -3139,6 +3252,9 @@ def ensure_garage_vehicles_table() -> None:
             plate VARCHAR(20),
             notes TEXT,
             source VARCHAR(32) NOT NULL DEFAULT 'manual',
+            laximo_catalog VARCHAR(64),
+            laximo_vehicle_id VARCHAR(64),
+            laximo_attributes JSONB,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             CONSTRAINT uq_garage_vehicles_client_vin UNIQUE (client_id, vin)
@@ -3163,6 +3279,9 @@ def ensure_garage_vehicles_table() -> None:
             plate VARCHAR(20),
             notes TEXT,
             source VARCHAR(32) NOT NULL DEFAULT 'manual',
+            laximo_catalog VARCHAR(64),
+            laximo_vehicle_id VARCHAR(64),
+            laximo_attributes JSON,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT uq_garage_vehicles_client_vin UNIQUE (client_id, vin)
@@ -3179,6 +3298,43 @@ def ensure_garage_vehicles_table() -> None:
                 pass
 
     logger.info("Applied garage_vehicles table patch")
+
+
+def ensure_garage_vehicle_laximo_columns() -> None:
+    """Add Laximo catalog/vehicle_id/attributes snapshot columns to garage_vehicles."""
+    inspector = inspect(engine)
+    if "garage_vehicles" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("garage_vehicles")}
+    statements = []
+    is_pg = engine.dialect.name == "postgresql"
+
+    if "laximo_catalog" not in columns:
+        statements.append(
+            "ALTER TABLE garage_vehicles ADD COLUMN laximo_catalog VARCHAR(64)"
+        )
+    if "laximo_vehicle_id" not in columns:
+        statements.append(
+            "ALTER TABLE garage_vehicles ADD COLUMN laximo_vehicle_id VARCHAR(64)"
+        )
+    if "laximo_attributes" not in columns:
+        col_type = "JSONB" if is_pg else "JSON"
+        statements.append(
+            f"ALTER TABLE garage_vehicles ADD COLUMN laximo_attributes {col_type}"
+        )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info(
+        "Applied garage_vehicles laximo column patches: %s",
+        statements,
+    )
 
 
 def ensure_autoservice_settings_table() -> None:

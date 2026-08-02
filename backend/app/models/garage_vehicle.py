@@ -3,6 +3,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -35,6 +36,9 @@ class GarageVehicle(Base):
     plate = Column(String(20), nullable=True)
     notes = Column(Text, nullable=True)
     source = Column(String(32), nullable=False, default="manual")
+    laximo_catalog = Column(String(64), nullable=True)
+    laximo_vehicle_id = Column(String(64), nullable=True)
+    laximo_attributes = Column(JSON, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime,
@@ -42,6 +46,9 @@ class GarageVehicle(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    client = relationship("AutoserviceClient", foreign_keys=[client_id])
+    organization = relationship("Organization", foreign_keys=[organization_id])
 
     client = relationship("AutoserviceClient", foreign_keys=[client_id])
     organization = relationship("Organization", foreign_keys=[organization_id])

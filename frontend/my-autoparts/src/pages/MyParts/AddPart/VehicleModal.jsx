@@ -11,7 +11,13 @@ import {
   fetchReferenceTransmissions,
 } from '../../../redux/slices/ProductSlice';
 import { fetchStorageLocations } from '../../../redux/slices/OrganizationSlice';
-import { apiRequestFormData, normalizeImageUrl } from '../../../utils/apiClient';
+import { apiRequest, apiRequestFormData, normalizeImageUrl } from '../../../utils/apiClient';
+import SoftServiceNotice from '../../../components/SoftServiceNotice/SoftServiceNotice';
+import {
+  candidateLabel,
+  mapCandidateToDismantlingPrefill,
+  softNoticeVariantFromReason,
+} from '../../../utils/laximoVinCandidate';
 
 const MAX_VEHICLE_PHOTOS = 10;
 
@@ -293,6 +299,21 @@ const VehicleModal = ({
   const [detailVehicle, setDetailVehicle] = useState(null);
   const [create, setCreate] = useState(emptyCreate);
   const [childLoading, setChildLoading] = useState(false);
+  const [vinLookupInput, setVinLookupInput] = useState('');
+  const [vinLookupLoading, setVinLookupLoading] = useState(false);
+  const [vinLookupError, setVinLookupError] = useState(null);
+  const [vinLookupNotice, setVinLookupNotice] = useState(null);
+  const [vinLookupCandidates, setVinLookupCandidates] = useState([]);
+  const [plateLookupInput, setPlateLookupInput] = useState('');
+  const [plateLookupLoading, setPlateLookupLoading] = useState(false);
+  const [plateLookupError, setPlateLookupError] = useState(null);
+  const [plateLookupNotice, setPlateLookupNotice] = useState(null);
+  const [plateLookupCandidates, setPlateLookupCandidates] = useState([]);
+  const [frameLookupInput, setFrameLookupInput] = useState('');
+  const [frameLookupLoading, setFrameLookupLoading] = useState(false);
+  const [frameLookupError, setFrameLookupError] = useState(null);
+  const [frameLookupNotice, setFrameLookupNotice] = useState(null);
+  const [frameLookupCandidates, setFrameLookupCandidates] = useState([]);
   const [detailEdit, setDetailEdit] = useState(emptyDetailEdit);
   const [detailBaselinePayload, setDetailBaselinePayload] = useState('');
   const [detailSaveLoading, setDetailSaveLoading] = useState(false);
@@ -605,7 +626,159 @@ const VehicleModal = ({
 
   // После выбора поколения активируем остальные поля.
   // Двигатель/КПП не обязаны для ввода VIN/пробега.
-  const vinEnabled = engineTxEnabled;
+  // VIN также доступен после успешного поиска по VIN выше каскада.
+  const vinEnabled = engineTxEnabled || Boolean((create.vin || '').trim());
+
+  const applyVinCandidate = (candidate, vin) => {
+    const mapped = mapCandidateToDismantlingPrefill(candidate, vin);
+    setCreate((prev) => ({
+      ...prev,
+      catalogManufacturerId: null,
+      catalogModelId: null,
+      catalogPassengercarId: null,
+      catalogEngineId: null,
+      manufacturerOptions: [],
+      modelOptions: [],
+      pcOptions: [],
+      engineOptions: [],
+      brandInput: mapped.brandInput,
+      modelInput: mapped.modelInput,
+      generationInput: mapped.generationInput,
+      engineText: mapped.engineText,
+      transmissionText: mapped.transmissionText || prev.transmissionText,
+      vin: mapped.vin,
+    }));
+    setVinLookupInput(vin);
+    setVinLookupCandidates([]);
+    setVinLookupNotice(null);
+    setVinLookupError(null);
+  };
+
+  const handleVinLookup = async () => {
+    setVinLookupError(null);
+    const vin = vinLookupInput.trim().toUpperCase() || (create.vin || '').trim().toUpperCase();
+    if (vin.length !== 17) {
+      setVinLookupError('VIN должен содержать 17 символов');
+      return;
+    }
+    setVinLookupInput(vin);
+    setVinLookupLoading(true);
+    try {
+      const result = await apiRequest('/laximo/vehicles/by-vin', {
+        method: 'POST',
+        body: JSON.stringify({ vin }),
+      });
+      const list = Array.isArray(result?.candidates) ? result.candidates : [];
+      if (result?.ok && list.length === 1) {
+        applyVinCandidate(list[0], vin);
+        return;
+      }
+      if (result?.ok && list.length > 1) {
+        setVinLookupCandidates(list);
+        setVinLookupNotice(null);
+        setCreate((prev) => ({ ...prev, vin }));
+        return;
+      }
+      setVinLookupCandidates([]);
+      setCreate((prev) => ({ ...prev, vin }));
+      setVinLookupNotice(softNoticeVariantFromReason(result?.reason));
+    } catch (err) {
+      setVinLookupError(err?.message || 'Не удалось найти автомобиль по VIN');
+    } finally {
+      setVinLookupLoading(false);
+    }
+  };
+
+  const applyPlateCandidate = (candidate, vin, plate) => {
+    applyVinCandidate(candidate, vin || '');
+    setPlateLookupInput(plate || '');
+    setPlateLookupCandidates([]);
+    setPlateLookupNotice(null);
+    setPlateLookupError(null);
+  };
+
+  const applyFrameCandidate = (candidate, frame) => {
+    applyVinCandidate(candidate, '');
+    setFrameLookupInput(frame || '');
+    setFrameLookupCandidates([]);
+    setFrameLookupNotice(null);
+    setFrameLookupError(null);
+  };
+
+  const handlePlateLookup = async () => {
+    setPlateLookupError(null);
+    const plate = plateLookupInput.trim();
+    if (plate.length < 6) {
+      setPlateLookupError('Укажите госномер');
+      return;
+    }
+    setPlateLookupLoading(true);
+    try {
+      const result = await apiRequest('/laximo/vehicles/by-plate', {
+        method: 'POST',
+        body: JSON.stringify({ plate, country_code: 'ru' }),
+      });
+      const list = Array.isArray(result?.candidates) ? result.candidates : [];
+      const vin = (result?.vin || '').trim().toUpperCase();
+      const normalizedPlate = (result?.plate || plate).trim();
+      if (result?.ok && list.length === 1) {
+        applyPlateCandidate(list[0], vin, normalizedPlate);
+        return;
+      }
+      if (result?.ok && list.length > 1) {
+        setPlateLookupCandidates(list);
+        setPlateLookupNotice(null);
+        setCreate((prev) => ({ ...prev, vin: vin || prev.vin }));
+        setPlateLookupInput(normalizedPlate);
+        return;
+      }
+      setPlateLookupCandidates([]);
+      if (vin) {
+        setCreate((prev) => ({ ...prev, vin }));
+        setVinLookupInput(vin);
+      }
+      setPlateLookupInput(normalizedPlate);
+      setPlateLookupNotice(softNoticeVariantFromReason(result?.reason));
+    } catch (err) {
+      setPlateLookupError(err?.message || 'Не удалось найти автомобиль по госномеру');
+    } finally {
+      setPlateLookupLoading(false);
+    }
+  };
+
+  const handleFrameLookup = async () => {
+    setFrameLookupError(null);
+    const frame = frameLookupInput.trim().toUpperCase().replace(/\s+/g, '');
+    if (frame.length < 6) {
+      setFrameLookupError('Укажите Frame (номер кузова)');
+      return;
+    }
+    setFrameLookupLoading(true);
+    try {
+      const result = await apiRequest('/laximo/vehicles/by-frame', {
+        method: 'POST',
+        body: JSON.stringify({ frame }),
+      });
+      const list = Array.isArray(result?.candidates) ? result.candidates : [];
+      const normalizedFrame = (result?.frame || frame).trim();
+      setFrameLookupInput(normalizedFrame);
+      if (result?.ok && list.length === 1) {
+        applyFrameCandidate(list[0], normalizedFrame);
+        return;
+      }
+      if (result?.ok && list.length > 1) {
+        setFrameLookupCandidates(list);
+        setFrameLookupNotice(null);
+        return;
+      }
+      setFrameLookupCandidates([]);
+      setFrameLookupNotice(softNoticeVariantFromReason(result?.reason));
+    } catch (err) {
+      setFrameLookupError(err?.message || 'Не удалось найти автомобиль по Frame');
+    } finally {
+      setFrameLookupLoading(false);
+    }
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -1513,6 +1686,200 @@ const VehicleModal = ({
                   isPage ? 'flex flex-col gap-6' : 'grid grid-cols-1 md:grid-cols-2 gap-4'
                 }
               >
+                <div className="md:col-span-2 rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+                  <div className={createLabel}>Найти по VIN</div>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Подставим марку, модель и двигатель, если удастся определить автомобиль.
+                    Каталог TecDoc можно уточнить ниже вручную.
+                  </p>
+                  {vinLookupNotice ? (
+                    <div className="mt-3">
+                      <SoftServiceNotice
+                        variant={vinLookupNotice}
+                        onRetry={() => {
+                          setVinLookupNotice(null);
+                          handleVinLookup();
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="text"
+                      value={vinLookupInput}
+                      onChange={(e) => {
+                        setVinLookupInput(e.target.value.toUpperCase());
+                        setVinLookupError(null);
+                        setVinLookupNotice(null);
+                      }}
+                      maxLength={17}
+                      disabled={vinLookupLoading || plateLookupLoading || frameLookupLoading}
+                      className={createInput}
+                      placeholder={PLH.vin}
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleVinLookup}
+                      disabled={vinLookupLoading || plateLookupLoading || frameLookupLoading}
+                      className="shrink-0 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                    >
+                      {vinLookupLoading ? 'Поиск…' : 'Найти'}
+                    </button>
+                  </div>
+                  {vinLookupError ? (
+                    <p className="mt-1 text-sm text-red-600">{vinLookupError}</p>
+                  ) : null}
+                  {vinLookupCandidates.length > 1 ? (
+                    <ul className="mt-3 space-y-2">
+                      {vinLookupCandidates.map((c, idx) => (
+                        <li key={`${c.vehicle_id || 'v'}-${idx}`}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              applyVinCandidate(
+                                c,
+                                vinLookupInput.trim().toUpperCase() || create.vin
+                              )
+                            }
+                            className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/50"
+                          >
+                            {candidateLabel(c)}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+
+                <div className="md:col-span-2 rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+                  <div className={createLabel}>Найти по госномеру</div>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Если VIN неизвестен — попробуем определить автомобиль по государственному номеру.
+                  </p>
+                  {plateLookupNotice ? (
+                    <div className="mt-3">
+                      <SoftServiceNotice
+                        variant={plateLookupNotice}
+                        onRetry={() => {
+                          setPlateLookupNotice(null);
+                          handlePlateLookup();
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="text"
+                      value={plateLookupInput}
+                      onChange={(e) => {
+                        setPlateLookupInput(e.target.value.toUpperCase());
+                        setPlateLookupError(null);
+                        setPlateLookupNotice(null);
+                      }}
+                      maxLength={12}
+                      disabled={vinLookupLoading || plateLookupLoading || frameLookupLoading}
+                      className={createInput}
+                      placeholder="А123БВ77"
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      onClick={handlePlateLookup}
+                      disabled={vinLookupLoading || plateLookupLoading || frameLookupLoading}
+                      className="shrink-0 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                    >
+                      {plateLookupLoading ? 'Поиск…' : 'Найти'}
+                    </button>
+                  </div>
+                  {plateLookupError ? (
+                    <p className="mt-1 text-sm text-red-600">{plateLookupError}</p>
+                  ) : null}
+                  {plateLookupCandidates.length > 1 ? (
+                    <ul className="mt-3 space-y-2">
+                      {plateLookupCandidates.map((c, idx) => (
+                        <li key={`plate-${c.vehicle_id || 'v'}-${idx}`}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              applyPlateCandidate(
+                                c,
+                                (create.vin || '').trim().toUpperCase(),
+                                plateLookupInput.trim(),
+                              )
+                            }
+                            className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/50"
+                          >
+                            {candidateLabel(c)}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+
+                <div className="md:col-span-2 rounded-xl border border-gray-200 bg-white p-3 sm:p-4">
+                  <div className={createLabel}>Найти по Frame</div>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Для японских авто — номер кузова, например SGL5-400683.
+                  </p>
+                  {frameLookupNotice ? (
+                    <div className="mt-3">
+                      <SoftServiceNotice
+                        variant={frameLookupNotice}
+                        onRetry={() => {
+                          setFrameLookupNotice(null);
+                          handleFrameLookup();
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="text"
+                      value={frameLookupInput}
+                      onChange={(e) => {
+                        setFrameLookupInput(e.target.value.toUpperCase());
+                        setFrameLookupError(null);
+                        setFrameLookupNotice(null);
+                      }}
+                      maxLength={32}
+                      disabled={vinLookupLoading || plateLookupLoading || frameLookupLoading}
+                      className={createInput}
+                      placeholder="SGL5-400683"
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleFrameLookup}
+                      disabled={vinLookupLoading || plateLookupLoading || frameLookupLoading}
+                      className="shrink-0 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                    >
+                      {frameLookupLoading ? 'Поиск…' : 'Найти'}
+                    </button>
+                  </div>
+                  {frameLookupError ? (
+                    <p className="mt-1 text-sm text-red-600">{frameLookupError}</p>
+                  ) : null}
+                  {frameLookupCandidates.length > 1 ? (
+                    <ul className="mt-3 space-y-2">
+                      {frameLookupCandidates.map((c, idx) => (
+                        <li key={`frame-${c.vehicle_id || 'v'}-${idx}`}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              applyFrameCandidate(c, frameLookupInput.trim())
+                            }
+                            className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/50"
+                          >
+                            {candidateLabel(c)}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+
                 {isPage && (
                   <div>
                     <div className={createLabel}>Склад *</div>

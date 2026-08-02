@@ -106,6 +106,7 @@ const publicInfoSlice = createSlice({
         newPartsMarkupPercent: 15,
         usedPartsPurchaseMode: 'both',
         roundProductPrices: false,
+        laximoVinCatalogAvailable: false,
         adminSellerMarkupContext: null,
         quickLinks: [],
         quickLinksLoading: false,
@@ -124,6 +125,7 @@ const publicInfoSlice = createSlice({
       state.newPartsMarkupPercent = 15;
       state.usedPartsPurchaseMode = 'both';
       state.roundProductPrices = false;
+      state.laximoVinCatalogAvailable = false;
       state.error = null;
     },
     setShowNewAutoparts: (state, action) => {
@@ -183,6 +185,7 @@ const publicInfoSlice = createSlice({
         state.usedPartsPurchaseMode =
           mode === 'cart_only' || mode === 'cta_only' || mode === 'both' ? mode : 'both';
         state.roundProductPrices = p?.round_product_prices === true;
+        state.laximoVinCatalogAvailable = p?.laximo_vin_catalog_available === true;
         if (p?.organization_phone) {
           state.adminOrganizationPhone = {
             organization_name: p.organization_name ?? null,
@@ -199,6 +202,7 @@ const publicInfoSlice = createSlice({
         state.showSiteReviews = true;
         state.showYandexBadge = true;
         state.newPartsMarkupPercent = 15;
+        state.laximoVinCatalogAvailable = false;
       })
       .addCase(fetchSiteQuickLinks.pending, (state) => {
         state.quickLinksLoading = true;

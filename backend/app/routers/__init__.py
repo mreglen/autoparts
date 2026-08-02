@@ -46,6 +46,10 @@ from app.routers.admin_rossko import router as admin_rossko_router
 from app.routers.yandex_feeds import router as yandex_feeds_router
 from app.routers.google_search_console import router as google_search_console_router
 from app.routers.openrouter_admin import router as openrouter_admin_router
+from app.routers.laximo_cat_admin import router as laximo_cat_admin_router
+from app.routers.laximo_vehicles import router as laximo_vehicles_router
+from app.routers.laximo_catalog import router as laximo_catalog_router
+from app.routers.laximo_public import router as laximo_public_router
 from app.routers.backup_admin import router as backup_admin_router
 from app.routers.public_feeds import router as public_feeds_router
 from app.routers.site_delivery import router as site_delivery_router
@@ -124,6 +128,10 @@ api_router.include_router(payments_new_parts_router)
 api_router.include_router(yandex_feeds_router)
 api_router.include_router(google_search_console_router)
 api_router.include_router(openrouter_admin_router)
+api_router.include_router(laximo_cat_admin_router)
+api_router.include_router(laximo_vehicles_router)
+api_router.include_router(laximo_catalog_router)
+api_router.include_router(laximo_public_router)
 api_router.include_router(backup_admin_router)
 api_router.include_router(public_feeds_router)
 api_router.include_router(site_delivery_router)

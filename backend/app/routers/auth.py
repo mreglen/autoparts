@@ -22,6 +22,7 @@ from app.core.security import get_password_hash
 from app.core.auth import authenticate_user, create_access_token, get_current_user, oauth2_scheme, cleanup_old_user_sessions
 from app.models.user_session import UserSession
 from app.db.database import get_db
+from app.services.laximo.gate import laximo_cat_ready
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 from app.core.config import Settings
@@ -686,4 +687,5 @@ def get_public_site_config(
         "new_parts_markup_percent": markup,
         "used_parts_purchase_mode": purchase_mode,
         "round_product_prices": getattr(settings_row, "round_product_prices", False) is True,
+        "laximo_vin_catalog_available": laximo_cat_ready(db),
     }

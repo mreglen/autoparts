@@ -7,6 +7,7 @@ import {
   setSearchQuery as setGlobalSearchQuery,
 } from '../../../redux/slices/RosskoSlice';
 import { useDebouncedCallback } from '../../../hooks/useDebouncedCallback';
+import { looksLikeVin, normalizeVinOrNull } from '../../../utils/laximoVin';
 
 function Search() {
   const [searchParams] = useSearchParams();
@@ -16,13 +17,16 @@ function Search() {
   const navigate = useNavigate();
   const location = useLocation();
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
+  const laximoVinCatalogAvailable = useSelector(
+    (state) => state.publicInfo.laximoVinCatalogAvailable === true
+  );
   const autopartsSearchPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
   const isOnUsedAutoparts = location.pathname.startsWith('/autoparts/used');
   const isOnNewAutoparts = location.pathname.startsWith('/autoparts/new');
   const showClear = Boolean(searchTerm.trim());
 
   useEffect(() => {
-    setSearchTerm(searchParams.get('q') || '');
+    setSearchTerm(searchParams.get('q') || searchParams.get('vin') || '');
   }, [searchParams]);
 
   const applyUsedQueryToUrl = useCallback((text) => {
@@ -49,6 +53,19 @@ function Search() {
     const trimmedTerm = searchTerm.trim();
     if (!trimmedTerm || isSearching) return;
 
+    const vin = normalizeVinOrNull(trimmedTerm);
+    if (vin) {
+      if (laximoVinCatalogAvailable) {
+        setIsSearching(false);
+        navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
+        return;
+      }
+      setIsSearching(false);
+      dispatch(setGlobalSearchQuery(vin));
+      navigate(`${autopartsSearchPath}?q=${encodeURIComponent(vin)}&vin_unavailable=1`);
+      return;
+    }
+
     setIsSearching(true);
     dispatch(setGlobalSearchQuery(trimmedTerm));
 
@@ -68,6 +85,10 @@ function Search() {
   const handleInputChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
+
+    if (looksLikeVin(value.trim())) {
+      return;
+    }
 
     if (isOnUsedAutoparts || (!showNewAutoparts && location.pathname.startsWith('/autoparts'))) {
       debouncedUsedLiveSearch(value);
@@ -97,6 +118,7 @@ function Search() {
       const params = new URLSearchParams(searchParams);
       params.delete('q');
       params.delete('page');
+      params.delete('vin_unavailable');
       const qs = params.toString();
       navigate(`/autoparts/new${qs ? `?${qs}` : ''}`, { replace: true });
       dispatch(clearSearch());
@@ -127,7 +149,7 @@ function Search() {
         value={searchTerm}
         onChange={handleInputChange}
         onKeyPress={handleKeyPress}
-        placeholder="Поиск: бренд, артикул, название или комбинация"
+        placeholder="Поиск: VIN, бренд, артикул или название"
         className={`block w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-4 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 ${showClear ? 'pr-20' : 'pr-11'}`}
         disabled={isSearching}
       />

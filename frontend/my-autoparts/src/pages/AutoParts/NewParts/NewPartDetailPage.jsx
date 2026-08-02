@@ -13,6 +13,7 @@ import PartDetailFaqBlock from '../../PartDetail/PartDetailFaqBlock';
 import PartDetailAboutBlock from '../../PartDetail/PartDetailAboutBlock';
 import PartDetailFitmentBlock from '../../PartDetail/PartDetailFitmentBlock';
 import PartDetailSeoCrossLinks from '../../PartDetail/PartDetailSeoCrossLinks';
+import { mapLaximoApplicableVehicles } from '../../../utils/fitmentDisplay';
 import NewPartProductCard from './NewPartProductCard';
 import NewPartDeliveryStockBlock from './NewPartDeliveryStockBlock';
 import NewPartAnalogsTable from './NewPartAnalogsTable';
@@ -290,13 +291,28 @@ export default function NewPartDetailPage() {
     setFitmentLoading(true);
     (async () => {
       try {
-        const response = await apiAxiosUnauth.get('/public/part-reference-fitment', {
-          params: { brand: brandText, article: articleText },
-        });
-        const vehicles = Array.isArray(response?.data?.vehicles) ? response.data.vehicles : [];
+        const [refResponse, laximoResponse] = await Promise.all([
+          apiAxiosUnauth.get('/public/part-reference-fitment', {
+            params: { brand: brandText, article: articleText },
+          }),
+          apiAxiosUnauth
+            .post('/public/laximo/oem/applicable-vehicles', {
+              oem: articleText,
+              brand: brandText,
+            })
+            .catch(() => null),
+        ]);
+        const vehicles = Array.isArray(refResponse?.data?.vehicles)
+          ? refResponse.data.vehicles
+          : [];
+        const laximoOk = laximoResponse?.data?.ok !== false;
+        const laximoRows = laximoOk
+          ? mapLaximoApplicableVehicles(laximoResponse?.data?.vehicles)
+          : [];
+        const merged = [...vehicles, ...laximoRows];
         if (!cancelled) {
-          writePartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey, vehicles);
-          setReferenceVehicles(vehicles);
+          writePartDetailCache(PART_DETAIL_CACHE.referenceFitment, fitmentKey, merged);
+          setReferenceVehicles(merged);
         }
       } catch (_e) {
         if (!cancelled) {
