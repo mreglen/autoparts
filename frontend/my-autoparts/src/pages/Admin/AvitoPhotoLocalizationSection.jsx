@@ -119,20 +119,15 @@ export default function AvitoPhotoLocalizationSection() {
 
   if (loading) {
     return (
-      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <p className="text-sm text-gray-500">Загрузка организаций с фото Avito…</p>
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <p className="text-sm text-gray-500">Загрузка…</p>
       </div>
     );
   }
 
   return (
-    <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-1 text-lg font-semibold text-gray-900">Локализация фото с Avito</h2>
-      <p className="mb-4 text-sm text-gray-500">
-        Скачивает картинки с CDN Avito, сохраняет в{' '}
-        <span className="font-mono text-gray-700">/pictures/</span> на сервере и обновляет URL в товарах.
-        Выберите организации, для которых выполнить перенос.
-      </p>
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+      <h2 className="mb-4 text-lg font-semibold text-gray-900">Фото с Avito</h2>
 
       {error ? (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

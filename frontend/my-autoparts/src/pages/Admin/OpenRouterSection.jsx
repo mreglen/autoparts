@@ -193,8 +193,8 @@ export default function OpenRouterSection() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
-        <p className="text-sm text-gray-500">Загрузка OpenRouter…</p>
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <p className="text-sm text-gray-500">Загрузка…</p>
       </div>
     );
   }
@@ -202,35 +202,31 @@ export default function OpenRouterSection() {
   return (
     <>
       {error && (
-        <div className="mb-4 rounded-lg bg-red-50 text-red-800 text-sm px-4 py-3 border border-red-100">
+        <div className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
         </div>
       )}
       {notice && (
-        <div className="mb-4 rounded-lg bg-green-50 text-green-800 text-sm px-4 py-3 border border-green-100">
+        <div className="mb-4 rounded-xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800">
           {notice}
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
-        <div className="flex flex-wrap items-center gap-3 mb-1">
-          <h2 className="text-lg font-semibold text-gray-900">OpenRouter — генерация описаний</h2>
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <h2 className="text-lg font-semibold text-gray-900">OpenRouter</h2>
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${pill.className}`}>
             {pill.label}
           </span>
         </div>
-        <p className="text-sm text-gray-500 mb-4">
-          AI-описания для карточек товаров продавцов. Для бесплатного старта используйте модели с суффиксом{' '}
-          <code className="text-xs bg-gray-100 px-1 rounded">:free</code> (лимит OpenRouter: 50 запросов/день без пополнения).
-        </p>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">API-ключ</label>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <label className="mb-1 block text-sm font-medium text-gray-700">API-ключ</label>
+            <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 type="password"
-                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
                 placeholder="sk-or-v1-…"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
@@ -240,21 +236,21 @@ export default function OpenRouterSection() {
                 type="button"
                 onClick={saveCredentials}
                 disabled={saving}
-                className="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
               >
                 Сохранить ключ
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {integration?.api_key_configured ? 'Ключ сохранён в БД (зашифрован).' : 'Ключ ещё не задан.'}
+            <p className="mt-1 text-xs text-gray-500">
+              {integration?.api_key_configured ? 'Ключ сохранён' : 'Ключ не задан'}
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Модель</label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Модель</label>
               <select
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 value={recommendedModels.includes(modelId) ? modelId : '__custom__'}
                 onChange={(e) => setModelId(e.target.value)}
               >
@@ -267,7 +263,7 @@ export default function OpenRouterSection() {
               </select>
               {modelId === '__custom__' && (
                 <input
-                  className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
+                  className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
                   placeholder="provider/model:free"
                   value={customModelId}
                   onChange={(e) => setCustomModelId(e.target.value)}
@@ -275,17 +271,14 @@ export default function OpenRouterSection() {
               )}
             </div>
             <div className="flex items-end">
-              <label className="flex items-start gap-3 cursor-pointer select-none">
+              <label className="flex cursor-pointer select-none items-center gap-3">
                 <input
                   type="checkbox"
-                  className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   checked={isEnabled}
                   onChange={(e) => setIsEnabled(e.target.checked)}
                 />
-                <span>
-                  <span className="font-medium text-gray-900 block">Включить генерацию</span>
-                  <span className="text-sm text-gray-500">Глобальный переключатель для продавцов</span>
-                </span>
+                <span className="font-medium text-gray-900">Включить генерацию</span>
               </label>
             </div>
           </div>
@@ -351,16 +344,13 @@ export default function OpenRouterSection() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">Организации с доступом к AI-описаниям</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Продавцы выбранных организаций увидят кнопку «Сгенерировать описание» в формах добавления и редактирования товара.
-        </p>
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">Организации с AI</h2>
 
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row">
           <input
-            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
-            placeholder="Поиск по названию или ID…"
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            placeholder="Поиск…"
             value={orgSearch}
             onChange={(e) => setOrgSearch(e.target.value)}
           />
@@ -368,7 +358,7 @@ export default function OpenRouterSection() {
             type="button"
             disabled={saving || selectedOrgIds.length === 0}
             onClick={() => bulkUpdateOrganizations(true)}
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
           >
             Включить выбранным
           </button>
@@ -376,7 +366,7 @@ export default function OpenRouterSection() {
             type="button"
             disabled={saving || selectedOrgIds.length === 0}
             onClick={() => bulkUpdateOrganizations(false)}
-            className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
           >
             Выключить выбранным
           </button>

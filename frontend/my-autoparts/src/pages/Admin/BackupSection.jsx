@@ -235,16 +235,8 @@ export default function BackupSection() {
   };
 
   return (
-    <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Резервные копии</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Еженедельное автоматическое сохранение БД и папки uploads на сервере.
-            Кнопка запускает создание в фоне (без обрыва по таймауту 60 с), затем скачивает готовый файл.
-          </p>
-        </div>
-      </div>
+    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+      <h2 className="mb-4 text-lg font-semibold text-gray-900">Резервные копии</h2>
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

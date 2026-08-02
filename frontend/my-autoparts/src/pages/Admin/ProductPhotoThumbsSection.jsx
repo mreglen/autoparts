@@ -73,21 +73,15 @@ export default function ProductPhotoThumbsSection() {
 
   if (loading) {
     return (
-      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <p className="text-sm text-gray-500">Загрузка статистики превью фото…</p>
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <p className="text-sm text-gray-500">Загрузка…</p>
       </div>
     );
   }
 
   return (
-    <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-1 text-lg font-semibold text-gray-900">Превью фото товаров</h2>
-      <p className="mb-4 text-sm text-gray-500">
-        Создаёт уменьшенные WebP (до 400×400) рядом с оригиналом и пишет{' '}
-        <span className="font-mono text-gray-700">thumb_url</span>. Каталог{' '}
-        <span className="font-mono text-gray-700">/autoparts/used</span> использует их для быстрой
-        загрузки списка.
-      </p>
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+      <h2 className="mb-4 text-lg font-semibold text-gray-900">Превью фото</h2>
 
       {error ? (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

@@ -4,6 +4,8 @@
 
 Связанный документ: [laximo-cat-vin-capabilities.md](./laximo-cat-vin-capabilities.md) (оценка пригодности API под VIN-сценарии).
 
+Поэтапный план для Cursor Plan mode: [laximo-stages-plan.md](./laximo-stages-plan.md).
+
 Официальная документация: [doc.laximo.ru](https://doc.laximo.ru/).
 
 ---
@@ -315,7 +317,7 @@ backend/app/services/laximo/
 backend/app/routers/laximo_cat.py
 ```
 
-Конфиг: `LAXIMO_CAT_LOGIN`, `LAXIMO_CAT_PASSWORD`, `LAXIMO_CAT_BASE=https://ws.laximo.ru/restApi/v1`.
+Конфиг: credentials **только через `/admin-settings`** (шифр в БД) + тест `ListCatalogs` + тумблер `is_enabled`. Продуктовые вызовы CAT — лишь при `laximo_cat_ready()`. См. [laximo-stages-plan.md](./laximo-stages-plan.md). Env `LAXIMO_CAT_*` — опциональный dev-fallback.
 
 ### 6.3. Черновик BFF API
 

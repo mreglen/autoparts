@@ -105,15 +105,9 @@ export default function DeployUpdateSection() {
   const logTail = Array.isArray(info?.log_tail) ? info.log_tail : [];
 
   return (
-    <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mt-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Обновление сервера</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            Запускает скрипт <code className="text-xs bg-gray-100 px-1 rounded">update</code> на
-            сервере: git pull, сборка фронтенда, перезапуск backend. Нужны права администратора.
-          </p>
-        </div>
+    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-lg font-semibold text-gray-900">Обновление сервера</h2>
         <span
           className={`inline-flex self-start items-center rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(
             status
