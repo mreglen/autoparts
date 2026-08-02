@@ -265,8 +265,8 @@ install_kroan_unit() {
 
 verify_gunicorn() {
   local gunicorn_count uvicorn_standalone sched_started sched_skipped
-  gunicorn_count=$(pgrep -f 'gunicorn.*app.main:app' 2>/dev/null | wc -l | tr -d ' ')
-  uvicorn_standalone=$(pgrep -f '/bin/uvicorn app.main:app' 2>/dev/null | wc -l | tr -d ' ')
+  gunicorn_count=$(pgrep -f 'gunicorn.*app.main:app' 2>/dev/null | wc -l | tr -d ' ' || true)
+  uvicorn_standalone=$(pgrep -f '/bin/uvicorn app.main:app' 2>/dev/null | wc -l | tr -d ' ' || true)
   sched_started=$(journalctl -u kroan -n 50 --no-pager 2>/dev/null | grep -c 'Scheduler started. Expired' || true)
   sched_skipped=$(journalctl -u kroan -n 50 --no-pager 2>/dev/null | grep -c 'Scheduler skipped' || true)
   gunicorn_count=${gunicorn_count:-0}

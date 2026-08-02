@@ -2006,7 +2006,8 @@ def ensure_laximo_cat_tables() -> None:
             seed = (
                 "INSERT INTO site_laximo_cat_integration "
                 "(id, is_enabled, last_test_ok, daily_request_limit, requests_today) "
-                "VALUES (1, FALSE, FALSE, 500, 0)"
+                "VALUES (1, FALSE, FALSE, 500, 0) "
+                "ON CONFLICT (id) DO NOTHING"
             )
         else:
             ddl = """
