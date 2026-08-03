@@ -317,8 +317,8 @@ export default function GaragePage() {
     setPlateError(null);
     setFrameError(null);
     const vin = vinInput.trim().toUpperCase();
-    if (vin.length !== 17) {
-      setVinError('VIN должен содержать 17 символов');
+    if (vin.length < 11 || vin.length > 17) {
+      setVinError('VIN должен содержать от 11 до 17 символов');
       return;
     }
     setVinDecoding(true);

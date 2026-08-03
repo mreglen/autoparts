@@ -17,6 +17,9 @@ class LooksLikeVinTests(unittest.TestCase):
 
     def test_invalid_length(self):
         self.assertFalse(looks_like_vin("SHORT"))
+        self.assertFalse(looks_like_vin("XW8ZZZ7PZD"))  # 10 chars
+        self.assertTrue(looks_like_vin("XW8ZZZ7PZDG00269"))  # 16 — VAG/Rossko-style
+        self.assertEqual(normalize_vin_or_none("xw8zzz7pzdg00269"), "XW8ZZZ7PZDG00269")
 
     def test_forbidden_letter(self):
         self.assertFalse(looks_like_vin("WBA3A5C58CF12345I"))

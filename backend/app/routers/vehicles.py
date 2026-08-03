@@ -272,8 +272,14 @@ def update_vehicle(
     if "vin" in data:
         vin_raw = data.get("vin")
         norm_vin = vin_raw.strip().upper() if vin_raw and str(vin_raw).strip() else None
-        if norm_vin and len(norm_vin) != 17:
-            raise HTTPException(status_code=400, detail="VIN должен содержать ровно 17 символов")
+        if norm_vin:
+            from app.services.laximo.vin import looks_like_vin
+
+            if not looks_like_vin(norm_vin):
+                raise HTTPException(
+                    status_code=400,
+                    detail="VIN должен содержать от 11 до 17 латинских букв и цифр",
+                )
         if norm_vin:
             dup = (
                 db.query(VehicleModel.id)
@@ -404,8 +410,14 @@ def create_vehicle(
     tecdoc_engine_json = _tecdoc_row_to_dict(db.get(TecdocEngine, eid) if eid else None)
 
     norm_vin = vin_raw.strip().upper() if vin_raw and str(vin_raw).strip() else None
-    if norm_vin and len(norm_vin) != 17:
-        raise HTTPException(status_code=400, detail="VIN должен содержать ровно 17 символов")
+    if norm_vin:
+        from app.services.laximo.vin import looks_like_vin
+
+        if not looks_like_vin(norm_vin):
+            raise HTTPException(
+                status_code=400,
+                detail="VIN должен содержать от 11 до 17 латинских букв и цифр",
+            )
 
     if norm_vin:
         dup = (

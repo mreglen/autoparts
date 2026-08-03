@@ -51,7 +51,7 @@ const PLH = {
   generationManual: 'Введите поколение',
   engine: 'Начните вводить или выберите из списка',
   engineManual: 'Например, 2.0 TDI',
-  vin: '17 символов',
+  vin: '11–17 символов',
   mileage: 'Например, 85000',
   price: 'Необязательно',
   description: 'Комплектация, замечания по кузову…',
@@ -657,8 +657,8 @@ const VehicleModal = ({
   const handleVinLookup = async () => {
     setVinLookupError(null);
     const vin = vinLookupInput.trim().toUpperCase() || (create.vin || '').trim().toUpperCase();
-    if (vin.length !== 17) {
-      setVinLookupError('VIN должен содержать 17 символов');
+    if (vin.length < 11 || vin.length > 17) {
+      setVinLookupError('VIN должен содержать от 11 до 17 символов');
       return;
     }
     setVinLookupInput(vin);
@@ -784,9 +784,12 @@ const VehicleModal = ({
     e.preventDefault();
     if (!create.brandInput.trim()) return;
 
-    if (create.vin && create.vin.length !== 17) {
-      alert('VIN должен содержать ровно 17 символов');
-      return;
+    if (create.vin) {
+      const v = create.vin.trim().toUpperCase();
+      if (v.length < 11 || v.length > 17 || !/^[A-Z0-9]+$/.test(v) || /[IOQ]/.test(v)) {
+        alert('VIN должен содержать от 11 до 17 латинских букв и цифр (без I, O, Q)');
+        return;
+      }
     }
 
     let modelVal = create.modelInput.trim();
@@ -952,9 +955,12 @@ const VehicleModal = ({
       return;
     }
 
-    if (detailEdit.vin && detailEdit.vin.length !== 17) {
-      alert('VIN должен содержать ровно 17 символов');
-      return;
+    if (detailEdit.vin) {
+      const v = String(detailEdit.vin).trim().toUpperCase();
+      if (v.length < 11 || v.length > 17 || !/^[A-Z0-9]+$/.test(v) || /[IOQ]/.test(v)) {
+        alert('VIN должен содержать от 11 до 17 латинских букв и цифр (без I, O, Q)');
+        return;
+      }
     }
 
     const mileageStr = String(detailEdit.mileage ?? '').trim();

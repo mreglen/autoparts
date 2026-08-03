@@ -60,6 +60,12 @@ class VinNormalizeTests(unittest.TestCase):
             normalize_vin_or_raise("SHORT")
         self.assertEqual(ctx.exception.status_code, 400)
 
+    def test_sixteen_char_vag_vin(self):
+        self.assertEqual(
+            normalize_vin_or_raise("xw8zzz7pzdg00269"),
+            "XW8ZZZ7PZDG00269",
+        )
+
     def test_forbidden_letters(self):
         with self.assertRaises(HTTPException) as ctx:
             normalize_vin_or_raise("WBA3A5C58CF12345I")

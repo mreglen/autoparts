@@ -345,8 +345,8 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
   const handleDecodeVin = async () => {
     setError('');
     const vin = form.vin.trim().toUpperCase();
-    if (vin.length !== 17) {
-      setError('VIN должен содержать 17 символов');
+    if (vin.length < 11 || vin.length > 17) {
+      setError('VIN должен содержать от 11 до 17 символов');
       return;
     }
     setVinDecoding(true);
@@ -441,7 +441,7 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
               }}
               disabled={saving || vinDecoding}
               maxLength={17}
-              placeholder="17 символов"
+              placeholder="11–17 символов"
             />
             <button
               type="button"

@@ -174,7 +174,7 @@ export default function VinCatalogPage() {
     async (vinValue) => {
       const normalized = normalizeVinOrNull(vinValue);
       if (!normalized) {
-        setError('VIN должен содержать 17 символов');
+        setError('VIN должен содержать от 11 до 17 символов');
         setStep('boot');
         return;
       }
@@ -768,14 +768,14 @@ export default function VinCatalogPage() {
               value={vin}
               onChange={(e) => setVin(e.target.value.toUpperCase())}
               maxLength={17}
-              placeholder="17 символов"
+              placeholder="11–17 символов"
             />
             <button
               type="button"
               onClick={() => {
                 const next = normalizeVinOrNull(vin);
                 if (!next) {
-                  setError('VIN должен содержать 17 символов');
+                  setError('VIN должен содержать от 11 до 17 символов');
                   return;
                 }
                 navigate(`/autoparts/vin?vin=${encodeURIComponent(next)}`, { replace: true });
