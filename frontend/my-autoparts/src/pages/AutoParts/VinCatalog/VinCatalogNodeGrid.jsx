@@ -12,10 +12,10 @@ export default function VinCatalogNodeGrid({ nodes, onSelect }) {
           key={node.id}
           type="button"
           onClick={() => onSelect(node)}
-          className="group flex min-h-[7.5rem] flex-col overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white text-left transition hover:border-indigo-300 hover:shadow-md"
+          className="group flex min-h-[11rem] flex-col overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white text-left transition hover:border-indigo-300 hover:shadow-md"
         >
           {node.imageUrl ? (
-            <div className="flex h-28 items-center justify-center bg-white p-2">
+            <div className="flex h-44 items-center justify-center bg-white p-3">
               <img
                 src={node.imageUrl}
                 alt=""

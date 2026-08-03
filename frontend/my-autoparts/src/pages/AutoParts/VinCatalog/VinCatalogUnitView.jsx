@@ -10,6 +10,10 @@ function lookupAvail(availability, oem) {
   return availability[key] || availability[String(oem).toUpperCase()] || null;
 }
 
+function detailRowKey(d, idx) {
+  return String(d.detail_id || `${d.oem || 'd'}-${idx}`);
+}
+
 function AvailCell({ row }) {
   if (!row) return <span className="text-gray-400">—</span>;
   const used = row.used?.count ?? 0;
@@ -24,64 +28,26 @@ function AvailCell({ row }) {
 export default function VinCatalogUnitView({
   title,
   imageUrl,
-  imageMap,
   details,
   availability,
   searchEmpty,
-  hoverCode,
-  onHoverCode,
+  hoverRowKey,
+  onHoverRowKey,
   onSelectDetail,
   onDetailFilter,
 }) {
-  const hotspots = (imageMap || []).filter(
-    (m) => m.x1 != null && m.y1 != null && m.x2 != null && m.y2 != null
-  );
-
   return (
     <div className="space-y-4">
       <h3 className="text-base font-semibold text-gray-900">{title}</h3>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+      <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
         {imageUrl ? (
-          <div className="relative overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
-            <img src={imageUrl} alt="" className="mx-auto max-h-[360px] w-auto object-contain" />
-            {hotspots.length > 0 ? (
-              <div className="pointer-events-none absolute inset-0">
-                {hotspots.map((m, i) => {
-                  const active = hoverCode && String(m.code_on_image) === String(hoverCode);
-                  const left = Math.min(Number(m.x1), Number(m.x2));
-                  const top = Math.min(Number(m.y1), Number(m.y2));
-                  const w = Math.abs(Number(m.x2) - Number(m.x1));
-                  const h = Math.abs(Number(m.y2) - Number(m.y1));
-                  // Laximo coords often 0–1000 relative; treat as percent of image box
-                  const isPct = left <= 100 && top <= 100 && w <= 100 && h <= 100;
-                  const style = isPct
-                    ? {
-                        left: `${left}%`,
-                        top: `${top}%`,
-                        width: `${Math.max(w, 1)}%`,
-                        height: `${Math.max(h, 1)}%`,
-                      }
-                    : {
-                        left: `${left}px`,
-                        top: `${top}px`,
-                        width: `${Math.max(w, 4)}px`,
-                        height: `${Math.max(h, 4)}px`,
-                      };
-                  return (
-                    <div
-                      key={`${m.code_on_image}-${i}`}
-                      className={`absolute rounded border transition ${
-                        active
-                          ? 'border-indigo-500 bg-indigo-400/30'
-                          : 'border-transparent bg-transparent'
-                      }`}
-                      style={style}
-                    />
-                  );
-                })}
-              </div>
-            ) : null}
+          <div className="overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+            <img
+              src={imageUrl}
+              alt=""
+              className="mx-auto max-h-[560px] w-full object-contain"
+            />
           </div>
         ) : (
           <div className="flex min-h-[120px] items-center justify-center rounded-lg border border-dashed border-gray-200 text-sm text-gray-400">
@@ -105,9 +71,8 @@ export default function VinCatalogUnitView({
               </thead>
               <tbody>
                 {(details || []).map((d, idx) => {
-                  const key = d.detail_id || d.oem || idx;
-                  const code = d.code_on_image;
-                  const isHover = hoverCode && code && String(code) === String(hoverCode);
+                  const key = detailRowKey(d, idx);
+                  const isHover = hoverRowKey && hoverRowKey === key;
                   const needsFilter = Boolean(d.filter);
                   return (
                     <tr
@@ -115,8 +80,8 @@ export default function VinCatalogUnitView({
                       className={`cursor-pointer border-b border-gray-50 transition ${
                         isHover ? 'bg-indigo-50' : 'hover:bg-gray-50'
                       }`}
-                      onMouseEnter={() => onHoverCode(code || null)}
-                      onMouseLeave={() => onHoverCode(null)}
+                      onMouseEnter={() => onHoverRowKey?.(key)}
+                      onMouseLeave={() => onHoverRowKey?.(null)}
                       onClick={() => {
                         if (needsFilter && onDetailFilter) {
                           onDetailFilter(d);

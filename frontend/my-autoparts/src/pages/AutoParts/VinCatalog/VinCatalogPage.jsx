@@ -712,23 +712,6 @@ export default function VinCatalogPage() {
     navigate(`${fallbackSearchPath}?q=${encodeURIComponent(q || '')}`);
   };
 
-  const loadImageMap = useCallback(
-    async (unitId, unitSsd) => {
-      if (!vehicle || !unitId) return [];
-      const ctx = vehicleCtx(vehicle);
-      const res = await apiRequestUnauth(
-        `/public/laximo/units/${encodeURIComponent(unitId)}/image-map?${qs({
-          catalog: ctx.catalog,
-          vehicle_id: ctx.vehicle_id,
-          ssd: unitSsd || ctx.ssd,
-        })}`
-      );
-      if (!res?.ok) return [];
-      return Array.isArray(res?.image_map) ? res.image_map : [];
-    },
-    [vehicle]
-  );
-
   const loadUsedProducts = useCallback(async (oem) => {
     const q = (oem || '').trim();
     if (!q) return [];
@@ -1002,7 +985,6 @@ export default function VinCatalogPage() {
           onSetFilterAnswer={setFilterAnswer}
           onSubmitFilterStep={submitFilterStep}
           onCancelFilter={() => setFilterStep(null)}
-          loadImageMap={loadImageMap}
           loadUsedProducts={loadUsedProducts}
         />
       )}

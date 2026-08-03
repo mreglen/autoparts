@@ -96,7 +96,6 @@ export default function VinCatalogBrowse({
   onSetFilterAnswer,
   onSubmitFilterStep,
   onCancelFilter,
-  loadImageMap,
   loadUsedProducts,
 }) {
   const token = useSelector((state) => state.auth?.token);
@@ -105,8 +104,7 @@ export default function VinCatalogBrowse({
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [gridNodes, setGridNodes] = useState([]);
   const [panelMode, setPanelMode] = useState('grid');
-  const [hoverCode, setHoverCode] = useState(null);
-  const [imageMap, setImageMap] = useState([]);
+  const [hoverRowKey, setHoverRowKey] = useState(null);
   const [drawerDetail, setDrawerDetail] = useState(null);
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
   const [childrenCache, setChildrenCache] = useState({});
@@ -142,7 +140,7 @@ export default function VinCatalogBrowse({
     setTreeOpenIds(new Set());
     setSelectedNodeId(null);
     setDrawerDetail(null);
-    setHoverCode(null);
+    setHoverRowKey(null);
   }, [vehicle?.vehicle_id, vehicle?.catalog]);
 
   useEffect(() => {
@@ -186,25 +184,6 @@ export default function VinCatalogBrowse({
       setGridNodes(categoriesToNodes(treeCategories));
     }
   }, [mode, quickGroups, treeCategories, panelCategories, units, selectedUnit, unitInfo]);
-
-  useEffect(() => {
-    if (!unitInfo?.unit_id || !loadImageMap) {
-      setImageMap([]);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const map = await loadImageMap(unitInfo.unit_id, unitInfo.ssd);
-        if (!cancelled) setImageMap(Array.isArray(map) ? map : []);
-      } catch {
-        if (!cancelled) setImageMap([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [unitInfo?.unit_id, unitInfo?.ssd, loadImageMap]);
 
   const toggleTree = (id) => {
     setTreeOpenIds((prev) => {
@@ -415,12 +394,11 @@ export default function VinCatalogBrowse({
             <VinCatalogUnitView
               title={unitInfo?.name || 'Поиск'}
               imageUrl={null}
-              imageMap={[]}
               details={details}
               availability={availability}
               searchEmpty={searchEmpty}
-              hoverCode={hoverCode}
-              onHoverCode={setHoverCode}
+              hoverRowKey={hoverRowKey}
+              onHoverRowKey={setHoverRowKey}
               onSelectDetail={setDrawerDetail}
               onDetailFilter={onBeginDetailFilter}
             />
@@ -428,12 +406,11 @@ export default function VinCatalogBrowse({
             <VinCatalogUnitView
               title={unitInfo?.name || selectedUnit?.name || 'Узел'}
               imageUrl={unitInfo?.image_url}
-              imageMap={imageMap}
               details={details}
               availability={availability}
               searchEmpty={false}
-              hoverCode={hoverCode}
-              onHoverCode={setHoverCode}
+              hoverRowKey={hoverRowKey}
+              onHoverRowKey={setHoverRowKey}
               onSelectDetail={setDrawerDetail}
               onDetailFilter={onBeginDetailFilter}
             />
@@ -445,7 +422,6 @@ export default function VinCatalogBrowse({
 
       <VinCatalogPartDrawer
         detail={drawerDetail}
-        availability={availability}
         onClose={() => setDrawerDetail(null)}
         loadUsedProducts={loadUsedProducts}
       />
