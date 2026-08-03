@@ -68,6 +68,8 @@ export default function FavoriteHeartOverlay({
 
   useEffect(() => {
     if (!isReady || !token || !isAuthenticated || !favoriteKey) return;
+    if (loading) return;
+    if (favoriteStatusKnown) return;
     if (rossko) {
       dispatch(fetchRosskoFavoriteStatus({
         brand: rossko.brand,
@@ -75,7 +77,6 @@ export default function FavoriteHeartOverlay({
       }));
       return;
     }
-    if (favoriteStatusKnown) return;
     dispatch(fetchFavoriteStatus(productId));
   }, [
     dispatch,
@@ -84,15 +85,21 @@ export default function FavoriteHeartOverlay({
     isAuthenticated,
     favoriteKey,
     productId,
-    rossko,
+    rossko?.brand,
+    rossko?.partnumber,
     favoriteStatusKnown,
+    loading,
+    // intentionally not depending on whole `rossko` object (new ref each render)
   ]);
 
   const handleClick = useCallback(async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isLoading) return;
-    if (!isAuthenticated || !token) {
+    if (typeof e.nativeEvent?.stopImmediatePropagation === 'function') {
+      e.nativeEvent.stopImmediatePropagation();
+    }
+    if (isLoading || !isReady) return;
+    if (!token || !isAuthenticated) {
       goToAuth();
       return;
     }
@@ -118,6 +125,7 @@ export default function FavoriteHeartOverlay({
     dispatch,
     isAuthenticated,
     isLoading,
+    isReady,
     token,
     isFavorite,
     productId,
@@ -131,7 +139,14 @@ export default function FavoriteHeartOverlay({
     <button
       type="button"
       onClick={handleClick}
-      disabled={loading}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+      }}
+      disabled={loading || isLoading}
       aria-pressed={isFavorite}
       aria-label={isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
       className={`absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-gray-200/80 bg-white/90 shadow-sm backdrop-blur-sm transition-colors hover:bg-white disabled:opacity-50 ${className}`}

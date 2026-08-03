@@ -316,9 +316,11 @@ const userEngagementSlice = createSlice({
         }
       })
       .addCase(fetchRosskoFavoriteStatus.fulfilled, (state, action) => {
-        if (action.payload.key) {
-          state.favoriteByKey[action.payload.key] = action.payload.isFavorite;
-        }
+        const key = action.payload?.key;
+        if (!key) return;
+        // Don't clobber an in-flight optimistic toggle
+        if (state.favoriteTogglingKey === key) return;
+        state.favoriteByKey[key] = Boolean(action.payload.isFavorite);
       })
       .addCase(toggleFavorite.pending, (state, action) => {
         const key = productFavoriteKey(action.meta.arg.productId);

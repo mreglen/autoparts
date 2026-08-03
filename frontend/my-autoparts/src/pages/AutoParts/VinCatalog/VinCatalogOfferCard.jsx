@@ -119,6 +119,17 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
   const number = String(part?.partnumber || part?.article || '').trim();
   const displayTitle = formatProductDisplayTitle(brand, number, part?.name) || `${brand} ${number}`.trim();
 
+  const favoriteRossko = useMemo(
+    () => ({
+      brand,
+      partnumber: number,
+      guid: part?.guid,
+      title: displayTitle,
+      minPrice: undefined,
+    }),
+    [brand, number, part?.guid, displayTitle]
+  );
+
   const stocks = useMemo(() => {
     const raw = mapPartToStocksData(part);
     return raw.filter(
@@ -249,10 +260,7 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
     <article className="relative rounded-lg border border-gray-200 bg-white p-3">
       <FavoriteHeartOverlay
         rossko={{
-          brand,
-          partnumber: number,
-          guid: part?.guid,
-          title: displayTitle,
+          ...favoriteRossko,
           minPrice: price,
         }}
         className="right-2 top-2"
@@ -261,14 +269,13 @@ export default function VinCatalogOfferCard({ part, sectionType = 'available', u
       <div className="pr-8">
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           <span className="rounded bg-gray-100 px-1.5 py-0.5 font-medium text-gray-700">{brand}</span>
-          <a
-            href={detailHref}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => window.open(detailHref, '_blank', 'noopener,noreferrer')}
             className="rounded bg-gray-100 px-1.5 py-0.5 font-mono font-medium text-indigo-700 hover:bg-indigo-50"
           >
             {number}
-          </a>
+          </button>
           {isAnalog ? (
             <span className="rounded bg-orange-100 px-1.5 py-0.5 font-medium text-orange-800">Аналог</span>
           ) : null}
