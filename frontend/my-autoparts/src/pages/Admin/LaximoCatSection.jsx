@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../../utils/apiClient';
+import { clearPublicSiteConfigCache } from '../../redux/slices/PublicInfoSlice';
 
 function statusPill(integration, { prefix = '' } = {}) {
   const loginOk = prefix
@@ -158,6 +159,7 @@ export default function LaximoCatSection() {
       setIntegration(data);
       setIsEnabled(Boolean(data?.is_enabled));
       setDocIsEnabled(Boolean(data?.doc_is_enabled));
+      clearPublicSiteConfigCache();
       setNotice('Настройки сохранены');
     } catch (e) {
       setError(e?.message || 'Ошибка сохранения настроек');
@@ -203,6 +205,7 @@ export default function LaximoCatSection() {
     try {
       const result = await apiRequest('/admin/laximo-cat/test', { method: 'POST' });
       await loadData();
+      clearPublicSiteConfigCache();
       if (result?.ok) {
         setNotice(`API доступен (${result.catalogs_count ?? 0} каталогов)`);
       } else {

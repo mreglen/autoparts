@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import SoftServiceNotice from '../../../components/SoftServiceNotice/SoftServiceNotice';
 import { apiRequestUnauth } from '../../../utils/apiClient';
 import {
@@ -8,6 +8,7 @@ import {
   softNoticeVariantFromReason,
 } from '../../../utils/laximoVinCandidate';
 import { looksLikeVin, normalizeVinOrNull } from '../../../utils/laximoVin';
+import { fetchPublicSiteConfig } from '../../../redux/slices/PublicInfoSlice';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -36,11 +37,9 @@ function formatPrice(value) {
 
 export default function VinCatalogPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
-  const laximoAvailable = useSelector(
-    (state) => state.publicInfo.laximoVinCatalogAvailable === true
-  );
   const fallbackSearchPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
 
   const initialVin = useMemo(
@@ -178,12 +177,8 @@ export default function VinCatalogPage() {
         setStep('boot');
         return;
       }
-      if (!laximoAvailable) {
-        setVin(normalized);
-        setNotice('unavailable');
-        setStep('boot');
-        return;
-      }
+      // Always call API — do not gate on Redux flag (session cache can be stale
+      // after admin enables Laximo; garage decode does not use this flag).
       setVin(normalized);
       setFromWizard(false);
       setLoading(true);
@@ -216,7 +211,7 @@ export default function VinCatalogPage() {
         setLoading(false);
       }
     },
-    [laximoAvailable]
+    []
   );
 
   const beginWizard = async () => {
@@ -313,6 +308,10 @@ export default function VinCatalogPage() {
   };
 
   useEffect(() => {
+    dispatch(fetchPublicSiteConfig(true));
+  }, [dispatch]);
+
+  useEffect(() => {
     if (openWizard && !initialVin) {
       beginWizard();
       return;
@@ -323,7 +322,7 @@ export default function VinCatalogPage() {
       setStep('boot');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialVin, laximoAvailable, openWizard]);
+  }, [initialVin, openWizard]);
 
   const openCategory = async (cat) => {
     if (!vehicle || !cat?.category_id) return;
