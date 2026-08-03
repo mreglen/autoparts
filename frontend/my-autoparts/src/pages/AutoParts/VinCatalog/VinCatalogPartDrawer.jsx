@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { apiAxiosUnauth } from '../../../utils/apiClient';
-import { buildNewPartOpenPath, buildPartDetailPath } from '../../../utils/partRoutes';
+import { buildPartDetailPath } from '../../../utils/partRoutes';
 import {
-  getRosskoMinPrice,
   getRosskoParts,
   normalizeArticle,
-  roundRosskoSalePrice,
 } from '../NewParts/rosskoHelpers';
+import VinCatalogOfferCard from './VinCatalogOfferCard';
 
 const CLOSE_ANIMATION_MS = 200;
 
@@ -39,15 +38,15 @@ function formatPrice(value) {
   return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
 }
 
-function OfferSkeleton({ rows = 4 }) {
+function OfferSkeleton({ rows = 3 }) {
   return (
     <div className="space-y-2">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="animate-pulse rounded-lg border border-gray-100 px-3 py-3">
-          <div className="h-3 w-24 rounded bg-gray-100" />
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <div className="h-3 w-32 rounded bg-gray-100" />
-            <div className="h-3 w-16 rounded bg-gray-100" />
+        <div key={i} className="animate-pulse rounded-lg border border-gray-100 p-3">
+          <div className="h-3 w-28 rounded bg-gray-100" />
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="h-5 w-20 rounded bg-gray-100" />
+            <div className="h-8 w-24 rounded bg-gray-100" />
           </div>
         </div>
       ))}
@@ -57,7 +56,7 @@ function OfferSkeleton({ rows = 4 }) {
 
 function UsedSkeleton({ count = 4 }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="animate-pulse overflow-hidden rounded-lg border border-gray-100">
           <div className="aspect-square bg-gray-100" />
@@ -186,35 +185,6 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
 
   if (!isVisible) return null;
 
-  const renderRosskoRow = (part, idx) => {
-    const brand = part?.brand || part?.manufacturer || '';
-    const article = part?.partnumber || part?.article || '';
-    const rawPrice = getRosskoMinPrice(part);
-    const price = rawPrice > 0 ? roundRosskoSalePrice(rawPrice) : null;
-    const href = buildNewPartOpenPath({ brand, article });
-    return (
-      <a
-        key={`${brand}-${article}-${idx}`}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2.5 transition hover:border-indigo-300 hover:bg-indigo-50/40"
-      >
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-gray-900">{brand || '—'}</p>
-          <p className="mt-0.5 truncate font-mono text-xs text-indigo-700">{article || '—'}</p>
-        </div>
-        <div className="shrink-0 text-right">
-          {price != null ? (
-            <p className="text-sm font-semibold text-gray-900">{formatPrice(price)} ₽</p>
-          ) : (
-            <p className="text-xs text-gray-400">—</p>
-          )}
-        </div>
-      </a>
-    );
-  };
-
   const body = (
     <div className="fixed inset-0 z-[100] flex justify-end" role="dialog" aria-modal="true">
       <button
@@ -224,7 +194,7 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
         onClick={requestClose}
       />
       <div
-        className={`relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl sm:max-w-lg ${
+        className={`relative flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl sm:max-w-2xl lg:max-w-3xl ${
           isClosing ? 'animate-slide-out-right' : 'animate-slide-in-right'
         }`}
       >
@@ -245,13 +215,22 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
           </button>
         </div>
 
-        <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
+        <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
           <section>
             <h4 className="mb-2 text-sm font-semibold text-gray-900">Схожие</h4>
             {rosskoLoading ? (
               <OfferSkeleton rows={3} />
             ) : similarParts.length ? (
-              <div className="space-y-2">{similarParts.map(renderRosskoRow)}</div>
+              <div className="space-y-2">
+                {similarParts.map((part, idx) => (
+                  <VinCatalogOfferCard
+                    key={`sim-${part?.guid || part?.partnumber || idx}`}
+                    part={part}
+                    sectionType="available"
+                    uniqueId={`sim-${idx}`}
+                  />
+                ))}
+              </div>
             ) : (
               <p className="text-sm text-gray-500">Нет предложений</p>
             )}
@@ -260,7 +239,7 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
               {usedLoading ? (
                 <UsedSkeleton />
               ) : usedItems.length ? (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {usedItems.map((p) => {
                     const img = productImage(p);
                     const href = buildPartDetailPath(p);
@@ -299,7 +278,16 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
             {rosskoLoading ? (
               <OfferSkeleton rows={4} />
             ) : analogParts.length ? (
-              <div className="space-y-2">{analogParts.map(renderRosskoRow)}</div>
+              <div className="space-y-2">
+                {analogParts.map((part, idx) => (
+                  <VinCatalogOfferCard
+                    key={`an-${part?.guid || part?.partnumber || idx}`}
+                    part={part}
+                    sectionType="analog"
+                    uniqueId={`an-${idx}`}
+                  />
+                ))}
+              </div>
             ) : (
               <p className="text-sm text-gray-500">Нет аналогов</p>
             )}
