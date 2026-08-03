@@ -38,11 +38,12 @@ import {
 import { buildAutoPartsSeo, PageSeoHelmet } from '../../utils/pageSeo';
 import { apiAxiosUnauth } from '../../utils/apiClient';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
+import { looksLikeVin, normalizeVinOrNull } from '../../utils/laximoVin';
 
 const UsedPartsList = React.lazy(() => import('./UsedParts/UsedPartsList'));
 const NewPartsResults = React.lazy(() => import('./NewParts/NewPartsResults'));
 
-const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs'];
+const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs', 'vin_unavailable'];
 
 function AutoParts() {
   const [searchParams] = useSearchParams();
@@ -154,6 +155,11 @@ function AutoParts() {
   const handleNewPartsSearch = useCallback(async (text) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+    const vin = normalizeVinOrNull(trimmed);
+    if (vin) {
+      navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
+      return;
+    }
     dispatch(setSearchQuery(trimmed));
     await dispatch(fetchSearchResults({ text: trimmed }));
     navigate(`/autoparts/new?q=${encodeURIComponent(trimmed)}`);
@@ -162,7 +168,13 @@ function AutoParts() {
   const applyUsedQueryToUrl = useCallback((text, { replace = true } = {}) => {
     const params = new URLSearchParams(searchParams);
     params.delete('page');
+    params.delete('vin_unavailable');
     const trimmed = text.trim();
+    const vin = normalizeVinOrNull(trimmed);
+    if (vin) {
+      navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`, { replace });
+      return;
+    }
     if (trimmed) {
       params.set('q', trimmed);
       dispatch(setSearchQuery(trimmed));
@@ -178,6 +190,9 @@ function AutoParts() {
   }, [searchParams, navigate, location.pathname, dispatch]);
 
   const handleUsedLiveQueryChange = useCallback((text) => {
+    if (looksLikeVin(text.trim())) {
+      return;
+    }
     applyUsedQueryToUrl(text, { replace: true });
   }, [applyUsedQueryToUrl]);
 
@@ -232,6 +247,13 @@ function AutoParts() {
 
   const urlQuery = searchParams.get('q');
   const effectiveQuery = (urlQuery ? decodeURIComponent(urlQuery) : searchQuery || '').trim();
+
+  // VIN in listing query → OEM catalog page (same as header search)
+  useEffect(() => {
+    const vin = normalizeVinOrNull(urlQuery || '');
+    if (!vin) return;
+    navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`, { replace: true });
+  }, [urlQuery, navigate]);
 
   // Sync activeTab with URL on initial load
   useEffect(() => {

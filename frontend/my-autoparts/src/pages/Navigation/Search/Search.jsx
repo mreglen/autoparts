@@ -17,9 +17,6 @@ function Search() {
   const navigate = useNavigate();
   const location = useLocation();
   const showNewAutoparts = useSelector((state) => state.publicInfo.showNewAutoparts !== false);
-  const laximoVinCatalogAvailable = useSelector(
-    (state) => state.publicInfo.laximoVinCatalogAvailable === true
-  );
   const autopartsSearchPath = showNewAutoparts ? '/autoparts/new' : '/autoparts/used';
   const isOnUsedAutoparts = location.pathname.startsWith('/autoparts/used');
   const isOnNewAutoparts = location.pathname.startsWith('/autoparts/new');
@@ -55,14 +52,8 @@ function Search() {
 
     const vin = normalizeVinOrNull(trimmedTerm);
     if (vin) {
-      if (laximoVinCatalogAvailable) {
-        setIsSearching(false);
-        navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
-        return;
-      }
       setIsSearching(false);
-      dispatch(setGlobalSearchQuery(vin));
-      navigate(`${autopartsSearchPath}?q=${encodeURIComponent(vin)}&vin_unavailable=1`);
+      navigate(`/autoparts/vin?vin=${encodeURIComponent(vin)}`);
       return;
     }
 
