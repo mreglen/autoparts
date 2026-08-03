@@ -19,6 +19,7 @@ from app.schemas.laximo_catalog import (
     FilterByDetailRequest,
     FilterByUnitRequest,
     FilterConditionsResponse,
+    ImageMapResponse,
     OemApplicabilityRequest,
     OemApplicabilityResponse,
     QuickGroupDetailsResponse,
@@ -166,6 +167,26 @@ def public_unit(
     return _envelope(
         UnitDetailsResponse,
         unit_tree.get_unit_with_details(
+            db,
+            catalog=catalog,
+            vehicle_id=vehicle_id,
+            ssd=ssd,
+            unit_id=unit_id,
+        ),
+    )
+
+
+@router.get("/units/{unit_id}/image-map", response_model=ImageMapResponse)
+def public_unit_image_map(
+    unit_id: str,
+    catalog: str = Query(...),
+    vehicle_id: str = Query(...),
+    ssd: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    return _envelope(
+        ImageMapResponse,
+        unit_tree.get_unit_image_map(
             db,
             catalog=catalog,
             vehicle_id=vehicle_id,

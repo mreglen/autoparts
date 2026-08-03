@@ -9,6 +9,7 @@ import {
 } from '../../../utils/laximoVinCandidate';
 import { looksLikeVin, normalizeVinOrNull } from '../../../utils/laximoVin';
 import { fetchPublicSiteConfig } from '../../../redux/slices/PublicInfoSlice';
+import VinCatalogBrowse from './VinCatalogBrowse';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -29,10 +30,10 @@ function vehicleCtx(vehicle) {
   };
 }
 
-function formatPrice(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+function normalizeOemKey(oem) {
+  return String(oem || '')
+    .replace(/[^A-Za-z0-9А-Яа-яЁё]/g, '')
+    .toUpperCase();
 }
 
 export default function VinCatalogPage() {
@@ -63,8 +64,8 @@ export default function VinCatalogPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchEmpty, setSearchEmpty] = useState(false);
   const [quickGroups, setQuickGroups] = useState([]);
+  const [treeCategories, setTreeCategories] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [categoryStack, setCategoryStack] = useState([]);
   const [units, setUnits] = useState([]);
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [details, setDetails] = useState([]);
@@ -111,8 +112,11 @@ export default function VinCatalogPage() {
       });
       const map = {};
       (res?.items || []).forEach((item) => {
-        if (item?.normalized_oem) map[item.normalized_oem] = item;
-        if (item?.oem) map[String(item.oem).toUpperCase()] = item;
+        if (item?.normalized_oem) map[normalizeOemKey(item.normalized_oem)] = item;
+        if (item?.oem) {
+          map[normalizeOemKey(item.oem)] = item;
+          map[String(item.oem).toUpperCase()] = item;
+        }
       });
       setAvailability(map);
     } catch {
@@ -125,8 +129,8 @@ export default function VinCatalogPage() {
     setFromWizard(wizard);
     setStep('browse');
     setQuickGroups([]);
+    setTreeCategories([]);
     setCategories([]);
-    setCategoryStack([]);
     setUnits([]);
     setSelectedUnit(null);
     setDetails([]);
@@ -159,7 +163,9 @@ export default function VinCatalogPage() {
           `/public/laximo/categories?${qs({ ...ctx, category_id: '-1' })}`
         );
         if (handleSoftFail(cats)) return;
-        setCategories(Array.isArray(cats?.categories) ? cats.categories : []);
+        const list = Array.isArray(cats?.categories) ? cats.categories : [];
+        setTreeCategories(list);
+        setCategories(list);
       }
     } catch (err) {
       setNotice('unavailable');
@@ -346,7 +352,6 @@ export default function VinCatalogPage() {
           })}`
         );
         if (handleSoftFail(cats)) return;
-        setCategoryStack((prev) => [...prev, { id: cat.category_id, name: cat.name }]);
         setCategories(Array.isArray(cats?.categories) ? cats.categories : []);
         setUnits([]);
       } else {
@@ -359,7 +364,6 @@ export default function VinCatalogPage() {
           })}`
         );
         if (handleSoftFail(unitsRes)) return;
-        setCategoryStack((prev) => [...prev, { id: cat.category_id, name: cat.name }]);
         setUnits(Array.isArray(unitsRes?.units) ? unitsRes.units : []);
         setCategories([]);
       }
@@ -626,17 +630,18 @@ export default function VinCatalogPage() {
           `/public/laximo/categories?${qs({ ...ctx, category_id: '-1' })}`
         );
         if (handleSoftFail(cats)) return;
-        setCategories(Array.isArray(cats?.categories) ? cats.categories : []);
-        setCategoryStack([]);
+        const list = Array.isArray(cats?.categories) ? cats.categories : [];
+        setTreeCategories(list);
+        setCategories(list);
         setUnits([]);
         setQuickGroups([]);
       } else {
         const groups = await apiRequestUnauth(`/public/laximo/quick-groups?${qs(ctx)}`);
         if (handleSoftFail(groups)) return;
         setQuickGroups(Array.isArray(groups?.quick_groups) ? groups.quick_groups : []);
+        setTreeCategories([]);
         setCategories([]);
         setUnits([]);
-        setCategoryStack([]);
       }
     } catch (err) {
       setNotice('unavailable');
@@ -707,14 +712,47 @@ export default function VinCatalogPage() {
     navigate(`${fallbackSearchPath}?q=${encodeURIComponent(q || '')}`);
   };
 
-  const availFor = (oem) => {
-    if (!oem) return null;
-    const key = String(oem).replace(/[^A-Za-z0-9А-Яа-яЁё]/g, '').toUpperCase();
-    return availability[key] || availability[String(oem).toUpperCase()] || null;
-  };
+  const loadImageMap = useCallback(
+    async (unitId, unitSsd) => {
+      if (!vehicle || !unitId) return [];
+      const ctx = vehicleCtx(vehicle);
+      const res = await apiRequestUnauth(
+        `/public/laximo/units/${encodeURIComponent(unitId)}/image-map?${qs({
+          catalog: ctx.catalog,
+          vehicle_id: ctx.vehicle_id,
+          ssd: unitSsd || ctx.ssd,
+        })}`
+      );
+      if (!res?.ok) return [];
+      return Array.isArray(res?.image_map) ? res.image_map : [];
+    },
+    [vehicle]
+  );
+
+  const loadUsedProducts = useCallback(async (oem) => {
+    const q = (oem || '').trim();
+    if (!q) return [];
+    const params = new URLSearchParams({
+      q,
+      has_photos: 'true',
+      page_size: '8',
+      page: '1',
+      sort: 'created_at_desc',
+      is_new: 'false',
+    });
+    const res = await apiRequestUnauth(`/catalog/products?${params}`);
+    const items = Array.isArray(res?.items)
+      ? res.items
+      : Array.isArray(res?.products)
+        ? res.products
+        : Array.isArray(res)
+          ? res
+          : [];
+    return items.filter((p) => p?.id).slice(0, 8);
+  }, []);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className={`mx-auto px-4 py-8 ${step === 'browse' ? 'max-w-7xl' : 'max-w-5xl'}`}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Каталог по VIN</h1>
@@ -931,346 +969,42 @@ export default function VinCatalogPage() {
       )}
 
       {step === 'browse' && vehicle && (
-        <div className="mt-6 space-y-4">
-          {fromWizard ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Подбор по параметрам — точность ниже, чем по VIN. Автомобиль не сохраняется в гараж.
-            </div>
-          ) : null}
-          <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-            <p className="text-sm font-semibold text-gray-900">
-              {candidateLabel(vehicle) || vehicle.display_name || 'Автомобиль'}
-            </p>
-            {vin && !fromWizard ? <p className="mt-0.5 text-xs text-gray-500">VIN: {vin}</p> : null}
-          </div>
-
-          {hasFulltext ? (
-            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
-              <label className="block text-sm font-medium text-gray-700">Найти деталь</label>
-              <p className="mt-0.5 text-xs text-gray-500">
-                Поиск по названию внутри этого автомобиля (например, «колодки», «фильтр»).
-              </p>
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                <input
-                  className={inputClass}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      runSearch();
-                    }
-                  }}
-                  placeholder="Название детали"
-                  disabled={searchLoading || loading}
-                />
-                <button
-                  type="button"
-                  onClick={runSearch}
-                  disabled={searchLoading || loading}
-                  className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-                >
-                  {searchLoading ? 'Поиск…' : 'Найти'}
-                </button>
-                {mode === 'search' ? (
-                  <button
-                    type="button"
-                    onClick={clearSearch}
-                    disabled={searchLoading || loading}
-                    className="shrink-0 rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                  >
-                    К каталогу
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-          {filterStep ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50/40 px-4 py-3">
-              <h3 className="text-sm font-semibold text-gray-900">Уточните комплектацию</h3>
-              <p className="mt-0.5 text-xs text-gray-500">
-                Для этого узла нужны дополнительные параметры автомобиля.
-              </p>
-              <div className="mt-3 space-y-3">
-                {filterStep.conditions.map((cond, idx) => {
-                  const isInput = cond.type === 'input';
-                  const values = Array.isArray(cond.values) ? cond.values : [];
-                  return (
-                    <div key={`${cond.name || 'c'}-${idx}`}>
-                      <label className="block text-sm font-medium text-gray-700">
-                        {cond.name || `Параметр ${idx + 1}`}
-                      </label>
-                      {isInput ? (
-                        <input
-                          className={inputClass}
-                          value={filterStep.answers[idx] || ''}
-                          onChange={(e) => setFilterAnswer(idx, e.target.value)}
-                          placeholder={cond.regexp ? `Формат: ${cond.regexp}` : 'Значение'}
-                          disabled={filterLoading || loading}
-                        />
-                      ) : (
-                        <select
-                          className={inputClass}
-                          value={filterStep.answers[idx] || ''}
-                          onChange={(e) => setFilterAnswer(idx, e.target.value)}
-                          disabled={filterLoading || loading}
-                        >
-                          <option value="">Выберите…</option>
-                          {values.map((v, vIdx) => {
-                            const optVal = v.ssd_modification || v.name || '';
-                            return (
-                              <option key={`${optVal}-${vIdx}`} value={optVal}>
-                                {v.name || v.note || `Вариант ${vIdx + 1}`}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={submitFilterStep}
-                  disabled={filterLoading || loading}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-                >
-                  {filterLoading ? 'Применение…' : 'Применить'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterStep(null)}
-                  disabled={filterLoading || loading}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                >
-                  Отмена
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {hasQuickgroups && mode !== 'search' ? (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => switchMode('quick')}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                  mode === 'quick'
-                    ? 'bg-indigo-600 text-white'
-                    : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Быстрые группы
-              </button>
-              <button
-                type="button"
-                onClick={() => switchMode('oem')}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                  mode === 'oem'
-                    ? 'bg-indigo-600 text-white'
-                    : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Оригинальный каталог
-              </button>
-            </div>
-          ) : null}
-
-          {error && !notice ? (
-            <p className="text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          {mode === 'quick' && (
-            <ul className="space-y-2">
-              {quickGroups.map((g, idx) => (
-                <li key={`${g.quick_group_id || 'g'}-${idx}`}>
-                  <button
-                    type="button"
-                    onClick={() => openQuickGroup(g)}
-                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/40"
-                  >
-                    {g.name || g.quick_group_id}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {mode === 'oem' && (
-            <div className="space-y-3">
-              {categoryStack.length > 0 ? (
-                <p className="text-xs text-gray-500">
-                  {categoryStack.map((c) => c.name || c.id).join(' / ')}
-                </p>
-              ) : null}
-              <ul className="space-y-2">
-                {categories.map((c, idx) => (
-                  <li key={`${c.category_id || 'c'}-${idx}`}>
-                    <button
-                      type="button"
-                      onClick={() => openCategory(c)}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/40"
-                    >
-                      {c.name || c.category_id}
-                    </button>
-                  </li>
-                ))}
-                {units.map((u, idx) => (
-                  <li key={`${u.unit_id || 'u'}-${idx}`}>
-                    <button
-                      type="button"
-                      onClick={() => openUnit(u)}
-                      disabled={loading || filterLoading}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/40 disabled:opacity-60"
-                    >
-                      <span>{u.name || u.unit_id}</span>
-                      {u.filter ? (
-                        <span className="mt-0.5 block text-xs text-amber-700">
-                          Требуется уточнение комплектации
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {(mode === 'search' || unitInfo || details.length > 0) && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {unitInfo?.name || selectedUnit?.name || (mode === 'search' ? 'Результаты поиска' : 'Детали')}
-              </h2>
-              {unitInfo?.image_url ? (
-                <img
-                  src={unitInfo.image_url}
-                  alt=""
-                  className="mt-3 max-h-64 w-auto rounded-lg border border-gray-100"
-                />
-              ) : null}
-              <div className="mt-4 overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-gray-500">
-                      <th className="py-2 pr-3 font-medium">OEM</th>
-                      <th className="py-2 pr-3 font-medium">Название</th>
-                      <th className="py-2 pr-3 font-medium">Оригинал</th>
-                      <th className="py-2 pr-3 font-medium">Аналоги</th>
-                      <th className="py-2 font-medium">Б/у</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {details.map((d, idx) => {
-                      const av = availFor(d.oem);
-                      const rossko = av?.rossko;
-                      const used = av?.used;
-                      const analogs = av?.analogs;
-                      const price = formatPrice(rossko?.min_price);
-                      const analogItems = Array.isArray(analogs?.items) ? analogs.items : [];
-                      const noStock =
-                        !rossko?.available && !used?.available && !analogs?.available;
-                      return (
-                        <tr key={`${d.oem || 'd'}-${idx}`} className="border-b border-gray-100 align-top">
-                          <td className="py-2 pr-3 font-mono text-xs text-gray-900">
-                            {d.oem || '—'}
-                          </td>
-                          <td className="py-2 pr-3 text-gray-800">
-                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-                              <span>{d.name || '—'}</span>
-                              {d.filter ? (
-                                <button
-                                  type="button"
-                                  onClick={() => beginDetailFilter(d)}
-                                  disabled={filterLoading || loading || !selectedUnit?.unit_id}
-                                  className="w-fit text-xs font-medium text-indigo-600 hover:underline disabled:opacity-50"
-                                >
-                                  Уточнить
-                                </button>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td className="py-2 pr-3 text-gray-700">
-                            {rossko?.available ? (
-                              <Link
-                                to={`/autoparts/new?q=${encodeURIComponent(d.oem || '')}`}
-                                className="text-indigo-600 hover:underline"
-                              >
-                                {price ? `от ${price} ₽` : 'есть'}
-                              </Link>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td className="py-2 pr-3 text-gray-700">
-                            {analogs?.available && analogItems.length > 0 ? (
-                              <div className="space-y-1">
-                                <span className="text-xs text-gray-500">
-                                  {analogs.count > 1 ? `${analogs.count} шт.` : 'есть'}
-                                </span>
-                                <ul className="space-y-0.5">
-                                  {analogItems.slice(0, 3).map((item, aIdx) => {
-                                    const q = item.oem || '';
-                                    const hasNew = item.rossko?.available;
-                                    const hasUsed = item.used?.available;
-                                    const href = hasNew
-                                      ? `/autoparts/new?q=${encodeURIComponent(q)}`
-                                      : hasUsed
-                                        ? `/autoparts/used?q=${encodeURIComponent(q)}`
-                                        : `/autoparts/new?q=${encodeURIComponent(q)}`;
-                                    return (
-                                      <li key={`${q}-${aIdx}`}>
-                                        <Link
-                                          to={href}
-                                          className="font-mono text-xs text-indigo-600 hover:underline"
-                                          title={item.name || item.brand || q}
-                                        >
-                                          {item.brand ? `${item.brand} ` : ''}
-                                          {q}
-                                        </Link>
-                                      </li>
-                                    );
-                                  })}
-                                </ul>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400">—</span>
-                            )}
-                          </td>
-                          <td className="py-2 text-gray-700">
-                            {used?.available ? (
-                              <Link
-                                to={`/autoparts/used?q=${encodeURIComponent(d.oem || '')}`}
-                                className="text-indigo-600 hover:underline"
-                              >
-                                {used.count > 1 ? `${used.count} шт.` : 'есть'}
-                              </Link>
-                            ) : noStock ? (
-                              <span className="text-gray-400">нет в наличии</span>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {details.length === 0 ? (
-                  <p className="mt-2 text-sm text-gray-500">
-                    {mode === 'search' || searchEmpty
-                      ? 'Ничего не найдено.'
-                      : 'Нет деталей в этом узле.'}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          )}
-        </div>
+        <VinCatalogBrowse
+          vehicle={vehicle}
+          vin={vin}
+          fromWizard={fromWizard}
+          loading={loading}
+          filterLoading={filterLoading}
+          hasQuickgroups={hasQuickgroups}
+          hasFulltext={hasFulltext}
+          mode={mode}
+          quickGroups={quickGroups}
+          treeCategories={treeCategories}
+          panelCategories={categories}
+          units={units}
+          selectedUnit={selectedUnit}
+          unitInfo={unitInfo}
+          details={details}
+          availability={availability}
+          searchQuery={searchQuery}
+          searchLoading={searchLoading}
+          searchEmpty={searchEmpty}
+          filterStep={filterStep}
+          error={error && !notice ? error : null}
+          onSearchQueryChange={setSearchQuery}
+          onRunSearch={runSearch}
+          onClearSearch={clearSearch}
+          onSwitchMode={switchMode}
+          onOpenCategory={openCategory}
+          onOpenUnit={openUnit}
+          onOpenQuickGroup={openQuickGroup}
+          onBeginDetailFilter={beginDetailFilter}
+          onSetFilterAnswer={setFilterAnswer}
+          onSubmitFilterStep={submitFilterStep}
+          onCancelFilter={() => setFilterStep(null)}
+          loadImageMap={loadImageMap}
+          loadUsedProducts={loadUsedProducts}
+        />
       )}
     </div>
   );
