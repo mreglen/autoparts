@@ -72,6 +72,16 @@ class VinNormalizeTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 400)
         self.assertIn("I, O или Q", ctx.exception.detail)
 
+    def test_strips_separators_and_cyrillic(self):
+        self.assertEqual(
+            normalize_vin_or_raise("wba 3a5c58-cf123456"),
+            "WBA3A5C58CF123456",
+        )
+        self.assertEqual(
+            normalize_vin_or_raise("WBA3A5С58СF123456"),
+            "WBA3A5C58CF123456",
+        )
+
 
 class VehicleNormalizeTests(unittest.TestCase):
     def test_audi_like_attributes(self):

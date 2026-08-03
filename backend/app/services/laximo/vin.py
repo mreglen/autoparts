@@ -9,18 +9,47 @@ VIN_MAX_LENGTH = 17
 
 # ISO 3779: VIN uses A–Z and 0–9 except I, O, Q
 _VIN_FORBIDDEN = frozenset("IOQ")
+_VIN_ALLOWED = frozenset("ABCDEFGHJKLMNPRSTUVWXYZ0123456789")
+
+# Cyrillic lookalikes typed on a RU keyboard → Latin VIN letters
+_CYR_TO_LATIN = str.maketrans(
+    {
+        "А": "A",
+        "В": "B",
+        "Е": "E",
+        "К": "K",
+        "М": "M",
+        "Н": "H",
+        "О": "O",
+        "Р": "P",
+        "С": "C",
+        "Т": "T",
+        "У": "Y",
+        "Х": "X",
+    }
+)
+
+_SEPARATORS = (" ", "\t", "\r", "\n", "-", "–", "—", "_", ".", "/", "\\")
+
+
+def normalize_vin(vin: str | None) -> str:
+    """Uppercase, strip separators, map Cyrillic lookalikes to Latin. No validation."""
+    if vin is None:
+        return ""
+    text = str(vin).strip().upper().translate(_CYR_TO_LATIN)
+    for sep in _SEPARATORS:
+        text = text.replace(sep, "")
+    return text
 
 
 def looks_like_vin(vin: str | None) -> bool:
     """True if string is a plausible VIN/chassis for catalog lookup. No HTTPException."""
-    if vin is None or not str(vin).strip():
-        return False
-    norm = str(vin).strip().upper()
+    norm = normalize_vin(vin)
     if not (VIN_MIN_LENGTH <= len(norm) <= VIN_MAX_LENGTH):
         return False
     if any(ch in _VIN_FORBIDDEN for ch in norm):
         return False
-    if not all(ch.isalnum() for ch in norm):
+    if not all(ch in _VIN_ALLOWED for ch in norm):
         return False
     # Require at least one letter so pure numeric strings are not treated as VIN
     if not any(ch.isalpha() for ch in norm):
@@ -31,7 +60,7 @@ def looks_like_vin(vin: str | None) -> bool:
 def normalize_vin_or_none(vin: str | None) -> str | None:
     if not looks_like_vin(vin):
         return None
-    return str(vin).strip().upper()
+    return normalize_vin(vin)
 
 
 def normalize_vin_or_raise(vin: str | None) -> str:
@@ -40,7 +69,7 @@ def normalize_vin_or_raise(vin: str | None) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"VIN должен содержать от {VIN_MIN_LENGTH} до {VIN_MAX_LENGTH} символов",
         )
-    norm = str(vin).strip().upper()
+    norm = normalize_vin(vin)
     if not (VIN_MIN_LENGTH <= len(norm) <= VIN_MAX_LENGTH):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -51,7 +80,7 @@ def normalize_vin_or_raise(vin: str | None) -> str:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="VIN не должен содержать буквы I, O или Q",
         )
-    if not all(ch.isalnum() for ch in norm):
+    if not all(ch in _VIN_ALLOWED for ch in norm):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="VIN должен содержать только латинские буквы и цифры",

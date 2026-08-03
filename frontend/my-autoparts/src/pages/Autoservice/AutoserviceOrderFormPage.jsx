@@ -12,6 +12,7 @@ import {
   mapCandidateToGarageForm,
   softNoticeVariantFromReason,
 } from '../../utils/laximoVinCandidate';
+import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 import { getRosskoMinPrice, getRosskoParts } from '../AutoParts/NewParts/rosskoHelpers';
 
 const inputClass =
@@ -344,11 +345,12 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
 
   const handleDecodeVin = async () => {
     setError('');
-    const vin = form.vin.trim().toUpperCase();
-    if (vin.length < 11 || vin.length > 17) {
+    const vin = normalizeVinOrNull(form.vin);
+    if (!vin) {
       setError('VIN должен содержать от 11 до 17 символов');
       return;
     }
+    setForm((prev) => ({ ...prev, vin }));
     setVinDecoding(true);
     try {
       const result = await apiRequest('/laximo/vehicles/by-vin', {
@@ -435,12 +437,12 @@ function AddVehicleModal({ clientId, onClose, onCreated }) {
               className={inputClass}
               value={form.vin}
               onChange={(e) => {
-                setForm((p) => ({ ...p, vin: e.target.value.toUpperCase() }));
+                setForm((p) => ({ ...p, vin: sanitizeVinInput(e.target.value) }));
                 setError('');
                 setNotice(null);
               }}
               disabled={saving || vinDecoding}
-              maxLength={17}
+              maxLength={VIN_INPUT_MAX_LENGTH}
               placeholder="11–17 символов"
             />
             <button

@@ -8,6 +8,7 @@ import {
   candidateLabel,
   softNoticeVariantFromReason,
 } from '../../utils/laximoVinCandidate';
+import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -109,11 +110,12 @@ export default function LaximoCatalogSandboxPage() {
   const handleDecodeVin = async () => {
     setVinError(null);
     setNotice(null);
-    const vin = vinInput.trim().toUpperCase();
-    if (vin.length < 11 || vin.length > 17) {
+    const vin = normalizeVinOrNull(vinInput);
+    if (!vin) {
       setVinError('VIN должен содержать от 11 до 17 символов');
       return;
     }
+    setVinInput(vin);
     setVinLoading(true);
     try {
       const result = await apiRequest('/laximo/vehicles/by-vin', {
@@ -353,11 +355,11 @@ export default function LaximoCatalogSandboxPage() {
               className={inputClass}
               value={vinInput}
               onChange={(e) => {
-                setVinInput(e.target.value.toUpperCase());
+                setVinInput(sanitizeVinInput(e.target.value));
                 setVinError(null);
                 setNotice(null);
               }}
-              maxLength={17}
+              maxLength={VIN_INPUT_MAX_LENGTH}
               disabled={vinLoading}
               placeholder="17 символов"
             />

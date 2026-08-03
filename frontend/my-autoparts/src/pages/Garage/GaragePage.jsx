@@ -13,6 +13,7 @@ import {
   mapCandidateToGarageForm,
   softNoticeVariantFromReason,
 } from '../../utils/laximoVinCandidate';
+import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../utils/laximoVin';
 
 const inputClass =
   'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
@@ -106,8 +107,8 @@ function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice,
         <input
           className={inputClass}
           value={form.vin}
-          onChange={(e) => setForm((p) => ({ ...p, vin: e.target.value.toUpperCase() }))}
-          maxLength={17}
+          onChange={(e) => setForm((p) => ({ ...p, vin: sanitizeVinInput(e.target.value) }))}
+          maxLength={VIN_INPUT_MAX_LENGTH}
           disabled={saving}
         />
       </div>
@@ -316,11 +317,12 @@ export default function GaragePage() {
     setVinError(null);
     setPlateError(null);
     setFrameError(null);
-    const vin = vinInput.trim().toUpperCase();
-    if (vin.length < 11 || vin.length > 17) {
+    const vin = normalizeVinOrNull(vinInput);
+    if (!vin) {
       setVinError('VIN должен содержать от 11 до 17 символов');
       return;
     }
+    setVinInput(vin);
     setVinDecoding(true);
     setLookupFromPlate(false);
     setLookupFromFrame(false);
@@ -627,10 +629,10 @@ export default function GaragePage() {
                 className={inputClass}
                 value={vinInput}
                 onChange={(e) => {
-                  setVinInput(e.target.value.toUpperCase());
+                  setVinInput(sanitizeVinInput(e.target.value));
                   setVinError(null);
                 }}
-                maxLength={17}
+                maxLength={VIN_INPUT_MAX_LENGTH}
                 disabled={vinDecoding || plateDecoding || frameDecoding}
               />
               {vinError && <p className="mt-1 text-sm text-red-600">{vinError}</p>}

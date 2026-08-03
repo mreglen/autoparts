@@ -27,6 +27,25 @@ class LooksLikeVinTests(unittest.TestCase):
     def test_pure_numeric_rejected(self):
         self.assertFalse(looks_like_vin("12345678901234567"))
 
+    def test_spaces_and_dashes(self):
+        self.assertEqual(
+            normalize_vin_or_none("WBA 3A5C58-CF123456"),
+            "WBA3A5C58CF123456",
+        )
+        self.assertEqual(
+            normalize_vin_or_none("xw8zzz7pzdg–00269"),
+            "XW8ZZZ7PZDG00269",
+        )
+        self.assertTrue(looks_like_vin("WBA3A5C58 CF123456"))
+
+    def test_cyrillic_lookalikes(self):
+        # Н→H, С→C (Cyrillic letters that look like Latin)
+        self.assertEqual(
+            normalize_vin_or_none("WBA3A5С58СF123456"),
+            "WBA3A5C58CF123456",
+        )
+        self.assertTrue(looks_like_vin("ХW8ZZZ7PZDG00269"))  # Х→X
+
 
 class ResolveVinTests(unittest.TestCase):
     def test_vin_ready_redirects_to_catalog(self):
@@ -39,6 +58,15 @@ class ResolveVinTests(unittest.TestCase):
         self.assertEqual(result.match_type, "vin_catalog")
         self.assertTrue(result.redirect_path.startswith("/autoparts/vin?vin="))
 
+    def test_spaced_vin_ready_redirects(self):
+        db = MagicMock()
+        with patch(
+            "app.services.search_resolve_service.laximo_cat_ready",
+            return_value=True,
+        ):
+            result = resolve_search_query(db, "WBA 3A5C58-CF123456", site_origin="https://ex.ru")
+        self.assertEqual(result.match_type, "vin_catalog")
+        self.assertIn("WBA3A5C58CF123456", result.redirect_path)
     def test_vin_not_ready_fallback_not_vin_route(self):
         db = MagicMock()
         with patch(

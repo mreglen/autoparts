@@ -7,7 +7,7 @@ import {
   candidateLabel,
   softNoticeVariantFromReason,
 } from '../../../utils/laximoVinCandidate';
-import { looksLikeVin, normalizeVinOrNull } from '../../../utils/laximoVin';
+import { looksLikeVin, normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../../utils/laximoVin';
 import { fetchPublicSiteConfig } from '../../../redux/slices/PublicInfoSlice';
 import VinCatalogBrowse from './VinCatalogBrowse';
 
@@ -786,8 +786,8 @@ export default function VinCatalogPage() {
             <input
               className={inputClass}
               value={vin}
-              onChange={(e) => setVin(e.target.value.toUpperCase())}
-              maxLength={17}
+              onChange={(e) => setVin(sanitizeVinInput(e.target.value))}
+              maxLength={VIN_INPUT_MAX_LENGTH}
               placeholder="11–17 символов"
             />
             <button

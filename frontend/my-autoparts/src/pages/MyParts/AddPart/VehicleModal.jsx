@@ -18,6 +18,7 @@ import {
   mapCandidateToDismantlingPrefill,
   softNoticeVariantFromReason,
 } from '../../../utils/laximoVinCandidate';
+import { normalizeVinOrNull, sanitizeVinInput, VIN_INPUT_MAX_LENGTH } from '../../../utils/laximoVin';
 
 const MAX_VEHICLE_PHOTOS = 10;
 
@@ -656,8 +657,8 @@ const VehicleModal = ({
 
   const handleVinLookup = async () => {
     setVinLookupError(null);
-    const vin = vinLookupInput.trim().toUpperCase() || (create.vin || '').trim().toUpperCase();
-    if (vin.length < 11 || vin.length > 17) {
+    const vin = normalizeVinOrNull(vinLookupInput) || normalizeVinOrNull(create.vin);
+    if (!vin) {
       setVinLookupError('VIN должен содержать от 11 до 17 символов');
       return;
     }
@@ -785,8 +786,8 @@ const VehicleModal = ({
     if (!create.brandInput.trim()) return;
 
     if (create.vin) {
-      const v = create.vin.trim().toUpperCase();
-      if (v.length < 11 || v.length > 17 || !/^[A-Z0-9]+$/.test(v) || /[IOQ]/.test(v)) {
+      const v = normalizeVinOrNull(create.vin);
+      if (!v) {
         alert('VIN должен содержать от 11 до 17 латинских букв и цифр (без I, O, Q)');
         return;
       }
@@ -865,7 +866,7 @@ const VehicleModal = ({
       generation: generationVal || null,
       engine: engineVal || null,
       transmission: transmissionVal || null,
-      vin: create.vin ? create.vin.trim().toUpperCase() || null : null,
+      vin: create.vin ? normalizeVinOrNull(create.vin) : null,
       mileage,
       price,
       description: descTrim === '' ? null : descTrim,
@@ -956,8 +957,8 @@ const VehicleModal = ({
     }
 
     if (detailEdit.vin) {
-      const v = String(detailEdit.vin).trim().toUpperCase();
-      if (v.length < 11 || v.length > 17 || !/^[A-Z0-9]+$/.test(v) || /[IOQ]/.test(v)) {
+      const v = normalizeVinOrNull(detailEdit.vin);
+      if (!v) {
         alert('VIN должен содержать от 11 до 17 латинских букв и цифр (без I, O, Q)');
         return;
       }
@@ -1541,16 +1542,19 @@ const VehicleModal = ({
                         type="text"
                         value={detailEdit.vin}
                         onChange={(e) =>
-                          setDetailEdit((prev) => ({ ...prev, vin: e.target.value }))
+                          setDetailEdit((prev) => ({
+                            ...prev,
+                            vin: sanitizeVinInput(e.target.value),
+                          }))
                         }
                         onBlur={() =>
                           setDetailEdit((prev) => ({
                             ...prev,
-                            vin: prev.vin.trim().toUpperCase(),
+                            vin: sanitizeVinInput(prev.vin),
                           }))
                         }
                         className={detailEditInput}
-                        maxLength={17}
+                        maxLength={VIN_INPUT_MAX_LENGTH}
                         placeholder={PLH.vin}
                         spellCheck={false}
                       />
@@ -1714,11 +1718,11 @@ const VehicleModal = ({
                       type="text"
                       value={vinLookupInput}
                       onChange={(e) => {
-                        setVinLookupInput(e.target.value.toUpperCase());
+                        setVinLookupInput(sanitizeVinInput(e.target.value));
                         setVinLookupError(null);
                         setVinLookupNotice(null);
                       }}
-                      maxLength={17}
+                      maxLength={VIN_INPUT_MAX_LENGTH}
                       disabled={vinLookupLoading || plateLookupLoading || frameLookupLoading}
                       className={createInput}
                       placeholder={PLH.vin}
@@ -2138,16 +2142,21 @@ const VehicleModal = ({
                   <input
                     type="text"
                     value={create.vin}
-                    onChange={(e) => setCreate((prev) => ({ ...prev, vin: e.target.value }))}
+                    onChange={(e) =>
+                      setCreate((prev) => ({
+                        ...prev,
+                        vin: sanitizeVinInput(e.target.value),
+                      }))
+                    }
                     onBlur={() =>
                       setCreate((prev) => ({
                         ...prev,
-                        vin: prev.vin.trim().toUpperCase(),
+                        vin: sanitizeVinInput(prev.vin),
                       }))
                     }
                     disabled={!vinEnabled}
                     className={createInput}
-                    maxLength={17}
+                    maxLength={VIN_INPUT_MAX_LENGTH}
                     placeholder={PLH.vin}
                     spellCheck={false}
                   />
