@@ -13,7 +13,7 @@ import NewPartsFiltersForm from './NewPartsFiltersForm';
 import { newHasActiveFilters } from '../../../utils/autopartsFilters';
 import { Z_MOBILE_STICKY_FOOTER } from '../../../constants/mobileTokens';
 
-const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs'];
+const NEW_PARTS_URL_KEYS = ['q', 'brand', 'vmin', 'vmax', 'in_stock', 'sort', 'show_analogs', 'vin_unavailable'];
 
 export default function NewPartsFiltersPage() {
   const dispatch = useDispatch();
