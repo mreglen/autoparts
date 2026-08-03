@@ -429,6 +429,18 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
                     path="/autoparts/new?q=запчасти",
                     view_id="view-pop-04",
                 ),
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id="visitor-e",
+                    path="/autoparts/new?q=XW8ZZZ7PZDG002696",
+                    view_id="view-pop-05",
+                ),
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id="visitor-f",
+                    path="/autoparts/new?q=xw8zzz7pzdg002696",
+                    view_id="view-pop-06",
+                ),
             ],
             user_id=None,
         )
@@ -438,6 +450,7 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
         self.assertEqual(items[0], "KRAFT KT 100529")
         self.assertIn("масляный фильтр", items)
         self.assertNotIn("запчасти", [item.lower() for item in items])
+        self.assertNotIn("XW8ZZZ7PZDG002696", [item.upper() for item in items])
         self.assertIsNotNone(generated_at)
 
 

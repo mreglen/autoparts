@@ -39,6 +39,7 @@ from app.schemas.site_analytics import (
     AnalyticsSourcesOut,
     AnalyticsSummaryOut,
 )
+from app.services.laximo.vin import looks_like_vin
 
 SENSITIVE_FIELD_NAMES = frozenset(
     {
@@ -205,6 +206,9 @@ def _normalize_popular_query(value: str | None) -> str | None:
     text = text[:60].strip()
     low = text.casefold()
     if low in POPULAR_QUERY_STOPLIST:
+        return None
+    # VIN/chassis lookups belong in /autoparts/vin, not popular article chips
+    if looks_like_vin(text):
         return None
     if len(text) < 3 and not any(ch.isdigit() for ch in text):
         return None
