@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import SoftServiceNotice from '../../../components/SoftServiceNotice/SoftServiceNotice';
@@ -70,6 +70,7 @@ export default function VinCatalogPage() {
   const [selectedUnit, setSelectedUnit] = useState(null);
   const [details, setDetails] = useState([]);
   const [unitInfo, setUnitInfo] = useState(null);
+  const [imageMap, setImageMap] = useState([]);
   const [availability, setAvailability] = useState({});
   // filterStep: { kind, unit, filter, detail?, conditions, answers: { [idx]: string } }
   const [filterStep, setFilterStep] = useState(null);
@@ -81,6 +82,7 @@ export default function VinCatalogPage() {
   const [wizardConditions, setWizardConditions] = useState([]);
   const [wizardCanList, setWizardCanList] = useState(false);
   const [wizardLoading, setWizardLoading] = useState(false);
+  const imageMapReqId = useRef(0);
 
   const openWizard = searchParams.get('wizard') === '1';
 
@@ -124,6 +126,44 @@ export default function VinCatalogPage() {
     }
   };
 
+  const clearUnitView = () => {
+    setSelectedUnit(null);
+    setDetails([]);
+    setUnitInfo(null);
+    setImageMap([]);
+    setAvailability({});
+    setSearchEmpty(false);
+    setFilterStep(null);
+  };
+
+  const loadImageMap = async (unitId, ssd, vehicleOverride = null) => {
+    const v = vehicleOverride || vehicle;
+    if (!v || !unitId) {
+      setImageMap([]);
+      return;
+    }
+    const reqId = ++imageMapReqId.current;
+    const ctx = vehicleCtx(v);
+    try {
+      const res = await apiRequestUnauth(
+        `/public/laximo/units/${encodeURIComponent(unitId)}/image-map?${qs({
+          catalog: ctx.catalog,
+          vehicle_id: ctx.vehicle_id,
+          ssd: ssd || ctx.ssd,
+        })}`
+      );
+      if (reqId !== imageMapReqId.current) return;
+      if (!res?.ok) {
+        setImageMap([]);
+        return;
+      }
+      setImageMap(Array.isArray(res?.image_map) ? res.image_map : []);
+    } catch {
+      if (reqId !== imageMapReqId.current) return;
+      setImageMap([]);
+    }
+  };
+
   const startBrowse = async (cand, { wizard = false } = {}) => {
     setVehicle(cand);
     setFromWizard(wizard);
@@ -135,6 +175,7 @@ export default function VinCatalogPage() {
     setSelectedUnit(null);
     setDetails([]);
     setUnitInfo(null);
+    setImageMap([]);
     setAvailability({});
     setSearchQuery('');
     setSearchEmpty(false);
@@ -340,6 +381,7 @@ export default function VinCatalogPage() {
     setSelectedUnit(null);
     setDetails([]);
     setUnitInfo(null);
+    setImageMap([]);
     setAvailability({});
     try {
       if (cat.has_children) {
@@ -391,6 +433,7 @@ export default function VinCatalogPage() {
     setError(null);
     setFilterStep(null);
     setSelectedUnit(unit);
+    setImageMap([]);
     try {
       const res = await apiRequestUnauth(
         `/public/laximo/units/${encodeURIComponent(unit.unit_id)}?${qs({
@@ -403,7 +446,10 @@ export default function VinCatalogPage() {
       const detailRows = Array.isArray(res?.details) ? res.details : [];
       setUnitInfo(res?.unit || null);
       setDetails(detailRows);
-      await loadAvailability(detailRows);
+      await Promise.all([
+        loadAvailability(detailRows),
+        loadImageMap(unit.unit_id, ssd),
+      ]);
     } catch (err) {
       setNotice('unavailable');
       setError(err?.message || 'Не удалось загрузить детали');
@@ -592,6 +638,7 @@ export default function VinCatalogPage() {
     setError(null);
     setSelectedUnit({ name: group.name, unit_id: group.quick_group_id });
     setUnitInfo({ name: group.name });
+    setImageMap([]);
     try {
       const res = await apiRequestUnauth(
         `/public/laximo/quick-groups/${encodeURIComponent(group.quick_group_id)}/details?${qs({
@@ -611,6 +658,11 @@ export default function VinCatalogPage() {
       );
       setDetails(detailRows);
       await loadAvailability(detailRows);
+      if (unit?.unit_id) {
+        await loadImageMap(unit.unit_id, unit.ssd || ssd);
+      } else {
+        setImageMap([]);
+      }
     } catch (err) {
       setNotice('unavailable');
       setError(err?.message || 'Не удалось загрузить группу');
@@ -625,6 +677,7 @@ export default function VinCatalogPage() {
     setSelectedUnit(null);
     setDetails([]);
     setUnitInfo(null);
+    setImageMap([]);
     setAvailability({});
     setSearchEmpty(false);
     setError(null);
@@ -660,10 +713,7 @@ export default function VinCatalogPage() {
 
   const clearSearch = () => {
     setSearchEmpty(false);
-    setDetails([]);
-    setUnitInfo(null);
-    setSelectedUnit(null);
-    setAvailability({});
+    clearUnitView();
     setError(null);
     setNotice(null);
     const next = hasQuickgroups ? 'quick' : 'oem';
@@ -683,6 +733,7 @@ export default function VinCatalogPage() {
     setNotice(null);
     setSearchEmpty(false);
     setSelectedUnit(null);
+    setImageMap([]);
     setUnitInfo({ name: `Поиск: ${q}` });
     setMode('search');
     try {
@@ -742,17 +793,17 @@ export default function VinCatalogPage() {
   }, []);
 
   return (
-    <div className={`mx-auto px-3 py-6 sm:px-4 sm:py-8 ${step === 'browse' ? 'max-w-7xl' : 'max-w-4xl'}`}>
+    <div className={`mx-auto px-3 ${step === 'browse' ? 'max-w-7xl py-2 sm:px-4 sm:py-3' : 'max-w-4xl py-4 sm:px-4 sm:py-6'}`}>
       {step !== 'browse' ? (
-        <div className="mb-6 flex items-center justify-between gap-3">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Каталог по VIN</h1>
           <Link to={fallbackSearchPath} className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
             Обычный поиск
           </Link>
         </div>
       ) : (
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h1 className="text-lg font-bold text-gray-900 sm:text-xl">Каталог по VIN</h1>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h1 className="text-base font-bold text-gray-900 sm:text-lg">Каталог по VIN</h1>
           <Link to={fallbackSearchPath} className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
             Обычный поиск
           </Link>
@@ -979,6 +1030,7 @@ export default function VinCatalogPage() {
           unitInfo={unitInfo}
           details={details}
           availability={availability}
+          imageMap={imageMap}
           searchQuery={searchQuery}
           searchLoading={searchLoading}
           searchEmpty={searchEmpty}
@@ -991,6 +1043,7 @@ export default function VinCatalogPage() {
           onOpenCategory={openCategory}
           onOpenUnit={openUnit}
           onOpenQuickGroup={openQuickGroup}
+          onClearUnitView={clearUnitView}
           onBeginDetailFilter={beginDetailFilter}
           onSetFilterAnswer={setFilterAnswer}
           onSubmitFilterStep={submitFilterStep}

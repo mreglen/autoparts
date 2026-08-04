@@ -4,6 +4,8 @@ import { apiAxiosUnauth } from '../../../utils/apiClient';
 import { buildPartDetailPath } from '../../../utils/partRoutes';
 import {
   getRosskoParts,
+  collectRosskoAnalogs,
+  mapPartToStocksData,
   normalizeArticle,
 } from '../NewParts/rosskoHelpers';
 import VinCatalogOfferCard from './VinCatalogOfferCard';
@@ -74,7 +76,18 @@ function isExactOemMatch(part, oemNorm) {
   if (!oemNorm) return false;
   const pn = normalizeArticle(part?.partnumber || part?.article);
   if (!pn) return false;
-  return pn === oemNorm || pn.includes(oemNorm) || oemNorm.includes(pn);
+  return pn === oemNorm;
+}
+
+function hasOfferStock(part) {
+  return mapPartToStocksData(part).length > 0;
+}
+
+function partKey(part) {
+  return (
+    String(part?.guid || '').trim()
+    || `${String(part?.brand || '').trim()}|${normalizeArticle(part?.partnumber || part?.article)}`
+  );
 }
 
 export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts }) {
@@ -141,14 +154,29 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
           address_id: 176458,
         });
         if (cancelled) return;
-        const parts = getRosskoParts(response?.data || response);
+        const parts = getRosskoParts(response?.data || response).filter(hasOfferStock);
         const similar = [];
-        const analogs = [];
+        const listAnalogs = [];
         parts.forEach((part) => {
           if (isExactOemMatch(part, oemNorm)) similar.push(part);
-          else analogs.push(part);
+          else listAnalogs.push(part);
         });
-        setSimilarParts(similar);
+        const similarFinal = similar.length ? similar : parts;
+        const similarKeys = new Set(similarFinal.map(partKey).filter(Boolean));
+        const crosses = collectRosskoAnalogs(parts).filter((cross) => {
+          const key = partKey(cross);
+          return key && !similarKeys.has(key);
+        });
+        const analogs = [];
+        const analogSeen = new Set();
+        [...(similar.length ? listAnalogs : []), ...crosses].forEach((part) => {
+          const key = partKey(part);
+          if (!key || similarKeys.has(key) || analogSeen.has(key)) return;
+          if (isExactOemMatch(part, oemNorm) && similar.length) return;
+          analogSeen.add(key);
+          analogs.push(part);
+        });
+        setSimilarParts(similarFinal);
         setAnalogParts(analogs);
       } catch {
         if (!cancelled) {
@@ -274,7 +302,12 @@ export default function VinCatalogPartDrawer({ detail, onClose, loadUsedProducts
           </section>
 
           <section>
-            <h4 className="mb-2 text-sm font-semibold text-gray-900">Аналоги</h4>
+            <h4 className="mb-2 text-sm font-semibold text-gray-900">
+              Аналоги
+              {!rosskoLoading && analogParts.length ? (
+                <span className="ml-2 text-xs font-normal text-gray-500">{analogParts.length}</span>
+              ) : null}
+            </h4>
             {rosskoLoading ? (
               <OfferSkeleton rows={4} />
             ) : analogParts.length ? (

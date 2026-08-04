@@ -73,7 +73,7 @@ class UnitTreeNormalizeTests(unittest.TestCase):
         self.assertEqual(out["oem"], "8K0121451D")
         self.assertEqual(out["name"], "Air filter")
         self.assertEqual(out["code_on_image"], "12")
-        self.assertEqual(out["filter"], {"x": 1})
+        self.assertEqual(out["filter"], "{'x': 1}")
 
     def test_flatten_quick_groups_nested_tree(self):
         raw = [
@@ -140,8 +140,10 @@ class UnitTreeNormalizeTests(unittest.TestCase):
         self.assertEqual(unit["unit_id"], "3252309")
         self.assertIn("source", unit["image_url"])
         self.assertEqual(len(details), 2)
-        self.assertEqual(details[0]["oem"], "059115389AD")
-        self.assertTrue(details[1]["match"])
+        # match=true rows are sorted first
+        self.assertEqual(details[0]["oem"], "059198405B")
+        self.assertTrue(details[0]["match"])
+        self.assertEqual(details[1]["oem"], "059115389AD")
 
 
 class UnitTreeGateTests(unittest.TestCase):

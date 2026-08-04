@@ -100,6 +100,32 @@ export const getRosskoParts = (data) => {
   return Array.isArray(parts) ? parts : [parts];
 };
 
+/** Analog / cross parts nested under a Rossko Part. */
+export const collectRosskoCrossParts = (part) => {
+  let crossParts = part?.crosses?.Part;
+  if (!crossParts) return [];
+  return Array.isArray(crossParts) ? crossParts : [crossParts];
+};
+
+export const collectRosskoAnalogs = (parts) => {
+  const list = Array.isArray(parts) ? parts : [];
+  const seen = new Set();
+  const out = [];
+  list.forEach((part) => {
+    collectRosskoCrossParts(part).forEach((cross) => {
+      const guid = String(cross?.guid || '').trim();
+      const key =
+        guid
+        || `${String(cross?.brand || '').trim()}|${normalizeArticle(cross?.partnumber || cross?.article)}`;
+      if (!key || key === '|' || seen.has(key)) return;
+      if (!mapPartToStocksData(cross).length) return;
+      seen.add(key);
+      out.push(cross);
+    });
+  });
+  return out;
+};
+
 const scoreRosskoPart = (part, queryArticleNorm, queryBrandLower) => {
   let score = 0;
   const pn = normalizeArticle(part?.partnumber);

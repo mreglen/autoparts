@@ -331,7 +331,24 @@ def parse_quick_detail_response(
 ) -> tuple[Optional[dict[str, Any]], list[dict[str, Any]]]:
     """Extract unit info and detail rows from ListQuickDetail response."""
     primary_unit: Optional[dict[str, Any]] = None
+    matched_unit: Optional[dict[str, Any]] = None
     details: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def _append_detail(item: dict[str, Any]) -> None:
+        row = normalize_detail(item)
+        key = "|".join(
+            [
+                str(row.get("oem") or ""),
+                str(row.get("code_on_image") or ""),
+                str(row.get("name") or ""),
+                str(row.get("detail_id") or ""),
+            ]
+        )
+        if key in seen:
+            return
+        seen.add(key)
+        details.append(row)
 
     for cat in _quick_detail_categories(data):
         units = cat.get("units")
@@ -340,20 +357,39 @@ def parse_quick_detail_response(
         for unit in units:
             if not isinstance(unit, dict):
                 continue
+            unit_norm = normalize_unit_info(unit)
             if primary_unit is None:
-                primary_unit = normalize_unit_info(unit)
+                primary_unit = unit_norm
             unit_details = unit.get("details")
+            has_match = False
             if isinstance(unit_details, list):
                 for item in unit_details:
-                    if isinstance(item, dict):
-                        details.append(normalize_detail(item))
+                    if not isinstance(item, dict):
+                        continue
+                    _append_detail(item)
+                    match_raw = item.get("match")
+                    if match_raw is True or str(match_raw).lower() in ("t", "true", "1"):
+                        has_match = True
+            if has_match and matched_unit is None:
+                matched_unit = unit_norm
 
     if details:
-        return primary_unit, details
+        # Prefer unit that contains match=true details (better schema for the group).
+        details.sort(
+            key=lambda d: (
+                0
+                if d.get("match") is True
+                or str(d.get("match") or "").lower() in ("t", "true", "1")
+                else 1,
+                str(d.get("code_on_image") or ""),
+                str(d.get("name") or ""),
+            )
+        )
+        return matched_unit or primary_unit, details
 
     for row in _quick_detail_flat_rows(data):
         if _pick(row, "oem", "OEM", "partNumber", "partnumber"):
-            details.append(normalize_detail(row))
+            _append_detail(row)
         elif _pick(row, "unitId", "unitid", "id") and _pick(row, "name"):
             if primary_unit is None:
                 primary_unit = normalize_unit_info(row)

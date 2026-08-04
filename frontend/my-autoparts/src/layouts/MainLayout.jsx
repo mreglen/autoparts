@@ -31,6 +31,7 @@ export default function MainLayout() {
     });
 
     const isAutopartsPage = location.pathname.startsWith('/autoparts');
+    const isVinCatalogPage = location.pathname.startsWith('/autoparts/vin');
     const isChatsPage = location.pathname.startsWith('/chats');
     const isMobileActiveChat = isChatsPage && Boolean(searchParams.get('chatId'));
     const isFullBleedAmbientPage =
@@ -93,12 +94,14 @@ export default function MainLayout() {
                           } lg:min-h-[calc(100dvh-var(--sg-desktop-header-h))]`
                         : isPartPage
                         ? 'max-w-7xl max-lg:px-0 max-lg:py-0 px-3 sm:px-1 lg:px-2 py-6 sm:py-8 max-lg:min-h-[calc(100dvh-4.5rem-env(safe-area-inset-bottom,0px))]'
+                        : isVinCatalogPage
+                        ? 'max-w-7xl max-lg:px-0 max-lg:py-0 px-3 sm:px-1 lg:px-2 py-2 sm:py-3'
                         : isAutopartsPage
                         ? 'max-w-7xl max-lg:px-0 max-lg:py-2 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                         : 'max-w-7xl max-lg:px-3 max-lg:py-4 px-3 sm:px-1 lg:px-2 py-6 sm:py-8'
                 }`}
             >
-                {breadcrumbItems.length > 0 && !isSeoLandingPage && !isPartPage && !isNewPartDetailPage && !isChatsPage ? (
+                {breadcrumbItems.length > 0 && !isSeoLandingPage && !isPartPage && !isNewPartDetailPage && !isChatsPage && !isVinCatalogPage ? (
                     <div className={isFullBleedAmbientPage ? 'mx-auto max-w-7xl px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8' : undefined}>
                         <Breadcrumbs items={breadcrumbItems} includeJsonLd={!isPartPage} />
                     </div>

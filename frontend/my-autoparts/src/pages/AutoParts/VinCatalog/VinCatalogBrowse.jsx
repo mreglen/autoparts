@@ -80,6 +80,7 @@ export default function VinCatalogBrowse({
   unitInfo,
   details,
   availability,
+  imageMap,
   searchQuery,
   searchLoading,
   searchEmpty,
@@ -92,6 +93,7 @@ export default function VinCatalogBrowse({
   onOpenCategory,
   onOpenUnit,
   onOpenQuickGroup,
+  onClearUnitView,
   onBeginDetailFilter,
   onSetFilterAnswer,
   onSubmitFilterStep,
@@ -197,12 +199,14 @@ export default function VinCatalogBrowse({
   const handleSelectNode = async (node) => {
     setSelectedNodeId(node.id);
     setDrawerDetail(null);
+    setHoverRowKey(null);
     setMobileTreeOpen(false);
 
     if (node.kind === 'quickgroup') {
       const g = node.raw;
       if (node.children?.length) {
         setTreeOpenIds((prev) => new Set(prev).add(node.id));
+        onClearUnitView?.();
         setPanelMode('grid');
         setGridNodes(node.children);
         return;
@@ -218,6 +222,7 @@ export default function VinCatalogBrowse({
 
     if (node.kind === 'category') {
       setTreeOpenIds((prev) => new Set(prev).add(node.id));
+      onClearUnitView?.();
       setPanelMode('grid');
       await onOpenCategory(node.raw);
       return;
@@ -265,9 +270,9 @@ export default function VinCatalogBrowse({
   }, [rootNodes, childrenCache]);
 
   return (
-    <div className="mt-4 space-y-3">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="min-w-0 text-lg font-semibold text-gray-900 sm:text-xl">{title}</h2>
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+        <h2 className="min-w-0 text-sm font-semibold text-gray-900 sm:text-base">{title}</h2>
         {vin && !fromWizard ? (
           <span className="font-mono text-xs text-gray-400">{vin}</span>
         ) : null}
@@ -318,7 +323,7 @@ export default function VinCatalogBrowse({
           />
         </aside>
 
-        <section className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+        <section className="min-w-0 self-start rounded-lg border border-gray-200 bg-white p-2 sm:p-3">
           {loading || filterLoading ? (
             <p className="text-sm text-gray-500">Загрузка…</p>
           ) : null}
@@ -379,6 +384,7 @@ export default function VinCatalogBrowse({
             <VinCatalogUnitView
               title={unitInfo?.name || 'Поиск'}
               imageUrl={null}
+              imageMap={[]}
               details={details}
               availability={availability}
               searchEmpty={searchEmpty}
@@ -391,6 +397,7 @@ export default function VinCatalogBrowse({
             <VinCatalogUnitView
               title={unitInfo?.name || selectedUnit?.name || 'Узел'}
               imageUrl={unitInfo?.image_url}
+              imageMap={imageMap}
               details={details}
               availability={availability}
               searchEmpty={false}
