@@ -220,7 +220,122 @@ def normalize_quick_group(row: dict[str, Any]) -> dict[str, Any]:
         "ssd": _str_or_none(_pick(row, "ssd")),
         "link": _boolish(_pick(row, "link")),
         "parent_id": _str_or_none(_pick(row, "parentId", "parentid", "parent_id")),
+        "synonyms": _str_or_none(_pick(row, "synonyms")),
     }
+
+
+def _quick_group_roots(data: Any) -> list[dict[str, Any]]:
+    if data is None:
+        return []
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    if isinstance(data, dict):
+        for key in ("quickGroups", "groups", "rows", "items", "data"):
+            nested = data.get(key)
+            if isinstance(nested, list):
+                return [item for item in nested if isinstance(item, dict)]
+        return [data]
+    return []
+
+
+def flatten_quick_groups(data: Any) -> list[dict[str, Any]]:
+    """Flatten nested ListQuickGroup tree into rows with parent_id."""
+    return _flatten_quick_group_nodes(_quick_group_roots(data), parent_id="")
+
+
+def _flatten_quick_group_nodes(
+    nodes: list[dict[str, Any]],
+    *,
+    parent_id: str,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        qid = (
+            _str_or_none(_pick(node, "quickGroupId", "quickgroupid", "id", "groupId"))
+            or ""
+        )
+        row = normalize_quick_group(node)
+        row["parent_id"] = parent_id or None
+        out.append(row)
+        children = node.get("children")
+        if isinstance(children, list) and children:
+            child_nodes = [c for c in children if isinstance(c, dict)]
+            out.extend(_flatten_quick_group_nodes(child_nodes, parent_id=qid))
+    return out
+
+
+def _quick_detail_categories(data: Any) -> list[dict[str, Any]]:
+    if data is None:
+        return []
+    if isinstance(data, list):
+        cats: list[dict[str, Any]] = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            if isinstance(item.get("units"), list):
+                cats.append(item)
+            elif _pick(item, "categoryId", "categoryid"):
+                cats.append(item)
+        return cats or [item for item in data if isinstance(item, dict)]
+    if isinstance(data, dict):
+        for key in ("categories", "rows", "items", "data"):
+            nested = data.get(key)
+            if isinstance(nested, list):
+                return [item for item in nested if isinstance(item, dict)]
+        if isinstance(data.get("units"), list):
+            return [data]
+        return [data]
+    return []
+
+
+def _quick_detail_flat_rows(data: Any) -> list[dict[str, Any]]:
+    if data is None:
+        return []
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    if isinstance(data, dict):
+        for key in ("details", "units", "rows", "items", "data", "quickDetails"):
+            nested = data.get(key)
+            if isinstance(nested, list):
+                return [item for item in nested if isinstance(item, dict)]
+    return []
+
+
+def parse_quick_detail_response(
+    data: Any,
+) -> tuple[Optional[dict[str, Any]], list[dict[str, Any]]]:
+    """Extract unit info and detail rows from ListQuickDetail response."""
+    primary_unit: Optional[dict[str, Any]] = None
+    details: list[dict[str, Any]] = []
+
+    for cat in _quick_detail_categories(data):
+        units = cat.get("units")
+        if not isinstance(units, list):
+            continue
+        for unit in units:
+            if not isinstance(unit, dict):
+                continue
+            if primary_unit is None:
+                primary_unit = normalize_unit_info(unit)
+            unit_details = unit.get("details")
+            if isinstance(unit_details, list):
+                for item in unit_details:
+                    if isinstance(item, dict):
+                        details.append(normalize_detail(item))
+
+    if details:
+        return primary_unit, details
+
+    for row in _quick_detail_flat_rows(data):
+        if _pick(row, "oem", "OEM", "partNumber", "partnumber"):
+            details.append(normalize_detail(row))
+        elif _pick(row, "unitId", "unitid", "id") and _pick(row, "name"):
+            if primary_unit is None:
+                primary_unit = normalize_unit_info(row)
+
+    return primary_unit, details
 
 
 def normalize_unit_info(row: dict[str, Any]) -> dict[str, Any]:
@@ -495,7 +610,7 @@ def get_quick_groups(
         cache_key=cache_key,
         call=call,
         build_payload=lambda rows: {
-            "quick_groups": [normalize_quick_group(r) for r in rows],
+            "quick_groups": flatten_quick_groups(rows),
             "has_quickgroups": True,
         },
     )
@@ -529,14 +644,21 @@ def get_quick_group_details(
             count_toward_quota=True,
         )
 
+    def build(raw: Any) -> dict[str, Any]:
+        unit, detail_rows = parse_quick_detail_response(raw)
+        payload: dict[str, Any] = {
+            "details": detail_rows,
+            "quick_group_id": qid,
+        }
+        if unit:
+            payload["unit"] = unit
+        return payload
+
     return _execute(
         db,
         cache_key=cache_key,
         call=call,
-        build_payload=lambda rows: {
-            "details": [normalize_detail(r) for r in rows],
-            "quick_group_id": qid,
-        },
+        build_payload=build,
     )
 
 
@@ -765,4 +887,6 @@ __all__ = [
     "normalize_category",
     "normalize_unit",
     "normalize_detail",
+    "flatten_quick_groups",
+    "parse_quick_detail_response",
 ]

@@ -602,6 +602,13 @@ export default function VinCatalogPage() {
       );
       if (handleSoftFail(res)) return;
       const detailRows = Array.isArray(res?.details) ? res.details : [];
+      const unit = res?.unit || null;
+      setUnitInfo(unit || { name: group.name });
+      setSelectedUnit(
+        unit
+          ? { ...unit, name: unit.name || group.name }
+          : { name: group.name, unit_id: group.quick_group_id }
+      );
       setDetails(detailRows);
       await loadAvailability(detailRows);
     } catch (err) {

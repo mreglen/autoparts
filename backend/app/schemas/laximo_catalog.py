@@ -90,6 +90,7 @@ class QuickGroupOut(BaseModel):
     ssd: Optional[str] = None
     link: bool = False
     parent_id: Optional[str] = None
+    synonyms: Optional[str] = None
 
 
 class QuickGroupsResponse(CatalogSoftBase):
@@ -99,6 +100,7 @@ class QuickGroupsResponse(CatalogSoftBase):
 
 class QuickGroupDetailsResponse(CatalogSoftBase):
     quick_group_id: Optional[str] = None
+    unit: Optional[UnitInfoOut] = None
     details: list[DetailOut] = Field(default_factory=list)
 
 

@@ -14,12 +14,15 @@ from app.services.laximo.unit_tree import (
     PUBLIC_SESSION_EXPIRED,
     PUBLIC_SESSION_MESSAGE,
     clear_unit_tree_cache,
+    flatten_quick_groups,
     get_categories,
     get_features,
+    get_quick_group_details,
     get_unit_with_details,
     get_units,
     normalize_category,
     normalize_detail,
+    parse_quick_detail_response,
 )
 
 
@@ -71,6 +74,74 @@ class UnitTreeNormalizeTests(unittest.TestCase):
         self.assertEqual(out["name"], "Air filter")
         self.assertEqual(out["code_on_image"], "12")
         self.assertEqual(out["filter"], {"x": 1})
+
+    def test_flatten_quick_groups_nested_tree(self):
+        raw = [
+            {
+                "quickGroupId": 0,
+                "name": "Passenger Cars",
+                "link": False,
+                "children": [
+                    {
+                        "quickGroupId": 1,
+                        "name": "Service parts",
+                        "link": False,
+                        "children": [
+                            {
+                                "quickGroupId": 2,
+                                "name": "Oil Filter",
+                                "link": True,
+                                "children": [],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+        flat = flatten_quick_groups(raw)
+        self.assertEqual(len(flat), 3)
+        self.assertEqual(flat[0]["quick_group_id"], "0")
+        self.assertIsNone(flat[0]["parent_id"])
+        self.assertEqual(flat[1]["quick_group_id"], "1")
+        self.assertEqual(flat[1]["parent_id"], "0")
+        self.assertEqual(flat[2]["quick_group_id"], "2")
+        self.assertEqual(flat[2]["parent_id"], "1")
+        self.assertTrue(flat[2]["link"])
+
+    def test_parse_quick_detail_response_nested_units(self):
+        raw = [
+            {
+                "categoryId": "1",
+                "name": "Engine",
+                "units": [
+                    {
+                        "unitId": "3252309",
+                        "name": "oil filter with flange",
+                        "code": "115-056",
+                        "imageUrl": "https://img.laximo.ru/AU1587/%size%/788.gif",
+                        "details": [
+                            {
+                                "oem": "059115389AD",
+                                "name": "oil filter with flange",
+                                "codeOnImage": "1",
+                            },
+                            {
+                                "oem": "059198405B",
+                                "name": "filter element",
+                                "codeOnImage": "12",
+                                "match": True,
+                            },
+                        ],
+                    }
+                ],
+            }
+        ]
+        unit, details = parse_quick_detail_response(raw)
+        self.assertEqual(unit["unit_id"], "3252309")
+        self.assertIn("250", unit["image_url"])
+        self.assertEqual(len(details), 2)
+        self.assertEqual(details[0]["oem"], "059115389AD")
+        self.assertTrue(details[1]["match"])
 
 
 class UnitTreeGateTests(unittest.TestCase):
@@ -209,6 +280,41 @@ class UnitTreeGateTests(unittest.TestCase):
             no = get_features(db, "MB")
         self.assertTrue(no.ok)
         self.assertFalse(no.payload["has_quickgroups"])
+
+    def test_quick_group_details_parses_nested_response(self):
+        db = MagicMock()
+        raw = [
+            {
+                "categoryId": "10",
+                "units": [
+                    {
+                        "unitId": "u1",
+                        "name": "Filter unit",
+                        "imageUrl": "http://x/%size%/a.png",
+                        "details": [{"oem": "OEM1", "name": "Part A", "match": True}],
+                    }
+                ],
+            }
+        ]
+        with patch(
+            "app.services.laximo.unit_tree.laximo_cat_ready",
+            return_value=True,
+        ), patch(
+            "app.services.laximo.unit_tree.cat_client.list_quick_detail",
+            return_value=raw,
+        ) as mock_qd:
+            result = get_quick_group_details(
+                db,
+                catalog="VW2016",
+                vehicle_id="1",
+                ssd="ssd-token",
+                quick_group_id="2",
+            )
+            mock_qd.assert_called_once()
+            self.assertTrue(mock_qd.call_args.kwargs.get("all_details"))
+        self.assertTrue(result.ok)
+        self.assertEqual(result.payload["details"][0]["oem"], "OEM1")
+        self.assertEqual(result.payload["unit"]["unit_id"], "u1")
 
 
 if __name__ == "__main__":
