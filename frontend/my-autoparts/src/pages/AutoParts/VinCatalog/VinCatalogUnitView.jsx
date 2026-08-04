@@ -196,6 +196,30 @@ function SchemaImage({
   );
 }
 
+/** Scroll table row into the list panel only when it is outside the visible area. */
+function scrollRowIntoPanel(rowEl, panelEl) {
+  if (!rowEl || !panelEl) return;
+  const panelRect = panelEl.getBoundingClientRect();
+  const rowRect = rowEl.getBoundingClientRect();
+  const sticky = panelEl.querySelector('thead');
+  const stickyH = sticky ? sticky.getBoundingClientRect().height : 0;
+  const topEdge = panelRect.top + stickyH;
+  const bottomEdge = panelRect.bottom;
+  const pad = 4;
+
+  if (rowRect.top >= topEdge + pad && rowRect.bottom <= bottomEdge - pad) {
+    return;
+  }
+
+  const deltaTop = rowRect.top - topEdge - pad;
+  const deltaBottom = rowRect.bottom - (bottomEdge - pad);
+  if (deltaTop < 0) {
+    panelEl.scrollTop += deltaTop;
+  } else if (deltaBottom > 0) {
+    panelEl.scrollTop += deltaBottom;
+  }
+}
+
 export default function VinCatalogUnitView({
   title,
   imageUrl,
@@ -210,6 +234,7 @@ export default function VinCatalogUnitView({
 }) {
   const [hoverCode, setHoverCode] = useState(null);
   const rowRefs = useRef({});
+  const listPanelRef = useRef(null);
 
   const detailsList = details || [];
 
@@ -232,11 +257,20 @@ export default function VinCatalogUnitView({
     [onHoverRowKey]
   );
 
+  const ensureRowVisible = useCallback((rowKey) => {
+    if (!rowKey) return;
+    const el = rowRefs.current[rowKey];
+    const panel = listPanelRef.current;
+    if (!el || !panel) return;
+    scrollRowIntoPanel(el, panel);
+  }, []);
+
   const onSelectCode = useCallback(
     (code) => {
       const rows = codeToRows.get(normalizeCode(code)) || [];
       const first = rows.find((r) => (r.detail?.oem || '').trim())?.detail || rows[0]?.detail;
       if (!first) return;
+      if (rows[0]?.key) ensureRowVisible(rows[0].key);
       if (first.filter && onDetailFilter) {
         onDetailFilter(first);
         return;
@@ -244,7 +278,7 @@ export default function VinCatalogUnitView({
       if (!(first.oem || '').trim()) return;
       onSelectDetail?.(first);
     },
-    [codeToRows, onDetailFilter, onSelectDetail]
+    [codeToRows, ensureRowVisible, onDetailFilter, onSelectDetail]
   );
 
   return (
@@ -262,17 +296,18 @@ export default function VinCatalogUnitView({
                 return;
               }
               const rows = codeToRows.get(code) || [];
-              setHover(code, rows[0]?.key || null);
-              if (rows[0]?.key) {
-                const el = rowRefs.current[rows[0].key];
-                if (el?.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-              }
+              const rowKey = rows[0]?.key || null;
+              setHover(code, rowKey);
+              ensureRowVisible(rowKey);
             }}
             onSelectCode={onSelectCode}
           />
         ) : null}
 
-        <div className="min-w-0 overflow-x-auto lg:max-h-[min(70vh,640px)] lg:overflow-y-auto">
+        <div
+          ref={listPanelRef}
+          className="min-w-0 overflow-x-auto lg:max-h-[min(70vh,640px)] lg:overflow-y-auto"
+        >
           {title ? (
             <h3 className="mb-2 text-sm font-semibold text-gray-900">{title}</h3>
           ) : null}
