@@ -138,7 +138,7 @@ class UnitTreeNormalizeTests(unittest.TestCase):
         ]
         unit, details = parse_quick_detail_response(raw)
         self.assertEqual(unit["unit_id"], "3252309")
-        self.assertIn("250", unit["image_url"])
+        self.assertIn("source", unit["image_url"])
         self.assertEqual(len(details), 2)
         self.assertEqual(details[0]["oem"], "059115389AD")
         self.assertTrue(details[1]["match"])
@@ -255,7 +255,7 @@ class UnitTreeGateTests(unittest.TestCase):
             self.assertTrue(mock_det.call_args.kwargs.get("count_toward_quota"))
         self.assertTrue(details.ok)
         self.assertEqual(details.payload["details"][0]["oem"], "OEM1")
-        self.assertIn("250", details.payload["unit"]["image_url"])
+        self.assertIn("source", details.payload["unit"]["image_url"])
 
     def test_features_with_and_without_quickgroups(self):
         db = MagicMock()

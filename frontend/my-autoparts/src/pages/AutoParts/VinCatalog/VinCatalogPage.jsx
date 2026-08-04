@@ -742,21 +742,25 @@ export default function VinCatalogPage() {
   }, []);
 
   return (
-    <div className={`mx-auto px-4 py-8 ${step === 'browse' ? 'max-w-7xl' : 'max-w-5xl'}`}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Каталог по VIN</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Узлы и OEM-номера. Наличие новых и б/у — отдельно по каждой детали.
-          </p>
+    <div className={`mx-auto px-3 py-6 sm:px-4 sm:py-8 ${step === 'browse' ? 'max-w-7xl' : 'max-w-4xl'}`}>
+      {step !== 'browse' ? (
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Каталог по VIN</h1>
+          <Link to={fallbackSearchPath} className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+            Обычный поиск
+          </Link>
         </div>
-        <Link to={fallbackSearchPath} className="text-sm font-medium text-indigo-600 hover:underline">
-          Обычный поиск
-        </Link>
-      </div>
+      ) : (
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h1 className="text-lg font-bold text-gray-900 sm:text-xl">Каталог по VIN</h1>
+          <Link to={fallbackSearchPath} className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+            Обычный поиск
+          </Link>
+        </div>
+      )}
 
       {notice && step !== 'wizard' ? (
-        <div className="mt-4">
+        <div className="mb-4">
           <SoftServiceNotice
             variant={notice}
             onRetry={
@@ -769,16 +773,16 @@ export default function VinCatalogPage() {
             <button
               type="button"
               onClick={goFallbackSearch}
-              className="mt-3 text-sm font-medium text-indigo-600 hover:underline"
+              className="mt-2 text-sm font-medium text-indigo-600 hover:text-indigo-800"
             >
-              Искать VIN как обычный запрос
+              Искать как обычный запрос
             </button>
           ) : null}
           {notice === 'not_found' && step === 'boot' ? (
             <button
               type="button"
               onClick={beginWizard}
-              className="mt-3 block text-sm font-medium text-indigo-600 hover:underline"
+              className="mt-2 block text-sm font-medium text-indigo-600 hover:text-indigo-800"
             >
               Подобрать по параметрам
             </button>
@@ -787,15 +791,15 @@ export default function VinCatalogPage() {
       ) : null}
 
       {step === 'boot' && !loading && (
-        <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <label className="block text-sm font-medium text-gray-700">VIN</label>
-          <div className="mt-1 flex flex-col gap-2 sm:flex-row">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <input
-              className={inputClass}
+              className="block w-full rounded-lg border border-gray-300 px-4 py-3 text-base shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
               value={vin}
               onChange={(e) => setVin(sanitizeVinInput(e.target.value))}
               maxLength={VIN_INPUT_MAX_LENGTH}
-              placeholder="11–17 символов"
+              placeholder="VIN автомобиля"
+              autoCapitalize="characters"
             />
             <button
               type="button"
@@ -808,31 +812,35 @@ export default function VinCatalogPage() {
                 navigate(`/autoparts/vin?vin=${encodeURIComponent(next)}`, { replace: true });
                 decodeVin(next);
               }}
-              className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+              className="shrink-0 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-medium text-white hover:bg-indigo-700"
             >
               Найти
             </button>
           </div>
           {error && !notice ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+          <button
+            type="button"
+            onClick={beginWizard}
+            className="mt-3 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+          >
+            Подобрать по параметрам
+          </button>
         </div>
       )}
 
       {loading ? <p className="mt-6 text-sm text-gray-500">Загрузка…</p> : null}
 
       {step === 'wizard' && (
-        <div className="mt-6 space-y-4">
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Подбор по параметрам — точность ниже, чем по VIN. Результат не сохраняется в гараж.
-          </div>
+        <div className="mt-2 space-y-4">
           {notice ? (
             <SoftServiceNotice
               variant={notice}
               onRetry={notice === 'unavailable' ? beginWizard : undefined}
             />
           ) : null}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+          <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 sm:p-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Каталог / марка</label>
+              <label className="block text-sm font-medium text-gray-700">Марка</label>
               <select
                 className={inputClass}
                 value={wizardCatalog}
@@ -935,20 +943,15 @@ export default function VinCatalogPage() {
       )}
 
       {step === 'pick' && (
-        <div className="mt-6 space-y-3">
-          {fromWizard ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Подбор по параметрам — точность ниже, чем по VIN.
-            </div>
-          ) : null}
-          <p className="text-sm text-gray-600">Найдено несколько автомобилей. Выберите вариант.</p>
+        <div className="mt-2 space-y-2">
+          <p className="text-sm text-gray-600">Выберите автомобиль</p>
           <ul className="space-y-2">
             {candidates.map((c, idx) => (
               <li key={`${c.vehicle_id || 'v'}-${idx}`}>
                 <button
                   type="button"
                   onClick={() => startBrowse(c, { wizard: fromWizard })}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/40"
+                  className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-left text-sm hover:border-indigo-300 hover:bg-indigo-50/40"
                 >
                   {candidateLabel(c)}
                 </button>

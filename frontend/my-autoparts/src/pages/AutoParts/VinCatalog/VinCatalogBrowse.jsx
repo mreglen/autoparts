@@ -265,37 +265,22 @@ export default function VinCatalogBrowse({
   }, [rootNodes, childrenCache]);
 
   return (
-    <div className="mt-4 space-y-4">
-      {fromWizard ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Подбор по параметрам — точность ниже, чем по VIN
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-lg font-semibold text-gray-900">{title}</h2>
-          {vin && !fromWizard ? (
-            <p className="mt-0.5 font-mono text-xs text-gray-500">{vin}</p>
-          ) : null}
-        </div>
+    <div className="mt-4 space-y-3">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="min-w-0 text-lg font-semibold text-gray-900 sm:text-xl">{title}</h2>
+        {vin && !fromWizard ? (
+          <span className="font-mono text-xs text-gray-400">{vin}</span>
+        ) : null}
+        {fromWizard ? (
+          <span className="text-xs text-amber-700">по параметрам</span>
+        ) : null}
         {inGarage === true ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-            В гараже
-          </span>
-        ) : inGarage === false ? (
-          token ? (
-            <span className="inline-flex items-center rounded-full bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600 ring-1 ring-gray-200">
-              Не в гараже
-            </span>
-          ) : (
-            <Link
-              to="/login"
-              className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100 hover:bg-indigo-100"
-            >
-              Войти
-            </Link>
-          )
+          <span className="text-xs font-medium text-emerald-700">в гараже</span>
+        ) : null}
+        {!token && inGarage === false ? (
+          <Link to="/login" className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
+            Войти
+          </Link>
         ) : null}
       </div>
 
@@ -303,15 +288,15 @@ export default function VinCatalogBrowse({
         <button
           type="button"
           onClick={() => setMobileTreeOpen((v) => !v)}
-          className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-800"
+          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800"
         >
-          {mobileTreeOpen ? 'Скрыть разделы' : 'Разделы каталога'}
+          {mobileTreeOpen ? 'Скрыть разделы' : 'Разделы'}
         </button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside
-          className={`rounded-xl border border-gray-200 bg-white ${
+          className={`rounded-lg border border-gray-200 bg-white ${
             mobileTreeOpen ? 'block' : 'hidden lg:block'
           }`}
         >
@@ -333,7 +318,7 @@ export default function VinCatalogBrowse({
           />
         </aside>
 
-        <section className="min-w-0 rounded-xl border border-gray-200 bg-white p-4">
+        <section className="min-w-0 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
           {loading || filterLoading ? (
             <p className="text-sm text-gray-500">Загрузка…</p>
           ) : null}
@@ -341,7 +326,7 @@ export default function VinCatalogBrowse({
 
           {filterStep ? (
             <div className="mb-4 space-y-3 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
-              <p className="text-sm font-medium text-gray-900">Уточните комплектацию</p>
+              <p className="text-sm font-medium text-gray-900">Комплектация</p>
               {filterStep.conditions.map((cond, idx) => {
                 const isInput = cond.type === 'input';
                 const values = Array.isArray(cond.values) ? cond.values : [];

@@ -148,6 +148,31 @@ def _boolish(value: Any) -> bool:
     return str(value).strip().lower() in ("1", "true", "yes", "y")
 
 
+def resolve_laximo_image_url(url: Optional[str], *, size: str = "source") -> Optional[str]:
+    """Replace Laximo %size% placeholder. Prefer 'source' for full quality."""
+    text = _str_or_none(url)
+    if not text:
+        return None
+    if "%size%" in text:
+        return text.replace("%size%", size or "source")
+    return text
+
+
+def _pick_unit_image(row: dict[str, Any]) -> Optional[str]:
+    return resolve_laximo_image_url(
+        _str_or_none(
+            _pick(
+                row,
+                "largeImageUrl",
+                "largeimageurl",
+                "imageUrl",
+                "imageurl",
+                "image",
+            )
+        )
+    )
+
+
 def normalize_category(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "category_id": _str_or_none(_pick(row, "categoryId", "categoryid", "id")),
@@ -171,9 +196,7 @@ def normalize_unit(row: dict[str, Any]) -> dict[str, Any]:
         "code": _str_or_none(_pick(row, "code")),
         "name": _str_or_none(_pick(row, "name")),
         "ssd": _str_or_none(_pick(row, "ssd")),
-        "image_url": _str_or_none(
-            _pick(row, "imageUrl", "imageurl", "largeImageUrl", "largeimageurl")
-        ),
+        "image_url": _pick_unit_image(row),
         "filter": filter_text,
     }
 
@@ -339,11 +362,6 @@ def parse_quick_detail_response(
 
 
 def normalize_unit_info(row: dict[str, Any]) -> dict[str, Any]:
-    image = _str_or_none(
-        _pick(row, "imageUrl", "imageurl", "largeImageUrl", "largeimageurl", "image")
-    )
-    if image and "%size%" in image:
-        image = image.replace("%size%", "250")
     filter_raw = _pick(row, "filter")
     filter_text = None
     if filter_raw is not None and filter_raw is not False:
@@ -353,7 +371,7 @@ def normalize_unit_info(row: dict[str, Any]) -> dict[str, Any]:
         "code": _str_or_none(_pick(row, "code")),
         "name": _str_or_none(_pick(row, "name")),
         "ssd": _str_or_none(_pick(row, "ssd")),
-        "image_url": image,
+        "image_url": _pick_unit_image(row),
         "filter": filter_text,
     }
 
@@ -887,6 +905,7 @@ __all__ = [
     "normalize_category",
     "normalize_unit",
     "normalize_detail",
+    "resolve_laximo_image_url",
     "flatten_quick_groups",
     "parse_quick_detail_response",
 ]

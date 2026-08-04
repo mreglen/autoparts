@@ -26,7 +26,7 @@ export default function VinCatalogTree({
           className={`flex items-center gap-0.5 rounded-md ${
             isSelected ? 'bg-indigo-50 text-indigo-900' : 'text-gray-800 hover:bg-gray-50'
           }`}
-          style={{ paddingLeft: `${8 + depth * 12}px` }}
+          style={{ paddingLeft: `${6 + depth * 12}px` }}
         >
           {canExpand ? (
             <button
@@ -72,7 +72,7 @@ export default function VinCatalogTree({
   };
 
   return (
-    <div className="flex max-h-[70vh] flex-col lg:max-h-[calc(100vh-12rem)]">
+    <div className="flex max-h-[70vh] flex-col lg:max-h-[calc(100vh-10rem)]">
       {hasFulltext ? (
         <div className="border-b border-gray-100 p-3">
           <div className="flex gap-2">
@@ -84,13 +84,13 @@ export default function VinCatalogTree({
                 if (e.key === 'Enter') onRunSearch();
               }}
               placeholder="Поиск детали"
-              className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
             <button
               type="button"
               disabled={searchLoading}
               onClick={onRunSearch}
-              className="rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+              className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
             >
               Найти
             </button>
@@ -99,9 +99,9 @@ export default function VinCatalogTree({
             <button
               type="button"
               onClick={onClearSearch}
-              className="mt-1.5 text-xs text-indigo-600 hover:underline"
+              className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-800"
             >
-              К каталогу
+              ← К каталогу
             </button>
           ) : null}
         </div>
@@ -112,8 +112,10 @@ export default function VinCatalogTree({
           <button
             type="button"
             onClick={() => onSwitchMode('quick')}
-            className={`rounded-md px-2 py-1 text-xs font-medium ${
-              mode === 'quick' ? 'bg-indigo-100 text-indigo-800' : 'text-gray-600 hover:bg-gray-50'
+            className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+              mode === 'quick'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             Группы
@@ -121,8 +123,10 @@ export default function VinCatalogTree({
           <button
             type="button"
             onClick={() => onSwitchMode('oem')}
-            className={`rounded-md px-2 py-1 text-xs font-medium ${
-              mode === 'oem' ? 'bg-indigo-100 text-indigo-800' : 'text-gray-600 hover:bg-gray-50'
+            className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+              mode === 'oem'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
             OEM

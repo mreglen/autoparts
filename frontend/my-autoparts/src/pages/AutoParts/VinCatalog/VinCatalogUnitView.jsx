@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 function normalizeOemKey(oem) {
   return String(oem || '')
     .replace(/[^A-Za-z0-9А-Яа-яЁё]/g, '')
@@ -22,7 +24,58 @@ function AvailCell({ row }) {
   if (rossko > 0 || row.rossko?.available) parts.push(rossko > 0 ? `нов. ${rossko}` : 'нов.');
   if (used > 0 || row.used?.available) parts.push(used > 0 ? `б/у ${used}` : 'б/у');
   if (!parts.length) return <span className="text-gray-400">нет</span>;
-  return <span className="text-xs text-gray-600">{parts.join(' · ')}</span>;
+  return <span className="text-xs font-medium text-emerald-700">{parts.join(' · ')}</span>;
+}
+
+function SchemaImage({ src, alt }) {
+  const [zoomed, setZoomed] = useState(false);
+  if (!src) {
+    return (
+      <div className="flex min-h-[160px] items-center justify-center rounded-lg bg-gray-50 text-sm text-gray-400">
+        Нет схемы
+      </div>
+    );
+  }
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setZoomed(true)}
+        className="group relative w-full overflow-hidden rounded-lg bg-white ring-1 ring-gray-200"
+        title="Увеличить"
+      >
+        <img
+          src={src}
+          alt={alt || ''}
+          className="mx-auto max-h-[480px] w-full object-contain p-2 transition group-hover:opacity-95"
+        />
+        <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-black/50 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition group-hover:opacity-100">
+          Увеличить
+        </span>
+      </button>
+      {zoomed ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setZoomed(false)}
+          role="presentation"
+        >
+          <img
+            src={src}
+            alt={alt || ''}
+            className="max-h-[92vh] max-w-[96vw] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setZoomed(false)}
+            className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-sm font-medium text-gray-800 shadow"
+          >
+            Закрыть
+          </button>
+        </div>
+      ) : null}
+    </>
+  );
 }
 
 export default function VinCatalogUnitView({
@@ -37,35 +90,23 @@ export default function VinCatalogUnitView({
   onDetailFilter,
 }) {
   return (
-    <div className="space-y-4">
-      <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+    <div className="space-y-3">
+      {title ? <h3 className="text-base font-semibold text-gray-900">{title}</h3> : null}
 
-      <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
-        {imageUrl ? (
-          <div className="overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
-            <img
-              src={imageUrl}
-              alt=""
-              className="mx-auto max-h-[560px] w-full object-contain"
-            />
-          </div>
-        ) : (
-          <div className="flex min-h-[120px] items-center justify-center rounded-lg border border-dashed border-gray-200 text-sm text-gray-400">
-            Нет схемы
-          </div>
-        )}
+      <div className={`grid gap-4 ${imageUrl ? 'lg:grid-cols-[1.2fr_1fr]' : ''}`}>
+        {imageUrl ? <SchemaImage src={imageUrl} alt={title} /> : null}
 
         <div className="min-w-0 overflow-x-auto">
           {searchEmpty ? (
-            <p className="text-sm text-gray-500">Ничего не найдено</p>
+            <p className="py-8 text-center text-sm text-gray-500">Ничего не найдено</p>
           ) : !(details || []).length ? (
-            <p className="text-sm text-gray-500">Нет деталей</p>
+            <p className="py-8 text-center text-sm text-gray-500">Нет деталей</p>
           ) : (
             <table className="min-w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
-                  <th className="py-2 pr-2 font-medium">Название</th>
-                  <th className="py-2 pr-2 font-medium">Артикул</th>
+                <tr className="border-b border-gray-200 text-xs text-gray-500">
+                  <th className="py-2 pr-2 font-medium">Деталь</th>
+                  <th className="py-2 pr-2 font-medium">OEM</th>
                   <th className="py-2 font-medium">Наличие</th>
                 </tr>
               </thead>
@@ -74,11 +115,12 @@ export default function VinCatalogUnitView({
                   const key = detailRowKey(d, idx);
                   const isHover = hoverRowKey && hoverRowKey === key;
                   const needsFilter = Boolean(d.filter);
+                  const matched = d.match === true || d.match === 't' || d.match === 'true';
                   return (
                     <tr
                       key={key}
                       className={`cursor-pointer border-b border-gray-50 transition ${
-                        isHover ? 'bg-indigo-50' : 'hover:bg-gray-50'
+                        isHover ? 'bg-indigo-50' : matched ? 'bg-indigo-50/40 hover:bg-indigo-50' : 'hover:bg-gray-50'
                       }`}
                       onMouseEnter={() => onHoverRowKey?.(key)}
                       onMouseLeave={() => onHoverRowKey?.(null)}
@@ -93,7 +135,7 @@ export default function VinCatalogUnitView({
                       <td className="py-2.5 pr-2 text-gray-900">
                         {d.name || '—'}
                         {needsFilter ? (
-                          <span className="ml-1 text-xs text-amber-600">фильтр</span>
+                          <span className="ml-1 text-xs text-amber-600">?</span>
                         ) : null}
                       </td>
                       <td className="py-2.5 pr-2 font-mono text-xs text-indigo-700">{d.oem || '—'}</td>
