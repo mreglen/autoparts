@@ -1,4 +1,5 @@
 import { apiAxiosUnauth } from '../../../utils/apiClient';
+import { isAllowedPopularQuery } from '../../../utils/queryModeration';
 import { QUICK_SEARCH_CHIPS } from './rosskoHelpers';
 
 const FALLBACK_LIMIT = 8;
@@ -8,7 +9,7 @@ function normalizeQueries(items) {
   const normalized = [];
   (items || []).forEach((item) => {
     const value = String(item || '').replace(/\s+/g, ' ').trim();
-    if (!value) return;
+    if (!value || !isAllowedPopularQuery(value)) return;
     const key = value.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);

@@ -28,16 +28,28 @@ function buildQuickTree(groups) {
         children: kids,
       };
     });
-  const roots = walk('');
-  if (roots.length) return roots;
-  return list.map((g) => ({
-    id: `qg-${g.quick_group_id}`,
-    name: g.name || 'Группа',
-    kind: 'quickgroup',
-    raw: g,
-    hasChildren: g.link === false,
-    children: [],
-  }));
+  let roots = walk('');
+  if (!roots.length) {
+    roots = list.map((g) => ({
+      id: `qg-${g.quick_group_id}`,
+      name: g.name || 'Группа',
+      kind: 'quickgroup',
+      raw: g,
+      hasChildren: g.link === false,
+      children: [],
+    }));
+  }
+
+  // Skip Laximo wrapper folders like «Легковые автомобили (NEW)».
+  while (
+    roots.length === 1
+    && roots[0].children?.length
+    && roots[0].raw?.link === false
+  ) {
+    roots = roots[0].children;
+  }
+
+  return roots;
 }
 
 function categoriesToNodes(cats) {

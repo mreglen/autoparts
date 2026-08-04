@@ -441,6 +441,18 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
                     path="/autoparts/new?q=xw8zzz7pzdg002696",
                     view_id="view-pop-06",
                 ),
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id="visitor-g",
+                    path="/autoparts/new?q=%D1%85%D1%83%D0%B9",
+                    view_id="view-pop-07",
+                ),
+                AnalyticsEventIn(
+                    type="page_view",
+                    visitor_id="visitor-h",
+                    path="/autoparts/new?q=%D0%B1%D0%BB%D1%8F%D1%82%D1%8C",
+                    view_id="view-pop-08",
+                ),
             ],
             user_id=None,
         )
@@ -451,6 +463,8 @@ class SiteAnalyticsServiceTests(unittest.TestCase):
         self.assertIn("масляный фильтр", items)
         self.assertNotIn("запчасти", [item.lower() for item in items])
         self.assertNotIn("XW8ZZZ7PZDG002696", [item.upper() for item in items])
+        self.assertFalse(any("хуй" in item.casefold() for item in items))
+        self.assertFalse(any("бля" in item.casefold() for item in items))
         self.assertIsNotNone(generated_at)
 
 
