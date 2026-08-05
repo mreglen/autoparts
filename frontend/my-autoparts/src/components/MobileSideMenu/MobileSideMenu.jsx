@@ -15,6 +15,9 @@ export default function MobileSideMenu({
     onTabChange,
     badgeCounts = {},
     guestContent = null,
+    showAdminMenuSwitch = false,
+    adminMenuMode,
+    onAdminMenuModeChange,
 }) {
     const dispatch = useDispatch();
     const navigate = useNavigate();
@@ -140,6 +143,9 @@ export default function MobileSideMenu({
                             activeTab={activeTab}
                             onTabChange={onTabChange}
                             badgeCounts={badgeCounts}
+                            showAdminMenuSwitch={showAdminMenuSwitch}
+                            adminMenuMode={adminMenuMode}
+                            onAdminMenuModeChange={onAdminMenuModeChange}
                         />
                     )}
                     <PublicSiteMenuLinks variant="drawer" onNavigate={requestClose} />

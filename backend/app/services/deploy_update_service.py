@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import fcntl
 import json
 import logging
 import os
@@ -12,6 +11,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None  # Windows — deploy update runs only on Linux server
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +53,9 @@ def _write_state(payload: dict[str, Any]) -> None:
 
 
 def is_update_running() -> bool:
+    if os.name == "nt" or fcntl is None:
+        return False
+
     if UPDATE_BIN.is_file():
         try:
             proc = subprocess.run(

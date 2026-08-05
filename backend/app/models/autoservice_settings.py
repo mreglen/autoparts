@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
@@ -16,6 +16,8 @@ class AutoserviceSettings(Base):
         index=True,
     )
     lifts_count = Column(Integer, nullable=False, default=0)
+    public_name = Column(String(160), nullable=True)
+    public_description = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime,

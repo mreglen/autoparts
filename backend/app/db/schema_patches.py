@@ -3373,6 +3373,91 @@ def ensure_autoservice_settings_table() -> None:
     logger.info("Applied autoservice_settings table patch")
 
 
+def ensure_autoservice_settings_public_columns() -> None:
+    """Add public_name/public_description to autoservice_settings for the welcome page."""
+    inspector = inspect(engine)
+    if "autoservice_settings" not in inspector.get_table_names():
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("autoservice_settings")}
+    statements = []
+    if "public_name" not in columns:
+        statements.append(
+            "ALTER TABLE autoservice_settings ADD COLUMN public_name VARCHAR(160)"
+        )
+    if "public_description" not in columns:
+        statements.append(
+            "ALTER TABLE autoservice_settings ADD COLUMN public_description TEXT"
+        )
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+    logger.info("Applied autoservice_settings public column patches: %s", statements)
+
+
+def ensure_repair_bookings_table() -> None:
+    """Create repair_bookings for client repair slot requests."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "repair_bookings" in tables:
+        return
+    if "autoservice_clients" not in tables:
+        return
+
+    if engine.dialect.name == "postgresql":
+        ddl = """
+        CREATE TABLE repair_bookings (
+            id SERIAL PRIMARY KEY,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            client_id INTEGER REFERENCES autoservice_clients(id),
+            name VARCHAR(120) NOT NULL,
+            phone VARCHAR(32) NOT NULL,
+            preferred_date DATE NOT NULL,
+            comment TEXT,
+            status VARCHAR(32) NOT NULL DEFAULT 'new',
+            source VARCHAR(32) NOT NULL DEFAULT 'client',
+            created_by_user_id INTEGER REFERENCES users(id),
+            staff_notes TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    else:
+        ddl = """
+        CREATE TABLE repair_bookings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id VARCHAR(10) NOT NULL REFERENCES organizations(id),
+            client_id INTEGER REFERENCES autoservice_clients(id),
+            name VARCHAR(120) NOT NULL,
+            phone VARCHAR(32) NOT NULL,
+            preferred_date DATE NOT NULL,
+            comment TEXT,
+            status VARCHAR(32) NOT NULL DEFAULT 'new',
+            source VARCHAR(32) NOT NULL DEFAULT 'client',
+            created_by_user_id INTEGER REFERENCES users(id),
+            staff_notes TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+
+    with engine.begin() as conn:
+        conn.execute(text(ddl))
+        conn.execute(
+            text(
+                "CREATE INDEX ix_repair_bookings_preferred_date "
+                "ON repair_bookings (preferred_date)"
+            )
+        )
+
+    logger.info("Applied repair_bookings table patch")
+
+
 def ensure_repair_orders_tables() -> None:
     """Create repair_orders and repair_order_assignees for autoservice repair journal."""
     inspector = inspect(engine)

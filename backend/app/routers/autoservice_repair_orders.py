@@ -585,6 +585,29 @@ def list_my_repair_orders(
     return [_to_client_view(row) for row in rows]
 
 
+@router.get(
+    "/autoservice/repair-orders/me/{order_id}",
+    response_model=RepairOrderClientView,
+)
+def get_my_repair_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    client = require_my_active_autoservice_client(db, current_user)
+    row = (
+        _order_query(db)
+        .filter(RepairOrder.id == order_id, RepairOrder.client_id == client.id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ремонт не найден",
+        )
+    return _to_client_view(row)
+
+
 @router.get("/autoservice/repair-orders", response_model=list[RepairOrderStaffView])
 def list_repair_orders(
     scope: str = Query("active"),

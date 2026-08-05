@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useAuthReady } from '../../hooks/useAuthReady';
 import AuthLoadingScreen from '../../components/AuthLoadingScreen/AuthLoadingScreen';
 import SoftServiceNotice from '../../components/SoftServiceNotice/SoftServiceNotice';
-import { AUTOSERVICE_PUBLIC_NAME } from '../../utils/autoserviceConstants';
-import { BECOME_CLIENT_CONFIRM } from '../../utils/autoservicePublic';
 import { apiRequest } from '../../utils/apiClient';
+import { selectIsAutoserviceClient } from '../../redux/slices/AutoserviceClientSlice';
 import {
   candidateLabel,
   mapCandidateToGarageCreatePayload,
@@ -195,13 +194,10 @@ function VehicleForm({ initial, onSubmit, onCancel, saving, submitLabel, notice,
 }
 
 export default function GaragePage() {
+  const navigate = useNavigate();
   const { isReady, isAuthenticated } = useAuthReady();
-  const { token } = useSelector((state) => state.auth);
-
-  const [meLoading, setMeLoading] = useState(true);
-  const [isClient, setIsClient] = useState(false);
-  const [becomeSaving, setBecomeSaving] = useState(false);
-  const [becomeError, setBecomeError] = useState(null);
+  const isClient = useSelector(selectIsAutoserviceClient);
+  const clientStatus = useSelector((state) => state.autoserviceClient.status);
 
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(false);
@@ -230,23 +226,6 @@ export default function GaragePage() {
   const [editSaving, setEditSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
-  const loadMe = useCallback(async () => {
-    if (!token) {
-      setIsClient(false);
-      setMeLoading(false);
-      return;
-    }
-    setMeLoading(true);
-    try {
-      const data = await apiRequest('/autoservice/clients/me');
-      setIsClient(data?.is_client === true);
-    } catch {
-      setIsClient(false);
-    } finally {
-      setMeLoading(false);
-    }
-  }, [token]);
-
   const loadVehicles = useCallback(async () => {
     setVehiclesLoading(true);
     setPageError(null);
@@ -262,32 +241,16 @@ export default function GaragePage() {
   }, []);
 
   useEffect(() => {
-    if (isReady && isAuthenticated) {
-      loadMe();
+    if (isReady && isAuthenticated && clientStatus === 'succeeded' && !isClient) {
+      navigate('/autoservice/welcome', { replace: true });
     }
-  }, [isReady, isAuthenticated, loadMe]);
+  }, [isReady, isAuthenticated, clientStatus, isClient, navigate]);
 
   useEffect(() => {
     if (isReady && isAuthenticated && isClient) {
       loadVehicles();
     }
   }, [isReady, isAuthenticated, isClient, loadVehicles]);
-
-  const handleBecomeClient = async () => {
-    setBecomeError(null);
-    if (!window.confirm(BECOME_CLIENT_CONFIRM(AUTOSERVICE_PUBLIC_NAME))) {
-      return;
-    }
-    setBecomeSaving(true);
-    try {
-      await apiRequest('/autoservice/clients/me', { method: 'POST' });
-      setIsClient(true);
-    } catch (err) {
-      setBecomeError(err?.message || 'Не удалось стать клиентом');
-    } finally {
-      setBecomeSaving(false);
-    }
-  };
 
   const openAdd = () => {
     setAddStep('vin');
@@ -504,7 +467,7 @@ export default function GaragePage() {
 
   if (!isReady) return <AuthLoadingScreen />;
 
-  if (meLoading) {
+  if (clientStatus === 'loading' || clientStatus === 'idle') {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10 text-sm text-gray-500">
         Загрузка…
@@ -512,53 +475,25 @@ export default function GaragePage() {
     );
   }
 
-  if (!isClient) {
-    return (
-      <div className="mx-auto max-w-xl px-4 py-10">
-        <h1 className="text-2xl font-bold text-gray-900">Гараж</h1>
-        <p className="mt-4 text-gray-600">
-          Гараж доступен клиентам автосервиса. Станьте клиентом, чтобы хранить свои автомобили.
-        </p>
-        <button
-          type="button"
-          onClick={handleBecomeClient}
-          disabled={becomeSaving}
-          className="mt-6 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
-        >
-          {becomeSaving ? 'Сохранение…' : 'Стать клиентом автосервиса'}
-        </button>
-        {becomeError && (
-          <p className="mt-3 text-sm text-red-600" role="alert">
-            {becomeError}
-          </p>
-        )}
-        <p className="mt-6 text-sm text-gray-500">
-          Или перейдите на{' '}
-          <Link to="/autoservice" className="text-indigo-600 hover:underline">
-            страницу автосервиса
-          </Link>
-          .
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mx-auto max-w-4xl px-4 py-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Гараж</h1>
-          <p className="mt-1 text-sm text-gray-500">Ваши автомобили</p>
-          <p className="mt-2 text-sm">
-            <Link to="/garage/orders" className="text-indigo-600 hover:underline">
-              Мои записи
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Мои авто</h1>
+          <p className="mt-1 text-sm">
+            <Link to="/autoservice/repair-booking" className="text-indigo-600 hover:underline">
+              Запись на ремонт
+            </Link>
+            <span className="text-gray-300"> · </span>
+            <Link to="/garage/repairs" className="text-indigo-600 hover:underline">
+              История ремонтов
             </Link>
           </p>
         </div>
         <button
           type="button"
           onClick={openAdd}
-          className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+          className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
         >
           Добавить авто
         </button>

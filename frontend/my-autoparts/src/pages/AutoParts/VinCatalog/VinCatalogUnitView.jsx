@@ -103,14 +103,24 @@ function SchemaImage({
         const width = Math.abs(x2 - x1);
         const height = Math.abs(y2 - y1);
         if (width < 1 || height < 1) return null;
+        // Expand tiny hotspots from their center so the number stays in the middle.
+        // Slight up/left nudge — Laximo boxes sit a bit low/right of the digit.
+        const rawW = width * layout.scale;
+        const rawH = height * layout.scale;
+        const w = Math.max(rawW, 14);
+        const h = Math.max(rawH, 14);
+        const cx = layout.left + (left + width / 2) * layout.scale;
+        const cy = layout.top + (top + height / 2) * layout.scale;
+        const nudgeX = -1.5;
+        const nudgeY = -2.5;
         return {
           key: `${code}-${idx}`,
           code,
           style: {
-            left: layout.left + left * layout.scale,
-            top: layout.top + top * layout.scale,
-            width: Math.max(width * layout.scale, 12),
-            height: Math.max(height * layout.scale, 12),
+            left: cx - w / 2 + nudgeX,
+            top: cy - h / 2 + nudgeY,
+            width: w,
+            height: h,
           },
         };
       })

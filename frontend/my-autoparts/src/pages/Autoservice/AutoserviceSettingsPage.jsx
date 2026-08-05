@@ -6,9 +6,14 @@ import { apiRequest } from '../../utils/apiClient';
 const inputClass =
   'mt-1 block w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
 
+const wideInputClass =
+  'mt-1 block w-full max-w-xl rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
+
 export default function AutoserviceSettingsPage() {
   const { isReady, isAuthenticated, user } = useAuthReady();
   const [liftsCount, setLiftsCount] = useState(0);
+  const [publicName, setPublicName] = useState('');
+  const [publicDescription, setPublicDescription] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -20,6 +25,8 @@ export default function AutoserviceSettingsPage() {
     try {
       const data = await apiRequest('/autoservice/settings');
       setLiftsCount(typeof data?.lifts_count === 'number' ? data.lifts_count : 0);
+      setPublicName(data?.public_name || '');
+      setPublicDescription(data?.public_description || '');
     } catch (e) {
       setError(e?.message || 'Не удалось загрузить настройки');
     } finally {
@@ -45,9 +52,15 @@ export default function AutoserviceSettingsPage() {
     try {
       const data = await apiRequest('/autoservice/settings', {
         method: 'PUT',
-        body: JSON.stringify({ lifts_count: value }),
+        body: JSON.stringify({
+          lifts_count: value,
+          public_name: publicName.trim() || null,
+          public_description: publicDescription.trim() || null,
+        }),
       });
       setLiftsCount(typeof data?.lifts_count === 'number' ? data.lifts_count : value);
+      setPublicName(data?.public_name || '');
+      setPublicDescription(data?.public_description || '');
       setSavedMessage('Сохранено');
     } catch (err) {
       setError(err?.message || 'Не удалось сохранить');
@@ -79,6 +92,31 @@ export default function AutoserviceSettingsPage() {
         <p className="mt-8 text-sm text-gray-500">Загрузка…</p>
       ) : (
         <form onSubmit={handleSave} className="mt-8 space-y-6">
+          <div>
+            <label htmlFor="public_name" className="block text-sm font-medium text-gray-700">
+              Название автосервиса
+            </label>
+            <input
+              id="public_name"
+              value={publicName}
+              onChange={(ev) => setPublicName(ev.target.value)}
+              maxLength={160}
+              className={wideInputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="public_description" className="block text-sm font-medium text-gray-700">
+              Описание
+            </label>
+            <textarea
+              id="public_description"
+              rows={3}
+              value={publicDescription}
+              onChange={(ev) => setPublicDescription(ev.target.value)}
+              maxLength={2000}
+              className={wideInputClass}
+            />
+          </div>
           <div>
             <label htmlFor="lifts_count" className="block text-sm font-medium text-gray-700">
               Количество подъёмников

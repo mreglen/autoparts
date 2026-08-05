@@ -20,6 +20,7 @@ import {
   canAccessAutoserviceStaffMenu,
   canAccessAutoserviceSettings,
 } from './utils/autoservicePublic';
+import { getAdminMenuMode } from './utils/adminMenuMode';
 import { buildAutopartsRedirectSeo, PageSeoHelmet } from './utils/pageSeo';
 import useSiteAnalytics from './hooks/useSiteAnalytics';
 
@@ -97,15 +98,16 @@ const OrganizationsPage = lazy(() => import('./pages/Organizations/Organizations
 const OrganizationPublicPage = lazy(() => import('./pages/Organizations/OrganizationPublicPage'));
 const PublicUserProfilePage = lazy(() => import('./pages/PublicProfiles/PublicUserProfilePage'));
 const ReviewsPage = lazy(() => import('./pages/About/ReviewsPage'));
-const AutoservicePublicPage = lazy(() => import('./pages/Autoservice/AutoservicePublicPage'));
 const AutoserviceStaffStubPage = lazy(() => import('./pages/Autoservice/AutoserviceStaffStubPage'));
-const AutoserviceInspectionsPage = lazy(() => import('./pages/Autoservice/AutoserviceInspectionsPage'));
 const AutoserviceClientsPage = lazy(() => import('./pages/Autoservice/AutoserviceClientsPage'));
 const AutoserviceSettingsPage = lazy(() => import('./pages/Autoservice/AutoserviceSettingsPage'));
 const AutoserviceOrdersPage = lazy(() => import('./pages/Autoservice/AutoserviceOrdersPage'));
 const AutoserviceOrderFormPage = lazy(() => import('./pages/Autoservice/AutoserviceOrderFormPage'));
+const AutoserviceWelcomePage = lazy(() => import('./pages/Autoservice/AutoserviceWelcomePage'));
+const AutoserviceRepairBookingPage = lazy(() => import('./pages/Autoservice/AutoserviceRepairBookingPage'));
+const AutoservicePlannerPage = lazy(() => import('./pages/Autoservice/AutoservicePlannerPage'));
 const GaragePage = lazy(() => import('./pages/Garage/GaragePage'));
-const GarageOrdersPage = lazy(() => import('./pages/Garage/GarageOrdersPage'));
+const GarageRepairHistoryPage = lazy(() => import('./pages/Garage/GarageRepairHistoryPage'));
 const LaximoCatalogSandboxPage = lazy(() => import('./pages/Laximo/LaximoCatalogSandboxPage'));
 
 // Lazy: интеграции
@@ -218,21 +220,19 @@ function WarehouseInventoryRoute() {
   );
 }
 
-function AutoservicePublicRoute() {
+function AutoserviceEntryRedirect() {
   const showAutoservice = useShowAutoservice();
-  if (!showAutoservice) {
+  const token = useSelector((state) => state.auth.token);
+  if (!showAutoservice || !token) {
     return <Navigate to="/" replace />;
   }
-  return (
-    <LazyRoute>
-      <AutoservicePublicPage />
-    </LazyRoute>
-  );
+  return <Navigate to="/autoservice/welcome" replace />;
 }
 
-function GarageRoute({ children }) {
+function AutoserviceClientRoute({ children }) {
   const showAutoservice = useShowAutoservice();
-  if (!showAutoservice) {
+  const user = useSelector((state) => state.auth.user);
+  if (!showAutoservice && !user?.is_admin) {
     return <Navigate to="/" replace />;
   }
   return (
@@ -248,9 +248,10 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
   const showAutoservice = useShowAutoservice();
   const autoserviceOrganizationId = useAutoserviceOrganizationId();
   const user = useSelector((state) => state.auth.user);
-  const accessOptions = { showAutoservice, autoserviceOrganizationId };
+  const adminMenuMode = getAdminMenuMode();
+  const accessOptions = { showAutoservice, autoserviceOrganizationId, adminMenuMode };
 
-  if (!showAutoservice) {
+  if (!showAutoservice && !user?.is_admin) {
     return <Navigate to="/" replace />;
   }
   if (!canAccessAutoserviceStaffMenu(user, accessOptions)) {
@@ -259,10 +260,10 @@ function AutoserviceStaffRoute({ section, settingsOnly = false }) {
   if (settingsOnly && !canAccessAutoserviceSettings(user, accessOptions)) {
     return <Navigate to="/autoservice/orders" replace />;
   }
-  if (section === 'inspections') {
+  if (section === 'planner') {
     return (
       <LazyRoute>
-        <AutoserviceInspectionsPage />
+        <AutoservicePlannerPage />
       </LazyRoute>
     );
   }
@@ -383,7 +384,7 @@ function App() {
           <Route path="/delivery" element={<LazyRoute><DeliveryPage /></LazyRoute>} />
           <Route path="/payment" element={<LazyRoute><PaymentPage /></LazyRoute>} />
           <Route path="/reviews" element={<ReviewsRoute />} />
-          <Route path="/autoservice" element={<AutoservicePublicRoute />} />
+          <Route path="/autoservice" element={<AutoserviceEntryRedirect />} />
           <Route
             path="/organizations"
             element={(
@@ -601,13 +602,30 @@ function App() {
               </LazyRoute>
             )}
           />
-          <Route path="/garage" element={<GarageRoute />} />
+          <Route path="/garage" element={<AutoserviceClientRoute />} />
           <Route
-            path="/garage/orders"
+            path="/garage/repairs"
             element={(
-              <GarageRoute>
-                <GarageOrdersPage />
-              </GarageRoute>
+              <AutoserviceClientRoute>
+                <GarageRepairHistoryPage />
+              </AutoserviceClientRoute>
+            )}
+          />
+          <Route path="/garage/orders" element={<Navigate to="/garage/repairs" replace />} />
+          <Route
+            path="/autoservice/welcome"
+            element={(
+              <AutoserviceClientRoute>
+                <AutoserviceWelcomePage />
+              </AutoserviceClientRoute>
+            )}
+          />
+          <Route
+            path="/autoservice/repair-booking"
+            element={(
+              <AutoserviceClientRoute>
+                <AutoserviceRepairBookingPage />
+              </AutoserviceClientRoute>
             )}
           />
           <Route
@@ -889,7 +907,11 @@ function App() {
           />
           <Route
             path="/autoservice/inspections"
-            element={<AutoserviceStaffRoute section="inspections" />}
+            element={<Navigate to="/autoservice/planner" replace />}
+          />
+          <Route
+            path="/autoservice/planner"
+            element={<AutoserviceStaffRoute section="planner" />}
           />
           <Route
             path="/autoservice/clients"

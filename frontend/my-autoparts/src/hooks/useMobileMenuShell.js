@@ -11,6 +11,14 @@ import {
     selectShowAutoservice,
     selectAutoserviceOrganizationId,
 } from '../utils/autoservicePublic';
+import {
+    ADMIN_MENU_MODE_ADMIN,
+    ADMIN_MENU_MODE_USER,
+    getAdminMenuMode,
+    isAdminOnlyPath,
+    setAdminMenuMode as persistAdminMenuMode,
+} from '../utils/adminMenuMode';
+import { selectIsAutoserviceClient } from '../redux/slices/AutoserviceClientSlice';
 
 export function useMobileMenuShell(userOverride) {
     const location = useLocation();
@@ -19,15 +27,37 @@ export function useMobileMenuShell(userOverride) {
     const showWarehouseInventory = useSelector(selectShowWarehouseInventory);
     const showAutoservice = useSelector(selectShowAutoservice);
     const autoserviceOrganizationId = useSelector(selectAutoserviceOrganizationId);
+    const isAutoserviceClient = useSelector(selectIsAutoserviceClient);
     const user = userOverride ?? authUser;
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [adminMenuMode, setAdminMenuModeState] = useState(getAdminMenuMode);
+
+    useEffect(() => {
+        if (!user?.is_admin) return;
+        setAdminMenuModeState(getAdminMenuMode());
+    }, [user?.id, user?.is_admin]);
 
     const activeTab = getActiveTabFromPath(location.pathname, user);
     const tabs = getAvailableTabs(user, permissionCodes, {
         showWarehouseInventory,
         showAutoservice,
         autoserviceOrganizationId,
+        isAutoserviceClient,
+        adminMenuMode: user?.is_admin ? adminMenuMode : undefined,
     });
+
+    const setAdminMenuMode = useCallback(
+        (mode) => {
+            if (!user?.is_admin) return;
+            const nextMode = mode === ADMIN_MENU_MODE_ADMIN ? ADMIN_MENU_MODE_ADMIN : ADMIN_MENU_MODE_USER;
+            persistAdminMenuMode(nextMode);
+            setAdminMenuModeState(nextMode);
+            if (nextMode === ADMIN_MENU_MODE_USER && isAdminOnlyPath(location.pathname)) {
+                navigate('/dashboard', { replace: true });
+            }
+        },
+        [user?.is_admin, location.pathname, navigate],
+    );
 
     useEffect(() => {
         setIsMobileMenuOpen(false);
@@ -86,6 +116,9 @@ export function useMobileMenuShell(userOverride) {
         closeMenu,
         handleTabChange,
         guestContent,
+        adminMenuMode,
+        setAdminMenuMode,
+        showAdminMenuSwitch: Boolean(user?.is_admin),
     };
 }
 
@@ -131,13 +164,14 @@ export function getPageTitle(pathname) {
         '/admin/users': 'Пользователи',
         '/admin/rossko': 'Rossko',
         '/admin/analytics': 'Аналитика',
-        '/autoservice': 'Автосервис',
-        '/autoservice/inspections': 'Записи на тех осмотр',
+        '/autoservice/welcome': 'Автосервис',
+        '/autoservice/repair-booking': 'Запись на ремонт',
+        '/autoservice/planner': 'Планировщик',
         '/autoservice/clients': 'Клиенты автосервиса',
-        '/autoservice/orders': 'Записи',
+        '/autoservice/orders': 'Заказ-наряды',
         '/autoservice/settings': 'Настройки автосервиса',
-        '/garage': 'Гараж',
-        '/garage/orders': 'Мои записи',
+        '/garage': 'Мои авто',
+        '/garage/repairs': 'История ремонтов',
     };
 
     if (exact[pathname]) return exact[pathname];

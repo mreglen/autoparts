@@ -1,4 +1,5 @@
 import { useSelector } from 'react-redux';
+import { ADMIN_MENU_MODE_USER } from './adminMenuMode';
 
 export function selectShowAutoservice(state) {
   return state.publicInfo.showAutoservice === true;
@@ -18,25 +19,29 @@ export function useAutoserviceOrganizationId() {
 
 /**
  * Staff menu / routes for autoservice org employees.
+ * Admins bypass the org check, but only while the menu is in «Админ» mode.
  * @param {object|null} user
- * @param {{ showAutoservice?: boolean, autoserviceOrganizationId?: string|null }} options
+ * @param {{ showAutoservice?: boolean, autoserviceOrganizationId?: string|null, adminMenuMode?: string }} options
  */
 export function canAccessAutoserviceStaffMenu(user, options = {}) {
   if (!user) return false;
-  if (options.showAutoservice !== true) return false;
   const orgId = options.autoserviceOrganizationId;
-  if (!orgId || user.organization_id !== orgId) return false;
+  if (!orgId) return false;
+  if (user.is_admin) return options.adminMenuMode !== ADMIN_MENU_MODE_USER;
+  if (options.showAutoservice !== true) return false;
+  if (user.organization_id !== orgId) return false;
   return Boolean(
-    user.is_admin || user.is_director || user.is_seller || user.is_employee,
+    user.is_director || user.is_seller || user.is_employee,
   );
 }
 
 /**
- * Client-facing autoservice menu (garage / my orders) for any logged-in user
- * when the site flag is on.
+ * Client-facing autoservice menu (my cars / booking / repair history).
+ * Always uses the real user so admins keep the client flow in both menu modes.
  */
 export function canAccessAutoserviceClientMenu(user, options = {}) {
   if (!user) return false;
+  if (user.is_admin) return true;
   return options.showAutoservice === true;
 }
 

@@ -50,6 +50,9 @@ export default function MainLayout() {
         closeMenu,
         handleTabChange,
         guestContent,
+        adminMenuMode,
+        setAdminMenuMode,
+        showAdminMenuSwitch,
     } = useMobileMenuShell(user);
 
     useEffect(() => {
@@ -80,6 +83,9 @@ export default function MainLayout() {
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 guestContent={token ? null : guestContent}
+                showAdminMenuSwitch={showAdminMenuSwitch}
+                adminMenuMode={adminMenuMode}
+                onAdminMenuModeChange={setAdminMenuMode}
             />
 
             <main

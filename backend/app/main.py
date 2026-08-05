@@ -27,6 +27,8 @@ from app.db.schema_patches import (
     ensure_garage_vehicles_table,
     ensure_garage_vehicle_laximo_columns,
     ensure_autoservice_settings_table,
+    ensure_autoservice_settings_public_columns,
+    ensure_repair_bookings_table,
     ensure_repair_orders_tables,
     ensure_repair_order_lines_tables,
     ensure_repair_order_shop_parts_table,
@@ -202,6 +204,8 @@ try:
     ensure_garage_vehicles_table()
     ensure_garage_vehicle_laximo_columns()
     ensure_autoservice_settings_table()
+    ensure_autoservice_settings_public_columns()
+    ensure_repair_bookings_table()
     ensure_repair_orders_tables()
     ensure_repair_order_lines_tables()
     ensure_repair_order_shop_parts_table()

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PublicSiteMenuLinks from '../../../components/MobileSideMenu/PublicSiteMenuLinks';
+import AdminMenuModeSwitch from '../../../components/AdminMenuModeSwitch/AdminMenuModeSwitch';
 import { getPathForTab } from './profileMenuConfig';
 
 // Icon mapping for menu items
@@ -71,7 +72,28 @@ const getMenuIcon = (menuId) => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
             </svg>
         ),
-        'autoservice-inspections': (
+        'autoservice-staff': (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        ),
+        'autoservice-welcome': (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17h.01M16 17h.01M3 13l2-5a2 2 0 011.85-1.25h10.3A2 2 0 0119 8l2 5m-18 0h18v4a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H6v1a1 1 0 01-1 1H4a1 1 0 01-1-1v-4z" />
+            </svg>
+        ),
+        'autoservice-planner': (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+        ),
+        'autoservice-repair-booking': (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        ),
+        'autoservice-repair-history': (
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
@@ -79,16 +101,6 @@ const getMenuIcon = (menuId) => {
         'autoservice-garage': (
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17h.01M16 17h.01M3 13l2-5a2 2 0 011.85-1.25h10.3A2 2 0 0119 8l2 5m-18 0h18v4a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H6v1a1 1 0 01-1 1H4a1 1 0 01-1-1v-4z" />
-            </svg>
-        ),
-        'autoservice-my-orders': (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-        ),
-        'autoservice-public': (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
         ),
         'autoservice-clients': (
@@ -240,6 +252,9 @@ export default function ProfileMenuTabs({
     onTabChange,
     badgeCounts = {},
     variant = 'sidebar',
+    showAdminMenuSwitch = false,
+    adminMenuMode,
+    onAdminMenuModeChange,
 }) {
     const isDrawer = variant === 'drawer';
     const [expandedMenus, setExpandedMenus] = useState(() =>
@@ -414,7 +429,18 @@ export default function ProfileMenuTabs({
     };
 
     if (isDrawer) {
-        return <div className="flex flex-col gap-0.5 pb-20">{tabs.map(renderMenuItem)}</div>;
+        return (
+            <div className="flex flex-col gap-0.5 pb-20">
+                {showAdminMenuSwitch ? (
+                    <AdminMenuModeSwitch
+                        variant="drawer"
+                        mode={adminMenuMode}
+                        onChange={onAdminMenuModeChange}
+                    />
+                ) : null}
+                {tabs.map(renderMenuItem)}
+            </div>
+        );
     }
 
     return (
@@ -422,6 +448,13 @@ export default function ProfileMenuTabs({
             className="w-full min-w-[15.5rem] rounded-xl border border-gray-200 bg-white shadow-md sticky top-[calc(var(--sg-desktop-header-h)+1rem)] h-[calc(100vh-var(--sg-desktop-header-h)-2rem)] overflow-y-auto overscroll-contain scroll-pb-32 [&::-webkit-scrollbar]:hidden"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
+            {showAdminMenuSwitch ? (
+                <AdminMenuModeSwitch
+                    variant="sidebar"
+                    mode={adminMenuMode}
+                    onChange={onAdminMenuModeChange}
+                />
+            ) : null}
             <div className="flex flex-col pb-4 pt-1">{tabs.map(renderMenuItem)}</div>
             <PublicSiteMenuLinks variant="sidebar" />
         </div>

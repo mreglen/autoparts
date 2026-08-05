@@ -5,6 +5,11 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { fetchPendingProducts } from '../redux/slices/ModerationProductsSlice';
 import { fetchPendingSellers } from '../redux/slices/ModerationSlice';
 import { fetchSalesMenuCounts } from '../redux/slices/SalesMenuCountsSlice';
+import {
+  clearAutoserviceClient,
+  fetchAutoserviceClientMe,
+} from '../redux/slices/AutoserviceClientSlice';
+import { selectShowAutoservice } from '../utils/autoservicePublic';
 import { apiAxios } from '../utils/apiClient';
 import Navigation from '../pages/Navigation/Navigation';
 import MobileHeader from '../components/MobileHeader/MobileHeader';
@@ -42,6 +47,7 @@ export default function ProfileWithMenuLayout() {
     const moderationProducts = useSelector((state) => state.moderationProducts);
     const moderation = useSelector((state) => state.moderation);
     const salesMenuCounts = useSelector((state) => state.salesMenuCounts);
+    const showAutoservice = useSelector(selectShowAutoservice);
     const location = useLocation();
   const [purchasesMenuCounts, setPurchasesMenuCounts] = useState({ orders: 0, returns: 0 });
 
@@ -131,6 +137,9 @@ export default function ProfileWithMenuLayout() {
         openMenu,
         closeMenu,
         handleTabChange,
+        adminMenuMode,
+        setAdminMenuMode,
+        showAdminMenuSwitch,
     } = useMobileMenuShell(user);
 
     useEffect(() => {
@@ -143,6 +152,15 @@ export default function ProfileWithMenuLayout() {
         if (!isReady || !canFetchSalesCounts) return;
         dispatch(fetchSalesMenuCounts());
     }, [dispatch, isReady, canFetchSalesCounts, location.pathname]);
+
+    useEffect(() => {
+        if (!isReady) return;
+        if (!user || !(showAutoservice || user.is_admin)) {
+            dispatch(clearAutoserviceClient());
+            return;
+        }
+        dispatch(fetchAutoserviceClientMe());
+    }, [dispatch, isReady, user?.id, showAutoservice, user?.is_admin]);
 
     if (!isReady) {
         return (
@@ -181,6 +199,9 @@ export default function ProfileWithMenuLayout() {
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 badgeCounts={badgeCounts}
+                showAdminMenuSwitch={showAdminMenuSwitch}
+                adminMenuMode={adminMenuMode}
+                onAdminMenuModeChange={setAdminMenuMode}
             />
 
             <main
@@ -203,6 +224,9 @@ export default function ProfileWithMenuLayout() {
                             activeTab={activeTab}
                             onTabChange={handleTabChange}
                             badgeCounts={badgeCounts}
+                            showAdminMenuSwitch={showAdminMenuSwitch}
+                            adminMenuMode={adminMenuMode}
+                            onAdminMenuModeChange={setAdminMenuMode}
                         />
                     </div>
 
