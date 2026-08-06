@@ -647,6 +647,7 @@ export default function AutoserviceOrderFormPage() {
   const [addVehicleOpen, setAddVehicleOpen] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const plannerPrefillRef = useRef(location.state);
 
   const applyFormState = useCallback((state) => {
     setClientId(state.clientId);
@@ -706,11 +707,34 @@ export default function AutoserviceOrderFormPage() {
       if (isEdit) {
         loadOrder();
       } else if (isCreate) {
-        applyFormState(emptyFormState());
+        const prefill = plannerPrefillRef.current || {};
+        const initial = emptyFormState();
+        if (prefill.scheduledAtLocal) {
+          initial.scheduledAt = prefill.scheduledAtLocal;
+        } else if (prefill.scheduledAt) {
+          initial.scheduledAt = toLocalInputValue(prefill.scheduledAt);
+        }
+        applyFormState(initial);
         setFormInitialized(true);
       }
     }
   }, [isReady, isAuthenticated, isEdit, isCreate, loadMeta, loadOrder, applyFormState]);
+
+  useEffect(() => {
+    if (!isCreate || !formInitialized || metaLoading || clients.length === 0) return;
+    const prefill = plannerPrefillRef.current;
+    if (!prefill?.clientPhone) return;
+    const digits = String(prefill.clientPhone).replace(/\D/g, '');
+    if (!digits) return;
+    const match = clients.find((client) => {
+      const clientDigits = String(client.phone || '').replace(/\D/g, '');
+      return clientDigits && clientDigits === digits;
+    });
+    if (match) {
+      setClientId(String(match.id));
+    }
+    plannerPrefillRef.current = null;
+  }, [isCreate, formInitialized, metaLoading, clients]);
 
   useEffect(() => {
     if (!clientId) {

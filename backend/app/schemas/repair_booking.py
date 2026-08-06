@@ -18,7 +18,18 @@ class RepairBookingCreate(BaseModel):
     comment: Optional[str] = Field(None, max_length=2000)
 
 
+class RepairBookingStaffCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    phone: str = Field(min_length=5, max_length=40)
+    preferred_date: date
+    comment: Optional[str] = Field(None, max_length=2000)
+
+
 class RepairBookingPatch(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=120)
+    phone: Optional[str] = Field(None, min_length=5, max_length=40)
+    preferred_date: Optional[date] = None
+    comment: Optional[str] = Field(None, max_length=2000)
     status: Optional[RepairBookingStatus] = None
     staff_notes: Optional[str] = Field(None, max_length=2000)
 

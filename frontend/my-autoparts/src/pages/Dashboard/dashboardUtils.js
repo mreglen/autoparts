@@ -196,3 +196,19 @@ export function formatShortDate(value) {
   if (!d) return '—';
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+const TASKS_SECTION_HIDDEN_PREFIX = 'dashboard_tasks_section_hidden';
+
+export function isDashboardTasksSectionHidden(userId) {
+  if (!userId || typeof localStorage === 'undefined') return false;
+  return localStorage.getItem(`${TASKS_SECTION_HIDDEN_PREFIX}_${userId}`) === '1';
+}
+
+export function setDashboardTasksSectionHidden(userId, hidden) {
+  if (!userId || typeof localStorage === 'undefined') return;
+  if (hidden) {
+    localStorage.setItem(`${TASKS_SECTION_HIDDEN_PREFIX}_${userId}`, '1');
+  } else {
+    localStorage.removeItem(`${TASKS_SECTION_HIDDEN_PREFIX}_${userId}`);
+  }
+}

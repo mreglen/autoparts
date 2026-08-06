@@ -13,6 +13,7 @@ from app.schemas.repair_booking import (
     REPAIR_BOOKING_STATUSES,
     RepairBookingCreate,
     RepairBookingPatch,
+    RepairBookingStaffCreate,
     RepairBookingView,
 )
 from app.utils.autoservice_access import (
@@ -49,6 +50,36 @@ def create_repair_booking(
         comment=(payload.comment or "").strip() or None,
         status="new",
         source="client",
+        created_by_user_id=current_user.id,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return RepairBookingView.model_validate(row)
+
+
+@router.post(
+    "/autoservice/repair-bookings/staff",
+    response_model=RepairBookingView,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_repair_booking_staff(
+    payload: RepairBookingStaffCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    org_id = require_autoservice_staff(db, current_user)
+    name = payload.name.strip()
+    phone = normalize_phone_or_400(payload.phone)
+    row = RepairBooking(
+        organization_id=org_id,
+        client_id=None,
+        name=name[:120],
+        phone=phone,
+        preferred_date=payload.preferred_date,
+        comment=(payload.comment or "").strip() or None,
+        status="new",
+        source="staff",
         created_by_user_id=current_user.id,
     )
     db.add(row)
@@ -135,6 +166,20 @@ def patch_repair_booking(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Заявка не найдена",
         )
+    if "name" in data:
+        name = (data["name"] or "").strip()
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Имя не может быть пустым",
+            )
+        row.name = name[:120]
+    if "phone" in data:
+        row.phone = normalize_phone_or_400(data["phone"] or "")
+    if "preferred_date" in data and data["preferred_date"]:
+        row.preferred_date = data["preferred_date"]
+    if "comment" in data:
+        row.comment = (data["comment"] or "").strip() or None
     if data.get("status"):
         row.status = data["status"]
     if "staff_notes" in data:

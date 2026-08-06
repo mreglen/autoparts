@@ -52,6 +52,65 @@ const buildPurchasesSubmenu = () => [
     { id: 'purchases-returns', label: 'Возвраты' },
 ];
 
+const buildGlobalSettingsTab = (menuUser, hasPermission) => {
+    if (menuUser.is_employee && !menuUser.is_admin) {
+        const settingsSubmenu = [
+            { id: 'profile', label: 'Профиль' },
+        ];
+        if (hasPermission('storage-addresses')) {
+            settingsSubmenu.push({ id: 'settings-storage-addresses', label: 'Адресное хранение' });
+        }
+        if (menuUser.organization_id && hasPermission('settings.printers')) {
+            settingsSubmenu.push({ id: 'settings-printers', label: 'Печать' });
+        }
+        if (menuUser.organization_id && hasPermission('settings.integration.avito')) {
+            settingsSubmenu.push({ id: 'settings-integration', label: 'Интеграция' });
+        }
+        return { id: 'settings', label: 'Настройки', submenu: settingsSubmenu };
+    }
+    if (menuUser.is_director) {
+        return {
+            id: 'settings',
+            label: 'Настройки',
+            submenu: [
+                { id: 'profile', label: 'Профиль' },
+                { id: 'settings-employees', label: 'Сотрудники' },
+                { id: 'settings-storage-addresses', label: 'Адресное хранение' },
+                { id: 'settings-organization', label: 'Организация' },
+                { id: 'settings-printers', label: 'Печать' },
+                { id: 'settings-integration', label: 'Интеграция' },
+            ],
+        };
+    }
+    if (menuUser.is_seller) {
+        const settingsSubmenu = [
+            { id: 'profile', label: 'Профиль' },
+        ];
+        if (menuUser.organization_id) {
+            settingsSubmenu.push({ id: 'settings-organization', label: 'Организация' });
+            settingsSubmenu.push({ id: 'settings-printers', label: 'Печать' });
+            settingsSubmenu.push({ id: 'settings-integration', label: 'Интеграция' });
+        }
+        return { id: 'settings', label: 'Настройки', submenu: settingsSubmenu };
+    }
+    if (menuUser.is_admin) {
+        return {
+            id: 'settings',
+            label: 'Настройки',
+            submenu: [
+                { id: 'profile', label: 'Профиль' },
+            ],
+        };
+    }
+    return {
+        id: 'settings',
+        label: 'Настройки',
+        submenu: [
+            { id: 'profile', label: 'Профиль' },
+        ],
+    };
+};
+
 const buildAutoserviceClientTab = (isClient) => {
     if (!isClient) {
         return { id: 'autoservice-welcome', label: 'Автосервис' };
@@ -159,13 +218,6 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
                 submenu: buildPurchasesSubmenu(),
             },
             { id: 'chats', label: 'Сообщения' },
-            {
-                id: 'settings',
-                label: 'Настройки',
-                submenu: [
-                    { id: 'profile', label: 'Профиль' },
-                ],
-            },
         ];
     }
 
@@ -267,52 +319,6 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
         if (warehouseSubmenu.length > 0) {
             baseTabs.push({ id: 'warehouse', label: 'Склад', submenu: warehouseSubmenu });
         }
-
-        const settingsSubmenu = [
-            { id: 'profile', label: 'Профиль' },
-        ];
-        if (hasPermission('storage-addresses')) {
-            settingsSubmenu.push({ id: 'settings-storage-addresses', label: 'Адресное хранение' });
-        }
-        if (menuUser.organization_id && hasPermission('settings.printers')) {
-            settingsSubmenu.push({ id: 'settings-printers', label: 'Печать' });
-        }
-        if (menuUser.organization_id && hasPermission('settings.integration.avito')) {
-            settingsSubmenu.push({ id: 'settings-integration', label: 'Интеграция' });
-        }
-
-        baseTabs.push({ id: 'settings', label: 'Настройки', submenu: settingsSubmenu });
-    } else if (menuUser.is_director) {
-        baseTabs.push({
-            id: 'settings',
-            label: 'Настройки',
-            submenu: [
-                { id: 'profile', label: 'Профиль' },
-                { id: 'settings-employees', label: 'Сотрудники' },
-                { id: 'settings-storage-addresses', label: 'Адресное хранение' },
-                { id: 'settings-organization', label: 'Организация' },
-                { id: 'settings-printers', label: 'Печать' },
-                { id: 'settings-integration', label: 'Интеграция' },
-            ],
-        });
-    } else if (menuUser.is_seller) {
-        const settingsSubmenu = [
-            { id: 'profile', label: 'Профиль' },
-        ];
-        if (menuUser.organization_id) {
-            settingsSubmenu.push({ id: 'settings-organization', label: 'Организация' });
-            settingsSubmenu.push({ id: 'settings-printers', label: 'Печать' });
-            settingsSubmenu.push({ id: 'settings-integration', label: 'Интеграция' });
-        }
-        baseTabs.push({ id: 'settings', label: 'Настройки', submenu: settingsSubmenu });
-    } else if (menuUser.is_admin) {
-        baseTabs.push({
-            id: 'settings',
-            label: 'Настройки',
-            submenu: [
-                { id: 'profile', label: 'Профиль' },
-            ],
-        });
     }
 
     if (canAccessAutoserviceClientMenu(user, autoserviceAccessOptions)) {
@@ -347,6 +353,8 @@ export const getAvailableTabs = (user, permissionCodes, options = {}) => {
             submenu: [auditSubmenuItem],
         });
     }
+
+    baseTabs.push(buildGlobalSettingsTab(menuUser, hasPermission));
 
     return baseTabs;
 };

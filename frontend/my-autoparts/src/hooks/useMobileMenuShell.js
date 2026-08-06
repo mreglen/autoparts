@@ -10,6 +10,8 @@ import { selectShowWarehouseInventory } from '../utils/siteReviewsPublic';
 import {
     selectShowAutoservice,
     selectAutoserviceOrganizationId,
+    isAutoserviceClientPath,
+    isAutoserviceStaffPath,
 } from '../utils/autoservicePublic';
 import {
     ADMIN_MENU_MODE_ADMIN,
@@ -54,6 +56,10 @@ export function useMobileMenuShell(userOverride) {
             setAdminMenuModeState(nextMode);
             if (nextMode === ADMIN_MENU_MODE_USER && isAdminOnlyPath(location.pathname)) {
                 navigate('/dashboard', { replace: true });
+            } else if (nextMode === ADMIN_MENU_MODE_USER && isAutoserviceStaffPath(location.pathname)) {
+                navigate('/garage', { replace: true });
+            } else if (nextMode === ADMIN_MENU_MODE_ADMIN && isAutoserviceClientPath(location.pathname)) {
+                navigate('/autoservice/planner', { replace: true });
             }
         },
         [user?.is_admin, location.pathname, navigate],

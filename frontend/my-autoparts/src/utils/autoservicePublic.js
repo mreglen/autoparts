@@ -37,12 +37,39 @@ export function canAccessAutoserviceStaffMenu(user, options = {}) {
 
 /**
  * Client-facing autoservice menu (my cars / booking / repair history).
- * Always uses the real user so admins keep the client flow in both menu modes.
+ * For admins: only in «Пользователь» mode; in «Админ» mode staff tab «Сервис» is shown instead.
  */
 export function canAccessAutoserviceClientMenu(user, options = {}) {
   if (!user) return false;
-  if (user.is_admin) return true;
+  if (user.is_admin) {
+    return options.adminMenuMode === ADMIN_MENU_MODE_USER;
+  }
   return options.showAutoservice === true;
+}
+
+const AUTOSERVICE_CLIENT_PATH_PREFIXES = [
+  '/garage',
+  '/autoservice/welcome',
+  '/autoservice/repair-booking',
+];
+
+/** Client autoservice routes hidden from admin menu in «Админ» mode. */
+export function isAutoserviceClientPath(pathname) {
+  if (pathname === '/autoservice' || pathname === '/autoservice/') return true;
+  return AUTOSERVICE_CLIENT_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+const AUTOSERVICE_STAFF_PATH_PREFIXES = [
+  '/autoservice/planner',
+  '/autoservice/clients',
+  '/autoservice/orders',
+  '/autoservice/settings',
+  '/autoservice/inspections',
+];
+
+/** Staff autoservice routes hidden from admin menu in «Пользователь» mode. */
+export function isAutoserviceStaffPath(pathname) {
+  return AUTOSERVICE_STAFF_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 /** Settings submenu: director of the autoservice org (incl. admin-director). */

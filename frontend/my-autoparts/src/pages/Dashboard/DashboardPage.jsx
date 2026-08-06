@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthReady } from '../../hooks/useAuthReady';
@@ -7,27 +7,43 @@ import { apiAxios } from '../../utils/apiClient';
 import {
   computeProductStats,
   computeWarehouseSalesStats,
-  computeStockOutStats,
-  computeStockInStats,
   formatCurrency,
   formatShortDate,
+  isDashboardTasksSectionHidden,
   saleLineTotal,
-  isAvitoSale,
+  setDashboardTasksSectionHidden,
 } from './dashboardUtils';
-import ResponsiveDataView from '../../components/ResponsiveDataView/ResponsiveDataView';
 import SellerOnboardingPanel from './SellerOnboardingPanel';
 
-function StatCard({ label, value, note, href, onClick }) {
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Доброе утро';
+  if (hour < 18) return 'Добрый день';
+  return 'Добрый вечер';
+}
+
+function getFirstName(user) {
+  const raw = (user?.name || user?.username || '').trim();
+  if (!raw) return null;
+  return raw.split(/\s+/)[0];
+}
+
+function MetricCard({ label, value, hint, href, accent = 'indigo' }) {
+  const accents = {
+    indigo: 'from-indigo-500/10 to-indigo-600/5 ring-indigo-500/10',
+    emerald: 'from-emerald-500/10 to-emerald-600/5 ring-emerald-500/10',
+    amber: 'from-amber-500/10 to-amber-600/5 ring-amber-500/10',
+  };
+
+  const className = `group block rounded-2xl bg-gradient-to-br ${accents[accent]} p-5 ring-1 transition-all hover:shadow-md hover:-translate-y-0.5`;
+
   const content = (
     <>
-      <p className="text-[13px] text-gray-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight text-gray-900 tabular-nums">{value}</p>
-      {note ? <p className="mt-1.5 text-xs text-gray-400 leading-snug">{note}</p> : null}
+      <p className="text-sm font-medium text-gray-600">{label}</p>
+      <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 tabular-nums">{value}</p>
+      {hint ? <p className="mt-2 text-sm text-gray-500">{hint}</p> : null}
     </>
   );
-
-  const className =
-    'block rounded-lg border border-gray-200 bg-white p-4 transition-colors hover:border-gray-300';
 
   if (href) {
     return (
@@ -36,96 +52,92 @@ function StatCard({ label, value, note, href, onClick }) {
       </Link>
     );
   }
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className={`${className} w-full text-left`}>
-        {content}
-      </button>
-    );
-  }
   return <div className={className}>{content}</div>;
 }
 
-function Panel({ title, action, children, className = '' }) {
-  return (
-    <section className={`rounded-lg border border-gray-200 bg-white ${className}`}>
-      {(title || action) && (
-        <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-gray-100">
-          {title ? <h2 className="text-sm font-semibold text-gray-900">{title}</h2> : <span />}
-          {action}
-        </div>
-      )}
-      <div className="p-5">{children}</div>
-    </section>
-  );
-}
-
-function MiniStat({ label, value }) {
-  return (
-    <div>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="mt-0.5 text-lg font-semibold text-gray-900 tabular-nums">{value}</p>
-    </div>
-  );
-}
-
-const TASK_DOT = {
-  high: 'bg-red-500',
-  medium: 'bg-amber-500',
-  low: 'bg-gray-300',
+const TASK_STYLES = {
+  high: {
+    ring: 'ring-red-200/80',
+    bg: 'bg-red-50/80',
+    dot: 'bg-red-500',
+    badge: 'bg-red-100 text-red-700',
+  },
+  medium: {
+    ring: 'ring-amber-200/80',
+    bg: 'bg-amber-50/80',
+    dot: 'bg-amber-500',
+    badge: 'bg-amber-100 text-amber-800',
+  },
+  low: {
+    ring: 'ring-gray-200',
+    bg: 'bg-gray-50/80',
+    dot: 'bg-gray-400',
+    badge: 'bg-gray-100 text-gray-700',
+  },
 };
 
-function AttentionTasksSection({ tasks, loading, onNavigate }) {
-  if (loading) {
-    return (
-      <Panel title="Требует внимания">
-        <div className="space-y-2">
-          {[1, 2].map((i) => (
-            <div key={i} className="h-11 rounded-md bg-gray-50 animate-pulse" />
-          ))}
-        </div>
-      </Panel>
-    );
-  }
-
-  if (!tasks?.length) {
-    return (
-      <Panel title="Требует внимания">
-        <p className="text-sm text-gray-500">Срочных задач нет.</p>
-      </Panel>
-    );
-  }
+function TaskCard({ task, onNavigate }) {
+  const style = TASK_STYLES[task.severity] || TASK_STYLES.low;
 
   return (
-    <Panel title="Требует внимания">
-      <ul className="divide-y divide-gray-100">
-        {tasks.map((task) => (
-          <li key={task.id}>
-            <button
-              type="button"
-              onClick={() => onNavigate(task.url)}
-              className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-gray-50 -mx-1 px-1 rounded-md"
-            >
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${TASK_DOT[task.severity] || TASK_DOT.low}`}
-                aria-hidden
-              />
-              <span className="min-w-0 flex-1">
-                <span className="text-sm text-gray-900">{task.title}</span>
-                {task.hint ? (
-                  <span className="ml-2 text-xs text-gray-400">{task.hint}</span>
-                ) : null}
-              </span>
-              <span className="shrink-0 text-sm font-medium tabular-nums text-gray-700">
-                {task.count}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </Panel>
+    <button
+      type="button"
+      onClick={() => onNavigate(task.url)}
+      className={`flex w-full items-center gap-4 rounded-xl p-4 text-left ring-1 transition-all hover:shadow-sm ${style.ring} ${style.bg}`}
+    >
+      <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${style.dot}`} aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-gray-900">{task.title}</span>
+        {task.hint ? (
+          <span className="mt-0.5 block text-sm text-gray-600">{task.hint}</span>
+        ) : null}
+      </span>
+      <span className={`shrink-0 rounded-full px-2.5 py-1 text-sm font-bold tabular-nums ${style.badge}`}>
+        {task.count}
+      </span>
+    </button>
   );
 }
+
+function QuickAction({ label, description, href, icon }) {
+  return (
+    <Link
+      to={href}
+      className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 transition-all hover:border-indigo-200 hover:bg-indigo-50/40 hover:shadow-sm"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-gray-900">{label}</span>
+        <span className="mt-0.5 block text-xs text-gray-500">{description}</span>
+      </span>
+    </Link>
+  );
+}
+
+const ICONS = {
+  orders: (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+    </svg>
+  ),
+  chats: (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+    </svg>
+  ),
+  parts: (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  ),
+  sales: (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+};
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -138,6 +150,7 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState([]);
   const [onboarding, setOnboarding] = useState(null);
   const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [tasksSectionHidden, setTasksSectionHidden] = useState(false);
 
   const canAccess = Boolean(user?.is_admin || user?.is_seller || user?.is_employee);
   const showOnboarding = Boolean(user?.is_seller || user?.is_director);
@@ -146,11 +159,26 @@ export default function DashboardPage() {
     || user?.is_seller
     || (user?.is_employee && permissionCodes?.includes('finance.reports'))
   );
+  const canViewSales = Boolean(
+    user?.is_admin
+    || user?.is_seller
+    || (user?.is_employee && permissionCodes?.includes('sales.orders'))
+  );
+  const canViewParts = Boolean(
+    user?.is_admin
+    || user?.is_seller
+    || (user?.is_employee && permissionCodes?.includes('my-parts'))
+  );
 
   useEffect(() => {
     if (!isReady) return;
     if (!canAccess) navigate('/', { replace: true });
   }, [isReady, canAccess, navigate]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setTasksSectionHidden(isDashboardTasksSectionHidden(user.id));
+  }, [user?.id]);
 
   const loadDashboard = useCallback(async () => {
     if (!user) return;
@@ -162,27 +190,23 @@ export default function DashboardPage() {
     try {
       const requests = [
         apiAxios.get('/products/'),
-        apiAxios.get('/stock-outs/sales'),
-        apiAxios.get('/stock-outs/'),
-        apiAxios.get('/stock-ins/'),
         apiAxios.get('/dashboard/tasks'),
       ];
+      if (canViewFinance) {
+        requests.push(apiAxios.get('/stock-outs/sales'));
+      }
       if (showOnboarding) {
         requests.push(apiAxios.get('/dashboard/onboarding'));
       }
 
       const results = await Promise.allSettled(requests);
 
-      const pick = (idx, fallback = []) =>
-        results[idx].status === 'fulfilled' ? results[idx].value.data : fallback;
+      let idx = 0;
+      const products = results[idx].status === 'fulfilled' ? results[idx].value.data : [];
+      idx += 1;
 
-      const products = pick(0);
-      const sales = pick(1);
-      const stockOuts = pick(2);
-      const stockIns = pick(3);
-      const tasksResult = results[4];
-      const onboardingResult = showOnboarding ? results[5] : null;
-
+      const tasksResult = results[idx];
+      idx += 1;
       if (tasksResult.status === 'fulfilled') {
         setTasks(tasksResult.value.data?.tasks || []);
       } else {
@@ -190,23 +214,34 @@ export default function DashboardPage() {
       }
       setTasksLoading(false);
 
-      if (onboardingResult?.status === 'fulfilled') {
-        setOnboarding(onboardingResult.value.data);
+      let sales = null;
+      if (canViewFinance) {
+        const salesResult = results[idx];
+        idx += 1;
+        if (salesResult.status === 'fulfilled') {
+          sales = computeWarehouseSalesStats(salesResult.value.data);
+        }
+      }
+
+      if (showOnboarding) {
+        const onboardingResult = results[idx];
+        if (onboardingResult?.status === 'fulfilled') {
+          setOnboarding(onboardingResult.value.data);
+        } else {
+          setOnboarding(null);
+        }
       } else {
         setOnboarding(null);
       }
       setOnboardingLoading(false);
 
       setData({
-        products,
         ...computeProductStats(products),
-        sales: computeWarehouseSalesStats(sales),
-        stockOuts: computeStockOutStats(stockOuts),
-        stockIns: computeStockInStats(stockIns),
+        sales,
       });
     } catch (e) {
       console.error(e);
-      setError('Не удалось загрузить данные дашборда');
+      setError('Не удалось загрузить обзор');
       setTasks([]);
       setTasksLoading(false);
       setOnboarding(null);
@@ -214,37 +249,89 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, showOnboarding]);
+  }, [user, showOnboarding, canViewFinance]);
 
   useEffect(() => {
     if (isReady && canAccess) loadDashboard();
   }, [isReady, canAccess, loadDashboard]);
+
+  const quickActions = useMemo(() => {
+    const actions = [];
+    if (canViewSales) {
+      actions.push({
+        label: 'Заказы',
+        description: 'Новые и в работе',
+        href: '/sales/orders',
+        icon: ICONS.orders,
+      });
+    }
+    actions.push({
+      label: 'Сообщения',
+      description: 'Чаты с покупателями',
+      href: '/chats',
+      icon: ICONS.chats,
+    });
+    if (canViewParts) {
+      actions.push({
+        label: 'Запчасти',
+        description: 'Склад и остатки',
+        href: '/my-parts',
+        icon: ICONS.parts,
+      });
+    }
+    if (canViewFinance) {
+      actions.push({
+        label: 'Продажи',
+        description: 'История продаж',
+        href: '/warehouse-sales',
+        icon: ICONS.sales,
+      });
+    }
+    return actions;
+  }, [canViewSales, canViewParts, canViewFinance]);
+
+  const firstName = getFirstName(user);
+
+  const urgentTasks = useMemo(
+    () => (tasks || []).filter((task) => task.severity === 'high'),
+    [tasks],
+  );
+  const otherTasks = useMemo(
+    () => (tasks || []).filter((task) => task.severity !== 'high'),
+    [tasks],
+  );
+
+  const toggleTasksSection = useCallback((hidden) => {
+    if (!user?.id) return;
+    setDashboardTasksSectionHidden(user.id, hidden);
+    setTasksSectionHidden(hidden);
+  }, [user?.id]);
 
   if (!isReady) return <AuthLoadingScreen />;
   if (!canAccess) return null;
 
   if (loading) {
     return (
-      <div className="mt-4 sm:mt-6 px-4 sm:px-0 space-y-5 max-w-6xl">
-        <div className="h-8 w-32 bg-gray-100 rounded animate-pulse" />
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-0 space-y-6">
+        <div className="h-10 w-56 rounded-lg bg-gray-100 animate-pulse" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-24 bg-gray-100 rounded-lg animate-pulse" />
+            <div key={i} className="h-28 rounded-2xl bg-gray-100 animate-pulse" />
           ))}
         </div>
-        <div className="h-56 bg-gray-100 rounded-lg animate-pulse" />
+        <div className="h-40 rounded-2xl bg-gray-100 animate-pulse" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="mt-12 text-center max-w-md mx-auto px-4">
-        <p className="text-gray-600 mb-4">{error || 'Нет данных'}</p>
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <p className="text-gray-600">{error || 'Нет данных'}</p>
         <button
           type="button"
           onClick={loadDashboard}
-          className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+          className="mt-4 text-sm font-medium text-indigo-600 hover:text-indigo-800"
         >
           Попробовать снова
         </button>
@@ -252,182 +339,177 @@ export default function DashboardPage() {
     );
   }
 
-  const { sales, stockOuts, stockIns } = data;
+  const { sales } = data;
+  const recentSales = sales?.recentSales?.slice(0, 4) || [];
 
   return (
-    <div className="mt-4 sm:mt-6 px-4 sm:px-0 pb-12 max-w-6xl space-y-5">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 tracking-tight">Обзор</h1>
-          <p className="mt-0.5 text-sm text-gray-500">
-            {canViewFinance ? 'Продажи и склад' : 'Склад и задачи'}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={loadDashboard}
-          className="text-sm text-gray-500 hover:text-gray-800 transition-colors shrink-0"
-        >
-          Обновить
-        </button>
-      </header>
-
+    <div className="mx-auto max-w-4xl px-4 pb-12 pt-2 sm:px-0 sm:pt-4 space-y-8">
       {showOnboarding && (
         <SellerOnboardingPanel onboarding={onboarding} loading={onboardingLoading} />
       )}
 
-      {canViewFinance && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <StatCard
-            label="Выручка"
-            value={formatCurrency(sales.totalSales)}
-            note={`${sales.warehouseSalesCount} продаж · Авито ${sales.avitoCount}`}
-            onClick={() => navigate('/warehouse-sales')}
-          />
-          <StatCard
-            label="За 30 дней"
-            value={formatCurrency(sales.revenue30d)}
-            note={`7 дней: ${formatCurrency(sales.revenue7d)}`}
-          />
-          <StatCard
-            label="Склад"
-            value={formatCurrency(data.totalWarehouseValue)}
-            note={`${data.totalWarehouseQuantity.toLocaleString('ru-RU')} шт. · ${data.totalProducts} поз.`}
-            href="/my-parts"
-          />
-        </div>
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+          {getGreeting()}
+          {firstName ? `, ${firstName}` : ''}
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Краткий обзор магазина на сегодня
+        </p>
+      </header>
+
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {canViewFinance && sales ? (
+          <>
+            <MetricCard
+              label="Выручка за 30 дней"
+              value={formatCurrency(sales.revenue30d)}
+              hint={`За 7 дней: ${formatCurrency(sales.revenue7d)}`}
+              href="/warehouse-sales"
+              accent="indigo"
+            />
+            <MetricCard
+              label="На складе"
+              value={`${data.totalWarehouseQuantity.toLocaleString('ru-RU')} шт.`}
+              hint={`${data.totalProducts} позиций · ${formatCurrency(data.totalWarehouseValue)}`}
+              href="/my-parts"
+              accent="emerald"
+            />
+            <MetricCard
+              label="Нужно внимание"
+              value={tasks.length}
+              hint={tasks.length === 0 ? 'Всё в порядке' : `${urgentTasks.length} срочных`}
+              accent="amber"
+            />
+          </>
+        ) : (
+          <>
+            <MetricCard
+              label="На складе"
+              value={`${data.totalWarehouseQuantity.toLocaleString('ru-RU')} шт.`}
+              hint={`${data.totalProducts} позиций`}
+              href={canViewParts ? '/my-parts' : undefined}
+              accent="emerald"
+            />
+            {data.lowStock > 0 ? (
+              <MetricCard
+                label="Мало на складе"
+                value={data.lowStock}
+                hint="1–2 шт. на позицию"
+                href={canViewParts ? '/my-parts?stock=low' : undefined}
+                accent="amber"
+              />
+            ) : (
+              <MetricCard
+                label="Задачи"
+                value={tasks.length}
+                hint={tasks.length === 0 ? 'Всё в порядке' : 'Требуют действий'}
+                accent="amber"
+              />
+            )}
+          </>
+        )}
+      </section>
+
+      {quickActions.length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Быстрые действия
+          </h2>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {quickActions.map((action) => (
+              <QuickAction key={action.href} {...action} />
+            ))}
+          </div>
+        </section>
       )}
 
-      {canViewFinance ? (
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-          <div className="lg:col-span-3">
-            <Panel
-              title="Последние продажи"
-              action={
-                <Link to="/warehouse-sales" className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                  Все →
-                </Link>
-              }
+      <section>
+        {tasksSectionHidden ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <span className="text-sm text-gray-600">
+              Блок «Требует внимания» скрыт
+              {tasks.length > 0 ? ` · ${tasks.length} задач` : ''}
+            </span>
+            <button
+              type="button"
+              onClick={() => toggleTasksSection(false)}
+              className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-indigo-600 shadow-sm ring-1 ring-gray-200 hover:bg-indigo-50"
             >
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5 pb-5 border-b border-gray-100">
-                <MiniStat label="Ручные" value={formatCurrency(sales.warehouseRevenue)} />
-                <MiniStat label="Авито" value={formatCurrency(sales.avitoRevenue)} />
-                <MiniStat label="7 дней" value={formatCurrency(sales.revenue7d)} />
-                <MiniStat label="Списания 30д" value={stockOuts.writeoffs30d} />
-              </div>
-
-              {sales.recentSales.length === 0 ? (
-                <p className="text-sm text-gray-500 py-6 text-center">Продаж пока нет</p>
-              ) : (
-                <ResponsiveDataView
-                  isEmpty={false}
-                  renderDesktop={() => (
-                    <div className="overflow-x-auto -mx-1">
-                      <table className="min-w-full text-sm">
-                        <thead>
-                          <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
-                            <th className="pb-2 pr-4 font-normal">Дата</th>
-                            <th className="pb-2 pr-4 font-normal">Запчасть</th>
-                            <th className="pb-2 pr-4 font-normal text-center">Кол.</th>
-                            <th className="pb-2 pr-4 font-normal">Канал</th>
-                            <th className="pb-2 font-normal text-right">Сумма</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sales.recentSales.map((sale) => (
-                            <tr key={sale.id} className="border-b border-gray-50 last:border-0">
-                              <td className="py-2.5 pr-4 text-gray-500 whitespace-nowrap tabular-nums">
-                                {formatShortDate(sale.movement_date)}
-                              </td>
-                              <td className="py-2.5 pr-4 text-gray-900">
-                                <span className="line-clamp-1">
-                                  {sale.product?.brand ? `${sale.product.brand} · ` : ''}
-                                  {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
-                                </span>
-                              </td>
-                              <td className="py-2.5 pr-4 text-center tabular-nums text-gray-600">
-                                {sale.quantity}
-                              </td>
-                              <td className="py-2.5 pr-4 text-xs text-gray-500">
-                                {isAvitoSale(sale) ? 'Авито' : 'Склад'}
-                              </td>
-                              <td className="py-2.5 text-right font-medium tabular-nums text-gray-900">
-                                {formatCurrency(saleLineTotal(sale))}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  renderMobile={() =>
-                    sales.recentSales.map((sale) => (
-                      <div
-                        key={sale.id}
-                        className="flex items-start justify-between gap-3 py-3 border-b border-gray-100 last:border-0"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm text-gray-900 truncate">
-                            {sale.product?.brand ? `${sale.product.brand} · ` : ''}
-                            {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
-                          </p>
-                          <p className="mt-0.5 text-xs text-gray-400">
-                            {formatShortDate(sale.movement_date)} · {sale.quantity} шт. ·{' '}
-                            {isAvitoSale(sale) ? 'Авито' : 'Склад'}
-                          </p>
-                        </div>
-                        <p className="shrink-0 text-sm font-medium tabular-nums text-gray-900">
-                          {formatCurrency(saleLineTotal(sale))}
-                        </p>
-                      </div>
-                    ))
-                  }
-                />
-              )}
-            </Panel>
+              Показать
+            </button>
           </div>
-
-          <div className="lg:col-span-2">
-            <Panel
-              title="Склад"
-              action={
-                <Link to="/stock-out" className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                  Расходы →
-                </Link>
-              }
-            >
-              <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-                <MiniStat label="Позиций" value={data.totalProducts} />
-                <MiniStat label="Единиц" value={data.totalWarehouseQuantity.toLocaleString('ru-RU')} />
-                <MiniStat label="Поступления 30д" value={stockIns.count30d} />
-                <MiniStat label="Нулевой остаток" value={data.zeroStock} />
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-gray-900">Требует внимания</h2>
+              <div className="flex items-center gap-3">
+                {tasks.length > 0 && (
+                  <span className="text-sm text-gray-500">{tasks.length} задач</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => toggleTasksSection(true)}
+                  className="rounded-lg px-2.5 py-1 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                >
+                  Скрыть
+                </button>
               </div>
-            </Panel>
-          </div>
-        </div>
-      ) : (
-        <Panel
-          title="Склад"
-          action={
-            <Link to="/my-parts" className="text-xs font-medium text-indigo-600 hover:text-indigo-800">
-              Мои запчасти →
+            </div>
+
+            {tasksLoading ? (
+              <div className="mt-4 space-y-3">
+                {[1, 2].map((i) => (
+                  <div key={i} className="h-16 rounded-xl bg-gray-100 animate-pulse" />
+                ))}
+              </div>
+            ) : tasks.length === 0 ? (
+              <div className="mt-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/50 px-5 py-8 text-center">
+                <p className="text-base font-medium text-emerald-900">Всё в порядке</p>
+                <p className="mt-1 text-sm text-emerald-700/80">Срочных задач нет — можно спокойно работать</p>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {urgentTasks.map((task) => (
+                  <TaskCard key={task.id} task={task} onNavigate={navigate} />
+                ))}
+                {otherTasks.map((task) => (
+                  <TaskCard key={task.id} task={task} onNavigate={navigate} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {canViewFinance && recentSales.length > 0 && (
+        <section className="rounded-2xl border border-gray-200 bg-white p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-gray-900">Последние продажи</h2>
+            <Link to="/warehouse-sales" className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+              Все →
             </Link>
-          }
-        >
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <MiniStat label="Позиций" value={data.totalProducts} />
-            <MiniStat label="На складе" value={data.totalWarehouseQuantity.toLocaleString('ru-RU')} />
-            <MiniStat label="Поступления 30д" value={stockIns.count30d} />
-            <MiniStat label="Низкий остаток" value={data.lowStock} />
           </div>
-        </Panel>
+          <ul className="mt-4 divide-y divide-gray-100">
+            {recentSales.map((sale) => (
+              <li key={sale.id} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900">
+                    {sale.product?.brand ? `${sale.product.brand} · ` : ''}
+                    {sale.product?.article || sale.product?.name || `#${sale.product_id}`}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {formatShortDate(sale.movement_date)} · {sale.quantity} шт.
+                  </p>
+                </div>
+                <p className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">
+                  {formatCurrency(saleLineTotal(sale))}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
-
-      <AttentionTasksSection
-        tasks={tasks}
-        loading={tasksLoading}
-        onNavigate={(url) => navigate(url)}
-      />
     </div>
   );
 }
