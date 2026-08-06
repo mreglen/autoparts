@@ -19,14 +19,6 @@ const API_BASE = normalizeBaseUrl(process.env.REACT_APP_API_BASE_URL);
 const BACKEND_BASE = normalizeBaseUrl(process.env.REACT_APP_BACKEND_BASE_URL);
 
 
-if (process.env.NODE_ENV !== 'production') {
-    console.log('REACT_APP_API_BASE_URL', process.env.REACT_APP_API_BASE_URL);
-    console.log('REACT_APP_BACKEND_BASE_URL', process.env.REACT_APP_BACKEND_BASE_URL);
-    console.log('API_BASE:', API_BASE);
-    console.log('BACKEND_BASE:', BACKEND_BASE);
-}
-
-
 export { API_BASE, BACKEND_BASE };
 
 /** База для статики (/uploads): на проде — origin сайта, в dev — FastAPI (BACKEND_BASE). */
@@ -51,9 +43,6 @@ export const getWebSocketBaseUrl = () => {
     // Get the backend base URL and convert http/https to ws/wss
     let backendUrl = BACKEND_BASE || '';
     
-    console.log('[WS Config] BACKEND_BASE from env:', BACKEND_BASE);
-    console.log('[WS Config] Processed backendUrl:', backendUrl);
-    
     // Remove trailing slash if present
     backendUrl = backendUrl.replace(/\/+$/, '');
 
@@ -65,8 +54,6 @@ export const getWebSocketBaseUrl = () => {
     let wsUrl = backendUrl
         .replace(/^http:\/\//, 'ws://')
         .replace(/^https:\/\//, 'wss://');
-    
-    console.log('[WS Config] Final WebSocket URL:', wsUrl);
     
     return wsUrl;
 };

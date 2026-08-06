@@ -272,7 +272,12 @@ try:
 except Exception as e:
     logger.warning("SEO landing pages seed skipped: %s", e)
 
-app = FastAPI(title="Автозапчасти")
+app = FastAPI(
+    title="Автозапчасти",
+    docs_url="/docs" if settings.API_DOCS_ENABLED else None,
+    redoc_url="/redoc" if settings.API_DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if settings.API_DOCS_ENABLED else None,
+)
 
 scheduler = None
 _scheduler_leader = False
@@ -282,7 +287,10 @@ _scheduler_renew_task = None
 try:
     from starlette.middleware.proxy_headers import ProxyHeadersMiddleware  # type: ignore
 
-    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+    trusted_proxy_hosts = [
+        host.strip() for host in settings.TRUSTED_PROXY_HOSTS.split(",") if host.strip()
+    ]
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=trusted_proxy_hosts)
 except Exception:
     pass
 
@@ -751,10 +759,9 @@ async def get_media_file(path: str):
     else:
         return JSONResponse(status_code=404, content={"detail": "File not found"})
     
-    file_path = base_dir / relative_path
-    
-   
-    if not file_path.exists():
+    base_dir = base_dir.resolve()
+    file_path = (base_dir / relative_path).resolve()
+    if base_dir not in file_path.parents or not file_path.is_file():
         return JSONResponse(status_code=404, content={"detail": "File not found"})
     
     media_type = "image/webp"

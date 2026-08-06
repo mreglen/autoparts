@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -84,13 +85,17 @@ def parse_messenger_webhook(body: dict[str, Any]) -> tuple[Optional[int], Option
 
 
 def _check_webhook_secret(request: Request, query_secret: Optional[str]) -> None:
-    secret = settings.AVITO_WEBHOOK_SECRET
+    secret = (settings.AVITO_WEBHOOK_SECRET or "").strip()
     if not secret:
-        return
-    if query_secret == secret:
+        logger.error("Avito webhook rejected because AVITO_WEBHOOK_SECRET is not configured")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Webhook is not configured",
+        )
+    if query_secret and secrets.compare_digest(query_secret, secret):
         return
     hdr = request.headers.get("X-Webhook-Secret")
-    if hdr == secret:
+    if hdr and secrets.compare_digest(hdr, secret):
         return
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid webhook secret")
 

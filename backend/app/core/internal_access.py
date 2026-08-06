@@ -8,11 +8,16 @@ from app.core.config import settings
 def require_internal_prerender(request: Request) -> None:
     """
     Доступ только из nginx internal locations с заголовком X-Internal-Prerender-Token.
-    Если PRERENDER_INTERNAL_TOKEN не задан — проверка отключена (локальная разработка).
+    Без токена доступ разрешён только в локальной разработке.
     """
     expected = (settings.PRERENDER_INTERNAL_TOKEN or "").strip()
     if not expected:
-        return
+        if settings.APP_ENV.lower() in {"development", "dev", "test"}:
+            return
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Internal prerender is not configured",
+        )
 
     provided = (request.headers.get("X-Internal-Prerender-Token") or "").strip()
     if provided != expected:

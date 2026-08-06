@@ -11,12 +11,15 @@ WEB_ROOT="/var/www/my-autoparts"
 VENV="$BACKEND/venv"
 LOG="/var/log/autoparts-update.log"
 LOCK="/var/run/autoparts-update.lock"
+DEPLOY_STATE_DIR="/var/lib/autoparts"
+PREVIOUS_RELEASE_FILE="$DEPLOY_STATE_DIR/previous-release.sha"
 HEALTH_URL="http://127.0.0.1:8080/api/auth/public-site-config"
 HEALTH_MAX_WAIT=120
 
 SKIP_FRONTEND=0
 SKIP_BACKEND=0
 RELOAD_NGINX=0
+ROLLBACK=0
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"
@@ -39,6 +42,7 @@ Options:
   --backend-only   Только git pull + pip + перезапуск kroan/celery
   --skip-frontend  Не собирать frontend
   --skip-backend   Не перезапускать kroan/celery (только код и frontend)
+  --rollback       Вернуть предыдущий успешно развёрнутый Git SHA
   -h, --help       Справка
 EOF
 }
@@ -51,6 +55,7 @@ parse_args() {
       --backend-only) SKIP_FRONTEND=1 ;;
       --skip-frontend) SKIP_FRONTEND=1 ;;
       --skip-backend) SKIP_BACKEND=1 ;;
+      --rollback) ROLLBACK=1 ;;
       -h|--help) usage; exit 0 ;;
       *) die "Неизвестный аргумент: $1 (update --help)" ;;
     esac
@@ -173,8 +178,9 @@ ensure_brotli_snippet() {
 
 git_pull() {
   log "git fetch + sync с origin (локальные правки сбрасываются, backend/.env сохраняется)..."
-  local branch env_backup=""
+  local branch env_backup="" previous_sha
   branch=$(sudo -u fast git -C "$ROOT" rev-parse --abbrev-ref HEAD)
+  previous_sha=$(sudo -u fast git -C "$ROOT" rev-parse HEAD)
   if [[ -f "$BACKEND/.env" ]]; then
     env_backup=$(mktemp)
     cp "$BACKEND/.env" "$env_backup"
@@ -190,7 +196,34 @@ git_pull() {
     rm -f "$env_backup"
   fi
   rm -f "$BACKEND/.requirements.sha256"
+  mkdir -p "$DEPLOY_STATE_DIR"
+  printf '%s\n' "$previous_sha" > "$PREVIOUS_RELEASE_FILE"
+  chmod 600 "$PREVIOUS_RELEASE_FILE"
   log "Коммит: $(sudo -u fast git -C "$ROOT" log -1 --oneline)"
+}
+
+rollback_to_previous_release() {
+  local env_backup="" previous_sha
+  [[ -f "$PREVIOUS_RELEASE_FILE" ]] || die "Нет сохранённого предыдущего релиза: $PREVIOUS_RELEASE_FILE"
+  previous_sha=$(tr -d '[:space:]' < "$PREVIOUS_RELEASE_FILE")
+  [[ "$previous_sha" =~ ^[0-9a-f]{40}$ ]] || die "Некорректный SHA в $PREVIOUS_RELEASE_FILE"
+
+  log "Откат к предыдущему релизу: $previous_sha"
+  if [[ -f "$BACKEND/.env" ]]; then
+    env_backup=$(mktemp)
+    cp "$BACKEND/.env" "$env_backup"
+  fi
+  sudo -u fast git -C "$ROOT" cat-file -e "${previous_sha}^{commit}" \
+    || die "Предыдущий SHA не найден в локальном Git-репозитории"
+  sudo -u fast git -C "$ROOT" reset --hard "$previous_sha"
+  sudo -u fast git -C "$ROOT" clean -fd
+  if [[ -n "$env_backup" && -f "$env_backup" ]]; then
+    cp "$env_backup" "$BACKEND/.env"
+    chown fast:fast "$BACKEND/.env"
+    chmod 600 "$BACKEND/.env"
+    rm -f "$env_backup"
+  fi
+  rm -f "$BACKEND/.requirements.sha256"
 }
 
 sync_installer() {
@@ -690,7 +723,11 @@ main() {
   ensure_upload_dirs
   ensure_nginx_cache_dirs
   fix_backend_env
-  git_pull
+  if [[ $ROLLBACK -eq 1 ]]; then
+    rollback_to_previous_release
+  else
+    git_pull
+  fi
   sync_installer
   ensure_deploy_sudoers
   ensure_scheduler_env

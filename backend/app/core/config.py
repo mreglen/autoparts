@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List
 
 class Settings(BaseSettings):
+    APP_ENV: str = "production"
     DATABASE_URL: str
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
@@ -112,13 +113,12 @@ class Settings(BaseSettings):
     # DDoS / rate limiting
     RATE_LIMIT_ENABLED: bool = True
     PRERENDER_INTERNAL_TOKEN: Optional[str] = None
+    API_DOCS_ENABLED: bool = False
+    TRUSTED_PROXY_HOSTS: str = "127.0.0.1,::1"
     PRODUCTS_PUBLIC_CACHE_TTL_SECONDS: int = 45
     PRODUCT_DETAIL_CACHE_TTL_SECONDS: int = 120
     CATALOG_CACHE_TTL_SECONDS: int = 60
     CATALOG_FACETS_CACHE_TTL_SECONDS: int = 300
-    USED_MATCH_CACHE_TTL_SECONDS: int = 120
-    PRODUCT_DETAIL_CACHE_TTL_SECONDS: int = 120
-    CATALOG_CACHE_TTL_SECONDS: int = 60
     USED_MATCH_CACHE_TTL_SECONDS: int = 120
     WEBSOCKET_MAX_CONNECTIONS_PER_USER: int = 5
 

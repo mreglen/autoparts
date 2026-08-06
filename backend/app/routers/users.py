@@ -4,7 +4,7 @@ import os
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_admin_user, get_current_user
 from app.db.database import get_db
 from app.models.user import User as UserModel
 from app.schemas.user import User as UserSchema, UserCreate, UserResponse, UserUpdate
@@ -23,7 +23,11 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.post("/", response_model=UserSchema)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
+def create_user(
+    user: UserCreate,
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(get_current_admin_user),
+):
     if getattr(user, "is_admin", False):
         existing_admin = db.query(UserModel).filter(UserModel.is_admin == True).first()
         if existing_admin:
@@ -156,7 +160,11 @@ def _user_to_response(user: UserModel) -> UserResponse:
 
 
 @router.get("/{user_id}", response_model=UserSchema)
-def read_user(user_id: int, db: Session = Depends(get_db)):
+def read_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(get_current_admin_user),
+):
     user = db.query(UserModel).filter(UserModel.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
@@ -164,7 +172,12 @@ def read_user(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{user_id}", response_model=UserSchema)
-def update_user(user_id: int, user: UserCreate, db: Session = Depends(get_db)):
+def update_user(
+    user_id: int,
+    user: UserCreate,
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(get_current_admin_user),
+):
     db_user = db.query(UserModel).filter(UserModel.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
@@ -186,7 +199,11 @@ def update_user(user_id: int, user: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.delete("/{user_id}", status_code=204)
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(get_current_admin_user),
+):
     db_user = db.query(UserModel).filter(UserModel.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")

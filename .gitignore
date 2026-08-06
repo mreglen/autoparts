@@ -4,6 +4,9 @@ __pycache__/
 venv/
 .venv/
 alert-bot/.env
+.env
+.env.*
+!.env.example
 alert-bot/venv/
 
 uploads/
@@ -17,6 +20,8 @@ backend/var/
 node_modules/
 build/
 dist/
+coverage/
+.pytest_cache/
 
 # OS
 .DS_Store

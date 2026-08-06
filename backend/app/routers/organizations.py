@@ -192,12 +192,24 @@ def add_employee(org_id: str, employee: EmployeeCreate, db: Session = Depends(ge
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 @router.get("/{org_id}/employees", response_model=list[UserResponse])
-def get_organization_employees(org_id: str, db: Session = Depends(get_db)):
+def get_organization_employees(
+    org_id: str,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not current_user.is_admin and (
+        current_user.organization_id != org_id or not current_user.is_director
+    ):
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
     employees = db.query(UserModel).filter(UserModel.organization_id == org_id).all()
     return employees
 
 @router.post("/", response_model=OrganizationSchema)
-def create_organization(org: OrganizationCreate, db: Session = Depends(get_db)):
+def create_organization(
+    org: OrganizationCreate,
+    db: Session = Depends(get_db),
+    _: UserModel = Depends(get_current_admin_user),
+):
     organization_id = random_id()
     db_org = OrganizationModel(id=organization_id,**org.dict())
     db.add(db_org)

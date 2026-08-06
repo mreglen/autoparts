@@ -70,17 +70,30 @@ def get_warehouse_sales(
     return list_warehouse_sales(db, current_user.organization_id)
 
 @router.get("/{stock_out_id}", response_model=StockOutSchema)
-def read_stock_out(stock_out_id: int, db: Session = Depends(get_db)):
+def read_stock_out(
+    stock_out_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     stock_out = db.query(StockOutModel).filter(StockOutModel.id == stock_out_id).first()
     if not stock_out:
         raise HTTPException(status_code=404, detail="Stock out record not found")
+    if not current_user.is_admin and stock_out.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
     return stock_out
 
 @router.put("/{stock_out_id}", response_model=StockOutSchema)
-def update_stock_out(stock_out_id: int, stock_out: StockOutCreate, db: Session = Depends(get_db)):
+def update_stock_out(
+    stock_out_id: int,
+    stock_out: StockOutCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     db_stock_out = db.query(StockOutModel).filter(StockOutModel.id == stock_out_id).first()
     if not db_stock_out:
         raise HTTPException(status_code=404, detail="Stock out record not found")
+    if not current_user.is_admin and db_stock_out.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
 
     for key, value in stock_out.dict().items():
         setattr(db_stock_out, key, value)
@@ -93,10 +106,16 @@ def update_stock_out(stock_out_id: int, stock_out: StockOutCreate, db: Session =
     return db_stock_out
 
 @router.delete("/{stock_out_id}", status_code=204)
-def delete_stock_out(stock_out_id: int, db: Session = Depends(get_db)):
+def delete_stock_out(
+    stock_out_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     db_stock_out = db.query(StockOutModel).filter(StockOutModel.id == stock_out_id).first()
     if not db_stock_out:
         raise HTTPException(status_code=404, detail="Stock out record not found")
+    if not current_user.is_admin and db_stock_out.organization_id != current_user.organization_id:
+        raise HTTPException(status_code=403, detail="Доступ запрещён")
 
     db.delete(db_stock_out)
     db.commit()

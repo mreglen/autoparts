@@ -458,7 +458,13 @@ function App() {
           <Route path="*" element={<LazyRoute><NotFound /></LazyRoute>} />
         </Route>
 
-        <Route element={<ProfileWithMenuLayout />}>
+        <Route
+          element={(
+            <RequireAuth>
+              <ProfileWithMenuLayout />
+            </RequireAuth>
+          )}
+        >
           <Route
             path="/design-system"
             element={(

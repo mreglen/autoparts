@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.core.config import Settings
+from app.core.auth import get_current_admin_user
+from app.models.user import User
 from app.schemas.rossko import CheckoutRequest, GetOrdersRequest, SearchRequest
 from app.db.database import get_db
 from datetime import datetime
@@ -148,7 +150,7 @@ async def search_items(request: SearchRequest, db: Session = Depends(get_db)):
     
 
 @router.get("/GetCheckoutDetails")
-async def get_details():
+async def get_details(_: User = Depends(get_current_admin_user)):
     try:
         params = {
             "KEY1": settings.ROSSKO_KEY1,
@@ -163,7 +165,10 @@ async def get_details():
 
 
 @router.post("/GetCheckout")
-async def get_checkout(request: CheckoutRequest):
+async def get_checkout(
+    request: CheckoutRequest,
+    _: User = Depends(get_current_admin_user),
+):
     try:
         params = {
             "KEY1": settings.ROSSKO_KEY1,
@@ -222,7 +227,10 @@ async def get_checkout(request: CheckoutRequest):
         )
 
 @router.post("/GetOrders")
-async def get_orders(request: GetOrdersRequest):
+async def get_orders(
+    request: GetOrdersRequest,
+    _: User = Depends(get_current_admin_user),
+):
     try:
         params = {
             "KEY1": settings.ROSSKO_KEY1,
